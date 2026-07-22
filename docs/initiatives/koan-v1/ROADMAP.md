@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Roadmap"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-19
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-21
   status: reviewed
   scope: tranche dependencies and exit criteria
 ---
@@ -30,10 +30,15 @@ T0 Privacy and memory boundary
                           -> T7A Semantic Composition Kernel
                               -> T7B Local release-candidate readiness
                                   -> T7C 0.20 public-preview maturity
+                                      -> T8 Terminal package maturity
 ```
 
 Feedback may move from later tranches to earlier ones. A later tranche cannot declare an earlier exit
 gate satisfied without updating the earlier artifact and evidence.
+
+T8 is allowed to open at R12-06's completed public-baseline checkpoint before T7C fully exits. Its
+first dependency-closed wave supplies T7C's final R12-07 upgrade/recovery evidence; this explicit
+overlap does not declare the earlier exit gate satisfied in advance.
 
 ## T0 — Privacy and memory boundary
 
@@ -178,3 +183,21 @@ signals rather than inheriting promotion from repository membership.
 - production guidance covers schema, deployment, recovery, diagnostics, secrets, and security posture;
 - external public-context-only readers reproduce the intended journey and their anonymous feedback is triaged;
 - the architect receives an explicit go/no-go record for the next maturity band.
+
+## T8 — Terminal package maturity
+
+**Outcome:** every package owner that was below 0.20 at ARCH-0120's acceptance point either earns a
+dependency-closed supported 0.20 contract or completes its accepted absorption, public migration, or
+retirement. No baseline owner remains accidentally unassessed.
+
+**Exit gate:**
+
+- [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) remains the governing admission
+  decision and [R13](work-items/R13-terminal-package-maturity.md) records execution;
+- all 55 baseline owners have exactly one terminal disposition;
+- every new or materially changed supported claim has exact runnable evidence, a consumer journey,
+  and green required provider/native cells;
+- public Koan dependencies are supported before their consumers and every retained API has an
+  enforced first-0.20 compatibility baseline;
+- generated product truth and current public guidance agree with the terminal source graph;
+- one final complete release ratchet passes after all waves converge.

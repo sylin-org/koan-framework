@@ -116,7 +116,7 @@
     },
     {
       "id": "Koan.Web.Auth.Connector.Test",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Extensions",

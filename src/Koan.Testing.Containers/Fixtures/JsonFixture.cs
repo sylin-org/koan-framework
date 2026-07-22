@@ -55,8 +55,7 @@ public sealed class JsonFixture : KoanContainerFixture
     {
         if (_baseRoot is not null)
         {
-            try { if (Directory.Exists(_baseRoot)) Directory.Delete(_baseRoot, recursive: true); }
-            catch { /* best-effort temp cleanup */ }
+            if (Directory.Exists(_baseRoot)) Directory.Delete(_baseRoot, recursive: true);
         }
         return ValueTask.CompletedTask;
     }

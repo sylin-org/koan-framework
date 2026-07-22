@@ -24,6 +24,9 @@ jobs:
       - name: Resolve guaranteed package scope
         run: dotnet run --project tools/Koan.Packaging -- product-surface --output artifacts/product-surface.json
 
+      - name: Validate supported API baselines
+        run: dotnet run --project tools/Koan.Packaging -- api-baselines
+
       - name: Pack
         shell: pwsh
         run: |

@@ -29,8 +29,9 @@ The generic host's `AppHostBinderHostedService` owns the process-default provide
 compare-and-release lease. Every inherited battery additionally enters `AppHost.PushScope(host.Services)`,
 so static Entity operations resolve the correct provider in
 their own async flow even while another conformance host is active. `DisposeAsync` delegates to
-integration-host disposal, then removes the temporary root best-effort. Stopping an older overlapping
-host cannot clear a newer owner.
+integration-host disposal, then removes the temporary root. Both phases are attempted; either failure
+fails teardown and dual failures are reported together. Stopping an older overlapping host cannot clear
+a newer owner.
 
 The scope is deliberately battery-owned instead of being pushed once from xUnit `InitializeAsync`:
 async-local changes made inside a lifecycle callback are not a public scheduling contract for the
@@ -71,7 +72,8 @@ scaffolding generator on the public surface. Tests needing custom DI composition
 - Host startup, composition, provider access, assertion, and Entity-operation failures propagate with
   their original exception.
 - Trait and capability absence produce explicit skips naming the missing declaration.
-- Temporary-root deletion is best-effort and cannot replace a test result with a cleanup failure.
+- Temporary-root deletion is part of the owned lifecycle. A cleanup failure is a failed conformance
+  result, and a simultaneous host-disposal failure is retained in the same aggregate exception.
 
 ## Evidence boundary
 

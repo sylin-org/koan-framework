@@ -78,9 +78,9 @@ public sealed class RuntimeFactsSpec
 }
 ```
 
-For a provider suite, derive from `KoanDataSpec<TFixture>` or use the documented class fixture. Skip
-with the fixture's concrete reason when infrastructure is unavailable; never turn missing Docker into
-a false pass.
+For a provider suite, derive from `KoanDataSpec<TFixture>` or use the documented class fixture. Required
+provider infrastructure fails setup with its concrete reason; select a Docker-free fixture for a
+deliberately infrastructure-free local run. A missing native prerequisite is never support evidence.
 
 ## Reliability rules
 

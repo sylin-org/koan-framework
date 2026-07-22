@@ -72,7 +72,7 @@
     },
     {
       "id": "Koan.Web.Admin",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.Auth",
@@ -84,7 +84,7 @@
     },
     {
       "id": "Koan.Web.Auth.Connector.Test",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web.OpenApi",

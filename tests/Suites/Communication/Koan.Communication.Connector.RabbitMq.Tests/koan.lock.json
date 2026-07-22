@@ -40,7 +40,7 @@
     },
     {
       "id": "Koan.Testing.Hosting",
-      "version": "0.17"
+      "version": "0.20"
     }
   ],
   "directReferences": [

@@ -19,6 +19,17 @@ internal sealed record ProductClaimInput
     public List<string> Packages { get; init; } = [];
     public List<string> Documentation { get; init; } = [];
     public List<string> Evidence { get; init; } = [];
+    public List<AdmissionCellInput> Admission { get; init; } = [];
+}
+
+internal sealed record AdmissionCellInput
+{
+    public required string Id { get; init; }
+    public required string Project { get; init; }
+    public required string Filter { get; init; }
+    public required string Lane { get; init; }
+    public string Phase { get; init; } = PackagingConstants.Admission.ExecutionPhase;
+    public int DeadlineSeconds { get; init; } = PackagingConstants.Admission.DefaultDeadlineSeconds;
 }
 
 internal sealed class ProductSurface
@@ -37,7 +48,17 @@ internal sealed record ProductClaim(
     string Maturity,
     IReadOnlyList<string> Packages,
     IReadOnlyList<string> Documentation,
-    IReadOnlyList<string> Evidence);
+    IReadOnlyList<string> Evidence,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<AdmissionCell>? Admission = null);
+
+internal sealed record AdmissionCell(
+    string Id,
+    string Project,
+    string Filter,
+    string Lane,
+    string Phase,
+    int DeadlineSeconds);
 
 internal sealed record ProductPackage(
     string PackageId,

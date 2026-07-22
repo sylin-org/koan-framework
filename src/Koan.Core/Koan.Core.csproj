@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <PackageValidationBaselineVersion>0.20.4</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Composition and runtime substrate for Koan modules: lifecycle, context, provider catalogs, readiness, discovery, facts, and build provenance.</Description>

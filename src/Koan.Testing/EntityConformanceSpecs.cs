@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Koan.Core;
 using Koan.Core.Hosting.App;
@@ -76,20 +77,52 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
                 .StartAsync(TestContext.Current.CancellationToken)
                 .ConfigureAwait(false);
         }
-        catch
+        catch (Exception startupFailure)
         {
-            TryDeleteRoot();
-            throw;
+            try
+            {
+                DeleteRoot();
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(
+                    "Entity conformance host startup and temporary-root cleanup both failed.",
+                    startupFailure,
+                    cleanupFailure);
+            }
+
+            ExceptionDispatchInfo.Capture(startupFailure).Throw();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (_host is not null)
+        Exception? hostFailure = null;
+        try
         {
-            await _host.DisposeAsync().ConfigureAwait(false);
+            if (_host is not null)
+            {
+                await _host.DisposeAsync().ConfigureAwait(false);
+            }
         }
-        TryDeleteRoot();
+        catch (Exception exception)
+        {
+            hostFailure = exception;
+        }
+
+        try
+        {
+            DeleteRoot();
+        }
+        catch (Exception cleanupFailure) when (hostFailure is not null)
+        {
+            throw new AggregateException(
+                "Entity conformance host disposal and temporary-root cleanup both failed.",
+                hostFailure,
+                cleanupFailure);
+        }
+
+        if (hostFailure is not null) ExceptionDispatchInfo.Capture(hostFailure).Throw();
     }
 
     [Fact]
@@ -244,9 +277,10 @@ public abstract class EntityConformanceSpecs<TEntity> : IAsyncLifetime
     private static string Firstline(string message)
         => message.Split('\n', 2)[0].Trim();
 
-    private void TryDeleteRoot()
+    private void DeleteRoot()
     {
-        try { if (_root is not null && Directory.Exists(_root)) Directory.Delete(_root, recursive: true); }
-        catch { /* best-effort cleanup */ }
+        if (_root is null || !Directory.Exists(_root)) return;
+        Directory.Delete(_root, recursive: true);
+        _root = null;
     }
 }

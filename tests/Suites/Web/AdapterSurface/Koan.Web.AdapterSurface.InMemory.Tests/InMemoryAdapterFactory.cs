@@ -43,7 +43,6 @@ public sealed class InMemoryAdapterFactory : AdapterTestFactoryBase
 
     public override async Task ResetAsync()
     {
-        AppHost.Current = Services;
         await Widget.RemoveAll();
     }
 }

@@ -44,8 +44,8 @@ composition assertions exercise the same `AddKoan()` discovery path as the appli
 - `StartAsync()` owns the built host until startup succeeds. If startup fails, it disposes the host
   before rethrowing the original startup exception.
 - A successfully returned host belongs to the caller and should be used with `await using`.
-- Disposal asks hosted services to stop best-effort, then uses the host's asynchronous disposal path
-  when available.
+- Disposal asks hosted services to stop, always attempts the host's asynchronous disposal path, and
+  fails the test if either phase fails; dual failures are reported together.
 
 ## Choose it when
 

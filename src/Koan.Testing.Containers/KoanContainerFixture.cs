@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -9,7 +10,7 @@ namespace Koan.Testing.Containers;
 /// ARCH-0091 base for engine container fixtures. Owns the xUnit <see cref="IAsyncLifetime"/>
 /// lifecycle, an explicit env-var connection override (the only piece of the old harness's
 /// env→local→container cascade kept — for CI lanes that provide a pre-running service), the
-/// Docker-absent skip contract, and the Koan settings hand-off. Subclasses only build/start their
+/// fail-closed infrastructure contract, and the Koan settings hand-off. Subclasses only build/start their
 /// official Testcontainers module container and return its connection string.
 /// </summary>
 /// <remarks>
@@ -17,11 +18,10 @@ namespace Koan.Testing.Containers;
 /// container starts in <see cref="InitializeAsync"/> before any test and disposes after all.
 /// Dockerless file/in-memory adapters (JSON, SQLite, in-memory) reuse this base unchanged: their
 /// <see cref="StartContainerAsync"/> resolves a temp path instead of a container and never throws,
-/// so <see cref="IsAvailable"/> is always true (the Docker-absent skip branch is simply never hit).
+/// so <see cref="IsAvailable"/> is always true after successful setup.
 /// Native Docker-host auto-discovery (Testcontainers 4.x) makes the old Docker.DotNet probe and the
-/// MissingMethodException→docker-run CLI fallback obsolete: an absent daemon simply throws from
-/// <see cref="StartContainerAsync"/>, which is caught here and surfaced as
-/// <see cref="IsAvailable"/> = false for specs to <c>Assert.Skip</c>.
+/// MissingMethodException→docker-run CLI fallback obsolete. Infrastructure startup and teardown
+/// failures remain test failures; a required native lane never treats missing Docker as evidence.
 /// </remarks>
 public abstract class KoanContainerFixture : IAsyncLifetime
 {
@@ -34,7 +34,7 @@ public abstract class KoanContainerFixture : IAsyncLifetime
     /// <summary>True once a usable backing store (container or env override) is ready.</summary>
     public bool IsAvailable { get; private set; }
 
-    /// <summary>Why the fixture is unavailable (Docker absent / start failure). Null when available.</summary>
+    /// <summary>Why fixture startup failed. Null when available.</summary>
     public string? Reason { get; private set; }
 
     /// <summary>The resolved connection string (container or env override).</summary>
@@ -84,10 +84,22 @@ public abstract class KoanContainerFixture : IAsyncLifetime
             ConnectionString = await StartContainerAsync().ConfigureAwait(false);
             MarkAvailable();
         }
-        catch (Exception ex)
+        catch (Exception startFailure)
         {
-            // Docker absent / misconfigured / image-pull failure → fixture unavailable; specs Assert.Skip.
-            Reason = $"{Engine} container unavailable: {ex.GetType().Name}: {ex.Message}";
+            Reason = $"{Engine} container unavailable: {startFailure.GetType().Name}: {startFailure.Message}";
+            try
+            {
+                await StopContainerAsync().ConfigureAwait(false);
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(
+                    $"{Engine} container startup and cleanup both failed.",
+                    startFailure,
+                    cleanupFailure);
+            }
+
+            ExceptionDispatchInfo.Capture(startFailure).Throw();
         }
     }
 
@@ -114,9 +126,5 @@ public abstract class KoanContainerFixture : IAsyncLifetime
         Reason = null;
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        try { await StopContainerAsync().ConfigureAwait(false); }
-        catch { /* teardown is best-effort */ }
-    }
+    public ValueTask DisposeAsync() => StopContainerAsync();
 }

@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <PackageValidationBaselineVersion>0.20.4</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.</Description>

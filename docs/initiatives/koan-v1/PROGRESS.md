@@ -3,13 +3,13 @@ type: ARCHITECTURE
 domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
-status: draft
-last_updated: 2026-07-19
+status: current
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-21
   status: in-progress
-  scope: R12 opening, selective 0.20 guarantee promotion, and coherent-public-narrative mandate
+  scope: R13 Wave 0 locally passed; publication/R12-07 observation pending
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,14 +20,18 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T7C — 0.20 public-preview maturity`
-- Active work item: [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md)
-- Active child: [R12-04 — Establish one coherent public narrative](work-items/r12/R12-04-coherent-public-narrative.md)
-- Most recently passed child: [R12-03 — Compile the preview product boundary](work-items/r12/R12-03-preview-product-boundary.md)
-- Pending release boundary: realign all public-facing content and compile a fresh selective candidate
-  before remote observation
-- Preview readiness: `not ready`; coherent narrative, public
-  observation, later upgrade/recovery proof, and an explicit maturity decision remain
+- Current tranche: `T8 — terminal package maturity`
+- Active work item: [R13 — Terminal package maturity](work-items/R13-terminal-package-maturity.md)
+- Active child: none; Wave 0 passed locally and awaits the authorized publication/observation boundary
+- Most recently completed R13 child: [R13-06 — Wave 0 testing substrate and quick wins](work-items/r13/R13-06-wave-0-testing-and-quick-wins.md)
+- Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
+- Pending release boundary: admit and observe the first new dependency-closed maturity wave, including
+  the later-wave upgrade and interruption-recovery proof
+- Preview readiness: `not ready`; R12-07's later-wave public upgrade/recovery, feedback triage, and
+  maintainer go/no-go record remain
+- Deliberate overlap: R12 remains `in-progress` only for
+  [R12-07](work-items/r12/R12-07-preview-evolution.md); R13 owns current implementation, and its first
+  dependency-closed publication wave will supply R12-07's evidence
 
 ## Work items
 
@@ -45,7 +49,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
-| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-19 | R12-01 through R12-03 pass. Generated truth admits exactly 38 package owners to 0.20 with a closed supported dependency graph; R12-04 now realigns every public-facing surface around that promise. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-21 | R12-01 through R12-06 are complete: 38 supported owners publish on 0.20 and the public template journey is proved. R12-07 owns the bounded later-wave upgrade/recovery, feedback triage, and final go/no-go record, using the first dependency-closed R13 wave. |
+| R13 | [Terminal package maturity](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Codex · 2026-07-21 | Bootstrap plus R13-06 pass locally. Seven Wave 0 owners are supported at 0.20 with 53/53 exact admission results; terminal reconciliation is 7/55. Publication/R12-07 observation precedes Wave 1. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -66,12 +71,19 @@ item should normally be `in-progress`.
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
-| R12 | in-progress | R12-01 through R12-03 pass: the version contract, promise-level seams, and exact 38-owner 0.20 boundary agree. R12-04 owns the coherent narrative; package-only readers, publication, and preview evolution follow. |
+| R12 | in-progress | R12-01 through R12-06 are complete. R12-07 is ready and will close from the first dependency-closed R13 publication/consumer observation, feedback triage, and maintainer go/no-go record. |
+| R13 | in-progress | Wave 0 passed locally at 7/55 resolved. Obtain exact publication authorization, observe the dependency-closed public wave for R12-07, then open Wave 1. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-21 | R13-06 fail-closed Wave 0 admission | Honest teardown exposed a pooled SQLite file lock; Windows Event Log and a stale DPAPI key ring made the OAuth/OIDC host nondeterministic; a broad Entity cell contained legitimate capability skips; NuGet 404 was not treated as empty first-publication history; redirected Windows intermediates could admit stale project-local generated sources. | Clear the owned SQLite pool on store disposal; make Admin/Auth test logging deterministic and Auth Data Protection ephemeral; narrow the Entity cell to teeth/ownership guarantees; treat a missing public package as zero history; preserve the conventional `obj/` exclusion after redirection. Eleven exact cells pass 53/53, the full solution builds warning-clean, API posture is 35/42 plus seven pending, and terminal reconciliation is 7/55. |
+| 2026-07-21 | R13-05 fixed-baseline reconciliation | Active product truth cannot account for an owner after its project is absorbed, migrated, or retired, but duplicating ARCH-0120's 55 rows would create a second ledger. | Parse the immutable ADR table directly and add one bounded certificate containing only removed owners. Partial mode rejects malformed/unknown/duplicate/still-active entries while reporting progress; explicit final mode requires all 55 owners across compiled active support plus removed outcomes. Real partial is 0/55 with the empty certificate, strict final correctly names all 55 missing, focused tests pass 13/13, and aggregate bootstrap tooling passes 65/65. |
+| 2026-07-21 | R13-04 exact-candidate native admission | The disabled canary emitted no check, claims had no durable executable-cell vocabulary, and no applicability/result contract bound native proof to GitHub's merge candidate. | Add optional validated claim-cell identity; conservatively map changed owners, reverse dependencies, claim evidence/test paths, and shared inputs; require exact base ancestry, HEAD/SHA equality, and a clean checkout; run required cells through R13-03 or emit explicit N/A. Repurpose the canary as an always-emitted credential-free main-PR workflow. Focused product/admission/native tests pass 52/52, the tool builds warning-clean, and generated truth remains current. |
+| 2026-07-21 | R13-03 result-aware admission | The bootstrap runner was deadline-bounded but count-based, Forge could accept a nonzero test exit when TRX existed, its record contract omitted provider-bounded streaming, and `IntegrationHost.DisposeAsync` swallowed stop faults. | Add one packaging admission/TRX contract that fails on timeout, nonzero exit, missing/zero/failed/skipped/unknown results and kills only its owned tree. Make bootstrap and Forge consume it without replacing family runners; require 5 record/4 vector AODB cells; propagate host-stop faults after disposal. Focused tooling passes 34 tests, lifecycle passes 2/2, Fast admits 20/20, and record/InMemory Forge is GREEN 5/5. |
+| 2026-07-21 | R13-01 supported API baselines | The accepted 38-owner supported boundary contains 35 assembly-bearing packages and three content-only owners (`Sylin.Koan`, `Sylin.Koan.App`, and `Sylin.Koan.Templates`), so applying SDK API validation to all 38 would be false. SDK package downloads also occur at restore time, so a not-yet-public first 0.20 artifact cannot validate against itself during its first pack. | Record the exact earliest immutable public 0.20 version in each of the 35 assembly-owner projects and activate standard SDK validation after project evaluation. Keep artifact/dependency-shape checks for the three content owners. Add one fail-closed guard to the existing packaging tool/main publisher: a missing baseline is allowed only while NuGet has no stable 0.20 artifact; every later patch is rejected until the earliest artifact is configured. Focused policy passes 7/7, packaging passes 35/35, the tool builds warning-clean, public verification reports 35/35 configured, and real assembly/content packs pass. |
+| 2026-07-21 | ARCH-0120 / R13 terminal package maturity | The generated surface has 38 supported 0.20 owners and 55 earlier-line owners. Moving all 55 mechanically to a common version would break the compiler-enforced meaning of 0.20; six AI owners also have accepted public migration homes rather than a Koan support disposition. | Retain the bidirectional claim/version/dependency invariant and open a distinct R13 epic. Execute ten dependency-closed waves; each owner terminates as supported 0.20, absorbed, publicly migrated, or retired. The first wave supplies R12-07 so preview completion does not wait on the full cross-repository program. Use supported test helpers, shared family matrices, exact claim evidence, standard .NET API compatibility, and a credential-free native validation lane without adding a maturity or release subsystem. |
 | 2026-07-19 | R12-03 selective 0.20 boundary | The provisional 35-package assessment omitted SQLite even though the admitted template depends on it through the relational layer; package availability and old `verified` labels also did not distinguish a preview support promise. | Admit guarantees first, yielding a closed 14-owner foundation plus 24 supported-extension owners. Promote exactly those 38 owners to project-local 0.20 and enforce bidirectional claim/version/dependency agreement in the existing generated product-surface compiler. Focused graph/version tests pass 41/41, lineage/planner tests pass 39/39, the tool builds warning-clean, and public docs pass 233/42. R12-03 passes; R12-04 opens on one coherent greenfield narrative. |
 | 2026-07-19 | R12-02 MCP transport/JSON boundary | MCP split the HTTP decision across a legacy master and nullable Streamable override, repeated transport selection on every Entity despite one shared handler, and serialized custom results differently from Entity/Web data. | Make transports one host decision: explicit STDIO, Streamable HTTP, deprecated legacy SSE, one HTTP route, one session vocabulary. Remove per-Entity transport metadata and compatibility aliases before 0.20. Reuse one camelCase, `[McpIgnore]`-aware application serializer across Entity/custom/Code Mode while preserving protocol DTO names. MCP conformance 80/80, HTTP 19/19, field exclusion 5/5, Code Mode 27/27, source consumers 3/3, warning-clean build, and public docs 233/42 pass. |
 | 2026-07-19 | R12-02 Data/Web filter and Entity-name boundary | PMC-007's old drop-filter concern no longer matched the unified AST/coordinator, but its public reference still implied SQLite-only semantics. PMC-015 remained real: inherited `Id` plus `id` has no portable JSON/provider identity. | Keep one filter pipeline and state its result guarantee without promising equal pushdown/cost. Strengthen the shared HTTP oracle, then reject case-colliding public Entity properties once at Data's cached first-use guard before adapter creation. InMemory 74/74, JSON 52/52, SQLite 52/52, exact guard/activation 9/9, and warning-clean affected builds pass. |

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -169,15 +170,32 @@ public sealed class IntegrationHost : IAsyncDisposable
     {
         if (_disposed) return;
         _disposed = true;
-        try { await _host.StopAsync(CancellationToken.None).ConfigureAwait(false); }
-        catch { /* teardown is best-effort */ }
-        if (_host is IAsyncDisposable asyncHost)
+        Exception? stopFailure = null;
+        try
         {
-            await asyncHost.DisposeAsync().ConfigureAwait(false);
+            await _host.StopAsync(CancellationToken.None).ConfigureAwait(false);
         }
-        else
+        catch (Exception exception)
         {
-            _host.Dispose();
+            stopFailure = exception;
         }
+
+        try
+        {
+            if (_host is IAsyncDisposable asyncHost)
+            {
+                await asyncHost.DisposeAsync().ConfigureAwait(false);
+            }
+            else
+            {
+                _host.Dispose();
+            }
+        }
+        catch (Exception disposeFailure) when (stopFailure is not null)
+        {
+            throw new AggregateException("Integration host stop and disposal both failed.", stopFailure, disposeFailure);
+        }
+
+        if (stopFailure is not null) ExceptionDispatchInfo.Capture(stopFailure).Throw();
     }
 }

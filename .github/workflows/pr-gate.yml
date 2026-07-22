@@ -5,7 +5,7 @@
 # merge check developers run locally — scripts/green-ratchet.ps1 — so "green in CI"
 # and "green on my machine" are one definition that cannot drift:
 #   A.  build      dotnet build Koan.sln                  (framework + dogfood samples)
-#   A'. test       dotnet test  Koan.sln --no-build       (container-gated specs self-skip)
+#   A'. test       deterministic test projects, isolated and bounded
 #   B.  docs-lint  scripts/docs-lint.ps1                  (links / front-matter / anchors)
 #   C.  doc-code   scripts/validate-code-examples.ps1     (diff-scoped, opt-in <!-- validate --> blocks)
 #
@@ -44,7 +44,38 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Compile product surface and reject generated drift
+        run: dotnet run --project tools/Koan.Packaging -- product-surface --check
+
+      - name: Validate supported API baselines
+        run: dotnet run --project tools/Koan.Packaging -- api-baselines
+
+      - name: Reconcile R13 terminal outcomes (partial)
+        run: dotnet run --project tools/Koan.Packaging -- terminal-outcomes
+
       - name: Green ratchet (build + test + docs-lint + doc-code)
         shell: pwsh
         run: |
           ./scripts/green-ratchet.ps1 -Configuration Release -Base "origin/${{ github.event.pull_request.base.ref }}"
+
+      - name: Enforce exact deterministic claim admissions
+        shell: pwsh
+        run: |
+          $claims = (Get-Content product/claims.json -Raw | ConvertFrom-Json).claims
+          $cells = @($claims.admission | Where-Object lane -eq 'deterministic')
+          foreach ($cell in $cells) {
+            Write-Host "[admission] $($cell.id)"
+            $arguments = @(
+              'run', '--configuration', 'Release', '--no-build',
+              '--project', 'tools/Koan.Packaging', '--',
+              'admission', '--id', $cell.id,
+              '--project', $cell.project,
+              '--filter', $cell.filter,
+              '--lane', $cell.lane,
+              '--phase', $cell.phase,
+              '--deadline-seconds', $cell.deadlineSeconds,
+              '--configuration', 'Release', '--no-build'
+            )
+            & dotnet @arguments
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

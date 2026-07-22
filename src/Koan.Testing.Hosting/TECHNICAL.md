@@ -21,7 +21,7 @@ fixtures.
 | `Build()` | Unstarted `IntegrationHost` | caller |
 | `StartAsync()` succeeds | Started `IntegrationHost` | caller after return |
 | `StartAsync()` fails | Original exception after owned host cleanup | builder until cleanup completes |
-| `DisposeAsync()` | Best-effort stop followed by host disposal | wrapper |
+| `DisposeAsync()` | Fail-loud stop followed by guaranteed host disposal | wrapper |
 
 `Builder.StartAsync` creates exactly one `IntegrationHost` wrapper and uses it as the ownership
 boundary. Ownership transfers only after hosted-service startup succeeds. Before that point, failure
@@ -29,12 +29,14 @@ cleanup awaits the wrapper's disposal and then rethrows; it does not return a pa
 
 `IntegrationHost.DisposeAsync` is idempotent. It first requests `StopAsync` with no new cancellation
 deadline because test teardown is already the owning boundary. Stop errors do not prevent resource
-disposal. If the underlying host implements `IAsyncDisposable`, its asynchronous path is awaited;
-otherwise the wrapper falls back to `Dispose()`.
+disposal, but propagate after disposal so an admission run cannot report green when teardown failed.
+If the underlying host implements `IAsyncDisposable`, its asynchronous path is awaited; otherwise
+the wrapper falls back to `Dispose()`. If stop and disposal both fail, both errors are retained in an
+aggregate exception.
 
-The cleanup contract preserves the normal startup exception when disposal succeeds. It is not a
-general multi-error envelope: a disposal exception can still replace the startup exception. Unified
-failure facts and redaction belong to the later framework explanation/error work.
+The cleanup contract preserves the normal startup exception when disposal succeeds. Unified failure
+facts and redaction beyond the stop/disposal pair belong to the later framework explanation/error
+work.
 
 ## Composition
 

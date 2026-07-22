@@ -63,6 +63,32 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         return output.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
     }
 
+    public async Task<bool> IsAncestorAsync(
+        string ancestor,
+        string descendant,
+        CancellationToken cancellationToken)
+    {
+        var result = await processRunner.RunAsync(
+            "git",
+            ["merge-base", "--is-ancestor", ancestor, descendant],
+            repositoryRoot,
+            cancellationToken);
+        if (result.ExitCode is 0 or 1) return result.ExitCode == 0;
+        throw new InvalidOperationException(
+            $"Unable to verify candidate ancestry (exit {result.ExitCode}): " +
+            $"{result.StandardError}{result.StandardOutput}".Trim());
+    }
+
+    public async Task<bool> IsWorktreeCleanAsync(CancellationToken cancellationToken)
+    {
+        var output = await processRunner.RequireAsync(
+            "git",
+            ["status", "--porcelain=v1", "--untracked-files=all"],
+            repositoryRoot,
+            cancellationToken);
+        return string.IsNullOrWhiteSpace(output);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> ReadTreeAsync(
         string commit,
         CancellationToken cancellationToken)
@@ -155,7 +181,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes",
+                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes,PackageValidationBaselineVersion,EnablePackageValidation",
                 "-getItem:ProjectReference", "-p:PublicRelease=true"
             ],
             repositoryRoot,
@@ -221,7 +247,9 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "RepositoryUrl"),
             ReadString(properties, "PackageLicenseExpression"),
             ReadString(properties, "PackageReleaseNotes"),
-            versionIntent);
+            versionIntent,
+            ReadString(properties, "PackageValidationBaselineVersion"),
+            ReadBoolean(properties, "EnablePackageValidation", defaultValue: false));
     }
 
     private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)

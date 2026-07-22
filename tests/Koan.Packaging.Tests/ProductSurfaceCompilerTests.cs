@@ -206,6 +206,118 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Accepts_optional_durable_admission_cells()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        SeedPath("tests/Owner/Owner.Tests.csproj");
+        var package = Project("Sylin.Koan.Owner");
+        var claim = Claim(package.PackageId) with
+        {
+            Admission =
+            [
+                new AdmissionCellInput
+                {
+                    Id = "owner:native",
+                    Project = "tests/Owner/Owner.Tests.csproj",
+                    Filter = "FullyQualifiedName=Owner.NativeSpec",
+                    Lane = "native",
+                    Phase = "lifecycle",
+                    DeadlineSeconds = 120
+                }
+            ]
+        };
+
+        var surface = Compiler().Compile([package], Claims(claim));
+
+        var cell = Assert.Single(Assert.Single(surface.Claims).Admission!);
+        Assert.Equal("owner:native", cell.Id);
+        Assert.Equal("tests/Owner/Owner.Tests.csproj", cell.Project);
+        Assert.Contains("\"admission\"", ProductSurfaceCompiler.ToJson(surface), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Rejects_duplicate_admission_identity_across_claims()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        SeedPath("tests/Owner/Owner.Tests.csproj");
+        var first = Project("Sylin.Koan.First");
+        var second = Project("Sylin.Koan.Second");
+        var cell = new AdmissionCellInput
+        {
+            Id = "shared:native",
+            Project = "tests/Owner/Owner.Tests.csproj",
+            Filter = "FullyQualifiedName=Owner.NativeSpec",
+            Lane = "native"
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => Compiler().Compile(
+            [first, second],
+            Claims(
+                Claim(first.PackageId) with { Id = "first", Admission = [cell] },
+                Claim(second.PackageId) with { Id = "second", Admission = [cell] })));
+
+        Assert.Contains("shared:native", error.Message, StringComparison.Ordinal);
+        Assert.Contains("more than one product claim", error.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("remote", 120, "lane")]
+    [InlineData("native", 0, "deadline")]
+    public void Rejects_invalid_admission_contract(string lane, int deadline, string expected)
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        SeedPath("tests/Owner/Owner.Tests.csproj");
+        var package = Project("Sylin.Koan.Owner");
+        var claim = Claim(package.PackageId) with
+        {
+            Admission =
+            [
+                new AdmissionCellInput
+                {
+                    Id = "owner:native",
+                    Project = "tests/Owner/Owner.Tests.csproj",
+                    Filter = "FullyQualifiedName=Owner.NativeSpec",
+                    Lane = lane,
+                    DeadlineSeconds = deadline
+                }
+            ]
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => Compiler().Compile([package], Claims(claim)));
+
+        Assert.Contains(expected, error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Rejects_unstable_admission_identity()
+    {
+        SeedPath("docs/capability.md");
+        SeedPath("tests/evidence.txt");
+        SeedPath("tests/Owner/Owner.Tests.csproj");
+        var package = Project("Sylin.Koan.Owner");
+        var claim = Claim(package.PackageId) with
+        {
+            Admission =
+            [
+                new AdmissionCellInput
+                {
+                    Id = "Owner Native Result",
+                    Project = "tests/Owner/Owner.Tests.csproj",
+                    Filter = "FullyQualifiedName=Owner.NativeSpec",
+                    Lane = "native"
+                }
+            ]
+        };
+
+        var error = Assert.Throws<InvalidOperationException>(() => Compiler().Compile([package], Claims(claim)));
+
+        Assert.Contains("stable lowercase identifier", error.Message, StringComparison.Ordinal);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(root)) Directory.Delete(root, recursive: true);

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Koan.Packaging.Infrastructure;
 using Koan.Packaging.Models;
 
@@ -51,6 +52,13 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
                 throw new InvalidOperationException($"Product claim '{id}' is declared more than once.");
             }
         }
+
+        var duplicateCell = claimsById.Values
+            .SelectMany(claim => claim.Admission ?? [])
+            .GroupBy(cell => cell.Id, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateCell is not null)
+            throw new InvalidOperationException($"Admission cell '{duplicateCell.Key}' is declared by more than one product claim.");
 
         ValidateSupportedBoundary(graph, claimsById.Values);
 
@@ -197,7 +205,66 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
 
         var documentation = RequirePaths(input.Documentation, $"documentation for claim '{id}'");
         var evidence = RequirePaths(input.Evidence, $"evidence for claim '{id}'");
-        return new ProductClaim(id, title, summary, maturity, packages, documentation, evidence);
+        var admission = CompileAdmission(id, input.Admission);
+        return new ProductClaim(
+            id,
+            title,
+            summary,
+            maturity,
+            packages,
+            documentation,
+            evidence,
+            admission.Count == 0 ? null : admission);
+    }
+
+    private IReadOnlyList<AdmissionCell> CompileAdmission(string claimId, IEnumerable<AdmissionCellInput> inputs)
+    {
+        var cells = new List<AdmissionCell>();
+        var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var input in inputs.OrderBy(cell => cell.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            var id = RequireText(input.Id, $"admission cell id for claim '{claimId}'");
+            if (!Regex.IsMatch(id, PackagingConstants.Admission.CellIdPattern, RegexOptions.CultureInvariant))
+            {
+                throw new InvalidOperationException(
+                    $"Admission cell '{id}' must use a stable lowercase identifier containing only letters, digits, " +
+                    "periods, colons, underscores, or hyphens.");
+            }
+            if (!ids.Add(id))
+                throw new InvalidOperationException($"Product claim '{claimId}' declares admission cell '{id}' more than once.");
+            var project = RequireText(input.Project, $"project for admission cell '{id}'").Replace('\\', '/');
+            var projectPath = Path.GetFullPath(Path.Combine(repositoryRoot, project));
+            if (!project.StartsWith("tests/", StringComparison.OrdinalIgnoreCase)
+                || !IsWithinRepository(projectPath) || !File.Exists(projectPath) ||
+                !string.Equals(Path.GetExtension(projectPath), ".csproj", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Admission cell '{id}' references missing repository test project '{project}'.");
+            }
+            var filter = RequireText(input.Filter, $"filter for admission cell '{id}'");
+            var lane = RequireText(input.Lane, $"lane for admission cell '{id}'").ToLowerInvariant();
+            if (lane is not (PackagingConstants.Admission.DeterministicLane or PackagingConstants.Admission.NativeLane))
+                throw new InvalidOperationException($"Admission cell '{id}' lane must be 'deterministic' or 'native'.");
+            var phase = RequireText(input.Phase, $"phase for admission cell '{id}'");
+            if (input.DeadlineSeconds is < PackagingConstants.Admission.MinimumDeadlineSeconds
+                or > PackagingConstants.Admission.MaximumDeadlineSeconds)
+            {
+                throw new InvalidOperationException(
+                    $"Admission cell '{id}' deadline must be between " +
+                    $"{PackagingConstants.Admission.MinimumDeadlineSeconds} and " +
+                    $"{PackagingConstants.Admission.MaximumDeadlineSeconds} seconds.");
+            }
+
+            cells.Add(new AdmissionCell(
+                id,
+                RepositoryPath(projectPath),
+                filter,
+                lane,
+                phase,
+                input.DeadlineSeconds));
+        }
+
+        return cells;
     }
 
     private static void ValidateSupportedBoundary(PackageGraph graph, IEnumerable<ProductClaim> claims)

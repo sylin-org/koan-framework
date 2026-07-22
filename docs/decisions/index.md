@@ -62,6 +62,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0116 | [One module lifecycle](ARCH-0116-one-module-lifecycle.md) | Accepted | One retained `KoanModule` per implementation assembly; standard identity, isolated contracts, and no legacy or reference-metadata bridge |
 | ARCH-0117 | [Safe connector telemetry by construction](ARCH-0117-safe-connector-telemetry.md) | Accepted | One credential grammar and structured log boundary; shared configuration/discovery narration; no application ceremony or global logger interception |
 | ARCH-0118 | [Evidence-derived product surface](ARCH-0118-evidence-derived-product-surface.md) | Accepted | Standard project facts plus one irreducible claims input compile every human, agent, and release projection |
+| ARCH-0120 | [Terminal package maturity and evidence-driven 0.20 admission](ARCH-0120-terminal-package-maturity.md) | Accepted | Every remaining owner reaches supported 0.20 or proved absorption, migration, or retirement through dependency-ordered, proportionate evidence |
 
 ## Authoring Principles
 
@@ -69,7 +70,8 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 2. Cite related ADR IDs (avoid re-stating prior rationale).
 3. Capture consequences (positive, negative, neutral) explicitly.
 4. Prefer removal over indefinite deprecation when safe (reduces cognitive load).
-5. Reference = Intent: inclusion in the solution implies support & maintenance.
+5. Reference = Intent: an application reference activates a module's contribution; repository or
+   solution membership alone implies no maturity or support promise.
 
 ## Change Workflow (Summary)
 

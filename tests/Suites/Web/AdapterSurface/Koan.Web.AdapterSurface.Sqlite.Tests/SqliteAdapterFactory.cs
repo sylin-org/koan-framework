@@ -25,33 +25,29 @@ public sealed class SqliteAdapterFactory : AdapterTestFactoryBase
 
     protected override ValueTask StopBackingStoreAsync()
     {
-        try { if (File.Exists(_dbPath)) File.Delete(_dbPath); } catch { }
+        if (File.Exists(_dbPath)) File.Delete(_dbPath);
         return ValueTask.CompletedTask;
     }
 
     public override async Task ResetAsync()
     {
-        try
+        await using var conn = new SqliteConnection(ConnectionString);
+        await conn.OpenAsync().ConfigureAwait(false);
+        var names = new List<string>();
+        await using (var read = conn.CreateCommand())
         {
-            await using var conn = new SqliteConnection(ConnectionString);
-            await conn.OpenAsync().ConfigureAwait(false);
-            var names = new List<string>();
-            await using (var read = conn.CreateCommand())
+            read.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+            await using var rdr = await read.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await rdr.ReadAsync().ConfigureAwait(false))
             {
-                read.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
-                await using var rdr = await read.ExecuteReaderAsync().ConfigureAwait(false);
-                while (await rdr.ReadAsync().ConfigureAwait(false))
-                {
-                    names.Add(rdr.GetString(0));
-                }
-            }
-            foreach (var name in names)
-            {
-                await using var drop = conn.CreateCommand();
-                drop.CommandText = $"DROP TABLE IF EXISTS \"{name}\"";
-                await drop.ExecuteNonQueryAsync().ConfigureAwait(false);
+                names.Add(rdr.GetString(0));
             }
         }
-        catch { /* best effort */ }
+        foreach (var name in names)
+        {
+            await using var drop = conn.CreateCommand();
+            drop.CommandText = $"DROP TABLE IF EXISTS \"{name}\"";
+            await drop.ExecuteNonQueryAsync().ConfigureAwait(false);
+        }
     }
 }

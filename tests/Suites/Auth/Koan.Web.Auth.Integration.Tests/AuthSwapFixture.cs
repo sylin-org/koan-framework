@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Koan.Core;
 using Koan.Web.Extensions;
 using Xunit;
@@ -27,10 +30,12 @@ public sealed class AuthSwapFixture : IAsyncLifetime
 {
     private IHost? _host;
     private string? _priorUrls;
+    private readonly ConcurrentQueue<string> _errors = new();
 
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
+    public string Diagnostics => string.Join(Environment.NewLine, _errors);
 
     public async ValueTask InitializeAsync()
     {
@@ -42,6 +47,11 @@ public sealed class AuthSwapFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ASPNETCORE_URLS", null);
 
         _host = Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging =>
+            {
+                logging.ClearProviders();
+                logging.AddProvider(new ErrorCaptureLoggerProvider(_errors));
+            })
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 // offline-only, mirrors the bootstrap specs
@@ -56,6 +66,7 @@ public sealed class AuthSwapFixture : IAsyncLifetime
                 web.UseEnvironment("Development");
                 web.ConfigureServices(s =>
                 {
+                    s.AddDataProtection().UseEphemeralDataProtectionProvider();
                     s.AddKoan();
                     s.AddKoanWeb();
                     s.AddKoanControllersFrom<WhoAmIController>();
@@ -99,5 +110,28 @@ public sealed class AuthSwapFixture : IAsyncLifetime
         l.Start();
         try { return ((IPEndPoint)l.LocalEndpoint).Port; }
         finally { l.Stop(); }
+    }
+
+    private sealed class ErrorCaptureLoggerProvider(ConcurrentQueue<string> errors) : ILoggerProvider
+    {
+        public ILogger CreateLogger(string categoryName) => new ErrorCaptureLogger(categoryName, errors);
+        public void Dispose() { }
+    }
+
+    private sealed class ErrorCaptureLogger(string category, ConcurrentQueue<string> errors) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (!IsEnabled(logLevel)) return;
+            errors.Enqueue($"{category} [{eventId.Id}]: {formatter(state, exception)}{Environment.NewLine}{exception}");
+        }
     }
 }

@@ -12,6 +12,7 @@
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <PackageValidationBaselineVersion>0.20.3</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.</Description>

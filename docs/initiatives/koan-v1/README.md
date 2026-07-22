@@ -4,10 +4,10 @@ domain: framework
 title: "Koan V1 Reorganization Initiative"
 audience: [architects, maintainers, ai-agents]
 status: draft
-last_updated: 2026-07-16
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-21
   status: verified
   scope: initiative artifact structure and links
 ---
@@ -52,11 +52,14 @@ completed composition architecture in the [parent](work-items/R09-semantic-compo
 [backlog](R09-BACKLOG.md), [coalescence inventory](R09-COALESCENCE-INVENTORY.md), and closing
 [single-module handoff](work-items/r09/R09-09-one-bootstrap-language-and-release-handoff.md).
 R08-01 preserves the completed Git-driven exact release-wave baseline; R08-01 through R08-04 pass locally and
-R08-05's public-observation contract is prepared. The completed
+R08-05's public-observation evidence remains historical input. The completed
 [R10 golden-sample graduation](work-items/R10-golden-samples.md) ensures the maintained curriculum teaches
-and executes the rebuilt architecture. The active
-[R11 package-product graduation](work-items/R11-package-product-quality.md) now ensures every surviving NuGet
-package earns and proves a distinct reference intent before that first public wave. See [NOW.md](NOW.md).
+and executes the rebuilt architecture. [R11 package-product graduation](work-items/R11-package-product-quality.md)
+and R12-01 through R12-06 are complete. [R12](work-items/R12-road-to-020-preview.md) remains active for
+its bounded later-wave upgrade/recovery proof; the accepted
+[R13 terminal package-maturity epic](work-items/R13-terminal-package-maturity.md) is queued to bring
+all 55 earlier-line owners to supported admission or completed migration/retirement. See
+[NOW.md](NOW.md).
 Small design and polish debts deliberately kept out of the active acceptance path live in the
 [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md) register with their required decisions and evidence.
 
@@ -72,6 +75,7 @@ Small design and polish debts deliberately kept out of the active acceptance pat
 | What records the foundation-repair sequence? | `R04-BACKLOG.md` and its linked historical child cards |
 | What records the golden-journey sequence? | `R05-BACKLOG.md` and its linked historical child cards |
 | What records the completed semantic-composition work? | `R09-BACKLOG.md`, `R09-COALESCENCE-INVENTORY.md`, and the linked accepted child cards |
+| What governs terminal package maturity? | [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) and [R13](work-items/R13-terminal-package-maturity.md) |
 | Which small issues wait until the main cycle closes? | `POST-CYCLE-TODO.md` |
 | Which module capabilities should grow Entity language? | the Entity Semantics Contract and `ARCH-0113`; the R04 slate is historical input |
 | What makes work acceptable? | `ACCEPTANCE.md` |
@@ -95,10 +99,10 @@ R00 privacy boundary
                           -> R07 semantic capability ring
                               -> R08-01 durable release-wave baseline
                                   -> R09 semantic composition kernel
-                                      -> remaining R08 release readiness
-                                          -> R10 golden sample graduation
-                                              -> R11 package-product graduation
-                                                  -> R08 public observation and V1 decision
+                                      -> R10 golden sample graduation
+                                          -> R11 package-product graduation
+                                              -> R12 0.20 public-preview maturity
+                                                  -> R13 terminal package maturity
 ```
 
 Later implementation cards are created only when the active parent and preceding evidence establish

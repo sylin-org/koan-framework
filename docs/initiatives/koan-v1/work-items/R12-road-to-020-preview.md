@@ -4,17 +4,17 @@ domain: framework
 title: "R12 - Road to the 0.20 Preview"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-21
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-21
   status: in-progress
   scope: epic charter and dependency-ordered preview maturity plan
 ---
 
 # R12 — Road to the 0.20 preview
 
-- Tranche: `T7B — public product maturity`
+- Tranche: `T7C — 0.20 public-preview maturity`
 - Status: `in-progress`
 - Depends on: passed R09, R10, and R11; completed local R08-01 through R08-05 evidence
 - Supersedes: the unexecuted public-observation and upgrade tail of R08
@@ -31,11 +31,11 @@ honest enough for people outside the repository to test.
 
 Only packages whose public contracts Koan explicitly guarantees earn the 0.20 quality band. R12-01
 selects those guarantees from evidence, maps them to their complete public package/dependency boundary,
-and gives each qualifying owner explicit `0.20.0` version intent. Demonstrated, experimental, and
+and gives each qualifying owner explicit `0.20` compatibility intent. Demonstrated, experimental, and
 unassessed packages do not inherit 0.20 merely because they build, pack, or sit in a promoted package's
-graph. The existing independent per-project lineage continues to select and version affected owners.
-R12-01 owns the exact NuGet prerelease label, NBGV output, dependency-band, and compatibility expression
-before version files change.
+graph. Each project retains independent local version ownership while the product compiler selects the
+supported dependency closure. R12-01 owns the exact NuGet prerelease label, NBGV output,
+dependency-band, and compatibility expression before version files change.
 
 ## Application intent
 
@@ -74,8 +74,9 @@ Communication, MCP, security, and optional AI/vector capability.
    explicitly excluding it from the preview promise. It is not closed by adding an unproved feature.
 6. **Outside-in evidence wins.** Repository suites prove implementation; package-only cold starts,
    upgrades, failures, and independent readers prove the public product.
-7. **No release-day reconstruction.** Git, evaluated package identity, exact escrow, and the existing
-   release coordinator remain the only selection, version, custody, and recovery owners.
+7. **No release-day reconstruction.** Git, evaluated package identity, project-local NBGV state, the
+   product compiler, and ARCH-0110's one `main`-boundary job remain the only release owners; no escrow
+   or parallel coordinator returns.
 
 ## Dependency-ordered execution
 
@@ -84,15 +85,15 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-01](r12/R12-01-preview-contract-and-version-band.md) | one exact 0.20 version, channel, guaranteed-package set, compatibility, support, and feedback contract before selective version edits | passed |
 | [R12-02](r12/R12-02-preview-blocking-seams.md) | every current PMC is re-evaluated against the proposed guarantee set; promise-level activation, configuration, lifetime, naming, wire, safety, and tooling concerns receive fix/remove/exclude decisions | passed |
 | [R12-03](r12/R12-03-preview-product-boundary.md) | a small recommended spine, advanced extensions, experiments, and non-claims are generated from current evidence without equating package availability with support | passed |
-| [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | in-progress |
-| [R12-05](r12/R12-05-public-consumer-journey.md) | one frozen source commit passes the exact local release ratchet, selective package graph, clean-room templates/applications, and deterministic escrow before remote mutation | pending |
-| [R12-06](r12/R12-06-publish-and-observe-first-wave.md) | the frozen candidate becomes one immutable NuGet/GitHub wave, then clean human and agent environments prove the genuine public-feed journey | pending |
-| R12-07 — prove preview evolution | a later independent package wave upgrades a public-created application, recovers injected interruption, and converts feedback into a bounded maturity queue | pending |
+| [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | passed |
+| [R12-05](r12/R12-05-public-consumer-journey.md) | the public template installs from NuGet, generates both starters, restores cleanly, and proves the SQLite-backed consumer result | passed |
+| [R12-06](r12/R12-06-publish-and-observe-first-wave.md) | one `main`-boundary job publishes and observes the exact supported package set without a second release system | passed |
+| [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves interrupted-publication recovery, establishes the feedback baseline, and produces the final R12 go/no-go record | pending |
 
-Later child cards open only when preceding evidence sizes their real work. R12-05 and R12-06 are now
-checkpointed because R12-04 exposed the crucial boundary: local packages can certify candidate behavior,
-but only published NuGet packages can prove the public consumer experience. R12-07 remains unopened until
-the first observed wave supplies a real upgrade and feedback baseline.
+R12-01 through R12-06 are complete. R12-07 remains one bounded preview-evolution proof and will close
+through the first dependency-closed R13 wave. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
+and [R13](R13-terminal-package-maturity.md) own the longer 55-package terminal-maturity program, so
+R12 completion does not wait on every cross-repository handoff.
 
 ## Scope
 
@@ -149,5 +150,5 @@ R12 passes only when:
 - Stop if documentation is rewritten before the underlying support/version decision is settled.
 - Stop if a public page needs historical initiative context to explain ordinary use.
 - Stop if “maturity” becomes a synonym for package existence, test count, or feature breadth.
-- Stop before remote mutation unless the exact R12-06 candidate, target, credential boundary, and
-  observable rollback/recovery posture are recorded and green.
+- Stop before remote mutation unless the exact dependency-closed candidate, target, credential
+  boundary, and observable recovery posture are recorded and green under R12-06 and ARCH-0110.

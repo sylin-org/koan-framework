@@ -23,10 +23,12 @@ public sealed class CouchbaseFixture : KoanContainerFixture
     private const string Admin = "Administrator";
     private const string AdminPass = "password";
     private const int ManagementPort = 8091;
+    private const int QueryPort = 8093;
 
     private CouchbaseContainer? _container;
     private string _bucket = "";
     private string _managementUrl = "";
+    private string _queryUrl = "";
 
     public override string Engine => "couchbase";
     protected override string Adapter => "couchbase";
@@ -38,6 +40,9 @@ public sealed class CouchbaseFixture : KoanContainerFixture
     /// (the AODB Database conformance cell) and to point a routed Couchbase source at this server.</summary>
     public string ManagementUrl => _managementUrl;
 
+    /// <summary>The cluster's N1QL query endpoint used by consumers that own explicit reset behavior.</summary>
+    public string QueryUrl => _queryUrl;
+
     /// <summary>The container's admin credentials (the official Testcontainers Couchbase module's defaults).</summary>
     public string AdminUser => Admin;
     public string AdminPassword => AdminPass;
@@ -48,6 +53,7 @@ public sealed class CouchbaseFixture : KoanContainerFixture
         await _container.StartAsync().ConfigureAwait(false);
         _bucket = _container.Buckets.First().Name;
         _managementUrl = $"http://{_container.Hostname}:{_container.GetMappedPublicPort(ManagementPort)}";
+        _queryUrl = $"http://{_container.Hostname}:{_container.GetMappedPublicPort(QueryPort)}";
 
         // Couchbase Community Edition only supports the 'forestdb' GSI storage mode, and it MUST be set before
         // any index is created — otherwise the adapter's CREATE PRIMARY INDEX fails with "Please Set Indexer

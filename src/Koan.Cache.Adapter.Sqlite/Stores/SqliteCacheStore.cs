@@ -292,7 +292,11 @@ public sealed class SqliteCacheStore : ICacheStore, IDisposable
         }
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        using var connection = CreateConnection();
+        SqliteConnection.ClearPool(connection);
+    }
 
     private void EnsureInitialized()
     {

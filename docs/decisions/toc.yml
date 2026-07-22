@@ -182,6 +182,8 @@
       href: ARCH-0118-evidence-derived-product-surface.md
     - name: ARCH-0119 One console host lifecycle
       href: ARCH-0119-one-console-host-lifecycle.md
+    - name: ARCH-0120 Terminal package maturity and evidence-driven 0.20 admission
+      href: ARCH-0120-terminal-package-maturity.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

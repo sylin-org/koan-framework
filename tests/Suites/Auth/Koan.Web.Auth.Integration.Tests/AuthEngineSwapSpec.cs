@@ -126,17 +126,34 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
             if (url.AbsolutePath.EndsWith("/authorize", StringComparison.Ordinal))
                 url = new Uri(QueryHelpers.AddQueryString(url.ToString(), "roles", injectRole));
 
-            using var resp = await client.GetAsync(url);
-            chain.Add($"{(int)resp.StatusCode} {url.PathAndQuery}");
-            if ((int)resp.StatusCode is < 300 or >= 400)
+            HttpResponseMessage resp;
+            try
             {
-                var body = (int)resp.StatusCode >= 400 ? await resp.Content.ReadAsStringAsync() : "";
-                resp.StatusCode.Should().Be(HttpStatusCode.OK,
-                    $"the round-trip should land on the return URL. chain:\n  {string.Join("\n  ", chain)}\nbody: {body[..Math.Min(body.Length, 800)]}");
-                return;
+                resp = await client.GetAsync(url, TestContext.Current.CancellationToken);
             }
-            var loc = resp.Headers.Location ?? throw new InvalidOperationException($"redirect with no Location at {url}. chain: {string.Join(" -> ", chain)}");
-            url = loc.IsAbsoluteUri ? loc : new Uri(url, loc);
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    $"request failed at {url}. chain: {string.Join(" -> ", chain)}{Environment.NewLine}{_fx.Diagnostics}",
+                    exception);
+            }
+            using (resp)
+            {
+                chain.Add($"{(int)resp.StatusCode} {url.PathAndQuery}");
+                if ((int)resp.StatusCode is < 300 or >= 400)
+                {
+                    var body = (int)resp.StatusCode >= 400
+                        ? await resp.Content.ReadAsStringAsync(TestContext.Current.CancellationToken)
+                        : "";
+                    resp.StatusCode.Should().Be(HttpStatusCode.OK,
+                        $"the round-trip should land on the return URL. chain:\n  {string.Join("\n  ", chain)}\nbody: {body[..Math.Min(body.Length, 800)]}");
+                    return;
+                }
+
+                var loc = resp.Headers.Location ?? throw new InvalidOperationException(
+                    $"redirect with no Location at {url}. chain: {string.Join(" -> ", chain)}");
+                url = loc.IsAbsoluteUri ? loc : new Uri(url, loc);
+            }
         }
         throw new InvalidOperationException("redirect chain did not terminate within 12 hops: " + string.Join(" -> ", chain));
     }

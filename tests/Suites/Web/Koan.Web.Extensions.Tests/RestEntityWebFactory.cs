@@ -54,7 +54,6 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                 }));
                 web.ConfigureServices(services =>
                 {
-                    AppHost.Current = null;
                     services.AddKoan(() => LifecycleWidget.Lifecycle
                         .BeforeUpsert(ctx =>
                         {

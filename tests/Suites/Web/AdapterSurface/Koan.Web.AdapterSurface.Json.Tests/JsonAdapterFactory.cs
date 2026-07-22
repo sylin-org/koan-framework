@@ -18,7 +18,7 @@ public sealed class JsonAdapterFactory : AdapterTestFactoryBase
 
     protected override ValueTask StopBackingStoreAsync()
     {
-        try { Directory.Delete(_dataDir, recursive: true); } catch { }
+        if (Directory.Exists(_dataDir)) Directory.Delete(_dataDir, recursive: true);
         return ValueTask.CompletedTask;
     }
 
@@ -34,7 +34,6 @@ public sealed class JsonAdapterFactory : AdapterTestFactoryBase
 
     public override async Task ResetAsync()
     {
-        AppHost.Current = Services;
         await Widget.RemoveAll();
     }
 }

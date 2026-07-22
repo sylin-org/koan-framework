@@ -148,6 +148,73 @@
       ]
     },
     {
+      "id": "deterministic-authentication-testing",
+      "title": "Deterministic local OAuth and OIDC testing",
+      "summary": "A Development test-provider reference supplies self-hosted OAuth2 and OIDC flows that exercise Web Auth challenge, callback, token validation, claim mapping, and identity linking without production identity credentials.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Web.Auth.Connector.Test"
+      ],
+      "documentation": [
+        "src/Connectors/Web/Auth/Test/README.md",
+        "src/Connectors/Web/Auth/Test/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md",
+        "samples/journeys/GardenCoop/01-GardenJournal",
+        "tests/Koan.Packaging.Tests",
+        "tests/Koan.Web.Auth.Tests",
+        "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests"
+      ],
+      "admission": [
+        {
+          "id": "wave0:auth-test-protocol",
+          "project": "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests/Koan.Web.Auth.Integration.Tests.csproj",
+          "filter": "FullyQualifiedName~AuthEngineSwapSpec",
+          "lane": "deterministic",
+          "phase": "protocol",
+          "deadlineSeconds": 180
+        },
+        {
+          "id": "wave0:auth-test-token",
+          "project": "tests/Koan.Web.Auth.Tests/Koan.Web.Auth.Tests.csproj",
+          "filter": "FullyQualifiedName~JwtTokenServiceTests",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 120
+        }
+      ]
+    },
+    {
+      "id": "development-runtime-diagnostics",
+      "title": "Authenticated Development runtime diagnostics",
+      "summary": "A Web Admin reference mounts one authenticated, read-only Development projection of canonical Koan provenance, health, environment, and bounded process facts with permanent secret and host-identity redaction.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Web.Admin"
+      ],
+      "documentation": [
+        "src/Koan.Web.Admin/README.md",
+        "src/Koan.Web.Admin/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md",
+        "samples/journeys/GardenCoop/02-LocalDiscovery",
+        "tests/Koan.Packaging.Tests",
+        "tests/Suites/Web/Koan.Web.Admin.Tests"
+      ],
+      "admission": [
+        {
+          "id": "wave0:web-admin",
+          "project": "tests/Suites/Web/Koan.Web.Admin.Tests/Koan.Web.Admin.Tests.csproj",
+          "filter": "FullyQualifiedName~Koan.Web.Admin.Tests",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 180
+        }
+      ]
+    },
+    {
       "id": "document-data-providers",
       "title": "MongoDB and Couchbase Entity persistence",
       "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend\u0027s stated limits.",
@@ -165,6 +232,43 @@
         "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
         "tests/Suites/Data/Connector.Couchbase",
         "tests/Suites/Data/Connector.Mongo"
+      ]
+    },
+    {
+      "id": "durable-local-cache",
+      "title": "Durable local SQLite Cache",
+      "summary": "A SQLite Cache reference replaces the memory Local floor with exact-tagged, sliding-expiration-aware state that survives complete host restart without changing Entity cache intent.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Cache.Adapter.Sqlite"
+      ],
+      "documentation": [
+        "src/Koan.Cache.Adapter.Sqlite/README.md",
+        "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md",
+        "tests/Koan.Packaging.Tests",
+        "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests",
+        "tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine"
+      ],
+      "admission": [
+        {
+          "id": "wave0:cache-sqlite-conformance",
+          "project": "tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj",
+          "filter": "FullyQualifiedName~SqliteEngineSpec",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 180
+        },
+        {
+          "id": "wave0:cache-sqlite-delta",
+          "project": "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests/Koan.Cache.Adapter.Sqlite.Tests.csproj",
+          "filter": "FullyQualifiedName~SqliteCachePersistenceSpec",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 180
+        }
       ]
     },
     {
@@ -454,6 +558,35 @@
       ]
     },
     {
+      "id": "recoverable-entity-deletion",
+      "title": "Recoverable Entity deletion",
+      "summary": "Selected Entity types replace physical removal with hidden managed deletion while explicit type-scoped recycle-bin, restore, and purge verbs preserve other filters and authorization boundaries.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.SoftDelete"
+      ],
+      "documentation": [
+        "src/Koan.Data.SoftDelete/README.md",
+        "src/Koan.Data.SoftDelete/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md",
+        "tests/Koan.Packaging.Tests",
+        "tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests",
+        "tests/Suites/Tenancy/Koan.Tenancy.Tests"
+      ],
+      "admission": [
+        {
+          "id": "wave0:data-soft-delete",
+          "project": "tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests/Koan.Data.SoftDelete.Tests.csproj",
+          "filter": "FullyQualifiedName~Koan.Data.SoftDelete.Tests",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 180
+        }
+      ]
+    },
+    {
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",
@@ -521,19 +654,67 @@
     {
       "id": "testing-local-infrastructure",
       "title": "Testing and local infrastructure",
-      "summary": "Koan supplies bounded test hosts and container-backed local infrastructure for focused conformance.",
-      "maturity": "demonstrated",
+      "summary": "Application, framework, and provider authors inherit Entity conformance, boot the real compiled Koan host, and reuse fail-closed container-backed infrastructure with owned ambient and async lifecycle.",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Testing",
         "Sylin.Koan.Testing.Containers",
         "Sylin.Koan.Testing.Hosting"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/guides/testing-your-app.md",
+        "src/Koan.Testing.Containers/README.md",
+        "src/Koan.Testing.Hosting/README.md",
+        "src/Koan.Testing/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "tests/Suites"
+        "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md",
+        "tests/Koan.Packaging.Tests",
+        "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap",
+        "tests/Suites/Testing/Koan.Testing.Containers.Tests",
+        "tests/Suites/Testing/Koan.Testing.Tests"
+      ],
+      "admission": [
+        {
+          "id": "wave0:package-consumer",
+          "project": "tests/Koan.Packaging.Tests/Koan.Packaging.Tests.csproj",
+          "filter": "FullyQualifiedName=Koan.Packaging.Tests.Wave0PackageConsumerTests.Candidate_packages_restore_compile_and_run_outside_the_repository",
+          "lane": "deterministic",
+          "phase": "consumer",
+          "deadlineSeconds": 300
+        },
+        {
+          "id": "wave0:testing-container-lifecycle",
+          "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj",
+          "filter": "FullyQualifiedName~ContainerLifecycleSpec",
+          "lane": "deterministic",
+          "phase": "lifecycle",
+          "deadlineSeconds": 180
+        },
+        {
+          "id": "wave0:testing-container-native",
+          "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj",
+          "filter": "FullyQualifiedName=Koan.Testing.Containers.Tests.ContainerNativeLifecycleSpec.Postgres_fixture_supports_two_complete_owned_lifecycles",
+          "lane": "native",
+          "phase": "infrastructure",
+          "deadlineSeconds": 300
+        },
+        {
+          "id": "wave0:testing-entity-conformance",
+          "project": "tests/Suites/Testing/Koan.Testing.Tests/Koan.Testing.Tests.csproj",
+          "filter": "FullyQualifiedName~ConformanceBatteriesHaveTeeth|FullyQualifiedName~ConformanceHostOwnershipSpec",
+          "lane": "deterministic",
+          "phase": "execution",
+          "deadlineSeconds": 180
+        },
+        {
+          "id": "wave0:testing-host-lifecycle",
+          "project": "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap/Koan.Tests.Integration.Bootstrap.csproj",
+          "filter": "FullyQualifiedName~KoanIntegrationHostFailedStartSpec",
+          "lane": "deterministic",
+          "phase": "lifecycle",
+          "deadlineSeconds": 120
+        }
       ]
     },
     {
@@ -952,7 +1133,7 @@
     },
     {
       "packageId": "Sylin.Koan.Cache.Adapter.Sqlite",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "SQLite-backed persistent L1 cache store for Koan.Cache. Provides on-disk cache persistence with tag indexing and TTL eviction. Preempts the default Memory store by ProviderPriority.",
       "targetFrameworks": [
@@ -966,7 +1147,9 @@
       "readme": "src/Koan.Cache.Adapter.Sqlite/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "durable-local-cache"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Canon",
@@ -1478,7 +1661,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.SoftDelete",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Opt-in recoverable Entity deletion: ordinary reads hide soft-removed rows while type-targeted recycle-bin, restore, and purge verbs remain explicit.",
       "targetFrameworks": [
@@ -1492,7 +1675,9 @@
       "readme": "src/Koan.Data.SoftDelete/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.SoftDelete/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "recoverable-entity-deletion"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector",
@@ -2037,7 +2222,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan conformance kit \u2014 your app inherits a test suite. Subclass EntityConformanceSpecs\u003CT\u003E (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.",
       "targetFrameworks": [
@@ -2058,7 +2243,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing.Containers",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan test harness \u2014 xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.",
       "targetFrameworks": [
@@ -2078,7 +2263,7 @@
     },
     {
       "packageId": "Sylin.Koan.Testing.Hosting",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan test harness \u2014 the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app\u0027s tests.",
       "targetFrameworks": [
@@ -2114,7 +2299,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Admin",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Development-only, read-only dashboard for sanitized Koan runtime, health, and provenance insight.",
       "targetFrameworks": [
@@ -2126,7 +2311,9 @@
       "readme": "src/Koan.Web.Admin/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Web.Admin/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "development-runtime-diagnostics"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth",
@@ -2223,7 +2410,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Test",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Test identity provider for Koan Web Auth: local login UI, token issuance for demos, and development-only wiring.",
       "targetFrameworks": [
@@ -2237,7 +2424,9 @@
       "readme": "src/Connectors/Web/Auth/Test/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Web/Auth/Test/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "deterministic-authentication-testing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Server",

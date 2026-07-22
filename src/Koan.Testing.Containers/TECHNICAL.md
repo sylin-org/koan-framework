@@ -14,7 +14,7 @@ backing-store fixtures, and the real ARCH-0079 `AddKoan()` integration host.
 - `KoanContainerFixture` owns backing-store setup, explicit connection overrides, availability
   diagnostics, and teardown.
 - Concrete fixtures translate one live backing store into canonical Koan settings.
-- `KoanDataSpec<TFixture>` supplies skip, host boot, per-test settings, and partition helpers.
+- `KoanDataSpec<TFixture>` supplies fail-closed readiness, host boot, per-test settings, and partition helpers.
 - `BoundHost` owns only the returned integration-host handle. Koan's generic-host binder owns the
   process-default `AppHost` lease and releases it when the host stops.
 
@@ -61,10 +61,13 @@ test must inspect the complete physical store rather than one logical partition.
 ## Availability and failure behavior
 
 - An explicit `Koan_<ENGINE>__CONNECTION_STRING` bypasses container startup for CI-managed services.
-- A container startup exception sets `IsAvailable = false` and records a diagnostic `Reason`.
-- `RequireBackingStore()` converts unavailability into a native xUnit v3 skip.
+- A container startup exception sets `IsAvailable = false`, records a diagnostic `Reason`, attempts
+  owned partial-start cleanup, and rethrows the original error. Dual startup/cleanup failure aggregates.
+- `RequireBackingStore()` rejects an uninitialized/unavailable fixture; it never converts missing
+  required infrastructure into a green result.
 - Host startup failures propagate; `KoanDataSpec` does not convert composition failures into skips.
-- Fixture teardown is best-effort so one infrastructure cleanup fault does not hide test results.
+- Fixture teardown failures propagate. The bounded admission runner still owns the outer process-tree
+  deadline and cleanup when a native tool or runtime hangs.
 
 ## Extension points
 
@@ -76,6 +79,7 @@ test must inspect the complete physical store rather than one logical partition.
 
 ## Verification
 
-The Docker-free InMemory connector suite is the focused lifecycle oracle. It covers both boot
+The deterministic container lifecycle meta-suite proves setup/cleanup propagation and dual-failure
+aggregation. The Docker-free InMemory connector suite remains the focused host oracle. It covers both boot
 overloads, later-owner preservation, overlapping host disposal, Entity operations, partitions,
 instructions, filtering, and adapter conformance through the shipped helper.

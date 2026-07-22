@@ -36,14 +36,7 @@ public sealed class SqliteCachePersistenceSpec : IDisposable
 
     public void Dispose()
     {
-        try
-        {
-            if (File.Exists(_databasePath)) File.Delete(_databasePath);
-        }
-        catch
-        {
-            // ignored — best-effort cleanup
-        }
+        if (File.Exists(_databasePath)) File.Delete(_databasePath);
     }
 
     [Fact]

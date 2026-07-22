@@ -49,7 +49,6 @@ public sealed class OpenApiWebApplicationFactory : IAsyncLifetime
                 });
                 web.ConfigureServices(services =>
                 {
-                    AppHost.Current = null;
                     services.AddKoan();
                 });
                 web.Configure(_ => { });
