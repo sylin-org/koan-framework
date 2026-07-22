@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R12-07 - Prove Preview Evolution"
 audience: [architects, maintainers, release-engineers, ai-agents]
-status: current
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-21
-  status: in-progress
-  scope: public upgrade and idempotent mixed-state publication evidence complete; maintainer go/no-go pending
+  date_last_tested: 2026-07-22
+  status: passed
+  scope: public upgrade and idempotent mixed-state publication evidence accepted; maintainer GO recorded
 ---
 
 # R12-07 — Prove preview evolution
 
 - Tranche: `T7C — 0.20 public-preview maturity`
-- Status: `in-progress — evidence complete; maintainer go/no-go pending`
+- Status: `passed — maintainer accepted GO on 2026-07-22`
 - Depends on: completed R12-06 and the first dependency-closed publication wave from
   [R13](../R13-terminal-package-maturity.md)
 - Unlocks: R12 completion independently of R13's remaining provider families
@@ -73,8 +73,10 @@ risk without testing a different mechanism, so it is not part of this card.
 
 **Go/no-go recommendation:** GO. The public 0.20 line upgraded through ordinary NuGet semantics, the
 same business expression remained valid, and the one-job publisher converged a mixed immutable set.
-R13 continues provider-family promotion independently. R12 remains open only for the maintainer's
-explicit acceptance of this recommendation.
+R13 completed its provider-family promotion independently.
+
+**Maintainer decision — 2026-07-22:** GO accepted. This closes R12's 0.20 preview-maturity contract.
+It does not declare V1 GA, set a V1 support date, or widen the generated supported package surface.
 
 ## Acceptance
 
@@ -87,6 +89,9 @@ R12-07 passes only when:
    second recovery system or manufactured failure;
 4. feedback is recorded as evidence and triaged into bounded action or explicit non-claim;
 5. the maintainer accepts the final R12 go/no-go record.
+
+**Acceptance result:** PASS on 2026-07-22. All five conditions are satisfied, including the
+maintainer's explicit GO.
 
 ## Stop conditions
 

@@ -1,7 +1,7 @@
 ---
 type: HANDOFF
 domain: koan-v1
-status: active
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 ---
@@ -10,10 +10,9 @@ framework_version: v0.20.0
 
 ## Current objective
 
-Complete the 0.20 maturity cycle by promoting the maintainer-intended provider families through
-small, evidence-backed slices while preserving 0.20 as the supported-contract signal. Historical
-package counts do not define completion. Release automation is infrastructure, not a product
-capability, and must remain proportionate.
+The 0.20 maturity cycle is complete. Preserve 0.20 as the supported-contract signal, keep release
+automation proportionate, and return to ordinary value-led framework development. Historical package
+counts do not define completion.
 
 ## Completed baseline: first supported wave and public consumer proof
 
@@ -75,8 +74,9 @@ connects them.
 ## Exact pause point
 
 The lean process change and first seven-owner slice are merged, published, indexed, and public-consumer
-green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
-maintainer acceptance rather than another technical exercise.
+green. R12-07's ordinary public upgrade proof is also green, and the maintainer explicitly accepted
+its GO recommendation on 2026-07-22. R12 and R13 are complete. This records 0.20 preview maturity; it
+does not declare V1 GA or a V1 support date.
 
 PostgreSQL R13-07 through Local Storage/Media R13-16 are merged, published, indexed, public-consumer
 green, and baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert
@@ -181,7 +181,9 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Obtain explicit maintainer acceptance or rejection of R12-07's technical GO recommendation.
+No active initiative work remains.
+
+1. Return to ordinary value-led framework development outside the closed maturity epics.
 2. Resume ARCH-0089 migrations only from public Agyo/Zen Garden destination and consumer evidence.
 3. Keep S3, Backup, and unclaimed `0.17` migration owners outside the supported 0.20 surface.
 
