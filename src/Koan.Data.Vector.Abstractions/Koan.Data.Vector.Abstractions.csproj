@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <Description>Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;abstractions;contracts;search;schema</PackageTags>
   </PropertyGroup>

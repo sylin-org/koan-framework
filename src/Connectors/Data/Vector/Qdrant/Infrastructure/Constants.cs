@@ -2,6 +2,12 @@ namespace Koan.Data.Vector.Connector.Qdrant.Infrastructure;
 
 internal static class Constants
 {
+    internal static class Provider
+    {
+        public const string Name = "qdrant";
+        public const int Priority = 30;
+    }
+
     public const string Section = "Koan:Data:Qdrant";
     public const string HttpClientName = "qdrant";
     public const string DefaultEndpoint = "http://localhost:6333";

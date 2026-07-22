@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <Description>Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;runtime;providers;querying;facade</PackageTags>
   </PropertyGroup>

@@ -3,6 +3,8 @@
 Use Weaviate behind Koan's entity-first vector API. Referencing this package activates the adapter; `AddKoan()` owns
 registration, provider election, schema naming, health participation, and startup reporting.
 
+> **Maturity:** Supported 0.20 extension within the capabilities and boundaries below.
+
 ## Install and use
 
 ```powershell

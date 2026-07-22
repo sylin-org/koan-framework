@@ -7,8 +7,8 @@ using Koan.Core.Services;
 
 namespace Koan.Data.Vector.Connector.Weaviate;
 
-[ProviderPriority(10)]
-[KoanService(ServiceKind.Vector, shortCode: "weaviate", name: "Weaviate",
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Name, name: "Weaviate",
     ContainerImage = "cr.weaviate.io/semitechnologies/weaviate",
     DefaultTag = "1.37.6",
     DefaultPorts = new[] { 8080 },
@@ -28,11 +28,11 @@ namespace Koan.Data.Vector.Connector.Weaviate;
     HealthIntervalSeconds = 5,
     HealthTimeoutSeconds = 2,
     HealthRetries = 12,
-    Scheme = "http", Host = "weaviate", EndpointPort = 8080, UriPattern = "http://{host}:{port}",
+    Scheme = "http", Host = Infrastructure.Constants.Provider.Name, EndpointPort = 8080, UriPattern = "http://{host}:{port}",
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 8080, LocalPattern = "http://{host}:{port}")]
 public sealed class WeaviateVectorAdapterFactory : IVectorAdapterFactory
 {
-    public string Provider => "weaviate";
+    public string Provider => Infrastructure.Constants.Provider.Name;
 
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
     // multi-tenancy / per-cluster) is realized in P4. Until then a Database-mode route resolves but is not yet honored here.

@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.SqliteVec</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.SqliteVec</RootNamespace>
     <Description>Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite's local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.</Description>
