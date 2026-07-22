@@ -2,6 +2,9 @@
 
 SQL Server provider for Koan relational data with safe defaults, pushdowns, and schema helpers.
 
+This package is a supported 0.20 networked Entity provider. Referencing it makes SQL Server eligible
+for normal `AddKoan()` provider selection; no provider-specific registration API is required.
+
 - Target framework: net10.0
 - License: Apache-2.0
 
@@ -20,11 +23,25 @@ dotnet add package Sylin.Koan.Data.Connector.SqlServer
 
 ## Minimal setup
 
-- Configure a connection using first-win resolution:
-  - ConnectionStrings:Default (or a named source)
-  - Koan:Data:Sources:Default:ConnectionString
-  - Koan:Data:SqlServer:ConnectionString
-- Bind options once at startup; keep credentials in secret stores.
+```csharp
+builder.Services.AddKoan();
+
+public sealed class Item : Entity<Item>;
+
+var saved = await new Item().Save();
+var same = await Item.Get(saved.Id);
+```
+
+Configure a connection using first-win resolution:
+
+- `Koan:Data:SqlServer:ConnectionString`
+- `Koan:Data:Sources:Default:sqlserver:ConnectionString`
+- `ConnectionStrings:SqlServer`
+- `ConnectionStrings:Default`
+
+With `ConnectionString=auto` (the default), local orchestration discovery is attempted and then the
+documented localhost development fallback is used. Keep explicit credentials in secret stores. A
+reachable SQL Server instance is the only external runtime prerequisite.
 
 ## Usage - safe snippets
 

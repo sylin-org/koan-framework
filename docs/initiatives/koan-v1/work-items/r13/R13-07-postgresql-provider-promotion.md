@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused provider, pack, external-consumer, product, and API evidence green; public publication pending
+  status: passed
+  scope: focused provider, pack, public consumer, product, API, merge, and publication evidence green
 ---
 
 # R13-07 — Promote PostgreSQL Entity persistence
@@ -99,5 +99,19 @@ slice; no nonexistent baseline is invented before publication.
 - API posture: 42/44 configured, exactly the PostgreSQL connector and Npgsql mechanism pending first
   publication, and three content-only owners.
 
-No sibling provider or framework-wide test ran. Public indexing and the exact immutable first versions
-remain the only exit evidence.
+No sibling provider or framework-wide test ran.
+
+## Public evidence — 2026-07-22
+
+- PR `#96` exact-head gate `29893297175` passed as one job with no tests or containers;
+- guarded merge produced main commit `b89cec6266080186db4fdd3fee99aa04b089abbc`;
+- main release run `29893491621` packed the supported surface and pushed both first artifacts;
+- NuGet.org indexed `Sylin.Koan.Data.Connector.Postgres 0.20.1` and
+  `Sylin.Koan.Data.Relational.Npgsql 0.20.1`;
+- a clean NuGet.org-only consumer built with zero warnings, selected `postgres` through `AddKoan()`,
+  and passed Entity save/get/query against `postgres:18.4-alpine` with
+  `POSTGRES|PUBLIC-CONSUMER|PASS`; and
+- both exact `0.20.1` versions are now immutable API floors at their owning projects.
+
+R13-07 passes. No workstation publication, tag, GitHub Release, or additional release mechanism was
+used.
