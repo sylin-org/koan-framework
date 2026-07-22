@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AwesomeAssertions;
 using Koan.Data.Core;
 using Koan.Identity.Impersonation;
+using Koan.Identity.Audit;
 using Koan.Identity.Management;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -31,7 +32,8 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         var created = await AuditEvent.Query(a => a.Subject == "audit-subject");
         created.Should().Contain(a => a.Action == "identity.created" && a.Target == "Identity/audit-subject",
             "creating an Identity must emit an audit row with no explicit logging call");
-        created.Single(a => a.Action == "identity.created").After.Should().Contain("Audit One");
+        created.Single(a => a.Action == "identity.created").After.Should().NotContain("Audit One",
+            "privacy-safe audit snapshots are the default");
 
         // Update via a fresh instance with the same id (not an in-place mutation of `person`) so the captured
         // before-image reflects the stored pre-write state — InMemory aliases the stored reference, so mutating
@@ -41,8 +43,52 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         var afterUpdate = await AuditEvent.Query(a => a.Subject == "audit-subject");
         afterUpdate.Should().Contain(a => a.Action == "identity.updated", "updating an Identity emits a second audit row");
         var updated = afterUpdate.Single(a => a.Action == "identity.updated");
-        updated.Before.Should().Contain("Audit One", "the pre-write image is captured");
-        updated.After.Should().Contain("Audit Two", "the post-write image is captured");
+        updated.Before.Should().NotContain("Audit One", "the pre-write snapshot excludes profile data");
+        updated.After.Should().NotContain("Audit Two", "the post-write snapshot excludes profile data");
+        updated.Before.Should().Contain(nameof(IdentityStatus.Active), "bounded lifecycle metadata remains useful");
+    }
+
+    [Fact]
+    public void Full_audit_snapshot_is_explicit_and_still_redacts_provider_claims()
+    {
+        IdentityAuditSnapshot.Serialize(
+                new Identity { Id = "full-audit", DisplayName = "Visible Only By Choice" },
+                IdentityAuditSnapshotMode.Full)
+            .Should().Contain("Visible Only By Choice");
+
+        IdentityAuditSnapshot.Serialize(
+                new ExternalIdentityLink
+                {
+                    Id = "link", IdentityId = "full-audit", Provider = "oidc", ProviderKeyHash = "hash",
+                    ClaimsJson = "super-secret-provider-claims",
+                },
+                IdentityAuditSnapshotMode.Full)
+            .Should().Contain("[redacted]")
+            .And.NotContain("super-secret-provider-claims");
+    }
+
+    [Fact]
+    public void Privacy_safe_snapshots_exclude_identity_profile_and_session_markers()
+    {
+        const string marker = "must-not-enter-default-audit";
+        var snapshots = new[]
+        {
+            IdentityAuditSnapshot.Serialize(
+                new Identity { DisplayName = marker, Picture = marker }, IdentityAuditSnapshotMode.PrivacySafe),
+            IdentityAuditSnapshot.Serialize(
+                new IdentityEmail { Address = marker }, IdentityAuditSnapshotMode.PrivacySafe),
+            IdentityAuditSnapshot.Serialize(
+                new ExternalIdentityLink { Provider = "oidc", ProviderKeyHash = marker, ClaimsJson = marker },
+                IdentityAuditSnapshotMode.PrivacySafe),
+            IdentityAuditSnapshot.Serialize(
+                new Session { Device = marker, Browser = marker, Os = marker, ApproxCity = marker },
+                IdentityAuditSnapshotMode.PrivacySafe),
+            IdentityAuditSnapshot.Serialize(
+                new ImpersonationGrant { Actor = marker, Target = marker, Reason = marker, Ticket = marker },
+                IdentityAuditSnapshotMode.PrivacySafe),
+        };
+
+        snapshots.Should().AllSatisfy(snapshot => snapshot.Should().NotContain(marker));
     }
 
     [Fact]
@@ -135,6 +181,9 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         (await IdentityRole.Query(r => r.IdentityId == id)).Should().BeEmpty("global roles cascade");
         (await ImpersonationGrant.Query(g => g.Actor == id || g.Target == id)).Should().BeEmpty(
             "acting and target-side impersonation grants cascade");
-        (await AuditEvent.Query(a => a.Subject == id)).Should().NotBeEmpty("audit evidence is retained");
+        (await AuditEvent.All()).Should().Contain(a =>
+            a.Action.StartsWith("identity.", StringComparison.Ordinal) &&
+            a.Target == "Identity/erased" && a.Subject == null,
+            "audit evidence is retained but no longer identifies the erased person");
     }
 }

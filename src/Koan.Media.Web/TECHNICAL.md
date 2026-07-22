@@ -17,7 +17,8 @@ overlay/font services.
 5. negotiate an allowed, producible response format;
 6. attempt the source's optional derivative lookup;
 7. execute the pipeline on a miss and attempt a best-effort derivative write; and
-8. emit ETag, cache, negotiation, and `X-Koan-Media-*` diagnostic headers.
+8. return an ASP.NET Core file result with ETag, Last-Modified, cache, range, length, negotiation, and
+   `X-Koan-Media-*` diagnostic headers.
 
 The default `MediaEntitySource<TEntity>` performs step 4 through `Entity<TEntity,string>.Get`, preserving active
 Entity read axes. Its derivative records are framework-owned `MediaDerivation` entities stored separately from
@@ -25,6 +26,12 @@ the source Entity.
 
 Discovery uses Koan's already compiled assembly closure once during composition. Request execution performs no type
 scan or source election. Startup reporting states the candidate/default posture.
+
+GET and HEAD share the same representation path for originals, persisted derivations, and freshly rendered recipes.
+Seekable streams and buffered recipe results enable ASP.NET Core range processing, including conditional and
+`If-Range` behavior. A custom `IMediaSource` may return a non-seekable stream for complete delivery; a GET carrying a
+`Range` header then returns corrective `416` with `Accept-Ranges: none`. The controller transfers seekable response
+stream ownership to the MVC result executor, which disposes it after delivery.
 
 ## Options
 

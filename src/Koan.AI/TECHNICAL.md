@@ -37,6 +37,12 @@ particular model is installed or healthy.
 Background health observation updates member state without rebuilding provider topology. Startup provenance reports
 configured categories/sources, the live adapter roster, and source/member status.
 
+`AiSourcesHealthContributor` composes as one element of the standard `IHealthContributor` collection and is
+noncritical by default. Its readiness data reports healthy, unhealthy, unknown, and recovering member counts.
+Unknown or recovering members are not false-green: an entirely unprobed source reports `unknown`, while a source
+with explicit failures and no healthy member reports `unhealthy`. Core's critical-only readiness policy can therefore
+keep the overall application ready while still exposing an unavailable AI subsystem and `critical=false`.
+
 ## Host contract
 
 `IAiPipeline` is a composed-host singleton. `Client` resolves it from the active host at operation time and does not

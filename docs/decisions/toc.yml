@@ -462,3 +462,5 @@
   items:
     - name: DEC-0053 Service-to-service authentication
       href: DEC-0053-service-to-service-authentication.md
+    - name: SEC-0009 Privacy-safe identity erasure with honest receipts
+      href: SEC-0009-privacy-safe-identity-erasure.md

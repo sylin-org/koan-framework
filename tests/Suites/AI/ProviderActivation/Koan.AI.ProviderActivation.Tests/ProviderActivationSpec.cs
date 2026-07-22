@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Koan.AI.ProviderActivation.Tests;
@@ -22,6 +23,7 @@ public sealed class ProviderActivationSpec
     {
         DisposableAdapter.Reset();
         var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Koan:Ai:AutoDiscoveryEnabled"] = "false",
@@ -63,6 +65,7 @@ public sealed class ProviderActivationSpec
     public async Task Conflicting_explicit_provider_placement_fails_startup_correctively()
     {
         var builder = Host.CreateApplicationBuilder();
+        builder.Logging.ClearProviders();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Koan:Ai:AutoDiscoveryEnabled"] = "false",

@@ -69,6 +69,9 @@ reference and, when conventions cannot locate it, that provider's exact endpoint
 - Referencing the AI runtime without a usable provider is allowed; invoking an unsupported operation is not.
 - Explicit provider configuration is intent and fails startup when invalid. Automatic candidates may be absent
   without making the application unhealthy.
+- AI source health is always present alongside other Koan readiness components once AI is active. It is noncritical
+  by default: an unavailable provider remains visible as `Koan.AI` without taking an otherwise healthy application
+  offline. Members that have not completed a probe report `unknown`; they are never counted as healthy.
 - Provider HTTP/model errors and cancellation remain visible to the caller.
 
 Provider packages document their exact discovery, configuration, and guarantee boundaries. See

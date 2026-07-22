@@ -1,6 +1,8 @@
 using Koan.Core;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Koan.Identity.Erasure;
 using Xunit;
 
 namespace Koan.Identity.Tests;
@@ -26,7 +28,11 @@ public sealed class IdentityHostFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _host = await KoanIntegrationHost.Configure()
-            .ConfigureServices(s => s.AddKoan())
+            .ConfigureServices(s =>
+            {
+                s.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityErasureContributor, TestIdentityErasureContributor>());
+                s.AddKoan();
+            })
             .StartAsync();
     }
 
