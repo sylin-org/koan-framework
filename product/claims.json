@@ -220,11 +220,47 @@
     {
       "id": "testing-local-infrastructure",
       "title": "Testing and local infrastructure",
-      "summary": "Koan supplies bounded test hosts and container-backed local infrastructure for focused conformance.",
-      "maturity": "demonstrated",
+      "summary": "Application, framework, and provider authors inherit Entity conformance, boot the real compiled Koan host, and reuse fail-closed container-backed infrastructure with owned ambient and async lifecycle.",
+      "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Testing", "Sylin.Koan.Testing.Containers", "Sylin.Koan.Testing.Hosting"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites"]
+      "documentation": ["docs/guides/testing-your-app.md", "src/Koan.Testing/README.md", "src/Koan.Testing.Containers/README.md", "src/Koan.Testing.Hosting/README.md"],
+      "evidence": ["tests/Suites/Testing/Koan.Testing.Tests", "tests/Suites/Testing/Koan.Testing.Containers.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
+    },
+    {
+      "id": "durable-local-cache",
+      "title": "Durable local SQLite Cache",
+      "summary": "A SQLite Cache reference replaces the memory Local floor with exact-tagged, sliding-expiration-aware state that survives complete host restart without changing Entity cache intent.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Cache.Adapter.Sqlite"],
+      "documentation": ["src/Koan.Cache.Adapter.Sqlite/README.md", "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"],
+      "evidence": ["tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine", "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
+    },
+    {
+      "id": "recoverable-entity-deletion",
+      "title": "Recoverable Entity deletion",
+      "summary": "Selected Entity types replace physical removal with hidden managed deletion while explicit type-scoped recycle-bin, restore, and purge verbs preserve other filters and authorization boundaries.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.SoftDelete"],
+      "documentation": ["src/Koan.Data.SoftDelete/README.md", "src/Koan.Data.SoftDelete/TECHNICAL.md"],
+      "evidence": ["tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
+    },
+    {
+      "id": "development-runtime-diagnostics",
+      "title": "Authenticated Development runtime diagnostics",
+      "summary": "A Web Admin reference mounts one authenticated, read-only Development projection of canonical Koan provenance, health, environment, and bounded process facts with permanent secret and host-identity redaction.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Web.Admin"],
+      "documentation": ["src/Koan.Web.Admin/README.md", "src/Koan.Web.Admin/TECHNICAL.md"],
+      "evidence": ["tests/Suites/Web/Koan.Web.Admin.Tests", "samples/journeys/GardenCoop/02-LocalDiscovery", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
+    },
+    {
+      "id": "deterministic-authentication-testing",
+      "title": "Deterministic local OAuth and OIDC testing",
+      "summary": "A Development test-provider reference supplies self-hosted OAuth2 and OIDC flows that exercise Web Auth challenge, callback, token validation, claim mapping, and identity linking without production identity credentials.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Web.Auth.Connector.Test"],
+      "documentation": ["src/Connectors/Web/Auth/Test/README.md", "src/Connectors/Web/Auth/Test/TECHNICAL.md"],
+      "evidence": ["tests/Koan.Web.Auth.Tests", "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests", "samples/journeys/GardenCoop/01-GardenJournal", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "package-first-installation",

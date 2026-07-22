@@ -23,18 +23,10 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Web.Extensions\Koan.Web.Extensions.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Testcontainers 4.x. The 1.7.0-beta version still used by Koan.Testing has a known
-         "cannot hijack chunked stream" bug that prevents most containers from starting;
-         this matrix uses the modern API. -->
-    <PackageReference Include="Testcontainers" />
-    <PackageReference Include="Testcontainers.MongoDb" />
-    <PackageReference Include="Testcontainers.PostgreSql" />
-    <PackageReference Include="Testcontainers.Redis" />
-    <PackageReference Include="Testcontainers.MsSql" />
-    <PackageReference Include="Testcontainers.Couchbase" />
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="MongoDB.Driver" />
     <PackageReference Include="SharpCompress" />

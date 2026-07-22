@@ -8,9 +8,11 @@
   adapter (or all), against real instances, and emits a MACHINE-PARSEABLE Gate VERDICT. This is the orchestrable
   step the Forge's agent loop consumes (Phase 4: agent -> blueprint -> gate -> retry), plus a human-readable table.
 
-  It does NOT re-implement the harness. It discovers each adapter's `*AodbConformanceSpec` test project, runs its
-  conformance cells via `dotnet test --filter FullyQualifiedName~Aodb` with a TRX logger, parses the TRX, maps each
-  cell to its AODB mode (Declares / Shared / Container / Database), and aggregates a per-adapter verdict:
+  It does NOT re-implement the harness. It discovers each adapter's `*AodbConformanceSpec` test project, runs the
+  exact `FullyQualifiedName~Aodb` selection through ordinary `dotnet test`, and interprets the resulting TRX without
+  accepting a failed process or incomplete result set. It maps each returned cell to its AODB mode (Declares /
+  Streaming / Shared / Container / Database for record adapters;
+  Declares / Shared / Container / Database for vector adapters), and aggregates a per-adapter verdict:
 
     GREEN    — every cell passed (the adapter realizes every mode it declares; shippable)
     RED      — a cell FAILED (an isolation lie: declared-but-not-realized, or a leak)
@@ -39,6 +41,7 @@ param(
     [switch]$DockerFree,
     [ValidateSet('table', 'json')][string]$Output = 'table',
     [string]$Configuration = 'Debug',
+    [ValidateRange(1, 3600)][int]$DeadlineSeconds = 600,
     [switch]$NoBuild
 )
 
@@ -50,11 +53,12 @@ try {
 
     # The Docker-free conformance surfaces (in-process / file) — fast local + agent-iteration runs without containers.
     $dockerFreeSet = @('record/InMemory', 'record/Json', 'record/Sqlite', 'vector/InMemory', 'vector/SqliteVec')
-    $modeOrder = @('Declares', 'Shared', 'Container', 'Database')
+    $modeOrder = @('Declares', 'Streaming', 'Shared', 'Container', 'Database')
 
     function Get-Mode([string]$methodName) {
         switch -regex ($methodName) {
             'Declares'  { return 'Declares' }
+            'Streaming' { return 'Streaming' }
             'Shared'    { return 'Shared' }
             'Container' { return 'Container' }
             'Database'  { return 'Database' }
@@ -94,54 +98,77 @@ try {
 
     $adapterReports = New-Object System.Collections.Generic.List[object]
     foreach ($t in $selected) {
+        $expectedModes = if ($t.Plane -eq 'record') { @($modeOrder) } else { @('Declares', 'Shared', 'Container', 'Database') }
         if (-not $t.Project) {
-            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $null; Cells = @(); MissingModes = @($modeOrder); Reason = 'no .csproj found next to the spec' }) | Out-Null
+            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $null; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = 'no .csproj found next to the spec' }) | Out-Null
             continue
         }
         $trxName = "$($t.Plane)-$($t.Adapter).trx"
-        $trx = Join-Path $resultsRoot $trxName
-        $dotnetArgs = @('test', $t.Project, '-c', $Configuration, '--filter', 'FullyQualifiedName~Aodb',
-            '--logger', "trx;LogFileName=$trxName", '--results-directory', $resultsRoot)
+        $trxPath = Join-Path $resultsRoot $trxName
+        $dotnetArgs = @(
+            'test', $t.Project, '--configuration', $Configuration,
+            '--filter', 'FullyQualifiedName~Aodb',
+            '--logger', "trx;LogFileName=$trxName", '--results-directory', $resultsRoot,
+            '--blame-hang-timeout', "$($DeadlineSeconds)s", '--blame-hang-dump-type', 'none'
+        )
         if ($NoBuild) { $dotnetArgs += '--no-build' }
         Write-Host ("forge-verify: running {0}/{1} ..." -f $t.Plane, $t.Adapter) -ForegroundColor DarkGray
         $out = & dotnet @dotnetArgs 2>&1
         $code = $LASTEXITCODE
 
-        if (-not (Test-Path $trx)) {
+        if (-not (Test-Path $trxPath)) {
             $tail = ($out | Select-Object -Last 14) -join "`n"
-            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $t.Project; Cells = @(); MissingModes = @($modeOrder); Reason = "dotnet test produced no TRX (exit $code):`n$tail" }) | Out-Null
+            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $t.Project; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = "dotnet test produced no TRX (exit $code):`n$tail" }) | Out-Null
             continue
         }
 
-        [xml]$xml = Get-Content -Raw $trx
+        [xml]$xml = Get-Content -LiteralPath $trxPath -Raw
         $idToMethod = @{}
-        foreach ($ut in $xml.TestRun.TestDefinitions.UnitTest) { $idToMethod[[string]$ut.id] = [string]$ut.TestMethod.name }
+        foreach ($definition in $xml.TestRun.TestDefinitions.UnitTest) {
+            $idToMethod[[string]$definition.id] = [string]$definition.TestMethod.name
+        }
         $cells = New-Object System.Collections.Generic.List[object]
-        foreach ($r in $xml.TestRun.Results.UnitTestResult) {
-            $method = $idToMethod[[string]$r.testId]
-            if (-not $method) { $method = '[unknown]' }   # testId absent from TestDefinitions — surfaced, never silent
+        foreach ($result in $xml.TestRun.Results.UnitTestResult) {
+            $method = $idToMethod[[string]$result.testId]
+            if (-not $method) { $method = '[unknown]' }
             $mode = Get-Mode $method
-            $outcome = switch ([string]$r.outcome) { 'Passed' { 'Passed' } 'Failed' { 'Failed' } 'NotExecuted' { 'Skipped' } default { [string]$r.outcome } }
-            $reason = ''
-            if ($r.Output -and $r.Output.ErrorInfo -and $r.Output.ErrorInfo.Message) { $reason = ([string]$r.Output.ErrorInfo.Message).Trim() }
-            elseif ($r.Output -and $r.Output.StdOut) { $reason = ([string]$r.Output.StdOut).Trim() }   # defensive fallback
-            $cells.Add([PSCustomObject]@{ Mode = $mode; Method = $method; Outcome = $outcome; Reason = $reason }) | Out-Null
+            $outcome = switch ([string]$result.outcome) {
+                'Passed' { 'Passed' }
+                'Failed' { 'Failed' }
+                { $_ -in @('NotExecuted', 'Skipped') } { 'Skipped' }
+                default { [string]$result.outcome }
+            }
+            $detail = ''
+            if ($result.Output -and $result.Output.ErrorInfo -and $result.Output.ErrorInfo.Message) {
+                $detail = ([string]$result.Output.ErrorInfo.Message).Trim()
+            }
+            elseif ($result.Output -and $result.Output.StdOut) {
+                $detail = ([string]$result.Output.StdOut).Trim()
+            }
+            $cells.Add([PSCustomObject]@{ Mode = $mode; Method = $method; Outcome = $outcome; Reason = $detail }) | Out-Null
         }
         $cellArr = @($cells | Sort-Object { [array]::IndexOf($modeOrder, $_.Mode) })
         $failed = @($cellArr | Where-Object { $_.Outcome -eq 'Failed' }).Count
         $skipped = @($cellArr | Where-Object { $_.Outcome -eq 'Skipped' }).Count
         $passed = @($cellArr | Where-Object { $_.Outcome -eq 'Passed' }).Count
-        # Every conformance spec inherits all four cells (Declares/Shared/Container/Database), so all four MUST appear in
-        # the TRX. A missing mode (or zero cells) = a discovery/filter failure — an ERROR, NEVER a silent GREEN.
         $presentModes = @($cellArr | ForEach-Object { $_.Mode } | Select-Object -Unique)
-        $missingModes = @($modeOrder | Where-Object { $presentModes -notcontains $_ })
-        # Precedence: RED (a real failure) > ERROR (a mode never ran) > SKIPPED (ran but skipped) > GREEN (all four passed).
+        $missingModes = @($expectedModes | Where-Object { $presentModes -notcontains $_ })
+        $unexpectedModes = @($presentModes | Where-Object { $expectedModes -notcontains $_ })
+        $duplicateModes = @($cellArr | Group-Object Mode | Where-Object Count -ne 1 | ForEach-Object Name)
+        $unknownOutcomes = @($cellArr | Where-Object { $_.Outcome -notin @('Passed', 'Failed', 'Skipped') }).Count
         $verdict = if ($failed -gt 0) { 'RED' }
-            elseif ($missingModes.Count -gt 0) { 'ERROR' }
+            elseif ($missingModes.Count -gt 0 -or $unexpectedModes.Count -gt 0 -or $duplicateModes.Count -gt 0 -or
+                $unknownOutcomes -gt 0 -or $code -ne 0) { 'ERROR' }
             elseif ($skipped -gt 0) { 'SKIPPED' }
             else { 'GREEN' }
-        $reason = if ($verdict -eq 'ERROR') { "expected mode(s) not run: $($missingModes -join ', ')" } else { '' }
-        $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = $verdict; Project = $t.Project; Cells = $cellArr; Passed = $passed; Failed = $failed; Skipped = $skipped; MissingModes = $missingModes; Reason = $reason }) | Out-Null
+        $structuralReasons = New-Object System.Collections.Generic.List[string]
+        if ($code -ne 0) { $structuralReasons.Add("dotnet test exited with code $code") }
+        if ($missingModes.Count -gt 0) { $structuralReasons.Add("expected mode(s) not run: $($missingModes -join ', ')") }
+        if ($unexpectedModes.Count -gt 0) { $structuralReasons.Add("unexpected mode(s): $($unexpectedModes -join ', ')") }
+        if ($duplicateModes.Count -gt 0) { $structuralReasons.Add("mode(s) did not run exactly once: $($duplicateModes -join ', ')") }
+        if ($unknownOutcomes -gt 0) { $structuralReasons.Add("unknown test outcome(s): $unknownOutcomes") }
+        $reason = $structuralReasons -join '; '
+        $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = $verdict; Project = $t.Project; Cells = $cellArr; ExpectedModes = $expectedModes; Passed = $passed; Failed = $failed; Skipped = $skipped; MissingModes = $missingModes; Reason = $reason }) | Out-Null
     }
 
     # ---- aggregate the gate verdict ----
@@ -163,7 +190,7 @@ try {
             adapters  = @($adapterReports | ForEach-Object {
                     [PSCustomObject]@{
                         adapter       = $_.Adapter; plane = $_.Plane; verdict = $_.Verdict; project = $_.Project
-                        expectedCells = $modeOrder.Count
+                        expectedCells = @($_.ExpectedModes).Count
                         actualCells   = @($_.Cells).Count
                         missingModes  = @($_.MissingModes)
                         cells         = @($_.Cells | ForEach-Object { [PSCustomObject]@{ mode = $_.Mode; outcome = $_.Outcome; reason = $_.Reason } })

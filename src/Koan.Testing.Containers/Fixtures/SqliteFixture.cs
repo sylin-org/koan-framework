@@ -30,8 +30,7 @@ public sealed class SqliteFixture : KoanContainerFixture
     {
         if (_dbPath is not null)
         {
-            try { if (File.Exists(_dbPath)) File.Delete(_dbPath); }
-            catch { /* best-effort temp cleanup */ }
+            if (File.Exists(_dbPath)) File.Delete(_dbPath);
         }
         return ValueTask.CompletedTask;
     }

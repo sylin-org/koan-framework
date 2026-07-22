@@ -13,7 +13,8 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
     - `AdapterSurfaceSpecsBase<TFactory>` — 31 HTTP surface specs (CRUD, sort, pagination, PATCH ×3 content types, DELETE bulk / by-query / all, body-query, filter)
     - `AdapterPartitionSpecsBase<TFactory>` — 8 partition routing specs (?set= isolation on read/write/delete/patch/bulk)
     - `AdapterTransferSpecsBase<TFactory>` — 9 cross-partition transfer specs (`Copy`, `Move`, fluent `MoveFrom().To()`, `CopyPartition`, `MovePartition`, `ClearPartition`, predicate-filtered transfer)
-  - `Containers/` — Testcontainers helpers for Mongo, Postgres, Redis, SqlServer, Couchbase (all on `Testcontainers 4.11.0` per-image packages)
+  - `Containers/` — Web reset bridges over the public `Koan.Testing.Containers` fixtures for Mongo,
+    Postgres, Redis, SqlServer, and Couchbase; the Web matrix owns no duplicate container constructor
 
 - **Per-adapter projects** subclass each of the three base classes (one-liner each) and declare capabilities on the factory.
 
@@ -21,7 +22,11 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
 
 Each adapter declares what it supports via `IAdapterCapabilities` on its factory. Specs that need a missing capability skip with `[FactoryName] does not support <capability>`. The default for `SupportsDeleteByQuery` and `SupportsQueryStringFilter` is **false** because the framework's string-query path requires `IStringQueryRepository` (only the relational adapters implement it) and silently degrades to "operate on all" otherwise — a real adapter inconsistency the matrix surfaced.
 
-## Status
+## Historical status baseline
+
+The counts below predate R13-06's fail-closed infrastructure boundary and are retained only as the
+last complete capability baseline. Required Docker infrastructure no longer turns setup failure into
+a skip; rerun an adapter on a Docker-capable host before treating its row as current evidence.
 
 48 specs per adapter (31 surface + 8 partition + 9 transfer). Numbers below are passing / skipped / failing.
 
@@ -34,9 +39,9 @@ Each adapter declares what it supports via `IAdapterCapabilities` on its factory
 | **Postgres** | **25 / 23 / 0** | Testcontainer `postgres:18.4-alpine`. Same partition/transfer opt-out as Sqlite. |
 | **Redis** | **25 / 23 / 0** | Testcontainer Redis. Most partition ops work but bulk-upsert and collection-read with `?set=` leak across to default; opted out to keep the matrix honest. |
 | **SqlServer** | **25 / 23 / 0** | Testcontainer MsSql. Same partition/transfer opt-out as Sqlite/Postgres. |
-| **Couchbase** | **0 / 48 / 0** | Whole suite cleanly skipped: `Testcontainers.Couchbase` exposes KV and management on separate random host ports, but Koan's `CouchbaseClusterProvider` derives the management URL from the single KV connection string. Set `Koan_TESTS_COUCHBASE=...` to run against an externally provisioned cluster. |
+| **Couchbase** | **0 / 48 / 0** | Historical pre-R13 baseline. The shared fixture now exposes separate KV, management, and query endpoints; current execution requires Docker or an explicit external connection. |
 
-**Total: 209 active passing, 159 cleanly skipped, 0 failing across 8 adapters.**
+**Historical total: 209 passing, 159 skipped, 0 failing across 8 adapters.**
 
 The 6-skip baseline (3 PATCH variants + 2 DeleteByQuery + 1 ?filter=) reflects the framework limitations documented below; the 23-skip pattern on relational + Mongo + Redis reflects partition-routing opt-out.
 
@@ -81,11 +86,12 @@ This expansion was a productive net negative — it found more framework issues 
 2. Rename namespace, project, csproj refs.
 3. Update `Program.cs` to set `Koan:Data:Sources:Default:Adapter` to the new adapter name.
 4. Update the `Factory` class:
-   - Container-based: instantiate the matching `*ContainerHelper`, inject `ConnectionString` via `ConfigureAppConfiguration`.
+   - Container-based: instantiate the matching `*ContainerHelper`, which delegates infrastructure
+     ownership to `Koan.Testing.Containers`, and inject its `ConnectionString` via configuration.
    - File-based: pick a temp path; clean up in `DisposeAsync`.
    - Implement `ResetAsync()` — drop the database / clear the store.
    - Override capability flags on the factory that don't apply (e.g. `public bool SupportsPartitions => false;`).
-5. Add `WebApplicationFactoryContentRoot` + `[assembly: CollectionBehavior(DisableTestParallelization = true)]` in `Properties/AssemblyInfo.cs` (the parallelization toggle is required because the three spec classes share `AppHost.Current`).
+5. Add `WebApplicationFactoryContentRoot` + `[assembly: CollectionBehavior(DisableTestParallelization = true)]` in `Properties/AssemblyInfo.cs` (the three spec classes share one factory/backend lifecycle).
 6. Spec classes are one-liners per base:
    ```csharp
    public sealed class XAdapterSurfaceSpecs : AdapterSurfaceSpecsBase<XAdapterFactory> { public XAdapterSurfaceSpecs(XAdapterFactory f) : base(f) { } }
@@ -101,12 +107,12 @@ dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.InMemory.Tes
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Json.Tests
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Sqlite.Tests
 
-# Adapters that need Docker; tests gracefully Skip without it
+# Adapters that need Docker; unavailable required infrastructure fails setup
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Mongo.Tests
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Postgres.Tests
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Redis.Tests
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.SqlServer.Tests
 
-# Couchbase currently always skips (see Status); set Koan_TESTS_COUCHBASE to run against an external cluster
+# Couchbase uses the shared fixture's separate KV, management, and query endpoints
 dotnet test tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Couchbase.Tests
 ```

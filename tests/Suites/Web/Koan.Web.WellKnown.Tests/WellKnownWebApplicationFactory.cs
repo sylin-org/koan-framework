@@ -49,7 +49,6 @@ public sealed class WellKnownWebApplicationFactory : IAsyncLifetime
                 }))
                 .ConfigureServices(services =>
                 {
-                    AppHost.Current = null;
                     services.AddKoan();
                 })
                 .Configure(_ => { });

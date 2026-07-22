@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core.Capabilities;
@@ -48,11 +50,12 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     protected IntegrationHost? Host { get; private set; }
     private string? _skip;
+    private IDisposable? _hostScope;
 
     /// <summary>
     /// Boot the adapter's <c>AddKoan()</c> conformance host (tenancy + the shard axis discovered). Return a skip reason
     /// (e.g. Docker/backend unavailable) instead of a host to skip the whole ledger. The base sets
-    /// <see cref="AppHost.Current"/> and tears the host down.
+    /// a flow-owned <see cref="AppHost"/> scope and tears the host down.
     /// </summary>
     protected abstract Task<(IntegrationHost? host, string? skip)> BootHostAsync();
 
@@ -78,17 +81,41 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
         var (host, skip) = await BootHostAsync().ConfigureAwait(false);
         Host = host;
         _skip = skip;
-        if (host is not null) AppHost.Current = host.Services;
+        if (host is not null) _hostScope = AppHost.PushScope(host.Services);
     }
 
     public async ValueTask DisposeAsync()
     {
-        if (Host is not null)
+        var failures = new List<Exception>();
+        try
         {
-            if (ReferenceEquals(AppHost.Current, Host.Services)) AppHost.Current = null;
-            await Host.DisposeAsync().ConfigureAwait(false);
+            _hostScope?.Dispose();
         }
-        await DisposeBackendAsync().ConfigureAwait(false);
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        try
+        {
+            if (Host is not null) await Host.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        try
+        {
+            await DisposeBackendAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException("Vector AODB host and backend teardown failed.", failures);
     }
 
     private void SkipIfUnavailable() => Assert.SkipWhen(_skip is not null, _skip ?? "");

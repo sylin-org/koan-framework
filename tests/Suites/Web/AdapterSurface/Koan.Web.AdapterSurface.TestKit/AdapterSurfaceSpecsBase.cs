@@ -711,7 +711,6 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
 
     private async Task UpsertWidget(string id, string? name = null, int priority = 0, List<Sighting>? sightings = null)
     {
-        AppHost.Current = Factory.Services;
         await Widget.Upsert(new Widget
         {
             Id = id,

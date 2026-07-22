@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Runtime.ExceptionServices;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
@@ -32,7 +33,7 @@ public abstract class AdapterTestFactoryBase : IAdapterTestFactory
     /// <summary>Human-readable reason when <see cref="IsAvailable"/> is false.</summary>
     public virtual string? UnavailableReason => null;
 
-    public HttpClient Client => _client ?? new HttpClient();
+    public HttpClient Client => _client ?? throw new InvalidOperationException("Adapter Web host not started");
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Adapter host not started");
 
     /// <summary>ASP.NET host environment. Non-production so the relational DDL guard allows AutoCreate.</summary>
@@ -62,36 +63,90 @@ public abstract class AdapterTestFactoryBase : IAdapterTestFactory
         await StartBackingStoreAsync();
         if (!IsAvailable) return;
 
-        var builder = Host.CreateDefaultBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.UseContentRoot(AppContext.BaseDirectory);
-                web.UseEnvironment(HostEnvironment);
-                web.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(AdapterConfiguration()));
-                web.ConfigureServices(services =>
+        try
+        {
+            var builder = Host.CreateDefaultBuilder()
+                .ConfigureWebHost(web =>
                 {
-                    AppHost.Current = null;
-                    services.AddKoan();
-                    services.AddKoanControllersFrom<WidgetController>();
-                    ConfigureAdditionalServices(services);
+                    web.UseTestServer();
+                    web.UseContentRoot(AppContext.BaseDirectory);
+                    web.UseEnvironment(HostEnvironment);
+                    web.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(AdapterConfiguration()));
+                    web.ConfigureServices(services =>
+                    {
+                        services.AddKoan();
+                        services.AddKoanControllersFrom<WidgetController>();
+                        ConfigureAdditionalServices(services);
+                    });
+                    web.Configure(_ => { });
                 });
-                web.Configure(_ => { });
-            });
 
-        _host = await builder.StartAsync(TestContext.Current.CancellationToken);
-        _client = _host.GetTestClient();
-        _client.BaseAddress = new Uri("http://localhost");
+            _host = await builder.StartAsync(TestContext.Current.CancellationToken);
+            _client = _host.GetTestClient();
+            _client.BaseAddress = new Uri("http://localhost");
+        }
+        catch (Exception startFailure)
+        {
+            try
+            {
+                await StopBackingStoreAsync();
+            }
+            catch (Exception cleanupFailure)
+            {
+                throw new AggregateException(
+                    "Adapter Web host startup and backing-store cleanup both failed.",
+                    startFailure,
+                    cleanupFailure);
+            }
+
+            ExceptionDispatchInfo.Capture(startFailure).Throw();
+        }
     }
 
     public virtual async ValueTask DisposeAsync()
     {
-        _client?.Dispose();
+        var failures = new List<Exception>();
+        try
+        {
+            _client?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
         if (_host is not null)
         {
-            await _host.StopAsync();
-            _host.Dispose();
+            try
+            {
+                await _host.StopAsync();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+
+            try
+            {
+                if (_host is IAsyncDisposable asyncHost) await asyncHost.DisposeAsync();
+                else _host.Dispose();
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
         }
-        await StopBackingStoreAsync();
+
+        try
+        {
+            await StopBackingStoreAsync();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
+
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException("Adapter Web host teardown failed.", failures);
     }
 }

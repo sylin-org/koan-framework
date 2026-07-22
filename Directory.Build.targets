@@ -1,4 +1,11 @@
 <Project>
+  <PropertyGroup>
+    <!-- ARCH-0120: this targets file is evaluated after each project-local baseline declaration.
+         Standard SDK validation protects later packs; release-on-main's api-baselines guard permits
+         a missing baseline only until the first immutable public 0.20 artifact exists. -->
+    <EnablePackageValidation Condition="'$(PackageValidationBaselineVersion)' != ''">true</EnablePackageValidation>
+  </PropertyGroup>
+
   <!--
     ARCH-0085: package versions are computed by Nerdbank.GitVersioning from each package's
     version.json (operator-owned major.minor) + git commit height (automatic patch). nbgv sets

@@ -34,6 +34,7 @@ public static class Constants
         public static class DataFallback
         {
             public const string ConnectionString = "Koan:Data:ConnectionString";
+            public const string DefaultSource = ".koan/data/Koan.sqlite";
         }
     }
 

@@ -182,6 +182,10 @@
       href: ARCH-0118-evidence-derived-product-surface.md
     - name: ARCH-0119 One console host lifecycle
       href: ARCH-0119-one-console-host-lifecycle.md
+    - name: ARCH-0120 Value-led promotion to the Koan 0.20 surface
+      href: ARCH-0120-terminal-package-maturity.md
+    - name: ARCH-0121 Claim-scoped validation and a cheap main boundary
+      href: ARCH-0121-claim-scoped-validation.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

@@ -108,7 +108,7 @@ public sealed class DataProviderSelectionPackageBuildTests
             var runner = new ProcessRunner();
             await runner.RequireAsync(
                 "dotnet",
-                ["restore", "Probe.csproj", "--configfile", config, "--nologo", property],
+                ["restore", "Probe.csproj", "--configfile", config, "--no-dependencies", "--nologo", property],
                 app,
                 TestContext.Current.CancellationToken);
             await runner.RequireAsync(

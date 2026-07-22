@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <PackageValidationBaselineVersion>0.20.2</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Governed MCP operations for Koan Jobs and Cache, with explicit enablement, exact grants, destructive confirmation, and mutation audit.</Description>

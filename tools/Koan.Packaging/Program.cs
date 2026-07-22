@@ -12,8 +12,10 @@ internal static class PackagingProgram
         {
             var cancellationToken = CancellationToken.None;
             var root = FindRepositoryRoot(Environment.CurrentDirectory);
-            var repository = new RepositoryInspector(root, new ProcessRunner());
+            var processRunner = new ProcessRunner();
+            var repository = new RepositoryInspector(root, processRunner);
             var productSurfaceCompiler = new ProductSurfaceCompiler(root);
+            var generatedOutputVerifier = new GeneratedOutputVerifier(root);
             var packageQualityCompiler = new PackageQualityCompiler(root);
             var command = args.FirstOrDefault()?.ToLowerInvariant() ?? "help";
             var options = CommandOptions.Parse(args.Skip(1));
@@ -48,20 +50,52 @@ internal static class PackagingProgram
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
                     var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
-                    await WriteOutputAsync(
-                        options.Value("output"),
-                        ProductSurfaceCompiler.ToJson(surface).TrimEnd(),
-                        cancellationToken);
-                    var markdown = options.Value("markdown");
-                    if (markdown is not null)
+                    var jsonContent = ProductSurfaceCompiler.ToJson(surface).TrimEnd();
+                    var markdownContent = ProductSurfaceCompiler.ToMarkdown(surface).TrimEnd();
+                    if (options.Has("check"))
                     {
-                        await WriteOutputAsync(
-                            markdown,
-                            ProductSurfaceCompiler.ToMarkdown(surface).TrimEnd(),
-                            cancellationToken);
+                        if (options.Has("output") || options.Has("markdown"))
+                        {
+                            throw new InvalidOperationException(
+                                "product-surface --check uses the canonical generated paths and cannot write outputs.");
+                        }
+                        generatedOutputVerifier.RequireMatch(
+                            PackagingConstants.ProductSurface.GeneratedJsonPath,
+                            jsonContent);
+                        generatedOutputVerifier.RequireMatch(
+                            PackagingConstants.ProductSurface.GeneratedMarkdownPath,
+                            markdownContent);
+                    }
+                    else
+                    {
+                        await WriteOutputAsync(options.Value("output"), jsonContent, cancellationToken);
+                        var markdown = options.Value("markdown");
+                        if (markdown is not null)
+                        {
+                            await WriteOutputAsync(markdown, markdownContent, cancellationToken);
+                        }
                     }
 
-                    Console.WriteLine($"surface    {surface.Claims.Count} claim(s), {surface.Packages.Count} package(s)");
+                    Console.WriteLine(
+                        $"surface    {surface.Claims.Count} claim(s), {surface.Packages.Count} package(s)" +
+                        (options.Has("check") ? ", generated outputs current" : string.Empty));
+                    return 0;
+                }
+                case "api-baselines":
+                {
+                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
+                    var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
+                    using var client = new HttpClient
+                    {
+                        BaseAddress = new Uri(PackagingConstants.PackageValidation.NuGetFlatContainerBaseUrl)
+                    };
+                    var validator = new PackageBaselineValidator(
+                        (packageId, ct) => PackageBaselineValidator.ReadNuGetVersionsAsync(client, packageId, ct));
+                    var report = await validator.ValidateAsync(packages, surface, cancellationToken);
+                    Console.WriteLine(
+                        $"api-baselines  {report.ConfiguredBaselines}/{report.AssemblyOwners} configured, " +
+                        $"{report.FirstPublicationPending} first-publication pending, " +
+                        $"{report.ContentOnlyOwners} content-only");
                     return 0;
                 }
                 case "inventory":
@@ -95,7 +129,8 @@ internal static class PackagingProgram
 
           inventory       [--output PATH]
           quality         [--output PATH] [--markdown PATH]
-          product-surface [--output PATH] [--markdown PATH]
+          product-surface [--output PATH] [--markdown PATH] [--check]
+          api-baselines
         """);
 
     private static async Task WriteOutputAsync(string? path, string content, CancellationToken cancellationToken)
@@ -146,4 +181,6 @@ internal sealed class CommandOptions
     }
 
     public string? Value(string name) => values.GetValueOrDefault(name);
+    public bool Has(string name) => values.ContainsKey(name);
+
 }

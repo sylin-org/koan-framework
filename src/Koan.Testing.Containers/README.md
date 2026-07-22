@@ -54,7 +54,9 @@ public sealed class TodoSpec(PostgresFixture fixture, ITestOutputHelper output)
 }
 ```
 
-- `RequireBackingStore()` skips with the fixture's diagnostic reason when infrastructure is absent.
+- `RequireBackingStore()` fails with the fixture's diagnostic reason when setup did not produce a
+  usable store. Optional local runs can select a Docker-free fixture; required native admission never
+  treats missing infrastructure as evidence.
 - `BootAsync()` starts a real `KoanIntegrationHost` with `AddKoan()` and returns an async-disposable
   `BoundHost`.
 - `BootAsync(configure)` adds test services after `AddKoan()`.
@@ -70,14 +72,16 @@ Testcontainers. `InMemoryFixture`, `JsonFixture`, and `SqliteFixture` provide th
 without Docker. `CockroachFixture` is available for CockroachDB-specific suites.
 
 An explicit `Koan_<ENGINE>__CONNECTION_STRING` environment variable selects a pre-running service;
-otherwise container fixtures use Testcontainers' normal runtime discovery.
+otherwise container fixtures use Testcontainers' normal runtime discovery. A bad endpoint, unavailable
+runtime, image/start failure, or stop failure remains a failed test with its original diagnostic.
 
 ## Limits
 
 - Tests within one process must serialize host boots unless they establish their own explicit
   `AppHost.PushScope` around the complete operation flow.
 - Partition isolation protects data; it does not make process-default host selection parallel-safe.
-- Container-start failure skips guarded specs. It does not prove the adapter works on that machine.
+- Container-start and teardown failures fail the fixture. Use an explicit Docker-free fixture when
+  the intended test contract does not require native infrastructure.
 
 See [`TECHNICAL.md`](./TECHNICAL.md) for lifecycle and ownership details and
 [`docs/guides/testing-your-app.md`](../../docs/guides/testing-your-app.md) for the broader testing

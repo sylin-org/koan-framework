@@ -41,8 +41,7 @@ internal sealed class ProcessRunner
         var stdoutTask = CaptureAsync(process.StandardOutput, echo ? Console.Out : null, cancellationToken);
         var stderrTask = CaptureAsync(process.StandardError, echo ? Console.Error : null, cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-        var result = new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
-        return result;
+        return new ProcessResult(process.ExitCode, await stdoutTask, await stderrTask);
     }
 
     public async Task<string> RequireAsync(

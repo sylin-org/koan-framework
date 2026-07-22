@@ -29,13 +29,6 @@ public sealed class SqliteEngineSpec : CrossEngineCacheBehaviorSpecBase, IDispos
 
     public void Dispose()
     {
-        try
-        {
-            if (File.Exists(_databasePath)) File.Delete(_databasePath);
-        }
-        catch
-        {
-            // ignored — best-effort cleanup
-        }
+        if (File.Exists(_databasePath)) File.Delete(_databasePath);
     }
 }

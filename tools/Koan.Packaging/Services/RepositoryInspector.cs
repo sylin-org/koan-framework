@@ -155,7 +155,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes",
+                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes,PackageValidationBaselineVersion,EnablePackageValidation",
                 "-getItem:ProjectReference", "-p:PublicRelease=true"
             ],
             repositoryRoot,
@@ -221,7 +221,9 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "RepositoryUrl"),
             ReadString(properties, "PackageLicenseExpression"),
             ReadString(properties, "PackageReleaseNotes"),
-            versionIntent);
+            versionIntent,
+            ReadString(properties, "PackageValidationBaselineVersion"),
+            ReadBoolean(properties, "EnablePackageValidation", defaultValue: false));
     }
 
     private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)

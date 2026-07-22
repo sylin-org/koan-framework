@@ -3,13 +3,13 @@ type: ARCHITECTURE
 domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
-status: draft
-last_updated: 2026-07-19
+status: current
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-19
+  date_last_tested: 2026-07-21
   status: in-progress
-  scope: R12 opening, selective 0.20 guarantee promotion, and coherent-public-narrative mandate
+  scope: draft PR 95 simplified and focused-green; cheap merge coherence pending
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,14 +20,18 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T7C — 0.20 public-preview maturity`
-- Active work item: [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md)
-- Active child: [R12-04 — Establish one coherent public narrative](work-items/r12/R12-04-coherent-public-narrative.md)
-- Most recently passed child: [R12-03 — Compile the preview product boundary](work-items/r12/R12-03-preview-product-boundary.md)
-- Pending release boundary: realign all public-facing content and compile a fresh selective candidate
-  before remote observation
-- Preview readiness: `not ready`; coherent narrative, public
-  observation, later upgrade/recovery proof, and an explicit maturity decision remain
+- Current tranche: `T8 — public provider promotion`
+- Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
+- Active child: obtain green cheap PR coherence for the first value-led promotion slice
+- Most recently completed R13 child: [R13-06 — first value-led 0.20 promotion slice](work-items/r13/R13-06-wave-0-testing-and-quick-wins.md)
+- Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
+- Pending release boundary: maintainer acceptance and merge of the green first promotion slice, then
+  public observation through the later-wave upgrade and interruption-recovery proof
+- Preview readiness: `not ready`; R12-07's later-wave public upgrade/recovery, feedback triage, and
+  maintainer go/no-go record remain
+- Deliberate overlap: R12 remains `in-progress` only for
+  [R12-07](work-items/r12/R12-07-preview-evolution.md); R13 owns current implementation, and its first
+  dependency-closed publication wave will supply R12-07's evidence
 
 ## Work items
 
@@ -45,7 +49,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
-| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-19 | R12-01 through R12-03 pass. Generated truth admits exactly 38 package owners to 0.20 with a closed supported dependency graph; R12-04 now realigns every public-facing surface around that promise. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-21 | R12-01 through R12-06 are complete: 38 supported owners publish on 0.20 and the public template journey is proved. R12-07 owns the bounded later-wave upgrade/recovery, feedback triage, and final go/no-go record, using the first dependency-closed R13 wave. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Draft PR #95 implements the lean ARCH-0120 path: seven useful promotions, direct family/native evidence, a dependency-closed package consumer, and API/product guards. Focused evidence and a one-time exact ratchet are green; merge now requires only cheap repository coherence, never certification. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -66,12 +71,19 @@ item should normally be `in-progress`.
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
-| R12 | in-progress | R12-01 through R12-03 pass: the version contract, promise-level seams, and exact 38-owner 0.20 boundary agree. R12-04 owns the coherent narrative; package-only readers, publication, and preview evolution follow. |
+| R12 | in-progress | R12-01 through R12-06 are complete. R12-07 is ready and will close from the first dependency-closed R13 publication/consumer observation, feedback triage, and maintainer go/no-go record. |
+| R13 | in-progress | The lean seven-package slice, focused repairs, connected consumer, native proof, and one-time exact ratchet are green. Obtain cheap PR coherence, then merge under the maintainer's explicit authorization and observe publication. Data providers follow. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-22 | Practical merge and publication flow | Per-package NBGV versioning and main publication had become coupled to a 107-project certification ratchet, a permanent PR-native job, a duplicate surface workflow, and repeated consumer proof. This delayed framework work while proving unrelated providers and confused portfolio certification with package identity. | ARCH-0121 keeps one cheap main-PR coherence job and one test-free main publisher. Affected behavior/native tests run during development; clean consumers apply only to first publication or changed artifact shape; the complete ratchet is an explicit whole-framework milestone. The exact replacement flow passed in 86.6 seconds versus about 16 minutes 22 seconds for the preceding connected gate. |
+| 2026-07-21 | R13 first-slice merge ratchet | The first simplified PR ratchet passed build, docs, product truth, API posture, and direct native proof, but its deterministic test leg exposed three real evidence seams: failed-start cleanup masked corrective exceptions, the shared Mongo Web bridge changed the database without preserving authentication source, and the clean consumer omitted locally newer package dependencies. | Keep the lean path and repair each direct owner. Dispose incomplete hosts without an invalid stop sequence; preserve an authenticated Mongo URL's original auth database; derive and pack the promoted owners' complete public project-reference closure through the existing repository inspector. Focused host/Communication/Data and real Mongo evidence pass; rerun the final PR ratchet. |
+| 2026-07-21 | ARCH-0120 value-led correction | The fixed 55-owner program confused repository accounting with product value. Provider adapters are legitimate public leaf packages whose consumers are applications; reverse dependencies cannot decide whether they belong. The ten-wave plan, terminal certificate, central exact-cell metadata, and generic admission/native-candidate coordination added more process than the 0.20 promotion decision required. | Amend ARCH-0120 and R13 around cohesive provider families. Product intent decides inclusion; shared semantics, provider-specific real-boundary proof, a clean consumer, and package/API integrity decide promotion. Preserve the claim/version/dependency invariant, API baselines, generated truth, and existing family tests. Keep PR #95 draft until superseded machinery is removed and the smaller slice is revalidated. |
+| 2026-07-21 | R13-06 first value-led slice | Honest lifecycle and provider proof exposed a pooled SQLite file lock, swallowed host-stop faults, duplicated adapter fixtures, nondeterministic Windows logging/data-protection state, incomplete Forge result handling, and first-publication baseline handling. The first implementation also added a central cell/admission/native-candidate/terminal program that did not improve the application guarantee. | Keep the lifecycle, conformance, consumer, API-baseline, generated-truth, and seven package-promotion value. Make Forge fail closed through direct `dotnet test`; run the sole native PostgreSQL lifecycle fact as a direct workflow job. Remove central admission metadata/services, candidate planning, terminal reconciliation, and their three work cards. Product intent selects later families; proportional evidence proves them. |
+| 2026-07-21 | R13-01 supported API baselines | The accepted 38-owner supported boundary contains 35 assembly-bearing packages and three content-only owners (`Sylin.Koan`, `Sylin.Koan.App`, and `Sylin.Koan.Templates`), so applying SDK API validation to all 38 would be false. SDK package downloads also occur at restore time, so a not-yet-public first 0.20 artifact cannot validate against itself during its first pack. | Record the exact earliest immutable public 0.20 version in each of the 35 assembly-owner projects and activate standard SDK validation after project evaluation. Keep artifact/dependency-shape checks for the three content owners. Add one fail-closed guard to the existing packaging tool/main publisher: a missing baseline is allowed only while NuGet has no stable 0.20 artifact; every later patch is rejected until the earliest artifact is configured. Focused policy passes 7/7, packaging passes 35/35, the tool builds warning-clean, public verification reports 35/35 configured, and real assembly/content packs pass. |
+| 2026-07-21 | ARCH-0120 / R13 terminal package maturity | The generated surface has 38 supported 0.20 owners and 55 earlier-line owners. Moving all 55 mechanically to a common version would break the compiler-enforced meaning of 0.20; six AI owners also have accepted public migration homes rather than a Koan support disposition. | Retain the bidirectional claim/version/dependency invariant and open a distinct R13 epic. Execute ten dependency-closed waves; each owner terminates as supported 0.20, absorbed, publicly migrated, or retired. The first wave supplies R12-07 so preview completion does not wait on the full cross-repository program. Use supported test helpers, shared family matrices, exact claim evidence, standard .NET API compatibility, and a credential-free native validation lane without adding a maturity or release subsystem. |
 | 2026-07-19 | R12-03 selective 0.20 boundary | The provisional 35-package assessment omitted SQLite even though the admitted template depends on it through the relational layer; package availability and old `verified` labels also did not distinguish a preview support promise. | Admit guarantees first, yielding a closed 14-owner foundation plus 24 supported-extension owners. Promote exactly those 38 owners to project-local 0.20 and enforce bidirectional claim/version/dependency agreement in the existing generated product-surface compiler. Focused graph/version tests pass 41/41, lineage/planner tests pass 39/39, the tool builds warning-clean, and public docs pass 233/42. R12-03 passes; R12-04 opens on one coherent greenfield narrative. |
 | 2026-07-19 | R12-02 MCP transport/JSON boundary | MCP split the HTTP decision across a legacy master and nullable Streamable override, repeated transport selection on every Entity despite one shared handler, and serialized custom results differently from Entity/Web data. | Make transports one host decision: explicit STDIO, Streamable HTTP, deprecated legacy SSE, one HTTP route, one session vocabulary. Remove per-Entity transport metadata and compatibility aliases before 0.20. Reuse one camelCase, `[McpIgnore]`-aware application serializer across Entity/custom/Code Mode while preserving protocol DTO names. MCP conformance 80/80, HTTP 19/19, field exclusion 5/5, Code Mode 27/27, source consumers 3/3, warning-clean build, and public docs 233/42 pass. |
 | 2026-07-19 | R12-02 Data/Web filter and Entity-name boundary | PMC-007's old drop-filter concern no longer matched the unified AST/coordinator, but its public reference still implied SQLite-only semantics. PMC-015 remained real: inherited `Id` plus `id` has no portable JSON/provider identity. | Keep one filter pipeline and state its result guarantee without promising equal pushdown/cost. Strengthen the shared HTTP oracle, then reject case-colliding public Entity properties once at Data's cached first-use guard before adapter creation. InMemory 74/74, JSON 52/52, SQLite 52/52, exact guard/activation 9/9, and warning-clean affected builds pass. |

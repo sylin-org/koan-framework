@@ -9,9 +9,9 @@
     0.  Tools       dotnet tool restore      — pinned repository tools used by executable proofs.
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
-    A'. Test        dotnet test per project  — runs every runnable suite in its own host lifecycle
-                    through a bounded parallel wave with per-host hang detection. Container-gated
-                    integration specs skip cleanly when infra is absent. Skip with -SkipTests.
+    A'. Test        dotnet test per project  — runs every deterministic suite in its own host lifecycle
+                    through a bounded parallel wave with per-host hang detection. Real provider
+                    boundaries are owned by direct workflow checks. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
     B'. Public docs scripts/public-docs-lint.ps1 — current navigation boundary, retired
@@ -149,6 +149,7 @@ try {
                         '-c', $configuration,
                         '--no-build',
                         '--nologo',
+                        '--filter', 'KoanLane!=native',
                         '--blame-hang-timeout', $hangTimeout,
                         '--blame-hang-dump-type', 'none'
                     )
@@ -175,6 +176,7 @@ try {
                         '-c', $Configuration,
                         '--no-build',
                         '--nologo',
+                        '--filter', 'KoanLane!=native',
                         '--blame-hang-timeout', $testHostHangTimeout,
                         '--blame-hang-dump-type', 'none'
                     )

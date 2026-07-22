@@ -88,7 +88,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("src", count: 3);
 
         var result = await Entity<Widget>.Copy()
@@ -113,7 +112,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("staging", count: 4);
 
         var result = await Entity<Widget>.Move()
@@ -138,7 +136,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         using (EntityContext.With(partition: "mixed"))
         {
             await Widget.Upsert(new Widget { Id = "lo-1", Name = "Lo", Priority = 1 });
@@ -165,7 +162,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("src-direct", count: 5);
 
         var copied = await Data<Widget, string>.CopyPartition("src-direct", "dst-direct");
@@ -185,7 +181,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("src-move", count: 3);
 
         var moved = await Data<Widget, string>.MovePartition("src-move", "dst-move");
@@ -205,7 +200,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("fl-src", count: 2);
 
         var result = await Data<Widget, string>.MoveFrom("fl-src")
@@ -224,7 +218,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("fl-src-move", count: 2);
 
         await Data<Widget, string>.MoveFrom("fl-src-move").To("fl-dst-move");
@@ -243,7 +236,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("to-clear", count: 4);
 
         var removed = await Data<Widget, string>.ClearPartition("to-clear");
@@ -262,7 +254,6 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
-        AppHost.Current = Factory.Services;
         await SeedPartition("same", count: 2);
 
         var copied = await Data<Widget, string>.CopyPartition("same", "same");

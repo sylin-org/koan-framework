@@ -12,7 +12,7 @@ namespace Koan.Testing.Containers;
 /// <summary>
 /// ARCH-0091 base for engine integration specs. Injects the assembly-shared container fixture
 /// (<typeparamref name="TFixture"/>) and provides the three things every connector spec needs:
-/// a Docker-absent skip guard, a real reflective <c>AddKoan()</c> boot bound to the ambient host
+/// a fail-closed backing-store guard, a real reflective <c>AddKoan()</c> boot bound to the ambient host
 /// (ARCH-0079), and a per-call isolation partition lease (ARCH-0091 Decision 4).
 /// </summary>
 /// <remarks>
@@ -32,12 +32,13 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
         Output = output ?? throw new ArgumentNullException(nameof(output));
     }
 
-    /// <summary>Skip the test (native v3 dynamic skip) when the backing store is unavailable.</summary>
+    /// <summary>Fail when fixture setup did not produce a usable backing store.</summary>
     protected void RequireBackingStore()
     {
         if (!Fixture.IsAvailable)
         {
-            Assert.Skip(Fixture.Reason ?? $"{Fixture.Engine} backing store unavailable");
+            throw new InvalidOperationException(
+                Fixture.Reason ?? $"{Fixture.Engine} backing store unavailable. Ensure fixture setup completed successfully.");
         }
     }
 
@@ -59,7 +60,7 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(Fixture.SettingsForBoot())
             .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
-            .StartAsync()
+            .StartAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(false);
         return new BoundHost(host);
     }
@@ -79,7 +80,7 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
             .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
-            .StartAsync()
+            .StartAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(false);
         return new BoundHost(host);
     }

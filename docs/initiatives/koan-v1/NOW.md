@@ -2,7 +2,7 @@
 type: HANDOFF
 domain: koan-v1
 status: active
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 framework_version: v0.20.0
 ---
 
@@ -10,10 +10,11 @@ framework_version: v0.20.0
 
 ## Current objective
 
-Finish the road to the 0.20 pre-release with product work and a coherent public narrative. Release
+Complete the 0.20 maturity cycle by bringing every remaining earlier-line package owner to a
+terminal, evidence-backed decision while preserving 0.20 as the supported-contract signal. Release
 automation is infrastructure, not a product capability, and must remain proportionate.
 
-## Active slice: public-feed first use observed; clean-template correction ready
+## Completed baseline: first supported wave and public consumer proof
 
 The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
 failures in release orchestration rather than framework behavior. The later manual-from-`dev`
@@ -45,21 +46,56 @@ Focused implementation evidence:
   legacy release state;
 - `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
   pack command in the same job.
-- Public `Sylin.Koan.Templates 0.20.5` installs and generates successfully. The generated web app
-  builds and passes SQLite-backed REST create/read plus runtime facts, but its stale
-  `[0.20.0,0.21.0)` references emit NU1603 because the first published App/SQLite versions are
-  `0.20.4`.
-- The template source now uses standard `0.20.*` patch floats. An exact packed correction installed
-  in an isolated hive; both generated projects restored from NuGet.org without warnings, the web
-  project built cleanly, and the console passed SQLite Entity save/load/query.
-- A separate non-blocking startup-explanation rough edge remains: local SQLite fallback succeeds only
-  after logging a failed service-discovery correction. Keep it with the discovery/runtime owner.
+- Public `Sylin.Koan.Templates 0.20.6` now uses standard `0.20.*` patch floats. A fresh NuGet.org
+  install generated both templates; isolated restores completed without warnings, the web project
+  built with zero warnings/errors, and the console passed SQLite Entity save/load/query.
+- SQLite startup explanation now follows adapter-owned fallback selection and no longer emits the
+  misleading correction path for local auto mode. The fix is tracked as complete in `R12-05`.
+
+## Accepted next epic: value-led 0.20 promotion
+
+[ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) keeps the useful 0.20 invariant:
+supported claim owners use 0.20 intent, their public Koan dependency closure is supported, and every
+0.20 owner belongs to a supported claim. It now rejects the larger fixed-owner program that grew
+around that invariant.
+
+Product intent—not reverse dependencies—decides whether a package belongs. Database, vector, search,
+storage, authentication, and AI adapters are first-class public extensions even when applications
+are their only consumers. R13 promotes those capabilities by meaningful family: shared semantics,
+provider-specific real-boundary proof, a clean package consumer, and package/API integrity. The
+historical 38/55 inventory remains discovery, not an execution ledger or completion count.
+
+The lean [R13](work-items/R13-terminal-package-maturity.md) uses the first seven-owner testing and
+operational slice to prove the smaller promotion path. After that publication decision, high-use Data
+providers are next, followed by Vector/Search, AI providers, Storage/Media, external Auth, and only
+already-decided public migrations. Families may progress independently when no real prerequisite
+connects them.
+
+## Exact pause point
+
+Draft PR [#95](https://github.com/sylin-org/koan-framework/pull/95) contains the first seven promotion
+candidates. It retains reusable conformance, lifecycle, API, compiler-drift, clean-consumer, and package
+corrections. The terminal certificate, central exact-cell metadata, generic admission coordination,
+and native candidate-planning machinery have been removed under the amended ADR.
+
+The superseded machinery is gone, the PR narrative is value-led, and focused retained evidence is
+complete. A one-time complete PR ratchet exposed three evidence-owner defects: incomplete host startup
+was stopped before disposal and masked the original correction, Mongo database isolation lost the
+container authentication source, and the clean consumer packed candidates without their newer local
+dependency closure. Those owner-local repairs are implemented and focused validation is green. The
+complete ratchet subsequently passed, but reassessment removed certification from merge/publication;
+the remaining pre-merge check is cheap repository coherence. Untracked `tmp/` is unrelated user-owned
+material and must remain untouched and unstaged.
 
 ## Remote/public state
 
 - PR `#93` merged to `main` as `ad9d739199da809fa44efc9a4ce3db8059348b42`. Main-boundary run
   `29792486934` succeeded: product-surface selection resolved the exact 38-package guaranteed 0.20
   closure, packing completed, and NuGet accepted the publication set.
+- PR `#94` merged to `main` as `cfb60f848653686278a1976dcacc71386f4cb19e`. Main-boundary run
+  `29796113330` succeeded and NuGet.org indexed the corrected `Sylin.Koan.Templates 0.20.6`.
+- Draft PR `#95` targets `main` from `dev`. It publishes nothing while unmerged and now follows the
+  amended value-led ARCH-0120 boundary.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -71,22 +107,22 @@ Focused implementation evidence:
 
 ## Validation posture
 
-- Run focused checks only.
-- For this slice, build `tools/Koan.Packaging`, run its remaining focused tests only if required by a
-  compile failure, and statically inspect the workflow.
-- Do not run the full solution, all test projects, the green ratchet, completed Tenancy/Classification
-  suites, or package clean-room applications.
-- Do not repeat a passing check unless affected code changes.
+- The smaller slice retains API baselines, generated-surface drift detection, host/container lifecycle,
+  reusable family conformance, package-only consumption, and direct provider evidence.
+- Focused repairs pass the host failure oracle, Communication 44/44, the affected Data correction 1/1,
+  and the real Mongo Web owner 52/52. The package consumer builds the complete local dependency closure;
+  its connected clean-network run passed.
+- The main PR now runs only product/API agreement, one Release build, lockfile and structural
+  documentation/tooling checks. Affected behavior and native evidence run at their owning family;
+  complete certification is never inferred from promotion or publication.
 
 ## Next actions
 
-1. Commit the template-range correction and greenfield public-entry copy to `dev`; this publishes
-   nothing.
-2. Open a pull request to `main` for ordinary validation. Merge only when publishing the corrected
-   template and docs is intended.
-3. After that main-boundary publication, repeat only the clean public template restore and record the
-   result; then address the separate SQLite discovery/explanation rough edge.
-4. Resume product and coherent public-documentation work. Do not expand release infrastructure.
+1. Obtain green cheap PR coherence for the exact seven-package promotion commit.
+2. Merge under the maintainer's explicit authorization; observe the ordinary pack/push job and public
+   consumer evidence for R12-07.
+3. Open the first high-value provider-family slice, starting with Entity data providers rather than
+   the former owner-number sequence.
 
 ## Repository boundaries
 
@@ -94,5 +130,5 @@ Focused implementation evidence:
 - Do not inspect private dogfood applications.
 - Do not publish from a workstation, tag, create a GitHub Release, or mutate unrelated remote
   configuration.
-- Full release certification belongs to an explicitly requested milestone, not normal development or
-  a release plumbing correction.
+- Full release certification belongs only to an explicitly requested whole-framework milestone, not
+  normal development, merge, promotion, version calculation, publication, or release plumbing.

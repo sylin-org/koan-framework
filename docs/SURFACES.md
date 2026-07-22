@@ -3,9 +3,9 @@ type: DEV
 domain: framework
 audience: [maintainers]
 status: archived
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 framework_version: v0.20.0
-validation: 2026-07-19
+validation: 2026-07-22
 ---
 
 # Surface Ledger
@@ -33,7 +33,7 @@ guessed "works".
   honesty rule, not "exercised on 2026-06-11".
 - **Guards marked `(local)`** run only in the local green-ratchet. `pr-gate.yml` protects pull
   requests targeting `main`; `release-on-main.yml` packs and publishes after merge.
-  A standalone `surfaces.yml` lints *this ledger*; it does not run the suites.
+  The cheap surface-ledger parser runs inside `pr-gate.yml`; it does not run the suites.
 
 | Surface | Exercised by | Last exercised | Guard | Notes |
 |---|---|---|---|---|

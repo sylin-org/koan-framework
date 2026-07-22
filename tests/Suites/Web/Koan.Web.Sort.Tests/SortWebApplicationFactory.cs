@@ -48,7 +48,6 @@ public sealed class SortWebApplicationFactory : IAsyncLifetime
                 }))
                 .ConfigureServices(services =>
                 {
-                    AppHost.Current = null;
                     services.AddKoan();
                     services.AddKoanControllersFrom<WidgetController>();
                 })

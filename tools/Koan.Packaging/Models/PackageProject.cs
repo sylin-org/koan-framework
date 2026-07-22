@@ -22,4 +22,6 @@ internal sealed record PackageProject(
     string? RepositoryUrl = null,
     string? PackageLicenseExpression = null,
     string? PackageReleaseNotes = null,
-    string? VersionIntent = null);
+    string? VersionIntent = null,
+    string? PackageValidationBaselineVersion = null,
+    bool EnablePackageValidation = false);

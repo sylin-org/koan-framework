@@ -12,6 +12,7 @@ using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Relational.Orchestration;
+using SqliteConstants = Koan.Data.Connector.Sqlite.Infrastructure.Constants;
 
 namespace Koan.Data.Connector.Sqlite;
 
@@ -105,14 +106,14 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             {
                 KoanLog.ConfigInfo(logger, LogActions.Discovery, "disabled",
                     ("reason", "config"));
-                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
+                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
             }
 
             if (_discoveryCoordinator == null)
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
                     ("reason", "no-coordinator"));
-                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
+                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
             }
 
             // Create discovery context with SQLite-specific parameters
@@ -139,15 +140,16 @@ internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<Sql
             else
             {
                 KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
-                    ("reason", "no-candidate"));
-                return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
+                    ("reason", result.ErrorMessage ?? "discovery-unresolved"),
+                    ("fallback", SqliteConstants.Configuration.DataFallback.DefaultSource));
+                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
             }
         }
         catch (Exception ex)
         {
             KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
                 ("error", Redaction.DeIdentify(ex.Message)));
-            return BuildSqliteConnectionString(".koan/data/Koan.sqlite");
+            return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
         }
     }
 

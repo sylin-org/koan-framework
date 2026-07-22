@@ -9,10 +9,19 @@ internal static class PackagingConstants
     public const string MsBuildDisableNodeReuseEnvironmentValue = "1";
     public const int EvaluationParallelism = 8;
 
+    public static class PackageValidation
+    {
+        public const string PreviewVersionPrefix = "0.20.";
+        public const string NuGetFlatContainerBaseUrl = "https://api.nuget.org/v3-flatcontainer/";
+        public const string NuGetVersionsIndexFile = "index.json";
+    }
+
     public static class ProductSurface
     {
         public const int Schema = 1;
         public const string ClaimsPath = "product/claims.json";
+        public const string GeneratedJsonPath = "docs/reference/product-surface.json";
+        public const string GeneratedMarkdownPath = "docs/reference/product-surface.md";
         public const string UnassessedMaturity = "unassessed";
         public static readonly IReadOnlyList<(string Name, string Meaning, string Contract)> MaturityDefinitions =
         [

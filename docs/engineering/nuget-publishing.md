@@ -21,7 +21,9 @@ state store is required.
 
 ## Publish
 
-1. Open a pull request targeting `main` and let the PR gate validate it.
+1. Open a pull request targeting `main`. The cheap PR coherence job checks product/API truth, one
+   Release build, lockfiles, and structural documentation/tooling drift; affected behavior tests
+   remain part of developing and reviewing the change.
 2. Merge the pull request. A deliberate direct commit to `main` has the same release effect.
 3. Observe **Release packages** on the resulting `main` commit.
 
@@ -53,4 +55,5 @@ dotnet run --project tools/Koan.Packaging -- inventory
 
 Do not publish from a workstation, print the API key, or create a parallel package list.
 
-The governing decision is [ARCH-0110](../decisions/ARCH-0110-main-release-boundary.md).
+The governing decisions are [ARCH-0110](../decisions/ARCH-0110-main-release-boundary.md) for the
+publisher and [ARCH-0121](../decisions/ARCH-0121-claim-scoped-validation.md) for validation boundaries.

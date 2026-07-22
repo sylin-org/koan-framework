@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using AwesomeAssertions;
+using Koan.Core.Hosting.App;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -127,8 +128,39 @@ public sealed class AdminSurfaceSpec
             });
         };
 
-        (await start.Should().ThrowAsync<OptionsValidationException>())
-            .WithMessage(correction);
+        var failure = await Record.ExceptionAsync(start);
+        failure.Should().NotBeNull();
+
+        var validationFailure = failure switch
+        {
+            OptionsValidationException validation => validation,
+            AggregateException aggregate => aggregate.Flatten().InnerExceptions
+                .OfType<OptionsValidationException>()
+                .Single(),
+            _ => throw new Xunit.Sdk.XunitException($"Expected an options-validation failure, but found {failure!.GetType().FullName}.")
+        };
+
+        validationFailure.Message.Should().Match(correction);
+    }
+
+    [Fact]
+    public async Task Overlapping_hosts_preserve_the_newer_owner_when_the_older_host_stops()
+    {
+        var older = await AdminWebHost.StartAsync();
+        var newer = await AdminWebHost.StartAsync();
+        try
+        {
+            AppHost.Current.Should().BeSameAs(newer.AmbientServices);
+            await older.DisposeAsync();
+            AppHost.Current.Should().BeSameAs(newer.AmbientServices);
+        }
+        finally
+        {
+            await newer.DisposeAsync();
+            await older.DisposeAsync();
+        }
+
+        AppHost.Current.Should().BeNull();
     }
 
     private static void Authenticate(HttpClient client)

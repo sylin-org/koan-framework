@@ -28,6 +28,25 @@ public sealed class KoanIntegrationHostFailedStartSpec
             "the builder owns and must dispose a host that never starts successfully");
     }
 
+    [Fact]
+    public async Task Failed_stop_propagates_after_disposing_async_owned_services()
+    {
+        var owned = new AsyncOwnedService();
+        var host = await KoanIntegrationHost.Configure()
+            .ConfigureServices(services =>
+            {
+                services.AddSingleton(_ => owned);
+                services.AddHostedService<StopFailureHostedService>();
+            })
+            .StartAsync(TestContext.Current.CancellationToken);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => host.DisposeAsync().AsTask());
+
+        exception.Message.Should().Be(StopFailureHostedService.FailureMessage);
+        owned.IsDisposed.Should().BeTrue(
+            "a teardown failure must remain visible without leaking resources owned by the host");
+    }
+
     private sealed class AsyncOwnedService : IAsyncDisposable
     {
         private int _disposed;
@@ -52,5 +71,19 @@ public sealed class KoanIntegrationHostFailedStartSpec
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class StopFailureHostedService(AsyncOwnedService owned) : IHostedService
+    {
+        public const string FailureMessage = "integration-host-stop-probe";
+
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            _ = owned;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) =>
+            Task.FromException(new InvalidOperationException(FailureMessage));
     }
 }

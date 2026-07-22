@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <PackageValidationBaselineVersion>0.20.3</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.</Description>
