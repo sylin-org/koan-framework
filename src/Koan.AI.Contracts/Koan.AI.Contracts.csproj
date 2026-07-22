@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <Description>Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.</Description>
     <PackageTags>$(CommonPackageTags);ai;contracts;adapters;routing;multimodal</PackageTags>
   </PropertyGroup>

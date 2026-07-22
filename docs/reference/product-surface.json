@@ -455,9 +455,10 @@
     {
       "id": "media-processing",
       "title": "Media processing and serving",
-      "summary": "Media recipes describe transformation and HTTP-serving behavior over storage-backed assets.",
-      "maturity": "verified",
+      "summary": "Inert recipe contracts, the Entity-backed media runtime, and controller-owned Web projection provide validated transformation and bounded HTTP-serving behavior over storage-backed originals.",
+      "maturity": "supported-extension",
       "packages": [
+        "Sylin.Koan.Media.Abstractions",
         "Sylin.Koan.Media.Core",
         "Sylin.Koan.Media.Web"
       ],
@@ -467,7 +468,7 @@
         "src/Koan.Media.Web/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-16-storage-backup-media-promotion.md",
         "tests/Suites/Media",
         "tests/Suites/Samples/Koan.Samples.SnapVault.Tests"
       ]
@@ -703,6 +704,27 @@
       "evidence": [
         "docs/initiatives/koan-v1/work-items/r13/R13-08-sqlserver-provider-promotion.md",
         "tests/Suites/Data/Connector.SqlServer"
+      ]
+    },
+    {
+      "id": "storage-local-foundation",
+      "title": "Entity storage and local filesystem",
+      "summary": "Storage compiles logical Entity/object routes once and the Local provider supplies safe filesystem persistence, range, stat, listing, transfer, and segmentation behavior within its single-node boundary.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan.Storage",
+        "Sylin.Koan.Storage.Abstractions",
+        "Sylin.Koan.Storage.Connector.Local"
+      ],
+      "documentation": [
+        "docs/reference/storage/index.md",
+        "src/Connectors/Storage/Local/README.md",
+        "src/Koan.Storage/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-16-storage-backup-media-promotion.md",
+        "tests/Suites/Storage/Koan.Storage.Connector.Local.Tests",
+        "tests/Suites/Storage/Koan.Storage.Core.Tests"
       ]
     },
     {
@@ -2029,7 +2051,7 @@
     },
     {
       "packageId": "Sylin.Koan.Media.Abstractions",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert Koan media contracts for immutable recipes, pipeline intent, media metadata, output shapes, and registries.",
       "targetFrameworks": [
@@ -2042,11 +2064,13 @@
       "readme": "src/Koan.Media.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Media.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "media-processing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Media.Core",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan media runtime for Entity-backed originals, recipe discovery, validated image pipelines, rendering, and runtime facts.",
       "targetFrameworks": [
@@ -2067,7 +2091,7 @@
     },
     {
       "packageId": "Sylin.Koan.Media.Web",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Recipe-driven HTTP rendering and Entity-backed media serving for Koan.",
       "targetFrameworks": [
@@ -2161,7 +2185,7 @@
     },
     {
       "packageId": "Sylin.Koan.Storage",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan storage runtime for Entity-backed objects, provider routing, segmentation, replication, validation, transfer, and lifecycle helpers.",
       "targetFrameworks": [
@@ -2176,11 +2200,13 @@
       "readme": "src/Koan.Storage/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Storage/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "storage-local-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Storage.Abstractions",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert Koan storage contracts for providers, services, objects, capabilities, listing, stat, copy, presign, and model binding.",
       "targetFrameworks": [
@@ -2192,11 +2218,13 @@
       "readme": "src/Koan.Storage.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Storage.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "storage-local-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.Local",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Safe local-filesystem provider for Koan Storage with seek, range, stat, listing, and same-provider copy.",
       "targetFrameworks": [
@@ -2209,7 +2237,9 @@
       "readme": "src/Connectors/Storage/Local/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Storage/Local/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "storage-local-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Storage.Connector.S3",

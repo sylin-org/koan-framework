@@ -164,13 +164,22 @@
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Cache"]
     },
     {
+      "id": "storage-local-foundation",
+      "title": "Entity storage and local filesystem",
+      "summary": "Storage compiles logical Entity/object routes once and the Local provider supplies safe filesystem persistence, range, stat, listing, transfer, and segmentation behavior within its single-node boundary.",
+      "maturity": "supported-foundation",
+      "packages": ["Sylin.Koan.Storage.Abstractions", "Sylin.Koan.Storage", "Sylin.Koan.Storage.Connector.Local"],
+      "documentation": ["docs/reference/storage/index.md", "src/Koan.Storage/README.md", "src/Connectors/Storage/Local/README.md"],
+      "evidence": ["tests/Suites/Storage/Koan.Storage.Core.Tests", "tests/Suites/Storage/Koan.Storage.Connector.Local.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-16-storage-backup-media-promotion.md"]
+    },
+    {
       "id": "media-processing",
       "title": "Media processing and serving",
-      "summary": "Media recipes describe transformation and HTTP-serving behavior over storage-backed assets.",
-      "maturity": "verified",
-      "packages": ["Sylin.Koan.Media.Core", "Sylin.Koan.Media.Web"],
+      "summary": "Inert recipe contracts, the Entity-backed media runtime, and controller-owned Web projection provide validated transformation and bounded HTTP-serving behavior over storage-backed originals.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Media.Abstractions", "Sylin.Koan.Media.Core", "Sylin.Koan.Media.Web"],
       "documentation": ["docs/reference/media/index.md", "src/Koan.Media.Core/README.md", "src/Koan.Media.Web/README.md"],
-      "evidence": ["tests/Suites/Media", "tests/Suites/Samples/Koan.Samples.SnapVault.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+      "evidence": ["tests/Suites/Media", "tests/Suites/Samples/Koan.Samples.SnapVault.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-16-storage-backup-media-promotion.md"]
     },
     {
       "id": "ai-runtime-semantics",
