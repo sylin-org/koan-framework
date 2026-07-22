@@ -90,8 +90,13 @@ authorization-code suite passed 5/5 without live credentials. Release publicatio
 three new identities; already-public Storage/Media packages were skipped at their existing versions.
 Their immutable API floors are now recorded centrally without touching package-owned version paths.
 
-The next R13 boundary is assessment of only the already-decided Agyo and Zen Garden ownership moves.
-No migration starts until its public destination evidence exists; this does not reopen S3 or Backup.
+R13 is complete. [R13-18](work-items/r13/R13-18-accepted-migration-disposition.md) rechecked the
+already-decided Agyo and Zen Garden moves against their public repositories and NuGet.org. Agyo has no
+public package IDs or migrated Agents/Orchestration/Eval/Review owners; Zen Garden has no newer public
+tip or equivalent Models/HuggingFace lifecycle proof. The six departing Koan owners therefore remain at
+truthful `0.17` intent with no supported claim until ARCH-0089's cross-repository destination gate is met.
+No migration, deletion, promotion, or forwarding package is part of R13 closure. This does not reopen
+S3 or Backup.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -150,6 +155,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   Microsoft, and Discord Auth connectors at exact `0.20.0`. All three are indexed and the unchanged
   fresh NuGet.org-only consumer passed. Existing Storage/Media packages remained at `0.20.0` and were
   skipped as duplicates, proving central baseline capture did not create patch churn.
+- PR `#108` passed lean gate `29927889388`, squash-merged as
+  `138388e86eacad2c9c9b238e97548a465396f2a4`, and release run `29928202945` reported `76/76`
+  immutable API floors. Every packed identity already existed; NuGet returned zero new package or
+  symbol-package creations.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -172,10 +181,9 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Validate and land the central immutable API floors for the three now-public Auth connectors without
-   editing package-owned paths.
-2. Assess the already-decided Agyo and Zen Garden moves against actual public destination evidence.
-3. Retire or redirect Koan owners only when destination packages preserve the current behavior and consumers.
+1. Obtain explicit maintainer acceptance or rejection of R12-07's technical GO recommendation.
+2. Resume ARCH-0089 migrations only from public Agyo/Zen Garden destination and consumer evidence.
+3. Keep S3, Backup, and unclaimed `0.17` migration owners outside the supported 0.20 surface.
 
 ## Repository boundaries
 

@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R13 - Promote the Meaningful Public Surface to 0.20"
 audience: [architects, maintainers, developers, ai-agents]
-status: current
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
-  status: in-progress
-  scope: Entity through external Auth public and observed; accepted migration assessment next
+  status: passed
+  scope: Intended public provider families observed; accepted migrations dispositioned without unsafe retirement
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — external Auth complete; assess accepted migrations; S3 and Backup shelved`
+- Status: `passed — intended 0.20 families public; migrations dispositioned; S3 and Backup shelved`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -142,7 +142,15 @@ and Backup remain shelved.
 [R13-17](r13/R13-17-external-auth-promotion.md) passed through PR `#107`, main commit
 `a12b2154907d9f75f8bdef77cf4470ecefa1aad8`, release run `29926734114`, public indexing of all
 three exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Its immutable API floors
-are recorded centrally in this closure change. Existing Storage/Media versions were skipped unchanged.
+were recorded centrally through PR `#108`, main commit
+`138388e86eacad2c9c9b238e97548a465396f2a4`, and release run `29928202945`. The guard reported
+`76/76` floors, every packed identity already existed, and no new package or symbol package was created.
+
+[R13-18](r13/R13-18-accepted-migration-disposition.md) passed by applying ARCH-0089's existing
+transition gate to current public evidence. Agyo has no public destination packages or migrated
+Agents/Orchestration/Eval/Review owners; Zen Garden has no newer public tip or complete
+Models/HuggingFace lifecycle proof. The six departing Koan owners remain unclaimed at `0.17`; no
+unsafe deletion, promotion, forwarding package, or sibling mutation occurred.
 
 ## Execution
 
@@ -169,8 +177,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: complete through R13-17 external authentication promotion; accepted migration assessment next;
-S3 and Backup shelved.
+Status: complete through R13-18 accepted migration disposition; S3 and Backup shelved.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a
