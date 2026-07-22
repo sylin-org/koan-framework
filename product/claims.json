@@ -47,6 +47,15 @@
       "evidence": ["tests/Suites/Data/Connector.Postgres", "docs/initiatives/koan-v1/work-items/r13/R13-07-postgresql-provider-promotion.md"]
     },
     {
+      "id": "sqlserver-data-provider",
+      "title": "SQL Server Entity persistence",
+      "summary": "SQL Server preserves Koan Entity CRUD, native filtering, paging, provider-bounded streaming, batch and conditional writes, source routing, schema policy, health, and declared isolation semantics over the supported relational foundation.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.Connector.SqlServer"],
+      "documentation": ["src/Connectors/Data/SqlServer/README.md", "src/Connectors/Data/SqlServer/TECHNICAL.md", "docs/reference/data/index.md"],
+      "evidence": ["tests/Suites/Data/Connector.SqlServer", "docs/initiatives/koan-v1/work-items/r13/R13-08-sqlserver-provider-promotion.md"]
+    },
+    {
       "id": "document-data-providers",
       "title": "MongoDB and Couchbase Entity persistence",
       "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend's stated limits.",

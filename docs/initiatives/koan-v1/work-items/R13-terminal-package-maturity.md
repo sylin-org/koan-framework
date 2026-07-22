@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: first lean slice public and observed; PostgreSQL focused evidence green, publication pending
+  scope: PostgreSQL public and observed; SQL Server focused evidence green, publication pending
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote PostgreSQL as the first networked Entity provider`
+- Status: `in-progress — promote SQL Server as the second networked Entity provider`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -88,11 +88,15 @@ Release run `29891926990` published the 45-package supported closure, NuGet.org 
 owners, and a clean public consumer passed. The first slice's seven immutable API floors are now
 recorded at their owning projects.
 
-[R13-07](r13/R13-07-postgresql-provider-promotion.md) is the active provider-family slice. It promotes
-the application-facing PostgreSQL connector together with its module-free shared Npgsql dependency.
-The existing 19-fact real provider suite, two focused packs, external Testcontainers consumer, product
-compiler, and API-floor guard are green. No production behavior changed and no sibling provider or
-whole-framework certification ran.
+[R13-07](r13/R13-07-postgresql-provider-promotion.md) passed through PR `#96`, main commit
+`b89cec6266080186db4fdd3fee99aa04b089abbc`, release run `29893491621`, public indexing of both
+`0.20.1` artifacts, and a clean NuGet.org-only PostgreSQL consumer. Those exact first versions are
+now recorded as immutable API floors.
+
+[R13-08](r13/R13-08-sqlserver-provider-promotion.md) is active. Its single connector owner has 0.20
+intent and one supported claim; the real provider suite passed 26/26, the focused pack succeeded,
+and a clean staged-package consumer selected SQL Server and passed Entity save/get/query. No
+production behavior changed and no sibling provider or whole-framework certification ran.
 
 ## Execution
 
@@ -119,7 +123,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-07 PostgreSQL promotion.
+Status: active through R13-08 SQL Server promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

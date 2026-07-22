@@ -3,7 +3,7 @@ uid: reference.modules.Koan.data.sqlserver
 title: Koan.Data.Connector.SqlServer - Technical Reference
 description: SQL Server adapter for Koan data.
 packages: [Sylin.Koan.Data.Connector.SqlServer]
-source: src/Koan.Data.Connector.SqlServer/
+source: src/Connectors/Data/SqlServer/
 ---
 
 ## Contract
@@ -14,16 +14,23 @@ source: src/Koan.Data.Connector.SqlServer/
 
 ## Configuration
 
-- Connection string, pooling, retry/backoff, command timeout.
+- Connection string, schema governance, JSON materialization, naming, discovery, and readiness use
+  the existing `SqlServerOptions` and adapter-readiness contracts.
 
 ### Options (typical keys)
 
 - ConnectionStrings:Default (first-win)
-- Koan:Data:Sources:Default:ConnectionString
+- ConnectionStrings:SqlServer
+- Koan:Data:Sources:Default:sqlserver:ConnectionString
 - Koan:Data:SqlServer:ConnectionString
-- Koan:Data:SqlServer:CommandTimeoutSeconds (default 30)
-- Koan:Data:SqlServer:MaxRetryCount (default 3)
-- Koan:Data:SqlServer:MaxRetryDelaySeconds (default 5)
+- Koan:Data:SqlServer:DdlPolicy
+- Koan:Data:SqlServer:SchemaMatchingMode
+- Koan:Data:SqlServer:JsonCaseInsensitive
+- Koan:Data:SqlServer:JsonWriteIndented
+- Koan:Data:SqlServer:JsonIgnoreNullValues
+
+`ConnectionString=auto` attempts orchestration discovery before using the localhost development
+fallback. The connector does not currently expose provider-specific retry or command-timeout options.
 
 ## LINQ and pushdowns
 
@@ -46,16 +53,17 @@ source: src/Koan.Data.Connector.SqlServer/
 
 ## Error modes
 
-- Provider errors (SqlException) surfaced; transient errors retried per options.
-- Timeouts honor `CommandTimeoutSeconds`.
+- Provider errors (`SqlException`) surface to the caller; the connector does not add a retry policy.
 - Unsupported predicates surface explicitly; simplify the predicate or materialize a known-small page.
   Provider-bounded streams may apply supported pointwise residuals but never hide a full-source fallback.
+- An unreachable selected SQL Server reports unhealthy readiness and never falls back to a different
+  data provider.
 
 ## Operations
 
 - Health: connection open/round-trip.
-- Metrics: command duration, retries, timeouts; expose counters/timers via hosting platform.
-- Logs: SQL text with parameter redaction; retry warnings with attempt counts.
+- Tracing: connector operations use the `Koan.Data.Connector.SqlServer` activity source.
+- Configuration/discovery logs avoid introducing a second provider-selection path.
 
 ## References
 

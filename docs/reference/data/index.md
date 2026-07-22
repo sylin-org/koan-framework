@@ -62,15 +62,15 @@ The providers below are deliberately not described as interchangeable.
 | InMemory | Fast conformance oracle and ephemeral test/development store | connector 56/56; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
 | JSON | Automatic zero-infrastructure floor carried by `Sylin.Koan` | connector 21/21, including selection-aware readiness and persistence safety | File-backed, limited concurrency, and not the durable V1 application proof. |
 
-PostgreSQL is the first supported networked extension outside that local foundation. Its 19-fact real
-provider suite covers Entity CRUD/query, batch, filtering, paging/streaming, source routing, health,
-field transforms, and declared isolation modes; its first-publication package consumer proves normal
-`AddKoan()` selection and Entity save/get/query against PostgreSQL. It still requires a reachable
-service and retains the documented schema, ordering, streaming, and SQL-subset limits.
+PostgreSQL and SQL Server are supported networked extensions outside that local foundation. Their real
+provider suites cover Entity CRUD/query, batch, filtering, paging/streaming, source routing, health,
+field transforms, and declared isolation modes; first-publication package consumers prove normal
+`AddKoan()` selection and Entity save/get/query against the selected service. Both require a reachable
+database and retain their documented schema, ordering, streaming, and SQL-subset limits.
 
-SQL Server, MongoDB, Couchbase, Redis, and other providers remain valuable lower-maturity extensions.
-Each needs its own current conformance, operations, packaging, and compatibility evidence; PostgreSQL's
-promotion does not confer support on a sibling.
+MongoDB, Couchbase, Redis, and other providers remain valuable lower-maturity extensions. Each needs
+its own current conformance, operations, packaging, and compatibility evidence; a relational
+provider's promotion does not confer support on a sibling.
 
 ## Reference is availability; negotiation selects
 

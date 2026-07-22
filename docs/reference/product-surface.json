@@ -596,6 +596,24 @@
       ]
     },
     {
+      "id": "sqlserver-data-provider",
+      "title": "SQL Server Entity persistence",
+      "summary": "SQL Server preserves Koan Entity CRUD, native filtering, paging, provider-bounded streaming, batch and conditional writes, source routing, schema policy, health, and declared isolation semantics over the supported relational foundation.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.SqlServer"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/SqlServer/README.md",
+        "src/Connectors/Data/SqlServer/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-08-sqlserver-provider-promotion.md",
+        "tests/Suites/Data/Connector.SqlServer"
+      ]
+    },
+    {
       "id": "tenant-isolation-administration",
       "title": "Local-first tenant isolation and administration",
       "summary": "Referencing Tenancy contributes one hard ambient segmentation guarantee across active pillars; the optional Web projection mounts host-authorized tenant-registry, deterministic membership, and administration-audit surfaces without lifecycle-shaped placeholders.",
@@ -1468,7 +1486,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.SqlServer",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "SQL Server provider for Koan relational data with JSON-projection pushdowns, guardrails, and governance.",
       "targetFrameworks": [
@@ -1482,7 +1500,9 @@
       "readme": "src/Connectors/Data/SqlServer/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/SqlServer/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "sqlserver-data-provider"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Core",
