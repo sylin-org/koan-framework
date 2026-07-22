@@ -9,8 +9,8 @@ schema/index ensure, source routing, and readiness participation.
 
 ## Install
 
-> **Maturity:** This provider is available below the supported 0.20 boundary. Package presence is not a support
-> claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
+MongoDB is a supported 0.20 networked Entity provider. Its transitive Zen Garden contract dependency
+is module-free and activates nothing; applications still reference only this connector for MongoDB.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Mongo

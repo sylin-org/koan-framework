@@ -148,6 +148,23 @@
       ]
     },
     {
+      "id": "couchbase-data-provider",
+      "title": "Couchbase Entity persistence",
+      "summary": "Couchbase demonstrates Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within its stated limits.",
+      "maturity": "demonstrated",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Couchbase"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Couchbase/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "tests/Suites/Data/Connector.Couchbase"
+      ]
+    },
+    {
       "id": "deterministic-authentication-testing",
       "title": "Deterministic local OAuth and OIDC testing",
       "summary": "A Development test-provider reference supplies self-hosted OAuth2 and OIDC flows that exercise Web Auth challenge, callback, token validation, claim mapping, and identity linking without production identity credentials.",
@@ -184,26 +201,6 @@
         "samples/journeys/GardenCoop/02-LocalDiscovery",
         "tests/Koan.Packaging.Tests",
         "tests/Suites/Web/Koan.Web.Admin.Tests"
-      ]
-    },
-    {
-      "id": "document-data-providers",
-      "title": "MongoDB and Couchbase Entity persistence",
-      "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend\u0027s stated limits.",
-      "maturity": "demonstrated",
-      "packages": [
-        "Sylin.Koan.Data.Connector.Couchbase",
-        "Sylin.Koan.Data.Connector.Mongo"
-      ],
-      "documentation": [
-        "docs/reference/data/index.md",
-        "src/Connectors/Data/Couchbase/README.md",
-        "src/Connectors/Data/Mongo/README.md"
-      ],
-      "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
-        "tests/Suites/Data/Connector.Couchbase",
-        "tests/Suites/Data/Connector.Mongo"
       ]
     },
     {
@@ -337,6 +334,24 @@
       ]
     },
     {
+      "id": "layered-provider-connection-intent",
+      "title": "Inert layered-provider connection intent",
+      "summary": "The module-free Zen Garden contract assembly supplies shared connection-intent, offering identity, catalog, subscription, and capability-wish vocabulary without registering services, opening connections, or activating a runtime.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan.ZenGarden.Contracts"
+      ],
+      "documentation": [
+        "src/Koan.ZenGarden.Contracts/README.md",
+        "src/Koan.ZenGarden.Contracts/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-09-mongodb-provider-promotion.md",
+        "tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs",
+        "tests/Koan.ZenGarden.Tests/ZenGardenConnectionIntentTests.cs"
+      ]
+    },
+    {
       "id": "local-ai-provider-composition",
       "title": "Local AI provider composition",
       "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
@@ -435,6 +450,24 @@
         "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
         "tests/Suites/Media",
         "tests/Suites/Samples/Koan.Samples.SnapVault.Tests"
+      ]
+    },
+    {
+      "id": "mongodb-data-provider",
+      "title": "MongoDB Entity persistence",
+      "summary": "MongoDB preserves Koan Entity CRUD, native filtering, explicit paging, provider-bounded streaming, batch and conditional writes, source-aware pooling and routing, readiness, and declared isolation semantics while optional layered connection intent remains inert unless explicitly activated.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Mongo"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Mongo/README.md",
+        "src/Connectors/Data/Mongo/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-09-mongodb-provider-promotion.md",
+        "tests/Suites/Data/Connector.Mongo"
       ]
     },
     {
@@ -1320,7 +1353,7 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
       "claims": [
-        "document-data-providers"
+        "couchbase-data-provider"
       ]
     },
     {
@@ -1384,7 +1417,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Mongo",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "MongoDB data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
@@ -1400,7 +1433,7 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Mongo/TECHNICAL.md",
       "claims": [
-        "document-data-providers"
+        "mongodb-data-provider"
       ]
     },
     {
@@ -2498,7 +2531,7 @@
     },
     {
       "packageId": "Sylin.Koan.ZenGarden.Contracts",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert client, discovery, connection-intent, and capability contracts for Koan Zen Garden integrations.",
       "targetFrameworks": [
@@ -2508,7 +2541,9 @@
       "readme": "src/Koan.ZenGarden.Contracts/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.ZenGarden.Contracts/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "layered-provider-connection-intent"
+      ]
     }
   ]
 }
