@@ -9,8 +9,9 @@ scope and collection routing, schema ensure, and readiness participation.
 
 ## Install
 
-> **Maturity:** This provider is available below the supported 0.20 boundary. Package presence is not a support
-> claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
+> **Supported 0.20 extension:** Koan supports this connector within the capability and operational
+> boundaries below. Couchbase availability is not eager activation; the selected or explicitly routed
+> provider owns connection and readiness.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Couchbase

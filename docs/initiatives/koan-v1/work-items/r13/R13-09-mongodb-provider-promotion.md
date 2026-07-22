@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused MongoDB provider, inert contract, pack, consumer, product, and API evidence
+  status: passed
+  scope: MongoDB and inert contract published, indexed, public-consumer green, and baseline-captured
 ---
 
 # R13-09 — Promote MongoDB Entity persistence
@@ -90,5 +90,12 @@ Their exact first public versions become immutable API floors in the following s
 - genuinely external staged-package consumer: clean restore, zero-warning Release build, real MongoDB
   boot, `AddKoan()` provider selection, Entity save/get/query, and absence of
   `IZenGardenInitializationProvider` all passed with `MONGODB|PACKAGE-CONSUMER|INERT-CONTRACT|PASS`;
-- generated product truth, API posture, cheap coherence, publication, public indexing, and immutable
-  baseline capture: pending.
+- generated product truth, API posture, no-tests coherence, and surface ledger: passed;
+- PR `#98` exact-head gate `29895799297`: passed and merged as
+  `e90e8fecff4efb3d1a4dd2d956b8d8f1bc4b423a`;
+- main publication run `29896020354`: passed and pushed MongoDB and Zen Garden Contracts `0.20.1`;
+- NuGet.org indexed both exact artifacts; a genuinely external NuGet.org-only application restored,
+  built with zero warnings/errors, selected MongoDB through `AddKoan()`, completed Entity
+  save/get/query against `mongo:8.3.4`, and proved the contract remained inert with
+  `MONGODB|PUBLIC-CONSUMER|INERT-CONTRACT|PASS`;
+- the following R13-10 slice records both exact `0.20.1` artifacts as immutable API floors.

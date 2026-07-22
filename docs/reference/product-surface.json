@@ -150,17 +150,18 @@
     {
       "id": "couchbase-data-provider",
       "title": "Couchbase Entity persistence",
-      "summary": "Couchbase demonstrates Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within its stated limits.",
-      "maturity": "demonstrated",
+      "summary": "Couchbase preserves Koan Entity CRUD, native filtering, explicit paging, provider-bounded streaming, conditional and transactional writes, source-aware pooling and routing, participation-owned readiness, and declared isolation semantics within its stated operational limits.",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Data.Connector.Couchbase"
       ],
       "documentation": [
         "docs/reference/data/index.md",
-        "src/Connectors/Data/Couchbase/README.md"
+        "src/Connectors/Data/Couchbase/README.md",
+        "src/Connectors/Data/Couchbase/TECHNICAL.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-10-couchbase-provider-promotion.md",
         "tests/Suites/Data/Connector.Couchbase"
       ]
     },
@@ -1338,7 +1339,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Couchbase",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Couchbase data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [

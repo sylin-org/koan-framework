@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL and SQL Server public and observed; MongoDB focused evidence green
+  scope: PostgreSQL, SQL Server, and MongoDB public and observed; Couchbase focused evidence active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote MongoDB with its inert layered-provider contract foundation`
+- Status: `in-progress — promote Couchbase as the next networked Entity provider`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -98,11 +98,15 @@ now recorded as immutable API floors.
 `0.20.1`, and a clean NuGet.org-only SQL Server consumer. Its exact first version is now recorded as
 the immutable API floor.
 
-[R13-09](r13/R13-09-mongodb-provider-promotion.md) is active. MongoDB and the inert, module-free Zen
-Garden contract foundation have 0.20 intent and separate honest supported claims. Mongo passed 68/68,
-connection-intent/FQID tests passed 45/45, semantic activation passed 7/7, both packs succeeded, and a
-clean staged-package consumer proved Mongo Entity behavior plus absence of runtime activation. No
-production behavior changed and no sibling provider or whole-framework certification ran.
+[R13-09](r13/R13-09-mongodb-provider-promotion.md) passed through PR `#98`, main commit
+`e90e8fecff4efb3d1a4dd2d956b8d8f1bc4b423a`, release run `29896020354`, public indexing of both
+`0.20.1` artifacts, and a clean NuGet.org-only MongoDB consumer that also proved the contract remained
+inert. Their exact first versions are recorded as immutable API floors in R13-10.
+
+[R13-10](r13/R13-10-couchbase-provider-promotion.md) is active. Couchbase's complete real-provider
+suite passed 20/20 with zero skips against Community 8.0.2. Pack, staged external consumer,
+product/API checks, cheap coherence, and the surface ledger are green; publication and public
+observation remain. No sibling provider or whole-framework certification is in scope.
 
 ## Execution
 
@@ -129,7 +133,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-09 MongoDB promotion.
+Status: active through R13-10 Couchbase promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a
