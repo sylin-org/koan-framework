@@ -78,14 +78,14 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 is merged, published, indexed, public-consumer green, and baseline-captured at exact
-`0.20.1` versions. The active local slice is
-[R13-08](work-items/r13/R13-08-sqlserver-provider-promotion.md): its one connector has a supported
-claim and 0.20 intent; the real provider suite passed 26/26 with zero skips, the focused pack
-succeeded, a clean staged-package consumer passed against SQL Server, generated product truth is
-current, and API posture reports only SQL Server as first-publication pending. Cheap repository
-coherence, commit, PR, publication, public indexing, and baseline capture remain. Untracked `tmp/` is
-unrelated user-owned material and must remain untouched and unstaged.
+PostgreSQL R13-07 and SQL Server R13-08 are merged, published, indexed, public-consumer green, and
+baseline-captured at exact `0.20.1` versions. The active local slice is
+[R13-09](work-items/r13/R13-09-mongodb-provider-promotion.md): MongoDB and the inert Zen Garden contract
+foundation have separate supported claims and 0.20 intent. The real provider suite passed 68/68,
+focused contract tests passed 45/45 plus 7/7, both packages packed, and a clean staged-package
+consumer passed Mongo Entity behavior while proving no runtime provider activation. Generated truth,
+API posture, cheap coherence, commit, PR, publication, public indexing, and baseline capture remain.
+Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
 
@@ -101,6 +101,9 @@ unrelated user-owned material and must remain untouched and unstaged.
 - PR `#96` merged to `main` as `b89cec6266080186db4fdd3fee99aa04b089abbc`. Lean gate
   `29893297175` passed as one job with no tests/containers; release run `29893491621` published
   PostgreSQL and Npgsql `0.20.1`. Both are indexed, and the exact public package consumer passed.
+- PR `#97` merged to `main` as `a8d3869adc84d15a330acb52cdf5c7dca916a6ad`. Lean gate
+  `29894628337` passed as one job with no tests/containers; release run `29894829655` published SQL
+  Server `0.20.1`. It is indexed, and the exact public package consumer passed.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -123,11 +126,12 @@ unrelated user-owned material and must remain untouched and unstaged.
 
 ## Next actions
 
-1. Finish cheap repository coherence for R13-08 and commit the focused SQL Server promotion.
+1. Compile generated truth and API posture for R13-09, run cheap coherence, and commit the focused
+   MongoDB plus inert-contract promotion.
 2. Open and merge the next `dev` → `main` PR after the exact lean gate passes; observe the ordinary
-   pack/push job and public SQL Server consumer.
-3. Record SQL Server's exact first public API floor, then select the next high-value Entity provider
-   independently.
+   pack/push job and public MongoDB consumer.
+3. Record MongoDB and Zen Garden Contracts' exact first public API floors, then select the next
+   high-value Entity provider independently.
 
 ## Repository boundaries
 

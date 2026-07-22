@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL public and observed; SQL Server focused evidence green, publication pending
+  scope: PostgreSQL and SQL Server public and observed; MongoDB focused evidence green
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote SQL Server as the second networked Entity provider`
+- Status: `in-progress — promote MongoDB with its inert layered-provider contract foundation`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -93,9 +93,15 @@ recorded at their owning projects.
 `0.20.1` artifacts, and a clean NuGet.org-only PostgreSQL consumer. Those exact first versions are
 now recorded as immutable API floors.
 
-[R13-08](r13/R13-08-sqlserver-provider-promotion.md) is active. Its single connector owner has 0.20
-intent and one supported claim; the real provider suite passed 26/26, the focused pack succeeded,
-and a clean staged-package consumer selected SQL Server and passed Entity save/get/query. No
+[R13-08](r13/R13-08-sqlserver-provider-promotion.md) passed through PR `#97`, main commit
+`a8d3869adc84d15a330acb52cdf5c7dca916a6ad`, release run `29894829655`, public indexing of
+`0.20.1`, and a clean NuGet.org-only SQL Server consumer. Its exact first version is now recorded as
+the immutable API floor.
+
+[R13-09](r13/R13-09-mongodb-provider-promotion.md) is active. MongoDB and the inert, module-free Zen
+Garden contract foundation have 0.20 intent and separate honest supported claims. Mongo passed 68/68,
+connection-intent/FQID tests passed 45/45, semantic activation passed 7/7, both packs succeeded, and a
+clean staged-package consumer proved Mongo Entity behavior plus absence of runtime activation. No
 production behavior changed and no sibling provider or whole-framework certification ran.
 
 ## Execution
@@ -123,7 +129,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-08 SQL Server promotion.
+Status: active through R13-09 MongoDB promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

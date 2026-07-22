@@ -62,15 +62,16 @@ The providers below are deliberately not described as interchangeable.
 | InMemory | Fast conformance oracle and ephemeral test/development store | connector 56/56; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
 | JSON | Automatic zero-infrastructure floor carried by `Sylin.Koan` | connector 21/21, including selection-aware readiness and persistence safety | File-backed, limited concurrency, and not the durable V1 application proof. |
 
-PostgreSQL and SQL Server are supported networked extensions outside that local foundation. Their real
-provider suites cover Entity CRUD/query, batch, filtering, paging/streaming, source routing, health,
-field transforms, and declared isolation modes; first-publication package consumers prove normal
-`AddKoan()` selection and Entity save/get/query against the selected service. Both require a reachable
-database and retain their documented schema, ordering, streaming, and SQL-subset limits.
+PostgreSQL, SQL Server, and MongoDB are supported networked extensions outside that local foundation.
+Their real provider suites cover the capabilities each adapter declares, including Entity CRUD/query,
+batch, filtering, paging/streaming, source routing, health, field transforms, and isolation. Their
+first-publication package consumers prove normal `AddKoan()` selection and Entity save/get/query
+against the selected service. Each requires its reachable database and retains its documented schema,
+ordering, streaming, query-subset, consistency, and operational limits.
 
-MongoDB, Couchbase, Redis, and other providers remain valuable lower-maturity extensions. Each needs
-its own current conformance, operations, packaging, and compatibility evidence; a relational
-provider's promotion does not confer support on a sibling.
+Couchbase, Redis, and other providers remain valuable lower-maturity extensions. Each needs its own
+current conformance, operations, packaging, and compatibility evidence; another provider's promotion
+does not confer support on a sibling.
 
 ## Reference is availability; negotiation selects
 

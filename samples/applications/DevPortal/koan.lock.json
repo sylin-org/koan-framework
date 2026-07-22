@@ -20,7 +20,7 @@
     },
     {
       "id": "Koan.Data.Connector.Mongo",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Connector.Postgres",
@@ -60,7 +60,7 @@
     },
     {
       "id": "Koan.ZenGarden.Contracts",
-      "version": "0.17"
+      "version": "0.20"
     }
   ],
   "directReferences": [

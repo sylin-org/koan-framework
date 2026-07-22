@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused SQL Server provider, pack, consumer, product, and API evidence
+  status: passed
+  scope: focused provider, pack, public consumer, product, API, merge, and publication evidence green
 ---
 
 # R13-08 — Promote SQL Server Entity persistence
@@ -92,5 +92,18 @@ NuGet.org. Its exact first public 0.20 version becomes the immutable API floor i
 - API posture: 44/45 configured, exactly the SQL Server connector pending first publication, and
   three content-only owners.
 
-No sibling provider or framework-wide test ran. Cheap repository coherence, publication, public
-indexing, final NuGet.org-only consumption, and immutable baseline capture remain.
+No sibling provider or framework-wide test ran.
+
+## Public evidence — 2026-07-22
+
+- PR `#97` exact-head gate `29894628337` passed as one job with no tests or containers;
+- guarded merge produced main commit `a8d3869adc84d15a330acb52cdf5c7dca916a6ad`;
+- main release run `29894829655` packed the supported surface and pushed the first artifact;
+- NuGet.org indexed `Sylin.Koan.Data.Connector.SqlServer 0.20.1`;
+- a clean NuGet.org-only consumer built with zero warnings, selected `mssql` through `AddKoan()`,
+  and passed Entity save/get/query against the official SQL Server 2025 image with
+  `SQLSERVER|PUBLIC-CONSUMER|PASS`; and
+- exact version `0.20.1` is now the immutable API floor at the connector project.
+
+R13-08 passes. No workstation publication, tag, GitHub Release, or additional release mechanism was
+used.

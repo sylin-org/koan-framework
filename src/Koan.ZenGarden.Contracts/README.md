@@ -2,6 +2,9 @@
 
 Inert client, discovery, connection-intent, and capability contracts for layered Zen Garden integrations.
 
+This package is a supported 0.20 provider-author foundation. It is deliberately module-free: merely
+receiving it transitively through MongoDB, Ollama, S3, or Weaviate registers nothing and performs no I/O.
+
 Most applications receive this package through `Sylin.Koan.ZenGarden` or a connector that can optionally use Zen
 Garden. Reference it directly only when implementing an integration boundary without activating the runtime client.
 
