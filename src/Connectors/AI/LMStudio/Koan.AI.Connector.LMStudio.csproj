@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <Description>LM Studio provider for Koan AI (chat, streaming, embeddings) with auto-discovery.</Description>
     <PackageTags>$(CommonPackageTags);ai;lmstudio;provider</PackageTags>
   </PropertyGroup>

@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: Entity and Vector/Search providers public and observed; AI runtime/provider promotion active
+  scope: Entity, Vector/Search, and AI providers public and observed; Local Storage/Media promotion active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote the AI runtime and local providers`
+- Status: `in-progress — promote Local Storage and Media; S3 and Backup shelved`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -74,7 +74,7 @@ when no real prerequisite connects them.
 | 1 | Entity data providers | PostgreSQL, SQL Server, MongoDB, Couchbase, Redis, and CockroachDB are supported extensions with shared Entity semantics and real provider proof |
 | 2 | Vector and search | establish the local vector floor, then promote Qdrant, Milvus, Weaviate, Elasticsearch, and OpenSearch through shared semantics plus native deltas |
 | 3 | AI runtime and providers | promote the mainline runtime, Ollama, LM Studio, and ONNX with lifecycle, routing, protocol/runtime, and consumer proof |
-| 4 | Storage, backup, and media | promote the local/S3 storage path, integrity-first backup/restore, and media behavior through their real user journeys |
+| 4 | Storage and media | promote the local storage path and media behavior; S3 and Backup are shelved until separately prioritized |
 | 5 | External authentication | promote Google, Microsoft, and Discord through deterministic authorization-code protocol tests without requiring live credentials |
 | 6 | Accepted migrations | complete only the already-decided Agyo and Zen Garden ownership moves with public destination evidence |
 
@@ -128,9 +128,15 @@ restart consumer. Their immutable API floors are recorded in R13-14.
 exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Their immutable API floors
 are recorded in R13-15.
 
-[R13-15](r13/R13-15-ai-runtime-provider-promotion.md) is active. The provider-neutral runtime and
-contracts, Ollama, LM Studio, and ONNX are the exact five-owner boundary; focused runtime, protocol,
-activation, real-model, package, consumer, product, and API evidence owns the decision.
+[R13-15](r13/R13-15-ai-runtime-provider-promotion.md) passed through PR `#105`, main commit
+`98c937b90b74e51d2a7b321214c7667e9743d6ce`, release run `29918889215`, public indexing of the four
+exact `0.20.0` artifacts plus ONNX `0.20.1`, and the unchanged fresh NuGet.org-only consumer. Their
+immutable API floors are recorded in R13-16.
+
+[R13-16](r13/R13-16-storage-backup-media-promotion.md) is active. Storage contracts/runtime, Local,
+and Media contracts/runtime/Web are the exact six-owner boundary; focused filesystem, image/Web,
+package, consumer, product, and API evidence owns the decision. S3 and Backup are shelved and do not
+block this slice.
 
 ## Execution
 
@@ -157,7 +163,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-15 AI runtime/provider promotion.
+Status: active through R13-16 Local Storage/Media promotion; S3 and Backup shelved.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

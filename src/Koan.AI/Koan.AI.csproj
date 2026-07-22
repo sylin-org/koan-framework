@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <Description>Koan AI semantic client, capability-aware routing, provider composition, source health, and startup inspection.</Description>
     <PackageTags>$(CommonPackageTags);ai;facade;runtime</PackageTags>
   </PropertyGroup>

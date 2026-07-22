@@ -72,15 +72,15 @@
     },
     {
       "id": "Koan.Media.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Media.Core",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Media.Web",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Security.Trust",
@@ -88,15 +88,15 @@
     },
     {
       "id": "Koan.Storage",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Storage.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Storage.Connector.Local",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Tenancy",

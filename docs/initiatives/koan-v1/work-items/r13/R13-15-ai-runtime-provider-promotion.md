@@ -7,7 +7,7 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
+  status: passed
   scope: AI runtime/contracts, Ollama, LM Studio, ONNX, package, consumer, product, and API evidence
 ---
 
@@ -177,3 +177,10 @@ rather than weakening it.
   refreshed from prior AI versions to exact `0.20`, documentation truth/lint, diff-scoped code
   validation, skills lint, and blueprint lint. No unrelated tests, containers, model downloads, or
   certification suite ran.
+- PR `#105` passed lean gate `29918584636` and squash-merged to `main` as
+  `98c937b90b74e51d2a7b321214c7667e9743d6ce`; release run `29918889215` published AI Contracts,
+  runtime, Ollama, and LM Studio at `0.20.0` and ONNX at `0.20.1`, with symbol artifacts;
+- NuGet.org indexed all five exact versions. The unchanged consumer restored from NuGet.org only
+  into a fresh cache, built with zero warnings/errors, and emitted the same
+  `AI|PACKAGE-CONSUMER|ADDKOAN|CLIENT|OLLAMA-NATIVE|LMSTUDIO-NATIVE|ONNX-REAL-MODEL|PASS` result;
+- the five immutable first-publication API floors are captured in their owning projects by R13-16.

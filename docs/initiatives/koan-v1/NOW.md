@@ -78,17 +78,15 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 through external Vector/Search R13-14 are merged, published, indexed,
-public-consumer green, and baseline-captured at their exact first 0.20 versions. Redis's functional
-backend and inert contract are separately supported while Cache Redis remains unassessed. R13-14's
-five real provider cells, six packages, staged/public consumers, product/API guards, and lean
-coherence all passed. The active slice is
-[R13-15](work-items/r13/R13-15-ai-runtime-provider-promotion.md): promote the provider-neutral AI
-runtime and contracts with Ollama, LM Studio, and ONNX through focused runtime/protocol/activation,
-real committed-model, package-only consumer, product, and API evidence. All focused owners, five
-packs, the native-wire/real-model staged consumer, product/API guards, and lean structural legs are
-green; the two affected sample composition lockfiles are refreshed. Publication and public
-observation remain.
+PostgreSQL R13-07 through AI R13-15 are merged, published, indexed, public-consumer green, and
+baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert contract
+are separately supported while Cache Redis remains unassessed. R13-15's runtime/native-wire/real-ONNX
+evidence, five packages, staged/public consumers, product/API guards, and lean coherence all passed.
+The active slice is [R13-16](work-items/r13/R13-16-storage-backup-media-promotion.md): promote Storage
+contracts/runtime, Local, and Media contracts/runtime/Web through focused filesystem, image/Web,
+package-only consumer, product, and API evidence. Storage Core 20/20, Local 31/31, Media Core 562/562,
+and Media Web 8/8 are green. The reduced six-package staged consumer, generated product truth, and API
+posture are also green. S3 and Data Backup are shelved; they are not 0.20 claims or blockers.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
