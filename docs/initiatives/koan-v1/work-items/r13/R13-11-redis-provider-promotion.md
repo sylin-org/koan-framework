@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused Redis backend, provider, pack, consumer, product, and API evidence
+  status: passed
+  scope: Redis backend, inert contract, and Data provider published, indexed, consumer-green, and baseline-captured
 ---
 
 # R13-11 — Promote Redis backend and Entity persistence
@@ -111,4 +111,12 @@ NuGet.org. Their exact first public versions become immutable API floors in the 
 - generated-drift check and the no-tests repository coherence gate: passed; the latter was green in
   22.6 seconds after recording the expected OrderIntake Redis lockfile version changes, with zero doc
   errors and 1,402 existing warnings;
-- publication, public indexing, and public-package consumer: pending.
+- PR `#100` exact-head gate `29900348172`: passed and merged as
+  `b5628a7abad1e275522bed74901e1db9a459de29`;
+- main publication run `29900614297`: passed and pushed all three exact `0.20.0` artifacts;
+- NuGet.org indexed the connector, backend, and abstraction; a genuinely external NuGet.org-only
+  application restored into a new empty package cache, built with zero warnings/errors, selected
+  Redis through `AddKoan()`, reused the standard multiplexer, proved the contract's activation
+  independence, completed Entity save/get/query/page against Redis 8.8, and rejected streaming before
+  yielding with `REDIS|PACKAGE-CONSUMER|SHARED-BACKEND|INERT-CONTRACT|PASS`;
+- the following R13-12 slice records all three exact `0.20.0` artifacts as immutable API floors.

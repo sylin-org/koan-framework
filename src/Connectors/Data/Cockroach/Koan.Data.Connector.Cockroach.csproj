@@ -16,10 +16,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\..\..\Koan.Data.Relational.Npgsql\Koan.Data.Relational.Npgsql.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
   </ItemGroup>
 </Project>
