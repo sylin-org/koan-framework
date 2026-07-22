@@ -78,15 +78,16 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07, SQL Server R13-08, and MongoDB R13-09 are merged, published, indexed,
-public-consumer green, and baseline-captured at exact first `0.20.1` versions. MongoDB's transitive Zen
-Garden Contracts package is separately supported and remained inert in both staged and public
-consumers. The active local slice is
-[R13-10](work-items/r13/R13-10-couchbase-provider-promotion.md): Couchbase has an honest supported
-claim and 0.20 intent, and its complete real-provider suite passed 20/20 with zero skips against
-Community 8.0.2. Its `PublicRelease` pack, zero-warning staged-package consumer, generated truth,
-47/48 API posture, no-tests coherence, and surface ledger are green. Commit, publication, public
-indexing, and public-consumer observation remain.
+PostgreSQL R13-07 through Couchbase R13-10 are merged, published, indexed, public-consumer green, and
+baseline-captured at exact first `0.20.1` versions. MongoDB's transitive Zen Garden Contracts package
+is separately supported and remained inert in staged and public consumers. The active local slice is
+[R13-11](work-items/r13/R13-11-redis-provider-promotion.md): promote the functional shared Redis
+backend, its inert contract, and the Redis Entity provider without changing runtime/API code or
+conferring support on Cache Redis. The complete real Redis 8.8 provider suite passes 12/12 with zero
+skips. All three `PublicRelease` packs, the zero-warning external staged-package consumer, generated
+truth, 48/51 API posture with exactly the three Redis first-publication floors pending, and the
+22.6-second no-tests coherence gate are green. Commit, publication, indexing, and public observation
+remain.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -110,6 +111,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   `29895799297` passed as one job with no tests/containers; release run `29896020354` published MongoDB
   and Zen Garden Contracts `0.20.1`. Both are indexed, and the exact public package consumer passed
   MongoDB Entity behavior while proving the contract remained inert.
+- PR `#99` merged to `main` as `38d00f841b9dcd0cc22e3540918436e8d2f542d3`. Lean gate
+  `29898149195` passed as one job with no tests/containers; release run `29898380061` published
+  Couchbase `0.20.1`. It is indexed, and the exact public package consumer passed against Community
+  8.0.2.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -132,11 +137,11 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Commit the focused Couchbase promotion plus MongoDB/Contracts baseline capture.
+1. Commit the focused Redis promotion and Couchbase baseline capture.
 2. Open and merge the next `dev` → `main` PR after the exact lean gate passes; observe the ordinary
-   pack/push job and public Couchbase consumer.
-3. Capture Couchbase's exact first public API floor in the next slice, then promote Redis or
-   CockroachDB independently according to dependency closure and real-provider evidence readiness.
+   pack/push job and public Redis consumer, then capture all three exact API floors in the next slice.
+3. Continue with CockroachDB as the remaining intended Entity provider, using the same proportional
+   real-provider and package evidence boundary.
 
 ## Repository boundaries
 

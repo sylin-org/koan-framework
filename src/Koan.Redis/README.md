@@ -1,6 +1,6 @@
 # Sylin.Koan.Redis
 
-Shared Redis backend lifecycle for Koan adapters.
+Supported shared Redis backend lifecycle for Koan adapters.
 
 ## Install
 
@@ -38,6 +38,8 @@ uses the environment-appropriate default endpoint.
 
 ## Guarantees and limits
 
+- This is the functional supported backend; `AddKoan()` activates it when a functional Redis adapter brings it
+  into the application.
 - One host-owned connection is shared for each exact normalized Redis connection string.
 - `ConnectionStrings:Redis` is the canonical default endpoint; adapter-specific settings do not duplicate backend
   ownership.
@@ -47,5 +49,7 @@ uses the environment-appropriate default endpoint.
   routing, readiness, and capability decisions.
 - Automatic discovery selects an endpoint; it does not provision Redis. Use Aspire, Compose, Docker, a managed
   service, or another standard topology owner to run it.
+- A malformed or unavailable selected endpoint fails correctively at connection use; the backend does not silently
+  substitute another service.
 
 See [TECHNICAL.md](TECHNICAL.md) for resolution order, ownership, and failure behavior.

@@ -1,6 +1,7 @@
 # Sylin.Koan.Redis technical notes
 
-`RedisModule` owns endpoint configuration, autonomous discovery, connection construction, and host-lifetime disposal.
+As a supported foundation, `RedisModule` owns endpoint configuration, autonomous discovery, connection construction,
+and host-lifetime disposal.
 It registers StackExchange.Redis's `IConnectionMultiplexer` for ordinary
 single-endpoint consumers and implements `IRedisConnectionProvider` for source-aware modules.
 

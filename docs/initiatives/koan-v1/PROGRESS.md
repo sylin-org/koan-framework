@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL, SQL Server, and MongoDB public and observed; Couchbase focused evidence active
+  scope: PostgreSQL through Couchbase public and observed; Redis focused evidence active
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,11 +22,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T8 — public provider promotion`
 - Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: [R13-10 — Couchbase provider promotion](work-items/r13/R13-10-couchbase-provider-promotion.md)
-- Most recently completed R13 child: [R13-09 — MongoDB provider promotion](work-items/r13/R13-09-mongodb-provider-promotion.md)
+- Active child: [R13-11 — Redis provider promotion](work-items/r13/R13-11-redis-provider-promotion.md)
+- Most recently completed R13 child: [R13-10 — Couchbase provider promotion](work-items/r13/R13-10-couchbase-provider-promotion.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: focused Couchbase promotion; native, pack, external-consumer, product,
-  API, and cheap-coherence evidence is green, with publication pending
+- Pending release boundary: focused Redis backend/provider promotion; native, three-package pack,
+  external-consumer, product/API, and cheap-coherence evidence is green, with publication pending
 - Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
   feedback triage are complete; explicit maintainer go/no-go acceptance remains
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -50,7 +50,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | PostgreSQL, Npgsql, SQL Server, MongoDB, and Zen Garden Contracts are public, indexed, consumer-green, and baseline-captured at their first 0.20 versions. R13-10 Couchbase is native, staged-package-consumer, product/API, and cheap-coherence green; publication remains. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | PostgreSQL through Couchbase are public, indexed, consumer-green, and baseline-captured at their first 0.20 versions. R13-11 Redis is native, staged-package-consumer, product/API, and cheap-coherence green while keeping Cache Redis outside its support boundary. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -72,7 +72,7 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
-| R13 | in-progress | The first lean slice, PostgreSQL, SQL Server, and MongoDB are public and observed. R13-10 Couchbase is focused-green through pack, staged consumer, and cheap coherence; publish and observe it, then capture its immutable API floor. |
+| R13 | in-progress | The first lean slice and PostgreSQL through Couchbase are public and observed. R13-11 Redis is focused-green through pack, staged consumer, and cheap coherence; publish and observe the three-owner closure, then capture its immutable API floors. |
 
 ## Divergence and risk log
 

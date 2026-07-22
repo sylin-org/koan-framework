@@ -32,7 +32,7 @@
     },
     {
       "id": "Koan.Data.Connector.Redis",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
@@ -60,11 +60,11 @@
     },
     {
       "id": "Koan.Redis",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Redis.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web",

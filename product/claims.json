@@ -83,6 +83,24 @@
       "evidence": ["tests/Suites/Data/Connector.Couchbase", "docs/initiatives/koan-v1/work-items/r13/R13-10-couchbase-provider-promotion.md"]
     },
     {
+      "id": "redis-backend-foundation",
+      "title": "Shared Redis backend lifecycle",
+      "summary": "The functional Redis backend owns discovery, endpoint resolution, host-lifetime connection pooling, and corrective connection failures while its module-author contract remains inert when referenced alone.",
+      "maturity": "supported-foundation",
+      "packages": ["Sylin.Koan.Redis", "Sylin.Koan.Redis.Abstractions"],
+      "documentation": ["src/Koan.Redis/README.md", "src/Koan.Redis/TECHNICAL.md", "src/Koan.Redis.Abstractions/README.md", "src/Koan.Redis.Abstractions/TECHNICAL.md"],
+      "evidence": ["tests/Suites/Data/Connector.Redis", "tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs", "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md"]
+    },
+    {
+      "id": "redis-data-provider",
+      "title": "Redis Entity persistence",
+      "summary": "Redis supplies keyed, TTL-aware Entity persistence, source and logical-database routing, fast keyed removal, caller-bounded result pages, participation-owned readiness, and explicit rejection of provider-bounded streaming within its stated scan-cost limits.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.Connector.Redis"],
+      "documentation": ["src/Connectors/Data/Redis/README.md", "src/Connectors/Data/Redis/TECHNICAL.md", "docs/reference/data/index.md"],
+      "evidence": ["tests/Suites/Data/Connector.Redis", "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md"]
+    },
+    {
       "id": "backend-negotiation",
       "title": "Backend discovery and negotiation",
       "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",
