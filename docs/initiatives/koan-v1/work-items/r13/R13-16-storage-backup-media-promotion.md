@@ -3,11 +3,11 @@ type: SPEC
 domain: framework
 title: "R13-16 - Promote local storage and media"
 audience: [architects, maintainers, developers, ai-agents]
-status: current
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: pending
+  status: passed
   scope: Storage runtime, Local provider, Media runtime/Web, packages, consumer, product, and API evidence
 ---
 
@@ -118,4 +118,9 @@ certification.
   with exactly these six allowed first-publication floors pending and three content-only owners;
 - lean no-tests coherence passed tool restore, solution build, composition lockfile, documentation
   truth/lint, diff-scoped code validation, skills lint, and blueprint lint; no test or container ran;
-- publication, public indexing, and the unchanged NuGet.org-only consumer remain.
+- PR `#106` passed lean gate `29923443985` and squash-merged as
+  `4f3eabe949bbb1b02b77cdb4f4afff85cb7a5917`;
+- release run `29923873005` attempt 2 passed after a transient NuGet metadata miss on the already-public
+  AI Contracts baseline. NuGet accepted all six exact `0.20.0` packages;
+- all six packages indexed, and the unchanged consumer restored from NuGet.org only into a fresh
+  cache, built with zero warnings/errors, and emitted the same `STORAGE-MEDIA|PACKAGE-CONSUMER|ADDKOAN|LOCAL|MEDIA-PIPELINE|MEDIA-WEB|PASS` result.

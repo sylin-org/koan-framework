@@ -1,6 +1,18 @@
 <Project>
   <PropertyGroup>
-    <!-- ARCH-0120: this targets file is evaluated after each project-local baseline declaration.
+    <!-- First-publication floors recorded outside package-owned NBGV paths. Adding an immutable API
+         floor after NuGet indexing must not manufacture a behaviorless patch package. Existing
+         project-local declarations remain valid; new promotions use this central policy owner. -->
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage.Abstractions'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage.Connector.Local'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Abstractions'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Core'">0.20.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Media.Web'">0.20.0</PackageValidationBaselineVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- ARCH-0120: this targets file is evaluated after project-local or central baseline declaration.
          Standard SDK validation protects later packs; release-on-main's api-baselines guard permits
          a missing baseline only until the first immutable public 0.20 artifact exists. -->
     <EnablePackageValidation Condition="'$(PackageValidationBaselineVersion)' != ''">true</EnablePackageValidation>
