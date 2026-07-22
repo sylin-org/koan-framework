@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-21
   status: in-progress
-  scope: ARCH-0120 amended; draft PR 95 simplified to the lean promotion path
+  scope: draft PR 95 simplified and focused-green; final merge ratchet pending
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,11 +22,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T8 — public provider promotion`
 - Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: validate the first value-led promotion slice before merge
+- Active child: obtain the final green PR ratchet for the first value-led promotion slice
 - Most recently completed R13 child: [R13-06 — first value-led 0.20 promotion slice](work-items/r13/R13-06-wave-0-testing-and-quick-wins.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: simplify and revalidate the first promotion slice, then admit and observe
-  it through the later-wave upgrade and interruption-recovery proof
+- Pending release boundary: maintainer acceptance and merge of the green first promotion slice, then
+  public observation through the later-wave upgrade and interruption-recovery proof
 - Preview readiness: `not ready`; R12-07's later-wave public upgrade/recovery, feedback triage, and
   maintainer go/no-go record remain
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -50,7 +50,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-21 | R12-01 through R12-06 are complete: 38 supported owners publish on 0.20 and the public template journey is proved. R12-07 owns the bounded later-wave upgrade/recovery, feedback triage, and final go/no-go record, using the first dependency-closed R13 wave. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-21 | ARCH-0120 now makes product intent primary and promotes cohesive provider families with proportional evidence. Draft PR #95 retains its direct tests, consumers, API/product guards, and seven useful package promotions without the former terminal ledger or generic admission coordination. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-21 | Draft PR #95 now implements the lean ARCH-0120 path: seven useful promotions, direct family/native evidence, a dependency-closed package consumer, and API/product guards without the former terminal ledger or generic admission coordination. Focused CI-owner repairs are green; the final PR ratchet remains. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -72,12 +72,13 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | R12-01 through R12-06 are complete. R12-07 is ready and will close from the first dependency-closed R13 publication/consumer observation, feedback triage, and maintainer go/no-go record. |
-| R13 | in-progress | Simplify draft PR #95 to the lean promotion contract, revalidate the seven-package slice, then publish/observe only if the maintainer accepts that smaller boundary. Data providers are the first value-led family after it. |
+| R13 | in-progress | The lean seven-package slice and its focused CI-owner repairs are implemented. Obtain a green final PR ratchet, then publish/observe only if the maintainer explicitly accepts that boundary. Data providers are the first value-led family after it. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-21 | R13 first-slice merge ratchet | The first simplified PR ratchet passed build, docs, product truth, API posture, and direct native proof, but its deterministic test leg exposed three real evidence seams: failed-start cleanup masked corrective exceptions, the shared Mongo Web bridge changed the database without preserving authentication source, and the clean consumer omitted locally newer package dependencies. | Keep the lean path and repair each direct owner. Dispose incomplete hosts without an invalid stop sequence; preserve an authenticated Mongo URL's original auth database; derive and pack the promoted owners' complete public project-reference closure through the existing repository inspector. Focused host/Communication/Data and real Mongo evidence pass; rerun the final PR ratchet. |
 | 2026-07-21 | ARCH-0120 value-led correction | The fixed 55-owner program confused repository accounting with product value. Provider adapters are legitimate public leaf packages whose consumers are applications; reverse dependencies cannot decide whether they belong. The ten-wave plan, terminal certificate, central exact-cell metadata, and generic admission/native-candidate coordination added more process than the 0.20 promotion decision required. | Amend ARCH-0120 and R13 around cohesive provider families. Product intent decides inclusion; shared semantics, provider-specific real-boundary proof, a clean consumer, and package/API integrity decide promotion. Preserve the claim/version/dependency invariant, API baselines, generated truth, and existing family tests. Keep PR #95 draft until superseded machinery is removed and the smaller slice is revalidated. |
 | 2026-07-21 | R13-06 first value-led slice | Honest lifecycle and provider proof exposed a pooled SQLite file lock, swallowed host-stop faults, duplicated adapter fixtures, nondeterministic Windows logging/data-protection state, incomplete Forge result handling, and first-publication baseline handling. The first implementation also added a central cell/admission/native-candidate/terminal program that did not improve the application guarantee. | Keep the lifecycle, conformance, consumer, API-baseline, generated-truth, and seven package-promotion value. Make Forge fail closed through direct `dotnet test`; run the sole native PostgreSQL lifecycle fact as a direct workflow job. Remove central admission metadata/services, candidate planning, terminal reconciliation, and their three work cards. Product intent selects later families; proportional evidence proves them. |
 | 2026-07-21 | R13-01 supported API baselines | The accepted 38-owner supported boundary contains 35 assembly-bearing packages and three content-only owners (`Sylin.Koan`, `Sylin.Koan.App`, and `Sylin.Koan.Templates`), so applying SDK API validation to all 38 would be false. SDK package downloads also occur at restore time, so a not-yet-public first 0.20 artifact cannot validate against itself during its first pack. | Record the exact earliest immutable public 0.20 version in each of the 35 assembly-owner projects and activate standard SDK validation after project evaluation. Keep artifact/dependency-shape checks for the three content owners. Add one fail-closed guard to the existing packaging tool/main publisher: a missing baseline is allowed only while NuGet has no stable 0.20 artifact; every later patch is rejected until the earliest artifact is configured. Focused policy passes 7/7, packaging passes 35/35, the tool builds warning-clean, public verification reports 35/35 configured, and real assembly/content packs pass. |

@@ -2,6 +2,8 @@ using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
 using Koan.Packaging.Infrastructure;
+using Koan.Packaging.Models;
+using Koan.Packaging.Services;
 using Xunit;
 
 namespace Koan.Packaging.Tests;
@@ -9,15 +11,15 @@ namespace Koan.Packaging.Tests;
 [Collection(ExecutableApplicationProbeCollection.Name)]
 public sealed class Wave0PackageConsumerTests
 {
-    private static readonly (string PackageId, string ProjectPath)[] Owners =
+    private static readonly string[] Owners =
     [
-        ("Sylin.Koan.Testing.Hosting", "src/Koan.Testing.Hosting/Koan.Testing.Hosting.csproj"),
-        ("Sylin.Koan.Testing", "src/Koan.Testing/Koan.Testing.csproj"),
-        ("Sylin.Koan.Testing.Containers", "src/Koan.Testing.Containers/Koan.Testing.Containers.csproj"),
-        ("Sylin.Koan.Cache.Adapter.Sqlite", "src/Koan.Cache.Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.csproj"),
-        ("Sylin.Koan.Data.SoftDelete", "src/Koan.Data.SoftDelete/Koan.Data.SoftDelete.csproj"),
-        ("Sylin.Koan.Web.Admin", "src/Koan.Web.Admin/Koan.Web.Admin.csproj"),
-        ("Sylin.Koan.Web.Auth.Connector.Test", "src/Connectors/Web/Auth/Test/Koan.Web.Auth.Connector.Test.csproj")
+        "Sylin.Koan.Testing.Hosting",
+        "Sylin.Koan.Testing",
+        "Sylin.Koan.Testing.Containers",
+        "Sylin.Koan.Cache.Adapter.Sqlite",
+        "Sylin.Koan.Data.SoftDelete",
+        "Sylin.Koan.Web.Admin",
+        "Sylin.Koan.Web.Auth.Connector.Test"
     ];
 
     [Fact]
@@ -33,24 +35,28 @@ public sealed class Wave0PackageConsumerTests
         {
             var repository = RepositoryRoot();
             var runner = new ProcessRunner();
-            foreach (var owner in Owners)
+            var packages = await PromotionClosureAsync(
+                repository,
+                runner,
+                TestContext.Current.CancellationToken);
+            foreach (var package in packages)
             {
                 await runner.RequireAsync(
                     "dotnet",
-                    ["pack", owner.ProjectPath, "-c", "Release", "--no-restore", "-p:PublicRelease=true", "-o", feed, "--nologo"],
+                    ["pack", package.ProjectPath, "-c", "Release", "--no-restore", "-p:PublicRelease=true", "-o", feed, "--nologo"],
                     repository,
                     TestContext.Current.CancellationToken);
             }
 
             var versions = Owners.ToDictionary(
-                owner => owner.PackageId,
-                owner => ReadPackedVersion(feed, owner.PackageId),
+                packageId => packageId,
+                packageId => ReadPackedVersion(feed, packageId),
                 StringComparer.OrdinalIgnoreCase);
             var references = new StringBuilder();
-            foreach (var owner in Owners)
+            foreach (var packageId in Owners)
             {
                 references.AppendLine(
-                    $"    <PackageReference Include=\"{owner.PackageId}\" Version=\"{versions[owner.PackageId]}\" />");
+                    $"    <PackageReference Include=\"{packageId}\" Version=\"{versions[packageId]}\" />");
             }
 
             await File.WriteAllTextAsync(Path.Combine(app, "Wave0Consumer.csproj"), $$"""
@@ -143,6 +149,45 @@ public sealed class Wave0PackageConsumerTests
         var package = Assert.Single(packages);
         var file = Path.GetFileName(package);
         return file[(packageId.Length + 1)..^".nupkg".Length];
+    }
+
+    private static async Task<IReadOnlyList<PackageProject>> PromotionClosureAsync(
+        string repository,
+        ProcessRunner runner,
+        CancellationToken cancellationToken)
+    {
+        var packages = await new RepositoryInspector(repository, runner)
+            .DiscoverPackagesAsync(cancellationToken);
+        var byId = packages.ToDictionary(package => package.PackageId, StringComparer.OrdinalIgnoreCase);
+        var byProject = packages.ToDictionary(
+            package => Path.GetFullPath(Path.Combine(repository, package.ProjectPath)),
+            StringComparer.OrdinalIgnoreCase);
+        var selected = new Dictionary<string, PackageProject>(StringComparer.OrdinalIgnoreCase);
+        var pending = new Queue<PackageProject>();
+
+        foreach (var packageId in Owners)
+        {
+            Assert.True(byId.TryGetValue(packageId, out var package),
+                $"Package owner '{packageId}' must be discoverable.");
+            pending.Enqueue(package!);
+        }
+
+        while (pending.TryDequeue(out var package))
+        {
+            if (!selected.TryAdd(package.PackageId, package)) continue;
+
+            foreach (var reference in package.ProjectReferences)
+            {
+                if (byProject.TryGetValue(Path.GetFullPath(reference), out var dependency))
+                {
+                    pending.Enqueue(dependency);
+                }
+            }
+        }
+
+        return selected.Values
+            .OrderBy(package => package.ProjectPath, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string RepositoryRoot([CallerFilePath] string sourceFile = "") =>

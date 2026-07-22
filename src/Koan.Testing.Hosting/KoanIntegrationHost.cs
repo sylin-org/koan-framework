@@ -133,9 +133,20 @@ public static class KoanIntegrationHost
                 await host.StartAsync(ct).ConfigureAwait(false);
                 return host;
             }
-            catch
+            catch (Exception startFailure)
             {
-                await host.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    await host.DisposeAfterFailedStartAsync().ConfigureAwait(false);
+                }
+                catch (Exception cleanupFailure)
+                {
+                    throw new AggregateException(
+                        "Integration host startup and cleanup both failed.",
+                        startFailure,
+                        cleanupFailure);
+                }
+
                 throw;
             }
         }
@@ -166,18 +177,25 @@ public sealed class IntegrationHost : IAsyncDisposable
     /// <summary>Stop the host's hosted services gracefully.</summary>
     public Task StopAsync(CancellationToken ct = default) => _host.StopAsync(ct);
 
-    public async ValueTask DisposeAsync()
+    internal ValueTask DisposeAfterFailedStartAsync() => DisposeCoreAsync(stopHost: false);
+
+    public ValueTask DisposeAsync() => DisposeCoreAsync(stopHost: true);
+
+    private async ValueTask DisposeCoreAsync(bool stopHost)
     {
         if (_disposed) return;
         _disposed = true;
         Exception? stopFailure = null;
-        try
+        if (stopHost)
         {
-            await _host.StopAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception exception)
-        {
-            stopFailure = exception;
+            try
+            {
+                await _host.StopAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                stopFailure = exception;
+            }
         }
 
         try

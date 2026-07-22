@@ -65,9 +65,11 @@ are their only consumers. R13 promotes those capabilities by meaningful family: 
 provider-specific real-boundary proof, a clean package consumer, and package/API integrity. The
 historical 38/55 inventory remains discovery, not an execution ledger or completion count.
 
-The lean [R13](work-items/R13-terminal-package-maturity.md) begins with high-use Data providers, then
-Vector/Search, AI providers, Storage/Media, external Auth, and only already-decided public migrations.
-Families may progress independently when no real prerequisite connects them.
+The lean [R13](work-items/R13-terminal-package-maturity.md) uses the first seven-owner testing and
+operational slice to prove the smaller promotion path. After that publication decision, high-use Data
+providers are next, followed by Vector/Search, AI providers, Storage/Media, external Auth, and only
+already-decided public migrations. Families may progress independently when no real prerequisite
+connects them.
 
 ## Exact pause point
 
@@ -76,8 +78,13 @@ candidates. It retains reusable conformance, lifecycle, API, compiler-drift, cle
 corrections. The terminal certificate, central exact-cell metadata, generic admission coordination,
 and native candidate-planning machinery have been removed under the amended ADR.
 
-Before merge, finish the focused retained evidence and update the PR narrative. Untracked `tmp/` is
-unrelated user-owned material and must remain untouched and unstaged.
+The superseded machinery is gone, the PR narrative is value-led, and focused retained evidence is
+complete. The first complete PR ratchet exposed three evidence-owner defects: incomplete host startup
+was stopped before disposal and masked the original correction, Mongo database isolation lost the
+container authentication source, and the clean consumer packed candidates without their newer local
+dependency closure. Those owner-local repairs are implemented and focused validation is green; the
+final PR ratchet is the remaining pre-merge check. Untracked `tmp/` is unrelated user-owned material
+and must remain untouched and unstaged.
 
 ## Remote/public state
 
@@ -99,20 +106,18 @@ unrelated user-owned material and must remain untouched and unstaged.
 
 ## Validation posture
 
-- Treat the existing PR #95 evidence as diagnostic input, not justification for retaining its
-  coordination machinery.
-- Preserve proven API baselines, generated-surface drift detection, host/container lifecycle fixes,
-  reusable family conformance, package-only consumers, and provider-specific behavior when their
-  direct owners remain.
-- After simplification, run only affected owner/family tests, the clean consumer, product compilation,
-  API checks, and any native/provider boundary required by the retained guarantee.
-- Run the complete release ratchet only when the simplified PR is intentionally approaching the
-  main/publication boundary.
+- The smaller slice retains API baselines, generated-surface drift detection, host/container lifecycle,
+  reusable family conformance, package-only consumption, and direct provider evidence.
+- Focused repairs pass the host failure oracle, Communication 44/44, the affected Data correction 1/1,
+  and the real Mongo Web owner 52/52. The package consumer builds the complete local dependency closure;
+  the connected CI runner owns its final clean network restore.
+- The final PR ratchet is now proportionate because the draft is intentionally approaching a possible
+  main/publication decision. It does not authorize merge or publication.
 
 ## Next actions
 
-1. Revalidate the smaller seven-package promotion slice and update the draft PR description.
-2. Merge/publish only after the maintainer accepts that smaller boundary; then observe its public
+1. Obtain a green final PR ratchet for the repaired seven-package promotion slice.
+2. Merge/publish only after the maintainer explicitly accepts that smaller boundary; then observe its public
    consumer and R12-07 recovery evidence.
 3. Open the first high-value provider-family slice, starting with Entity data providers rather than
    the former owner-number sequence.

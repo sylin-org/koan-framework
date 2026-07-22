@@ -105,3 +105,11 @@ Validation on 2026-07-21 passed:
 - generated product surface: 33 claims and 93 packages, current;
 - API posture: 35/42 configured baselines, seven first-publication cases, three content-only owners;
 - complete Release solution build: zero warnings and zero errors.
+
+The first simplified merge-ratchet run subsequently found and localized three evidence defects. The
+host wrapper now disposes an incompletely started generic host without invoking an invalid stop
+sequence, the Mongo Web bridge preserves the original authentication database while assigning its
+isolated test database, and the package-only consumer packs the complete evaluated project-reference
+closure rather than assuming newer dependencies already exist on nuget.org. Focused repair evidence
+passes the host failure oracle, Communication 44/44, the affected Data correction 1/1, and real Mongo
+Web behavior 52/52. The final connected PR ratchet owns clean external restore confirmation.

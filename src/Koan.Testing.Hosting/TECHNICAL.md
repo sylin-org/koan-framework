@@ -25,7 +25,10 @@ fixtures.
 
 `Builder.StartAsync` creates exactly one `IntegrationHost` wrapper and uses it as the ownership
 boundary. Ownership transfers only after hosted-service startup succeeds. Before that point, failure
-cleanup awaits the wrapper's disposal and then rethrows; it does not return a partially started host.
+cleanup disposes the incomplete host without asking it to stop, then rethrows the original startup
+exception. A generic host whose startup never completed has no valid stop sequence; attempting one can
+mask the primary composition error with hosting-internal teardown state. If both startup and owned host
+disposal fail, both errors are retained in an aggregate exception.
 
 `IntegrationHost.DisposeAsync` is idempotent. It first requests `StopAsync` with no new cancellation
 deadline because test teardown is already the owning boundary. Stop errors do not prevent resource

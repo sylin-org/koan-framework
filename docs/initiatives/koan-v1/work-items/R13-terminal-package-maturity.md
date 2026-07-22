@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-21
   status: in-progress
-  scope: lean promotion decision accepted; draft Wave 0 implementation awaiting simplification
+  scope: first lean promotion slice implemented and focused-green; final PR ratchet pending
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — simplify the draft promotion path before merge`
+- Status: `in-progress — obtain a green final ratchet before any merge decision`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
 - Coordinates with: [R12-07](r12/R12-07-preview-evolution.md); the first newly promoted public
@@ -98,13 +98,27 @@ It also introduced machinery whose primary purpose was administering the former 
 - native candidate planning and exact-candidate result orchestration;
 - multiple bootstrap cards and projections centered on owner-count progress.
 
-PR #95 remains draft. Before merge, retain the independently valuable behavior and remove or
-collapse the superseded coordination machinery. Revalidate the smaller boundary, update the PR
-narrative, and only then decide whether the seven promotions are ready for main/publication.
+PR #95 remains draft. The superseded coordination machinery has been removed, the seven candidates
+retain only direct family/package evidence, and the PR narrative now describes user value. Focused
+validation is green. The first final-ratchet attempt then exposed three direct evidence-owner defects:
+
+- failed host startup cleanup attempted `StopAsync` on an incomplete generic host and masked the
+  original corrective exception;
+- the Mongo Web reset bridge changed the container URL's database without preserving its
+  authentication source; and
+- the clean consumer packed seven candidates but not their locally newer public dependency closure.
+
+The repairs remain at those three owners. The host failure oracle, Communication 44/44, affected Data
+correction 1/1, and real Mongo Web owner 52/52 pass. The clean consumer now derives and packs the full
+closure through the existing package inspector and reaches its external restore boundary locally; the
+connected PR runner owns the final clean network proof. A green final ratchet is the only remaining
+R13-A check. Merge and publication still require an explicit maintainer decision.
 
 ## Execution
 
 ### R13-A — Simplify the first promotion slice
+
+Status: implementation and focused validation complete; final PR ratchet pending.
 
 1. Map PR #95 changes to the retained/removal lists in ARCH-0120.
 2. Delete generic R13 coordination that has no smaller existing owner.

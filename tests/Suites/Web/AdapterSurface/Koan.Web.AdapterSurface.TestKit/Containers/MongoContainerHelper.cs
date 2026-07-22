@@ -28,7 +28,16 @@ public sealed class MongoContainerHelper : KoanWebContainerHelper<MongoFixture>
 
     private static string EnsureDatabase(string connectionString, string database)
     {
-        var builder = new MongoUrlBuilder(connectionString) { DatabaseName = database };
+        var builder = new MongoUrlBuilder(connectionString);
+        if (!string.IsNullOrWhiteSpace(builder.Username) &&
+            string.IsNullOrWhiteSpace(builder.AuthenticationSource))
+        {
+            builder.AuthenticationSource = string.IsNullOrWhiteSpace(builder.DatabaseName)
+                ? "admin"
+                : builder.DatabaseName;
+        }
+
+        builder.DatabaseName = database;
         return builder.ToString();
     }
 
