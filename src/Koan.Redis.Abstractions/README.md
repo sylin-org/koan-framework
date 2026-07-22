@@ -1,6 +1,6 @@
 # Sylin.Koan.Redis.Abstractions
 
-Inert connection-lifecycle vocabulary for Koan modules that share a Redis backend.
+Supported, inert connection-lifecycle vocabulary for Koan modules that share a Redis backend.
 
 ## Install
 
@@ -24,6 +24,7 @@ backend is present.
 
 ## Guarantees and limits
 
+- The support claim covers the contract shape and its inertness; it does not make this package a Redis runtime.
 - This assembly contains no `KoanModule`, discovery adapter, or backend implementation.
 - Referencing it cannot activate Redis, open a connection, or add `IConnectionMultiplexer` to dependency injection.
 - `IRedisConnectionProvider` is a module integration contract, not an application bootstrap requirement.

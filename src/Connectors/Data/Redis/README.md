@@ -1,14 +1,17 @@
 # Sylin.Koan.Data.Connector.Redis
 
-Redis provider for Koan data - key-value storage with options binding, health checks, and simple scanning.
+Supported Redis provider for Koan Entity data: keyed storage, native TTL, fast keyed removal, source/database routing,
+participation-aware health, and deliberately limited scan-based queries.
 
 - Target framework: net10.0
 - License: Apache-2.0
 
 ## Capabilities
 
+- Supported for keyed, ephemeral, and modest-cardinality Entity workloads
 - Shared backend connection pooling without activating unrelated pillars
 - Basic scan/query over keys for simple filters
+- Native TTL and fast keyed removal
 - Health checks and minimal metrics hooks
 - Explicitly does not advertise `DataCaps.Query.ProviderBoundedPaging`
 
@@ -48,7 +51,9 @@ because the current Redis query path can scan the keyspace before slicing. Koan 
 behind a streaming-shaped API.
 
 Use `All`/`Query` only for deliberately small sets, or `FirstPage`/`Page` when a bounded result returned
-to application code is sufficient. Numbered pages do not make Redis keyspace scanning provider-bounded.
+to application code is sufficient. Numbered pages do not make Redis keyspace scanning provider-bounded,
+snapshot-based, resumable, or mutation-safe. Prefer another supported Data provider for large or
+query-intensive datasets.
 
 See TECHNICAL.md for options and operational considerations.
 

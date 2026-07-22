@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused Couchbase provider, pack, consumer, product, and API evidence
+  status: passed
+  scope: Couchbase published, indexed, public-consumer green, and baseline-captured
 ---
 
 # R13-10 — Promote Couchbase Entity persistence
@@ -101,4 +101,10 @@ public version becomes the immutable API floor in the following slice.
   and three content-only owners;
 - product-surface generated-drift check, the no-tests repository coherence pass, and the 36-row
   surface ledger: passed; no sibling provider tests or whole-framework certification ran;
-- publication, public indexing, and public-package consumer: pending.
+- PR `#99` exact-head gate `29898149195`: passed and merged as
+  `38d00f841b9dcd0cc22e3540918436e8d2f542d3`;
+- main publication run `29898380061`: passed and pushed Couchbase `0.20.1`;
+- NuGet.org indexed the exact artifact; a genuinely external NuGet.org-only application restored it,
+  built with zero warnings/errors, selected Couchbase through `AddKoan()`, and completed Entity
+  save/get/query against `couchbase:community-8.0.2` with `COUCHBASE|PUBLIC-CONSUMER|PASS`;
+- the following R13-11 slice records exact `0.20.1` as the immutable API floor.

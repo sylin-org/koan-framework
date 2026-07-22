@@ -1,6 +1,7 @@
 # Sylin.Koan.Redis.Abstractions technical notes
 
-`IRedisConnectionProvider` is the narrow cross-module seam for a host-owned Redis connection pool. It exposes the
+As a supported inert foundation, `IRedisConnectionProvider` is the narrow cross-module seam for a host-owned Redis
+connection pool. It exposes the
 resolved default endpoint, the default multiplexer, and an explicit-endpoint lookup. Implementations must reuse one
 multiplexer per distinct connection string and dispose created connections with the owning host.
 

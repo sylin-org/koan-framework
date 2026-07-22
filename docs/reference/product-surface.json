@@ -586,6 +586,45 @@
       ]
     },
     {
+      "id": "redis-backend-foundation",
+      "title": "Shared Redis backend lifecycle",
+      "summary": "The functional Redis backend owns discovery, endpoint resolution, host-lifetime connection pooling, and corrective connection failures while its module-author contract remains inert when referenced alone.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan.Redis",
+        "Sylin.Koan.Redis.Abstractions"
+      ],
+      "documentation": [
+        "src/Koan.Redis.Abstractions/README.md",
+        "src/Koan.Redis.Abstractions/TECHNICAL.md",
+        "src/Koan.Redis/README.md",
+        "src/Koan.Redis/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md",
+        "tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs",
+        "tests/Suites/Data/Connector.Redis"
+      ]
+    },
+    {
+      "id": "redis-data-provider",
+      "title": "Redis Entity persistence",
+      "summary": "Redis supplies keyed, TTL-aware Entity persistence, source and logical-database routing, fast keyed removal, caller-bounded result pages, participation-owned readiness, and explicit rejection of provider-bounded streaming within its stated scan-cost limits.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Redis"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Redis/README.md",
+        "src/Connectors/Data/Redis/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md",
+        "tests/Suites/Data/Connector.Redis"
+      ]
+    },
+    {
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",
@@ -1480,7 +1519,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.",
       "targetFrameworks": [
@@ -1496,7 +1535,9 @@
       "readme": "src/Connectors/Data/Redis/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Redis/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "redis-data-provider"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
@@ -2028,7 +2069,7 @@
     },
     {
       "packageId": "Sylin.Koan.Redis",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Shared Redis backend lifecycle, discovery, and connection pooling for Koan adapters.",
       "targetFrameworks": [
@@ -2041,11 +2082,13 @@
       "readme": "src/Koan.Redis/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Redis/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "redis-backend-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Redis.Abstractions",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert connection-lifecycle contracts for Koan modules that share a Redis backend.",
       "targetFrameworks": [
@@ -2055,7 +2098,9 @@
       "readme": "src/Koan.Redis.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Redis.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "redis-backend-foundation"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Security.Trust",

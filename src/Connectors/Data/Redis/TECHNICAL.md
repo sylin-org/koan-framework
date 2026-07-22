@@ -8,7 +8,8 @@ source: src/Koan.Data.Connector.Redis/
 
 ## Contract
 
-- Key-value/document patterns with limited query semantics and caller-visible numbered paging.
+- Supported keyed, ephemeral, and modest-cardinality Entity persistence with native TTL, fast keyed removal,
+  source/logical-database routing, limited query semantics, and caller-visible numbered paging.
 - The adapter does not declare `DataCaps.Query.ProviderBoundedPaging`; its current scan path cannot
   prove that a requested page is applied before the keyspace is traversed.
 
@@ -20,6 +21,8 @@ source: src/Koan.Data.Connector.Redis/
   application code, without inferring a provider-side scan bound.
 - A later incremental Redis implementation must earn a separate capability claim through shared
   conformance before these Entity streams become available.
+- Numbered pages bound only the result returned to application code. They do not make traversal snapshot-based,
+  resumable, mutation-safe, or bounded at the Redis keyspace.
 
 ## Configuration
 
