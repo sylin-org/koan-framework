@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: Entity, Vector/Search, and AI providers public and observed; Local Storage/Media promotion active
+  scope: R13 public provider promotion passed; R12-07 technical GO awaits maintainer acceptance
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,14 +20,13 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T8 — public provider promotion`
-- Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: none; the next boundary is evidence-based assessment of the accepted Agyo/Zen Garden migrations
-- Most recently completed R13 child: [R13-17 — External authentication promotion](work-items/r13/R13-17-external-auth-promotion.md)
-- Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: land the validated central immutable API floors for the three now-public Auth
-  connectors (`76/76` configured); this changes no package-owned path and therefore creates no new package
-  version. S3 and Backup are shelved.
+- Current tranche: `T7C — preview acceptance`
+- Active work item: [R12 — Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md)
+- Active child: [R12-07 — Preview evolution](work-items/r12/R12-07-preview-evolution.md)
+- Most recently completed R13 child: [R13-18 — Accepted migration disposition](work-items/r13/R13-18-accepted-migration-disposition.md)
+- Most recently completed child: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
+- Pending release boundary: none. R13 is complete; S3 and Backup are shelved. R12-07 awaits explicit
+  maintainer acceptance of its technical GO recommendation.
 - Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
   feedback triage are complete; explicit maintainer go/no-go acceptance remains
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -51,7 +50,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity through external Auth are public, indexed, consumer-green, and baseline-captured. Only evidence-based assessment of the accepted Agyo/Zen Garden migrations remains; S3 and Backup are shelved. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | passed | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity through external Auth are public, indexed, consumer-green, and baseline-captured. R13-18 keeps unready cross-repository migrations truthful at 0.17 without blocking closure; S3 and Backup are shelved. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -73,12 +72,13 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
-| R13 | in-progress | The first lean slice through R13-17 external Auth is public and observed. Google, Microsoft, and Discord passed 46 focused tests, exact/staged/public package proof, product/API posture, and lean coherence. The publisher created only their three `0.20.0` identities and skipped unchanged Storage/Media versions. Accepted migration assessment remains; S3 and Backup are shelved. |
+| R13 | passed | Entity, Vector/Search, AI runtime/providers, Local Storage/Media, and external Auth are public, indexed, public-consumer green, and API-baseline complete. R13-18 found no public destination evidence for the accepted Agyo/Zen Garden moves, so six unclaimed owners remain truthfully at 0.17 under ARCH-0089 rather than being deleted or promoted. S3 and Backup are shelved. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-22 | R13 accepted migration disposition | Agyo's public tip contains substantial RAG but no migrated Agents/Orchestration loop, standalone Eval/Review projects, or public NuGet package IDs. Zen Garden's public tip has not advanced since April and does not prove the complete Models/HuggingFace lifecycle destination. | Apply ARCH-0089's transition gate: keep the six departing Koan owners unclaimed at 0.17; perform no deletion, promotion, forwarding package, or sibling mutation. Move the cross-repository work out of the completed 0.20 promotion epic and resume only from public destination/consumer evidence. |
 | 2026-07-22 | Practical merge and publication flow | Per-package NBGV versioning and main publication had become coupled to a 107-project certification ratchet, a permanent PR-native job, a duplicate surface workflow, and repeated consumer proof. This delayed framework work while proving unrelated providers and confused portfolio certification with package identity. | ARCH-0121 keeps one cheap main-PR coherence job and one test-free main publisher. Affected behavior/native tests run during development; clean consumers apply only to first publication or changed artifact shape; the complete ratchet is an explicit whole-framework milestone. The exact replacement flow passed in 86.6 seconds versus about 16 minutes 22 seconds for the preceding connected gate. |
 | 2026-07-21 | R13 first-slice merge ratchet | The first simplified PR ratchet passed build, docs, product truth, API posture, and direct native proof, but its deterministic test leg exposed three real evidence seams: failed-start cleanup masked corrective exceptions, the shared Mongo Web bridge changed the database without preserving authentication source, and the clean consumer omitted locally newer package dependencies. | Keep the lean path and repair each direct owner. Dispose incomplete hosts without an invalid stop sequence; preserve an authenticated Mongo URL's original auth database; derive and pack the promoted owners' complete public project-reference closure through the existing repository inspector. Focused host/Communication/Data and real Mongo evidence pass; rerun the final PR ratchet. |
 | 2026-07-21 | ARCH-0120 value-led correction | The fixed 55-owner program confused repository accounting with product value. Provider adapters are legitimate public leaf packages whose consumers are applications; reverse dependencies cannot decide whether they belong. The ten-wave plan, terminal certificate, central exact-cell metadata, and generic admission/native-candidate coordination added more process than the 0.20 promotion decision required. | Amend ARCH-0120 and R13 around cohesive provider families. Product intent decides inclusion; shared semantics, provider-specific real-boundary proof, a clean consumer, and package/API integrity decide promotion. Preserve the claim/version/dependency invariant, API baselines, generated truth, and existing family tests. Keep PR #95 draft until superseded machinery is removed and the smaller slice is revalidated. |
