@@ -22,11 +22,13 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T8 — public provider promotion`
 - Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: [R13-16 — Local Storage/Media promotion](work-items/r13/R13-16-storage-backup-media-promotion.md)
-- Most recently completed R13 child: [R13-15 — AI runtime/provider promotion](work-items/r13/R13-15-ai-runtime-provider-promotion.md)
+- Active child: [R13-17 — External authentication promotion](work-items/r13/R13-17-external-auth-promotion.md)
+- Most recently completed R13 child: [R13-16 — Local Storage/Media promotion](work-items/r13/R13-16-storage-backup-media-promotion.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: six Local Storage/Media owners; focused source, staged packages/consumer,
-  product/API posture, and lean structural gate are green. Public observation remains. S3 and Backup are shelved.
+- Pending release boundary: Google, Microsoft, and Discord Auth connectors; 46 focused deterministic
+  tests, exact packs, staged package consumer, product truth, and API posture are green. Lean no-tests
+  coherence passed all eight legs in 66.3 seconds; public observation remains.
+  S3 and Backup are shelved.
 - Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
   feedback triage are complete; explicit maintainer go/no-go acceptance remains
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -50,7 +52,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity, Vector/Search, and AI providers are public, indexed, consumer-green, and baseline-captured. R13-16 promotes Local Storage/Media; S3 and Backup are shelved. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity, Vector/Search, AI, and Local Storage/Media are public, indexed, consumer-green, and baseline-captured. R13-17 promotes Google, Microsoft, and Discord Auth; S3 and Backup are shelved. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -72,7 +74,7 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
-| R13 | in-progress | The first lean slice, Entity providers, complete Vector/Search family, and AI runtime/providers are public and observed. R13-16 is reduced to six Local Storage/Media owners: 621 focused tests, staged package consumer, product truth, and API posture are green. S3 and Backup are shelved; lean/public proof remains. |
+| R13 | in-progress | The first lean slice through R13-16 Local Storage/Media is public and observed. R13-17 owns only Google, Microsoft, and Discord Auth: 41/41 definition tests, 5/5 deterministic protocol tests, exact packs, staged package consumer, product truth, API posture, and the 66.3-second lean gate are green. S3 and Backup are shelved; public proof remains. |
 
 ## Divergence and risk log
 

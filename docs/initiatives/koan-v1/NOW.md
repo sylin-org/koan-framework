@@ -78,15 +78,18 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 through AI R13-15 are merged, published, indexed, public-consumer green, and
-baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert contract
-are separately supported while Cache Redis remains unassessed. R13-15's runtime/native-wire/real-ONNX
-evidence, five packages, staged/public consumers, product/API guards, and lean coherence all passed.
-The active slice is [R13-16](work-items/r13/R13-16-storage-backup-media-promotion.md): promote Storage
-contracts/runtime, Local, and Media contracts/runtime/Web through focused filesystem, image/Web,
-package-only consumer, product, and API evidence. Storage Core 20/20, Local 31/31, Media Core 562/562,
-and Media Web 8/8 are green. The reduced six-package staged consumer, generated product truth, and API
-posture are also green. S3 and Data Backup are shelved; they are not 0.20 claims or blockers.
+PostgreSQL R13-07 through Local Storage/Media R13-16 are merged, published, indexed, public-consumer
+green, and baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert
+contract are separately supported while Cache Redis remains unassessed. R13-16 passed 621 focused tests,
+staged and public consumers, product/API guards, lean coherence, and exact publication of its six owners.
+S3 and Data Backup are shelved; they are not 0.20 claims or blockers.
+
+The active slice is [R13-17](work-items/r13/R13-17-external-auth-promotion.md): promote Google,
+Microsoft, and Discord as definition-only integrations over the shared Web Auth runtime. The focused
+definition suite passes 41/41 and the existing deterministic OAuth2/OIDC authorization-code suite passes
+5/5 without live credentials. Exact packs, the staged package-only consumer, generated product truth,
+and API posture are green. Lean no-tests coherence passed all eight legs in 66.3 seconds; public
+observation remains.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -131,6 +134,15 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   `663b947f783ff0d9a445cce6c45b0330684e59d3`, and release run `29908506818` published SearchEngine,
   Elasticsearch, OpenSearch, Qdrant, Milvus, and Weaviate at exact `0.20.0`. All six are indexed and
   the unchanged fresh NuGet.org-only activation consumer passed.
+- PR `#105` passed lean gate `29918564166`, squash-merged as
+  `98c937b90b74e51d2a7b321214c7667e9743d6ce`, and release run `29918889215` published AI runtime,
+  contracts, Ollama, and LM Studio at exact `0.20.0` plus ONNX `0.20.1`. All five are indexed and the
+  fresh NuGet.org-only consumer passed.
+- PR `#106` passed lean gate `29923443985`, squash-merged as
+  `4f3eabe949bbb1b02b77cdb4f4afff85cb7a5917`, and release run `29923873005` attempt 2 published the
+  six Local Storage/Media owners at exact `0.20.0`. All six are indexed and the fresh NuGet.org-only
+  consumer passed. S3 and Backup remained unchanged and unpublished. Attempt 1 encountered a transient
+  NuGet lookup miss before packing; rerunning the failed job succeeded without a code change.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -153,9 +165,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Publish the six external Vector/Search owners through the lean main boundary.
-2. Observe exact accepted/indexed versions and rerun the activation consumer from NuGet.org only.
-3. Record immutable API floors, then open the next value-led provider family slice.
+1. Pass the lean coherence gate and publish the three external Auth connectors through the existing main boundary.
+2. Observe their exact accepted/indexed versions and rerun the same consumer from NuGet.org only.
+3. Record their immutable API floors centrally, without editing already-published package projects, then
+   assess only the remaining accepted migrations.
 
 ## Repository boundaries
 

@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: Entity, Vector/Search, and AI providers public and observed; Local Storage/Media promotion active
+  scope: Entity through Local Storage/Media public and observed; external authentication promotion active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote Local Storage and Media; S3 and Backup shelved`
+- Status: `in-progress — promote Google, Microsoft, and Discord authentication; S3 and Backup shelved`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -133,10 +133,16 @@ are recorded in R13-15.
 exact `0.20.0` artifacts plus ONNX `0.20.1`, and the unchanged fresh NuGet.org-only consumer. Their
 immutable API floors are recorded in R13-16.
 
-[R13-16](r13/R13-16-storage-backup-media-promotion.md) is active. Storage contracts/runtime, Local,
-and Media contracts/runtime/Web are the exact six-owner boundary; focused filesystem, image/Web,
-package, consumer, product, and API evidence owns the decision. S3 and Backup are shelved and do not
-block this slice.
+[R13-16](r13/R13-16-storage-backup-media-promotion.md) passed through PR `#106`, main commit
+`4f3eabe949bbb1b02b77cdb4f4afff85cb7a5917`, release run `29923873005` attempt 2, public indexing
+of all six exact `0.20.0` artifacts, and the fresh NuGet.org-only consumer. Their immutable API floors
+are recorded centrally in R13-17, so baseline capture does not mint behaviorless package patches. S3
+and Backup remain shelved.
+
+[R13-17](r13/R13-17-external-auth-promotion.md) is active. Google, Microsoft, and Discord are the
+exact three-owner boundary over the shared Web Auth runtime; deterministic definition/protocol tests,
+exact packs, the staged consumer, product truth, API posture, and the 66.3-second lean no-tests gate
+are green. Public observation remains.
 
 ## Execution
 
@@ -163,7 +169,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-16 Local Storage/Media promotion; S3 and Backup shelved.
+Status: active through R13-17 external authentication promotion; S3 and Backup shelved.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

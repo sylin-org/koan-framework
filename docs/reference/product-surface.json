@@ -315,6 +315,28 @@
       ]
     },
     {
+      "id": "external-social-authentication",
+      "title": "Google, Microsoft, and Discord sign-in",
+      "summary": "Provider references contribute exact Google and Microsoft OIDC or Discord OAuth2 defaults while the shared Web Auth runtime keeps unconfigured connectors inert, validates explicit credentials, elects deterministically, and owns the maintained authorization-code flow.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Web.Auth.Connector.Discord",
+        "Sylin.Koan.Web.Auth.Connector.Google",
+        "Sylin.Koan.Web.Auth.Connector.Microsoft"
+      ],
+      "documentation": [
+        "docs/guides/authentication-setup.md",
+        "src/Connectors/Web/Auth/Discord/README.md",
+        "src/Connectors/Web/Auth/Google/README.md",
+        "src/Connectors/Web/Auth/Microsoft/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-17-external-auth-promotion.md",
+        "tests/Koan.Web.Auth.Tests",
+        "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests"
+      ]
+    },
+    {
       "id": "external-vector-providers",
       "title": "Qdrant, Milvus, and Weaviate vector providers",
       "summary": "Qdrant, Milvus, and Weaviate preserve Koan\u0027s Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
@@ -2451,7 +2473,7 @@
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Discord",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Discord OAuth2 auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2465,11 +2487,13 @@
       "readme": "src/Connectors/Web/Auth/Discord/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Web/Auth/Discord/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "external-social-authentication"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Google",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Google auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2483,11 +2507,13 @@
       "readme": "src/Connectors/Web/Auth/Google/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Web/Auth/Google/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "external-social-authentication"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Microsoft",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Microsoft (Entra ID) auth provider adapter for Koan.Web.Auth (self-registering defaults).",
       "targetFrameworks": [
@@ -2501,7 +2527,9 @@
       "readme": "src/Connectors/Web/Auth/Microsoft/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Web/Auth/Microsoft/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "external-social-authentication"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Web.Auth.Connector.Test",
