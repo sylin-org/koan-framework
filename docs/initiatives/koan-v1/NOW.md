@@ -27,7 +27,7 @@ is recorded in [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md)
 - the resulting `main` commit automatically runs one package publication job;
 - each packable project keeps its local NBGV `version.json`;
 - the workflow compiles the product surface, runs `dotnet pack` with `PublicRelease=true`, and runs
-  `dotnet nuget push --skip-duplicate` only for the 38 guaranteed package owners validated at 0.20,
+  `dotnet nuget push --skip-duplicate` only for the compiler-selected guaranteed 0.20 package owners,
   using the established `NUGET_API_KEY`;
 - no lineage branch, synthetic commits, manifests, escrow, tags, GitHub Releases, recovery ledger,
   duplicated proof lanes, or full test ratchet participates in publication.
@@ -78,13 +78,15 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 and SQL Server R13-08 are merged, published, indexed, public-consumer green, and
-baseline-captured at exact `0.20.1` versions. The active local slice is
-[R13-09](work-items/r13/R13-09-mongodb-provider-promotion.md): MongoDB and the inert Zen Garden contract
-foundation have separate supported claims and 0.20 intent. The real provider suite passed 68/68,
-focused contract tests passed 45/45 plus 7/7, both packages packed, and a clean staged-package
-consumer passed Mongo Entity behavior while proving no runtime provider activation. Generated truth,
-API posture, cheap coherence, commit, PR, publication, public indexing, and baseline capture remain.
+PostgreSQL R13-07, SQL Server R13-08, and MongoDB R13-09 are merged, published, indexed,
+public-consumer green, and baseline-captured at exact first `0.20.1` versions. MongoDB's transitive Zen
+Garden Contracts package is separately supported and remained inert in both staged and public
+consumers. The active local slice is
+[R13-10](work-items/r13/R13-10-couchbase-provider-promotion.md): Couchbase has an honest supported
+claim and 0.20 intent, and its complete real-provider suite passed 20/20 with zero skips against
+Community 8.0.2. Its `PublicRelease` pack, zero-warning staged-package consumer, generated truth,
+47/48 API posture, no-tests coherence, and surface ledger are green. Commit, publication, public
+indexing, and public-consumer observation remain.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -104,6 +106,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 - PR `#97` merged to `main` as `a8d3869adc84d15a330acb52cdf5c7dca916a6ad`. Lean gate
   `29894628337` passed as one job with no tests/containers; release run `29894829655` published SQL
   Server `0.20.1`. It is indexed, and the exact public package consumer passed.
+- PR `#98` merged to `main` as `e90e8fecff4efb3d1a4dd2d956b8d8f1bc4b423a`. Lean gate
+  `29895799297` passed as one job with no tests/containers; release run `29896020354` published MongoDB
+  and Zen Garden Contracts `0.20.1`. Both are indexed, and the exact public package consumer passed
+  MongoDB Entity behavior while proving the contract remained inert.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -126,12 +132,11 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Compile generated truth and API posture for R13-09, run cheap coherence, and commit the focused
-   MongoDB plus inert-contract promotion.
+1. Commit the focused Couchbase promotion plus MongoDB/Contracts baseline capture.
 2. Open and merge the next `dev` → `main` PR after the exact lean gate passes; observe the ordinary
-   pack/push job and public MongoDB consumer.
-3. Record MongoDB and Zen Garden Contracts' exact first public API floors, then select the next
-   high-value Entity provider independently.
+   pack/push job and public Couchbase consumer.
+3. Capture Couchbase's exact first public API floor in the next slice, then promote Redis or
+   CockroachDB independently according to dependency closure and real-provider evidence readiness.
 
 ## Repository boundaries
 

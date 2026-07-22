@@ -4,7 +4,7 @@ title: Koan.Data.Connector.Couchbase - Technical Reference
 description: Couchbase adapter for Koan Entity data.
 packages: [Sylin.Koan.Data.Connector.Couchbase]
 source: src/Connectors/Data/Couchbase/
-last_updated: 2026-07-17
+last_updated: 2026-07-22
 ---
 
 ## Contract
@@ -83,11 +83,15 @@ mutation-safe.
 
 ## Evidence boundary
 
-Current focused evidence passes selection/readiness participation 3/3 and real-backend CRUD 1/1.
-The complete connector suite exceeded the focused five-minute command budget because first-use
-initialization is expensive; this slice does not claim a fresh full-suite certification. Couchbase
-therefore remains a review-required package until the broader package-release ratchet records its
-complete evidence and operating boundary.
+The complete connector suite passes 20/20 with zero skips against a real Couchbase Community 8.0.2
+container. It covers CRUD, native filter convergence, provider-bounded streaming, conditional
+replace, all three declared AODB isolation modes, source-provider deduplication, identifier safety,
+and participation-owned readiness. The observed run took 7 minutes 21 seconds because fresh selected
+uses repeatedly wait for cluster/query/index readiness; that is provider-specific operational
+evidence, not a normal merge-gate requirement or a latency guarantee.
+
+First-publication pack and external-consumer evidence is recorded by
+[R13-10](../../../../docs/initiatives/koan-v1/work-items/r13/R13-10-couchbase-provider-promotion.md).
 
 ## References
 
