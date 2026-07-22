@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL through Couchbase public and observed; Redis focused evidence active
+  scope: PostgreSQL through Redis public and observed; CockroachDB focused evidence active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote the shared Redis backend and Entity provider`
+- Status: `in-progress — promote CockroachDB as the remaining networked Entity provider`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -108,12 +108,15 @@ inert. Their exact first versions are recorded as immutable API floors in R13-10
 `0.20.1`, and a clean NuGet.org-only Couchbase consumer. Its exact first version is recorded as the
 immutable API floor in R13-11.
 
-[R13-11](r13/R13-11-redis-provider-promotion.md) is active. The existing shared-backend architecture
-is retained: one functional Redis lifecycle owner, one inert contract owner, and a thin Data provider.
-The real Redis 8.8 suite passes 12/12 with zero skips. No runtime/API change, sibling provider, Cache
-promotion, or whole-framework certification is in scope. All three `PublicRelease` packs, the clean
-staged-package consumer, generated truth, API posture, and cheap coherence are green; publication and
-public observation remain.
+[R13-11](r13/R13-11-redis-provider-promotion.md) passed through PR `#100`, main commit
+`b5628a7abad1e275522bed74901e1db9a459de29`, release run
+`29900614297`, public indexing of all three exact `0.20.0` artifacts, and a clean NuGet.org-only Redis
+8.8 consumer. Their immutable API floors are recorded in R13-12. Cache Redis remains unassessed.
+
+[R13-12](r13/R13-12-cockroach-provider-promotion.md) is active. CockroachDB's health now follows the
+existing participation-owned Data law, and its complete focused real-provider project passes 7/7
+with zero skips against 26.2.3. Its corrected one-owner pack, zero-warning staged-package consumer,
+product/API checks, and cheap coherence are green; publication and public observation remain.
 
 ## Execution
 
@@ -140,7 +143,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-11 Redis promotion.
+Status: active through R13-12 CockroachDB promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

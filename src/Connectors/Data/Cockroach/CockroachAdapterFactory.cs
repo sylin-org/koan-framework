@@ -27,8 +27,8 @@ namespace Koan.Data.Connector.Cockroach;
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 26257, LocalPattern = "postgres://{host}:{port}")]
 public sealed class CockroachAdapterFactory : IDataAdapterFactory
 {
-    public string Provider => "cockroach";
-    public IReadOnlyCollection<string> Aliases => ["cockroachdb"];
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => [Infrastructure.Constants.Provider.Alias];
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -36,10 +36,28 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
+        var resolver = sp.GetRequiredService<IStorageNameResolver>();
+        var sourceOpts = ResolveOptions(sp, source);
+
+        return new NpgsqlRepository<TEntity, TKey>(sp, new NpgsqlRepositoryOptions
+        {
+            ProviderName = Provider,
+            ConnectionString = sourceOpts.ConnectionString,
+            DdlPolicy = sourceOpts.DdlPolicy,
+            SchemaMatching = sourceOpts.SchemaMatching,
+            AllowProductionDdl = sourceOpts.AllowProductionDdl,
+            SearchPath = sourceOpts.SearchPath,
+            NamingStyle = sourceOpts.NamingStyle,
+            Separator = sourceOpts.Separator,
+            StableOrderClause = "ORDER BY \"Id\""
+        }, resolver);
+    }
+
+    internal CockroachOptions ResolveOptions(IServiceProvider sp, string source)
+    {
         var config = sp.GetRequiredService<IConfiguration>();
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var baseOpts = sp.GetRequiredService<IOptions<CockroachOptions>>().Value;
-        var resolver = sp.GetRequiredService<IStorageNameResolver>();
 
         // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
         // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
@@ -60,18 +78,7 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory
             Readiness = baseOpts.Readiness
         };
 
-        return new NpgsqlRepository<TEntity, TKey>(sp, new NpgsqlRepositoryOptions
-        {
-            ProviderName = Provider,
-            ConnectionString = sourceOpts.ConnectionString,
-            DdlPolicy = sourceOpts.DdlPolicy,
-            SchemaMatching = sourceOpts.SchemaMatching,
-            AllowProductionDdl = sourceOpts.AllowProductionDdl,
-            SearchPath = sourceOpts.SearchPath,
-            NamingStyle = sourceOpts.NamingStyle,
-            Separator = sourceOpts.Separator,
-            StableOrderClause = "ORDER BY \"Id\""
-        }, resolver);
+        return sourceOpts;
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

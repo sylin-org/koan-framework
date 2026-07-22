@@ -148,6 +148,24 @@
       ]
     },
     {
+      "id": "cockroachdb-data-provider",
+      "title": "CockroachDB Entity persistence",
+      "summary": "CockroachDB preserves Koan Entity CRUD, native filtering, paging, provider-bounded streaming, source routing, additive schema policy, participation-owned readiness, and declared isolation semantics through a thin pg-wire delta over the supported relational foundation.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Cockroach"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Cockroach/README.md",
+        "src/Connectors/Data/Cockroach/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-12-cockroach-provider-promotion.md",
+        "tests/Suites/Data/Connector.Cockroach"
+      ]
+    },
+    {
       "id": "couchbase-data-provider",
       "title": "Couchbase Entity persistence",
       "summary": "Couchbase preserves Koan Entity CRUD, native filtering, explicit paging, provider-bounded streaming, conditional and transactional writes, source-aware pooling and routing, participation-owned readiness, and declared isolation semantics within its stated operational limits.",
@@ -1358,23 +1376,21 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Cockroach",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql \u002B Dapper) with guardrails and governance.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
         "Sylin.Koan.Data.Relational.Npgsql"
       ],
       "readme": "src/Connectors/Data/Cockroach/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Cockroach/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "cockroachdb-data-provider"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Couchbase",

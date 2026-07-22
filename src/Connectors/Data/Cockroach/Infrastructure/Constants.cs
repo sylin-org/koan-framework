@@ -2,6 +2,12 @@ namespace Koan.Data.Connector.Cockroach.Infrastructure;
 
 public static class Constants
 {
+    public static class Provider
+    {
+        public const string Name = "cockroach";
+        public const string Alias = "cockroachdb";
+    }
+
     public static class Configuration
     {
         public static class Keys
