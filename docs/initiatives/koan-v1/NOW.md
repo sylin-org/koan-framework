@@ -73,19 +73,17 @@ connects them.
 
 ## Exact pause point
 
-Draft PR [#95](https://github.com/sylin-org/koan-framework/pull/95) contains the first seven promotion
-candidates. It retains reusable conformance, lifecycle, API, compiler-drift, clean-consumer, and package
-corrections. The terminal certificate, central exact-cell metadata, generic admission coordination,
-and native candidate-planning machinery have been removed under the amended ADR.
+The lean process change and first seven-owner slice are merged, published, indexed, and public-consumer
+green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
+maintainer acceptance rather than another technical exercise.
 
-The superseded machinery is gone, the PR narrative is value-led, and focused retained evidence is
-complete. A one-time complete PR ratchet exposed three evidence-owner defects: incomplete host startup
-was stopped before disposal and masked the original correction, Mongo database isolation lost the
-container authentication source, and the clean consumer packed candidates without their newer local
-dependency closure. Those owner-local repairs are implemented and focused validation is green. The
-complete ratchet subsequently passed, but reassessment removed certification from merge/publication;
-the remaining pre-merge check is cheap repository coherence. Untracked `tmp/` is unrelated user-owned
-material and must remain untouched and unstaged.
+The active local slice is
+[R13-07](work-items/r13/R13-07-postgresql-provider-promotion.md): PostgreSQL plus the shared module-free
+Npgsql mechanism now have one supported claim and 0.20 intent. The real provider suite passed 19/19,
+both packages packed, a clean external consumer passed against PostgreSQL, generated product truth is
+current, and API posture reports only those two packages as first-publication pending. Cheap repository
+coherence, commit, PR, publication, public indexing, and baseline capture remain. Untracked `tmp/` is
+unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
 
@@ -94,8 +92,10 @@ material and must remain untouched and unstaged.
   closure, packing completed, and NuGet accepted the publication set.
 - PR `#94` merged to `main` as `cfb60f848653686278a1976dcacc71386f4cb19e`. Main-boundary run
   `29796113330` succeeded and NuGet.org indexed the corrected `Sylin.Koan.Templates 0.20.6`.
-- Draft PR `#95` targets `main` from `dev`. It publishes nothing while unmerged and now follows the
-  amended value-led ARCH-0120 boundary.
+- PR `#95` merged to `main` as `a8a1bb61b53195ce44bef00024d722862deb949d`. Lean gate
+  `29891719299` passed with one job and no tests/containers; release run `29891926990` published the
+  45-package supported closure. NuGet.org indexed all seven newly supported owners and their clean
+  public consumer passed.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -118,11 +118,11 @@ material and must remain untouched and unstaged.
 
 ## Next actions
 
-1. Obtain green cheap PR coherence for the exact seven-package promotion commit.
-2. Merge under the maintainer's explicit authorization; observe the ordinary pack/push job and public
-   consumer evidence for R12-07.
-3. Open the first high-value provider-family slice, starting with Entity data providers rather than
-   the former owner-number sequence.
+1. Finish cheap repository coherence for R13-07 and commit the focused PostgreSQL promotion.
+2. Open and merge the next `dev` → `main` PR after the exact lean gate passes; observe the ordinary
+   pack/push job and public PostgreSQL consumer.
+3. Record PostgreSQL/Npgsql's exact first public API floors, then select the next high-value Entity
+   provider independently.
 
 ## Repository boundaries
 

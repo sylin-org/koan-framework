@@ -88,7 +88,7 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | passed |
 | [R12-05](r12/R12-05-public-consumer-journey.md) | the public template installs from NuGet, generates both starters, restores cleanly, and proves the SQLite-backed consumer result | passed |
 | [R12-06](r12/R12-06-publish-and-observe-first-wave.md) | one `main`-boundary job publishes and observes the exact supported package set without a second release system | passed |
-| [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves interrupted-publication recovery, establishes the feedback baseline, and produces the final R12 go/no-go record | pending |
+| [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves mixed-state idempotent publication, establishes the feedback baseline, and produces the final R12 go/no-go record | in-progress |
 
 R12-01 through R12-06 are complete. R12-07 remains one bounded preview-evolution proof and will close
 through the first newly promoted R13 family slice. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
@@ -139,7 +139,7 @@ R12 passes only when:
 4. all public-facing content passes R12-04's coherent-narrative contract;
 5. public packages and templates reproduce the documented first result without repository access;
 6. the exact initial preview wave has immutable, reconcilable public evidence;
-7. a later preview wave proves upgrade and interrupted-release recovery;
+7. a later preview wave proves upgrade and mixed-state idempotent publication recovery;
 8. external feedback is recorded as bounded evidence, not used to reopen architecture by anecdote;
 9. the maintainer receives a concise go/no-go record for the next maturity band.
 

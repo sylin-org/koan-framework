@@ -114,3 +114,13 @@ closure rather than assuming newer dependencies already exist on nuget.org. Focu
 passes the host failure oracle, Communication 44/44, the affected Data correction 1/1, and real Mongo
 Web behavior 52/52. Connected package-consumer and exact-ratchet runs passed as one-time evidence;
 future merges do not inherit either as a universal publication prerequisite.
+
+Public observation on 2026-07-22 completed the slice:
+
+- PR `#95` merged as `a8a1bb61b53195ce44bef00024d722862deb949d` after lean gate
+  `29891719299` passed without tests or containers;
+- release run `29891926990` published the complete supported closure successfully;
+- NuGet.org indexed the seven owners at `0.20.2`, `0.20.2`, `0.20.3`, `0.20.1`, `0.20.2`,
+  `0.20.1`, and `0.20.1` respectively in the order listed above; and
+- a clean NuGet.org-only external consumer restored all seven exact versions, built with zero
+  warnings/errors, booted the public composition, and printed `R13-06|PUBLIC-CONSUMER|PASS`.

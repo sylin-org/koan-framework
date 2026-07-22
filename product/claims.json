@@ -38,6 +38,15 @@
       "evidence": ["tests/Suites/Data/Connector.Sqlite", "tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Sqlite.Tests", "samples/FirstUse", "samples/GoldenJourney"]
     },
     {
+      "id": "postgresql-data-provider",
+      "title": "PostgreSQL Entity persistence",
+      "summary": "PostgreSQL preserves Koan Entity CRUD, query, paging, provider-bounded streaming, source routing, schema policy, health, and declared isolation semantics through an application-facing connector and a module-free shared Npgsql mechanism.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.Connector.Postgres", "Sylin.Koan.Data.Relational.Npgsql"],
+      "documentation": ["src/Connectors/Data/Postgres/README.md", "src/Connectors/Data/Postgres/TECHNICAL.md", "src/Koan.Data.Relational.Npgsql/README.md", "src/Koan.Data.Relational.Npgsql/TECHNICAL.md", "docs/reference/data/index.md"],
+      "evidence": ["tests/Suites/Data/Connector.Postgres", "docs/initiatives/koan-v1/work-items/r13/R13-07-postgresql-provider-promotion.md"]
+    },
+    {
       "id": "document-data-providers",
       "title": "MongoDB and Couchbase Entity persistence",
       "summary": "MongoDB and Couchbase preserve Koan Entity semantics through selected-provider naming, source-aware client pooling, explicit pagination, and participation-owned readiness within each backend's stated limits.",

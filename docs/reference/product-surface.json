@@ -478,6 +478,27 @@
       ]
     },
     {
+      "id": "postgresql-data-provider",
+      "title": "PostgreSQL Entity persistence",
+      "summary": "PostgreSQL preserves Koan Entity CRUD, query, paging, provider-bounded streaming, source routing, schema policy, health, and declared isolation semantics through an application-facing connector and a module-free shared Npgsql mechanism.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Postgres",
+        "Sylin.Koan.Data.Relational.Npgsql"
+      ],
+      "documentation": [
+        "docs/reference/data/index.md",
+        "src/Connectors/Data/Postgres/README.md",
+        "src/Connectors/Data/Postgres/TECHNICAL.md",
+        "src/Koan.Data.Relational.Npgsql/README.md",
+        "src/Koan.Data.Relational.Npgsql/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-07-postgresql-provider-promotion.md",
+        "tests/Suites/Data/Connector.Postgres"
+      ]
+    },
+    {
       "id": "preview-evolution",
       "title": "Preview upgrade and interrupted-release recovery",
       "summary": "A later 0.20 package wave must prove that a public-created application upgrades cleanly and that interrupted publication recovers from immutable evidence.",
@@ -1385,7 +1406,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Postgres",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.",
       "targetFrameworks": [
@@ -1401,7 +1422,9 @@
       "readme": "src/Connectors/Data/Postgres/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Connectors/Data/Postgres/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "postgresql-data-provider"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
@@ -1522,7 +1545,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Relational.Npgsql",
-      "versionIntent": "0.1",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Shared Npgsql repository mechanics for PostgreSQL-wire Koan Data providers.",
       "targetFrameworks": [
@@ -1537,7 +1560,9 @@
       "readme": "src/Koan.Data.Relational.Npgsql/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.Relational.Npgsql/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "postgresql-data-provider"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.SearchEngine",

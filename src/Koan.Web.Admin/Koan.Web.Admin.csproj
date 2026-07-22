@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <Description>Development-only, read-only dashboard for sanitized Koan runtime, health, and provenance insight.</Description>
     <PackageTags>$(CommonPackageTags);admin;dashboard;diagnostics;development;provenance</PackageTags>
   </PropertyGroup>

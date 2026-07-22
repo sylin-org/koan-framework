@@ -3,7 +3,7 @@ uid: reference.modules.Koan.data.postgres
 title: Koan.Data.Connector.Postgres - Technical Reference
 description: PostgreSQL adapter for Koan data.
 packages: [Sylin.Koan.Data.Connector.Postgres]
-source: src/Koan.Data.Connector.Postgres/
+source: src/Connectors/Data/Postgres/
 ---
 
 ## Contract
@@ -16,15 +16,19 @@ source: src/Koan.Data.Connector.Postgres/
 
 - Connection options, SSL, timeouts; naming conventions.
 
-### Options (typical keys)
+### Options
 
-- ConnectionStrings:Default (first-win)
-- Koan:Data:Sources:Default:ConnectionString
-- Koan:Data:Postgres:ConnectionString
-- Koan:Data:Postgres:CommandTimeoutSeconds (default 30)
-- Koan:Data:Postgres:MaxRetryCount (default 3)
-- Koan:Data:Postgres:MaxRetryDelaySeconds (default 5)
-- Koan:Data:Postgres:JsonMapping (text|jsonb; default text)
+- `ConnectionStrings:Postgres` or `ConnectionStrings:Default`
+- `Koan:Data:Postgres:ConnectionString`
+- `Koan:Data:Postgres:SearchPath` (default `public`)
+- `Koan:Data:Postgres:NamingStyle` and `Separator`
+- `Koan:Data:Postgres:DdlPolicy` (`NoDdl`, `Validate`, or `AutoCreate`)
+- `Koan:Data:Postgres:SchemaMatchingMode` (`Relaxed` or `Strict`)
+- `Koan:Data:Postgres:AllowProductionDdl` (default `false`)
+- standard adapter readiness options under `Koan:Data:Postgres:Readiness`
+
+Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets belong in normal
+.NET secret/configuration providers, not application source.
 
 ## LINQ and pushdowns
 
@@ -58,7 +62,7 @@ source: src/Koan.Data.Connector.Postgres/
 - Health: an available PostgreSQL package stays non-critical until it wins default election or a runtime operation
   selects one of its sources. Active sources resolve the same source-specific connection as repositories, then open
   it and execute `SELECT 1`.
-- Metrics: command duration, retries, timeouts; track server version for feature toggles.
+- Metrics: command duration and failures; track server version when diagnosing feature behavior.
 - Logs: SQL with parameter redaction; note when in-memory filtering occurs.
 
 ## References

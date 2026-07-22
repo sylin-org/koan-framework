@@ -7,9 +7,9 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-21
+  date_last_tested: 2026-07-22
   status: in-progress
-  scope: draft PR 95 simplified and focused-green; cheap merge coherence pending
+  scope: first lean slice public; PostgreSQL focused evidence green, publication pending
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,13 +22,13 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T8 — public provider promotion`
 - Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: obtain green cheap PR coherence for the first value-led promotion slice
+- Active child: [R13-07 — PostgreSQL provider promotion](work-items/r13/R13-07-postgresql-provider-promotion.md)
 - Most recently completed R13 child: [R13-06 — first value-led 0.20 promotion slice](work-items/r13/R13-06-wave-0-testing-and-quick-wins.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: maintainer acceptance and merge of the green first promotion slice, then
-  public observation through the later-wave upgrade and interruption-recovery proof
-- Preview readiness: `not ready`; R12-07's later-wave public upgrade/recovery, feedback triage, and
-  maintainer go/no-go record remain
+- Pending release boundary: focused PostgreSQL promotion; native, pack, and external-consumer evidence
+  is green, with cheap PR coherence and publication pending
+- Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
+  feedback triage are complete; explicit maintainer go/no-go acceptance remains
 - Deliberate overlap: R12 remains `in-progress` only for
   [R12-07](work-items/r12/R12-07-preview-evolution.md); R13 owns current implementation, and its first
   dependency-closed publication wave will supply R12-07's evidence
@@ -49,8 +49,8 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
-| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-21 | R12-01 through R12-06 are complete: 38 supported owners publish on 0.20 and the public template journey is proved. R12-07 owns the bounded later-wave upgrade/recovery, feedback triage, and final go/no-go record, using the first dependency-closed R13 wave. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Draft PR #95 implements the lean ARCH-0120 path: seven useful promotions, direct family/native evidence, a dependency-closed package consumer, and API/product guards. Focused evidence and a one-time exact ratchet are green; merge now requires only cheap repository coherence, never certification. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | PR #95's seven owners are published, indexed, and public-consumer green through the lean flow. R13-07 promotes PostgreSQL plus Npgsql; focused native, pack, external-consumer, product, and API evidence is green. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -71,8 +71,8 @@ item should normally be `in-progress`.
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
-| R12 | in-progress | R12-01 through R12-06 are complete. R12-07 is ready and will close from the first dependency-closed R13 publication/consumer observation, feedback triage, and maintainer go/no-go record. |
-| R13 | in-progress | The lean seven-package slice, focused repairs, connected consumer, native proof, and one-time exact ratchet are green. Obtain cheap PR coherence, then merge under the maintainer's explicit authorization and observe publication. Data providers follow. |
+| R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
+| R13 | in-progress | The first lean slice is public and observed. R13-07 PostgreSQL is focused-green; run cheap coherence, publish the two-owner claim, observe it publicly, then capture its immutable API floors. |
 
 ## Divergence and risk log
 

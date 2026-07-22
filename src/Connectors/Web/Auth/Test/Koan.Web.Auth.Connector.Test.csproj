@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <Description>Test identity provider for Koan Web Auth: local login UI, token issuance for demos, and development-only wiring.</Description>
     <PackageTags>$(CommonPackageTags);web;auth;test-provider;identity</PackageTags>
   </PropertyGroup>

@@ -24,7 +24,7 @@
     },
     {
       "id": "Koan.Data.Connector.Postgres",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
@@ -44,7 +44,7 @@
     },
     {
       "id": "Koan.Data.Relational.Npgsql",
-      "version": "0.1"
+      "version": "0.20"
     },
     {
       "id": "Koan.Web",

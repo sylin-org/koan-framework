@@ -11,6 +11,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageValidationBaselineVersion>0.20.2</PackageValidationBaselineVersion>
     <Description>Koan test harness — xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.</Description>
     <PackageTags>$(CommonPackageTags);testing;integration-testing;testcontainers;xunit</PackageTags>
     <!-- ARCH-0091: xUnit1051 (thread TestContext cancellation token) is advisory; was suppressed
