@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-21
   status: in-progress
-  scope: R13 Wave 0 locally passed; publication/R12-07 observation pending
+  scope: ARCH-0120 amended; draft PR 95 awaiting lean promotion-path simplification
 ---
 
 # Koan V1 Reorganization Progress
@@ -20,13 +20,13 @@ or completes a work item. The roadmap describes order; it does not report progre
 ## Initiative state
 
 - Overall: `active`
-- Current tranche: `T8 — terminal package maturity`
-- Active work item: [R13 — Terminal package maturity](work-items/R13-terminal-package-maturity.md)
-- Active child: none; Wave 0 passed locally and awaits the authorized publication/observation boundary
+- Current tranche: `T8 — public provider promotion`
+- Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
+- Active child: R13-A — simplify draft PR #95 before merge
 - Most recently completed R13 child: [R13-06 — Wave 0 testing substrate and quick wins](work-items/r13/R13-06-wave-0-testing-and-quick-wins.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: admit and observe the first new dependency-closed maturity wave, including
-  the later-wave upgrade and interruption-recovery proof
+- Pending release boundary: simplify and revalidate the first promotion slice, then admit and observe
+  it through the later-wave upgrade and interruption-recovery proof
 - Preview readiness: `not ready`; R12-07's later-wave public upgrade/recovery, feedback triage, and
   maintainer go/no-go record remain
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -50,7 +50,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-21 | R12-01 through R12-06 are complete: 38 supported owners publish on 0.20 and the public template journey is proved. R12-07 owns the bounded later-wave upgrade/recovery, feedback triage, and final go/no-go record, using the first dependency-closed R13 wave. |
-| R13 | [Terminal package maturity](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Codex · 2026-07-21 | Bootstrap plus R13-06 pass locally. Seven Wave 0 owners are supported at 0.20 with 53/53 exact admission results; terminal reconciliation is 7/55. Publication/R12-07 observation precedes Wave 1. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-21 | ARCH-0120 now makes product intent primary and promotes cohesive provider families with proportional evidence. Draft PR #95 must retain its direct test/package value while removing the former terminal ledger and generic admission coordination before merge. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -72,12 +72,13 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | R12-01 through R12-06 are complete. R12-07 is ready and will close from the first dependency-closed R13 publication/consumer observation, feedback triage, and maintainer go/no-go record. |
-| R13 | in-progress | Wave 0 passed locally at 7/55 resolved. Obtain exact publication authorization, observe the dependency-closed public wave for R12-07, then open Wave 1. |
+| R13 | in-progress | Simplify draft PR #95 to the lean promotion contract, revalidate the seven-package slice, then publish/observe only if the maintainer accepts that smaller boundary. Data providers are the first value-led family after it. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-21 | ARCH-0120 value-led correction | The fixed 55-owner program confused repository accounting with product value. Provider adapters are legitimate public leaf packages whose consumers are applications; reverse dependencies cannot decide whether they belong. The ten-wave plan, terminal certificate, central exact-cell metadata, and generic admission/native-candidate coordination added more process than the 0.20 promotion decision required. | Amend ARCH-0120 and R13 around cohesive provider families. Product intent decides inclusion; shared semantics, provider-specific real-boundary proof, a clean consumer, and package/API integrity decide promotion. Preserve the claim/version/dependency invariant, API baselines, generated truth, and existing family tests. Keep PR #95 draft until superseded machinery is removed and the smaller slice is revalidated. |
 | 2026-07-21 | R13-06 fail-closed Wave 0 admission | Honest teardown exposed a pooled SQLite file lock; Windows Event Log and a stale DPAPI key ring made the OAuth/OIDC host nondeterministic; a broad Entity cell contained legitimate capability skips; NuGet 404 was not treated as empty first-publication history; redirected Windows intermediates could admit stale project-local generated sources. | Clear the owned SQLite pool on store disposal; make Admin/Auth test logging deterministic and Auth Data Protection ephemeral; narrow the Entity cell to teeth/ownership guarantees; treat a missing public package as zero history; preserve the conventional `obj/` exclusion after redirection. Eleven exact cells pass 53/53, the full solution builds warning-clean, API posture is 35/42 plus seven pending, and terminal reconciliation is 7/55. |
 | 2026-07-21 | R13-05 fixed-baseline reconciliation | Active product truth cannot account for an owner after its project is absorbed, migrated, or retired, but duplicating ARCH-0120's 55 rows would create a second ledger. | Parse the immutable ADR table directly and add one bounded certificate containing only removed owners. Partial mode rejects malformed/unknown/duplicate/still-active entries while reporting progress; explicit final mode requires all 55 owners across compiled active support plus removed outcomes. Real partial is 0/55 with the empty certificate, strict final correctly names all 55 missing, focused tests pass 13/13, and aggregate bootstrap tooling passes 65/65. |
 | 2026-07-21 | R13-04 exact-candidate native admission | The disabled canary emitted no check, claims had no durable executable-cell vocabulary, and no applicability/result contract bound native proof to GitHub's merge candidate. | Add optional validated claim-cell identity; conservatively map changed owners, reverse dependencies, claim evidence/test paths, and shared inputs; require exact base ancestry, HEAD/SHA equality, and a clean checkout; run required cells through R13-03 or emit explicit N/A. Repurpose the canary as an always-emitted credential-free main-PR workflow. Focused product/admission/native tests pass 52/52, the tool builds warning-clean, and generated truth remains current. |

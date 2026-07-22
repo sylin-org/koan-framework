@@ -62,7 +62,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0116 | [One module lifecycle](ARCH-0116-one-module-lifecycle.md) | Accepted | One retained `KoanModule` per implementation assembly; standard identity, isolated contracts, and no legacy or reference-metadata bridge |
 | ARCH-0117 | [Safe connector telemetry by construction](ARCH-0117-safe-connector-telemetry.md) | Accepted | One credential grammar and structured log boundary; shared configuration/discovery narration; no application ceremony or global logger interception |
 | ARCH-0118 | [Evidence-derived product surface](ARCH-0118-evidence-derived-product-surface.md) | Accepted | Standard project facts plus one irreducible claims input compile every human, agent, and release projection |
-| ARCH-0120 | [Terminal package maturity and evidence-driven 0.20 admission](ARCH-0120-terminal-package-maturity.md) | Accepted | Every remaining owner reaches supported 0.20 or proved absorption, migration, or retirement through dependency-ordered, proportionate evidence |
+| ARCH-0120 | [Value-led promotion to the Koan 0.20 surface](ARCH-0120-terminal-package-maturity.md) | Accepted | Product intent selects meaningful public families; provider, consumer, dependency, and API evidence promote them with no second maturity or admission subsystem |
 
 ## Authoring Principles
 

@@ -91,9 +91,9 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves interrupted-publication recovery, establishes the feedback baseline, and produces the final R12 go/no-go record | pending |
 
 R12-01 through R12-06 are complete. R12-07 remains one bounded preview-evolution proof and will close
-through the first dependency-closed R13 wave. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
-and [R13](R13-terminal-package-maturity.md) own the longer 55-package terminal-maturity program, so
-R12 completion does not wait on every cross-repository handoff.
+through the first newly promoted R13 family slice. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
+and [R13](R13-terminal-package-maturity.md) own value-led promotion of the meaningful public provider
+surface, so R12 completion does not wait on unrelated families or cross-repository handoffs.
 
 ## Scope
 

@@ -57,8 +57,8 @@ R08-05's public-observation evidence remains historical input. The completed
 and executes the rebuilt architecture. [R11 package-product graduation](work-items/R11-package-product-quality.md)
 and R12-01 through R12-06 are complete. [R12](work-items/R12-road-to-020-preview.md) remains active for
 its bounded later-wave upgrade/recovery proof; the accepted
-[R13 terminal package-maturity epic](work-items/R13-terminal-package-maturity.md) is queued to bring
-all 55 earlier-line owners to supported admission or completed migration/retirement. See
+[R13 public provider-promotion epic](work-items/R13-terminal-package-maturity.md) promotes meaningful
+capability families to 0.20 through proportional provider and consumer evidence. See
 [NOW.md](NOW.md).
 Small design and polish debts deliberately kept out of the active acceptance path live in the
 [`POST-CYCLE-TODO.md`](POST-CYCLE-TODO.md) register with their required decisions and evidence.
@@ -75,7 +75,7 @@ Small design and polish debts deliberately kept out of the active acceptance pat
 | What records the foundation-repair sequence? | `R04-BACKLOG.md` and its linked historical child cards |
 | What records the golden-journey sequence? | `R05-BACKLOG.md` and its linked historical child cards |
 | What records the completed semantic-composition work? | `R09-BACKLOG.md`, `R09-COALESCENCE-INVENTORY.md`, and the linked accepted child cards |
-| What governs terminal package maturity? | [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) and [R13](work-items/R13-terminal-package-maturity.md) |
+| What governs value-led promotion to 0.20? | [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) and [R13](work-items/R13-terminal-package-maturity.md) |
 | Which small issues wait until the main cycle closes? | `POST-CYCLE-TODO.md` |
 | Which module capabilities should grow Entity language? | the Entity Semantics Contract and `ARCH-0113`; the R04 slate is historical input |
 | What makes work acceptable? | `ACCEPTANCE.md` |
@@ -102,7 +102,7 @@ R00 privacy boundary
                                       -> R10 golden sample graduation
                                           -> R11 package-product graduation
                                               -> R12 0.20 public-preview maturity
-                                                  -> R13 terminal package maturity
+                                                  -> R13 public provider promotion
 ```
 
 Later implementation cards are created only when the active parent and preceding evidence establish

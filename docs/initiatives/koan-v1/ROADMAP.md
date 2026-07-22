@@ -30,7 +30,7 @@ T0 Privacy and memory boundary
                           -> T7A Semantic Composition Kernel
                               -> T7B Local release-candidate readiness
                                   -> T7C 0.20 public-preview maturity
-                                      -> T8 Terminal package maturity
+                                      -> T8 Public provider promotion
 ```
 
 Feedback may move from later tranches to earlier ones. A later tranche cannot declare an earlier exit
@@ -184,20 +184,19 @@ signals rather than inheriting promotion from repository membership.
 - external public-context-only readers reproduce the intended journey and their anonymous feedback is triaged;
 - the architect receives an explicit go/no-go record for the next maturity band.
 
-## T8 — Terminal package maturity
+## T8 — Public provider promotion
 
-**Outcome:** every package owner that was below 0.20 at ARCH-0120's acceptance point either earns a
-dependency-closed supported 0.20 contract or completes its accepted absorption, public migration, or
-retirement. No baseline owner remains accidentally unassessed.
+**Outcome:** Koan's maintainer-intended provider families become useful public 0.20 extensions through
+shared semantics, provider-specific real-boundary proof, clean package consumption, and package/API
+integrity. Historical package counts do not substitute for product intent.
 
 **Exit gate:**
 
-- [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) remains the governing admission
+- [ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) remains the governing promotion
   decision and [R13](work-items/R13-terminal-package-maturity.md) records execution;
-- all 55 baseline owners have exactly one terminal disposition;
-- every new or materially changed supported claim has exact runnable evidence, a consumer journey,
-  and green required provider/native cells;
-- public Koan dependencies are supported before their consumers and every retained API has an
-  enforced first-0.20 compatibility baseline;
-- generated product truth and current public guidance agree with the terminal source graph;
-- one final complete release ratchet passes after all waves converge.
+- product intent, not reverse dependencies, identifies the intended public adapters;
+- every promoted family has shared conformance, provider-specific proof, and a clean consumer journey;
+- public Koan dependencies are supported before their consumers and every promoted API follows the
+  first-0.20 compatibility policy;
+- generated product truth and current provider guidance agree;
+- no terminal ledger or generic admission subsystem is required for completion.
