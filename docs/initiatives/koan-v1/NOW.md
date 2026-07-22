@@ -71,16 +71,13 @@ Families may progress independently when no real prerequisite connects them.
 
 ## Exact pause point
 
-`dev` and `origin/dev` are aligned at `c6a5f2059a6f36edccdab996c817d9a9bd963988`. Draft PR
-[#95](https://github.com/sylin-org/koan-framework/pull/95) contains the original R13 bootstrap plus
-the first seven promotion candidates. Its reusable conformance, lifecycle, API, compiler-drift,
-consumer, and package corrections remain valuable. Its terminal certificate, central exact-cell
-metadata, generic admission coordination, and native candidate-planning machinery are now candidates
-for removal under the amended ADR.
+Draft PR [#95](https://github.com/sylin-org/koan-framework/pull/95) contains the first seven promotion
+candidates. It retains reusable conformance, lifecycle, API, compiler-drift, clean-consumer, and package
+corrections. The terminal certificate, central exact-cell metadata, generic admission coordination,
+and native candidate-planning machinery have been removed under the amended ADR.
 
-Do not merge PR #95 as currently shaped. First simplify it to the smallest promotion path, rerun the
-focused retained evidence, and update the PR narrative. Untracked `tmp/` is unrelated user-owned
-material and must remain untouched and unstaged.
+Before merge, finish the focused retained evidence and update the PR narrative. Untracked `tmp/` is
+unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
 
@@ -89,8 +86,8 @@ material and must remain untouched and unstaged.
   closure, packing completed, and NuGet accepted the publication set.
 - PR `#94` merged to `main` as `cfb60f848653686278a1976dcacc71386f4cb19e`. Main-boundary run
   `29796113330` succeeded and NuGet.org indexed the corrected `Sylin.Koan.Templates 0.20.6`.
-- Draft PR `#95` targets `main` from `dev` at `c6a5f2059`. It publishes nothing while unmerged and
-  must be simplified under the amended ARCH-0120 before it is considered ready.
+- Draft PR `#95` targets `main` from `dev`. It publishes nothing while unmerged and now follows the
+  amended value-led ARCH-0120 boundary.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -114,12 +111,10 @@ material and must remain untouched and unstaged.
 
 ## Next actions
 
-1. Audit PR #95 against ARCH-0120's retained/removal lists and delete the superseded terminal and
-   generic admission machinery.
-2. Revalidate the smaller seven-package promotion slice and update the draft PR description.
-3. Merge/publish only after the maintainer accepts that smaller boundary; then observe its public
+1. Revalidate the smaller seven-package promotion slice and update the draft PR description.
+2. Merge/publish only after the maintainer accepts that smaller boundary; then observe its public
    consumer and R12-07 recovery evidence.
-4. Open the first high-value provider-family slice, starting with Entity data providers rather than
+3. Open the first high-value provider-family slice, starting with Entity data providers rather than
    the former owner-number sequence.
 
 ## Repository boundaries

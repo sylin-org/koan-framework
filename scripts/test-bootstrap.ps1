@@ -16,7 +16,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$resultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("koan-bootstrap-admission-" + [guid]::NewGuid().ToString("n"))
 
 $lanes = @(
     [pscustomobject]@{
@@ -112,47 +111,27 @@ function Invoke-BoundedDotnet {
     return $stdout
 }
 
-try {
-    New-Item -ItemType Directory -Path $resultsRoot -Force | Out-Null
-    $selected = if ($Lane -eq "All") { $lanes } else { $lanes | Where-Object Name -eq $Lane }
+$selected = if ($Lane -eq "All") { $lanes } else { $lanes | Where-Object Name -eq $Lane }
 
-    foreach ($current in $selected) {
-        $buildDeadline = if ($PSBoundParameters.ContainsKey("BuildTimeoutSeconds")) { $BuildTimeoutSeconds } else { $current.BuildTimeout }
-        $runDeadline = if ($PSBoundParameters.ContainsKey("RunTimeoutSeconds")) { $RunTimeoutSeconds } else { $current.RunTimeout }
-        $trxPath = Join-Path $resultsRoot "$($current.Name).trx"
-        $validationPath = Join-Path $resultsRoot "$($current.Name).admission.json"
+foreach ($current in $selected) {
+    $buildDeadline = if ($PSBoundParameters.ContainsKey("BuildTimeoutSeconds")) { $BuildTimeoutSeconds } else { $current.BuildTimeout }
+    $runDeadline = if ($PSBoundParameters.ContainsKey("RunTimeoutSeconds")) { $RunTimeoutSeconds } else { $current.RunTimeout }
 
-        $buildArguments = @("build", $current.Project, "--configuration", $Configuration, "--nologo")
-        [void](Invoke-BoundedDotnet -LaneName $current.Name -Phase "build" -Project $current.Project -Arguments $buildArguments -TimeoutSeconds $buildDeadline)
+    $buildArguments = @("build", $current.Project, "--configuration", $Configuration, "--nologo")
+    [void](Invoke-BoundedDotnet -LaneName $current.Name -Phase "build" -Project $current.Project -Arguments $buildArguments -TimeoutSeconds $buildDeadline)
 
-        $runArguments = @(
-            "run", "--no-build", "--configuration", $Configuration, "--project", $current.Project, "--",
-            "-longRunning", "10", "-diagnostics", "-reporter", "verbose", "-noColor", "-failSkips", "-trx", $trxPath
-        )
-        if ($current.Explicit) {
-            $runArguments += @("-explicit", "only")
-        }
-
-        $output = Invoke-BoundedDotnet -LaneName $current.Name -Phase "run" -Project $current.Project -Arguments $runArguments -TimeoutSeconds $runDeadline
-        if ($output -notmatch "TEST EXECUTION SUMMARY" -or $output -notmatch "Total:\s*([1-9][0-9]*)") {
-            throw "[$($current.Name)/run] process succeeded without a nonzero xUnit execution summary. Project: $($current.Project)"
-        }
-
-        $reproduction = "pwsh scripts/test-bootstrap.ps1 -Lane $($current.Name) -Configuration $Configuration -RunTimeoutSeconds $runDeadline"
-        $validationArguments = @(
-            "run", "--configuration", $Configuration, "--project", "tools/Koan.Packaging/Koan.Packaging.csproj", "--",
-            "admission-results", "--id", "bootstrap:$($current.Name.ToLowerInvariant())", "--project", $current.Project,
-            "--filter", "bootstrap:$($current.Name)", "--lane", "deterministic", "--phase", "lifecycle",
-            "--deadline-seconds", $runDeadline.ToString(), "--result", $trxPath, "--exit-code", "0",
-            "--reproduction", $reproduction, "--output", $validationPath
-        )
-        [void](Invoke-BoundedDotnet -LaneName $current.Name -Phase "validate" -Project $current.Project -Arguments $validationArguments -TimeoutSeconds 60)
+    $runArguments = @(
+        "run", "--no-build", "--configuration", $Configuration, "--project", $current.Project, "--",
+        "-longRunning", "10", "-diagnostics", "-reporter", "verbose", "-noColor"
+    )
+    if ($current.Explicit) {
+        $runArguments += @("-explicit", "only")
     }
 
-    Write-Host "Bootstrap lane '$Lane' passed."
-}
-finally {
-    if (Test-Path -LiteralPath $resultsRoot) {
-        Remove-Item -LiteralPath $resultsRoot -Recurse -Force -ErrorAction SilentlyContinue
+    $output = Invoke-BoundedDotnet -LaneName $current.Name -Phase "run" -Project $current.Project -Arguments $runArguments -TimeoutSeconds $runDeadline
+    if ($output -notmatch "TEST EXECUTION SUMMARY" -or $output -notmatch "Total:\s*([1-9][0-9]*)") {
+        throw "[$($current.Name)/run] process succeeded without a nonzero xUnit execution summary. Project: $($current.Project)"
     }
 }
+
+Write-Host "Bootstrap lane '$Lane' passed."

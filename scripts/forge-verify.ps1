@@ -8,10 +8,10 @@
   adapter (or all), against real instances, and emits a MACHINE-PARSEABLE Gate VERDICT. This is the orchestrable
   step the Forge's agent loop consumes (Phase 4: agent -> blueprint -> gate -> retry), plus a human-readable table.
 
-  It does NOT re-implement the harness. It discovers each adapter's `*AodbConformanceSpec` test project and delegates
-  the exact `FullyQualifiedName~Aodb` selection, deadline, process-tree ownership, TRX parsing, and required-result
-  verdict to `Koan.Packaging admission`. It maps each returned cell to its AODB mode (Declares / Streaming / Shared /
-  Container / Database for record adapters;
+  It does NOT re-implement the harness. It discovers each adapter's `*AodbConformanceSpec` test project, runs the
+  exact `FullyQualifiedName~Aodb` selection through ordinary `dotnet test`, and interprets the resulting TRX without
+  accepting a failed process or incomplete result set. It maps each returned cell to its AODB mode (Declares /
+  Streaming / Shared / Container / Database for record adapters;
   Declares / Shared / Container / Database for vector adapters), and aggregates a per-adapter verdict:
 
     GREEN    — every cell passed (the adapter realizes every mode it declares; shippable)
@@ -103,32 +103,49 @@ try {
             $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $null; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = 'no .csproj found next to the spec' }) | Out-Null
             continue
         }
-        $admissionPath = Join-Path $resultsRoot "$($t.Plane)-$($t.Adapter).admission.json"
-        $relativeProject = [System.IO.Path]::GetRelativePath($repoRoot, $t.Project).Replace('\', '/')
+        $trxName = "$($t.Plane)-$($t.Adapter).trx"
+        $trxPath = Join-Path $resultsRoot $trxName
         $dotnetArgs = @(
-            'run', '--configuration', $Configuration, '--project', 'tools/Koan.Packaging/Koan.Packaging.csproj', '--',
-            'admission', '--id', "aodb:$($t.Plane):$($t.Adapter.ToLowerInvariant())", '--project', $relativeProject,
-            '--filter', 'FullyQualifiedName~Aodb', '--lane', 'native', '--phase', 'lifecycle',
-            '--deadline-seconds', $DeadlineSeconds.ToString(), '--configuration', $Configuration,
-            '--output', $admissionPath
+            'test', $t.Project, '--configuration', $Configuration,
+            '--filter', 'FullyQualifiedName~Aodb',
+            '--logger', "trx;LogFileName=$trxName", '--results-directory', $resultsRoot,
+            '--blame-hang-timeout', "$($DeadlineSeconds)s", '--blame-hang-dump-type', 'none'
         )
         if ($NoBuild) { $dotnetArgs += '--no-build' }
         Write-Host ("forge-verify: running {0}/{1} ..." -f $t.Plane, $t.Adapter) -ForegroundColor DarkGray
         $out = & dotnet @dotnetArgs 2>&1
         $code = $LASTEXITCODE
 
-        if (-not (Test-Path $admissionPath)) {
+        if (-not (Test-Path $trxPath)) {
             $tail = ($out | Select-Object -Last 14) -join "`n"
-            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $t.Project; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = "admission produced no result (exit $code):`n$tail" }) | Out-Null
+            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $t.Project; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = "dotnet test produced no TRX (exit $code):`n$tail" }) | Out-Null
             continue
         }
 
-        $admission = Get-Content -LiteralPath $admissionPath -Raw | ConvertFrom-Json
+        [xml]$xml = Get-Content -LiteralPath $trxPath -Raw
+        $idToMethod = @{}
+        foreach ($definition in $xml.TestRun.TestDefinitions.UnitTest) {
+            $idToMethod[[string]$definition.id] = [string]$definition.TestMethod.name
+        }
         $cells = New-Object System.Collections.Generic.List[object]
-        foreach ($r in @($admission.results)) {
-            $mode = Get-Mode ([string]$r.name)
-            $outcome = switch ([string]$r.outcome) { 'Passed' { 'Passed' } 'Failed' { 'Failed' } { $_ -in @('NotExecuted', 'Skipped') } { 'Skipped' } default { [string]$r.outcome } }
-            $cells.Add([PSCustomObject]@{ Mode = $mode; Method = [string]$r.name; Outcome = $outcome; Reason = [string]$r.detail }) | Out-Null
+        foreach ($result in $xml.TestRun.Results.UnitTestResult) {
+            $method = $idToMethod[[string]$result.testId]
+            if (-not $method) { $method = '[unknown]' }
+            $mode = Get-Mode $method
+            $outcome = switch ([string]$result.outcome) {
+                'Passed' { 'Passed' }
+                'Failed' { 'Failed' }
+                { $_ -in @('NotExecuted', 'Skipped') } { 'Skipped' }
+                default { [string]$result.outcome }
+            }
+            $detail = ''
+            if ($result.Output -and $result.Output.ErrorInfo -and $result.Output.ErrorInfo.Message) {
+                $detail = ([string]$result.Output.ErrorInfo.Message).Trim()
+            }
+            elseif ($result.Output -and $result.Output.StdOut) {
+                $detail = ([string]$result.Output.StdOut).Trim()
+            }
+            $cells.Add([PSCustomObject]@{ Mode = $mode; Method = $method; Outcome = $outcome; Reason = $detail }) | Out-Null
         }
         $cellArr = @($cells | Sort-Object { [array]::IndexOf($modeOrder, $_.Mode) })
         $failed = @($cellArr | Where-Object { $_.Outcome -eq 'Failed' }).Count
@@ -138,18 +155,18 @@ try {
         $missingModes = @($expectedModes | Where-Object { $presentModes -notcontains $_ })
         $unexpectedModes = @($presentModes | Where-Object { $expectedModes -notcontains $_ })
         $duplicateModes = @($cellArr | Group-Object Mode | Where-Object Count -ne 1 | ForEach-Object Name)
-        $unknownOutcomes = [int]$admission.unknown
+        $unknownOutcomes = @($cellArr | Where-Object { $_.Outcome -notin @('Passed', 'Failed', 'Skipped') }).Count
         $verdict = if ($failed -gt 0) { 'RED' }
             elseif ($missingModes.Count -gt 0 -or $unexpectedModes.Count -gt 0 -or $duplicateModes.Count -gt 0 -or
-                $unknownOutcomes -gt 0 -or [bool]$admission.timedOut -or [int]$admission.processExitCode -ne 0 -or $code -ne 0) { 'ERROR' }
+                $unknownOutcomes -gt 0 -or $code -ne 0) { 'ERROR' }
             elseif ($skipped -gt 0) { 'SKIPPED' }
-            elseif ([string]$admission.verdict -ne 'passed') { 'ERROR' }
             else { 'GREEN' }
         $structuralReasons = New-Object System.Collections.Generic.List[string]
+        if ($code -ne 0) { $structuralReasons.Add("dotnet test exited with code $code") }
         if ($missingModes.Count -gt 0) { $structuralReasons.Add("expected mode(s) not run: $($missingModes -join ', ')") }
         if ($unexpectedModes.Count -gt 0) { $structuralReasons.Add("unexpected mode(s): $($unexpectedModes -join ', ')") }
         if ($duplicateModes.Count -gt 0) { $structuralReasons.Add("mode(s) did not run exactly once: $($duplicateModes -join ', ')") }
-        foreach ($message in @($admission.reasons)) { if ($message) { $structuralReasons.Add([string]$message) } }
+        if ($unknownOutcomes -gt 0) { $structuralReasons.Add("unknown test outcome(s): $unknownOutcomes") }
         $reason = $structuralReasons -join '; '
         $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = $verdict; Project = $t.Project; Cells = $cellArr; ExpectedModes = $expectedModes; Passed = $passed; Failed = $failed; Skipped = $skipped; MissingModes = $missingModes; Reason = $reason }) | Out-Null
     }

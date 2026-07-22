@@ -10,8 +10,8 @@
     A.  Build       dotnet build Koan.sln   — framework + every dogfood sample
                     (the samples live in Koan.sln, so one build covers both).
     A'. Test        dotnet test per project  — runs every deterministic suite in its own host lifecycle
-                    through a bounded parallel wave with per-host hang detection. Native admission
-                    is owned by its exact merge-candidate workflow. Skip with -SkipTests.
+                    through a bounded parallel wave with per-host hang detection. Real provider
+                    boundaries are owned by direct workflow checks. Skip with -SkipTests.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
     B'. Public docs scripts/public-docs-lint.ps1 — current navigation boundary, retired

@@ -1,4 +1,4 @@
-name: native-admission
+name: Native provider proof
 
 on:
   pull_request:
@@ -8,12 +8,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: native-admission-${{ github.event.pull_request.number }}
+  group: native-provider-proof-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  native-admission:
-    name: native-admission
+  testing-containers:
+    name: PostgreSQL container lifecycle
     runs-on: ubuntu-latest
     steps:
       - name: Checkout exact merge candidate
@@ -27,11 +27,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Evaluate and run native admission
-        shell: pwsh
+      - name: Exercise the real PostgreSQL provider boundary
         run: >-
-          dotnet run --configuration Release --project tools/Koan.Packaging --
-          native-admission
-          --base "${{ github.event.pull_request.base.sha }}"
-          --candidate "${{ github.sha }}"
+          dotnet test
+          tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj
           --configuration Release
+          --filter FullyQualifiedName=Koan.Testing.Containers.Tests.ContainerNativeLifecycleSpec.Postgres_fixture_supports_two_complete_owned_lifecycles

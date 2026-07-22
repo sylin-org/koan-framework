@@ -16,7 +16,7 @@ validation:
 
 - Status: `passed`
 - Depends on: passed R13-01
-- Unlocks: R13-03 result-aware admission
+- Unlocks: value-led provider-family promotion
 - Owner: `.github/workflows/pr-gate.yml` invoking the existing product compiler
 
 ## Entry gate
@@ -85,5 +85,5 @@ the full ratchet for this slice.
 - Evidence: real Release check reports 29 claims, 93 packages, and generated outputs current
 - Tests / validation: focused product/compiler/baseline/workflow slice 22/22
 - Unsupported scenarios: the command never writes in check mode and performs no publication
-- Follow-up work: R13-03 establishes required-result and deadline semantics before native cells rely on it
+- Follow-up work: each promoted family owns its ordinary deterministic and real-provider evidence
 - Reviewer: pending maintainer review

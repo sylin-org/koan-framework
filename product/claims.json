@@ -224,14 +224,7 @@
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Testing", "Sylin.Koan.Testing.Containers", "Sylin.Koan.Testing.Hosting"],
       "documentation": ["docs/guides/testing-your-app.md", "src/Koan.Testing/README.md", "src/Koan.Testing.Containers/README.md", "src/Koan.Testing.Hosting/README.md"],
-      "evidence": ["tests/Suites/Testing/Koan.Testing.Tests", "tests/Suites/Testing/Koan.Testing.Containers.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"],
-      "admission": [
-        { "id": "wave0:testing-host-lifecycle", "project": "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap/Koan.Tests.Integration.Bootstrap.csproj", "filter": "FullyQualifiedName~KoanIntegrationHostFailedStartSpec", "lane": "deterministic", "phase": "lifecycle", "deadlineSeconds": 120 },
-        { "id": "wave0:testing-entity-conformance", "project": "tests/Suites/Testing/Koan.Testing.Tests/Koan.Testing.Tests.csproj", "filter": "FullyQualifiedName~ConformanceBatteriesHaveTeeth|FullyQualifiedName~ConformanceHostOwnershipSpec", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 180 },
-        { "id": "wave0:testing-container-lifecycle", "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj", "filter": "FullyQualifiedName~ContainerLifecycleSpec", "lane": "deterministic", "phase": "lifecycle", "deadlineSeconds": 180 },
-        { "id": "wave0:testing-container-native", "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj", "filter": "FullyQualifiedName=Koan.Testing.Containers.Tests.ContainerNativeLifecycleSpec.Postgres_fixture_supports_two_complete_owned_lifecycles", "lane": "native", "phase": "infrastructure", "deadlineSeconds": 300 },
-        { "id": "wave0:package-consumer", "project": "tests/Koan.Packaging.Tests/Koan.Packaging.Tests.csproj", "filter": "FullyQualifiedName=Koan.Packaging.Tests.Wave0PackageConsumerTests.Candidate_packages_restore_compile_and_run_outside_the_repository", "lane": "deterministic", "phase": "consumer", "deadlineSeconds": 300 }
-      ]
+      "evidence": ["tests/Suites/Testing/Koan.Testing.Tests", "tests/Suites/Testing/Koan.Testing.Containers.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "durable-local-cache",
@@ -240,11 +233,7 @@
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Cache.Adapter.Sqlite"],
       "documentation": ["src/Koan.Cache.Adapter.Sqlite/README.md", "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"],
-      "evidence": ["tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine", "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"],
-      "admission": [
-        { "id": "wave0:cache-sqlite-conformance", "project": "tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj", "filter": "FullyQualifiedName~SqliteEngineSpec", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 180 },
-        { "id": "wave0:cache-sqlite-delta", "project": "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests/Koan.Cache.Adapter.Sqlite.Tests.csproj", "filter": "FullyQualifiedName~SqliteCachePersistenceSpec", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 180 }
-      ]
+      "evidence": ["tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine", "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "recoverable-entity-deletion",
@@ -253,10 +242,7 @@
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.SoftDelete"],
       "documentation": ["src/Koan.Data.SoftDelete/README.md", "src/Koan.Data.SoftDelete/TECHNICAL.md"],
-      "evidence": ["tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"],
-      "admission": [
-        { "id": "wave0:data-soft-delete", "project": "tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests/Koan.Data.SoftDelete.Tests.csproj", "filter": "FullyQualifiedName~Koan.Data.SoftDelete.Tests", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 180 }
-      ]
+      "evidence": ["tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "development-runtime-diagnostics",
@@ -265,10 +251,7 @@
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.Admin"],
       "documentation": ["src/Koan.Web.Admin/README.md", "src/Koan.Web.Admin/TECHNICAL.md"],
-      "evidence": ["tests/Suites/Web/Koan.Web.Admin.Tests", "samples/journeys/GardenCoop/02-LocalDiscovery", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"],
-      "admission": [
-        { "id": "wave0:web-admin", "project": "tests/Suites/Web/Koan.Web.Admin.Tests/Koan.Web.Admin.Tests.csproj", "filter": "FullyQualifiedName~Koan.Web.Admin.Tests", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 180 }
-      ]
+      "evidence": ["tests/Suites/Web/Koan.Web.Admin.Tests", "samples/journeys/GardenCoop/02-LocalDiscovery", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "deterministic-authentication-testing",
@@ -277,11 +260,7 @@
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.Auth.Connector.Test"],
       "documentation": ["src/Connectors/Web/Auth/Test/README.md", "src/Connectors/Web/Auth/Test/TECHNICAL.md"],
-      "evidence": ["tests/Koan.Web.Auth.Tests", "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests", "samples/journeys/GardenCoop/01-GardenJournal", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"],
-      "admission": [
-        { "id": "wave0:auth-test-token", "project": "tests/Koan.Web.Auth.Tests/Koan.Web.Auth.Tests.csproj", "filter": "FullyQualifiedName~JwtTokenServiceTests", "lane": "deterministic", "phase": "execution", "deadlineSeconds": 120 },
-        { "id": "wave0:auth-test-protocol", "project": "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests/Koan.Web.Auth.Integration.Tests.csproj", "filter": "FullyQualifiedName~AuthEngineSwapSpec", "lane": "deterministic", "phase": "protocol", "deadlineSeconds": 180 }
-      ]
+      "evidence": ["tests/Koan.Web.Auth.Tests", "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests", "samples/journeys/GardenCoop/01-GardenJournal", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
       "id": "package-first-installation",

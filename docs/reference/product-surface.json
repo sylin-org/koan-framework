@@ -165,24 +165,6 @@
         "tests/Koan.Packaging.Tests",
         "tests/Koan.Web.Auth.Tests",
         "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests"
-      ],
-      "admission": [
-        {
-          "id": "wave0:auth-test-protocol",
-          "project": "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests/Koan.Web.Auth.Integration.Tests.csproj",
-          "filter": "FullyQualifiedName~AuthEngineSwapSpec",
-          "lane": "deterministic",
-          "phase": "protocol",
-          "deadlineSeconds": 180
-        },
-        {
-          "id": "wave0:auth-test-token",
-          "project": "tests/Koan.Web.Auth.Tests/Koan.Web.Auth.Tests.csproj",
-          "filter": "FullyQualifiedName~JwtTokenServiceTests",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 120
-        }
       ]
     },
     {
@@ -202,16 +184,6 @@
         "samples/journeys/GardenCoop/02-LocalDiscovery",
         "tests/Koan.Packaging.Tests",
         "tests/Suites/Web/Koan.Web.Admin.Tests"
-      ],
-      "admission": [
-        {
-          "id": "wave0:web-admin",
-          "project": "tests/Suites/Web/Koan.Web.Admin.Tests/Koan.Web.Admin.Tests.csproj",
-          "filter": "FullyQualifiedName~Koan.Web.Admin.Tests",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 180
-        }
       ]
     },
     {
@@ -251,24 +223,6 @@
         "tests/Koan.Packaging.Tests",
         "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests",
         "tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine"
-      ],
-      "admission": [
-        {
-          "id": "wave0:cache-sqlite-conformance",
-          "project": "tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine/Koan.Tests.Cache.CrossEngine.csproj",
-          "filter": "FullyQualifiedName~SqliteEngineSpec",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 180
-        },
-        {
-          "id": "wave0:cache-sqlite-delta",
-          "project": "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests/Koan.Cache.Adapter.Sqlite.Tests.csproj",
-          "filter": "FullyQualifiedName~SqliteCachePersistenceSpec",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 180
-        }
       ]
     },
     {
@@ -574,16 +528,6 @@
         "tests/Koan.Packaging.Tests",
         "tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests",
         "tests/Suites/Tenancy/Koan.Tenancy.Tests"
-      ],
-      "admission": [
-        {
-          "id": "wave0:data-soft-delete",
-          "project": "tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests/Koan.Data.SoftDelete.Tests.csproj",
-          "filter": "FullyQualifiedName~Koan.Data.SoftDelete.Tests",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 180
-        }
       ]
     },
     {
@@ -673,48 +617,6 @@
         "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap",
         "tests/Suites/Testing/Koan.Testing.Containers.Tests",
         "tests/Suites/Testing/Koan.Testing.Tests"
-      ],
-      "admission": [
-        {
-          "id": "wave0:package-consumer",
-          "project": "tests/Koan.Packaging.Tests/Koan.Packaging.Tests.csproj",
-          "filter": "FullyQualifiedName=Koan.Packaging.Tests.Wave0PackageConsumerTests.Candidate_packages_restore_compile_and_run_outside_the_repository",
-          "lane": "deterministic",
-          "phase": "consumer",
-          "deadlineSeconds": 300
-        },
-        {
-          "id": "wave0:testing-container-lifecycle",
-          "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj",
-          "filter": "FullyQualifiedName~ContainerLifecycleSpec",
-          "lane": "deterministic",
-          "phase": "lifecycle",
-          "deadlineSeconds": 180
-        },
-        {
-          "id": "wave0:testing-container-native",
-          "project": "tests/Suites/Testing/Koan.Testing.Containers.Tests/Koan.Testing.Containers.Tests.csproj",
-          "filter": "FullyQualifiedName=Koan.Testing.Containers.Tests.ContainerNativeLifecycleSpec.Postgres_fixture_supports_two_complete_owned_lifecycles",
-          "lane": "native",
-          "phase": "infrastructure",
-          "deadlineSeconds": 300
-        },
-        {
-          "id": "wave0:testing-entity-conformance",
-          "project": "tests/Suites/Testing/Koan.Testing.Tests/Koan.Testing.Tests.csproj",
-          "filter": "FullyQualifiedName~ConformanceBatteriesHaveTeeth|FullyQualifiedName~ConformanceHostOwnershipSpec",
-          "lane": "deterministic",
-          "phase": "execution",
-          "deadlineSeconds": 180
-        },
-        {
-          "id": "wave0:testing-host-lifecycle",
-          "project": "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap/Koan.Tests.Integration.Bootstrap.csproj",
-          "filter": "FullyQualifiedName~KoanIntegrationHostFailedStartSpec",
-          "lane": "deterministic",
-          "phase": "lifecycle",
-          "deadlineSeconds": 120
-        }
       ]
     },
     {

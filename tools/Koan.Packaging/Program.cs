@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Koan.Packaging.Infrastructure;
-using Koan.Packaging.Models;
 using Koan.Packaging.Services;
 
 return await PackagingProgram.RunAsync(args);
@@ -23,119 +22,6 @@ internal static class PackagingProgram
 
             switch (command)
             {
-                case "terminal-outcomes":
-                {
-                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
-                    var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
-                    var report = await new TerminalOutcomeReconciler(root).ReconcileAsync(
-                        packages,
-                        surface,
-                        options.Has("final"),
-                        cancellationToken);
-                    await WriteOutputAsync(options.Value("output"), ToJson(report), cancellationToken);
-                    Console.WriteLine(
-                        $"terminal-outcomes  {report.Resolved}/{report.BaselineOwners} resolved; " +
-                        $"{report.ActiveSupported} active supported, {report.Removed} removed, " +
-                        $"{report.Remaining} remaining" + (report.Final ? ", final" : ", partial"));
-                    return 0;
-                }
-                case "native-admission":
-                {
-                    var baseCommit = await repository.ResolveCommitAsync(options.RequiredValue("base"), cancellationToken);
-                    var candidate = await repository.ResolveCommitAsync(options.RequiredValue("candidate"), cancellationToken);
-                    var head = await repository.ResolveCommitAsync("HEAD", cancellationToken);
-                    NativeCandidateGuard.RequireExact(
-                        baseCommit,
-                        candidate,
-                        head,
-                        await repository.IsAncestorAsync(baseCommit, candidate, cancellationToken),
-                        await repository.IsWorktreeCleanAsync(cancellationToken));
-
-                    var configuration = options.Value("configuration") ?? "Release";
-                    if (configuration is not ("Debug" or "Release"))
-                        throw new InvalidOperationException("native-admission --configuration must be 'Debug' or 'Release'.");
-                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
-                    var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
-                    var changedPaths = await repository.GetChangedPathsAsync(baseCommit, candidate, cancellationToken);
-                    var plan = new NativeAdmissionPlanner().Create(
-                        baseCommit,
-                        candidate,
-                        changedPaths,
-                        packages,
-                        surface);
-                    var admissionRunner = new AdmissionRunner(root, processRunner, new AdmissionResultValidator());
-                    var report = await new NativeAdmissionExecutor(admissionRunner).RunAsync(
-                        plan,
-                        configuration,
-                        options.Has("no-build"),
-                        cancellationToken);
-                    await WriteOutputAsync(options.Value("output"), ToJson(report), cancellationToken);
-                    Console.WriteLine(
-                        $"native-admission  {report.Verdict}; candidate {candidate}; " +
-                        $"{plan.AffectedClaims.Count} affected claim(s), {plan.Cells.Count} required cell(s)");
-                    if (report.Verdict is PackagingConstants.Admission.PassedVerdict
-                        or PackagingConstants.Admission.NotApplicable) return 0;
-                    foreach (var reason in report.Reasons) Console.Error.WriteLine($"error  {reason}");
-                    return 1;
-                }
-                case "admission":
-                {
-                    var runner = new AdmissionRunner(root, processRunner, new AdmissionResultValidator());
-                    var report = await runner.RunAsync(
-                        options.RequiredValue("id"),
-                        options.RequiredValue("project"),
-                        options.RequiredValue("filter"),
-                        options.Value("lane") ?? PackagingConstants.Admission.DeterministicLane,
-                        options.Value("phase") ?? PackagingConstants.Admission.ExecutionPhase,
-                        options.IntValue("deadline-seconds", PackagingConstants.Admission.DefaultDeadlineSeconds),
-                        options.Value("configuration") ?? "Release",
-                        options.Has("no-build"),
-                        cancellationToken);
-                    await WriteOutputAsync(options.Value("output"), ToJson(report), cancellationToken);
-                    Console.WriteLine(
-                        $"admission  {report.CellId} {report.Verdict}; " +
-                        $"{report.Passed} passed, {report.Failed} failed, " +
-                        $"{report.Skipped} skipped, {report.Unknown} unknown");
-                    if (report.Verdict == PackagingConstants.Admission.PassedVerdict) return 0;
-                    foreach (var reason in report.Reasons) Console.Error.WriteLine($"error  {reason}");
-                    Console.Error.WriteLine($"reproduce  {report.ReproductionCommand}");
-                    return 1;
-                }
-                case "admission-results":
-                {
-                    var cellId = options.RequiredValue("id");
-                    var project = options.RequiredValue("project");
-                    var filter = options.RequiredValue("filter");
-                    var lane = options.Value("lane") ?? PackagingConstants.Admission.DeterministicLane;
-                    var phase = options.Value("phase") ?? PackagingConstants.Admission.ExecutionPhase;
-                    var deadline = options.IntValue(
-                        "deadline-seconds",
-                        PackagingConstants.Admission.DefaultDeadlineSeconds);
-                    var report = new AdmissionResultValidator().Validate(
-                        cellId,
-                        project,
-                        filter,
-                        lane,
-                        phase,
-                        deadline,
-                        options.Value("reproduction") ?? $"rerun admission cell '{cellId}'",
-                        new ProcessResult(
-                            options.IntValue("exit-code", 0),
-                            string.Empty,
-                            string.Empty,
-                            options.Has("timed-out"),
-                            options.Has("killed-process-tree")),
-                        options.RequiredValue("result"));
-                    await WriteOutputAsync(options.Value("output"), ToJson(report), cancellationToken);
-                    Console.WriteLine(
-                        $"admission-results  {report.CellId} {report.Verdict}; " +
-                        $"{report.Passed} passed, {report.Failed} failed, " +
-                        $"{report.Skipped} skipped, {report.Unknown} unknown");
-                    if (report.Verdict == PackagingConstants.Admission.PassedVerdict) return 0;
-                    foreach (var reason in report.Reasons) Console.Error.WriteLine($"error  {reason}");
-                    Console.Error.WriteLine($"reproduce  {report.ReproductionCommand}");
-                    return 1;
-                }
                 case "quality":
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
@@ -245,22 +131,7 @@ internal static class PackagingProgram
           quality         [--output PATH] [--markdown PATH]
           product-surface [--output PATH] [--markdown PATH] [--check]
           api-baselines
-          terminal-outcomes [--final] [--output PATH]
-          native-admission --base SHA --candidate SHA [--configuration Debug|Release]
-                          [--no-build] [--output PATH]
-          admission       --id ID --project PATH --filter FILTER
-                          [--lane deterministic|native] [--phase NAME]
-                          [--deadline-seconds N] [--configuration Debug|Release]
-                          [--no-build] [--output PATH]
-          admission-results --id ID --project PATH --filter FILTER --result PATH
-                          [--exit-code N] [--timed-out] [--killed-process-tree]
-                          [--lane deterministic|native] [--phase NAME]
-                          [--deadline-seconds N] [--reproduction COMMAND] [--output PATH]
         """);
-
-    private static string ToJson<T>(T value) => JsonSerializer.Serialize(
-        value,
-        new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
 
     private static async Task WriteOutputAsync(string? path, string content, CancellationToken cancellationToken)
     {
@@ -312,16 +183,4 @@ internal sealed class CommandOptions
     public string? Value(string name) => values.GetValueOrDefault(name);
     public bool Has(string name) => values.ContainsKey(name);
 
-    public string RequiredValue(string name) => Value(name) is { Length: > 0 } value
-        ? value
-        : throw new InvalidOperationException($"--{name} requires a value.");
-
-    public int IntValue(string name, int defaultValue)
-    {
-        var value = Value(name);
-        if (value is null) return defaultValue;
-        return int.TryParse(value, out var parsed)
-            ? parsed
-            : throw new InvalidOperationException($"--{name} must be an integer.");
-    }
 }

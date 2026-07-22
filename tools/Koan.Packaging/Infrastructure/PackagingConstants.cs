@@ -16,43 +16,6 @@ internal static class PackagingConstants
         public const string NuGetVersionsIndexFile = "index.json";
     }
 
-    public static class Admission
-    {
-        public const int DefaultDeadlineSeconds = 300;
-        public const int MinimumDeadlineSeconds = 1;
-        public const int MaximumDeadlineSeconds = 3600;
-        public const string DeterministicLane = "deterministic";
-        public const string NativeLane = "native";
-        public const string ExecutionPhase = "execution";
-        public const string PassedVerdict = "passed";
-        public const string FailedVerdict = "failed";
-        public const string RequiredApplicability = "required";
-        public const string NotApplicable = "not-applicable";
-        public const string TrxExtension = ".trx";
-        public const string CellIdPattern = "^[a-z0-9]+(?:[.:_-][a-z0-9]+)*$";
-        public static readonly IReadOnlySet<string> SharedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Directory.Build.props",
-            "Directory.Build.targets",
-            "Directory.Packages.props",
-            "global.json",
-            "NuGet.Config",
-            ProductSurface.ClaimsPath,
-            ".github/workflows/canary-nightly.yml",
-            "scripts/forge-verify.ps1",
-            "scripts/test-bootstrap.ps1"
-        };
-        public static readonly IReadOnlyList<string> SharedPrefixes =
-        [
-            "tools/Koan.Packaging/",
-            ".github/actions/",
-            "eng/",
-            "src/Koan.Testing.",
-            "tests/Suites/Data/AdapterSurface/Koan.Data.AdapterSurface.TestKit/",
-            "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit/"
-        ];
-    }
-
     public static class ProductSurface
     {
         public const int Schema = 1;
@@ -98,22 +61,6 @@ internal static class PackagingConstants
         {
             "supported-extension",
             "supported-foundation"
-        };
-    }
-
-    public static class TerminalOutcomes
-    {
-        public const int Schema = 1;
-        public const int BaselineCount = 55;
-        public const string ArchitectureDecision = "ARCH-0120";
-        public const string ArchitectureDecisionPath = "docs/decisions/ARCH-0120-terminal-package-maturity.md";
-        public const string CertificatePath = "docs/initiatives/koan-v1/R13-TERMINAL-OUTCOMES.json";
-        public const string BaselineTableHeader = "| # | Wave | Package owner | Intended decision surface |";
-        public static readonly IReadOnlySet<string> RemovedDispositions = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "absorbed",
-            "migrated",
-            "retired"
         };
     }
 

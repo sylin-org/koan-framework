@@ -63,32 +63,6 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         return output.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
     }
 
-    public async Task<bool> IsAncestorAsync(
-        string ancestor,
-        string descendant,
-        CancellationToken cancellationToken)
-    {
-        var result = await processRunner.RunAsync(
-            "git",
-            ["merge-base", "--is-ancestor", ancestor, descendant],
-            repositoryRoot,
-            cancellationToken);
-        if (result.ExitCode is 0 or 1) return result.ExitCode == 0;
-        throw new InvalidOperationException(
-            $"Unable to verify candidate ancestry (exit {result.ExitCode}): " +
-            $"{result.StandardError}{result.StandardOutput}".Trim());
-    }
-
-    public async Task<bool> IsWorktreeCleanAsync(CancellationToken cancellationToken)
-    {
-        var output = await processRunner.RequireAsync(
-            "git",
-            ["status", "--porcelain=v1", "--untracked-files=all"],
-            repositoryRoot,
-            cancellationToken);
-        return string.IsNullOrWhiteSpace(output);
-    }
-
     public async Task<IReadOnlyDictionary<string, string>> ReadTreeAsync(
         string commit,
         CancellationToken cancellationToken)
