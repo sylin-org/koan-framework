@@ -2,6 +2,8 @@
 
 Local and remote Ollama provider for Koan AI: chat, streaming, embeddings, vision, tools, and model operations.
 
+> **Maturity:** Supported 0.20 extension within the runtime, model, and deployment boundaries below.
+
 ## Install
 
 ```powershell
@@ -13,13 +15,14 @@ The package reference is the provider declaration. There is no Ollama-specific r
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/ask", async () => await Client.Chat("What makes a good domain model?"));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("What makes a good domain model?"));
 ```
 
 In Development, Koan looks for a healthy Ollama runtime at the conventional local or container address. A ready

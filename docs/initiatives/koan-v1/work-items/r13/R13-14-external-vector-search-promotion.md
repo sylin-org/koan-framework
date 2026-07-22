@@ -7,7 +7,7 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
+  status: passed
   scope: Qdrant, Milvus, Weaviate, Elasticsearch, OpenSearch, shared SearchEngine, package, consumer, product, and API evidence
 ---
 
@@ -174,3 +174,11 @@ are determined only by the merged main commit and must become API floors in the 
   with exactly these six allowed first-publication floors pending and three content-only owners;
 - lean no-tests coherence passed release build, composition lockfile, documentation truth/lint,
   diff-scoped code validation, skills lint, and blueprint lint; no certification suite ran.
+- PR `#104` passed lean gate `29908221940` and squash-merged to `main` as
+  `663b947f783ff0d9a445cce6c45b0330684e59d3`; release run `29908506818` published the six exact
+  `0.20.0` package and symbol artifacts;
+- NuGet.org indexed all six artifacts. The unchanged consumer restored from NuGet.org only into a
+  second fresh cache, built with zero warnings/errors, and emitted the same
+  `EXTERNAL-VECTOR-SEARCH|PACKAGE-CONSUMER|ADDKOAN|ELASTICSEARCH|OPENSEARCH|QDRANT|MILVUS|WEAVIATE|PASS`
+  result;
+- the six immutable first-publication API floors are captured in their owning projects by R13-15.

@@ -27,9 +27,9 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private int _disposed;
 
-    public string Id => "ollama";
+    public string Id => Infrastructure.Constants.Adapter.Type;
     public string Name => "Ollama AI Provider";
-    public string Type => "ollama";
+    public string Type => Infrastructure.Constants.Adapter.Type;
 
     public IReadOnlySet<string> Capabilities { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {

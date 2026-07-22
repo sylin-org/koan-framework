@@ -175,11 +175,11 @@
     {
       "id": "ai-runtime-semantics",
       "title": "AI runtime semantics",
-      "summary": "The AI runtime adds provider-neutral model capabilities; individual runtime and provider guarantees remain under assessment.",
-      "maturity": "experimental",
-      "packages": ["Sylin.Koan.AI"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.AI"]
+      "summary": "The inert AI contracts and compiled runtime expose one Client facade, activate referenced providers once with DI-owned lifetime, and route only through sources that advertise the requested capability while preserving corrective failures.",
+      "maturity": "supported-foundation",
+      "packages": ["Sylin.Koan.AI.Contracts", "Sylin.Koan.AI"],
+      "documentation": ["docs/reference/ai/index.md", "src/Koan.AI.Contracts/README.md", "src/Koan.AI/README.md"],
+      "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md"]
     },
     {
       "id": "vector-runtime-semantics",
@@ -194,17 +194,17 @@
       "id": "local-ai-provider-composition",
       "title": "Local AI provider composition",
       "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": ["Sylin.Koan.AI.Connector.Ollama", "Sylin.Koan.AI.Connector.LMStudio", "Sylin.Koan.AI.Connector.Onnx"],
       "documentation": ["src/Connectors/AI/Ollama/README.md", "src/Connectors/AI/LMStudio/README.md", "src/Connectors/AI/Onnx/README.md"],
-      "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+      "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs", "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md"]
     },
     {
       "id": "ai-prompt-and-http-projection",
       "title": "AI prompt semantics and HTTP projection",
       "summary": "Inspectable prompt values remain inert until used, optional Entity-backed prompt versions resolve deliberately, and a Web package reference projects the compiled AI runtime without registration ceremony.",
       "maturity": "demonstrated",
-      "packages": ["Sylin.Koan.AI.Contracts", "Sylin.Koan.AI.Prompt", "Sylin.Koan.AI.Web"],
+      "packages": ["Sylin.Koan.AI.Prompt", "Sylin.Koan.AI.Web"],
       "documentation": ["docs/reference/ai/index.md", "src/Koan.AI.Prompt/README.md", "src/Koan.AI.Web/README.md"],
       "evidence": ["tests/Koan.AI.Prompt.Tests", "tests/Suites/AI/Web/Koan.AI.Web.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },

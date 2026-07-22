@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.Weaviate</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Weaviate</RootNamespace>
     <Description>Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.</Description>

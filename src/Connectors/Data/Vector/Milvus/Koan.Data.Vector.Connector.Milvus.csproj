@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.Milvus</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Milvus</RootNamespace>
     <Description>Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.</Description>

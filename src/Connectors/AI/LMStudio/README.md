@@ -2,6 +2,8 @@
 
 LM Studio provider for Koan AI: OpenAI-compatible chat, streaming, embeddings, model listing, and readiness.
 
+> **Maturity:** Supported 0.20 extension within the runtime, model, and deployment boundaries below.
+
 ## Install
 
 ```powershell
@@ -13,13 +15,14 @@ The reference activates the provider through the normal Koan boot path; no provi
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/ask", async () => await Client.Chat("Summarize this release in one sentence."));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("Summarize this release in one sentence."));
 ```
 
 In Development, Koan discovers a healthy LM Studio server at its conventional local address. LM Studio is modeled

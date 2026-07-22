@@ -78,16 +78,17 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 through local Vector R13-13 are merged, published, indexed, public-consumer green,
-and baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert
-contract are separately supported while Cache Redis remains unassessed. The active slice is
-[R13-14](work-items/r13/R13-14-external-vector-search-promotion.md): promote Qdrant, Milvus,
-Weaviate, Elasticsearch, OpenSearch, and the shared SearchEngine mechanism. All five real provider
-cells are green without infrastructure skips: Qdrant 39/41, Weaviate 34/34, Elasticsearch 29/33,
-OpenSearch 29/33, and Milvus 25/33 on its real three-service stack. Skips are only declared capability
-limits. All six packages now pack with supported dependency bands; one fresh-cache consumer builds
-without warnings and activates all five providers through `AddKoan()`; product, API, and no-tests
-coherence guards pass. Only publication and public observation remain.
+PostgreSQL R13-07 through external Vector/Search R13-14 are merged, published, indexed,
+public-consumer green, and baseline-captured at their exact first 0.20 versions. Redis's functional
+backend and inert contract are separately supported while Cache Redis remains unassessed. R13-14's
+five real provider cells, six packages, staged/public consumers, product/API guards, and lean
+coherence all passed. The active slice is
+[R13-15](work-items/r13/R13-15-ai-runtime-provider-promotion.md): promote the provider-neutral AI
+runtime and contracts with Ollama, LM Studio, and ONNX through focused runtime/protocol/activation,
+real committed-model, package-only consumer, product, and API evidence. All focused owners, five
+packs, the native-wire/real-model staged consumer, product/API guards, and lean structural legs are
+green; the two affected sample composition lockfiles are refreshed. Publication and public
+observation remain.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -128,6 +129,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   `e96a4dbe8fd83dd99f8d5a438f1765f31c420ec5`, and release run `29905812375` published the Vector
   runtime/abstractions at `0.20.0` and InMemory/sqlite-vec at `0.20.1`. All four are indexed and the
   fresh NuGet.org-only restart consumer passed unchanged.
+- PR `#104` passed lean gate `29908221940`, squash-merged as
+  `663b947f783ff0d9a445cce6c45b0330684e59d3`, and release run `29908506818` published SearchEngine,
+  Elasticsearch, OpenSearch, Qdrant, Milvus, and Weaviate at exact `0.20.0`. All six are indexed and
+  the unchanged fresh NuGet.org-only activation consumer passed.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner

@@ -8,15 +8,15 @@
   "modules": [
     {
       "id": "Koan.AI",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.AI.Connector.Onnx",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.AI.Contracts",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Cache.Abstractions",

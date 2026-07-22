@@ -8,7 +8,6 @@
       "summary": "Inspectable prompt values remain inert until used, optional Entity-backed prompt versions resolve deliberately, and a Web package reference projects the compiled AI runtime without registration ceremony.",
       "maturity": "demonstrated",
       "packages": [
-        "Sylin.Koan.AI.Contracts",
         "Sylin.Koan.AI.Prompt",
         "Sylin.Koan.AI.Web"
       ],
@@ -26,17 +25,21 @@
     {
       "id": "ai-runtime-semantics",
       "title": "AI runtime semantics",
-      "summary": "The AI runtime adds provider-neutral model capabilities; individual runtime and provider guarantees remain under assessment.",
-      "maturity": "experimental",
+      "summary": "The inert AI contracts and compiled runtime expose one Client facade, activate referenced providers once with DI-owned lifetime, and route only through sources that advertise the requested capability while preserving corrective failures.",
+      "maturity": "supported-foundation",
       "packages": [
-        "Sylin.Koan.AI"
+        "Sylin.Koan.AI",
+        "Sylin.Koan.AI.Contracts"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/ai/index.md",
+        "src/Koan.AI.Contracts/README.md",
+        "src/Koan.AI/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "src/Koan.AI"
+        "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md",
+        "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests",
+        "tests/Suites/AI/Unit/Koan.Tests.AI.Unit"
       ]
     },
     {
@@ -372,7 +375,7 @@
       "id": "local-ai-provider-composition",
       "title": "Local AI provider composition",
       "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.AI.Connector.LMStudio",
         "Sylin.Koan.AI.Connector.Ollama",
@@ -384,7 +387,7 @@
         "src/Connectors/AI/Onnx/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md",
         "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests",
         "tests/Suites/AI/Unit/Koan.Tests.AI.Unit",
         "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs"
@@ -832,7 +835,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Koan AI semantic client, capability-aware routing, provider composition, source health, and startup inspection.",
       "targetFrameworks": [
@@ -893,7 +896,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.LMStudio",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "LM Studio provider for Koan AI (chat, streaming, embeddings) with auto-discovery.",
       "targetFrameworks": [
@@ -913,7 +916,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Ollama",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Ollama provider for Koan AI (chat, streaming, embeddings) with Dev auto-discovery.",
       "targetFrameworks": [
@@ -934,7 +937,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Connector.Onnx",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "In-process embedding generation for Koan via ONNX Runtime. Runs a local sentence-embedding model (e.g. all-MiniLM-L6-v2) with a WordPiece tokenizer entirely in-process \u2014 no model server, no network. The embeddings rung of the single-binary tier.",
       "targetFrameworks": [
@@ -954,7 +957,7 @@
     },
     {
       "packageId": "Sylin.Koan.AI.Contracts",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Inert Koan AI contracts for provider adapters, routing, model selection, prompts, and multimodal request and result shapes.",
       "targetFrameworks": [
@@ -965,7 +968,7 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
       "claims": [
-        "ai-prompt-and-http-projection"
+        "ai-runtime-semantics"
       ]
     },
     {

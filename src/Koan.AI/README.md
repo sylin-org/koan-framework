@@ -3,6 +3,8 @@
 The AI capability ring for Koan: one business-facing client, capability-aware routing, provider composition, source
 health, and startup inspection.
 
+> **Maturity:** Supported 0.20 foundation within the routing, capability, and failure boundaries below.
+
 ## Smallest meaningful use
 
 Install this runtime and one provider, for example:
@@ -15,13 +17,14 @@ dotnet add package Sylin.Koan.AI.Connector.Ollama
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/summary", async () => await Client.Chat("Summarize today's orders."));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("Summarize today's orders."));
 ```
 
 `AddKoan()` is the complete application bootstrap. Referenced provider modules describe their capabilities; Koan

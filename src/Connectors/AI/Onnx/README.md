@@ -3,6 +3,8 @@
 In-process ONNX sentence embeddings for Koan AI. It is side-loadable and air-gap friendly: Koan downloads nothing at
 runtime.
 
+> **Maturity:** Supported 0.20 extension within the model and tokenizer boundaries below.
+
 ## Install
 
 ```powershell

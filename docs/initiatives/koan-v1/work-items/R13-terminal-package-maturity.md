@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: Entity and local Vector providers public and observed; external Vector/Search focused evidence active
+  scope: Entity and Vector/Search providers public and observed; AI runtime/provider promotion active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote external Vector and Search providers`
+- Status: `in-progress — promote the AI runtime and local providers`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -123,9 +123,14 @@ in R13-13.
 runtime/abstractions at `0.20.0` and both local providers at `0.20.1`, and the unchanged NuGet.org-only
 restart consumer. Their immutable API floors are recorded in R13-14.
 
-[R13-14](r13/R13-14-external-vector-search-promotion.md) is active. All five real provider cells are
-green without infrastructure skips, and its six-package pack, clean activation consumer, product/API
-guards, and no-tests coherence pass. Publication and public observation remain.
+[R13-14](r13/R13-14-external-vector-search-promotion.md) passed through PR `#104`, main commit
+`663b947f783ff0d9a445cce6c45b0330684e59d3`, release run `29908506818`, public indexing of all six
+exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Their immutable API floors
+are recorded in R13-15.
+
+[R13-15](r13/R13-15-ai-runtime-provider-promotion.md) is active. The provider-neutral runtime and
+contracts, Ollama, LM Studio, and ONNX are the exact five-owner boundary; focused runtime, protocol,
+activation, real-model, package, consumer, product, and API evidence owns the decision.
 
 ## Execution
 
@@ -152,7 +157,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-14 external Vector/Search promotion.
+Status: active through R13-15 AI runtime/provider promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

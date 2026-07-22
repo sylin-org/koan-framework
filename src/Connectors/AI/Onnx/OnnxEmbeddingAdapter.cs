@@ -40,9 +40,9 @@ internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IDisposable
     // in-process ONNX *provider*, and the embedded model is its default — a usage-time concern surfaced via
     // the source's Embedding capability, not baked into the adapter's identity. The registry dedupes by Id,
     // so one ONNX provider serves the one model the app embeds (the in-process single-model tier).
-    public string Id => "onnx";
-    public string Name => $"ONNX ({_options.ModelName})";
-    public string Type => "onnx";
+    public string Id => Infrastructure.Constants.Adapter.Type;
+    public string Name => $"{Infrastructure.Constants.Adapter.DisplayName} ({_options.ModelName})";
+    public string Type => Infrastructure.Constants.Adapter.Type;
 
     /// <summary>The default (and, for the in-process tier, only) model this provider serves.</summary>
     public string DefaultModel => _options.ModelName;
