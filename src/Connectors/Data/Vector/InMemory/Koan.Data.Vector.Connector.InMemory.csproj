@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.InMemory</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.InMemory</RootNamespace>
     <Description>In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.</Description>

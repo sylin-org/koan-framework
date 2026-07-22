@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL through Redis public and observed; CockroachDB focused evidence active
+  scope: Entity and local Vector providers public and observed; external Vector/Search focused evidence active
 ---
 
 # Koan V1 Reorganization Progress
@@ -22,11 +22,11 @@ or completes a work item. The roadmap describes order; it does not report progre
 - Overall: `active`
 - Current tranche: `T8 — public provider promotion`
 - Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: [R13-13 — Local Vector floor promotion](work-items/r13/R13-13-local-vector-floor-promotion.md)
-- Most recently completed R13 child: [R13-12 — CockroachDB provider promotion](work-items/r13/R13-12-cockroach-provider-promotion.md)
+- Active child: [R13-14 — External Vector/Search promotion](work-items/r13/R13-14-external-vector-search-promotion.md)
+- Most recently completed R13 child: [R13-13 — Local Vector floor promotion](work-items/r13/R13-13-local-vector-floor-promotion.md)
 - Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: focused local Vector foundation; both local cells, four-owner pack, and
-  staged package consumer are green, with product/API/coherence completion pending
+- Pending release boundary: six external Vector/Search owners; all five real provider cells,
+  six-owner pack, clean activation consumer, product/API guards, and no-tests coherence are green
 - Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
   feedback triage are complete; explicit maintainer go/no-go acceptance remains
 - Deliberate overlap: R12 remains `in-progress` only for
@@ -50,7 +50,7 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
 | R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | PostgreSQL through CockroachDB are public, indexed, consumer-green, and baseline-captured. R13-13 local Vector implementation, family evidence, pack, and staged consumer are green. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity and local Vector providers are public, indexed, consumer-green, and baseline-captured. R13-14 focused provider, package, consumer, product, API, and coherence evidence is green; publication remains. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -72,7 +72,7 @@ item should normally be `in-progress`.
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
 | R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
-| R13 | in-progress | The first lean slice and PostgreSQL through CockroachDB are public and observed. R13-13 proves the local Vector family through both local cells and a staged restart consumer; finish product/API/coherence, publish, and observe it. |
+| R13 | in-progress | The first lean slice, Entity providers, and local Vector family are public and observed. R13-14 focused evidence is green across all five real providers and the six-package public shape; publish and observe it. |
 
 ## Divergence and risk log
 

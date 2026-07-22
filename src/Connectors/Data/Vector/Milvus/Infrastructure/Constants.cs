@@ -3,6 +3,12 @@ namespace Koan.Data.Vector.Connector.Milvus.Infrastructure;
 
 internal static class Constants
 {
+    internal static class Provider
+    {
+        public const string Name = "milvus";
+        public const int Priority = 30;
+    }
+
     public const string Section = "Koan:Data:Milvus";
     public const string HttpClientName = "milvus";
     public const string DefaultEndpoint = "http://localhost:19530";

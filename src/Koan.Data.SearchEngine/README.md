@@ -23,8 +23,8 @@ Provider authors extending the shared mechanism can reference it directly:
 dotnet add package Sylin.Koan.Data.SearchEngine
 ```
 
-> **Maturity:** This shared provider layer is available below the supported 0.20 boundary. Package presence is not a
-> support claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
+> **Maturity:** Supported 0.20 implementation dependency for the Elasticsearch and OpenSearch vector
+> providers. Applications should still install one of those provider packages rather than this mechanism directly.
 
 ## What it adds
 

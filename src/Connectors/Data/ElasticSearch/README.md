@@ -9,8 +9,7 @@ kNN requests, filtering, naming, source isolation, and readiness participation.
 
 ## Install
 
-> **Maturity:** This provider is available below the supported 0.20 boundary. Package presence is not a support
-> claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
+> **Maturity:** Supported 0.20 extension within the capabilities and boundaries below.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.ElasticSearch

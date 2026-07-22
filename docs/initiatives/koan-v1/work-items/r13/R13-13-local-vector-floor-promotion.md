@@ -7,8 +7,8 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
-  scope: focused Vector runtime, InMemory, sqlite-vec, pack, consumer, product, and API evidence
+  status: passed
+  scope: local Vector runtime/providers published, indexed, public-consumer green, and baseline-captured
 ---
 
 # R13-13 — Promote the local Vector foundation
@@ -164,5 +164,15 @@ limits remain explicit rather than normalized away.
   owners;
 - no-tests coherence: release build, committed composition lockfiles, documentation truth/lint,
   diff-scoped code validation, skills lint, and blueprint lint all passed in 20.2 seconds;
+- PR `#103` passed lean gate `29905547144` on exact head `d6c2ba289`, squash-merged as
+  `e96a4dbe8fd83dd99f8d5a438f1765f31c420ec5`, and release run `29905812375` accepted all four
+  packages and symbols;
+- NuGet.org indexed `Sylin.Koan.Data.Vector.Abstractions 0.20.0`, `Sylin.Koan.Data.Vector 0.20.0`,
+  `Sylin.Koan.Data.Vector.Connector.InMemory 0.20.1`, and
+  `Sylin.Koan.Data.Vector.Connector.SqliteVec 0.20.1`; these immutable first versions are now the API
+  floors at their owning projects;
+- the same consumer restored those exact public packages from NuGet.org only into a brand-new cache,
+  built with zero warnings/errors, and passed the unchanged
+  `LOCAL-VECTOR|PACKAGE-CONSUMER|INMEMORY-EPHEMERAL|SQLITEVEC-DURABLE|BATCH-GET|PASS` result;
 - no external Vector provider, provider matrix beyond the two local cells, or whole-framework
   certification ran.

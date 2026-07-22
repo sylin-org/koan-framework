@@ -9,13 +9,13 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
   status: in-progress
-  scope: PostgreSQL through Redis public and observed; CockroachDB focused evidence active
+  scope: Entity and local Vector providers public and observed; external Vector/Search focused evidence active
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote CockroachDB as the remaining networked Entity provider`
+- Status: `in-progress — promote external Vector and Search providers`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -118,9 +118,14 @@ immutable API floor in R13-11.
 `0.20.0`, and a fresh NuGet.org-only CockroachDB 26.2.3 consumer. Its immutable API floor is recorded
 in R13-13.
 
-[R13-13](r13/R13-13-local-vector-floor-promotion.md) is active. It promotes the provider-neutral
-Vector runtime and the InMemory/sqlite-vec local providers as one family, while keeping the AI runtime
-under separate assessment.
+[R13-13](r13/R13-13-local-vector-floor-promotion.md) passed through PR `#103`, main commit
+`e96a4dbe8fd83dd99f8d5a438f1765f31c420ec5`, release run `29905812375`, public indexing of the
+runtime/abstractions at `0.20.0` and both local providers at `0.20.1`, and the unchanged NuGet.org-only
+restart consumer. Their immutable API floors are recorded in R13-14.
+
+[R13-14](r13/R13-14-external-vector-search-promotion.md) is active. All five real provider cells are
+green without infrastructure skips, and its six-package pack, clean activation consumer, product/API
+guards, and no-tests coherence pass. Publication and public observation remain.
 
 ## Execution
 
@@ -147,7 +152,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-13 local Vector promotion.
+Status: active through R13-14 external Vector/Search promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

@@ -315,7 +315,7 @@
       "id": "external-vector-providers",
       "title": "Qdrant, Milvus, and Weaviate vector providers",
       "summary": "Qdrant, Milvus, and Weaviate preserve Koan\u0027s Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Data.Vector.Connector.Milvus",
         "Sylin.Koan.Data.Vector.Connector.Qdrant",
@@ -328,7 +328,7 @@
         "src/Connectors/Data/Vector/Weaviate/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests"
@@ -644,7 +644,7 @@
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Data.Connector.ElasticSearch",
         "Sylin.Koan.Data.Connector.OpenSearch",
@@ -656,7 +656,7 @@
         "src/Koan.Data.SearchEngine/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.ElasticSearch.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.OpenSearch.Tests"
       ]
@@ -1432,7 +1432,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Elasticsearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the Elasticsearch REST API.",
       "targetFrameworks": [
@@ -1512,7 +1512,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "OpenSearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the OpenSearch REST API.",
       "targetFrameworks": [
@@ -1695,7 +1695,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.SearchEngine",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Shared core for Koan search-engine vector connectors (Elasticsearch / OpenSearch, both built on Apache Lucene): the shared SearchEngineVectorRepository behind a 3-member ISearchEngineDialect seam, plus the single source of truth for translating the unified Filter AST into the search-engine query DSL.",
       "targetFrameworks": [
@@ -1796,7 +1796,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.",
       "targetFrameworks": [
@@ -1818,7 +1818,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Qdrant",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Qdrant vector provider for Koan: entity-first KNN search, payload filtering, bulk operations, export, and visibility-aware writes over REST.",
       "targetFrameworks": [
@@ -1862,7 +1862,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.",
       "targetFrameworks": [

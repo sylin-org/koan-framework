@@ -2,6 +2,12 @@ namespace Koan.Data.Vector.Connector.Weaviate.Infrastructure;
 
 internal static class Constants
 {
+    internal static class Provider
+    {
+        public const string Name = "weaviate";
+        public const int Priority = 10;
+    }
+
     public static class Configuration
     {
         public const string Section = "Koan:Data:Weaviate";

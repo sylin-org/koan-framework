@@ -7,8 +7,8 @@ using Koan.Core.Services;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
-[ProviderPriority(30)]
-[KoanService(ServiceKind.Vector, shortCode: "qdrant", name: "Qdrant",
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Name, name: "Qdrant",
     ContainerImage = "qdrant/qdrant",
     DefaultTag = "v1.18.3",
     DefaultPorts = new[] { 6333, 6334 },
@@ -19,11 +19,11 @@ namespace Koan.Data.Vector.Connector.Qdrant;
     HealthIntervalSeconds = 5,
     HealthTimeoutSeconds = 3,
     HealthRetries = 12,
-    Scheme = "http", Host = "qdrant", EndpointPort = 6333, UriPattern = "http://{host}:{port}",
+    Scheme = "http", Host = Infrastructure.Constants.Provider.Name, EndpointPort = 6333, UriPattern = "http://{host}:{port}",
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 6333, LocalPattern = "http://{host}:{port}")]
 public sealed class QdrantVectorAdapterFactory : IVectorAdapterFactory
 {
-    public string Provider => "qdrant";
+    public string Provider => Infrastructure.Constants.Provider.Name;
 
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
     // multi-tenancy / per-collection) is realized in P4.

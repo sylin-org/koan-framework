@@ -3,6 +3,8 @@
 Use Qdrant behind Koan's entity-first vector API. Referencing this package is the activation step; `AddKoan()`
 discovers it, elects it when appropriate, and reports the effective route at startup.
 
+> **Maturity:** Supported 0.20 extension within the capabilities and boundaries below.
+
 ## Install and use
 
 ```powershell

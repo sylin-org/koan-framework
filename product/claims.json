@@ -212,10 +212,10 @@
       "id": "search-engine-vector-providers",
       "title": "Elasticsearch and OpenSearch vector providers",
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.SearchEngine", "Sylin.Koan.Data.Connector.ElasticSearch", "Sylin.Koan.Data.Connector.OpenSearch"],
       "documentation": ["src/Koan.Data.SearchEngine/README.md", "src/Connectors/Data/ElasticSearch/README.md", "src/Connectors/Data/OpenSearch/README.md"],
-      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.ElasticSearch.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.OpenSearch.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.ElasticSearch.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.OpenSearch.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md"]
     },
     {
       "id": "local-vector-providers",
@@ -230,10 +230,10 @@
       "id": "external-vector-providers",
       "title": "Qdrant, Milvus, and Weaviate vector providers",
       "summary": "Qdrant, Milvus, and Weaviate preserve Koan's Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.Vector.Connector.Qdrant", "Sylin.Koan.Data.Vector.Connector.Milvus", "Sylin.Koan.Data.Vector.Connector.Weaviate"],
       "documentation": ["src/Connectors/Data/Vector/Qdrant/README.md", "src/Connectors/Data/Vector/Milvus/README.md", "src/Connectors/Data/Vector/Weaviate/README.md", "docs/reference/cards/vector.md"],
-      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md"]
     },
     {
       "id": "mcp-agent-surface",

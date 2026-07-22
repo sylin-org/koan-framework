@@ -7,8 +7,8 @@ using Koan.Core.Services;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 
-[ProviderPriority(30)]
-[KoanService(ServiceKind.Vector, shortCode: "milvus", name: "Milvus",
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Name, name: "Milvus",
     ContainerImage = "milvusdb/milvus",
     DefaultTag = "2.6.20",
     DefaultPorts = new[] { 19530 },
@@ -24,11 +24,11 @@ namespace Koan.Data.Vector.Connector.Milvus;
     HealthIntervalSeconds = 5,
     HealthTimeoutSeconds = 3,
     HealthRetries = 12,
-    Scheme = "http", Host = "milvus", EndpointPort = 19530, UriPattern = "http://{host}:{port}",
+    Scheme = "http", Host = Infrastructure.Constants.Provider.Name, EndpointPort = 19530, UriPattern = "http://{host}:{port}",
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 19530, LocalPattern = "http://{host}:{port}")]
 public sealed class MilvusVectorAdapterFactory : IVectorAdapterFactory
 {
-    public string Provider => "milvus";
+    public string Provider => Infrastructure.Constants.Provider.Name;
 
     // ARCH-0103 §4.1: accepts the routed source for contract alignment; per-source physical placement (native
     // partitions / per-collection) is realized in P4.

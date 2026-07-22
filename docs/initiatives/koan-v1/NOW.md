@@ -78,15 +78,16 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 through CockroachDB R13-12 are merged, published, indexed, public-consumer green,
+PostgreSQL R13-07 through local Vector R13-13 are merged, published, indexed, public-consumer green,
 and baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert
-contract are separately supported while Cache Redis remains unassessed. The active local slice is
-[R13-13](work-items/r13/R13-13-local-vector-floor-promotion.md): promote the provider-neutral Vector
-runtime and the InMemory/sqlite-vec local providers as one useful family. InMemory passes 34/34;
-sqlite-vec passes 29 with five explicit unsupported-capability skips, and its matrix exposed and
-closed the missing batch-embedding retrieval. All four exact `0.20.0` staged artifacts pack, and a
-fresh-cache external consumer builds with zero warnings/errors and proves ephemeral InMemory plus
-sqlite-vec restart durability and batch retrieval through normal `AddKoan()` composition.
+contract are separately supported while Cache Redis remains unassessed. The active slice is
+[R13-14](work-items/r13/R13-14-external-vector-search-promotion.md): promote Qdrant, Milvus,
+Weaviate, Elasticsearch, OpenSearch, and the shared SearchEngine mechanism. All five real provider
+cells are green without infrastructure skips: Qdrant 39/41, Weaviate 34/34, Elasticsearch 29/33,
+OpenSearch 29/33, and Milvus 25/33 on its real three-service stack. Skips are only declared capability
+limits. All six packages now pack with supported dependency bands; one fresh-cache consumer builds
+without warnings and activates all five providers through `AddKoan()`; product, API, and no-tests
+coherence guards pass. Only publication and public observation remain.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -123,6 +124,10 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   replacement PR `#102` passed lean gate `29902727400`, squash-merged as
   `3ff7f1950931addd12a16e194299468bd442dcdf`, and release run `29903009583` published CockroachDB
   `0.20.0`. NuGet.org indexed it and the fresh public 26.2.3 consumer passed.
+- PR `#103` passed lean gate `29905547144`, squash-merged as
+  `e96a4dbe8fd83dd99f8d5a438f1765f31c420ec5`, and release run `29905812375` published the Vector
+  runtime/abstractions at `0.20.0` and InMemory/sqlite-vec at `0.20.1`. All four are indexed and the
+  fresh NuGet.org-only restart consumer passed unchanged.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -145,11 +150,9 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Finish the focused R13-13 product/API/coherence checks without running external Vector providers.
-2. Publish the four local Vector owners through the ordinary lean main boundary and repeat the
-   consumer from NuGet.org.
-3. Capture their exact first API floors, then promote the external Vector/Search providers through
-   the same family matrix plus their native deltas.
+1. Publish the six external Vector/Search owners through the lean main boundary.
+2. Observe exact accepted/indexed versions and rerun the activation consumer from NuGet.org only.
+3. Record immutable API floors, then open the next value-led provider family slice.
 
 ## Repository boundaries
 
