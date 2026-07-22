@@ -113,10 +113,14 @@ immutable API floor in R13-11.
 `29900614297`, public indexing of all three exact `0.20.0` artifacts, and a clean NuGet.org-only Redis
 8.8 consumer. Their immutable API floors are recorded in R13-12. Cache Redis remains unassessed.
 
-[R13-12](r13/R13-12-cockroach-provider-promotion.md) is active. CockroachDB's health now follows the
-existing participation-owned Data law, and its complete focused real-provider project passes 7/7
-with zero skips against 26.2.3. Its corrected one-owner pack, zero-warning staged-package consumer,
-product/API checks, and cheap coherence are green; publication and public observation remain.
+[R13-12](r13/R13-12-cockroach-provider-promotion.md) passed through PR `#102`, main commit
+`3ff7f1950931addd12a16e194299468bd442dcdf`, release run `29903009583`, public indexing of exact
+`0.20.0`, and a fresh NuGet.org-only CockroachDB 26.2.3 consumer. Its immutable API floor is recorded
+in R13-13.
+
+[R13-13](r13/R13-13-local-vector-floor-promotion.md) is active. It promotes the provider-neutral
+Vector runtime and the InMemory/sqlite-vec local providers as one family, while keeping the AI runtime
+under separate assessment.
 
 ## Execution
 
@@ -143,7 +147,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-12 CockroachDB promotion.
+Status: active through R13-13 local Vector promotion.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

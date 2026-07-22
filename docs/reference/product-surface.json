@@ -24,21 +24,19 @@
       ]
     },
     {
-      "id": "ai-vector-semantics",
-      "title": "AI, vector, and semantic capabilities",
-      "summary": "AI and vector modules add provider-neutral semantic model capabilities; individual provider guarantees are stated separately.",
+      "id": "ai-runtime-semantics",
+      "title": "AI runtime semantics",
+      "summary": "The AI runtime adds provider-neutral model capabilities; individual runtime and provider guarantees remain under assessment.",
       "maturity": "experimental",
       "packages": [
-        "Sylin.Koan.AI",
-        "Sylin.Koan.Data.Vector"
+        "Sylin.Koan.AI"
       ],
       "documentation": [
         "docs/initiatives/koan-v1/CAPABILITIES.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "src/Koan.AI",
-        "src/Koan.Data.Vector"
+        "src/Koan.AI"
       ]
     },
     {
@@ -414,7 +412,7 @@
       "id": "local-vector-providers",
       "title": "Local in-memory and sqlite-vec vector providers",
       "summary": "In-memory supplies Koan\u0027s automatic ephemeral semantic floor while sqlite-vec preserves the same Entity intent with embedded durability, SQLite placement pairing, selected-provider naming, and participation-owned readiness within stated limits.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Data.Vector.Connector.InMemory",
         "Sylin.Koan.Data.Vector.Connector.SqliteVec"
@@ -425,7 +423,7 @@
         "src/Connectors/Data/Vector/SqliteVec/README.md"
       ],
       "evidence": [
-        "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md",
+        "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests"
       ]
@@ -750,6 +748,26 @@
       ]
     },
     {
+      "id": "vector-runtime-semantics",
+      "title": "Provider-neutral Entity vector semantics",
+      "summary": "Vector\u003CTEntity\u003E supplies exact provider election, source and segmentation folds, bounded similarity queries, capability-gated operations, and participation reporting without leaking adapter construction into application code.",
+      "maturity": "supported-foundation",
+      "packages": [
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
+      ],
+      "documentation": [
+        "docs/reference/cards/vector.md",
+        "src/Koan.Data.Vector.Abstractions/README.md",
+        "src/Koan.Data.Vector/README.md"
+      ],
+      "evidence": [
+        "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md",
+        "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests",
+        "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit"
+      ]
+    },
+    {
       "id": "web-api-conventions",
       "title": "Web/API conventions",
       "summary": "Entity controllers expose business-readable HTTP APIs through framework conventions.",
@@ -828,7 +846,7 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.AI/TECHNICAL.md",
       "claims": [
-        "ai-vector-semantics"
+        "ai-runtime-semantics"
       ]
     },
     {
@@ -1719,7 +1737,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector",
-      "versionIntent": "0.18",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.",
       "targetFrameworks": [
@@ -1733,12 +1751,12 @@
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.Vector/TECHNICAL.md",
       "claims": [
-        "ai-vector-semantics"
+        "vector-runtime-semantics"
       ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Abstractions",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.",
       "targetFrameworks": [
@@ -1750,11 +1768,13 @@
       "readme": "src/Koan.Data.Vector.Abstractions/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Data.Vector.Abstractions/TECHNICAL.md",
-      "claims": []
+      "claims": [
+        "vector-runtime-semantics"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.InMemory",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.",
       "targetFrameworks": [
@@ -1820,7 +1840,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
-      "versionIntent": "0.17",
+      "versionIntent": "0.20",
       "shape": "library",
       "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [

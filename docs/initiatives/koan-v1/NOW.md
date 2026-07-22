@@ -78,15 +78,15 @@ The lean process change and first seven-owner slice are merged, published, index
 green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
 maintainer acceptance rather than another technical exercise.
 
-PostgreSQL R13-07 through Redis R13-11 are merged, published, indexed, public-consumer green, and
-baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert contract
-are separately supported while Cache Redis remains unassessed. The active local slice is
-[R13-12](work-items/r13/R13-12-cockroach-provider-promotion.md): promote CockroachDB as the remaining
-intended networked Entity provider. Its health now follows participation rather than package
-availability, and the complete real CockroachDB 26.2.3 suite passes 7/7 with zero skips. Its
-one-owner `PublicRelease` pack, zero-warning staged-package consumer, 40-claim product truth, 51/52
-API posture, and 51.1-second no-tests coherence gate are green. Commit, publication, indexing, and
-public observation remain.
+PostgreSQL R13-07 through CockroachDB R13-12 are merged, published, indexed, public-consumer green,
+and baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert
+contract are separately supported while Cache Redis remains unassessed. The active local slice is
+[R13-13](work-items/r13/R13-13-local-vector-floor-promotion.md): promote the provider-neutral Vector
+runtime and the InMemory/sqlite-vec local providers as one useful family. InMemory passes 34/34;
+sqlite-vec passes 29 with five explicit unsupported-capability skips, and its matrix exposed and
+closed the missing batch-embedding retrieval. All four exact `0.20.0` staged artifacts pack, and a
+fresh-cache external consumer builds with zero warnings/errors and proves ephemeral InMemory plus
+sqlite-vec restart durability and batch retrieval through normal `AddKoan()` composition.
 Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
 
 ## Remote/public state
@@ -118,6 +118,11 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
   `29900348172` passed as one job with no tests/containers; release run `29900614297` published the
   Redis Data connector, shared backend, and inert abstractions at exact `0.20.0`. All are indexed,
   and a NuGet.org-only consumer restored into an empty cache and passed against Redis 8.8.
+- PR `#101` was closed unmerged when protected `dev` could not be force-rebased across historical
+  merge commits already present on `main`; no validation or publication ran from it. Exact one-commit
+  replacement PR `#102` passed lean gate `29902727400`, squash-merged as
+  `3ff7f1950931addd12a16e194299468bd442dcdf`, and release run `29903009583` published CockroachDB
+  `0.20.0`. NuGet.org indexed it and the fresh public 26.2.3 consumer passed.
 - The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
   Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
   organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
@@ -140,11 +145,11 @@ Untracked `tmp/` is unrelated user-owned material and must remain untouched and 
 
 ## Next actions
 
-1. Commit the focused CockroachDB promotion and Redis baseline capture.
-2. Merge only after the exact lean gate passes; observe the ordinary publisher and public CockroachDB
-   consumer.
-3. Capture CockroachDB's exact first API floor in the next slice, then move to the Vector/Search
-   family.
+1. Finish the focused R13-13 product/API/coherence checks without running external Vector providers.
+2. Publish the four local Vector owners through the ordinary lean main boundary and repeat the
+   consumer from NuGet.org.
+3. Capture their exact first API floors, then promote the external Vector/Search providers through
+   the same family matrix plus their native deltas.
 
 ## Repository boundaries
 

@@ -173,13 +173,22 @@
       "evidence": ["tests/Suites/Media", "tests/Suites/Samples/Koan.Samples.SnapVault.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
     },
     {
-      "id": "ai-vector-semantics",
-      "title": "AI, vector, and semantic capabilities",
-      "summary": "AI and vector modules add provider-neutral semantic model capabilities; individual provider guarantees are stated separately.",
+      "id": "ai-runtime-semantics",
+      "title": "AI runtime semantics",
+      "summary": "The AI runtime adds provider-neutral model capabilities; individual runtime and provider guarantees remain under assessment.",
       "maturity": "experimental",
-      "packages": ["Sylin.Koan.AI", "Sylin.Koan.Data.Vector"],
+      "packages": ["Sylin.Koan.AI"],
       "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.AI", "src/Koan.Data.Vector"]
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.AI"]
+    },
+    {
+      "id": "vector-runtime-semantics",
+      "title": "Provider-neutral Entity vector semantics",
+      "summary": "Vector<TEntity> supplies exact provider election, source and segmentation folds, bounded similarity queries, capability-gated operations, and participation reporting without leaking adapter construction into application code.",
+      "maturity": "supported-foundation",
+      "packages": ["Sylin.Koan.Data.Vector.Abstractions", "Sylin.Koan.Data.Vector"],
+      "documentation": ["docs/reference/cards/vector.md", "src/Koan.Data.Vector/README.md", "src/Koan.Data.Vector.Abstractions/README.md"],
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md"]
     },
     {
       "id": "local-ai-provider-composition",
@@ -212,10 +221,10 @@
       "id": "local-vector-providers",
       "title": "Local in-memory and sqlite-vec vector providers",
       "summary": "In-memory supplies Koan's automatic ephemeral semantic floor while sqlite-vec preserves the same Entity intent with embedded durability, SQLite placement pairing, selected-provider naming, and participation-owned readiness within stated limits.",
-      "maturity": "demonstrated",
+      "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.Vector.Connector.InMemory", "Sylin.Koan.Data.Vector.Connector.SqliteVec"],
       "documentation": ["src/Connectors/Data/Vector/InMemory/README.md", "src/Connectors/Data/Vector/SqliteVec/README.md", "docs/reference/cards/vector.md"],
-      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md"]
+      "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md"]
     },
     {
       "id": "external-vector-providers",

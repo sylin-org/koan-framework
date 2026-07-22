@@ -52,15 +52,15 @@
     },
     {
       "id": "Koan.Data.Vector",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Vector.Abstractions",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Data.Vector.Connector.SqliteVec",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Security.Trust",
