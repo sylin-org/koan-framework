@@ -17,7 +17,8 @@ if (-not (Test-Path -LiteralPath $tocPath)) {
     throw 'docs/toc.yml is missing.'
 }
 
-$trackedPaths = @(git -C $root ls-files --) | ForEach-Object { $_.Replace('\', '/') }
+$trackedPaths = @(git -C $root ls-files --cached --others --exclude-standard --) |
+    ForEach-Object { $_.Replace('\', '/') }
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to enumerate repository-tracked paths.'
 }
@@ -421,21 +422,53 @@ foreach ($entry in $packageCompanionFiles) {
     }
 }
 
+# Protect the experience at the public front door. Exact package maturity remains the generated
+# ledger's job; these pages must preserve the short intent -> application -> growth journey.
 $frontDoorRequirements = [ordered]@{
-    'README.md' = @('0.20', 'Sylin.Koan.Templates', 'AddKoan()', 'Entity<', 'product surface')
-    'docs/index.md' = @('0.20', 'Sylin.Koan.Templates', 'AddKoan()', 'Entity<', 'product surface')
+    'README.md' = @('Write with intent. Koan makes it real.', 'Entity. Controller. Done.', 'Sylin.Koan.Templates', 'McpEntity', '0.20')
+    'docs/index.md' = @('Bring an idea', 'Entity<', 'what-works.md', 'agents/index.md', '0.20')
+    'docs/getting-started/quickstart.md' = @('Make it real', 'Sylin.Koan.Templates', 'Entity. Controller. Done.', 'AddKoan()')
+    'docs/getting-started/adopt-existing-app.md' = @('Bring Koan into the app you already have', 'one Koan line', 'EntityController<Todo>', 'what-works.md')
+    'samples/README.md' = @('Pick an idea. Make it run.', 'FirstUse', 'GoldenJourney', 'SnapVault', '0.20')
+    'docs/reference/agents/index.md' = @('Agent, meet your app.', 'Sylin.Koan.Mcp', 'McpEntity', 'Same Entity. Same data. Same access rules.')
+    'docs/architecture/index.md' = @('Small code. Serious architecture.', 'Where Koan shines', 'existing ASP.NET Core', 'what-works.md')
+    'docs/reference/what-works.md' = @('One Entity. A lot of places to go.', 'McpEntity', 'product-surface.md', 'Koan 0.20')
     'llms.txt' = @('0.20', 'Sylin.Koan.Templates', 'AddKoan()', 'Entity<', 'product surface')
     'CLAUDE.md' = @('0.20', 'AddKoan()', 'Entity<', 'product-surface.md')
     '.github/copilot-instructions.md' = @('0.20', 'AddKoan()', 'Entity<', 'product-surface.md')
     'templates/README.md' = @('0.20', 'dotnet new install Sylin.Koan.Templates', 'AddKoan()', 'Entity<')
-    'samples/README.md' = @('0.20', 'FirstUse', 'GoldenJourney', 'product surface')
     'docs/reference/product-surface.md' = @('Maturity vocabulary', 'supported-foundation', 'supported-extension', 'verified', 'demonstrated', 'experimental', 'specified', 'unassessed', 'deprecated', 'retired')
 }
 foreach ($path in $frontDoorRequirements.Keys) {
     $content = Get-Content -Raw -LiteralPath (Join-Path $root $path)
     foreach ($phrase in $frontDoorRequirements[$path]) {
         if (-not $content.Contains($phrase, [StringComparison]::OrdinalIgnoreCase)) {
-            $issues.Add("$path is missing canonical front-door phrase '$phrase'.")
+            $issues.Add("$path is missing public-experience anchor '$phrase'.")
+        }
+    }
+}
+
+$delightFrontDoors = @(
+    'README.md',
+    'docs/index.md',
+    'docs/getting-started/quickstart.md',
+    'docs/getting-started/adopt-existing-app.md',
+    'samples/README.md',
+    'docs/reference/agents/index.md',
+    'docs/architecture/index.md',
+    'docs/reference/what-works.md'
+)
+$retiredFrontDoorHeadings = @(
+    '## Guarantee and correction',
+    '## Product truth',
+    '## Graduation contract',
+    '## Prove the increment'
+)
+foreach ($path in $delightFrontDoors) {
+    $content = Get-Content -Raw -LiteralPath (Join-Path $root $path)
+    foreach ($heading in $retiredFrontDoorHeadings) {
+        if ($content.Contains($heading, [StringComparison]::OrdinalIgnoreCase)) {
+            $issues.Add("$path restores retired front-door heading '$heading'; lead with the reader's result.")
         }
     }
 }

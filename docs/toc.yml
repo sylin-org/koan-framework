@@ -3,109 +3,109 @@
 - name: Start
   href: getting-started/quickstart.md
   items:
-    - name: Build a new application
+    - name: Make your first application
       href: getting-started/quickstart.md
-    - name: Adopt in an existing application
+    - name: Bring Koan into an existing app
       href: getting-started/adopt-existing-app.md
-- name: Capability pillars
-  href: reference/core/index.md
+- name: Build
+  href: reference/what-works.md
   items:
-    - name: Foundation and composition
+    - name: How Koan starts
       href: reference/core/index.md
     - name: Data
       href: reference/data/index.md
-    - name: Web
+    - name: HTTP APIs
       href: reference/web/index.md
-    - name: Identity and isolation
+    - name: Identity and tenancy
       href: reference/identity/index.md
-    - name: Work and communication
+    - name: Jobs, events, and messages
       href: reference/work/index.md
       items:
-        - name: Jobs
+        - name: Background jobs
           href: reference/jobs/index.md
-        - name: Entity events and transport
+        - name: Events and transport
           href: reference/communication/index.md
-    - name: State and content
+    - name: Cache, files, and media
       href: reference/state-content/index.md
       items:
         - name: Cache
           href: reference/data/cache.md
-        - name: Storage
+        - name: Files and storage
           href: reference/storage/index.md
         - name: Media
           href: reference/media/index.md
-    - name: Intelligence
+    - name: AI and semantic search
       href: reference/ai/index.md
       items:
         - name: Vector search
           href: reference/ai/vector.md
-    - name: Agents
+    - name: Agents and MCP
       href: reference/agents/index.md
-    - name: Canon
+    - name: Trusted records with Canon
       href: reference/canon/index.md
-    - name: Testing and operations
+    - name: Test and understand the app
       href: reference/operations/index.md
       items:
         - name: OpenTelemetry
           href: reference/operations/observability.md
-        - name: External topology
+        - name: External services
           href: reference/operations/external-topology.md
-        - name: NativeAOT boundary
+        - name: NativeAOT
           href: reference/operations/native-aot.md
-- name: Task guides
+- name: How to…
   href: guides/README.md
   items:
-    - name: Entity access and streaming
+    - name: Read and stream Entities
       href: guides/data/entity-access-and-streaming.md
-    - name: Configure authentication
+    - name: Add sign-in
       href: guides/authentication-setup.md
     - name: Issue OAuth tokens
       href: guides/oauth-server-howto.md
-    - name: Apply tenant isolation
+    - name: Isolate tenants
       href: guides/tenancy-howto.md
-    - name: Build background work
+    - name: Run background work
       href: guides/jobs-howto.md
-    - name: Canon capabilities
+    - name: Build trusted records with Canon
       href: guides/canon-capabilities-howto.md
-    - name: Agent-native MCP
+    - name: Let an agent use the app
       href: guides/mcp-agent-native-howto.md
-    - name: MCP over HTTP
+    - name: Reach MCP over HTTP
       href: guides/mcp-http-sse-howto.md
-    - name: Testing an application
+    - name: Test an application
       href: guides/testing-your-app.md
-    - name: Composition lockfile
+    - name: Review what changed
       href: guides/composition-lockfile.md
-- name: Product reference
-  href: reference/product-surface.md
+- name: Reference
+  href: reference/what-works.md
   items:
-    - name: Supported capabilities and packages
+    - name: What works today
+      href: reference/what-works.md
+    - name: Exact package and support status
       href: reference/product-surface.md
     - name: Package quality
       href: reference/package-quality.md
     - name: HTTP API
       href: reference/web/http-api.md
-    - name: Generated .NET API
+    - name: .NET API
       href: api/index.md
-    - name: PATCH normalization
+    - name: PATCH behavior
       href: api/patch-normalization.md
     - name: Glossary
       href: reference/glossary.md
-- name: Samples
+- name: Stories you can run
   href: ../samples/README.md
-- name: Troubleshooting
+- name: Help when something breaks
   href: support/troubleshooting.md
 - name: Architecture
   href: architecture/index.md
   items:
-    - name: Architecture at a glance
+    - name: The big picture
       href: architecture/index.md
-    - name: Product constitution
+    - name: The product promises
       href: architecture/product-constitution.md
-    - name: Entity semantics contract
+    - name: How Entities grow
       href: architecture/entity-semantics-contract.md
-    - name: Framework principles
+    - name: Design principles
       href: architecture/principles.md
-- name: Decision history
-  href: decisions/index.md
 - name: Contributing
   href: ../CONTRIBUTING.md

@@ -50,13 +50,24 @@
           "README.md",
           "CONTRIBUTING.md"
         ]
+      },
+      {
+        "files": [
+          "samples/README.md",
+          "samples/**/README.md"
+        ],
+        "exclude": [
+          "**/bin/**",
+          "**/obj/**"
+        ]
       }
     ],
     "resource": [
       {
         "files": [
           "images/**",
-          "other/website/assets/**"
+          "other/website/assets/**",
+          "llms.txt"
         ]
       }
     ],
@@ -91,9 +102,9 @@
     ],
     "disableGitFeatures": false,
     "globalMetadata": {
-      "_appTitle": "Koan Framework Documentation",
-      "_appName": "Koan Framework",
-      "_appFooter": "Koan Framework - Talk to your code, don't fight it",
+      "_appTitle": "Koan — Write with intent",
+      "_appName": "Koan",
+      "_appFooter": "Write with intent. Koan makes it real.",
       "_enableSearch": true,
       "_enableNewTab": true,
       "_disableContribution": false,
@@ -112,6 +123,7 @@
         "documentation/guides/**": "Developer Guides - Koan Framework",
         "docs/reference/**": "API Reference - Koan Framework",
         "documentation/reference/**": "API Reference - Koan Framework",
+        "samples/**": "Stories you can run - Koan",
         "api/**": "API Documentation - Koan Framework"
       },
       "_tocTitle": {
@@ -121,6 +133,7 @@
         "documentation/guides/**": "Guides",
         "docs/reference/**": "Reference",
         "documentation/reference/**": "Reference",
+        "samples/**": "Stories",
         "api/**": "API"
       }
     }
