@@ -518,7 +518,9 @@ Off by default (the zero-config path stays write-free); the flush cadence is `Me
 
 ## 11. Testing your jobs
 
-**Concept.** Jobs are testable without containers or background timers. **Inline mode** runs a job synchronously on submit, so a test reads like a function call.
+**Concept.** Jobs are testable without background timers. Inline mode is useful for the smallest handler test.
+For schedules, leases, retries, deferrals, and chain boundaries, the xUnit-free
+`Sylin.Koan.Jobs.Testing` package drives the production engine deterministically.
 
 **Sample.**
 
@@ -530,15 +532,30 @@ var saved = await ThumbnailJob.Get(id);
 saved!.ThumbUrl.Should().NotBeNull();
 ```
 
-For schedules, timeouts, and deferrals, inject a `TimeProvider` (Koan uses the standard `System.TimeProvider`) and a fake clock to **advance time** instead of waiting—no flakiness, no real delays.
+For schedules, timeouts, and deferrals, inject a `TimeProvider` (Koan uses the standard
+`System.TimeProvider`) and a fake clock to **advance time** instead of waiting.
 
 **When to use it.** Always—assert your handler's logic and chain decisions in milliseconds.
 
-### Testing stage handlers in-process (JobStagePilot)
+### Drive the production engine
 
-When a job has multiple stages, `DrainAsync` runs all ready stages in one call. To assert the settle result and chain advancement of a **single stage** without triggering its successors, use `JobStagePilot` from `Koan.Jobs.TestKit`.
+Configure the same host the application test already owns:
 
-`host.Pilot.RunStageAsync(workItem, action)` submits the work-item for that specific action and drives exactly one claim/settle cycle through the real production path. It returns a `StageRunResult`:
+```csharp
+services.Configure<JobsOptions>(options =>
+{
+    options.EnableWorker = false;
+    options.Mode = JobMode.Normal;
+});
+
+var driver = JobsTestDriver.From(host.Services);
+```
+
+`DrainAsync` runs all currently-ready work. Advance the test's fake clock, then call `TriggerDueAsync`,
+`ReapAsync`, or `DrainAsync` explicitly. No sleep or second host is involved.
+
+To assert one stage without running its successor, call
+`driver.RunStageAsync(workItem, action)`. It returns:
 
 | Field | What it holds |
 |---|---|
@@ -551,10 +568,9 @@ When a job has multiple stages, `DrainAsync` runs all ready stages in one call. 
 **Sample — two-stage chain:**
 
 ```csharp
-await using var host = await JobsHarness.StartInMemoryAsync();
 var pipeline = new Pipeline();
 
-var result = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+var result = await driver.RunStageAsync(pipeline, Stage.Fetch);
 
 // Assert the control signal
 result.Run.Signal.Should().Be(JobSignal.None);   // default chain advance
@@ -591,22 +607,18 @@ result.Settled.Status.Should().Be(JobStatus.Queued);
 result.Successor.Should().BeNull();
 ```
 
-**Real-storage pattern.** `JobStagePilot` works against any adapter. Pass your store settings to `JobsHarness.StartWithSettingsAsync`:
-
-```csharp
-await using var host = await JobsHarness.StartWithSettingsAsync(mongoSettings);
-var result = await host.Pilot.RunStageAsync(convergeJob, "Converge");
-```
+The driver uses whichever Data adapter and settings the host composed, including a real external provider. It
+contains no storage substitute or assertion framework.
 
 **Driving multiple stages sequentially.** Call `RunStageAsync` once per stage and assert intermediate state after each:
 
 ```csharp
-var stage1 = await host.Pilot.RunStageAsync(pipeline, Stage.Fetch);
+var stage1 = await driver.RunStageAsync(pipeline, Stage.Fetch);
 stage1.Successor!.Action.Should().Be(Stage.Parse);
 
 // Reload the mutated entity and run the next stage
 var fetchedPipeline = await Pipeline.Get(pipeline.Id);
-var stage2 = await host.Pilot.RunStageAsync(fetchedPipeline!, Stage.Parse);
+var stage2 = await driver.RunStageAsync(fetchedPipeline!, Stage.Parse);
 stage2.Settled.Status.Should().Be(JobStatus.Completed);
 ```
 

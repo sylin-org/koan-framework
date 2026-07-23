@@ -30,6 +30,21 @@ public sealed class AiSourcesHealthContributorSpec
     }
 
     [Fact]
+    public async Task Disabled_sources_leave_runtime_health_immediately()
+    {
+        var registry = new FakeSourceRegistry();
+        registry.RegisterSource(CreateSource("maintenance", members:
+        [
+            CreateMember("maintenance::one", MemberHealthState.Unhealthy)
+        ]) with { IsEnabled = false });
+
+        var report = await new AiSourcesHealthContributor(registry).Check();
+
+        report.State.Should().Be(HealthState.Healthy);
+        report.Description.Should().Contain("No enabled AI sources");
+    }
+
+    [Fact]
     public async Task All_members_healthy_reports_healthy()
     {
         var registry = new FakeSourceRegistry();

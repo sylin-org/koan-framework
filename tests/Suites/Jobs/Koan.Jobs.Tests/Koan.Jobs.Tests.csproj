@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Jobs.TestKit\Koan.Jobs.TestKit.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Jobs.Testing\Koan.Jobs.Testing.csproj" />
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
   </ItemGroup>
 </Project>

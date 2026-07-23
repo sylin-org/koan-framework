@@ -40,6 +40,13 @@ public static class ServiceCollectionExtensions
             registry.DiscoverFromConfiguration(configuration, logger);
             return registry;
         });
+        services.TryAddSingleton<IAiSourceRuntimeRegistry>(sp =>
+            sp.GetRequiredService<IAiSourceRegistry>() as IAiSourceRuntimeRegistry
+            ?? throw new InvalidOperationException(
+                "IAiSourceControl requires a revision-aware AI source registry. " +
+                "Use Koan's AiSourceRegistry or implement the internal runtime contract."));
+        services.TryAddSingleton<AiProvenancePublisher>();
+        services.TryAddSingleton<IAiSourceControl, AiSourceControl>();
 
         // ADR-0015 Phase 5: Background health monitoring
         services.AddHttpClient("KoanAiHealthProbe");

@@ -25,7 +25,11 @@ public static class Sse
         ArgumentNullException.ThrowIfNull(source);
         serializer ??= DefaultSerializer;
 
-        return new SseResult(Project(source, eventName, serializer), eventName);
+        var isEnvelopeStream = typeof(T) == typeof(SseEnvelope);
+        return new SseResult(
+            Project(source, eventName, serializer),
+            eventName,
+            useConfiguredDefault: !isEnvelopeStream);
     }
 
     private static async IAsyncEnumerable<SseEnvelope> Project<T>(

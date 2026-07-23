@@ -18,7 +18,7 @@ namespace Koan.AI.Infrastructure;
 internal sealed class AiProvenancePublisher(
     IAiAdapterRegistry adapters,
     IAiSourceRegistry sources,
-    ILogger<AiProvenancePublisher> logger)
+    ILogger<AiProvenancePublisher>? logger = null)
 {
     public async Task Publish(CancellationToken cancellationToken)
     {
@@ -32,7 +32,7 @@ internal sealed class AiProvenancePublisher(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to publish AI provenance snapshot");
+            logger?.LogError(ex, "Failed to publish AI provenance snapshot");
         }
     }
 
@@ -104,7 +104,7 @@ internal sealed class AiProvenancePublisher(
             });
 
             var healthState = source.GetHealthState();
-            details.Add($"{source.Name} (priority={source.Priority}, policy={source.Policy}, health={healthState}): {string.Join(", ", memberSummaries)}");
+            details.Add($"{source.Name} (enabled={source.IsEnabled.ToString().ToLowerInvariant()}, priority={source.Priority}, policy={source.Policy}, health={healthState}): {string.Join(", ", memberSummaries)}");
         }
 
         module.SetSetting(KoanAiProvenanceItems.SourceMemberStatus.Key, setting => setting

@@ -120,7 +120,7 @@ public abstract class JobBehaviorSuite
 
         // Advance the job to Running state to simulate in-flight execution.
         var now = host.Clock.GetUtcNow();
-        _ = await host.Ledger.ClaimNext(host.Orchestrator.Owner, now, now + TimeSpan.FromMinutes(1), Array.Empty<string>(), default);
+        _ = await host.Ledger.ClaimNext("test-claim-owner", now, now + TimeSpan.FromMinutes(1), Array.Empty<string>(), default);
 
         // A submit arriving while the job is Running must queue a follow-up record, not be silently absorbed.
         var second = new DedupeJob { Key = "trail" };

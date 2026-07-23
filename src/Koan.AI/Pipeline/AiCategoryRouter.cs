@@ -203,12 +203,13 @@ internal sealed class AiCategoryRouter
                 return capabilitySources.First();
 
             var allSources = _sourceRegistry.GetAllSources();
-            if (allSources.Count > 0)
+            var enabledSources = allSources.Where(source => source.IsEnabled).ToArray();
+            if (enabledSources.Length > 0)
             {
                 _logger?.LogWarning(
                     "No source advertises capability {Capability}; falling back to first configured source",
                     capabilityName);
-                return allSources.First();
+                return enabledSources.First();
             }
 
             throw new InvalidOperationException(
@@ -218,13 +219,13 @@ internal sealed class AiCategoryRouter
         if (!string.IsNullOrWhiteSpace(sourceHint))
         {
             var source = _sourceRegistry.GetSource(sourceHint);
-            if (source is not null) return source;
+            if (source is not null) return RequireEnabled(source);
 
             if (sourceHint.Contains("::", StringComparison.Ordinal))
             {
                 var sourceName = sourceHint.Split("::")[0];
                 source = _sourceRegistry.GetSource(sourceName);
-                if (source is not null) return source;
+                if (source is not null) return RequireEnabled(source);
 
                 throw new InvalidOperationException(
                     $"Source '{sourceName}' not found for member reference '{sourceHint}'. " +
@@ -244,6 +245,13 @@ internal sealed class AiCategoryRouter
         }
 
         return candidates.First();
+    }
+
+    private static AiSourceDefinition RequireEnabled(AiSourceDefinition source)
+    {
+        if (source.IsEnabled) return source;
+        throw new InvalidOperationException(
+            $"AI source '{source.Name}' is disabled. Enable it through IAiSourceControl or select another source.");
     }
 
     private static AiMemberDefinition SelectMember(AiSourceDefinition source, string? sourceHint)

@@ -150,9 +150,9 @@
       "title": "Jobs and scheduling",
       "summary": "Entities own inspectable background work with retries, cancellation, schedules, context restoration, and capability-graded durability.",
       "maturity": "supported-extension",
-      "packages": ["Sylin.Koan.Jobs"],
+      "packages": ["Sylin.Koan.Jobs", "Sylin.Koan.Jobs.Testing"],
       "documentation": ["docs/reference/jobs/index.md", "docs/guides/jobs-howto.md"],
-      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Jobs"]
+      "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Jobs", "tests/Suites/Jobs"]
     },
     {
       "id": "cache-distributed-state",

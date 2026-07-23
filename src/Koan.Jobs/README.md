@@ -98,3 +98,5 @@ var outcomes = await JobMetrics.Summary(
 
 Use the [Jobs reference](../../docs/reference/jobs/index.md) for the greenfield API map and the
 [Jobs guide](../../docs/guides/jobs-howto.md) for scheduling, retries, chains, gates, and testing.
+For deterministic tests against the production engine, reference
+[`Sylin.Koan.Jobs.Testing`](../Koan.Jobs.Testing/README.md).

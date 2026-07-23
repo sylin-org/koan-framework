@@ -186,6 +186,8 @@
       href: ARCH-0120-terminal-package-maturity.md
     - name: ARCH-0121 Claim-scoped validation and a cheap main boundary
       href: ARCH-0121-claim-scoped-validation.md
+    - name: ARCH-0122 Dogfood-derived runtime control and deterministic test seams
+      href: ARCH-0122-dogfood-runtime-and-test-seams.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

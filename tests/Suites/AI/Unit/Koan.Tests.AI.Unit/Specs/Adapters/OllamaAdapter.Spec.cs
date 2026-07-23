@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using Koan.AI.Connector.Ollama;
 using Koan.AI.Connector.Ollama.Options;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Sources;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -96,6 +97,27 @@ public sealed class OllamaAdapterSpec
         response.Vectors[0].Should().Equal(1f, 0f, 0.5f);
         response.Vectors[1].Should().Equal(0.1f, 0.2f, 0.3f);
         handler.Requests.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Inspection_uses_the_candidate_ollama_protocol_without_registering_a_source()
+    {
+        var handler = new RecordingHandler((request, _) =>
+        {
+            request.RequestUri!.AbsolutePath.Should().Be("/api/tags");
+            return JsonResponse("""{"models":[{"name":"phi3:mini","model":"phi3"}]}""");
+        });
+        using var adapter = CreateAdapter(handler);
+
+        var result = await adapter.InspectAsync(new AiSourceCandidate
+        {
+            Provider = "ollama",
+            Endpoint = "http://localhost:11434"
+        });
+
+        result.Available.Should().BeTrue();
+        result.Models.Should().Equal("phi3:mini");
+        result.Capabilities.Should().Contain("Chat");
     }
 
     private static OllamaAdapter CreateAdapter(RecordingHandler handler, string model = "phi3")

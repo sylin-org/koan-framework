@@ -11,12 +11,13 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Sources;
 using Koan.AI.Contracts;
 using Koan.AI.Connector.Ollama.Options;
 
 namespace Koan.AI.Connector.Ollama;
 
-internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
+internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInspector, IDisposable
 {
     private readonly HttpClient _http;
     private readonly ILogger<OllamaAdapter> _logger;
@@ -232,7 +233,47 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
     {
         using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
 
-        var doc = await FetchTags(ct).ConfigureAwait(false);
+        var doc = await FetchTags(_http, ct).ConfigureAwait(false);
+        return MapModels(doc);
+    }
+
+    public async Task<AiSourceInspection> InspectAsync(
+        AiSourceCandidate candidate,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
+            var endpoint = GetHttpClientForRequest(candidate.Endpoint);
+            var models = MapModels(await FetchTags(endpoint, ct).ConfigureAwait(false));
+            return new AiSourceInspection
+            {
+                Provider = Type,
+                Endpoint = candidate.Endpoint,
+                Available = true,
+                Models = models.Select(model => model.Name).Where(name => name.Length > 0).ToArray(),
+                Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase)
+            };
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return new AiSourceInspection
+            {
+                Provider = Type,
+                Endpoint = candidate.Endpoint,
+                Available = false,
+                Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase),
+                Detail = ex.Message
+            };
+        }
+    }
+
+    private IReadOnlyList<AiModelDescriptor> MapModels(OllamaTagsResponse? doc)
+    {
         var models = new List<AiModelDescriptor>();
 
         foreach (var model in doc?.models ?? Enumerable.Empty<OllamaTag>())
@@ -249,9 +290,9 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
         return models;
     }
 
-    private async Task<OllamaTagsResponse?> FetchTags(CancellationToken ct)
+    private async Task<OllamaTagsResponse?> FetchTags(HttpClient http, CancellationToken ct)
     {
-        using var resp = await _http.GetAsync("/api/tags", ct).ConfigureAwait(false);
+        using var resp = await http.GetAsync("/api/tags", ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -268,6 +309,15 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IDisposable
         if (!string.IsNullOrWhiteSpace(connectionString))
         {
             var endpoint = new Uri(connectionString).ToString().TrimEnd('/');
+            if (_http.BaseAddress is not null &&
+                string.Equals(
+                    _http.BaseAddress.ToString().TrimEnd('/'),
+                    endpoint,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return _http;
+            }
+
             return _endpointClients.GetOrAdd(endpoint, static value => new HttpClient
             {
                 BaseAddress = new Uri(value),

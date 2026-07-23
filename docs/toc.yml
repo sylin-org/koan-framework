@@ -73,6 +73,8 @@
       href: guides/mcp-http-sse-howto.md
     - name: Test an application
       href: guides/testing-your-app.md
+    - name: Engineer an app with an agent
+      href: guides/agent-application-engineering.md
     - name: Review what changed
       href: guides/composition-lockfile.md
 - name: Reference

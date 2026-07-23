@@ -25,6 +25,7 @@ await app.RunAsync();
 | Skill | Use it for |
 |---|---|
 | [koan-quickstart](koan-quickstart/SKILL.md) | Create the first template application and reach one Entity result. |
+| [koan-application-engineering](koan-application-engineering/SKILL.md) | Plan a greenfield app or migrate a brownfield app across capability pillars. |
 | [koan-entity-first](koan-entity-first/SKILL.md) | Model business state with `Entity<T>` and its canonical verbs. |
 | [koan-bootstrap](koan-bootstrap/SKILL.md) | Understand `AddKoan()`, Reference = Intent, and `KoanModule`. |
 | [koan-debugging](koan-debugging/SKILL.md) | Read startup, health, facts, lock drift, and corrective failures. |

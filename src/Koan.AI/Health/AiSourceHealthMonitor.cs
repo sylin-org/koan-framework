@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Options;
+using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Sources;
+using Koan.AI.Sources;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,7 +16,8 @@ namespace Koan.AI.Health;
 /// and implements a per-member circuit breaker pattern using <see cref="CircuitBreakerConfig"/>.
 /// </summary>
 internal sealed class AiSourceHealthMonitor(
-    IAiSourceRegistry sourceRegistry,
+    IAiSourceRuntimeRegistry sourceRegistry,
+    IAiAdapterRegistry adapterRegistry,
     IHttpClientFactory httpClientFactory,
     IOptions<AiOptions> options,
     ILogger<AiSourceHealthMonitor> logger) : BackgroundService
@@ -56,23 +60,35 @@ internal sealed class AiSourceHealthMonitor(
 
     private async Task ProbeAllMembers(CancellationToken ct)
     {
-        var sources = sourceRegistry.GetAllSources();
+        var sources = sourceRegistry.GetRuntimeSources();
         if (sources.Count == 0) return;
 
-        foreach (var source in sources)
+        var activeCircuitKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var snapshot in sources)
         {
+            var source = snapshot.Source;
             var cbConfig = source.CircuitBreaker ?? DefaultCircuitBreaker;
 
             foreach (var member in source.Members)
             {
-                await ProbeMember(member, cbConfig, ct);
+                var circuitKey = CircuitKey(snapshot, member);
+                activeCircuitKeys.Add(circuitKey);
+                await ProbeMember(snapshot, member, cbConfig, circuitKey, ct);
             }
         }
+
+        foreach (var stale in _circuits.Keys.Where(key => !activeCircuitKeys.Contains(key)))
+            _circuits.TryRemove(stale, out _);
     }
 
-    private async Task ProbeMember(AiMemberDefinition member, CircuitBreakerConfig cbConfig, CancellationToken ct)
+    private async Task ProbeMember(
+        AiSourceRuntimeSnapshot snapshot,
+        AiMemberDefinition member,
+        CircuitBreakerConfig cbConfig,
+        string circuitKey,
+        CancellationToken ct)
     {
-        var circuit = _circuits.GetOrAdd(member.Name, _ => new MemberCircuitState());
+        var circuit = _circuits.GetOrAdd(circuitKey, _ => new MemberCircuitState());
         var now = DateTimeOffset.UtcNow;
 
         // If in break period, skip probe — stay Unhealthy.
@@ -84,12 +100,12 @@ internal sealed class AiSourceHealthMonitor(
         // If break period just expired, transition to Recovering (half-open).
         if (circuit.BreakUntilUtc is not null && now >= circuit.BreakUntilUtc)
         {
-            TransitionState(member, MemberHealthState.Recovering);
+            TransitionState(snapshot, member, MemberHealthState.Recovering);
             circuit.BreakUntilUtc = null;
             circuit.ConsecutiveSuccesses = 0;
         }
 
-        var success = await SendProbe(member.ConnectionString, ct);
+        var success = await SendProbe(snapshot.Source.Provider, member.ConnectionString, ct);
 
         if (success)
         {
@@ -99,7 +115,7 @@ internal sealed class AiSourceHealthMonitor(
             if (circuit.ConsecutiveSuccesses >= cbConfig.SuccessThreshold
                 && member.HealthState is not MemberHealthState.Healthy)
             {
-                TransitionState(member, MemberHealthState.Healthy);
+                TransitionState(snapshot, member, MemberHealthState.Healthy);
             }
         }
         else
@@ -110,7 +126,7 @@ internal sealed class AiSourceHealthMonitor(
             if (circuit.ConsecutiveFailures >= cbConfig.FailureThreshold
                 && member.HealthState is not MemberHealthState.Unhealthy)
             {
-                TransitionState(member, MemberHealthState.Unhealthy);
+                TransitionState(snapshot, member, MemberHealthState.Unhealthy);
                 circuit.BreakUntilUtc = now.AddSeconds(cbConfig.BreakDurationSeconds);
                 logger.LogWarning(
                     "AI member {Member} circuit opened — break until {BreakUntil}",
@@ -121,13 +137,22 @@ internal sealed class AiSourceHealthMonitor(
         circuit.LastProbeUtc = now;
     }
 
-    private async Task<bool> SendProbe(string connectionString, CancellationToken ct)
+    private async Task<bool> SendProbe(string provider, string connectionString, CancellationToken ct)
     {
         try
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(ProbeTimeout);
 
+            if (adapterRegistry.Get(provider) is IAiSourceInspector inspector)
+            {
+                var inspection = await inspector.InspectAsync(
+                    new AiSourceCandidate { Provider = provider, Endpoint = connectionString },
+                    cts.Token);
+                return inspection.Available;
+            }
+
+            // Compatibility floor for third-party providers that predate endpoint inspection.
             var client = httpClientFactory.CreateClient("KoanAiHealthProbe");
             using var request = new HttpRequestMessage(HttpMethod.Head, connectionString);
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token);
@@ -141,10 +166,20 @@ internal sealed class AiSourceHealthMonitor(
         }
     }
 
-    private void TransitionState(AiMemberDefinition member, MemberHealthState newState)
+    private void TransitionState(
+        AiSourceRuntimeSnapshot snapshot,
+        AiMemberDefinition member,
+        MemberHealthState newState)
     {
         var previous = member.HealthState;
-        member.HealthState = newState;
+        if (!sourceRegistry.TrySetMemberHealth(
+                snapshot.Source.Name,
+                snapshot.Revision,
+                member.Name,
+                newState))
+        {
+            return;
+        }
 
         if (previous != newState)
         {
@@ -153,6 +188,9 @@ internal sealed class AiSourceHealthMonitor(
                 member.Name, previous, newState);
         }
     }
+
+    private static string CircuitKey(AiSourceRuntimeSnapshot snapshot, AiMemberDefinition member)
+        => $"{snapshot.Source.Name}@{snapshot.Revision}::{member.Name}";
 
     /// <summary>
     /// Per-member circuit breaker tracking state.

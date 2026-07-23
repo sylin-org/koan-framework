@@ -17,12 +17,15 @@ internal sealed class AiSourcesHealthContributor(IAiSourceRegistry sourceRegistr
 
     public Task<HealthReport> Check(CancellationToken ct = default)
     {
-        var sources = sourceRegistry.GetAllSources();
+        var allSources = sourceRegistry.GetAllSources();
+        var sources = allSources
+            .Where(source => source.IsEnabled)
+            .ToArray();
 
-        if (sources.Count == 0)
+        if (sources.Length == 0)
         {
-            // No sources registered — nothing to report on.
-            return Task.FromResult(new HealthReport(Name, HealthState.Healthy, "No AI sources registered", null, null));
+            var detail = allSources.Count == 0 ? "No AI sources registered" : "No enabled AI sources";
+            return Task.FromResult(new HealthReport(Name, HealthState.Healthy, detail, null, null));
         }
 
         var totalMembers = 0;
@@ -67,7 +70,7 @@ internal sealed class AiSourcesHealthContributor(IAiSourceRegistry sourceRegistr
             ["unhealthyMembers"] = unhealthyMembers,
             ["unknownMembers"] = unknownMembers,
             ["recoveringMembers"] = recoveringMembers,
-            ["sources"] = sources.Count
+            ["sources"] = sources.Length
         };
 
         if (healthyMembers == totalMembers)

@@ -16,10 +16,11 @@ namespace Koan.AI.Sources;
 /// ADR-0015: Sources are collections with priority and policy. Members are endpoints within sources.
 /// No "Default" source is created - router elects highest-priority source with required capability.
 /// </summary>
-public sealed class AiSourceRegistry : IAiSourceRegistry
+public sealed class AiSourceRegistry : IAiSourceRegistry, IAiSourceRuntimeRegistry
 {
-    private readonly ConcurrentDictionary<string, AiSourceDefinition> _sources =
+    private readonly ConcurrentDictionary<string, AiSourceRuntimeSnapshot> _sources =
         new(StringComparer.OrdinalIgnoreCase);
+    private long _revision;
 
     /// <summary>
     /// Auto-discover sources from IConfiguration at "<see cref="ConfigurationConstants.Sources.Section"/>:{name}".
@@ -185,9 +186,19 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
     /// Throws if source name collides with existing source from different origin.
     /// </summary>
     public void RegisterSource(AiSourceDefinition source)
+        => Apply(source);
+
+    AiSourceDefinition IAiSourceRuntimeRegistry.Apply(AiSourceDefinition source)
+        => Apply(source);
+
+    private AiSourceDefinition Apply(AiSourceDefinition source)
     {
         if (string.IsNullOrWhiteSpace(source.Name))
             throw new ArgumentException("Source name cannot be empty", nameof(source));
+        if (string.IsNullOrWhiteSpace(source.Provider))
+            throw new ArgumentException("Source provider cannot be empty", nameof(source));
+        if (source.Members is null)
+            throw new ArgumentException("Source members cannot be null", nameof(source));
 
         // Validate source name doesn't contain ::
         if (source.Name.Contains("::"))
@@ -195,36 +206,118 @@ public sealed class AiSourceRegistry : IAiSourceRegistry
                 $"Source name '{source.Name}' cannot contain '::' - this separator is reserved for members",
                 nameof(source));
 
+        var sourceName = source.Name.Trim();
+
         // Check for collision
-        if (_sources.TryGetValue(source.Name, out var existing))
+        if (_sources.TryGetValue(sourceName, out var existing))
         {
             // Allow same-origin re-registration (e.g., discovery service updating members)
-            if (existing.Origin != source.Origin)
+            if (!string.Equals(existing.Source.Origin, source.Origin, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"Source name collision detected: '{source.Name}' already registered by {existing.Origin}. " +
+                    $"Source name collision detected: '{source.Name}' already registered by {existing.Source.Origin}. " +
                     $"Use a different name or remove conflicting configuration.");
             }
         }
 
-        _sources[source.Name] = source;
+        var normalized = source with
+        {
+            Name = source.Name.Trim(),
+            Provider = source.Provider.Trim(),
+            Members = source.Members
+                .Select(member => member with { HealthState = MemberHealthState.Unknown })
+                .ToList()
+        };
+        _sources[sourceName] = new AiSourceRuntimeSnapshot(
+            normalized,
+            Interlocked.Increment(ref _revision));
+        return normalized;
     }
 
     public AiSourceDefinition? GetSource(string name)
-        => _sources.TryGetValue(name, out var source) ? source : null;
+        => _sources.TryGetValue(name, out var source) ? source.Source : null;
 
     public bool TryGetSource(string name, out AiSourceDefinition? source)
-        => _sources.TryGetValue(name, out source!);
+    {
+        if (_sources.TryGetValue(name, out var snapshot))
+        {
+            source = snapshot.Source;
+            return true;
+        }
+
+        source = null;
+        return false;
+    }
 
     public IReadOnlyCollection<string> GetSourceNames() => _sources.Keys.ToArray();
 
-    public IReadOnlyCollection<AiSourceDefinition> GetAllSources() => _sources.Values.ToArray();
+    public IReadOnlyCollection<AiSourceDefinition> GetAllSources()
+        => _sources.Values.Select(snapshot => snapshot.Source).ToArray();
 
     public bool HasSource(string name) => _sources.ContainsKey(name);
 
     public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName)
         => _sources.Values
-            .Where(s => s.Capabilities.ContainsKey(capabilityName))
-            .OrderByDescending(s => s.Priority)
+            .Select(snapshot => snapshot.Source)
+            .Where(source => source.IsEnabled && source.Capabilities.ContainsKey(capabilityName))
+            .OrderByDescending(source => source.Priority)
             .ToArray();
+
+    bool IAiSourceRuntimeRegistry.SetEnabled(string name, bool enabled)
+    {
+        while (_sources.TryGetValue(name, out var existing))
+        {
+            if (existing.Source.IsEnabled == enabled) return true;
+            var updated = new AiSourceRuntimeSnapshot(
+                existing.Source with { IsEnabled = enabled },
+                Interlocked.Increment(ref _revision));
+            if (_sources.TryUpdate(name, updated, existing)) return true;
+        }
+
+        return false;
+    }
+
+    bool IAiSourceRuntimeRegistry.Remove(string name, string? expectedOrigin)
+    {
+        while (_sources.TryGetValue(name, out var existing))
+        {
+            if (!string.IsNullOrWhiteSpace(expectedOrigin) &&
+                !string.Equals(existing.Source.Origin, expectedOrigin, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (_sources.TryRemove(new KeyValuePair<string, AiSourceRuntimeSnapshot>(name, existing)))
+            {
+                Interlocked.Increment(ref _revision);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    IReadOnlyCollection<AiSourceRuntimeSnapshot> IAiSourceRuntimeRegistry.GetRuntimeSources(bool includeDisabled)
+        => _sources.Values
+            .Where(snapshot => includeDisabled || snapshot.Source.IsEnabled)
+            .ToArray();
+
+    bool IAiSourceRuntimeRegistry.TrySetMemberHealth(
+        string sourceName,
+        long revision,
+        string memberName,
+        MemberHealthState state)
+    {
+        if (!_sources.TryGetValue(sourceName, out var snapshot) || snapshot.Revision != revision)
+        {
+            return false;
+        }
+
+        var member = snapshot.Source.Members.FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, memberName, StringComparison.OrdinalIgnoreCase));
+        if (member is null) return false;
+
+        member.HealthState = state;
+        return _sources.TryGetValue(sourceName, out var current) && current.Revision == revision;
+    }
 }

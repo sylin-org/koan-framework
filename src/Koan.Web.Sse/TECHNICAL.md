@@ -18,14 +18,19 @@ The generic `Sse.Stream<T>` path inspects each yielded value:
 2. `string` becomes raw SSE data and empty strings are skipped; and
 3. every other value is serialized with compact Newtonsoft JSON.
 
-The result applies its explicit event name as a fallback, then `KoanSseOptions.DefaultEvent`. Explicit envelope event
-names always win.
+The result applies its explicit event name as a fallback. `KoanSseOptions.DefaultEvent` applies to typed and text
+projection only; an explicit unnamed envelope remains unnamed so comments and other control frames retain their
+protocol meaning. Explicit envelope event names always win.
 
 ## Execution
 
-Execution resolves the host-owned `IOptions<KoanSseOptions>`, sets the SSE response headers, enumerates with
+Execution resolves the host-owned `IOptions<KoanSseOptions>`, composes the SSE response headers, enumerates with
 `HttpContext.RequestAborted`, formats each envelope, writes it, and flushes the response body. There is one execution
 path for AI streaming, MCP HTTP transports, application controllers, and tests.
+
+Cache control is additive: absent policy becomes `no-cache`, an existing weaker policy gains `no-cache`, and an
+existing `no-store`/`no-cache` policy is preserved. `Pragma`, `Connection`, and `X-Accel-Buffering` are set only when
+the application or middleware has not already made that decision.
 
 ## Deliberate non-guarantees
 

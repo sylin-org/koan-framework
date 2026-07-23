@@ -30,6 +30,7 @@ capability.
 | Host MCP over HTTP | Agents | [MCP HTTP transport](mcp-http-sse-howto.md) |
 | Test Entity and provider behavior | Testing and operations | [Testing an application](testing-your-app.md) |
 | Review composition drift | Foundation and composition | [Composition lockfile](composition-lockfile.md) |
+| Engineer or migrate an application with a coding agent | Framework | [Agent application engineering](agent-application-engineering.md) |
 
 For cache, storage, media, AI, vector, Web, and operational diagnostics, begin at the
 [capability curriculum](../index.md). Package companions own provider-specific details.

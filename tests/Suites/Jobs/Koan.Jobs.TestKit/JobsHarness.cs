@@ -5,6 +5,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Jobs;
+using Koan.Jobs.Testing;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
@@ -27,8 +28,7 @@ public sealed class JobsHarness : IAsyncDisposable
         _host = host;
         _dbPath = dbPath;
         Clock = clock;
-        Orchestrator = host.Services.GetRequiredService<JobOrchestrator>();
-        Scheduler = host.Services.GetRequiredService<JobScheduler>();
+        Driver = JobsTestDriver.From(host.Services);
         Coordinator = host.Services.GetRequiredService<IJobCoordinator>();
         Ledger = host.Services.GetRequiredService<IJobLedger>();
         Registry = host.Services.GetRequiredService<JobTypeRegistry>();
@@ -36,8 +36,7 @@ public sealed class JobsHarness : IAsyncDisposable
 
     public FakeTimeProvider Clock { get; }
     public IServiceProvider Services => _host.Services;
-    internal JobOrchestrator Orchestrator { get; }
-    internal JobScheduler Scheduler { get; }
+    public JobsTestDriver Driver { get; }
     public IJobCoordinator Coordinator { get; }
     public IJobLedger Ledger { get; }
     internal JobTypeRegistry Registry { get; }
@@ -125,12 +124,12 @@ public sealed class JobsHarness : IAsyncDisposable
     public JobStagePilot Pilot => new(this);
 
     public void Advance(TimeSpan by) => Clock.Advance(by);
-    public Task Drain(CancellationToken ct = default) => Orchestrator.DrainAsync(ct);
-    public Task TriggerDue(CancellationToken ct = default) => Scheduler.TriggerDueAsync(ct);
-    public Task Boot(CancellationToken ct = default) => Scheduler.SubmitBootActionsAsync(ct);
-    public Task Reap(CancellationToken ct = default) => Scheduler.ReapAsync(ct);
-    public Task<int> Archive(CancellationToken ct = default) => Orchestrator.ArchiveAsync(ct);
-    public Task FlushMetrics(CancellationToken ct = default) => Orchestrator.FlushMetricsAsync(ct);
+    public Task Drain(CancellationToken ct = default) => Driver.DrainAsync(ct);
+    public Task TriggerDue(CancellationToken ct = default) => Driver.TriggerDueAsync(ct);
+    public Task Boot(CancellationToken ct = default) => Driver.SubmitBootAsync(ct);
+    public Task Reap(CancellationToken ct = default) => Driver.ReapAsync(ct);
+    public Task<int> Archive(CancellationToken ct = default) => Driver.ArchiveAsync(ct);
+    public Task FlushMetrics(CancellationToken ct = default) => Driver.FlushMetricsAsync(ct);
 
     public Task<JobStatus?> StatusOf<T>(string workId) where T : Entity<T>, IKoanJob<T>
         => Coordinator.StatusAsync(typeof(T).FullName!, workId, default);
