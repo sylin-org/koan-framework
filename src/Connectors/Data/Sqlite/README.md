@@ -14,8 +14,8 @@ SQLite provider for Koan relational data—suited to local development, tests, a
 
 ## Install
 
-> **0.20 preview:** SQLite belongs to the guaranteed 0.20 foundation and is published through standard NuGet release
-> flow.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity;
+this page owns SQLite setup and limits.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite

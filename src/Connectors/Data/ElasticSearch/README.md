@@ -9,7 +9,8 @@ kNN requests, filtering, naming, source isolation, and readiness participation.
 
 ## Install
 
-> **Maturity:** Supported 0.20 extension within the capabilities and boundaries below.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity;
+this page owns Elasticsearch setup and limits.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.ElasticSearch

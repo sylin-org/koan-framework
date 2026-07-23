@@ -9,8 +9,9 @@ schema/index ensure, source routing, and readiness participation.
 
 ## Install
 
-MongoDB is a supported 0.20 networked Entity provider. Its transitive Zen Garden contract dependency
-is module-free and activates nothing; applications still reference only this connector for MongoDB.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity.
+MongoDB's transitive Zen Garden contract dependency is module-free and activates nothing;
+applications still reference only this connector for MongoDB.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Mongo

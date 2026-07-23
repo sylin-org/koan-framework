@@ -172,7 +172,7 @@ public sealed class ArticlesController : EntityController<Article> { }
 ```
 
 External roles map to `ClaimTypes.Role`; permissions from the local simulator map to `Koan.permission`. Row-level
-ownership and agent grants are authorization concerns, documented in the [Auth pillar map](../reference/cards/auth.md).
+ownership and agent grants are authorization concerns, introduced by [Identity and isolation](../reference/identity/index.md).
 
 ## Built-in application endpoints
 

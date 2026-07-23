@@ -136,5 +136,5 @@ isolation-line human review. Green against the real instance = shippable.
 
 ## 9. See also
 
-- Card: [docs/reference/cards/data.md](../../../docs/reference/cards/data.md)
+- Data capability: [docs/reference/data/index.md](../../../docs/reference/data/index.md)
 - ADRs: [ARCH-0094](../../../docs/decisions/ARCH-0094-adapter-forge.md) (the Forge) · [ARCH-0084](../../../docs/decisions/ARCH-0084-unified-capability-model.md) (capability model) · [ARCH-0102](../../../docs/decisions/ARCH-0102-access-overlay-definition-block.md) (AODB) · [ARCH-0103](../../../docs/decisions/ARCH-0103-aodb-adapter-conformance.md) (fleet conformance + shared helpers) · [DATA-0100](../../../docs/decisions/DATA-0100-comparable-encoding-contract.md) (comparable encoding)

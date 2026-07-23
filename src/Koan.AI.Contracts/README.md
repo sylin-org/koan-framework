@@ -4,7 +4,8 @@ Inert vocabulary for building on Koan AI: provider adapters, capability identifi
 registries, immutable prompt values/options, and multimodal request/result shapes. Referencing this package alone starts no runtime,
 selects no provider, and performs no network or model operation.
 
-> **Maturity:** Supported 0.20 inert foundation for the AI runtime and provider extension boundary.
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity. This
+page owns the inert provider-author contract and its limits.
 
 ## Install
 

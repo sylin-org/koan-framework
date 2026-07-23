@@ -2,7 +2,7 @@
 name: koan-media
 description: Content-addressable media over Storage — MediaEntity<T> : StorageEntity<T>, Store (SHA-256 dedup) / Upload / Url, the fluent MediaRecipe transform pipeline served by GET /media/{id}/{recipe}, [MediaRecipe] named transforms with MutatorKind URL allowlists, and the [MediaAnalysis] vision/OCR → [Embedding] bridge
 pillar: media
-card: docs/reference/cards/media.md
+card: docs/reference/media/index.md
 status: current
 last_validated: 2026-06-18
 ---
@@ -121,7 +121,7 @@ public sealed class PhotoService
 
 ## See also
 
-- [Reference card: media.md](../../../docs/reference/cards/media.md) — one-screen pillar map
+- [Media capability](../../../docs/reference/media/index.md) — recipes, source selection, and HTTP behavior
 - [Media recipes how-to](../../../docs/guides/media-recipes-howto.md) — the authoritative walkthrough (recipes, mutators, serving, AI)
 - [SnapVault](../../../samples/applications/SnapVault/README.md) — `PhotoAsset : MediaEntity<PhotoAsset>` with `[StorageBinding]` + `[Embedding]`, recipes, and optional AI/vector enrichment
 - [MEDIA-0001 — media pillar baseline + storage integration](../../../docs/decisions/MEDIA-0001-media-pillar-baseline-and-storage-integration.md)

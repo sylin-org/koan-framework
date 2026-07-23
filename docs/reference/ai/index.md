@@ -1,10 +1,10 @@
 ---
 type: REF
 domain: ai
-title: "AI"
+title: "Add model-powered operations"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
@@ -12,9 +12,9 @@ validation:
   scope: AI runtime, prompt semantics, local provider composition, and HTTP projection
 ---
 
-# AI
+# Add model-powered operations
 
-Koan AI lets application code state an operation—chat, embed, OCR, image generation, speech, reranking, or another
+Use Koan AI when application code needs chat, embedding, OCR, image generation, speech, reranking, or another
 declared capability—while referenced providers own native protocol and model mechanics. `AddKoan()` compiles the
 provider topology and reports which providers and sources became active.
 
@@ -79,6 +79,11 @@ Other operations include OCR, image generation/editing, transcription, speech, d
 structured extraction, reranking, translation, moderation, and video rendering. Availability depends on an active
 provider that declares and implements the requested capability. Koan fails an unsupported operation; it does not
 pretend every referenced provider supports every verb.
+
+For Entity-aware embeddings and nearest-neighbor retrieval, continue to
+[Vector search](vector.md). `[Embedding]` adds vector synchronization to ordinary Entity saves;
+`EntityAi.Embed(entity)` remains the explicit one-off transformation. AI inference and vector storage
+are separate provider choices even when one application workflow uses both.
 
 ## Inspectable prompts
 
@@ -162,9 +167,9 @@ those through their owning Koan/ASP.NET Core concerns before exposing AI routes 
 ## Related reading
 
 - [Entity data](../data/index.md)
-- [Vector providers](../cards/vector.md)
-- [Usagi Picks standalone recommendation application](https://github.com/lbotinelly/usagipicks)
-- [MCP and agent-facing surfaces](../cards/mcp.md)
+- [Vector search](vector.md)
+- [MCP and agent-facing surfaces](../agents/index.md)
+- [GardenCoop local discovery sample](../../../samples/journeys/GardenCoop/02-LocalDiscovery/)
 - [Ollama package](../../../src/Connectors/AI/Ollama/README.md)
 - [LM Studio package](../../../src/Connectors/AI/LMStudio/README.md)
 - [ONNX package](../../../src/Connectors/AI/Onnx/README.md)

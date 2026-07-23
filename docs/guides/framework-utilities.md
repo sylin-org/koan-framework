@@ -12,7 +12,7 @@ validation:
   scope: module declaration verified by downstream generated/trim-shaped packaging proof; other sections retain prior evidence
 related_guides:
   - entity-capabilities-howto.md
-  - data-modeling.md
+  - ../reference/data/index.md
   - ../reference/web/index.md
   - performance.md
 ---
@@ -555,7 +555,7 @@ await app.RunAsync();
 
 **Location**: Throughout `Entity<T>` and `Entity<T, TKey>` classes
 **Pattern**: Static factory methods on entity classes
-**Guidance**: [Entity-First Development guide](data-modeling.md)
+**Guidance**: [Data capability](../reference/data/index.md)
 
 #### Common Patterns
 

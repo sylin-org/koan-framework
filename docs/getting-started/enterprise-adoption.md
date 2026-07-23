@@ -150,7 +150,7 @@ Create a guild of "Koan champions" who review architecture proposals, run office
 ## 6. Next Steps
 
 - Start with the [Getting Started Hub](./overview.md) to ground teams in the basics and staged rollout plan.
-- Keep deployment topology in standard tooling; see the [external-topology boundary](../reference/cards/orchestration.md).
+- Keep deployment topology in standard tooling; see the [external-topology boundary](../reference/operations/external-topology.md).
 
 ---
 

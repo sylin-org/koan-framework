@@ -2,7 +2,7 @@
 name: koan-orchestration
 description: V1 deployment ownership — use standard .NET, Aspire, Compose, Docker, Podman, or Kubernetes topology while Koan connectors consume ordinary configuration and injected service endpoints
 pillar: orchestration
-card: docs/reference/cards/orchestration.md
+card: docs/reference/operations/external-topology.md
 status: shelved
 last_validated: 2026-07-19
 ---

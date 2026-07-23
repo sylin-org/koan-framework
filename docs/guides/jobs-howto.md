@@ -11,7 +11,7 @@ validation:
   status: verified
   scope: in-memory Jobs; focused SQLite submission transaction
 related_guides:
-  - data-modeling.md
+  - ../reference/data/index.md
   - ../reference/web/index.md
   - performance.md
 ---
@@ -25,7 +25,7 @@ Each section follows a gentle rhythm: **Concept** (what is this?), **Recipe** (h
 **The one idea to hold onto:** a job is just an **entity that knows how to do work**. You write the entity and a single `Execute` method; Koan does the queuing, claiming, retrying, scheduling, and cancelling. You never see a queue, a worker, or a coordinator.
 
 **Related Guides:**
-- Modeling the entity itself? → [Data Modeling](data-modeling.md)
+- Modeling the entity itself? → [Data](../reference/data/index.md)
 - Kicking jobs off from an API? → [Web reference](../reference/web/index.md)
 - Throughput and tuning? → [Performance](performance.md)
 

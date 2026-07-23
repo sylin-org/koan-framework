@@ -1,7 +1,7 @@
 ---
 type: REF
 domain: web
-title: "Web Pillar Reference"
+title: "Expose Entities through HTTP"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-18
@@ -12,7 +12,10 @@ validation:
   scope: controller/endpoint surfaces plus ordered request-context contribution and read projection
 ---
 
-# Web Pillar Reference
+# Expose Entities through HTTP
+
+Use Koan Web when the same Entity model needs a conventional HTTP API with governed CRUD, query,
+paging, hooks, and inspectable correction paths.
 
 ## Contract
 

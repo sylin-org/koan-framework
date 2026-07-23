@@ -61,7 +61,7 @@
         "docs/guides/authentication-setup.md",
         "docs/guides/oauth-server-howto.md",
         "docs/guides/tenancy-howto.md",
-        "docs/initiatives/koan-v1/CAPABILITIES.md",
+        "docs/reference/identity/index.md",
         "src/Koan.Identity.Tenancy/README.md",
         "src/Koan.Security.Trust/README.md"
       ],
@@ -88,7 +88,7 @@
         "Sylin.Koan.Data.Core"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/core/index.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
@@ -104,7 +104,7 @@
         "Sylin.Koan.Core"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md",
+        "docs/reference/core/index.md",
         "src/Koan.Core/README.md"
       ],
       "evidence": [
@@ -122,7 +122,8 @@
         "Sylin.Koan.Cache"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/data/cache.md",
+        "src/Koan.Cache/README.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
@@ -193,6 +194,7 @@
         "Sylin.Koan.Web.Auth.Connector.Test"
       ],
       "documentation": [
+        "docs/reference/identity/index.md",
         "src/Connectors/Web/Auth/Test/README.md",
         "src/Connectors/Web/Auth/Test/TECHNICAL.md"
       ],
@@ -213,6 +215,7 @@
         "Sylin.Koan.Web.Admin"
       ],
       "documentation": [
+        "docs/reference/operations/index.md",
         "src/Koan.Web.Admin/README.md",
         "src/Koan.Web.Admin/TECHNICAL.md"
       ],
@@ -232,6 +235,7 @@
         "Sylin.Koan.Cache.Adapter.Sqlite"
       ],
       "documentation": [
+        "docs/reference/data/cache.md",
         "src/Koan.Cache.Adapter.Sqlite/README.md",
         "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"
       ],
@@ -270,7 +274,7 @@
         "Sylin.Koan.Data.Core"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/data/index.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
@@ -287,6 +291,7 @@
         "Sylin.Koan.Classification.Contracts"
       ],
       "documentation": [
+        "docs/reference/identity/index.md",
         "src/Koan.Classification.Contracts/README.md",
         "src/Koan.Classification/README.md",
         "src/Koan.Classification/TECHNICAL.md"
@@ -306,6 +311,7 @@
       ],
       "documentation": [
         "docs/guides/opengraph-howto.md",
+        "docs/reference/web/index.md",
         "src/Koan.Web.OpenGraph/README.md"
       ],
       "evidence": [
@@ -326,6 +332,7 @@
       ],
       "documentation": [
         "docs/guides/authentication-setup.md",
+        "docs/reference/identity/index.md",
         "src/Connectors/Web/Auth/Discord/README.md",
         "src/Connectors/Web/Auth/Google/README.md",
         "src/Connectors/Web/Auth/Microsoft/README.md"
@@ -347,7 +354,7 @@
         "Sylin.Koan.Data.Vector.Connector.Weaviate"
       ],
       "documentation": [
-        "docs/reference/cards/vector.md",
+        "docs/reference/ai/vector.md",
         "src/Connectors/Data/Vector/Milvus/README.md",
         "src/Connectors/Data/Vector/Qdrant/README.md",
         "src/Connectors/Data/Vector/Weaviate/README.md"
@@ -368,7 +375,8 @@
         "Sylin.Koan.Jobs"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/guides/jobs-howto.md",
+        "docs/reference/jobs/index.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
@@ -384,6 +392,7 @@
         "Sylin.Koan.ZenGarden.Contracts"
       ],
       "documentation": [
+        "docs/reference/core/index.md",
         "src/Koan.ZenGarden.Contracts/README.md",
         "src/Koan.ZenGarden.Contracts/TECHNICAL.md"
       ],
@@ -404,6 +413,7 @@
         "Sylin.Koan.AI.Connector.Onnx"
       ],
       "documentation": [
+        "docs/reference/ai/index.md",
         "src/Connectors/AI/LMStudio/README.md",
         "src/Connectors/AI/Ollama/README.md",
         "src/Connectors/AI/Onnx/README.md"
@@ -425,6 +435,7 @@
         "Sylin.Koan.Data.Connector.Json"
       ],
       "documentation": [
+        "docs/reference/data/index.md",
         "src/Connectors/Data/InMemory/README.md",
         "src/Connectors/Data/Json/README.md"
       ],
@@ -443,7 +454,7 @@
         "Sylin.Koan.Data.Vector.Connector.SqliteVec"
       ],
       "documentation": [
-        "docs/reference/cards/vector.md",
+        "docs/reference/ai/vector.md",
         "src/Connectors/Data/Vector/InMemory/README.md",
         "src/Connectors/Data/Vector/SqliteVec/README.md"
       ],
@@ -464,7 +475,8 @@
         "Sylin.Koan.Mcp.Operations"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/agents/index.md",
+        "src/Koan.Mcp/README.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
@@ -522,8 +534,7 @@
         "Sylin.Koan.Observability"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md",
-        "docs/reference/cards/observability.md",
+        "docs/reference/operations/observability.md",
         "src/Koan.Observability/README.md"
       ],
       "evidence": [
@@ -542,9 +553,10 @@
         "Sylin.Koan.Templates"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/work-items/r12/R12-01-preview-contract-and-version-band.md",
+        "docs/reference/core/index.md",
         "samples/FirstUse/README.md",
         "samples/GoldenJourney/README.md",
+        "templates/README.md",
         "tools/Koan.Packaging/README.md"
       ],
       "evidence": [
@@ -617,6 +629,7 @@
         "Sylin.Koan.Data.SoftDelete"
       ],
       "documentation": [
+        "docs/reference/data/index.md",
         "src/Koan.Data.SoftDelete/README.md",
         "src/Koan.Data.SoftDelete/TECHNICAL.md"
       ],
@@ -637,6 +650,7 @@
         "Sylin.Koan.Redis.Abstractions"
       ],
       "documentation": [
+        "docs/reference/core/index.md",
         "src/Koan.Redis.Abstractions/README.md",
         "src/Koan.Redis.Abstractions/TECHNICAL.md",
         "src/Koan.Redis/README.md",
@@ -677,6 +691,7 @@
         "Sylin.Koan.Data.SearchEngine"
       ],
       "documentation": [
+        "docs/reference/ai/vector.md",
         "src/Connectors/Data/ElasticSearch/README.md",
         "src/Connectors/Data/OpenSearch/README.md",
         "src/Koan.Data.SearchEngine/README.md"
@@ -760,7 +775,7 @@
       ],
       "documentation": [
         "docs/guides/tenancy-howto.md",
-        "docs/reference/cards/tenancy.md",
+        "docs/reference/identity/index.md",
         "src/Koan.Tenancy.Web/README.md",
         "src/Koan.Tenancy/README.md"
       ],
@@ -782,6 +797,7 @@
       ],
       "documentation": [
         "docs/guides/testing-your-app.md",
+        "docs/reference/operations/index.md",
         "src/Koan.Testing.Containers/README.md",
         "src/Koan.Testing.Hosting/README.md",
         "src/Koan.Testing/README.md"
@@ -804,7 +820,7 @@
         "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "documentation": [
-        "docs/reference/cards/vector.md",
+        "docs/reference/ai/vector.md",
         "src/Koan.Data.Vector.Abstractions/README.md",
         "src/Koan.Data.Vector/README.md"
       ],
@@ -823,7 +839,7 @@
         "Sylin.Koan.Web"
       ],
       "documentation": [
-        "docs/initiatives/koan-v1/CAPABILITIES.md"
+        "docs/reference/web/index.md"
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",

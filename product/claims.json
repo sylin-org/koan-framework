@@ -7,7 +7,7 @@
       "summary": "AddKoan composes referenced capabilities and reports the resulting runtime decisions.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Core"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "src/Koan.Core/README.md"],
+      "documentation": ["docs/reference/core/index.md", "src/Koan.Core/README.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "docs/initiatives/koan-v1/work-items/r11/R11-07-release-certification-boundary.md", "samples/FirstUse"]
     },
     {
@@ -16,7 +16,7 @@
       "summary": "Entities expose provider-bounded persistence, query, paging, streaming, and ambient context semantics.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Cache.Abstractions", "Sylin.Koan.Data.Abstractions", "Sylin.Koan.Data.Core"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/data/index.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Data"]
     },
     {
@@ -25,7 +25,7 @@
       "summary": "JSON supplies Koan's inspectable automatic local floor while InMemory supplies an explicitly ephemeral host-scoped provider and conformance oracle.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Data.Connector.Json", "Sylin.Koan.Data.Connector.InMemory"],
-      "documentation": ["src/Connectors/Data/Json/README.md", "src/Connectors/Data/InMemory/README.md"],
+      "documentation": ["docs/reference/data/index.md", "src/Connectors/Data/Json/README.md", "src/Connectors/Data/InMemory/README.md"],
       "evidence": ["tests/Suites/Data/Connector.Json", "tests/Suites/Data/Connector.InMemory"]
     },
     {
@@ -61,7 +61,7 @@
       "summary": "The module-free Zen Garden contract assembly supplies shared connection-intent, offering identity, catalog, subscription, and capability-wish vocabulary without registering services, opening connections, or activating a runtime.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.ZenGarden.Contracts"],
-      "documentation": ["src/Koan.ZenGarden.Contracts/README.md", "src/Koan.ZenGarden.Contracts/TECHNICAL.md"],
+      "documentation": ["docs/reference/core/index.md", "src/Koan.ZenGarden.Contracts/README.md", "src/Koan.ZenGarden.Contracts/TECHNICAL.md"],
       "evidence": ["tests/Koan.ZenGarden.Tests/ZenGardenConnectionIntentTests.cs", "tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs", "docs/initiatives/koan-v1/work-items/r13/R13-09-mongodb-provider-promotion.md"]
     },
     {
@@ -88,7 +88,7 @@
       "summary": "The functional Redis backend owns discovery, endpoint resolution, host-lifetime connection pooling, and corrective connection failures while its module-author contract remains inert when referenced alone.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Redis", "Sylin.Koan.Redis.Abstractions"],
-      "documentation": ["src/Koan.Redis/README.md", "src/Koan.Redis/TECHNICAL.md", "src/Koan.Redis.Abstractions/README.md", "src/Koan.Redis.Abstractions/TECHNICAL.md"],
+      "documentation": ["docs/reference/core/index.md", "src/Koan.Redis/README.md", "src/Koan.Redis/TECHNICAL.md", "src/Koan.Redis.Abstractions/README.md", "src/Koan.Redis.Abstractions/TECHNICAL.md"],
       "evidence": ["tests/Suites/Data/Connector.Redis", "tests/Koan.Packaging.Tests/SemanticActivationManifestBuildTests.cs", "docs/initiatives/koan-v1/work-items/r13/R13-11-redis-provider-promotion.md"]
     },
     {
@@ -115,7 +115,7 @@
       "summary": "Referenced adapters participate in capability-aware selection with inspectable decisions and corrective rejection.",
       "maturity": "demonstrated",
       "packages": ["Sylin.Koan.Data.Core"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/core/index.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Data"]
     },
     {
@@ -124,7 +124,7 @@
       "summary": "Entity controllers expose business-readable HTTP APIs through framework conventions.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Web"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/web/index.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "tests/Suites/Web"]
     },
     {
@@ -151,7 +151,7 @@
       "summary": "Entities own inspectable background work with retries, cancellation, schedules, context restoration, and capability-graded durability.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Jobs"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/jobs/index.md", "docs/guides/jobs-howto.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Jobs"]
     },
     {
@@ -160,7 +160,7 @@
       "summary": "Typed cache semantics work across local and external engines within their stated topology limits.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Cache"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/data/cache.md", "src/Koan.Cache/README.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Cache"]
     },
     {
@@ -196,7 +196,7 @@
       "summary": "Vector<TEntity> supplies exact provider election, source and segmentation folds, bounded similarity queries, capability-gated operations, and participation reporting without leaking adapter construction into application code.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan.Data.Vector.Abstractions", "Sylin.Koan.Data.Vector"],
-      "documentation": ["docs/reference/cards/vector.md", "src/Koan.Data.Vector/README.md", "src/Koan.Data.Vector.Abstractions/README.md"],
+      "documentation": ["docs/reference/ai/vector.md", "src/Koan.Data.Vector/README.md", "src/Koan.Data.Vector.Abstractions/README.md"],
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md"]
     },
     {
@@ -205,7 +205,7 @@
       "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.AI.Connector.Ollama", "Sylin.Koan.AI.Connector.LMStudio", "Sylin.Koan.AI.Connector.Onnx"],
-      "documentation": ["src/Connectors/AI/Ollama/README.md", "src/Connectors/AI/LMStudio/README.md", "src/Connectors/AI/Onnx/README.md"],
+      "documentation": ["docs/reference/ai/index.md", "src/Connectors/AI/Ollama/README.md", "src/Connectors/AI/LMStudio/README.md", "src/Connectors/AI/Onnx/README.md"],
       "evidence": ["tests/Suites/AI/Unit/Koan.Tests.AI.Unit", "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs", "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md"]
     },
     {
@@ -223,7 +223,7 @@
       "summary": "Elasticsearch and OpenSearch execute Koan vector semantics through one shared runtime while preserving native kNN dialects, selected-provider naming, and participation-owned readiness within stated limits.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.SearchEngine", "Sylin.Koan.Data.Connector.ElasticSearch", "Sylin.Koan.Data.Connector.OpenSearch"],
-      "documentation": ["src/Koan.Data.SearchEngine/README.md", "src/Connectors/Data/ElasticSearch/README.md", "src/Connectors/Data/OpenSearch/README.md"],
+      "documentation": ["docs/reference/ai/vector.md", "src/Koan.Data.SearchEngine/README.md", "src/Connectors/Data/ElasticSearch/README.md", "src/Connectors/Data/OpenSearch/README.md"],
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.ElasticSearch.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.OpenSearch.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md"]
     },
     {
@@ -232,7 +232,7 @@
       "summary": "In-memory supplies Koan's automatic ephemeral semantic floor while sqlite-vec preserves the same Entity intent with embedded durability, SQLite placement pairing, selected-provider naming, and participation-owned readiness within stated limits.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.Vector.Connector.InMemory", "Sylin.Koan.Data.Vector.Connector.SqliteVec"],
-      "documentation": ["src/Connectors/Data/Vector/InMemory/README.md", "src/Connectors/Data/Vector/SqliteVec/README.md", "docs/reference/cards/vector.md"],
+      "documentation": ["src/Connectors/Data/Vector/InMemory/README.md", "src/Connectors/Data/Vector/SqliteVec/README.md", "docs/reference/ai/vector.md"],
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.InMemory.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.SqliteVec.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-13-local-vector-floor-promotion.md"]
     },
     {
@@ -241,7 +241,7 @@
       "summary": "Qdrant, Milvus, and Weaviate preserve Koan's Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.Vector.Connector.Qdrant", "Sylin.Koan.Data.Vector.Connector.Milvus", "Sylin.Koan.Data.Vector.Connector.Weaviate"],
-      "documentation": ["src/Connectors/Data/Vector/Qdrant/README.md", "src/Connectors/Data/Vector/Milvus/README.md", "src/Connectors/Data/Vector/Weaviate/README.md", "docs/reference/cards/vector.md"],
+      "documentation": ["src/Connectors/Data/Vector/Qdrant/README.md", "src/Connectors/Data/Vector/Milvus/README.md", "src/Connectors/Data/Vector/Weaviate/README.md", "docs/reference/ai/vector.md"],
       "evidence": ["tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests", "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md"]
     },
     {
@@ -250,7 +250,7 @@
       "summary": "Koan exposes application tools and self-description to coding and runtime agents through MCP.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Mcp", "Sylin.Koan.Mcp.Explorer", "Sylin.Koan.Mcp.Operations"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md"],
+      "documentation": ["docs/reference/agents/index.md", "src/Koan.Mcp/README.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Mcp", "tests/Suites/Mcp/Koan.Mcp.Conformance.Tests", "tests/Suites/Mcp/Koan.Mcp.Explorer.IntegrationTests", "tests/Suites/Mcp/Koan.Mcp.Operations.IntegrationTests"]
     },
     {
@@ -268,7 +268,7 @@
       "summary": "A host-owned Entity declaration projects encoded OpenGraph, Twitter, title, and canonical metadata into SPA navigations without manual middleware or SSR.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.OpenGraph"],
-      "documentation": ["docs/guides/opengraph-howto.md", "src/Koan.Web.OpenGraph/README.md"],
+      "documentation": ["docs/reference/web/index.md", "docs/guides/opengraph-howto.md", "src/Koan.Web.OpenGraph/README.md"],
       "evidence": ["tests/Koan.Web.OpenGraph.Tests", "tests/Suites/Samples/Koan.Samples.DevPortal.Tests", "samples/applications/DevPortal"]
     },
     {
@@ -277,7 +277,7 @@
       "summary": "Referencing Tenancy contributes one hard ambient segmentation guarantee across active pillars; the optional Web projection mounts host-authorized tenant-registry, deterministic membership, and administration-audit surfaces without lifecycle-shaped placeholders.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Tenancy", "Sylin.Koan.Tenancy.Web"],
-      "documentation": ["docs/guides/tenancy-howto.md", "docs/reference/cards/tenancy.md", "src/Koan.Tenancy/README.md", "src/Koan.Tenancy.Web/README.md"],
+      "documentation": ["docs/reference/identity/index.md", "docs/guides/tenancy-howto.md", "src/Koan.Tenancy/README.md", "src/Koan.Tenancy.Web/README.md"],
       "evidence": ["tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Web.Tests", "tests/Suites/Integration/Identity/Koan.Identity.Tests"]
     },
     {
@@ -286,7 +286,7 @@
       "summary": "Writable classified string Entity properties are authenticated-encrypted through Data-owned transforms; active segmentation scopes key custody automatically, Development is zero-config, and non-Development hosts require an application key provider.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Classification.Contracts", "Sylin.Koan.Classification"],
-      "documentation": ["src/Koan.Classification/README.md", "src/Koan.Classification/TECHNICAL.md", "src/Koan.Classification.Contracts/README.md"],
+      "documentation": ["docs/reference/identity/index.md", "src/Koan.Classification/README.md", "src/Koan.Classification/TECHNICAL.md", "src/Koan.Classification.Contracts/README.md"],
       "evidence": ["tests/Suites/Classification/Koan.Classification.Tests", "tests/Suites/Data/Core/Koan.Tests.Data.Core/Specs/Pipeline"]
     },
     {
@@ -295,7 +295,7 @@
       "summary": "Durable Identity, web sign-in, authenticated identity management, active-membership tenant scoping, and one ES256 workload-token verifier compose through referenced modules; the embedded OAuth server adds audience-bound public-client issuance and durable key continuity, while external provider behavior remains connector-specific.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Identity", "Sylin.Koan.Identity.Tenancy", "Sylin.Koan.Identity.Web", "Sylin.Koan.Security.Trust", "Sylin.Koan.Web.Auth.Abstractions", "Sylin.Koan.Web.Auth", "Sylin.Koan.Web.Auth.Server"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "docs/guides/auth-howto.md", "docs/guides/authentication-setup.md", "docs/guides/oauth-server-howto.md", "docs/guides/tenancy-howto.md", "src/Koan.Identity.Tenancy/README.md", "src/Koan.Security.Trust/README.md"],
+      "documentation": ["docs/reference/identity/index.md", "docs/guides/auth-howto.md", "docs/guides/authentication-setup.md", "docs/guides/oauth-server-howto.md", "docs/guides/tenancy-howto.md", "src/Koan.Identity.Tenancy/README.md", "src/Koan.Security.Trust/README.md"],
       "evidence": ["docs/initiatives/koan-v1/R02-EVIDENCE.md", "src/Koan.Identity", "src/Koan.Identity.Tenancy", "src/Koan.Identity.Web", "src/Koan.Security.Trust", "src/Koan.Web.Auth", "tests/Suites/Auth/Koan.Web.Auth.Server.IntegrationTests", "tests/Suites/Integration/Identity/Koan.Identity.Tests", "tests/Suites/Security/Koan.Security.Trust.Tests", "tests/Suites/Security/Koan.Security.Trust.IntegrationTests", "tests/Suites/Samples/Koan.Samples.SnapVault.Tests"]
     },
     {
@@ -304,7 +304,7 @@
       "summary": "Provider references contribute exact Google and Microsoft OIDC or Discord OAuth2 defaults while the shared Web Auth runtime keeps unconfigured connectors inert, validates explicit credentials, elects deterministically, and owns the maintained authorization-code flow.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.Auth.Connector.Google", "Sylin.Koan.Web.Auth.Connector.Microsoft", "Sylin.Koan.Web.Auth.Connector.Discord"],
-      "documentation": ["docs/guides/authentication-setup.md", "src/Connectors/Web/Auth/Google/README.md", "src/Connectors/Web/Auth/Microsoft/README.md", "src/Connectors/Web/Auth/Discord/README.md"],
+      "documentation": ["docs/reference/identity/index.md", "docs/guides/authentication-setup.md", "src/Connectors/Web/Auth/Google/README.md", "src/Connectors/Web/Auth/Microsoft/README.md", "src/Connectors/Web/Auth/Discord/README.md"],
       "evidence": ["tests/Koan.Web.Auth.Tests", "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-17-external-auth-promotion.md"]
     },
     {
@@ -313,7 +313,7 @@
       "summary": "Application, framework, and provider authors inherit Entity conformance, boot the real compiled Koan host, and reuse fail-closed container-backed infrastructure with owned ambient and async lifecycle.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Testing", "Sylin.Koan.Testing.Containers", "Sylin.Koan.Testing.Hosting"],
-      "documentation": ["docs/guides/testing-your-app.md", "src/Koan.Testing/README.md", "src/Koan.Testing.Containers/README.md", "src/Koan.Testing.Hosting/README.md"],
+      "documentation": ["docs/reference/operations/index.md", "docs/guides/testing-your-app.md", "src/Koan.Testing/README.md", "src/Koan.Testing.Containers/README.md", "src/Koan.Testing.Hosting/README.md"],
       "evidence": ["tests/Suites/Testing/Koan.Testing.Tests", "tests/Suites/Testing/Koan.Testing.Containers.Tests", "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
@@ -322,7 +322,7 @@
       "summary": "A SQLite Cache reference replaces the memory Local floor with exact-tagged, sliding-expiration-aware state that survives complete host restart without changing Entity cache intent.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Cache.Adapter.Sqlite"],
-      "documentation": ["src/Koan.Cache.Adapter.Sqlite/README.md", "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"],
+      "documentation": ["docs/reference/data/cache.md", "src/Koan.Cache.Adapter.Sqlite/README.md", "src/Koan.Cache.Adapter.Sqlite/TECHNICAL.md"],
       "evidence": ["tests/Suites/Cache/CrossEngine/Koan.Tests.Cache.CrossEngine", "tests/Suites/Cache/Adapter.Sqlite/Koan.Cache.Adapter.Sqlite.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
@@ -331,7 +331,7 @@
       "summary": "Selected Entity types replace physical removal with hidden managed deletion while explicit type-scoped recycle-bin, restore, and purge verbs preserve other filters and authorization boundaries.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Data.SoftDelete"],
-      "documentation": ["src/Koan.Data.SoftDelete/README.md", "src/Koan.Data.SoftDelete/TECHNICAL.md"],
+      "documentation": ["docs/reference/data/index.md", "src/Koan.Data.SoftDelete/README.md", "src/Koan.Data.SoftDelete/TECHNICAL.md"],
       "evidence": ["tests/Suites/Data/SoftDelete/Koan.Data.SoftDelete.Tests", "tests/Suites/Tenancy/Koan.Tenancy.Tests", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
@@ -340,7 +340,7 @@
       "summary": "A Web Admin reference mounts one authenticated, read-only Development projection of canonical Koan provenance, health, environment, and bounded process facts with permanent secret and host-identity redaction.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.Admin"],
-      "documentation": ["src/Koan.Web.Admin/README.md", "src/Koan.Web.Admin/TECHNICAL.md"],
+      "documentation": ["docs/reference/operations/index.md", "src/Koan.Web.Admin/README.md", "src/Koan.Web.Admin/TECHNICAL.md"],
       "evidence": ["tests/Suites/Web/Koan.Web.Admin.Tests", "samples/journeys/GardenCoop/02-LocalDiscovery", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
@@ -349,7 +349,7 @@
       "summary": "A Development test-provider reference supplies self-hosted OAuth2 and OIDC flows that exercise Web Auth challenge, callback, token validation, claim mapping, and identity linking without production identity credentials.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Web.Auth.Connector.Test"],
-      "documentation": ["src/Connectors/Web/Auth/Test/README.md", "src/Connectors/Web/Auth/Test/TECHNICAL.md"],
+      "documentation": ["docs/reference/identity/index.md", "src/Connectors/Web/Auth/Test/README.md", "src/Connectors/Web/Auth/Test/TECHNICAL.md"],
       "evidence": ["tests/Koan.Web.Auth.Tests", "tests/Suites/Auth/Koan.Web.Auth.Integration.Tests", "samples/journeys/GardenCoop/01-GardenJournal", "tests/Koan.Packaging.Tests", "docs/initiatives/koan-v1/work-items/r13/R13-06-wave-0-testing-and-quick-wins.md"]
     },
     {
@@ -358,7 +358,7 @@
       "summary": "The foundation bundle, web application bundle, and templates install through ordinary NuGet and dotnet new flows, preserve independent package identity, and reach the documented first business result outside the repository.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan", "Sylin.Koan.App", "Sylin.Koan.Templates"],
-      "documentation": ["docs/initiatives/koan-v1/work-items/r12/R12-01-preview-contract-and-version-band.md", "tools/Koan.Packaging/README.md", "samples/FirstUse/README.md", "samples/GoldenJourney/README.md"],
+      "documentation": ["docs/reference/core/index.md", "templates/README.md", "tools/Koan.Packaging/README.md", "samples/FirstUse/README.md", "samples/GoldenJourney/README.md"],
       "evidence": ["docs/initiatives/koan-v1/work-items/r08/R08-05-initial-public-observation.md", "docs/initiatives/koan-v1/work-items/r11/R11-07-release-certification-boundary.md", "tests/Koan.Packaging.Tests"]
     },
     {
@@ -376,7 +376,7 @@
       "summary": "Runtime facts and health expose bounded host decisions; the optional Observability reference composes one inspectable OpenTelemetry pipeline across every Koan trace source and meter.",
       "maturity": "supported-extension",
       "packages": ["Sylin.Koan.Observability"],
-      "documentation": ["docs/initiatives/koan-v1/CAPABILITIES.md", "docs/reference/cards/observability.md", "src/Koan.Observability/README.md"],
+      "documentation": ["docs/reference/operations/observability.md", "src/Koan.Observability/README.md"],
       "evidence": ["docs/initiatives/koan-v1/work-items/r11/R11-05-package-family-graduation.md", "tests/Suites/Observability/Koan.Observability.Tests"]
     },
     {

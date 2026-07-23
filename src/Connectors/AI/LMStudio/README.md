@@ -2,7 +2,8 @@
 
 LM Studio provider for Koan AI: OpenAI-compatible chat, streaming, embeddings, model listing, and readiness.
 
-> **Maturity:** Supported 0.20 extension within the runtime, model, and deployment boundaries below.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity;
+this page owns LM Studio setup and limits.
 
 ## Install
 

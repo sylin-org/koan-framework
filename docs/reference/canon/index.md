@@ -1,7 +1,7 @@
 ---
 type: REF
 domain: canon
-title: "Canon Pillar Reference"
+title: "Reconcile arrivals into trusted Entities"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-18
@@ -12,7 +12,7 @@ validation:
   scope: Canon unit 35/35, integration 7/7, CustomerCanon host 1/1
 ---
 
-# Canon pillar reference
+# Reconcile arrivals into trusted Entities
 
 Canon turns imperfect arrivals into one trusted Entity. Application code owns identity and business
 rules; Koan owns discovery, deterministic phase execution, metadata, convergence, persistence,

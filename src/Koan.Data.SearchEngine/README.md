@@ -23,8 +23,8 @@ Provider authors extending the shared mechanism can reference it directly:
 dotnet add package Sylin.Koan.Data.SearchEngine
 ```
 
-> **Maturity:** Supported 0.20 implementation dependency for the Elasticsearch and OpenSearch vector
-> providers. Applications should still install one of those provider packages rather than this mechanism directly.
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity.
+Applications install one of the provider packages above rather than this mechanism directly.
 
 ## What it adds
 

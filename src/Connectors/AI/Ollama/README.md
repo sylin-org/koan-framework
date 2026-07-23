@@ -2,7 +2,8 @@
 
 Local and remote Ollama provider for Koan AI: chat, streaming, embeddings, vision, tools, and model operations.
 
-> **Maturity:** Supported 0.20 extension within the runtime, model, and deployment boundaries below.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity;
+this page owns Ollama setup and limits.
 
 ## Install
 

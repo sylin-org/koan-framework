@@ -28,7 +28,11 @@ Wire a new external system (database, vector store, message broker, AI provider,
 
 You want to add a new connector to a pillar that already exists (Data, Data.Vector, Cache, Communication, Storage, AI, etc.). The pillar defines the contract; you're filling it in for a specific provider.
 
-**Out of scope:** creating an entirely new *pillar* (a new abstraction layer with multiple adapters of its own). That's an ADR-level decision; a pillar needs its `*.Abstractions` package, a core implementation, and a place in the kernel manifest. Talk to the architect.
+**Out of scope:** creating an entirely new *pillar* (a new abstraction layer with multiple adapters
+of its own). Start with the [product proposal test](../architecture/product-constitution.md#proposal-decision-test),
+then define the contract/functional/provider split, activation boundary, facts, health, corrective
+failure, and evidence before proposing an API. That review is about ownership and value, not
+permission to create scaffolding.
 
 **Prerequisites:**
 
@@ -53,8 +57,10 @@ A Koan connector is **just** a few standard pieces:
    is non-critical and must not open a connection.
 7. **Tests** — at minimum, one integration spec hitting a real container via Testcontainers (ARCH-0079).
 
-The connector package publishes as `Sylin.Koan.<Pillar>.Connector.<Name>` and owns an independent
-`version.json`; Git impact and the package graph determine when it mints.
+Most connector families publish as `Sylin.Koan.<Pillar>.Connector.<Name>`, but existing pillar
+metadata is the naming authority; Cache and other families may use a different established noun.
+Every package owns an independent `version.json`; Git impact and the package graph determine when it
+mints.
 
 Reference example to model after: **Weaviate** (`src/Connectors/Data/Vector/Weaviate/`) — clean, modern, all the standard pieces.
 
@@ -270,7 +276,7 @@ public sealed class AcmeConnectorSpec(AcmeConnectorFixture fx) : IClassFixture<A
 }
 ```
 
-### Step 9 — Verify
+### Step 8 — Verify
 
 ```pwsh
 # Builds + metadata + version inclusion
@@ -280,19 +286,21 @@ unzip -p /tmp/test/Sylin.Koan.Data.Vector.Connector.Acme.*.nupkg '*.nuspec' | gr
 #   id should be `Sylin.Koan.Data.Vector.Connector.Acme`, description present.
 
 dotnet run --project tools/Koan.Packaging -- inventory
-#   Your new package should have one evaluated owner with complete metadata.
+#   Your new package should appear with complete metadata and an honest claim or unassessed disposition.
 
 dotnet test tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests/Koan.Data.Connector.Acme.Tests.csproj
 #   At least one passing spec.
 ```
 
-### Step 10 — Push or merge to `dev`
+### Step 9 — Open a pull request to `main`
 
-The next advancement of `dev` picks up your connector. The release workflow:
+Development and review do not publish packages. After the pull request merges to `main`, the release
+workflow:
 
-- asks NBGV for its version at the two Git endpoints;
-- packs the changed identity and any missing current identities in dependency order;
-- proves the package closure in an external app, then publishes through trusted identity.
+- asks NBGV for the affected package version;
+- validates product and package coherence;
+- packs the selected 0.20 identities; and
+- pushes missing immutable package identities with the repository NuGet key.
 
 Commit-message vocabulary does not calculate versions. Git height owns patch; an intentional
 major/minor change is an explicit `version.json` edit. See [versioning.md](versioning.md) and
@@ -308,7 +316,7 @@ major/minor change is an explicit `version.json` edit. See [versioning.md](versi
 | Add a new vector connector | This workbook. Model after Weaviate. |
 | Add a new AI provider | Pillar = `AI`, model after `Koan.AI.Connector.Ollama`. |
 | Add a new communication transport | Pillar = `Communication`, model after `Koan.Communication.Connector.RabbitMq`. |
-| Add a new storage backend | Pillar = `Storage`, model after `Koan.Storage.Connector.Local` or `Koan.Storage.Connector.S3`. |
+| Add a new storage backend | Pillar = `Storage`, model after the supported `Koan.Storage.Connector.Local`; remote providers require their own truthful capability and support evidence. |
 | Add a connector that shares a physical backend with another | Reference the backend owner and consume its inert contract or ecosystem-standard client. Redis adapters reference `Koan.Redis`; they do not activate Data to borrow a connection. |
 
 ---
