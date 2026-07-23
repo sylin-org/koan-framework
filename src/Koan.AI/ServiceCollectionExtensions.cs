@@ -44,7 +44,7 @@ public static class ServiceCollectionExtensions
         // ADR-0015 Phase 5: Background health monitoring
         services.AddHttpClient("KoanAiHealthProbe");
         services.AddHostedService<AiSourceHealthMonitor>();
-        services.TryAddSingleton<IHealthContributor, AiSourcesHealthContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, AiSourcesHealthContributor>());
 
         // Register infrastructure
         services.TryAddSingleton<InMemoryAdapterRegistry>();

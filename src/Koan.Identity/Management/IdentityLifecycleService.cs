@@ -1,6 +1,10 @@
 using Newtonsoft.Json;
 using Koan.Data.Core;
+using Koan.Identity.Erasure;
 using Koan.Identity.Impersonation;
+using Koan.Identity.Infrastructure;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Koan.Identity.Management;
 
@@ -11,6 +15,30 @@ namespace Koan.Identity.Management;
 /// </summary>
 public sealed class IdentityLifecycleService
 {
+    private readonly IReadOnlyList<IIdentityErasureContributor> _erasureContributors;
+    private readonly ILogger<IdentityLifecycleService> _logger;
+
+    /// <summary>
+    /// Compatibility constructor for non-erasure lifecycle verbs. Resolve this service from DI to compose erasure
+    /// owners; an uncomposed instance will return a corrective blocked erasure plan.
+    /// </summary>
+    [Obsolete("Resolve IdentityLifecycleService from dependency injection so identity erasure owners compose.")]
+    public IdentityLifecycleService()
+        : this(Array.Empty<IIdentityErasureContributor>(), NullLogger<IdentityLifecycleService>.Instance)
+    {
+    }
+
+    public IdentityLifecycleService(
+        IEnumerable<IIdentityErasureContributor> erasureContributors,
+        ILogger<IdentityLifecycleService> logger)
+    {
+        _erasureContributors = erasureContributors
+            .OrderBy(static contributor => contributor.Order)
+            .ThenBy(static contributor => contributor.Owner, StringComparer.Ordinal)
+            .ToList();
+        _logger = logger;
+    }
+
     public sealed record BulkResult(IReadOnlyList<string> Succeeded, IReadOnlyList<string> Failed);
     public sealed record DeleteReport(
         string IdentityId,
@@ -57,28 +85,156 @@ public sealed class IdentityLifecycleService
         return new BulkResult(succeeded, failed);
     }
 
+    /// <summary>Preview every registered erasure owner without changing data.</summary>
+    public async Task<IdentityErasurePlan> PreviewErasureAsync(string identityId, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(identityId);
+        var duplicateOwners = _erasureContributors
+            .GroupBy(static contributor => contributor.Owner, StringComparer.Ordinal)
+            .Where(static group => group.Count() > 1)
+            .Select(static group => group.Key)
+            .OrderBy(static owner => owner, StringComparer.Ordinal)
+            .ToList();
+        if (duplicateOwners.Count > 0)
+        {
+            return new IdentityErasurePlan(
+                DateTimeOffset.UtcNow,
+                duplicateOwners.Select(owner => new IdentityErasureOwnerPlan(
+                    IdentityErasureConstants.CompositionOwner,
+                    int.MinValue,
+                    Ready: false,
+                    EstimatedItems: 0,
+                    Summary: "Identity erasure composition is ambiguous.",
+                    Correction: $"Keep exactly one contributor registered for owner '{owner}'.")).ToList());
+        }
+
+        if (_erasureContributors.Count == 0)
+        {
+            return new IdentityErasurePlan(
+                DateTimeOffset.UtcNow,
+                new[]
+                {
+                    new IdentityErasureOwnerPlan(
+                        IdentityErasureConstants.CompositionOwner,
+                        int.MinValue,
+                        Ready: false,
+                        EstimatedItems: 0,
+                        Summary: "No identity erasure owner is active.",
+                        Correction: "Reference Sylin.Koan.Identity and use AddKoan() so core erasure contributors are discovered."),
+                });
+        }
+
+        var owners = new List<IdentityErasureOwnerPlan>(_erasureContributors.Count);
+        foreach (var contributor in _erasureContributors)
+        {
+            try
+            {
+                var preview = await contributor.PreviewAsync(identityId, ct).ConfigureAwait(false);
+                owners.Add(preview with { Owner = contributor.Owner, Order = contributor.Order });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Identity erasure preview failed for owner {Owner}.", contributor.Owner);
+                owners.Add(new IdentityErasureOwnerPlan(
+                    contributor.Owner,
+                    contributor.Order,
+                    Ready: false,
+                    EstimatedItems: 0,
+                    Summary: "Owner preview failed.",
+                    Correction: $"Inspect protected logs for owner '{contributor.Owner}', correct it, and retry preview."));
+            }
+        }
+
+        return new IdentityErasurePlan(DateTimeOffset.UtcNow, owners);
+    }
+
     /// <summary>
-    /// Delete a person and every core-owned dependent. Audit evidence is deliberately retained. Optional modules own
-    /// their own deprovisioning contributors/services. Returns a report of what was removed.
+    /// Execute every registered owner in deterministic order and persist a non-identifying integrity-checked receipt.
+    /// Later owners still run after an owner-local failure so audit/privacy cleanup is not silently skipped.
+    /// </summary>
+    public async Task<IdentityErasureReceipt> EraseAsync(string identityId, CancellationToken ct = default)
+    {
+        var plan = await PreviewErasureAsync(identityId, ct).ConfigureAwait(false);
+        if (!plan.CanComplete)
+        {
+            var corrections = string.Join(" ", plan.Owners
+                .Where(static owner => !owner.Ready)
+                .Select(static owner => owner.Correction ?? $"Owner '{owner.Owner}' is not ready."));
+            throw new InvalidOperationException($"Identity erasure is blocked. {corrections}");
+        }
+
+        var startedAt = DateTimeOffset.UtcNow;
+        var results = new List<IdentityErasureOwnerResult>(_erasureContributors.Count);
+        foreach (var contributor in _erasureContributors)
+        {
+            try
+            {
+                var result = await contributor.EraseAsync(identityId, ct).ConfigureAwait(false);
+                results.Add(new IdentityErasureOwnerResult
+                {
+                    Owner = contributor.Owner,
+                    Order = contributor.Order,
+                    Succeeded = result.Succeeded,
+                    Counts = new Dictionary<string, int>(result.Counts, StringComparer.Ordinal),
+                    Summary = result.Summary,
+                    Correction = result.Correction,
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Identity erasure failed for owner {Owner}.", contributor.Owner);
+                results.Add(new IdentityErasureOwnerResult
+                {
+                    Owner = contributor.Owner,
+                    Order = contributor.Order,
+                    Succeeded = false,
+                    Summary = "Owner erasure failed.",
+                    Correction = $"Inspect protected logs for owner '{contributor.Owner}' and retry the same erasure request.",
+                });
+            }
+        }
+
+        var receipt = new IdentityErasureReceipt
+        {
+            PolicyVersion = IdentityErasureConstants.PolicyVersion,
+            StartedAt = startedAt,
+            CompletedAt = DateTimeOffset.UtcNow,
+            Complete = results.All(static result => result.Succeeded),
+            Owners = results,
+        };
+        receipt.Hash = receipt.ComputeHash();
+        return await receipt.Save(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Compatibility projection over the canonical erasure path. New code should retain the returned
+    /// <see cref="IdentityErasureReceipt"/> from <see cref="EraseAsync"/>.
     /// </summary>
     public async Task<DeleteReport> DeleteWithDependentsAsync(string identityId, CancellationToken ct = default)
     {
-        var emails = await IdentityEmail.Query(e => e.IdentityId == identityId, ct).ConfigureAwait(false);
-        var sessions = await Session.Query(s => s.IdentityId == identityId, ct).ConfigureAwait(false);
-        var links = await ExternalIdentityLink.Query(l => l.IdentityId == identityId, ct).ConfigureAwait(false);
-        var roles = await IdentityRole.Query(r => r.IdentityId == identityId, ct).ConfigureAwait(false);
-        var impersonation = await ImpersonationGrant.Query(
-            g => g.Actor == identityId || g.Target == identityId, ct).ConfigureAwait(false);
+        var receipt = await EraseAsync(identityId, ct).ConfigureAwait(false);
+        if (!receipt.Complete)
+            throw new InvalidOperationException(
+                $"Identity erasure is incomplete. Inspect receipt '{receipt.Id}' and retry the erasure request.");
 
-        foreach (var e in emails) await e.Remove(ct).ConfigureAwait(false);
-        foreach (var s in sessions) await s.Remove(ct).ConfigureAwait(false);
-        foreach (var l in links) await l.Remove(ct).ConfigureAwait(false);
-        foreach (var r in roles) await r.Remove(ct).ConfigureAwait(false);
-        foreach (var g in impersonation) await g.Remove(ct).ConfigureAwait(false);
-
-        var person = await Identity.Get(identityId, ct).ConfigureAwait(false);
-        if (person is not null) await person.Remove(ct).ConfigureAwait(false);
-
-        return new DeleteReport(identityId, emails.Count, sessions.Count, links.Count, roles.Count, impersonation.Count);
+        var core = receipt.Owners.Single(owner => owner.Owner == IdentityErasureConstants.CoreOwner);
+        return new DeleteReport(
+            identityId,
+            Count(core, IdentityErasureConstants.Counts.Emails),
+            Count(core, IdentityErasureConstants.Counts.Sessions),
+            Count(core, IdentityErasureConstants.Counts.ExternalLinks),
+            Count(core, IdentityErasureConstants.Counts.GlobalRoles),
+            Count(core, IdentityErasureConstants.Counts.ImpersonationGrants));
     }
+
+    private static int Count(IdentityErasureOwnerResult result, string key)
+        => result.Counts.TryGetValue(key, out var value) ? value : 0;
 }

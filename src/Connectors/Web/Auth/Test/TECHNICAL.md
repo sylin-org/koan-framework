@@ -17,6 +17,12 @@ Controllers use stable absolute attribute routes under `/.testoauth`; there is n
 mapper. The OIDC simulator publishes an ES256 JWKS and signed ID token. OAuth2/OIDC code flow supports PKCE S256,
 state/nonce through the consuming ASP.NET handler, redirect-URI checks, and one-time code redemption.
 
+For the relative OIDC authority, Web Auth derives two views automatically. The live challenge request defines the
+public issuer and browser authorization endpoint; the running Kestrel server address defines discovery, token,
+userinfo, and JWKS back-channel endpoints. The authorization code records the public issuer, so an ID token minted by
+an internal token request still has the exact issuer advertised to the browser-facing handler. This supports Docker
+port publishing and reverse proxies without an application-owned back-channel option or DNS workaround.
+
 Userinfo emits `sub`, `id`, username, email, roles, permissions, and custom claims. Web Auth maps roles to
 `ClaimTypes.Role`, permissions to `Koan.permission`, and extra claims one-for-one.
 

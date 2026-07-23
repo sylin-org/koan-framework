@@ -1,7 +1,11 @@
 using AwesomeAssertions;
+using Koan.AI;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Health;
+using Koan.Core;
 using Koan.Core.Observability.Health;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tests.AI.Unit.Specs.Health;
@@ -58,7 +62,7 @@ public sealed class AiSourcesHealthContributorSpec
         var report = await contributor.Check();
 
         report.State.Should().Be(HealthState.Degraded);
-        report.Description.Should().Be("1/2 members healthy");
+        report.Description.Should().Contain("1/2 members healthy");
     }
 
     [Fact]
@@ -76,11 +80,11 @@ public sealed class AiSourcesHealthContributorSpec
         var report = await contributor.Check();
 
         report.State.Should().Be(HealthState.Unhealthy);
-        report.Description.Should().Be("0/2 members healthy");
+        report.Description.Should().Contain("0/2 members healthy");
     }
 
     [Fact]
-    public async Task Unknown_members_count_as_healthy()
+    public async Task Unknown_members_report_unknown_instead_of_false_green()
     {
         var registry = new FakeSourceRegistry();
         registry.RegisterSource(CreateSource("ollama", members:
@@ -93,8 +97,9 @@ public sealed class AiSourcesHealthContributorSpec
 
         var report = await contributor.Check();
 
-        report.State.Should().Be(HealthState.Healthy, "Unknown members get startup grace period");
-        report.Description.Should().Be("2/2 members healthy");
+        report.State.Should().Be(HealthState.Unknown);
+        report.Description.Should().Contain("health has not been established");
+        report.Data!["unknownMembers"].Should().Be(2);
     }
 
     [Fact]
@@ -120,11 +125,27 @@ public sealed class AiSourcesHealthContributorSpec
         var report = await contributor.Check();
 
         report.State.Should().Be(HealthState.Degraded, "one unhealthy member across sources degrades overall health");
-        report.Description.Should().Be("2/3 members healthy");
+        report.Description.Should().Contain("2/3 members healthy");
         report.Data.Should().NotBeNull();
         report.Data!["totalMembers"].Should().Be(3);
         report.Data["healthyMembers"].Should().Be(2);
         report.Data["sources"].Should().Be(2);
+    }
+
+    [Fact]
+    public void AddAi_composes_with_an_existing_health_contributor_exactly_once()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+        services.AddSingleton<IHealthContributor, ExistingHealthContributor>();
+
+        services.AddAi();
+        services.AddAi();
+
+        using var provider = services.BuildServiceProvider();
+        var contributors = provider.GetServices<IHealthContributor>().ToArray();
+        contributors.Should().ContainSingle(contributor => contributor is ExistingHealthContributor);
+        contributors.Should().ContainSingle(contributor => contributor.Name == "Koan.AI");
     }
 
     // ========================================================================
@@ -174,5 +195,13 @@ public sealed class AiSourcesHealthContributorSpec
                 .OrderByDescending(s => s.Priority)
                 .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+    }
+
+    private sealed class ExistingHealthContributor : IHealthContributor
+    {
+        public string Name => "existing";
+        public bool IsCritical => true;
+        public Task<HealthReport> Check(CancellationToken ct = default) =>
+            Task.FromResult(new HealthReport(Name, HealthState.Healthy, "healthy", null, null));
     }
 }

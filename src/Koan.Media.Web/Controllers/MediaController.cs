@@ -98,9 +98,19 @@ public sealed class MediaController : ControllerBase
     public Task<IActionResult> GetOriginal(string id, CancellationToken ct)
         => RenderAsync(id, seed: null, ct: ct);
 
+    /// <summary>Original metadata with the same validators and length as GET, without a response body.</summary>
+    [HttpHead("media/{id}")]
+    public Task<IActionResult> HeadOriginal(string id, CancellationToken ct)
+        => RenderAsync(id, seed: null, ct: ct);
+
     /// <summary>Named recipe or format-shortcut render with optional overrides.</summary>
     [HttpGet("media/{id}/{seed}")]
     public Task<IActionResult> GetWithSeed(string id, string seed, CancellationToken ct)
+        => RenderAsync(id, seed, ct);
+
+    /// <summary>Recipe result metadata with the same validators and length as GET, without a response body.</summary>
+    [HttpHead("media/{id}/{seed}")]
+    public Task<IActionResult> HeadWithSeed(string id, string seed, CancellationToken ct)
         => RenderAsync(id, seed, ct);
 
     // ----- Engine -----
@@ -166,6 +176,7 @@ public sealed class MediaController : ControllerBase
         var handle = await _source.OpenAsync(id, ct).ConfigureAwait(false);
         if (handle is null) return NotFound(new { error = $"Media '{id}' not found." });
 
+        var disposeHandle = true;
         try
         {
             var effectiveRecipe = parseResult.Recipe;
@@ -202,25 +213,20 @@ public sealed class MediaController : ControllerBase
                 && effectiveRecipe.AllowedOutputFormats.IsDefaultOrEmpty)
             {
                 var rawEtag = BuildETag(handle.ContentHashHex, "raw");
-                if (Request.Headers.TryGetValue(HttpHeaderNames.IfNoneMatch, out var rawIfNone)
-                    && rawIfNone.ToString().Contains(rawEtag, StringComparison.Ordinal))
-                {
-                    Response.Headers[HeaderNames.ETag] = rawEtag;
-                    Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
-                    return StatusCode(StatusCodes.Status304NotModified);
-                }
-                Response.Headers[HeaderNames.ETag] = rawEtag;
                 Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
-                if (handle.LastModified is { } lm)
+                if (MatchesIfNoneMatch(rawEtag))
                 {
-                    Response.Headers[HeaderNames.LastModified] = lm.ToString("R");
+                    return NotModified(rawEtag, handle.LastModified);
                 }
-                Response.ContentType = handle.ContentType;
-                // Stream directly to Response.Body so the outer finally's
-                // handle.DisposeAsync() doesn't race with FileStreamResult
-                // reading the stream after the action returns.
-                await handle.Bytes.CopyToAsync(Response.Body, ct).ConfigureAwait(false);
-                return new EmptyResult();
+                if (IsUnsatisfiedNonSeekableRange(handle.Bytes))
+                {
+                    return NonSeekableRangeProblem();
+                }
+
+                // FileStreamResult's executor owns and disposes the stream after the action returns.
+                // MediaSourceHandle owns no resource beyond that stream, so transfer ownership here.
+                disposeHandle = false;
+                return StreamResult(handle.Bytes, handle.ContentType, rawEtag, handle.LastModified);
             }
 
             // Per MEDIA-0009 §d/e: when the recipe declares an
@@ -251,16 +257,16 @@ public sealed class MediaController : ControllerBase
 
             var fingerprint = effectiveRecipe.Fingerprint();
             var etag = BuildETag(handle.ContentHashHex, fingerprint);
+            Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
 
-            // 5) Conditional GET — short-circuit on If-None-Match
-            if (Request.Headers.TryGetValue(HttpHeaderNames.IfNoneMatch, out var ifNoneMatch) &&
-                ifNoneMatch.ToString().Contains(etag, StringComparison.Ordinal))
+            // A matching validator is representation identity, so it can short-circuit before a derivative lookup
+            // or render. Preserve the existing cache diagnostic while leaving range/If-Range execution to MVC for
+            // requests that actually need a body.
+            if (MatchesIfNoneMatch(etag))
             {
                 ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint, sourceFormat: null,
                     output: null, ignored: parseResult.IgnoredParams, fromCache: "hit");
-                Response.Headers[HeaderNames.ETag] = etag;
-                Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
-                return StatusCode(StatusCodes.Status304NotModified);
+                return NotModified(etag, handle.LastModified);
             }
 
             // 5b) Storage-backed derivation lookup — serve a previously persisted
@@ -272,12 +278,17 @@ public sealed class MediaController : ControllerBase
                 .ConfigureAwait(false);
             if (derivation is not null)
             {
-                Response.Headers[HeaderNames.ETag] = etag;
                 Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
                 ApplyDiagnostics(seedRecipe, effectiveRecipe, fingerprint,
                     sourceFormat: null, output: null,
                     ignored: parseResult.IgnoredParams, fromCache: "hit");
-                return File(derivation.Bytes, derivation.ContentType);
+                if (IsUnsatisfiedNonSeekableRange(derivation.Bytes))
+                {
+                    await derivation.DisposeAsync().ConfigureAwait(false);
+                    return NonSeekableRangeProblem();
+                }
+
+                return StreamResult(derivation.Bytes, derivation.ContentType, etag, handle.LastModified);
             }
 
             // 6) Run pipeline. Per MEDIA-0008 the encoder writes through
@@ -353,7 +364,6 @@ public sealed class MediaController : ControllerBase
             }
 
             // 7) Build response
-            Response.Headers[HeaderNames.ETag] = etag;
             Response.Headers[HttpHeaderNames.CacheControl] = _options.DefaultCacheControl;
             // Per MEDIA-0009 §f: Vary: Accept is precise.
             //   - Format-shortcut URL → no Vary (URL pinned it).
@@ -370,19 +380,83 @@ public sealed class MediaController : ControllerBase
                 sourceFormat: bufferedOutput.SourceFormat, output: bufferedOutput,
                 ignored: parseResult.IgnoredParams, fromCache: "miss");
 
-            // Per MEDIA-0008 the controller threads the bytes through the
-            // streaming WriteToAsync on the MediaOutput. With the captured
-            // buffer in hand we replay it onto Response.Body via that same
-            // contract — the future no-tee path uses the encoder's own
-            // SaveAsync into Response.Body without ever allocating bytes.
-            Response.ContentType = bufferedOutput.ContentType;
-            await bufferedOutput.WriteToAsync(Response.Body, ct).ConfigureAwait(false);
-            return new EmptyResult();
+            return ContentResult(capturedBytes, bufferedOutput.ContentType, etag, handle.LastModified);
         }
         finally
         {
-            await handle.DisposeAsync().ConfigureAwait(false);
+            if (disposeHandle)
+            {
+                await handle.DisposeAsync().ConfigureAwait(false);
+            }
         }
+    }
+
+    private FileStreamResult StreamResult(
+        Stream stream,
+        string contentType,
+        string etag,
+        DateTimeOffset? lastModified)
+    {
+        if (!stream.CanSeek)
+        {
+            Response.Headers[HttpHeaderNames.AcceptRanges] = "none";
+        }
+
+        return new FileStreamResult(stream, contentType)
+        {
+            EnableRangeProcessing = stream.CanSeek,
+            EntityTag = new EntityTagHeaderValue(etag),
+            LastModified = lastModified,
+        };
+    }
+
+    private static FileContentResult ContentResult(
+        byte[] bytes,
+        string contentType,
+        string etag,
+        DateTimeOffset? lastModified) => new(bytes, contentType)
+        {
+            EnableRangeProcessing = true,
+            EntityTag = new EntityTagHeaderValue(etag),
+            LastModified = lastModified,
+        };
+
+    private bool IsUnsatisfiedNonSeekableRange(Stream stream) =>
+        HttpMethods.IsGet(Request.Method)
+        && Request.Headers.ContainsKey(HttpHeaderNames.Range)
+        && !stream.CanSeek;
+
+    private IActionResult NonSeekableRangeProblem()
+    {
+        Response.Headers[HttpHeaderNames.AcceptRanges] = "none";
+        return Problem(
+            statusCode: StatusCodes.Status416RequestedRangeNotSatisfiable,
+            title: "This media source does not support byte ranges.",
+            detail: "Request the complete representation or provide a seekable IMediaSource stream.");
+    }
+
+    private bool MatchesIfNoneMatch(string etag)
+    {
+        try
+        {
+            var expected = new EntityTagHeaderValue(etag);
+            return Request.GetTypedHeaders().IfNoneMatch?.Any(candidate =>
+                candidate == EntityTagHeaderValue.Any || candidate.Compare(expected, useStrongComparison: false)) == true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private IActionResult NotModified(string etag, DateTimeOffset? lastModified)
+    {
+        Response.Headers[HeaderNames.ETag] = etag;
+        if (lastModified is { } value)
+        {
+            Response.Headers[HeaderNames.LastModified] = value.ToString("R");
+        }
+        return StatusCode(StatusCodes.Status304NotModified);
     }
 
     private void ApplyDiagnostics(

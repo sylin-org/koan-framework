@@ -34,6 +34,7 @@ public sealed class AuthSwapFixture : IAsyncLifetime
 
     public int Port { get; private set; }
     public string BaseUrl => $"http://127.0.0.1:{Port}";
+    public string PublicBaseUrl => $"http://koan-browser.test:{Port}";
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
     public string Diagnostics => string.Join(Environment.NewLine, _errors);
 
@@ -92,6 +93,41 @@ public sealed class AuthSwapFixture : IAsyncLifetime
         handler.CookieContainer.Add(new Uri(BaseUrl),
             new Cookie("_tp_user", Uri.EscapeDataString("alice|alice@example.com")) { Path = "/" });
         return new HttpClient(handler) { BaseAddress = new Uri(BaseUrl) };
+    }
+
+    /// <summary>
+    /// Browser-shaped client whose public hostname deliberately does not identify the server's bound address.
+    /// The client maps that hostname to loopback, as a browser/host port mapping would; the application's own
+    /// back-channel receives no such mapping. A successful OIDC flow therefore proves that Koan uses the internal
+    /// Kestrel address for discovery/token/userinfo/JWKS while preserving this public issuer.
+    /// </summary>
+    public HttpClient NewSplitHostClient()
+    {
+        var cookies = new CookieContainer();
+        cookies.Add(new Uri(PublicBaseUrl),
+            new Cookie("_tp_user", Uri.EscapeDataString("alice|alice@example.com")) { Path = "/" });
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            UseCookies = true,
+            CookieContainer = cookies,
+            UseProxy = false,
+            ConnectCallback = async (_, ct) =>
+            {
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+                try
+                {
+                    await socket.ConnectAsync(IPAddress.Loopback, Port, ct);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            }
+        };
+        return new HttpClient(handler) { BaseAddress = new Uri(PublicBaseUrl) };
     }
 
     public async ValueTask DisposeAsync()

@@ -82,6 +82,6 @@ public sealed class IdentityTenancyModule : KoanModule
         module.Describe(Version);
         module.SetSetting("Identity×Tenancy", b => b.Value(
             "active-membership tenant scope + tenant-role projection + effective-access facts + " +
-            "integrity-checked lifecycle receipts"));
+            "identity-erasure owner + integrity-checked lifecycle receipts"));
     }
 }

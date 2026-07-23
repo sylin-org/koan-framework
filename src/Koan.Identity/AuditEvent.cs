@@ -9,7 +9,8 @@ namespace Koan.Identity;
 /// before → after / context / occurred_at</c>.
 /// <para>
 /// Identity lifecycle hooks emit best-effort records. Optional hash chaining detects later edits, reordering, or
-/// removal; storage-level append-only enforcement and SIEM delivery are not provided.
+/// removal. Identity erasure may perform one authorized privacy rewrite and re-hash the chain; storage-level
+/// append-only enforcement and SIEM delivery are not provided.
 /// </para>
 /// </summary>
 public sealed class AuditEvent : Entity<AuditEvent>, IAmbientExempt

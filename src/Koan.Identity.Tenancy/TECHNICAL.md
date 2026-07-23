@@ -8,9 +8,9 @@ Identity's effective-access explanation, and explicit identity/seat lifecycle cl
 protocol, bearer-token issuer, tenant CRUD API, or invitation ceremony.
 
 `IdentityTenancyModule` binds and validates carrier options, registers four `ITenantResolver` implementations, adds one
-ordered `IWebContextContributor`, and registers `DeprovisioningService`. Identity's existing discovered
-contributor registry finds `MembershipAccessContributor`; the bridge does not create another registry or activation
-ordering mechanism.
+ordered `IWebContextContributor`, and registers `DeprovisioningService`. Identity's existing discovered contributor
+registries find `MembershipAccessContributor` and `IdentityTenancyErasureContributor`; the bridge does not create
+another registry or activation ordering mechanism.
 
 ## Request isolation chokepoint
 
@@ -60,6 +60,11 @@ These are multi-write workflows over the selected Data provider. They are not tr
 can partially complete before an exception. No receipt is emitted on an incomplete workflow. A completed receipt is
 host-scoped and stores counts, explicit surface names, time, and a SHA-256 content hash. `HasValidHash()` detects field
 changes; it is not a signature, append-only guarantee, or proof of current external state.
+
+For whole-person erasure, the bridge's discovered owner enumerates registered tenants, removes matching tenant-scoped
+`AgentGrant` rows and host-scoped memberships, blanks identity IDs from prior deprovisioning receipts and recomputes
+their hashes, and replaces identifying tenancy-audit actor/summary fields. Repeated execution is idempotent. Coverage
+is limited to registered tenants and this package's owned records; it does not imply external tenant-system cleanup.
 
 ## Unsupported and deferred
 

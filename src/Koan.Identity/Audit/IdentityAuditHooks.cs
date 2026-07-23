@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -8,7 +7,7 @@ namespace Koan.Identity.Audit;
 
 /// <summary>
 /// SEC-0007 Layer 1 — <b>audit-by-construction</b>. Hooks the entity lifecycle seam so every identity/access
-/// mutation emits an append-only <see cref="AuditEvent"/> (before → after) with no "remember to log it". Registered
+/// mutation emits a retained <see cref="AuditEvent"/> (before → after) with no "remember to log it". Registered
 /// into each host composition over the identity-domain entities; <see cref="AuditEvent"/> itself is deliberately
 /// NOT hooked, so emitting an audit row never recurses. Tamper-evidence + guaranteed delivery are P3 — here the
 /// emission is best-effort relative to the mutation it records (a failed audit write never rolls back the operation).
@@ -59,18 +58,20 @@ internal static class IdentityAuditHooks
     {
         try
         {
+            var options = AppHost.Current?.GetService<Microsoft.Extensions.Options.IOptions<IdentityOptions>>()?.Value;
+            var snapshotMode = options?.AuditSnapshotMode ?? IdentityAuditSnapshotMode.PrivacySafe;
             var e = new AuditEvent
             {
                 Actor = AppHost.Current?.GetService<IIdentityActorAccessor>()?.CurrentActorSubject,
                 Subject = subject,
                 Action = action,
                 Target = $"{entityName}/{id}",
-                Before = Snapshot(before),
-                After = Snapshot(after),
+                Before = IdentityAuditSnapshot.Serialize(before, snapshotMode),
+                After = IdentityAuditSnapshot.Serialize(after, snapshotMode),
             };
 
             // Tamper-evidence (Layer 3, opt-in): chain-stamp + write atomically (head advances only on success).
-            if (AppHost.Current?.GetService<Microsoft.Extensions.Options.IOptions<IdentityOptions>>()?.Value?.HashChainAudit == true
+            if (options?.HashChainAudit == true
                 && AppHost.Current?.GetService<AuditChain>() is { } chain)
                 await chain.AppendAsync(e, ev => ev.Save(ct), ct).ConfigureAwait(false);
             else
@@ -83,20 +84,4 @@ internal static class IdentityAuditHooks
         }
     }
 
-    // Serialize the before/after image, redacting free-form provider PII (ExternalIdentityLink.ClaimsJson = raw
-    // userinfo) so the audit channel does not fan that blob out (relevant once P3 streams audit to a SIEM).
-    private static string? Snapshot(object? entity) => entity switch
-    {
-        null => null,
-        ExternalIdentityLink link => JsonConvert.SerializeObject(new
-        {
-            link.Id,
-            link.IdentityId,
-            link.Provider,
-            link.ProviderKeyHash,
-            link.CreatedAt,
-            ClaimsJson = link.ClaimsJson is null ? null : "[redacted]",
-        }),
-        _ => JsonConvert.SerializeObject(entity),
-    };
 }

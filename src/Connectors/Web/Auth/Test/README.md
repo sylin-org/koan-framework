@@ -32,6 +32,8 @@ persona cookie.
 - Automatic only when `TestProviderOptions.IsActive` is true: Development by default, or explicit enablement outside
   Development.
 - Stable attribute-routed protocol endpoints; no configurable route base or startup-order dependency.
+- Container and reverse-proxy flows preserve the browser-visible issuer while discovery, token, userinfo, and JWKS
+  calls use the application's internal bound address automatically; no Docker hostname setting is required.
 - The provider is a protocol simulator, not a security or production identity system. Do not enable it in production.
 - Personas persisted in browser LocalStorage are developer convenience, not durable identity data.
 

@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -182,7 +184,12 @@ internal static class AuthSchemeSeeder
                 ?? throw new InvalidOperationException(
                     "Koan.Web.Auth: a self-hosted OIDC provider (relative authority) requires IHttpContextAccessor; " +
                     "ensure services.AddHttpContextAccessor() is registered.");
-            o.ConfigurationManager = new RequestHostOidcConfigurationManager(cfg.Authority!, http, o);
+            var server = sp.GetRequiredService<IServer>();
+            o.ConfigurationManager = new RequestHostOidcConfigurationManager(
+                cfg.Authority!,
+                http,
+                o,
+                () => ResolveSelfHostedBackchannelBase(server));
         }
         if (cfg.Scopes is { Length: > 0 })
         {
@@ -281,4 +288,16 @@ internal static class AuthSchemeSeeder
         Environment.GetEnvironmentVariable("ASPNETCORE_URLS"),
         Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"),
         Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
+
+    private static string? ResolveSelfHostedBackchannelBase(IServer server)
+    {
+        var addresses = server.Features.Get<IServerAddressesFeature>()?.Addresses;
+        var liveAddresses = addresses is { Count: > 0 }
+            ? string.Join(';', addresses)
+            : null;
+        return ServerAddressResolver.ResolveBase(
+            liveAddresses ?? Environment.GetEnvironmentVariable("ASPNETCORE_URLS"),
+            Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"),
+            Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
+    }
 }
