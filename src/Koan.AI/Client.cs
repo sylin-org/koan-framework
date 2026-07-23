@@ -1524,7 +1524,7 @@ public static class Client
             Model = model,
             Options = promptOpts,
             Route = scopeSource is not null
-                ? new AiRouteHints { AdapterId = scopeSource }
+                ? new AiRouteHints { Source = scopeSource }
                 : null
         };
     }

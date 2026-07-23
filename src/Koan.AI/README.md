@@ -62,6 +62,20 @@ Category configuration can constrain source or model without leaking provider me
 sources under `Koan:Ai:Sources` are the advanced routing surface; ordinary applications normally need only a provider
 reference and, when conventions cannot locate it, that provider's exact endpoint configuration.
 
+When one request must select both, the choices compose:
+
+```csharp
+var response = await Client.Conversation()
+    .WithUser("Summarize the deployment.")
+    .WithSource("local-gpu") // or "local-gpu::secondary" to pin one member
+    .WithModel("qwen3:8b")
+    .Send();
+```
+
+An explicit source or member is authoritative. Koan preserves it with the explicit model or rejects a
+missing, disabled, or capability-incompatible choice with usable alternatives; it never silently elects
+another source. Without `WithSource`, normal capability and priority election remains unchanged.
+
 Applications that operate a changing endpoint catalog can request `IAiSourceControl`. Inspect an endpoint through
 its provider protocol before applying it, then enable, disable, or remove the logical source without rebuilding the
 host:
