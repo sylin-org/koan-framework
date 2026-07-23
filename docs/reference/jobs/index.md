@@ -95,3 +95,8 @@ else
 
 The [background jobs guide](../../guides/jobs-howto.md) owns the deeper recipes for chains, schedules,
 gates, pools, cooperative control, and operational tuning.
+
+For deterministic execution against an existing test host, reference `Sylin.Koan.Jobs.Testing`, configure
+`EnableWorker=false` with normal mode, and create `JobsTestDriver.From(host.Services)`. The xUnit-free driver runs
+the production scheduler and orchestrator; the test remains responsible for its host, fake clock, provider, and
+assertions.

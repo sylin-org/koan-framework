@@ -62,6 +62,24 @@ Category configuration can constrain source or model without leaking provider me
 sources under `Koan:Ai:Sources` are the advanced routing surface; ordinary applications normally need only a provider
 reference and, when conventions cannot locate it, that provider's exact endpoint configuration.
 
+Applications that operate a changing endpoint catalog can request `IAiSourceControl`. Inspect an endpoint through
+its provider protocol before applying it, then enable, disable, or remove the logical source without rebuilding the
+host:
+
+```csharp
+var inspection = await sourceControl.InspectAsync(new AiSourceCandidate
+{
+    Provider = "ollama",
+    Endpoint = "http://model-host:11434"
+});
+
+sourceControl.Disable("maintenance-pool");
+sourceControl.Remove("retired-pool", expectedOrigin: "runtime");
+```
+
+Ollama inspection calls its tags API; LM Studio inspection calls its OpenAI-compatible models API. Inspection does
+not register the endpoint. Disabled and removed sources leave routing and health probing immediately.
+
 ## Host and failure contract
 
 - `Client.IsAvailable` and `Client.TryResolve()` are optional probes. They return absence for a missing or disposed

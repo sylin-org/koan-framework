@@ -45,6 +45,7 @@ hatch.
 
 - Start or orient: README.md, docs/getting-started/quickstart.md, docs/index.md
 - Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
+- Engineer or migrate an application with an agent: docs/guides/agent-application-engineering.md
 - Foundation/composition/configuration: docs/reference/core/index.md
 - Entity persistence/query/providers: docs/reference/data/index.md
 - HTTP/API/OpenAPI/SSE: docs/reference/web/index.md

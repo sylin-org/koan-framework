@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "guide": "docs/guides/agent-application-engineering.md",
+  "evaluations": [
+    {
+      "id": "greenfield",
+      "prompt": "Design a small lending-library API whose loans persist and whose overdue notices run after the request. Use Koan's native application language.",
+      "requiredSignals": [
+        "states application intent before implementation",
+        "uses Entity<T> and standard Entity operations",
+        "uses Jobs for Entity-owned background work",
+        "names package and durability boundary",
+        "proposes focused behavior, composition, and corrective proof"
+      ]
+    },
+    {
+      "id": "brownfield",
+      "prompt": "Migrate an ASP.NET Core reminders app to Koan while preserving its routes, payloads, MongoDB database, container topology, and environment keys. It currently has repositories, hosted polling, and handwritten CRUD controllers.",
+      "requiredSignals": [
+        "preserves observable integration contracts",
+        "classifies mechanisms as keep, absorb, rebuild, or delete",
+        "moves persistence and CRUD to Entity<T> surfaces",
+        "moves background work only after naming its guarantee",
+        "migrates and proves one mechanism at a time"
+      ]
+    },
+    {
+      "id": "corrective",
+      "prompt": "A team wants durable Jobs but references only the Jobs package and no durable Data provider. Explain the implementation and expected failure behavior.",
+      "requiredSignals": [
+        "does not invent Jobs registration",
+        "distinguishes in-memory convenience from durable restart survival",
+        "requires a durable Data provider for the durability claim",
+        "expects a corrective composition failure for explicitly required durability"
+      ]
+    }
+  ]
+}

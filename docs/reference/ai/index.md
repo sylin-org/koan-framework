@@ -137,6 +137,27 @@ using (Client.Scope(chat: "ollama"))
 Explicit source/model/endpoint intent wins. Koan does not promise automatic retry, provider fallback, budget
 enforcement, rate limiting, or cost routing unless a separately documented capability implements it.
 
+### Operate a changing source catalog
+
+Ordinary applications should keep automatic composition. When an application genuinely owns a runtime endpoint
+catalog, resolve `IAiSourceControl` and inspect before applying:
+
+```csharp
+var inspection = await sourceControl.InspectAsync(new AiSourceCandidate
+{
+    Provider = "lmstudio",
+    Endpoint = candidateEndpoint
+});
+
+if (inspection.Available)
+    sourceControl.Apply(candidateSource);
+```
+
+`Enable`, `Disable`, and `Remove` change routing immediately. Applying a same-origin source replaces it and resets
+health; late probes from the previous revision are discarded. Provider packages own inspection grammar. A provider
+that does not implement inspection is rejected with the package/configuration correction rather than a guessed
+generic probe.
+
 ## HTTP projection
 
 To expose the same runtime through HTTP, add the Web projection:

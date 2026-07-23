@@ -63,6 +63,8 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0117 | [Safe connector telemetry by construction](ARCH-0117-safe-connector-telemetry.md) | Accepted | One credential grammar and structured log boundary; shared configuration/discovery narration; no application ceremony or global logger interception |
 | ARCH-0118 | [Evidence-derived product surface](ARCH-0118-evidence-derived-product-surface.md) | Accepted | Standard project facts plus one irreducible claims input compile every human, agent, and release projection |
 | ARCH-0120 | [Value-led promotion to the Koan 0.20 surface](ARCH-0120-terminal-package-maturity.md) | Accepted | Product intent selects meaningful public families; provider, consumer, dependency, and API evidence promote them with no second maturity or admission subsystem |
+| ARCH-0121 | [Claim-scoped validation and a cheap main boundary](ARCH-0121-claim-scoped-validation.md) | Accepted | Claim-owned evidence, cheap PR coherence, main-boundary publication, and explicit portfolio certification |
+| ARCH-0122 | [Dogfood-derived runtime control and deterministic test seams](ARCH-0122-dogfood-runtime-and-test-seams.md) | Accepted | Exact SSE intent, AI source lifecycle and inspection, public deterministic Jobs testing, and concise agent workflow |
 
 ## Authoring Principles
 

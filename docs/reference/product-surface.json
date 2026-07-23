@@ -372,7 +372,8 @@
       "summary": "Entities own inspectable background work with retries, cancellation, schedules, context restoration, and capability-graded durability.",
       "maturity": "supported-extension",
       "packages": [
-        "Sylin.Koan.Jobs"
+        "Sylin.Koan.Jobs",
+        "Sylin.Koan.Jobs.Testing"
       ],
       "documentation": [
         "docs/guides/jobs-howto.md",
@@ -380,7 +381,8 @@
       ],
       "evidence": [
         "docs/initiatives/koan-v1/R02-EVIDENCE.md",
-        "src/Koan.Jobs"
+        "src/Koan.Jobs",
+        "tests/Suites/Jobs"
       ]
     },
     {
@@ -2023,6 +2025,24 @@
       "readme": "src/Koan.Jobs/README.md",
       "ownsReadme": true,
       "technicalDocumentation": "src/Koan.Jobs/TECHNICAL.md",
+      "claims": [
+        "jobs-scheduling"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Jobs.Testing",
+      "versionIntent": "0.20",
+      "shape": "library",
+      "description": "Deterministically drive Koan Jobs through its production execution engine from any test framework.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Jobs"
+      ],
+      "readme": "src/Koan.Jobs.Testing/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Jobs.Testing/TECHNICAL.md",
       "claims": [
         "jobs-scheduling"
       ]

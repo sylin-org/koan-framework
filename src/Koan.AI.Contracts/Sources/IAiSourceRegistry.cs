@@ -11,7 +11,8 @@ namespace Koan.AI.Contracts.Sources;
 public interface IAiSourceRegistry
 {
     /// <summary>
-    /// Register a source (for runtime/testing scenarios or auto-discovery)
+    /// Register a source during composition or discovery. Use <see cref="IAiSourceControl"/>
+    /// when the application owns runtime source lifecycle.
     /// </summary>
     void RegisterSource(AiSourceDefinition source);
 

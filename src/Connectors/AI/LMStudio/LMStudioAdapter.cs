@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Sources;
 using Koan.Core.Adapters;
 using Koan.AI.Contracts;
 using Koan.AI.Connector.LMStudio.Options;
@@ -22,6 +23,7 @@ namespace Koan.AI.Connector.LMStudio;
 internal sealed class LMStudioAdapter :
     IChatAdapter,
     IEmbedAdapter,
+    IAiSourceInspector,
     IAdapterReadiness,
     IAdapterReadinessConfiguration,
     IAsyncAdapterInitializer,
@@ -210,8 +212,49 @@ internal sealed class LMStudioAdapter :
     }
 
     public async Task<IReadOnlyList<AiModelDescriptor>> ListModels(CancellationToken ct = default)
+        => await ListModels(GetHttpClientForRequest(null), ct);
+
+    public async Task<AiSourceInspection> InspectAsync(
+        AiSourceCandidate candidate,
+        CancellationToken ct = default)
     {
-        var httpClient = GetHttpClientForRequest(null);
+        try
+        {
+            var models = await ListModels(GetHttpClientForRequest(candidate.Endpoint), ct);
+            return new AiSourceInspection
+            {
+                Provider = Type,
+                Endpoint = candidate.Endpoint,
+                Available = true,
+                Models = models.Select(model => model.Name).Where(name => name.Length > 0).ToArray(),
+                Capabilities = new HashSet<string>(
+                    ((IAiAdapter)this).Capabilities,
+                    StringComparer.OrdinalIgnoreCase)
+            };
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return new AiSourceInspection
+            {
+                Provider = Type,
+                Endpoint = candidate.Endpoint,
+                Available = false,
+                Capabilities = new HashSet<string>(
+                    ((IAiAdapter)this).Capabilities,
+                    StringComparer.OrdinalIgnoreCase),
+                Detail = ex.Message
+            };
+        }
+    }
+
+    private async Task<IReadOnlyList<AiModelDescriptor>> ListModels(
+        HttpClient httpClient,
+        CancellationToken ct)
+    {
         using var message = new HttpRequestMessage(HttpMethod.Get, Constants.Discovery.ModelsPath);
         AttachAuth(message);
 
@@ -398,6 +441,15 @@ internal sealed class LMStudioAdapter :
         {
             var timeoutSeconds = _options.RequestTimeoutSeconds > 0 ? _options.RequestTimeoutSeconds : 120;
             var endpoint = NormalizeBase(connectionString);
+            if (_http.BaseAddress is not null &&
+                string.Equals(
+                    NormalizeBase(_http.BaseAddress.ToString()),
+                    endpoint,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return _http;
+            }
+
             return _endpointClients.GetOrAdd(endpoint, value => new HttpClient
             {
                 BaseAddress = new Uri(value),
