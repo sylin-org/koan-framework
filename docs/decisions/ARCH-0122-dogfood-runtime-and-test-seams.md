@@ -17,11 +17,12 @@ related:
 
 ## Outcome
 
-Koan closes three application-facing gaps found through brownfield use:
+Koan closes four application-facing gaps found through brownfield use:
 
 1. SSE preserves the caller's protocol intent and composes with stronger HTTP cache policy.
 2. AI sources can be inspected and changed at runtime through one source-lifecycle owner.
 3. Jobs exposes an xUnit-free deterministic driver over the production execution engine.
+4. Explicit AI source or member selection composes with explicit model selection without fallback.
 
 A concise agent workflow teaches how to find and prove those expressions. It links to the canonical
 capability guides rather than becoming another framework curriculum.
@@ -36,6 +37,8 @@ An engineer or coding agent can discover those paths quickly for greenfield or b
 comment, retry, or id fields is an exact control frame. AI exposes `IAiSourceControl` with inspect,
 apply, enable, disable, and remove operations while ordinary routing remains automatic. Inspection
 reports provider version, installed models, and resident models without exposing a provider client.
+An advanced request selects a logical source with `WithSource` or `AiRouteHints.Source`; it may
+compose that choice with `WithModel` and may pin one member using `source::member`.
 `JobsTestDriver.From(services)` drives the existing Jobs engine after the host opts out of background
 execution. The agent workflow uses the normal package, configuration, Entity, context, and runtime
 surfaces documented by each capability pillar.
@@ -98,13 +101,18 @@ provider-owned inspection request; partial failures remain visible in `Detail`.
 Ollama owns `/api/version`, `/api/tags`, and `/api/ps`. The application neither calls nor parses those
 endpoints. Other providers populate only the facets their protocol can truthfully inspect.
 
-### Route-hint naming clarification
+### Explicit AI route composition
 
-`WithRouteAdapter` currently carries a source or member hint; the router resolves the actual provider
-adapter from that source. This decision does not add a source-named alias because two names for one
-route field would make the public path less clear. A later semantic rename must change
-`AiRouteHints.AdapterId` and its fluent method together, with one compatibility decision, rather than
-layering another permanent synonym into this closure.
+The application selects a logical source, not a provider adapter. `AiRouteHints.Source` and
+`WithSource` are therefore the canonical public expression. The existing `AdapterId` property and
+`WithRouteAdapter` method remain compatibility aliases that carry the same value; current
+documentation does not teach them. The router still resolves the provider adapter from the selected
+source, so no second route field, registry, or resolution path is introduced.
+
+Source, member, and model are orthogonal request decisions. An explicit source or member is resolved
+before model-driven election. Capability validation then applies to that exact choice. Missing,
+disabled, and capability-incompatible choices report usable alternatives, while source-free requests
+retain automatic capability and priority election, including the existing model-only fallback.
 
 ### Deterministic Jobs testing
 
@@ -128,6 +136,7 @@ retrieval evaluation. They do not encode a private application, infrastructure t
 ### Positive
 
 - Applications stop working around missing lifecycle and testing seams.
+- Source and model intent compose without silently changing either decision.
 - Provider integrations remain unchanged and continue to own their protocols.
 - The public Jobs surface grows by a driver, not by exposing the engine's internals.
 - Agent guidance becomes a routing and reasoning aid rather than duplicated documentation.
@@ -138,6 +147,8 @@ retrieval evaluation. They do not encode a private application, infrastructure t
 - AI source mutation requires revision-aware registry and health-monitor coordination.
 - Provider-specific inspection is available only when an adapter implements the inspection contract;
   unsupported providers reject the request correctively.
+- Adapter-named route members remain temporarily visible for compatibility, although source-named
+  members are the only current path taught.
 - Deterministic Jobs tests must deliberately disable the background worker.
 
 ## Evidence boundary

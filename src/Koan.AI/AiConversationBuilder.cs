@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,12 +126,16 @@ public sealed class AiConversationBuilder
         return this;
     }
 
-    public AiConversationBuilder WithRouteAdapter(string adapterId)
+    public AiConversationBuilder WithSource(string source)
     {
-        if (string.IsNullOrWhiteSpace(adapterId)) throw new ArgumentException("Adapter ID is required.", nameof(adapterId));
-        _route = (_route ?? new AiRouteHints()) with { AdapterId = adapterId.Trim() };
+        if (string.IsNullOrWhiteSpace(source)) throw new ArgumentException("Source is required.", nameof(source));
+        _route = (_route ?? new AiRouteHints()) with { Source = source.Trim() };
         return this;
     }
+
+    [EditorBrowsable(EditorBrowsableState.Never)]
+    public AiConversationBuilder WithRouteAdapter(string adapterId)
+        => WithSource(adapterId);
 
     public AiConversationBuilder WithRoutePolicy(string policy)
     {

@@ -34,6 +34,11 @@ The router handles capability and category intent, optional source/model hints, 
 adapter resolution. A capability declaration means the adapter implements that operation; it does not guarantee a
 particular model is installed or healthy.
 
+`AiRouteHints.Source` carries either a source name or a pinned `source::member`; `WithSource` is its fluent
+expression. Explicit source/member and model hints are orthogonal and are preserved together. The router validates
+capability against the exact explicit choice and reports usable alternatives instead of falling back. Source-free
+requests retain automatic election. `AdapterId` and `WithRouteAdapter` remain compatibility aliases only.
+
 Background health observation updates member state without rebuilding provider topology. Startup provenance reports
 configured categories/sources, the live adapter roster, and source/member status.
 

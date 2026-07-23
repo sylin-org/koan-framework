@@ -103,10 +103,13 @@ internal sealed class AiCategoryRouter
             return Resolve(via, effectiveSource, effectiveModel);
         }
 
-        var source = ResolveSource(effectiveSource, MapCategoryToCapability(category), effectiveModel);
-        var member = SelectMember(source, effectiveSource);
+        var capability = MapCategoryToCapability(category);
+        var source = ResolveSource(effectiveSource, capability, effectiveModel);
+        var requireMemberCapability =
+            !string.IsNullOrWhiteSpace(effectiveSource) || string.IsNullOrWhiteSpace(effectiveModel);
+        var member = SelectMember(source, effectiveSource, capability, requireMemberCapability);
         var adapter = ResolveAdapter(source);
-        var resolvedModel = DetermineEffectiveModel(source, member, MapCategoryToCapability(category), effectiveModel);
+        var resolvedModel = DetermineEffectiveModel(source, member, capability, effectiveModel);
 
         return new AiRouteResolution(source, member, adapter, category, resolvedModel);
     }
@@ -150,7 +153,7 @@ internal sealed class AiCategoryRouter
             }
         }
 
-        return Resolve(AiCapability.Chat, request.Route?.AdapterId, modelHint);
+        return Resolve(AiCapability.Chat, request.Route?.Source, modelHint);
     }
 
     /// <summary>
@@ -196,6 +199,37 @@ internal sealed class AiCategoryRouter
 
     private AiSourceDefinition ResolveSource(string? sourceHint, string capabilityName, string? explicitModel)
     {
+        if (!string.IsNullOrWhiteSpace(sourceHint))
+        {
+            var sourceName = GetSourceName(sourceHint);
+            var source = _sourceRegistry.GetSource(sourceName);
+            if (source is null)
+            {
+                var memberContext = sourceHint.Contains("::", StringComparison.Ordinal)
+                    ? $" for member reference '{sourceHint}'"
+                    : string.Empty;
+                throw new InvalidOperationException(
+                    $"Source '{sourceName}' not found{memberContext}. " +
+                    $"Usable sources for capability '{capabilityName}': {FormatChoices(GetUsableSourceNames(capabilityName))}");
+            }
+
+            if (!source.IsEnabled)
+            {
+                throw new InvalidOperationException(
+                    $"AI source '{source.Name}' is disabled. Enable it through IAiSourceControl or select another source. " +
+                    $"Usable sources for capability '{capabilityName}': {FormatChoices(GetUsableSourceNames(capabilityName))}");
+            }
+
+            if (!SupportsCapability(source, capabilityName))
+            {
+                throw new InvalidOperationException(
+                    $"Source '{source.Name}' does not support capability '{capabilityName}'. " +
+                    $"Usable sources: {FormatChoices(GetUsableSourceNames(capabilityName))}");
+            }
+
+            return source;
+        }
+
         if (!string.IsNullOrWhiteSpace(explicitModel))
         {
             var capabilitySources = _sourceRegistry.GetSourcesWithCapability(capabilityName);
@@ -216,27 +250,6 @@ internal sealed class AiCategoryRouter
                 "No AI sources available. Configure an adapter (e.g. Ollama) or enable discovery.");
         }
 
-        if (!string.IsNullOrWhiteSpace(sourceHint))
-        {
-            var source = _sourceRegistry.GetSource(sourceHint);
-            if (source is not null) return RequireEnabled(source);
-
-            if (sourceHint.Contains("::", StringComparison.Ordinal))
-            {
-                var sourceName = sourceHint.Split("::")[0];
-                source = _sourceRegistry.GetSource(sourceName);
-                if (source is not null) return RequireEnabled(source);
-
-                throw new InvalidOperationException(
-                    $"Source '{sourceName}' not found for member reference '{sourceHint}'. " +
-                    $"Available sources: {string.Join(", ", _sourceRegistry.GetSourceNames())}");
-            }
-
-            throw new InvalidOperationException(
-                $"Source '{sourceHint}' not found. " +
-                $"Available sources: {string.Join(", ", _sourceRegistry.GetSourceNames())}");
-        }
-
         var candidates = _sourceRegistry.GetSourcesWithCapability(capabilityName);
         if (candidates.Count == 0)
         {
@@ -247,14 +260,40 @@ internal sealed class AiCategoryRouter
         return candidates.First();
     }
 
-    private static AiSourceDefinition RequireEnabled(AiSourceDefinition source)
+    private IReadOnlyList<string> GetUsableSourceNames(string capabilityName)
+        => _sourceRegistry.GetAllSources()
+            .Where(source => source.IsEnabled && SupportsCapability(source, capabilityName))
+            .OrderByDescending(source => source.Priority)
+            .ThenBy(source => source.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(source => source.Name)
+            .ToArray();
+
+    private static bool SupportsCapability(AiSourceDefinition source, string capabilityName)
     {
-        if (source.IsEnabled) return source;
-        throw new InvalidOperationException(
-            $"AI source '{source.Name}' is disabled. Enable it through IAiSourceControl or select another source.");
+        if (source.Members.Count == 0)
+            return source.Capabilities.ContainsKey(capabilityName);
+
+        return source.Members.Any(member =>
+            source.GetEffectiveCapabilities(member).ContainsKey(capabilityName));
     }
 
-    private static AiMemberDefinition SelectMember(AiSourceDefinition source, string? sourceHint)
+    private static string GetSourceName(string sourceHint)
+    {
+        var separator = sourceHint.IndexOf("::", StringComparison.Ordinal);
+        return separator < 0 ? sourceHint : sourceHint[..separator];
+    }
+
+    private static string FormatChoices(IEnumerable<string> choices)
+    {
+        var values = choices.ToArray();
+        return values.Length == 0 ? "(none)" : string.Join(", ", values);
+    }
+
+    private static AiMemberDefinition SelectMember(
+        AiSourceDefinition source,
+        string? sourceHint,
+        string capabilityName,
+        bool requireCapability)
     {
         if (source is null) throw new ArgumentNullException(nameof(source));
 
@@ -267,7 +306,17 @@ internal sealed class AiCategoryRouter
             {
                 throw new InvalidOperationException(
                     $"Member '{sourceHint}' not found in source '{source.Name}'. " +
-                    $"Available members: {string.Join(", ", source.Members.Select(m => m.Name))}");
+                    $"Usable members for capability '{capabilityName}': " +
+                    $"{FormatChoices(GetUsableMemberNames(source, capabilityName))}");
+            }
+
+            if (requireCapability &&
+                !source.GetEffectiveCapabilities(pinned).ContainsKey(capabilityName))
+            {
+                throw new InvalidOperationException(
+                    $"Member '{sourceHint}' does not support capability '{capabilityName}'. " +
+                    $"Usable members in source '{source.Name}': " +
+                    $"{FormatChoices(GetUsableMemberNames(source, capabilityName))}");
             }
 
             return pinned;
@@ -279,11 +328,32 @@ internal sealed class AiCategoryRouter
                 $"Source '{source.Name}' has no members. Check configuration or discovery results.");
         }
 
-        return source.Members
+        var candidates = requireCapability
+            ? source.Members
+                .Where(member => source.GetEffectiveCapabilities(member).ContainsKey(capabilityName))
+                .ToArray()
+            : source.Members.ToArray();
+
+        if (candidates.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"Source '{source.Name}' has no member supporting capability '{capabilityName}'.");
+        }
+
+        return candidates
             .OrderBy(m => m.Order)
             .FirstOrDefault(m => m.HealthState != MemberHealthState.Unhealthy)
-            ?? source.Members.OrderBy(m => m.Order).First();
+            ?? candidates.OrderBy(m => m.Order).First();
     }
+
+    private static IReadOnlyList<string> GetUsableMemberNames(
+        AiSourceDefinition source,
+        string capabilityName)
+        => source.Members
+            .Where(member => source.GetEffectiveCapabilities(member).ContainsKey(capabilityName))
+            .OrderBy(member => member.Order)
+            .Select(member => member.Name)
+            .ToArray();
 
     private IAiAdapter ResolveAdapter(AiSourceDefinition source)
     {
