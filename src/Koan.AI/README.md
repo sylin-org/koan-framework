@@ -73,12 +73,24 @@ var inspection = await sourceControl.InspectAsync(new AiSourceCandidate
     Endpoint = "http://model-host:11434"
 });
 
+if (inspection.Available)
+{
+    Console.WriteLine(inspection.Version ?? "version unavailable");
+    Console.WriteLine($"Installed: {string.Join(", ", inspection.Models)}");
+    Console.WriteLine(inspection.ResidentModelsAvailable
+        ? $"Resident: {string.Join(", ", inspection.ResidentModels)}"
+        : "Residency unavailable");
+}
+
 sourceControl.Disable("maintenance-pool");
 sourceControl.Remove("retired-pool", expectedOrigin: "runtime");
 ```
 
-Ollama inspection calls its tags API; LM Studio inspection calls its OpenAI-compatible models API. Inspection does
-not register the endpoint. Disabled and removed sources leave routing and health probing immediately.
+`Available` means at least one provider-owned inspection facet answered. `VersionAvailable`,
+`ModelsAvailable`, and `ResidentModelsAvailable` distinguish unavailable facts from successful empty values;
+`Models` is the installed-model catalog. Ollama inspection owns its version, tags, and process APIs. LM Studio
+inspection owns its OpenAI-compatible models API and reports only the facets that protocol can inspect. Inspection
+does not register the endpoint. Disabled and removed sources leave routing and health probing immediately.
 
 ## Host and failure contract
 

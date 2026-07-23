@@ -32,17 +32,21 @@ capability guides rather than becoming another framework curriculum.
 sources at runtime, and drive Jobs deterministically in tests without copying framework internals.
 An engineer or coding agent can discover those paths quickly for greenfield or brownfield work.
 
-**Public expression:** An unnamed `SseEnvelope` remains unnamed. AI exposes `IAiSourceControl` with
-inspect, apply, enable, disable, and remove operations while ordinary routing remains automatic.
+**Public expression:** An unnamed `SseEnvelope` remains unnamed, and an empty envelope carrying
+comment, retry, or id fields is an exact control frame. AI exposes `IAiSourceControl` with inspect,
+apply, enable, disable, and remove operations while ordinary routing remains automatic. Inspection
+reports provider version, installed models, and resident models without exposing a provider client.
 `JobsTestDriver.From(services)` drives the existing Jobs engine after the host opts out of background
 execution. The agent workflow uses the normal package, configuration, Entity, context, and runtime
 surfaces documented by each capability pillar.
 
-**Guarantee/correction:** SSE control frames are not converted to named events and stronger cache
-directives survive. Disabled or removed AI sources leave routing immediately, replacement invalidates
-old health work, and endpoint inspection uses the selected provider's protocol. Jobs tests execute
-the production orchestrator deterministically. Unsupported inspection and incompatible Jobs test
-configuration fail with the exact safe correction.
+**Guarantee/correction:** SSE control frames contain no synthetic event or data field, null data
+still rejects, and stronger cache directives survive. Disabled or removed AI sources leave routing
+immediately, replacement invalidates old health work, and endpoint inspection uses the selected
+provider's protocol. Inspection distinguishes an unreachable endpoint, an available empty installed
+model catalog, and unavailable residency information. Jobs tests execute the production orchestrator
+deterministically. Unsupported inspection and incompatible Jobs test configuration fail with the
+exact safe correction.
 
 **Complete intent surface:** Reference the relevant package and use the API above. Deterministic Jobs
 tests additionally set `JobsOptions.EnableWorker` to `false` and retain normal, non-inline execution.
@@ -72,6 +76,10 @@ An absent event name is meaningful. Fallback event names apply only when the cal
 for that projection. Framework headers use set-if-absent or token composition: they never weaken a
 stronger application or middleware cache directive.
 
+An envelope with empty data and at least one comment, retry, or id field is a protocol control frame.
+The formatter writes only those control fields and the terminating blank line. An empty envelope
+without control fields remains an empty data event, and null data remains invalid.
+
 ### AI source lifecycle
 
 The runtime registry owns a monotonically increasing revision for each applied source. Routing sees
@@ -81,6 +89,22 @@ current, so a late probe cannot resurrect removed, disabled, or replaced state.
 Provider adapters own endpoint inspection because only they know the correct endpoint, request, and
 response grammar. Source control coordinates inspection and lifecycle; it does not reimplement
 provider protocols.
+
+The provider-neutral inspection result carries optional provider version, installed models, and
+resident models. Availability flags distinguish a successful empty collection from a provider facet
+that could not be inspected. Overall availability means the endpoint answered at least one
+provider-owned inspection request; partial failures remain visible in `Detail`.
+
+Ollama owns `/api/version`, `/api/tags`, and `/api/ps`. The application neither calls nor parses those
+endpoints. Other providers populate only the facets their protocol can truthfully inspect.
+
+### Route-hint naming clarification
+
+`WithRouteAdapter` currently carries a source or member hint; the router resolves the actual provider
+adapter from that source. This decision does not add a source-named alias because two names for one
+route field would make the public path less clear. A later semantic rename must change
+`AiRouteHints.AdapterId` and its fluent method together, with one compatibility decision, rather than
+layering another permanent synonym into this closure.
 
 ### Deterministic Jobs testing
 
@@ -119,6 +143,11 @@ retrieval evaluation. They do not encode a private application, infrastructure t
 ## Evidence boundary
 
 Each slice owns focused behavioral tests. The new Jobs package is checked for an xUnit-free dependency
-graph. Agent fixtures receive static structure/link validation; independent cold-agent runs are
-requested only when the workflow itself changes materially. Repository-wide certification remains
-outside this decision under ARCH-0121.
+graph. Agent fixtures receive static structure/link validation; when the workflow itself changes
+materially, each of the three anonymous prompts runs once with a cold agent and retains its raw output
+and signal score. Successful prompts are not repeated and no model matrix is required. Repository-wide
+certification remains outside this decision under ARCH-0121.
+
+The material workflow change accepted by this decision has retained cold-agent evidence at
+`tests/Fixtures/AgentApplicationEngineering/evidence/2026-07-23`: all three anonymous prompts passed
+their declared signals on the first run.

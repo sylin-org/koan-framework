@@ -227,6 +227,7 @@ internal sealed class LMStudioAdapter :
                 Endpoint = candidate.Endpoint,
                 Available = true,
                 Models = models.Select(model => model.Name).Where(name => name.Length > 0).ToArray(),
+                ModelsAvailable = true,
                 Capabilities = new HashSet<string>(
                     ((IAiAdapter)this).Capabilities,
                     StringComparer.OrdinalIgnoreCase)
@@ -730,4 +731,3 @@ internal sealed class LMStudioAdapter :
         public string? owned_by { get; set; }
     }
 }
-

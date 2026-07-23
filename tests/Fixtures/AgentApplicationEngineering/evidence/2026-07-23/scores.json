@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-23",
+  "protocol": "one independent cold-agent run per prompt",
+  "guide": "docs/guides/agent-application-engineering.md",
+  "fixture": "tests/Fixtures/AgentApplicationEngineering/evaluations.json",
+  "results": [
+    {
+      "id": "greenfield",
+      "rawOutput": "greenfield.md",
+      "passed": true,
+      "signals": [
+        {
+          "signal": "states application intent before implementation",
+          "passed": true,
+          "evidence": "Opens with the atomic loan and durable overdue-notice outcome."
+        },
+        {
+          "signal": "uses Entity<T> and standard Entity operations",
+          "passed": true,
+          "evidence": "Defines Loan : Entity<Loan> and uses Save, Get, and Entity-owned job operations."
+        },
+        {
+          "signal": "uses Jobs for Entity-owned background work",
+          "passed": true,
+          "evidence": "Loan implements IKoanJob<Loan> and submits its notice action."
+        },
+        {
+          "signal": "names package and durability boundary",
+          "passed": true,
+          "evidence": "Names Sylin.Koan.Jobs, SQLite, DataStore persistence, and at-least-once execution."
+        },
+        {
+          "signal": "proposes focused behavior, composition, and corrective proof",
+          "passed": true,
+          "evidence": "Covers the checkout behavior, AddKoan host composition, and missing durable-provider startup failure."
+        }
+      ]
+    },
+    {
+      "id": "brownfield",
+      "rawOutput": "brownfield.md",
+      "passed": true,
+      "signals": [
+        {
+          "signal": "preserves observable integration contracts",
+          "passed": true,
+          "evidence": "Freezes HTTP, Mongo, deployment, and environment contracts before replacement."
+        },
+        {
+          "signal": "classifies mechanisms as keep, absorb, rebuild, or delete",
+          "passed": true,
+          "evidence": "Keeps controllers and policy initially, absorbs persistence and work, and deletes duplicates only after proof."
+        },
+        {
+          "signal": "moves persistence and CRUD to Entity<T> surfaces",
+          "passed": true,
+          "evidence": "Introduces Reminder : Entity<Reminder> and replaces repository calls with Entity operations."
+        },
+        {
+          "signal": "moves background work only after naming its guarantee",
+          "passed": true,
+          "evidence": "Names durable acceptance, restart survival, retries, and at-least-once execution before replacing polling."
+        },
+        {
+          "signal": "migrates and proves one mechanism at a time",
+          "passed": true,
+          "evidence": "Uses staged cutover with HTTP, Mongo, Jobs, configuration, and deployment proofs."
+        }
+      ]
+    },
+    {
+      "id": "corrective",
+      "rawOutput": "corrective.md",
+      "passed": true,
+      "signals": [
+        {
+          "signal": "does not invent Jobs registration",
+          "passed": true,
+          "evidence": "Keeps AddKoan and explicitly says Jobs needs no manual registration."
+        },
+        {
+          "signal": "distinguishes in-memory convenience from durable restart survival",
+          "passed": true,
+          "evidence": "Explains process-lifetime in-memory behavior separately from DataStore persistence."
+        },
+        {
+          "signal": "requires a durable Data provider for the durability claim",
+          "passed": true,
+          "evidence": "Requires a qualifying durable Data provider for DataStore persistence."
+        },
+        {
+          "signal": "expects a corrective composition failure for explicitly required durability",
+          "passed": true,
+          "evidence": "States that host composition fails instead of silently downgrading."
+        }
+      ]
+    }
+  ],
+  "passed": 3,
+  "failed": 0
+}

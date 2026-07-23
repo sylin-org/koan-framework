@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
+    <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <Description>Deterministically drive Koan Jobs through its production execution engine from any test framework.</Description>
     <PackageTags>$(CommonPackageTags);jobs;testing;deterministic;integration-testing</PackageTags>
   </PropertyGroup>

@@ -52,6 +52,9 @@ Configure only the fallback event name when needed:
   and stop on request cancellation. Existing stronger cache or application-owned transport directives survive.
 - Typed and text values receive the explicit `Sse.Stream(..., eventName)` value or configured default. An explicit
   envelope remains unnamed unless the caller supplies `eventName`.
+- An envelope with empty data plus a comment, retry, or id is a control frame. It emits only those control fields,
+  even when the stream has a fallback event name; comment-only heartbeats are exactly `: text` plus the blank frame
+  terminator.
 - Empty text chunks are skipped; multiline data is emitted as valid repeated `data:` lines.
 - The package does not promise delivery, replay, resume storage, heartbeat generation, backpressure persistence,
   authentication, or proxy-specific buffering behavior. Compose those concerns at their owning transport or host.

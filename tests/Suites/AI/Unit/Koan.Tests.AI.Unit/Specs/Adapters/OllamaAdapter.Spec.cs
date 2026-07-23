@@ -104,8 +104,13 @@ public sealed class OllamaAdapterSpec
     {
         var handler = new RecordingHandler((request, _) =>
         {
-            request.RequestUri!.AbsolutePath.Should().Be("/api/tags");
-            return JsonResponse("""{"models":[{"name":"phi3:mini","model":"phi3"}]}""");
+            return request.RequestUri!.AbsolutePath switch
+            {
+                "/api/version" => JsonResponse("""{"version":"0.11.4"}"""),
+                "/api/tags" => JsonResponse("""{"models":[{"name":"phi3:mini","model":"phi3"}]}"""),
+                "/api/ps" => JsonResponse("""{"models":[{"name":"phi3:mini","model":"phi3"}]}"""),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            };
         });
         using var adapter = CreateAdapter(handler);
 
@@ -116,8 +121,64 @@ public sealed class OllamaAdapterSpec
         });
 
         result.Available.Should().BeTrue();
+        result.VersionAvailable.Should().BeTrue();
+        result.Version.Should().Be("0.11.4");
+        result.ModelsAvailable.Should().BeTrue();
         result.Models.Should().Equal("phi3:mini");
+        result.ResidentModelsAvailable.Should().BeTrue();
+        result.ResidentModels.Should().Equal("phi3:mini");
         result.Capabilities.Should().Contain("Chat");
+        handler.Requests.Select(request => request.Uri.AbsolutePath)
+            .Should().Equal("/api/version", "/api/tags", "/api/ps");
+    }
+
+    [Fact]
+    public async Task Inspection_distinguishes_an_empty_catalog_from_unavailable_residency()
+    {
+        var handler = new RecordingHandler((request, _) =>
+            request.RequestUri!.AbsolutePath switch
+            {
+                "/api/version" => JsonResponse("""{"version":"0.11.4"}"""),
+                "/api/tags" => JsonResponse("""{"models":[]}"""),
+                "/api/ps" => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
+                _ => new HttpResponseMessage(HttpStatusCode.NotFound)
+            });
+        using var adapter = CreateAdapter(handler);
+
+        var result = await adapter.InspectAsync(new AiSourceCandidate
+        {
+            Provider = "ollama",
+            Endpoint = "http://localhost:11434"
+        });
+
+        result.Available.Should().BeTrue();
+        result.ModelsAvailable.Should().BeTrue();
+        result.Models.Should().BeEmpty();
+        result.ResidentModelsAvailable.Should().BeFalse();
+        result.ResidentModels.Should().BeEmpty();
+        result.Detail.Should().Contain("resident models").And.Contain("503");
+    }
+
+    [Fact]
+    public async Task Inspection_reports_unreachable_when_no_provider_facet_answers()
+    {
+        var handler = new RecordingHandler((_, _) =>
+            new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        using var adapter = CreateAdapter(handler);
+
+        var result = await adapter.InspectAsync(new AiSourceCandidate
+        {
+            Provider = "ollama",
+            Endpoint = "http://localhost:11434"
+        });
+
+        result.Available.Should().BeFalse();
+        result.VersionAvailable.Should().BeFalse();
+        result.ModelsAvailable.Should().BeFalse();
+        result.ResidentModelsAvailable.Should().BeFalse();
+        result.Detail.Should().Contain("provider version").And
+            .Contain("installed models").And
+            .Contain("resident models");
     }
 
     private static OllamaAdapter CreateAdapter(RecordingHandler handler, string model = "phi3")

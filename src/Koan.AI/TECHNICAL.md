@@ -37,6 +37,11 @@ particular model is installed or healthy.
 Background health observation updates member state without rebuilding provider topology. Startup provenance reports
 configured categories/sources, the live adapter roster, and source/member status.
 
+`IAiSourceControl` coordinates runtime mutation and provider-owned endpoint inspection. `AiSourceInspection`
+separates overall reachability from version, installed-model, and resident-model facet availability. Successful
+empty collections therefore remain distinct from facets the provider could not inspect. Adapters own all transport
+and parsing; source control never becomes a provider client.
+
 `AiSourcesHealthContributor` composes as one element of the standard `IHealthContributor` collection and is
 noncritical by default. Its readiness data reports healthy, unhealthy, unknown, and recovering member counts.
 Unknown or recovering members are not false-green: an entirely unprobed source reports `unknown`, while a source

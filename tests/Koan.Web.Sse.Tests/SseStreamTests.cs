@@ -54,6 +54,34 @@ public sealed class SseStreamTests
     }
 
     [Fact]
+    public void Formatter_emits_the_exact_comment_only_control_frame()
+    {
+        var formatted = SseFormatter.ToWireFormat(
+            new SseEnvelope(null, "", Comment: "hb"));
+
+        formatted.Should().Be(": hb\n\n");
+    }
+
+    [Fact]
+    public void Formatter_emits_the_exact_retry_only_control_frame()
+    {
+        var formatted = SseFormatter.ToWireFormat(
+            new SseEnvelope(null, "", Retry: TimeSpan.FromSeconds(2)));
+
+        formatted.Should().Be("retry: 2000\n\n");
+    }
+
+    [Fact]
+    public void Formatter_rejects_null_data()
+    {
+        var envelope = new SseEnvelope(null, null!);
+
+        var act = () => SseFormatter.ToWireFormat(envelope);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
     public async Task The_same_result_executes_through_mvc()
     {
         var context = CreateHttpContext();
@@ -89,6 +117,27 @@ public sealed class SseStreamTests
         var payload = await ReadBody(context);
         payload.Should().Contain("event: requested").And.Contain("event: custom");
         payload.Should().NotContain("event: configured");
+    }
+
+    [Fact]
+    public async Task Minimal_result_preserves_exact_control_frames_even_with_a_requested_fallback()
+    {
+        var context = CreateHttpContext();
+
+        await Sse.Stream(GetControlFrames(), eventName: "fallback").ExecuteAsync(context);
+
+        (await ReadBody(context)).Should().Be(": hb\n\nretry: 1500\n\n: warm\nretry: 3000\n\n");
+    }
+
+    [Fact]
+    public async Task Mvc_result_preserves_exact_control_frames()
+    {
+        var context = CreateHttpContext();
+        IActionResult result = Sse.Stream(GetControlFrames());
+
+        await result.ExecuteResultAsync(new ActionContext(context, new RouteData(), new ActionDescriptor()));
+
+        (await ReadBody(context)).Should().Be(": hb\n\nretry: 1500\n\n: warm\nretry: 3000\n\n");
     }
 
     [Fact]
@@ -158,6 +207,18 @@ public sealed class SseStreamTests
         yield return new SseEnvelope(null, "noop");
         await Task.Yield();
         yield return new SseEnvelope("custom", "data");
+    }
+
+    private static async IAsyncEnumerable<SseEnvelope> GetControlFrames()
+    {
+        yield return new SseEnvelope(null, "", Comment: "hb");
+        await Task.Yield();
+        yield return new SseEnvelope(null, "", Retry: TimeSpan.FromMilliseconds(1500));
+        yield return new SseEnvelope(
+            "ignored-for-control",
+            "",
+            Retry: TimeSpan.FromSeconds(3),
+            Comment: "warm");
     }
 
     private sealed class TestMessage

@@ -23,7 +23,7 @@ public static class SseFormatter
             builder.Append(':').Append(' ').Append(envelope.Comment).Append('\n');
         }
 
-        if (envelope.HasEventName)
+        if (!envelope.IsControlFrame && envelope.HasEventName)
         {
             builder.Append("event: ").Append(envelope.EventName).Append('\n');
         }
@@ -40,7 +40,11 @@ public static class SseFormatter
                 .Append('\n');
         }
 
-        AppendDataLines(builder, envelope.Data);
+        if (!envelope.IsControlFrame)
+        {
+            AppendDataLines(builder, envelope.Data);
+        }
+
         builder.Append('\n');
         return builder.ToString();
     }

@@ -22,6 +22,10 @@ The result applies its explicit event name as a fallback. `KoanSseOptions.Defaul
 projection only; an explicit unnamed envelope remains unnamed so comments and other control frames retain their
 protocol meaning. Explicit envelope event names always win.
 
+An envelope with empty data and at least one comment, retry, or id field is a control frame. Formatting suppresses
+both event and data fields for that frame, writes the supplied control fields, and terminates with one blank line.
+An empty envelope without control fields remains an empty data event. Null data remains invalid.
+
 ## Execution
 
 Execution resolves the host-owned `IOptions<KoanSseOptions>`, composes the SSE response headers, enumerates with

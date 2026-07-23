@@ -9,3 +9,6 @@ matrix or repeat successful prompts.
 
 The fixtures contain no downstream application identity, path, URL, topology, or recognizable
 workflow.
+
+Latest retained run: [2026-07-23 cold-agent evidence](evidence/2026-07-23/README.md) — 3/3 prompts
+passed.
