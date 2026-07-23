@@ -4,7 +4,7 @@ domain: core
 title: "Adopt Koan in an existing application"
 audience: [developers, architects, technical-leads, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
@@ -12,33 +12,33 @@ validation:
   scope: incremental ASP.NET Core adoption, coexistence, inspection, and rollback
 ---
 
-# Adopt Koan in an existing application
+# Bring Koan into the app you already have
 
-Koan does not require an application rewrite. Add one capability at a clear boundary, keep the
-existing host and integrations, and expand only after the result earns its place.
+Keep your application. Pick one place where plumbing is louder than intent. Let Koan own just that
+slice, then decide whether it has earned another.
 
-## Add one persisted model
+## Start with one Entity
 
-In an existing ASP.NET Core application, add the supported SQLite connector:
+Add Koan's supported SQLite provider:
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ```
 
-Keep the existing host and add one composition call:
+Keep the host you have and add one Koan line:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers(); // existing application services remain
+builder.Services.AddControllers(); // your existing services stay
 builder.Services.AddKoan();
 
 var app = builder.Build();
-// Keep the application's existing middleware and endpoint mappings here.
+// Keep your existing middleware and endpoint mappings.
 await app.RunAsync();
 ```
 
-Introduce Koan at one new or deliberately carved-out domain boundary:
+Now declare one new—or deliberately carved-out—piece of the domain:
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -46,7 +46,15 @@ public sealed class Todo : Entity<Todo>
     public string Title { get; set; } = "";
     public bool Done { get; set; }
 }
+```
 
+Koan gives that Entity durable SQLite persistence. How much more it owns is your choice.
+
+## Keep your controller
+
+Use Entity operations inside an ordinary ASP.NET Core controller:
+
+```csharp
 [ApiController, Route("api/todos")]
 public sealed class TodosController : ControllerBase
 {
@@ -55,31 +63,49 @@ public sealed class TodosController : ControllerBase
 }
 ```
 
-Existing controllers, middleware, services, EF Core models, repositories, and provider SDK clients
-continue to work. Use `EntityController<T>` only when its projection is the intended boundary.
+Your routes, actions, filters, and response design remain yours.
 
-## What stays ordinary .NET
+## Or declare the whole API
 
-| Existing concern | Adoption rule |
-|---|---|
-| Hosting and DI | Keep the current host and registrations; call `AddKoan()` once. |
-| Controllers and middleware | Keep them. Add Koan projections only where their conventions are useful. |
-| EF Core or repositories | Leave existing aggregates in place; adopt Entity semantics one boundary at a time. |
-| Authentication | Existing ASP.NET Core authorization remains valid; add Koan Identity only when its capability is needed. |
-| External SDK clients | Keep application-specific integrations; use a Koan connector only for a capability Koan owns. |
-| Docker, Aspire, or Kubernetes | Keep the topology unchanged; connectors consume configuration and report readiness. |
+When Koan's standard Entity API is exactly what you want, the controller becomes the intent:
 
-## Prove the increment
+```powershell
+dotnet add package Sylin.Koan.App
+```
 
-1. Start the application and read Koan's startup composition.
-2. Exercise the new business path while existing paths remain unchanged.
-3. Add an Entity conformance test when the boundary is intended to remain.
-4. Confirm the selected provider and its limits in the
-   [product surface](../reference/product-surface.md).
+```csharp
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
+```
 
-If the increment does not help, remove the package reference, the new Entity boundary, and
-`AddKoan()` when no other Koan capability uses it. Data already written to the selected provider is an
-application migration decision; Koan does not silently move or delete it.
+**Entity. Controller. Done—even inside the application you already have.**
 
-Continue with the [capability curriculum](../index.md), or review
-[architecture responsibilities](../architecture/index.md) before adding another capability.
+The App bundle adds Koan's ASP.NET Core integration; the explicit SQLite reference remains the
+provider for this Entity.
+
+## Nothing else has to move
+
+Existing controllers, middleware, services, EF Core models, repositories, authentication, and SDK
+clients continue to work. Your Docker, Aspire, or Kubernetes topology stays where it is. Koan
+connectors consume configuration and report readiness; they do not take over deployment.
+
+Adopt Entity semantics only at boundaries where they make the code clearer. Reach for ordinary .NET
+everywhere else.
+
+## Let the result earn the next step
+
+Run the application and exercise both the new path and an unchanged one. Koan's startup report shows
+what it added; `/.well-known/Koan/facts` shows the same choices in a machine-readable form.
+
+Before expanding the boundary:
+
+1. Add an Entity conformance test if this behavior should remain.
+2. Check the selected provider and its limits in [what works today](../reference/what-works.md).
+3. Add the next capability only when the application asks for it.
+
+If the experiment is not helping, remove the package and the Entity boundary. Remove `AddKoan()` too
+when no other Koan feature uses it. Data already written to SQLite remains an application migration
+decision; Koan will never silently move or delete it.
+
+Ready for another slice? [Choose what to add next](../index.md), or read
+[where Koan fits—and where it stops](../architecture/index.md).

@@ -1,99 +1,115 @@
 ---
 type: ARCHITECTURE
 domain: framework
-title: "Evaluate Koan architecture"
+title: "Small code. Serious architecture."
 audience: [architects, developers, technical-leads, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-22
+  date_last_tested: 2026-07-23
   status: reviewed
-  scope: architect decision path, responsibility boundary, reference profiles, and quality attributes
+  scope: architect fit, brownfield adoption, responsibility boundary, and production ownership
 ---
 
-# Evaluate Koan architecture
+# Small code. Serious architecture.
 
-Koan is an application framework, not a deployment platform. It gives Entity-centric .NET
-applications one business-facing grammar for capabilities, compiles referenced modules into one
-runtime composition, elects eligible providers, and explains the result. Your application keeps
-ownership of its domain, infrastructure topology, production guarantees, and deliberate exceptions.
+The two declarations are not demo sleight of hand. They are the architecture:
 
-```mermaid
-flowchart LR
-    A["Application<br/>Entities, policies, workflows"] --> K["AddKoan()<br/>compiled composition"]
-    K --> P["Capability pillars<br/>semantic policy and plans"]
-    P --> D["Provider adapters<br/>mechanics and declared guarantees"]
-    D --> E["Application-owned services<br/>databases, brokers, models, identity"]
-    K --> F["One fact model<br/>startup, health, facts, tests, MCP"]
+```csharp
+public sealed class Todo : Entity<Todo>;
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
 ```
 
-References make capabilities available; they do not make external commitments disappear. Explicit
-provider intent either wins or fails with a correction. Koan does not silently substitute a weaker
-durability, consistency, isolation, or delivery guarantee.
+`Todo` says what the application knows. `TodosController` says how the outside world reaches it. With
+the web application bundle and SQLite connector, that is a persisted, queryable HTTP API.
 
-## Is Koan a fit?
+The same Entity stays at the center when the application gains authorization, background work,
+events, caching, semantic search, media, or agent access. The business idea remains visible while
+Koan brings the machinery together around it.
 
-Choose Koan when the application is naturally Entity-centric, conventions are preferable to repeated
-plumbing, and provider decisions must remain inspectable while the application grows across data,
-web, work, identity, content, AI, and agent surfaces.
+**The magic is not that Koan hides everything. It is that Koan asks you to say only what matters—and
+can explain the rest.**
 
-Pause when the design requires a stable 1.0 compatibility contract, general cross-provider
-transactions, transparent failover between unequal providers, framework-owned infrastructure
-provisioning, a general backup/recovery system, or NativeAOT. Koan 0.20 does not promise those things.
+## Why it stays small
 
-## Responsibility boundary
+- **Intent stays in charge.** Application code talks about `Todo`, not database sessions, transport
+  envelopes, or tool schemas.
+- **References bring capabilities.** Add a supported package and Koan discovers what it contributes.
+  `AddKoan()` brings those contributions together once as the application starts.
+- **Conventions have exits.** Use a normal ASP.NET Core controller, service, provider SDK, or
+  deliberate override wherever the default is not the right shape.
+- **The application can explain itself.** Startup reports, health, runtime facts, and the composition
+  lockfile show what became active and why.
 
-| Decision | Koan owns | Application and platform own |
-|---|---|---|
-| Composition | module participation, provider election, corrective failure, runtime facts | referenced capabilities, explicit pins, deliberate overrides |
-| Business behavior | concise Entity and capability grammar | domain invariants, workflows, integration contracts |
-| Infrastructure | connector discovery, configuration binding, selected-provider health | Docker/Aspire/Kubernetes, service lifecycle, credentials, network topology |
-| Reliability | truthful capability and delivery semantics | SLOs, redundancy, failover, idempotency policy, incident response |
-| Security | supported authentication, access, tenancy, and redacted explanation surfaces | HTTPS, secrets, trust boundaries, entitlements, compliance, exposed operations |
-| Recovery | provider-specific behavior only where explicitly claimed | backups, restore testing, retention, RPO/RTO, disaster recovery |
+## Where Koan shines
 
-## Reference profiles
+Koan is a strong fit when:
 
-| Profile | Shape | Architectural boundary |
-|---|---|---|
-| Local-first application | one process with SQLite or another supported local provider | fastest supported start; embedded durability and single-node limits remain explicit |
-| Service with managed dependencies | Koan Web plus supported database, identity, AI, or vector connectors | the platform owns service availability, scaling, credentials, backup, and network policy |
-| Distributed work | Jobs plus a supported persistence and Communication connector | work is at-least-once; handlers are idempotent; acceptance is not completion |
-| Governed agent surface | MCP projection over explicitly exposed and authorized application operations | Entity capability is not automatic tool exposure; transport, identity, and access remain explicit |
+- business state maps naturally to Entities;
+- conventions are more valuable than repeating data, API, job, and integration plumbing;
+- the application should start locally and move to external providers without changing its domain
+  vocabulary;
+- people and agents should work through the same governed application model; and
+- architects need framework choices to remain visible at runtime.
 
-These are evaluation profiles, not generated deployment templates. Keep the same application grammar
-while selecting only providers whose published guarantees satisfy the intended profile.
+Take a different path, or keep Koan at a smaller boundary, when the design depends on:
 
-## At more than one instance
+- a stable 1.0 compatibility contract—Koan 0.20 is still a preview;
+- general transactions across different providers;
+- transparent failover between providers with different guarantees;
+- framework-owned infrastructure provisioning, backup, or disaster recovery; or
+- NativeAOT.
 
-| Concern | What changes |
+Koan will not quietly pretend those guarantees exist.
+
+## It can join an application already in motion
+
+Koan does not need to own the whole system. Add `AddKoan()` to an existing ASP.NET Core host,
+introduce one Entity at a useful boundary, and leave the rest alone.
+
+Existing middleware, controllers, EF Core models, repositories, SDK clients, authentication, and
+deployment topology can remain exactly where they are. Adopt another Koan capability only after the
+first one earns its place.
+
+[See incremental adoption in an existing ASP.NET Core application.](../getting-started/adopt-existing-app.md)
+
+## Who owns what
+
+Koan is an application framework, not a deployment platform.
+
+| Koan makes easier | Your application and platform still own |
 |---|---|
-| Embedded Data and Local Storage | State is node-local. Replicas do not become a shared database or filesystem. |
-| External providers | Replicas can share reach; the selected service still owns consistency, HA, backup, and failover. |
-| Jobs and Communication | At-least-once behavior remains. Prove shared persistence and connector reach, then keep handlers idempotent. |
-| Health and facts | Each instance reports its own resolved composition; the platform owns aggregation and rollout policy. |
+| Discovering referenced capabilities and bringing them together | Choosing which capabilities belong in the application |
+| Selecting an eligible provider and explaining the choice | Provider configuration, deliberate overrides, and acceptable guarantees |
+| Entity persistence, API, access, work, and agent conventions | Domain rules, workflows, and integration contracts |
+| Health, runtime facts, and actionable startup failures | SLOs, scaling, credentials, networks, and incident response |
+| Supported authentication, access, and tenant boundaries | Trust design, entitlements, exposed operations, and compliance |
+| Provider behavior that Koan explicitly documents | Backups, restore testing, retention, RPO/RTO, and disaster recovery |
 
-## Architecture review
+Docker, Aspire, Kubernetes, databases, brokers, model runtimes, and identity providers keep doing
+their jobs. Koan connects application intent to them; it does not become them.
 
-Before approving a design, confirm:
+When several instances run, local SQLite and local files remain local to each instance. External
+providers may give instances shared reach, but those services still own consistency, availability,
+backup, and failover. Background work remains at-least-once, so handlers must be idempotent.
 
-1. every required capability and provider is admitted by the
-   [generated product surface](../reference/product-surface.md);
-2. provider-specific consistency, boundedness, durability, and outage behavior satisfy the use case;
-3. tenant, actor, authorization, and integration trust boundaries are explicit;
-4. external topology, secrets, scaling, backup, recovery, and observability have named owners;
-5. readiness, runtime facts, and the composition lockfile expose the decisions operators must verify;
-6. unsupported guarantees fail or remain visible rather than becoming assumptions.
+## Look behind the magic
 
-## Go deeper
+The small code does not require blind trust. A running Koan application can tell you which modules and
+providers became active, why they were selected, whether their dependencies are ready, and whether
+the referenced composition has drifted.
 
-- [Product constitution](product-constitution.md) — durable product and responsibility rules.
-- [Framework principles](principles.md) — composition kernel, pillars, adapters, and runtime truth.
-- [Entity Semantics Contract](entity-semantics-contract.md) — placement and extension rules.
-- [Capability curriculum](../index.md) — application semantics and provider choices.
-- [Testing and operations](../reference/operations/index.md) — evidence, health, facts, and correction.
-- [External topology](../reference/operations/external-topology.md) — integration with existing
-  deployment platforms.
-- [Incremental adoption](../getting-started/adopt-existing-app.md) — coexistence with an existing
-  ASP.NET Core application.
+That visibility is there for development, tests, architecture review, and operations—not as homework
+before someone writes their first Entity.
+
+## Keep exploring
+
+- [See what Koan can do today](../reference/what-works.md)
+- [Bring Koan into an existing application](../getting-started/adopt-existing-app.md)
+- [Read the design principles](principles.md)
+- [Review how capabilities extend Entities](entity-semantics-contract.md)
+- [Test and inspect an application](../reference/operations/index.md)
+- [Plan external infrastructure](../reference/operations/external-topology.md)
+- [Check exact package and support status](../reference/product-surface.md)
