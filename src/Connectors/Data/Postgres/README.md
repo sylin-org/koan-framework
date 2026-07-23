@@ -14,8 +14,8 @@ PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
 
 ## Install
 
-> **0.20 preview:** PostgreSQL is a supported Koan Entity provider. The public guarantee covers the
-> behavior and limits below; it does not imply parity with every relational backend.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity.
+This page owns PostgreSQL behavior and limits; they do not imply parity with every relational backend.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Postgres

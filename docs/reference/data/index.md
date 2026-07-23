@@ -1,23 +1,44 @@
 ---
 type: REF
 domain: data
-title: "Entity Data Foundation"
+title: "Persist and query business state"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-15
+  date_last_tested: 2026-07-22
   status: verified
-  scope: Entity data grammar, local-provider roles, negotiation, and current support boundary
+  scope: Entity grammar, provider choice, query cost, relationships, lifecycle, and correction paths
 ---
 
-# Entity data foundation
+# Persist and query business state
 
-## Current contract
+Use Koan Data when an application needs to store, find, relate, page, or process business objects.
+Application code works with its own Entity types; the referenced connector owns the physical store.
+There is no repository, `DbContext`, provider-registration method, or schema bootstrap in the ordinary
+application path.
 
-Koan's data foundation is `Entity<T>` plus deterministic provider negotiation. The common application
-path needs no repository, `DbContext`, provider registration, or schema bootstrap code:
+## Smallest useful result
+
+Add the application bundle and one durable provider:
+
+```powershell
+dotnet add package Sylin.Koan.App
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+Keep the normal Koan bootstrap:
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+
+var app = builder.Build();
+await app.RunAsync();
+```
+
+Then model and use business state directly:
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -26,76 +47,58 @@ public sealed class Todo : Entity<Todo>
     public bool Done { get; set; }
 }
 
-var saved = await new Todo { Title = "Ship the meaningful step" }.Save();
-var same = await Todo.Get(saved.Id);
-var open = await Todo.Query(todo => !todo.Done);
-await saved.Remove();
+var todo = await new Todo { Title = "Ship one useful thing" }.Save(ct);
+var same = await Todo.Get(todo.Id, ct);
+var open = await Todo.Query(item => !item.Done, ct);
+await todo.Remove(ct);
 ```
 
-Entity persistence, query, and SQLite belong to the supported 0.20 foundation. That guarantee does not extend to
-every available provider: use the [generated product surface](../product-surface.md) for the exact boundary.
-Public-feed publication and observation follow the final package-only proof; the source checkout and staged
-candidate exercise the same application contract today.
+Referencing SQLite makes the connector available. `AddKoan()` discovers it, elects it, creates the
+default local schema on first use, and exposes the same Entity operations to application code,
+generated REST controllers, and generated MCP tools.
 
-## Smallest durable application path
+## The application vocabulary
 
-The maintained Level-1 application references:
+| Need | Use | Cost signal |
+|---|---|---|
+| One known Entity | `Todo.Get(id, ct)` | Keyed lookup |
+| A filtered, bounded result | `Todo.Query(predicate, ct)` | Materialized result; provider execution varies |
+| One UI or API page | `Todo.FirstPage(size, ct)` or `Todo.Page(number, size, ct)` | Caller supplies the bound |
+| A large sequential workload | `Todo.AllStream(...)` or `Todo.QueryStream(...)` | Only on a provider that proves bounded paging |
+| Create or update | `entity.Save(ct)` | One logical write |
+| Delete | `entity.Remove(ct)` | One logical removal |
+| A finite batch | `Todo.UpsertMany(items, ct)` | Atomicity depends on the provider capability |
 
-- `Sylin.Koan.App` for Core, Entity data, the automatic JSON floor, and controller-based Web composition;
-- `Sylin.Koan.Data.Connector.Sqlite` for the selected durable local provider; and
-- only the capability packages the application actually needs.
+Use `Entity<T, TKey>` when the identifier is not the default string key. The lower-level
+`Data<TEntity, TKey>` facade, direct provider instructions, and raw access are expert escape hatches,
+not an application architecture requirement.
 
-`AddKoan()` is the complete registration call. Referencing SQLite makes it available; FirstUse also
-pins its business Entity to SQLite so adding another connector cannot silently move its data.
+## Choose a provider by business need
 
-[`samples/FirstUse`](../../../samples/FirstUse/README.md) is the executable contract. It proves SQLite
-create/read/query, REST, startup facts, readiness, a checked-in composition lockfile, and agent/operator
-inspection from source and from a staged package-only clean room.
+Reference only the connectors the application can actually use. The
+[product surface](../product-surface.md) is the authority for current maturity; each connector README
+owns its setup and backend-specific limits.
 
-## Local provider roles
+| Need | Connector | Important boundary |
+|---|---|---|
+| Durable local or single-node state | `Sylin.Koan.Data.Connector.Sqlite` | The simplest durable application path |
+| Process-local tests or ephemeral work | `Sylin.Koan.Data.Connector.InMemory` | Non-durable; not a production persistence claim |
+| File-backed, zero-infrastructure state | JSON provider included by the application bundle | Limited concurrency; not the durable foundation path |
+| PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | External service and provider-owned schema/operations apply |
+| SQL Server | `Sylin.Koan.Data.Connector.SqlServer` | External service and provider-owned schema/operations apply |
+| MongoDB | `Sylin.Koan.Data.Connector.Mongo` | Document-store query and consistency limits apply |
+| Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | Bucket, query-service, and consistency limits apply |
+| CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | Cockroach-specific routing and schema policy apply |
+| Redis-backed keyed state | `Sylin.Koan.Data.Connector.Redis` | Queries may scan; Entity streams reject |
 
-The providers below are deliberately not described as interchangeable.
+Search and vector stores solve different needs. Start from the [AI pillar](../ai/index.md) for
+embedding/vector retrieval and from each search connector's package documentation for indexed search.
+Do not infer that every Data connector has identical query, transaction, ordering, or consistency
+semantics merely because the Entity vocabulary is stable.
 
-| Provider | Role in the foundation | Current evidence | Explicit limits |
-|---|---|---|---|
-| SQLite | Durable local/single-node application path | connector 35/35; FirstUse 8-step and GoldenJourney 11-step source/package proofs | No claim for multi-node writes, every transaction shape, production migration policy, or remote-database behavior. |
-| InMemory | Fast conformance oracle and ephemeral test/development store | connector 56/56; Koan.Testing 12 passed with 3 capability/trait skips | Process-local and non-durable; never a production persistence claim. |
-| JSON | Automatic zero-infrastructure floor carried by `Sylin.Koan` | connector 21/21, including selection-aware readiness and persistence safety | File-backed, limited concurrency, and not the durable V1 application proof. |
+## Pin important routing
 
-PostgreSQL, SQL Server, MongoDB, Couchbase, Redis, and CockroachDB are supported networked extensions outside that local foundation.
-Their real provider suites cover the capabilities each adapter declares, including Entity CRUD/query,
-batch, filtering, paging/streaming, source routing, health, field transforms, and isolation. Their
-first-publication package consumers prove normal `AddKoan()` selection and Entity save/get/query
-against the selected service. Redis additionally proves shared backend identity, native TTL, and fast keyed removal,
-but its queries may scan the keyspace and its Entity streams reject before yielding. Each requires its reachable database and retains its documented schema,
-ordering, streaming, query-subset, consistency, and operational limits.
-
-CockroachDB is independently selectable from PostgreSQL while reusing the supported pg-wire repository
-mechanism. It adds Cockroach-owned discovery, routing, additive schema policy, identifier limits,
-primary-key stable ordering, and participation-aware health; it does not claim destructive migrations,
-snapshot/resumable streams, or silent PostgreSQL substitution.
-
-Other providers remain valuable lower-maturity extensions. Each needs its own
-current conformance, operations, packaging, and compatibility evidence; another provider's promotion
-does not confer support on a sibling.
-
-## Reference is availability; negotiation selects
-
-Provider selection follows one order:
-
-1. an explicit `EntityContext` source;
-2. a database-axis route;
-3. an explicit `EntityContext` adapter override;
-4. `[SourceAdapter]` or `[DataAdapter]` on the Entity;
-5. `Koan:Data:Sources:Default:Adapter`; then
-6. the highest-priority referenced provider.
-
-Configured intent is fail-loud. If the selected adapter was not referenced, Koan reports
-`adapter-unavailable`, lists referenced choices, and names the configuration/package correction. It
-does not substitute a different provider. Availability alone is inspectable but does not make an
-unused connector a readiness dependency.
-
-Use explicit selection when business durability must not change as references grow:
+When more than one connector is referenced, make durability intent explicit on the Entity:
 
 ```csharp
 [DataAdapter("sqlite")]
@@ -105,98 +108,125 @@ public sealed class Approval : Entity<Approval>
 }
 ```
 
-Or configure the application default:
+Or choose the application default in configuration:
 
 ```json
 {
   "Koan": {
     "Data": {
       "Sources": {
-        "Default": { "Adapter": "sqlite" }
-      },
-      "Sqlite": {
-        "ConnectionString": "Data Source=./data/app.db"
+        "Default": {
+          "Adapter": "sqlite",
+          "ConnectionString": "Data Source=./data/app.db"
+        }
       }
     }
   }
 }
 ```
 
-## Query and cost honesty
+Explicit intent fails loudly. If the selected adapter is not referenced, Koan reports
+`adapter-unavailable`, lists the available choices, and names the package or configuration correction.
+It does not silently move the Entity to another store.
 
-One Entity grammar does not mean every provider has the same physical behavior. Capability facts
-describe whether filtering is native, bounded residual work, or in-memory. Provider-specific tests
-earn provider-specific claims.
+## Relationships stay in the model
 
-Pagination intent belongs to the caller, not the adapter. `Product.All()` requests the complete
-visible set; an adapter does not invent a default limit. `Product.Page(page, size)` and an explicitly
-paged `QueryDefinition` carry an exact page request to the selected provider. Consumer boundaries
-such as Web may apply documented defaults and safety bounds, but they compile that policy into an
-explicit page before Data executes it.
+Declare a direct edge with `[Parent]`, then navigate it without introducing a repository layer:
 
-- Use `Get`, `Query`, `FirstPage`/`Page`, `AllStream`, `Save`, and `Remove` as the common vocabulary.
-- Prefer explicit paging when the result can grow; use Entity streams only when the selected adapter
-  advertises `DataCaps.Query.ProviderBoundedPaging`.
+```csharp
+public sealed class Order : Entity<Order>
+{
+    [Parent(typeof(Customer))]
+    public string CustomerId { get; set; } = "";
+}
+
+var customer = await order.GetParent<Customer>(ct);
+var orders = await customer.GetChildren<Order>(ct);
+```
+
+Koan rejects an unbounded scan-backed relationship unless the call explicitly supplies a finite
+candidate/result budget. Direct-edge navigation is not recursive graph traversal or snapshot
+isolation.
+
+## Add write policy only when the business needs it
+
+The parameterless `AddKoan()` remains complete. Compose host-owned persistence rules only for a real
+business invariant:
+
+```csharp
+builder.Services.AddKoan(() =>
+    Product.Lifecycle.BeforeUpsert(context =>
+        context.Current.Price < 0
+            ? context.Cancel("Price cannot be negative.", "product.price")
+            : context.Proceed()));
+```
+
+Lifecycle policy applies at the common Entity/Data boundary, so ordinary Entity calls and generated
+protocol surfaces have the same persistence meaning. See [Entity lifecycle](entity-lifecycle.md) for
+phases, prior values, protected fields, bulk behavior, transactions, and deliberate bypasses.
+
+## Query and streaming honesty
+
+A shared vocabulary does not hide physical cost:
+
+- Prefer an explicit page when a request result can grow.
+- Use `All()` only when fully materializing the visible set is intentional.
+- Use Entity streams only when the elected connector advertises provider-bounded paging.
+- Treat a capability rejection as a design correction, not a reason to add a silent full-set fallback.
 - Inspect `Data<TEntity, string>.Capabilities` before relying on optional bulk, transaction, filter,
   or isolation behavior.
-- Unsupported guarantees reject explicitly; Koan does not silently claim backend parity.
 
-The low-level `Data<TEntity,TKey>` facade, direct provider instructions, and raw access remain expert
-escape hatches. They do not replace Entity statics in ordinary business code.
+The [Entity access and streaming guide](../../guides/data/entity-access-and-streaming.md) owns the
+qualified-provider matrix, ordering floor, cancellation behavior, offset-paging consistency limits,
+and corrective exception.
 
-## Optional semantics and recovery
+## Verify the application contract
 
-Reference optional Data packages only when their business meaning applies:
-
-- `Sylin.Koan.Data.SoftDelete` lets `[SoftDelete]` Entities retain ordinary `Remove()` grammar while hiding rows
-  through one Data axis. `T.WithDeleted()` is a type-targeted recycle-bin scope; `.Restore()` and `.HardDelete()` are
-  the explicit recovery and purge verbs. It supplies no generic HTTP workflow or authorization bypass.
-- `Sylin.Koan.Data.Backup` supplies one DI-owned, single-Entity archive/recovery round trip through Koan Storage.
-  Create requires provider-bounded paging; restore validates the complete archive before its first batched upsert.
-  It does not claim whole-application coordination, encryption, retention, schema migration, or transactional restore.
-
-Both packages compose through the application's existing `AddKoan()` call. See their package-owned README and
-technical contracts for the complete operation surface and limits.
-
-## Testing the contract
-
-Reference `Sylin.Koan.Testing` and add one class per Entity:
+`Sylin.Koan.Testing` can exercise the same host and Entity surface used by the application:
 
 ```csharp
 public sealed class TodoConformance : EntityConformanceSpecs<Todo>
 {
-    protected override Todo NewValid() => new() { Title = "A valid business example" };
+    protected override Todo NewValid() => new() { Title = "A valid example" };
 }
 ```
 
-Koan owns the real host, temporary storage, Entity partition, and async-flow host binding. Independent
-conformance classes can use normal xUnit scheduling. Trait/capability batteries skip explicitly when
-they do not apply; a skip is absence of evidence, not provider certification.
+Capability-specific batteries skip when their prerequisite is absent. A skip means the test did not
+produce evidence; it is not provider certification. External connectors still require reachable
+services and provider-specific tests for the guarantees the application relies on.
 
-## Inspect and recover
+## Inspect and correct
 
-- Read startup's data election and composition summary first.
-- Use `/health/ready` for aggregate dependency readiness and `/health/live` for process liveness.
-- Read `/.well-known/Koan/facts` as an operator or `koan://facts` as an MCP client; both project the
-  same redacted schema-1 decisions.
-- Review `koan.lock.json` for referenced-module drift. Runtime facts add the provider actually elected.
+- Read startup's Data election and composition summary first.
+- Use `/health/ready` for participating dependency readiness and `/health/live` for process liveness.
+- Read `/.well-known/Koan/facts` or `koan://facts` for the same redacted runtime decisions.
+- Review `koan.lock.json` for referenced-module drift; runtime facts add the connector actually elected.
+- If an available connector is unused, it remains non-critical and must not open a connection merely
+  because its package was referenced.
 
-## Not in this foundation boundary
+[Adapter diagnostics and readiness](adapter-diagnostics.md) owns the operator and connector-author
+contract for availability, participation, health, route identity, and redaction.
 
-- universal provider parity or production certification;
-- schema migrations/upgrades, rollback, or long-term compatibility guarantees;
-- cross-provider or distributed transactions;
-- tenancy, concurrency control, audit, recovery, SLOs, or security posture;
-- vector/AI storage semantics; or
-- an assumption that adding a provider reference changes existing Entity routing safely without an
-  explicit election review.
+## Add only the semantics you need
 
-Those capabilities graduate in later rings with their own evidence.
+- `Sylin.Koan.Data.SoftDelete` keeps ordinary `Remove()` grammar while adding explicit recycle-bin,
+  restore, and purge behavior for opted-in Entities.
 
-## Related contracts
+The package owns its complete API and limitations in its README and technical companion. Data Backup
+is shelved and is not a greenfield 0.20 capability; it does not belong in the application path above.
 
-- [Entity Semantics Contract](../../architecture/entity-semantics-contract.md)
-- [Adapter diagnostics](adapter-diagnostics.md)
-- [Entity access and streaming](../../guides/data/entity-access-and-streaming.md)
-- [Testing your app](../../guides/testing-your-app.md)
-- [Current capability evidence](../../initiatives/koan-v1/CAPABILITIES.md)
+## Continue by task
+
+- [Entity lifecycle](entity-lifecycle.md) — enforce persistence invariants.
+- [Entity access and streaming](../../guides/data/entity-access-and-streaming.md) — process large sets
+  without disguising provider cost.
+- [Adapter diagnostics and readiness](adapter-diagnostics.md) — operate or author a connector.
+- [Testing your app](../../guides/testing-your-app.md) — prove the application-facing contract.
+- [`FirstUse`](../../../samples/FirstUse/README.md) — run the smallest durable application path.
+
+## Deliberate limits
+
+Koan Data does not promise universal provider parity, cross-provider transactions, recursive graph
+loading, production migration policy, backup/SLO/security posture, or snapshot-safe streaming. Those
+guarantees belong to a selected provider, another capability pillar, or the application and must be
+stated and tested there.

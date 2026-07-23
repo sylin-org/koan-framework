@@ -101,7 +101,7 @@ then inspect the job status and Jobs health contribution.
 
 If a durable ledger or cross-node wake-up was intended, verify that the elected data adapter and
 Communication connector support that tier. The same handler remains valid when those packages are
-added. See the [Jobs pillar map](../reference/cards/jobs.md) and
+added. See the [Jobs reference](../reference/jobs/index.md) and
 [Jobs how-to](../guides/jobs-howto.md).
 
 ## Authentication is unavailable

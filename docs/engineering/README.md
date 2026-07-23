@@ -42,6 +42,8 @@ The voice is imperative. Commands are concrete. Explanations sit alongside what 
 | [packaging.md](packaging.md) | The evaluated package contract, bundle shape, and local release proof |
 | [nuget-publishing.md](nuget-publishing.md) | What every advancement of `dev` publishes and how failed events converge |
 | [adding-a-connector.md](adding-a-connector.md) | Scaffolding a new connector (data store, vector store, AI provider, broker, storage) from csproj to integration tests |
+| [docs-build-and-lint.md](docs-build-and-lint.md) | Building and validating the public documentation surface |
+| [samples-organization.md](samples-organization.md) | Organizing, graduating, and validating product samples |
 
 ---
 

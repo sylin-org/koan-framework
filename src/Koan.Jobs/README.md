@@ -96,5 +96,5 @@ var outcomes = await JobMetrics.Summary(
 - Metrics are derived, opt-in, and lossy-tolerant; the Jobs ledger remains the source of truth.
 - Use a window or batch as the job for large sources; do not create an unbounded job per input row.
 
-Use the [Jobs pillar reference](../../docs/reference/cards/jobs.md) for the compact API map and the
+Use the [Jobs reference](../../docs/reference/jobs/index.md) for the greenfield API map and the
 [Jobs guide](../../docs/guides/jobs-howto.md) for scheduling, retries, chains, gates, and testing.

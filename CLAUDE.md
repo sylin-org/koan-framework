@@ -6,12 +6,12 @@ samples, facts, and documentation.
 
 ## Product objective
 
-Koan is the opinionated meta-framework for agentic .NET applications: the “Rails move” for an era in
-which humans and coding agents build together. It should take an application from V0 to V1 in
-meaningful small steps. Application code reads as business; framework pillars own composition,
-backend negotiation, lifecycle, and explanation.
+Koan is the opinionated meta-framework for agentic, data-driven .NET applications. It should help
+humans and coding agents take an application from V0 to V1 in meaningful small steps. Application
+code reads as business; framework pillars own composition, backend negotiation, lifecycle, and
+explanation.
 
-The golden comparison is:
+The canonical application grammar is:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);

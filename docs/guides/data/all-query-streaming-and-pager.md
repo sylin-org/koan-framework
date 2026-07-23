@@ -3,8 +3,8 @@ type: GUIDE
 domain: data
 title: "All, Query, Streaming, and Paging (moved)"
 audience: [developers]
-status: current
-last_updated: 2026-07-15
+status: superseded
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-15

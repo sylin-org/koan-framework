@@ -200,6 +200,40 @@ foreach ($path in @(
     Add-PublicAsset -Path $path -Origin 'product-truth' -Purpose 'evaluate'
 }
 
+# Every promoted claim must enter the curriculum through exactly one capability owner. Package
+# companions can then describe their delta without becoming a second semantic or maturity authority.
+$capabilityHomes = @(
+    'docs/reference/core/index.md',
+    'docs/reference/data/index.md',
+    'docs/reference/data/cache.md',
+    'docs/reference/web/index.md',
+    'docs/reference/identity/index.md',
+    'docs/reference/jobs/index.md',
+    'docs/reference/communication/index.md',
+    'docs/reference/storage/index.md',
+    'docs/reference/media/index.md',
+    'docs/reference/ai/index.md',
+    'docs/reference/ai/vector.md',
+    'docs/reference/agents/index.md',
+    'docs/reference/canon/index.md',
+    'docs/reference/operations/index.md',
+    'docs/reference/operations/observability.md'
+)
+$claimSource = Get-Content -Raw -LiteralPath (Join-Path $root 'product/claims.json') | ConvertFrom-Json
+foreach ($claim in $claimSource.claims | Where-Object {
+    $_.maturity -in @('supported-foundation', 'supported-extension')
+}) {
+    $homes = @($claim.documentation | Where-Object { $_ -in $capabilityHomes })
+    if ($homes.Count -ne 1) {
+        $issues.Add("Promoted claim '$($claim.id)' resolves to $($homes.Count) capability homes; require exactly one.")
+    }
+
+    $historicalDocs = @($claim.documentation | Where-Object { $_ -match $historicalPattern })
+    if ($historicalDocs.Count -gt 0) {
+        $issues.Add("Promoted claim '$($claim.id)' uses historical material as current documentation: $($historicalDocs -join ', ').")
+    }
+}
+
 # Listing a sample once in samples/README.md admits its entire tracked directory as public curriculum.
 $sampleDirectories = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($link in Get-MarkdownLinks -Path 'samples/README.md') {
@@ -305,12 +339,25 @@ $retiredTerms = [ordered]@{
     '0.17.x' = 'Use the 0.20 preview line without pinning an exact patch.'
     'public 0.17.0' = 'Describe the 0.20 preview boundary without a stale package snapshot.'
     'source-first' = 'Describe the 0.20 preview and its exact current publication state.'
+    'Rails for .NET' = 'Describe Koan directly through its own product promise and guarantees.'
+    'Ruby on Rails for' = 'Describe Koan directly through its own product promise and guarantees.'
+    'Rails move' = 'Describe Koan directly through its own product promise and guarantees.'
 }
 
 $packageCompanionFiles = @($entries.Values | Where-Object { $_.Origins.Contains('package') })
 $currentTextEntries = @($entries.Values | Where-Object {
     -not $_.Historical -and ($_.Path -match $textPattern -or $_.Path -in @('DCO', 'LICENSE', 'NOTICE'))
 })
+$retiredAgentTerms = [ordered]@{
+    'AddKoanWebAuth()' = 'Auth participates through the public AddKoan() composition.'
+    'Koan.Web.Auth.Connector.Oidc' = 'No public generic OIDC connector package is currently admitted.'
+    'Koan.Data.Sqlite' = 'Use the public package id Sylin.Koan.Data.Connector.Sqlite.'
+    'Koan.Data.Postgres' = 'Use the public package id Sylin.Koan.Data.Connector.Postgres.'
+    'Koan.Data.Mongo' = 'Use the public package id Sylin.Koan.Data.Connector.Mongo.'
+    'Koan.Data.SqlServer' = 'Use the public package id Sylin.Koan.Data.Connector.SqlServer.'
+    'Koan.Data.Json' = 'Use the public package id Sylin.Koan.Data.Connector.Json.'
+    'Koan.Storage.Connector.S3' = 'S3 is shelved and must not be recommended by an agent skill.'
+}
 foreach ($entry in $currentTextEntries) {
     $content = Get-Content -Raw -LiteralPath (Join-Path $root $entry.Path)
     if ($null -eq $content) { $content = '' }
@@ -346,12 +393,26 @@ foreach ($entry in $currentTextEntries) {
         $Matches[1].Trim() -ne 'v0.20.0') {
         $issues.Add("$($entry.Path) declares framework_version '$($Matches[1].Trim())'; current public docs declare v0.20.0.")
     }
+    if ($entry.Path -match '^\.claude/skills/') {
+        foreach ($term in $retiredAgentTerms.Keys) {
+            if ($content.Contains($term, [StringComparison]::OrdinalIgnoreCase)) {
+                $issues.Add("$($entry.Path) teaches stale agent term '$term'. $($retiredAgentTerms[$term])")
+            }
+        }
+    }
 }
 
 foreach ($entry in $packageCompanionFiles) {
     $content = Get-Content -Raw -LiteralPath (Join-Path $root $entry.Path)
     if ($null -eq $content) { continue }
 
+    if ($content -match '(?im)^\s*>?\s*\*{0,2}Maturity\s*:' -or
+        $content -match '(?i)\b(supported[- ]foundation|supported[- ]extension|supported 0\.20|guaranteed 0\.20|0\.20 preview)\b') {
+        $issues.Add("$($entry.Path) restates support maturity; link to the generated product surface instead.")
+    }
+    if ($content -match '(?i)public-feed publication follows') {
+        $issues.Add("$($entry.Path) carries stale publication-phase prose; generated product truth owns publication state.")
+    }
     if ($content -match 'PackageReference\s+Include="[^"]+"\s+Version="0\.') {
         $issues.Add("$($entry.Path) hard-codes a pre-1.0 package version; packages are independently patched within their compatibility line.")
     }

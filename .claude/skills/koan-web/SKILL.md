@@ -2,7 +2,7 @@
 name: koan-web
 description: Instant REST for Entity<T> — EntityController<T> CRUD + POST /query, custom [HttpGet]/[HttpPost] routes, override Upsert/Get/Delete, [Authorize] policies/roles, IEntityTransformer content shaping, the entity capability authorization model ([Access] per-action gate + EntityAccess<T> row Constrain + can:[] projection on Entity<T>, cross-surface via the IAuthorize seam — SEC-0004/ARCH-0092), IEntityEndpointService escape hatch
 pillar: web
-card: docs/reference/cards/web.md
+card: docs/reference/web/index.md
 status: current
 last_validated: 2026-06-18
 ---
@@ -117,7 +117,7 @@ public static class WebRegistration
 |---|---|
 | `[Pagination(DefaultSize, MaxSize, Mode)]` | Per-controller page sizing + `PaginationMode.On` / `Optional` / `Off`. |
 | `[RequireCapability("action")]` | Method-level capability-authorization gate (SEC-0002 `IAuthorize` seam, `Koan.Web.Extensions`). |
-| `[Authorize]` / `[Authorize(Policy = "…")]` / `[Authorize(Roles = "…")]` | Standard ASP.NET authn/authz (see the [auth card](../../../docs/reference/cards/auth.md)). |
+| `[Authorize]` / `[Authorize(Policy = "…")]` / `[Authorize(Roles = "…")]` | Standard ASP.NET authn/authz (see [Identity and isolation](../../../docs/reference/identity/index.md)). |
 
 ## Anti-patterns to flag
 
@@ -142,7 +142,7 @@ public static class WebRegistration
 
 ## See also
 
-- [Reference card: web.md](../../../docs/reference/cards/web.md) — one-screen pillar map
+- [Web capability](../../../docs/reference/web/index.md) — HTTP projection, policies, and correction paths
 - [Web pillar reference](../../../docs/reference/web/index.md) — full controller / negotiation detail
 - [Web reference](../../../docs/reference/web/index.md) · [HTTP API conventions](../../../docs/reference/web/http-api.md)
 - [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `EntityController<Todo>` CRUD + custom relationship routes

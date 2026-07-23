@@ -11,7 +11,7 @@ validation:
   scope: docs/guides/performance.md
 related_guides:
   - entity-capabilities-howto.md
-  - data-modeling.md
+  - ../reference/data/index.md
   - ai-vector-howto.md
   - ../reference/web/index.md
 ---

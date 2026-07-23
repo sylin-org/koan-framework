@@ -4,9 +4,20 @@ Koan’s public promise is simple: application code reads as the business, while
 composition, safe defaults, infrastructure negotiation, runtime explanation, and corrective failure. Contributions
 should make that promise smaller, clearer, or more dependable.
 
+## First contribution
+
+1. Use the .NET 10 SDK and choose one affected capability, package, or document owner.
+2. Find its current contract through the [documentation curriculum](docs/index.md) and
+   [product surface](docs/reference/product-surface.md).
+3. Build the smallest affected project and run its focused tests or documentation gate.
+4. Update the canonical owner and any package, sample, template, or agent guidance that would
+   otherwise teach a different result.
+5. Open a focused pull request to `main`, explain the user-visible promise, and sign the commit.
+
 ## Before changing code
 
-1. Read `CLAUDE.md` and the current initiative handoff when your change belongs to an active work item.
+1. Read `CLAUDE.md` and the current initiative handoff only when your change belongs to an active
+   maintainer work item.
 2. Map the complete concern before implementation: public contract, owning module, closest existing pattern,
    configuration, runtime facts, health, failure correction, tests, and documentation.
 3. Prefer standard .NET hosting, DI, options, health checks, and logging. Add Koan-specific vocabulary only when it

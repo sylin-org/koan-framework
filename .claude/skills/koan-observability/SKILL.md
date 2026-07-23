@@ -2,7 +2,7 @@
 name: koan-observability
 description: Opt-in OpenTelemetry leaf (ARCH-0088) — referencing Koan.Observability auto-wires traces + metrics + OTLP export by Reference=Intent, with configuration-owned options and IHealthContributor self-reporting
 pillar: observability
-card: docs/reference/cards/observability.md
+card: docs/reference/operations/observability.md
 status: current
 last_validated: 2026-06-18
 ---
@@ -81,6 +81,6 @@ public sealed class FeedHealthContributor : IHealthContributor
 
 ## See also
 
-- [Reference card: observability.md](../../../docs/reference/cards/observability.md) — one-screen pillar map
+- [Observability capability](../../../docs/reference/operations/observability.md) — OpenTelemetry composition and limits
 - [ARCH-0088 — extract the Koan.Observability package](../../../docs/decisions/ARCH-0088-extract-koan-observability-package.md) — the leaf-extraction decision (why options stay in Core, the dead-ref cleanup, the no-cycle rule)
 - [Koan.Observability package guide](../../../src/Koan.Observability/README.md) — Reference=Intent activation, configuration, and operator-facing behavior

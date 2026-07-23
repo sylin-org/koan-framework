@@ -1,7 +1,7 @@
 ---
 type: REF
 domain: core
-title: "Core and composition reference"
+title: "Compose and inspect an application"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-17
@@ -12,7 +12,10 @@ validation:
   scope: AddKoan, KoanModule lifecycle, compiled composition, runtime facts, and health projection
 ---
 
-# Core and composition reference
+# Compose and inspect an application
+
+Use this pillar to understand what `AddKoan()` composes, how referenced packages become eligible,
+and where to inspect the provider and configuration decisions that result.
 
 ## Contract
 
@@ -104,3 +107,6 @@ The current source proves compiled module activation, one retained module lifecy
 canonical facts, and focused host ownership. It does not make every package in the repository assessed
 or every provider production-certified. Use the [product surface](../product-surface.md) for maturity
 and [troubleshooting](../../support/troubleshooting.md) for corrective paths.
+
+Module and connector authors can continue to
+[adapter registration and external topology](../../architecture/adapter-and-orchestration-registration.md).

@@ -144,7 +144,7 @@ Use `KoanEnv.EnvironmentName` (not a fictional `CurrentEnvironment`). For multi-
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — pillar map (Entity facade the bootstrap exposes)
+- [Data capability](../../../docs/reference/data/index.md) — Entity facade the bootstrap exposes
 - [Bootstrap lifecycle deep-dive](../../../docs/guides/deep-dive/bootstrap-lifecycle.md) — discovery, ordering, provenance
 - [Framework utilities guide](../../../docs/guides/framework-utilities.md) — `Configuration`, `KoanEnv`, options helpers
 - [FirstUse Program.cs](../../../samples/FirstUse/Program.cs) — minimal bootstrap

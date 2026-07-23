@@ -1,39 +1,35 @@
 ---
 type: GUIDE
 domain: framework
-title: "Developer guides"
-audience: [developers, architects, ai-agents]
+title: "Task guides"
+audience: [developers, operators, ai-agents]
 status: current
-last_updated: 2026-07-17
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-17
-  status: in-progress
-  scope: current public guide map
+  date_last_tested: 2026-07-22
+  status: verified
+  scope: distinct public tasks subordinate to capability-pillar contracts
 ---
 
-# Developer guides
+# Task guides
 
-Start with a business need, then add the smallest semantic capability that expresses it. These are
-the current public guide paths; an unlisted document in this directory may be migration or
-engineering material and is not alternate product guidance.
+Capability pillars own Koan's semantics, guarantees, provider choices, and corrections. A task guide
+exists only when one concrete action needs more depth than its pillar page; it does not redefine the
+capability.
 
-| Need | Start here | Public concept added |
+| Task | Owning pillar | Guide |
 |---|---|---|
-| Build a conventional HTTP API | [Web reference](../reference/web/index.md) | `EntityController<T>` |
-| Persist, query, page, or stream Entities | [Entity data reference](../reference/data/index.md) | Entity statics and instance verbs |
-| Cache Entity state | [Cache reference](../reference/data/cache.md) | `[Cacheable]` |
-| Run durable work | [Jobs pillar map](../reference/cards/jobs.md) | `IKoanJob<T>` and `.Job` / `.Jobs` |
-| Raise Entity events or transport state | [Communication reference](../reference/communication/index.md) | `.Events` and `.Transport` |
-| Expose governed agent operations | [Agent-native MCP guide](mcp-agent-native-howto.md) | `[McpEntity]` and `[McpTool]` |
-| Host MCP over a network | [MCP over HTTP](mcp-http-sse-howto.md) | one transport setting and security boundary |
-| Add authentication and authorization | [Auth pillar map](../reference/cards/auth.md) | provider reference/config and `[Access]` |
-| Add tenant segmentation | [Tenancy pillar map](../reference/cards/tenancy.md) | `Tenant.Use` and `[HostScoped]` |
-| Test Entity/provider behavior | [Testing your app](testing-your-app.md) | conformance specification |
-| Review composition drift | [Composition lockfile](composition-lockfile.md) | checked-in `koan.lock.json` |
-| Evaluate experimental native deployment | [NativeAOT boundary](../reference/cards/nativeaot.md) | current compiler blocker and JIT fallback |
-| Diagnose a running application | [Troubleshooting](../support/troubleshooting.md) | no new application concept |
+| Process a large Entity set without unbounded materialization | Data | [Entity access and streaming](data/entity-access-and-streaming.md) |
+| Configure external sign-in and application authorization | Identity and isolation | [Authentication setup](authentication-setup.md) |
+| Apply fail-closed tenant isolation | Identity and isolation | [Tenancy](tenancy-howto.md) |
+| Add retries, schedules, chains, or durable background execution | Work and communication | [Background jobs](jobs-howto.md) |
+| Build and serve a named media transform | State and content | [Media recipes](media-recipes-howto.md) |
+| Build a canonical Entity pipeline | Canon | [Canon capabilities](canon-capabilities-howto.md) |
+| Expose governed agent operations | Agents | [Agent-native MCP](mcp-agent-native-howto.md) |
+| Host MCP over HTTP | Agents | [MCP HTTP transport](mcp-http-sse-howto.md) |
+| Test Entity and provider behavior | Testing and operations | [Testing an application](testing-your-app.md) |
+| Review composition drift | Foundation and composition | [Composition lockfile](composition-lockfile.md) |
 
-For AI/vector, media, storage, orchestration, and other surfaces, check the
-[generated product surface](../reference/product-surface.md) first. It distinguishes exercised
-capabilities from experimental or unassessed package families and links to their current evidence.
+For cache, storage, media, AI, vector, Web, and operational diagnostics, begin at the
+[capability curriculum](../index.md). Package companions own provider-specific details.

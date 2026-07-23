@@ -2,9 +2,9 @@
 name: koan-multi-provider
 description: Provider transparency, capability detection (CapabilitySet / DataCaps), context routing — partition, source, adapter (DATA-0077)
 pillar: data
-card: docs/reference/cards/data.md
+card: docs/reference/data/index.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-22
 ---
 
 # Koan Multi-Provider Transparency
@@ -82,9 +82,10 @@ public sealed class TodoService
 
 | Add this reference | Effect |
 |---|---|
-| `Koan.Data.Core` (alone) | In-memory adapter backs every entity — zero config. |
-| `+ Koan.Data.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` / `.Json` | That provider backs every entity; same code, no rewrite. |
-| `+ a vector connector` (`Koan.Data.Vector.Connector.Weaviate` / `.Qdrant` / `.Milvus`) | Vector store available for `[Embedding]` entities. |
+| `Sylin.Koan.Data.Core` (alone) | Supplies provider-neutral Entity semantics; it does not invent a persistence provider. |
+| `Sylin.Koan.Data.Connector.Json` / `.InMemory` | Adds the automatic local floor or an explicitly ephemeral provider. |
+| `Sylin.Koan.Data.Connector.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` | Makes that provider eligible; the same Entity grammar remains while guarantees stay provider-specific. |
+| A vector connector (`Sylin.Koan.Data.Vector.Connector.Weaviate` / `.Qdrant` / `.Milvus`) | Makes that vector provider eligible for Entity vector operations. |
 | `[DataAdapter("name")]` on an entity | Routes just that entity when several providers are referenced. |
 
 ## Context routing (DATA-0077)
@@ -118,7 +119,7 @@ Scopes nest and replace inner-most-wins; dispose restores the outer value. `Part
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
+- [Data capability](../../../docs/reference/data/index.md) — provider choice, routing, and correction
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — capability tokens, query pushdown, counts
 - [DATA-0077 — context routing (partition / source / adapter)](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)
 - [ARCH-0084 — unified capability model (`CapabilitySet` / `DataCaps`)](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

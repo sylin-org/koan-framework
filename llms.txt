@@ -1,106 +1,98 @@
-# Koan Framework — agent orientation
+# Koan Framework — agent retrieval map
 
-Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Its target is
-V0 to V1 in meaningful small steps: application code should read as business intent while framework
-pillars own composition, backend negotiation, lifecycle, and explanation.
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Application code
+states business intent; capability pillars own composition, provider negotiation, lifecycle, and
+explanation.
 
-Status: 0.20 preview. Supported package owners share the 0.20 compatibility signal while package
-patches remain independently owned. Other available packages are not promoted by proximity. Public-
-feed publication follows the final package-only proof; docs/reference/product-surface.md is the
-maturity authority.
+Current line: 0.20 preview. Use the generated product surface at
+docs/reference/product-surface.md as the sole maturity and supported-package authority. Package
+presence, repository proximity, or historical documentation does not imply support.
 
-## First supported action
+## Canonical application grammar
 
-The canonical package entry is:
+Install and create:
 
     dotnet new install Sylin.Koan.Templates
     dotnet new koan-web -o TodoApi
-    cd TodoApi
-    dotnet run
 
-Until the 0.20 package wave is observed on the public feed, run the proved checkout path:
-
-    dotnet run --project samples/FirstUse
-
-Then POST one approval to /api/approvals, read it back, and inspect
-/.well-known/Koan/facts. Use the URL printed by ASP.NET Core if it differs.
-
-The canonical web host is:
+Host:
 
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddKoan();
     var app = builder.Build();
     await app.RunAsync();
 
-## Application grammar
+Entity and HTTP projection:
 
-- Entity<T> is the primary domain/data grammar.
-- EntityController<T> is the ordinary HTTP projection.
-- Instance and static Entity verbs are preferred over application repositories.
-- References make capabilities available; AddKoan() compiles generated semantic modules once.
-- A custom KoanModule is warranted only when an application or package owns real registration,
-  startup work, or reporting. Its identity derives from normal package/assembly identity.
-- Framework pillars own semantic policy; adapters own mechanics; applications own business intent.
-- Do not introduce a new abstraction where a standard .NET convention or an existing pillar
-  chokepoint owns the concern.
+    public sealed class Todo : Entity<Todo>;
+    [Route("api/todos")]
+    public sealed class TodosController : EntityController<Todo>;
 
-## Entity capability vocabulary
+Entity operations:
 
-Data:
-
-    await new Todo { Title = "Ship it" }.Save();
+    await new Todo().Save();
     var todo = await Todo.Get(id);
     var open = await Todo.Query(item => !item.Done);
     await todo.Remove();
 
-Jobs:
+References make capabilities available. AddKoan() compiles referenced semantic modules once. A
+capability elects providers and rejects unsupported configured intent with a corrective explanation.
+Do not add provider registration, framework service locators, repositories around ordinary Entity
+operations, or manual endpoint mapping unless the owning capability explicitly documents an escape
+hatch.
 
-    public sealed class Review : Entity<Review>, IKoanJob<Review>
-    {
-        public static Task Execute(Review review, JobContext context, CancellationToken ct) => ...;
-    }
-    await review.Job.Submit(ct: ct);
+## Intent-to-document map
 
-Communication:
+- Start or orient: README.md, docs/getting-started/quickstart.md, docs/index.md
+- Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
+- Foundation/composition/configuration: docs/reference/core/index.md
+- Entity persistence/query/providers: docs/reference/data/index.md
+- HTTP/API/OpenAPI/SSE: docs/reference/web/index.md
+- Authentication/authorization/tenancy: docs/reference/identity/index.md
+- Jobs/Events/Transport: docs/reference/work/index.md
+- Jobs: docs/reference/jobs/index.md
+- Entity events and snapshot transport: docs/reference/communication/index.md
+- Cache/Storage/Media: docs/reference/state-content/index.md
+- AI/model operations: docs/reference/ai/index.md
+- Entity embeddings and vector search: docs/reference/ai/vector.md
+- MCP/agent tools/resources/transports: docs/reference/agents/index.md
+- Canonical Entity pipelines: docs/reference/canon/index.md
+- Testing/health/facts/diagnostics: docs/reference/operations/index.md
+- OpenTelemetry export: docs/reference/operations/observability.md
+- External infrastructure boundary: docs/reference/operations/external-topology.md
+- Architecture and adoption decisions: docs/architecture/index.md
+- Supported claims and package IDs: docs/reference/product-surface.md
+- Complete executable examples: samples/README.md
 
-    await order.Events.Raise<OrderApproved>(ct);
-    await order.Transport.Send(ct);
+## Page contract
 
-Events mean something happened to an Entity. Transport means distribute an isolated copy of its
-current state. Both work locally with no external adapter and lift pointwise over finite Entity
-collections and lazy streams. Eligible connectors may extend the mesh without changing the terminal.
+Prefer the page that owns the capability. Read, in order:
 
-Agent projection:
+1. business need and when to use it;
+2. package/reference prerequisite;
+3. smallest public expression;
+4. guarantee and provider limits;
+5. configuration and election;
+6. inspection and corrective failure;
+7. package-specific or technical links.
 
-    [McpEntity]
-    public sealed class Todo : Entity<Todo>;
+Package README.md files own package-specific installation, configuration, and limits. TECHNICAL.md
+files are for lifecycle, internal contracts, extension points, and operations; they are not a second
+greenfield path.
 
-Referencing Koan.Mcp activates its KoanModule through AddKoan(). Ordinary applications do not call
-AddKoanMcp() or map MCP endpoints manually.
-
-## Truth and inspectability
+## Runtime truth
 
 - Read startup reporting before guessing about composition.
 - Use /health/live for process liveness and /health/ready for dependency readiness.
 - /.well-known/Koan/facts and koan://facts project the same redacted runtime decisions.
 - koan://entities and koan://self describe the agent-visible surface.
 - koan.lock.json records referenced-module composition and drift.
-- Provider capability declarations bound what Koan may promise. Unsupported configured intent must
-  reject with a corrective explanation rather than silently degrade.
 
-## Documentation authority
+## Source precedence and safety
 
-Current product guidance is the root README, docs/toc.yml curriculum, graduated samples, current
-reference pages, executable tests, and generated product surface. Initiative ledgers, assessments,
-plans, proposals, and archives are engineering evidence, not alternate application patterns.
-Architecture decision records are dated records and may describe their historical context.
+Current capability pages, generated product truth, package companions, graduated samples, source, and
+focused tests outrank initiative prose. ADRs, initiatives, assessments, proposals, and archives are
+historical engineering evidence.
 
-Start reading at:
-
-- README.md
-- docs/getting-started/quickstart.md
-- docs/getting-started/overview.md
-- samples/README.md
-- docs/architecture/product-constitution.md
-- docs/architecture/entity-semantics-contract.md
-- docs/reference/product-surface.md
+Never copy private downstream names, paths, URLs, organizations, domain details, data, or recognizable
+workflows into public artifacts. Convert observations into anonymous repository-owned reproductions.

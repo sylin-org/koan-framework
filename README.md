@@ -1,18 +1,15 @@
 # Koan Framework
 
-Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications: the “Ruby on
-Rails for agentic .NET.” It is designed to move from V0 to V1 in meaningful small steps—application
-code states business intent while the framework owns composition, backend negotiation, lifecycle,
-and explanation.
+Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Application code
+states business intent; Koan owns composition, provider negotiation, lifecycle, and explanation.
 
-> **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
-> other available packages remain verified, demonstrated, experimental, specified, or unassessed. The supported
-> 0.20 package set is live on NuGet; use the [generated product surface](docs/reference/product-surface.md) as the
-> maturity authority.
+> **Current line:** Koan 0.20 is a preview. Supported capabilities and packages are explicit in the
+> [generated product surface](docs/reference/product-surface.md). Package availability alone is not a
+> support promise.
 
-## Reach a meaningful result
+## Build one useful application
 
-Install the template from NuGet and create a persisted web API:
+Install the public template and create a persisted web API:
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
@@ -21,7 +18,7 @@ cd TodoApi
 dotnet run
 ```
 
-In another shell, create and read a Todo and inspect what composed it:
+Use the URL printed by ASP.NET Core, then create and read a Todo and inspect the resolved application:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
@@ -30,13 +27,7 @@ Invoke-RestMethod http://localhost:5000/api/todos
 Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 ```
 
-Use the URL printed by the application if it differs. The complete result is in
-[the template guide](templates/README.md); repository contributors can inspect the richer executable contract in
-[`samples/FirstUse`](samples/FirstUse/README.md).
-
-## The application grammar
-
-The normal web host is four lines:
+The complete application grammar is small:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -44,8 +35,6 @@ builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 ```
-
-A model and its HTTP surface remain business-shaped:
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -58,75 +47,69 @@ public sealed class Todo : Entity<Todo>
 public sealed class TodosController : EntityController<Todo>;
 ```
 
-That expression gains Entity persistence, query, paging, controller conventions, health, structured
-startup reporting, and runtime facts from referenced capabilities. There is no application repository,
-`DbContext`, schema bootstrap, controller CRUD plumbing, or framework service-registration list.
-
 ```csharp
-var todo = await new Todo { Title = "Ship the meaningful step" }.Save();
+var todo = await new Todo { Title = "Ship it" }.Save();
 var same = await Todo.Get(todo.Id);
 var open = await Todo.Query(item => !item.Done);
 await todo.Remove();
 ```
 
-## Grow by intent
+There is no application repository, `DbContext`, schema bootstrap, controller CRUD plumbing, or list
+of framework services to register.
 
-References make capabilities available. `AddKoan()` compiles their modules once; the relevant pillar
-elects providers and reports the result. Adding a capability should add business vocabulary, not
-infrastructure ceremony.
+## Grow by capability
 
-Examples:
+References make capabilities available. `AddKoan()` compiles their modules once, each capability
+elects an eligible provider, and the resolved application explains itself.
 
-- `[Cacheable]` adds Entity cache semantics.
-- `IKoanJob<T>` makes an Entity durable work with progress and schedules.
-- `[Embedding]` adds semantic indexing and search when AI/vector providers are present.
-- `[McpEntity]` projects a governed Entity surface to agents.
-- Entity Events and Transport are local-first; adding an eligible connector can transparently extend
-  Transport reach without changing the application terminal. Events remain local to the process.
+| Need | Canonical capability |
+|---|---|
+| Persist and query business state | [Data](docs/reference/data/index.md) |
+| Expose Entities through HTTP | [Web](docs/reference/web/index.md) |
+| Authenticate users and isolate tenants | [Identity and isolation](docs/reference/identity/index.md) |
+| Run durable work and communicate Entity intent | [Work and communication](docs/reference/communication/index.md) |
+| Cache state, store files, and serve media | [State and content](docs/reference/state-content/index.md) |
+| Add AI, vector, and search behavior | [Intelligence](docs/reference/ai/index.md) |
+| Expose governed tools and resources to agents | [Agents](docs/reference/agents/index.md) |
+| Reconcile records into canonical Entities | [Canon](docs/reference/canon/index.md) |
+| Test, inspect, and operate the application | [Testing and operations](docs/reference/operations/index.md) |
 
-```csharp
-await order.Events.Raise<OrderApproved>(ct); // something happened to this order
-await order.Transport.Send(ct);              // distribute an isolated copy of its current state
-```
+Adding a capability should add business vocabulary rather than infrastructure ceremony. Provider
+differences are declared and negotiated; unsupported intent rejects with a corrective explanation
+instead of silently degrading.
 
-The same terminals lift pointwise over Entity collections and lazy streams. Backend differences are
-negotiated, not hidden: configured intent either resolves to an eligible provider or fails with a
-corrective explanation.
+## Inspect the resolved application
 
-## Inspect what happened
+The same composition decisions appear through:
 
-When Koan is working well, the same resolved composition is visible through:
-
-- the startup report;
+- startup reporting;
 - `/health/live` and `/health/ready`;
 - `/.well-known/Koan/facts` for operators and reviewers;
 - `koan://facts`, `koan://entities`, and `koan://self` for MCP clients; and
 - `koan.lock.json` for referenced-module drift.
 
-These are projections of runtime decisions, not separate configuration authorities.
+These are projections of one runtime model, not competing configuration authorities.
 
 ## Choose Koan when
 
-Choose Koan when the application is naturally Entity-centric, you value conventions over repeated
-plumbing, and you want data, jobs, communication, web, and agent surfaces to compose through one
-inspectable runtime.
+Choose Koan when your application is naturally Entity-centric, you value conventions over repeated
+plumbing, and you want data, web, jobs, communication, identity, and agent surfaces to compose through
+one inspectable runtime.
 
-Do not choose it when you need a stable 1.0 compatibility promise today, require a publicly certified
-package-only install, need an unsupported provider guarantee, or want direct control of every ORM,
-transport, and hosting mechanism. Koan rejects false backend parity; package existence is not a support
-claim.
+Koan 0.20 is not a stable 1.0 compatibility promise. Do not assume an unlisted provider guarantee,
+uniform backend cost or behavior, or production readiness merely because a package exists.
 
-## Read next
+## Continue
 
-- [Quickstart](docs/getting-started/quickstart.md)
-- [Golden path](docs/getting-started/overview.md)
-- [Graduated samples](samples/README.md)
-- [Product constitution](docs/architecture/product-constitution.md)
-- [Entity semantics contract](docs/architecture/entity-semantics-contract.md)
-- [Current capability and package surface](docs/reference/product-surface.md)
-- [Current package-quality assessment](docs/reference/package-quality.md)
-- [Troubleshooting](docs/support/troubleshooting.md)
-- [Agent-readable product map](llms.txt)
+- [Build the first application](docs/getting-started/quickstart.md)
+- [Adopt Koan in an existing application](docs/getting-started/adopt-existing-app.md)
+- [Evaluate the architecture](docs/architecture/index.md)
+- [Choose a capability pillar](docs/index.md)
+- [Run a graduated sample](samples/README.md)
+- [Evaluate the supported product surface](docs/reference/product-surface.md)
+- [Troubleshoot an application](docs/support/troubleshooting.md)
+- [Orient a coding agent](llms.txt)
 
-Architecture decision records are retained as dated decisions. For current product behavior, prefer
-the pages above, executable samples, generated product surface, and source/tests.
+Architecture decision records preserve historical decisions. For current application behavior, use
+the capability pages, package documentation, graduated samples, generated product surface, and
+repository-owned tests.

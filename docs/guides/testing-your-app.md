@@ -92,4 +92,4 @@ contract and the framework's contract can never drift.
 ## See also
 
 - [composition-lockfile.md](composition-lockfile.md) — what your app is composed of, the companion self-check
-- [data-modeling.md](data-modeling.md) — the entity grammar the batteries exercise
+- [Data capability](../reference/data/index.md) — the Entity grammar the batteries exercise

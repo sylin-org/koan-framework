@@ -1,88 +1,111 @@
 - name: Home
   href: index.md
-- name: Get started
+- name: Start
   href: getting-started/quickstart.md
   items:
-    - name: Quickstart
+    - name: Build a new application
       href: getting-started/quickstart.md
-    - name: Golden path
-      href: getting-started/overview.md
-- name: Developer guides
+    - name: Adopt in an existing application
+      href: getting-started/adopt-existing-app.md
+- name: Capability pillars
+  href: reference/core/index.md
+  items:
+    - name: Foundation and composition
+      href: reference/core/index.md
+    - name: Data
+      href: reference/data/index.md
+    - name: Web
+      href: reference/web/index.md
+    - name: Identity and isolation
+      href: reference/identity/index.md
+    - name: Work and communication
+      href: reference/work/index.md
+      items:
+        - name: Jobs
+          href: reference/jobs/index.md
+        - name: Entity events and transport
+          href: reference/communication/index.md
+    - name: State and content
+      href: reference/state-content/index.md
+      items:
+        - name: Cache
+          href: reference/data/cache.md
+        - name: Storage
+          href: reference/storage/index.md
+        - name: Media
+          href: reference/media/index.md
+    - name: Intelligence
+      href: reference/ai/index.md
+      items:
+        - name: Vector search
+          href: reference/ai/vector.md
+    - name: Agents
+      href: reference/agents/index.md
+    - name: Canon
+      href: reference/canon/index.md
+    - name: Testing and operations
+      href: reference/operations/index.md
+      items:
+        - name: OpenTelemetry
+          href: reference/operations/observability.md
+        - name: External topology
+          href: reference/operations/external-topology.md
+        - name: NativeAOT boundary
+          href: reference/operations/native-aot.md
+- name: Task guides
   href: guides/README.md
   items:
-    - name: Build an API
-      href: reference/web/index.md
-    - name: Model data
-      href: reference/data/index.md
     - name: Entity access and streaming
       href: guides/data/entity-access-and-streaming.md
-    - name: Cache Entity state
-      href: reference/data/cache.md
-    - name: Build a canonical Entity
+    - name: Configure authentication
+      href: guides/authentication-setup.md
+    - name: Issue OAuth tokens
+      href: guides/oauth-server-howto.md
+    - name: Apply tenant isolation
+      href: guides/tenancy-howto.md
+    - name: Build background work
+      href: guides/jobs-howto.md
+    - name: Canon capabilities
       href: guides/canon-capabilities-howto.md
-    - name: Store Entity-backed files
-      href: reference/storage/index.md
-    - name: Add AI capabilities
-      href: reference/ai/index.md
-    - name: Run durable jobs
-      href: reference/cards/jobs.md
-    - name: Use Entity Events and Transport
-      href: reference/communication/index.md
-    - name: Expose agent capabilities
+    - name: Agent-native MCP
       href: guides/mcp-agent-native-howto.md
-    - name: Configure MCP over HTTP
+    - name: MCP over HTTP
       href: guides/mcp-http-sse-howto.md
-    - name: Add authentication
-      href: reference/cards/auth.md
-    - name: Add tenancy
-      href: reference/cards/tenancy.md
-    - name: Test an application
+    - name: Testing an application
       href: guides/testing-your-app.md
-    - name: Evaluate experimental NativeAOT
-      href: reference/cards/nativeaot.md
-    - name: Understand the composition lockfile
+    - name: Composition lockfile
       href: guides/composition-lockfile.md
-- name: Reference
+- name: Product reference
   href: reference/product-surface.md
   items:
-    - name: Product and package surface
+    - name: Supported capabilities and packages
       href: reference/product-surface.md
     - name: Package quality
       href: reference/package-quality.md
-    - name: Core and composition
-      href: reference/core/index.md
-    - name: Entity data
-      href: reference/data/index.md
-    - name: Canon
-      href: reference/canon/index.md
-    - name: Web and HTTP
-      href: reference/web/index.md
     - name: HTTP API
       href: reference/web/http-api.md
+    - name: Generated .NET API
+      href: api/index.md
     - name: PATCH normalization
       href: api/patch-normalization.md
-    - name: Jobs
-      href: reference/cards/jobs.md
-    - name: Communication
-      href: reference/communication/index.md
-    - name: AI
-      href: reference/ai/index.md
-    - name: MCP
-      href: reference/cards/mcp.md
+    - name: Glossary
+      href: reference/glossary.md
+- name: Samples
+  href: ../samples/README.md
+- name: Troubleshooting
+  href: support/troubleshooting.md
 - name: Architecture
-  href: architecture/product-constitution.md
+  href: architecture/index.md
   items:
+    - name: Architecture at a glance
+      href: architecture/index.md
     - name: Product constitution
       href: architecture/product-constitution.md
     - name: Entity semantics contract
       href: architecture/entity-semantics-contract.md
     - name: Framework principles
       href: architecture/principles.md
-- name: Samples
-  href: ../samples/README.md
-- name: Troubleshooting
-  href: support/troubleshooting.md
-- name: Decision record
+- name: Decision history
   href: decisions/index.md
 - name: Contributing
   href: ../CONTRIBUTING.md

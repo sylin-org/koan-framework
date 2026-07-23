@@ -2,9 +2,9 @@
 name: koan-entity-first
 description: Entity<T> patterns, GUID v7 auto-generation, static Get/Query/All + instance Save/Remove, batch and streaming facades, static methods vs manual repositories
 pillar: data
-card: docs/reference/cards/data.md
+card: docs/reference/data/index.md
 status: current
-last_validated: 2026-06-18
+last_validated: 2026-07-22
 ---
 
 # Koan Entity-First Development
@@ -80,10 +80,12 @@ streaming as universal provider parity.
 
 | Add this | Effect |
 |---|---|
-| `Koan.Data.Core` + any entity | `Entity<T>` facade is live; an in-memory adapter backs it with zero config. |
-| `+ Koan.Data.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` / `.Json` | That provider backs every entity — same code, no rewrite (the adapter auto-registers). |
+| `Sylin.Koan.Data.Core` + any entity | Supplies the Entity runtime and vocabulary; persistence requires an eligible connector. |
+| `Sylin.Koan.Data.Connector.Json` | Supplies the zero-configuration local floor. |
+| `Sylin.Koan.Data.Connector.InMemory` | Supplies explicitly ephemeral, host-scoped persistence for tests and temporary work. |
+| `Sylin.Koan.Data.Connector.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` | Makes that provider eligible through `AddKoan()` — same Entity code, provider-specific guarantees. |
 | `[DataAdapter("mongo")]` on an entity | Routes just that entity to a named provider when several are referenced. |
-| `Koan.Web` + `EntityController<Todo>` (`Koan.Web.Controllers`) | Full REST CRUD + query + patch over the entity — no hand-written actions. |
+| `Sylin.Koan.Web` + `EntityController<Todo>` (`Koan.Web.Controllers`) | Full REST CRUD + query + patch over the entity — no hand-written actions. |
 
 ## Anti-patterns to flag
 
@@ -109,9 +111,9 @@ streaming as universal provider parity.
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
+- [Data capability](../../../docs/reference/data/index.md) — Entity grammar and provider path
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — the authoritative walkthrough (queries, batch, streaming, counts)
-- [Data modeling guide](../../../docs/guides/data-modeling.md) — aggregates, keys, relationships
+- [Entity lifecycle](../../../docs/reference/data/entity-lifecycle.md) — persistence invariants and policy
 - [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` CRUD + relationship navigation over a web UI
 - [DATA-0059 — entity-first facade & save semantics](../../../docs/decisions/DATA-0059-entity-first-facade-and-save-semantics.md)
 - [DATA-0096 — unified filter pipeline (`QueryDefinition`)](../../../docs/decisions/DATA-0096-unified-filter-pipeline.md) · [ARCH-0084 — unified capability model](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

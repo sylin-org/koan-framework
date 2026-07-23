@@ -3,7 +3,8 @@
 The AI capability ring for Koan: one business-facing client, capability-aware routing, provider composition, source
 health, and startup inspection.
 
-> **Maturity:** Supported 0.20 foundation within the routing, capability, and failure boundaries below.
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity. This
+page owns AI runtime setup, routing behavior, and limits.
 
 ## Smallest meaningful use
 

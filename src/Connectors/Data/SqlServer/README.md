@@ -2,8 +2,9 @@
 
 SQL Server provider for Koan relational data with safe defaults, pushdowns, and schema helpers.
 
-This package is a supported 0.20 networked Entity provider. Referencing it makes SQL Server eligible
-for normal `AddKoan()` provider selection; no provider-specific registration API is required.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity.
+Referencing this package makes SQL Server eligible for normal `AddKoan()` provider selection; no
+provider-specific registration API is required.
 
 - Target framework: net10.0
 - License: Apache-2.0
