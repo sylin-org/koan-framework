@@ -51,6 +51,25 @@ public sealed class AiSourceRuntimeLifecycleSpec
     }
 
     [Fact]
+    public void A_late_health_result_cannot_resurrect_a_removed_source()
+    {
+        var registry = new AiSourceRegistry();
+        var runtime = (IAiSourceRuntimeRegistry)registry;
+        runtime.Apply(Source("local", "runtime"));
+        var removed = runtime.GetRuntimeSources().Single();
+
+        runtime.Remove("local", expectedOrigin: "runtime").Should().BeTrue();
+
+        runtime.TrySetMemberHealth(
+                removed.Source.Name,
+                removed.Revision,
+                removed.Source.Members.Single().Name,
+                MemberHealthState.Healthy)
+            .Should().BeFalse();
+        registry.HasSource("local").Should().BeFalse();
+    }
+
+    [Fact]
     public void AddAi_exposes_the_runtime_control_plane_without_extra_registration()
     {
         var services = new ServiceCollection();

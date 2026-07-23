@@ -241,35 +241,48 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
         AiSourceCandidate candidate,
         CancellationToken ct = default)
     {
-        try
+        using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
+        var endpoint = GetHttpClientForRequest(candidate.Endpoint);
+
+        var version = await InspectEndpoint<OllamaVersionResponse>(
+            endpoint,
+            Infrastructure.Constants.Discovery.VersionPath,
+            "provider version",
+            ct).ConfigureAwait(false);
+        var installed = await InspectEndpoint<OllamaTagsResponse>(
+            endpoint,
+            Infrastructure.Constants.Discovery.ModelsPath,
+            "installed models",
+            ct).ConfigureAwait(false);
+        var resident = await InspectEndpoint<OllamaTagsResponse>(
+            endpoint,
+            Infrastructure.Constants.Discovery.ResidentModelsPath,
+            "resident models",
+            ct).ConfigureAwait(false);
+
+        var versionValue = version.Value?.version;
+        versionValue = string.IsNullOrWhiteSpace(versionValue) ? null : versionValue.Trim();
+        var versionDetail = version.Succeeded && versionValue is null
+            ? "provider version inspection returned no version."
+            : version.Detail;
+        var details = new[] { versionDetail, installed.Detail, resident.Detail }
+            .Where(detail => !string.IsNullOrWhiteSpace(detail))
+            .ToArray();
+
+        return new AiSourceInspection
         {
-            using var lease = await AcquireConcurrencySlot(ct).ConfigureAwait(false);
-            var endpoint = GetHttpClientForRequest(candidate.Endpoint);
-            var models = MapModels(await FetchTags(endpoint, ct).ConfigureAwait(false));
-            return new AiSourceInspection
-            {
-                Provider = Type,
-                Endpoint = candidate.Endpoint,
-                Available = true,
-                Models = models.Select(model => model.Name).Where(name => name.Length > 0).ToArray(),
-                Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase)
-            };
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            return new AiSourceInspection
-            {
-                Provider = Type,
-                Endpoint = candidate.Endpoint,
-                Available = false,
-                Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase),
-                Detail = ex.Message
-            };
-        }
+            Provider = Type,
+            Endpoint = candidate.Endpoint,
+            Available = version.Succeeded || installed.Succeeded || resident.Succeeded,
+            Version = versionValue,
+            VersionAvailable = versionValue is not null,
+            Models = MapModelNames(installed.Value),
+            ModelsAvailable = installed.Succeeded,
+            ResidentModels = MapModelNames(resident.Value),
+            ResidentModelsAvailable = resident.Succeeded,
+            Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase),
+            Detail = details.Length == 0 ? null : string.Join(" ", details)
+        };
     }
 
     private IReadOnlyList<AiModelDescriptor> MapModels(OllamaTagsResponse? doc)
@@ -292,7 +305,9 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
 
     private async Task<OllamaTagsResponse?> FetchTags(HttpClient http, CancellationToken ct)
     {
-        using var resp = await http.GetAsync("/api/tags", ct).ConfigureAwait(false);
+        using var resp = await http.GetAsync(
+            Infrastructure.Constants.Discovery.ModelsPath,
+            ct).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -302,6 +317,54 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
 
         var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         return JsonConvert.DeserializeObject<OllamaTagsResponse>(json);
+    }
+
+    private static IReadOnlyList<string> MapModelNames(OllamaTagsResponse? response)
+        => response?.models
+            .Select(model => model.name ?? model.model ?? "")
+            .Where(name => name.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray() ?? [];
+
+    private async Task<InspectionProbe<T>> InspectEndpoint<T>(
+        HttpClient http,
+        string path,
+        string facet,
+        CancellationToken ct)
+        where T : class
+    {
+        try
+        {
+            using var response = await http.GetAsync(path, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                _logger.LogWarning(
+                    "Ollama: {Facet} inspection failed ({Status}) body={Body}",
+                    facet,
+                    (int)response.StatusCode,
+                    body);
+                return new InspectionProbe<T>(
+                    false,
+                    null,
+                    $"{facet} inspection returned HTTP {(int)response.StatusCode}.");
+            }
+
+            var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var value = JsonConvert.DeserializeObject<T>(json);
+            return value is null
+                ? new InspectionProbe<T>(false, null, $"{facet} inspection returned no result.")
+                : new InspectionProbe<T>(true, value, null);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Ollama: {Facet} inspection failed", facet);
+            return new InspectionProbe<T>(false, null, $"{facet} inspection failed: {ex.Message}");
+        }
     }
 
     private HttpClient GetHttpClientForRequest(string? connectionString)
@@ -574,6 +637,11 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
         public float[]? embedding { get; set; }
     }
 
+    private sealed class OllamaVersionResponse
+    {
+        public string? version { get; set; }
+    }
+
     private sealed class OllamaTagsResponse
     {
         public List<OllamaTag> models { get; set; } = new();
@@ -584,4 +652,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
         public string? name { get; set; }
         public string? model { get; set; }
     }
+
+    private sealed record InspectionProbe<T>(bool Succeeded, T? Value, string? Detail)
+        where T : class;
 }
