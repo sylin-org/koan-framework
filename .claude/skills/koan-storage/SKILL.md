@@ -48,13 +48,13 @@ dotnet add package Sylin.Koan.Storage.Connector.Local
 using Koan.Storage;
 using Koan.Storage.Model;
 
-[StorageBinding("main")]
-public sealed class Document : StorageEntity<Document> { }
-
 var document = await Document.CreateTextFile("terms.txt", "Current terms");
 var text = await document.ReadAllText();
 await using var stream = await document.OpenRead();
 var stat = await document.Head();
+
+[StorageBinding("main")]
+public sealed class Document : StorageEntity<Document> { }
 ```
 
 The connector's `KoanModule` joins the application's ordinary `AddKoan()` composition. Do not call a
