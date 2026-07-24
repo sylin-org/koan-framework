@@ -6,6 +6,7 @@ using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Polymorphism;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -180,7 +181,8 @@ internal static class MongoDriverConfiguration
     {
         var identitySerializer = new SmartStringGuidSerializer();
 
-        foreach (var entityType in ScanEntityTypes())
+        foreach (var entityType in ScanEntityTypes()
+                     .OrderBy(static type => FamilyMapOrder(type)))
         {
             IReadOnlySet<string> members;
             try
@@ -202,6 +204,7 @@ internal static class MongoDriverConfiguration
                 var classMap = new BsonClassMap(entityType);
                 classMap.AutoMap();
                 classMap.SetIgnoreExtraElements(true);
+                MongoEntityDiscriminatorConvention.ConfigureFamilyRootMap(classMap);
 
                 foreach (var member in members)
                 {
@@ -214,6 +217,19 @@ internal static class MongoDriverConfiguration
             {
                 // One entity's class-map registration must never break the global BSON init.
             }
+        }
+    }
+
+    private static int FamilyMapOrder(Type entityType)
+    {
+        try
+        {
+            var descriptor = EntityRootDescriptor.For(entityType);
+            return descriptor.IsRoot ? 0 : 1;
+        }
+        catch (InvalidOperationException)
+        {
+            return 2;
         }
     }
 

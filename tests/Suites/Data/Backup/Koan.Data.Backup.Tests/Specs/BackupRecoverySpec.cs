@@ -12,6 +12,7 @@ using Koan.Data.Backup.Models;
 using Koan.Data.Core;
 using Koan.Data.Core.Decorators;
 using Koan.Data.Core.Infrastructure;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Querying;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Keys;
@@ -89,6 +90,44 @@ public sealed class BackupRecoverySpec
                 (await BackupRecord.All()).Select(x => x.Id).Should().Equal("a-0001", "a-0002");
             using (EntityContext.With(partition: "tenant-b"))
                 (await BackupRecord.All()).Select(x => x.Id).Should().Equal("b-0001");
+        });
+    }
+
+    [Fact]
+    public async Task Root_backup_and_restore_preserves_variant_runtime_types_and_fields()
+    {
+        await WithRuntime("sqlite", async runtime =>
+        {
+            EntityTypeCatalog.Register(typeof(BackupAnime));
+            EntityTypeCatalog.Register(typeof(BackupManga));
+            await Data<BackupMedia, string>.UpsertMany(
+            [
+                new BackupAnime { Id = "anime-1", Title = "Frieren", Episodes = 28 },
+                new BackupManga { Id = "manga-1", Title = "Witch Hat Atelier", Volumes = 14 }
+            ]);
+
+            using var scope = runtime.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+            var backup = await service.Create<BackupMedia, string>(
+                "polymorphic-media",
+                new BackupRequest { PageSize = 1, StorageProfile = Profile });
+
+            (await Data<BackupMedia, string>.DeleteAll()).Should().Be(2);
+            var restore = await service.Restore<BackupMedia, string>(
+                backup.StorageKey,
+                new RestoreRequest { BatchSize = 1, StorageProfile = Profile });
+
+            restore.RecordCount.Should().Be(2);
+            var restored = await BackupMedia.All();
+            restored.Should().HaveCount(2);
+            var anime = restored.Single(item => item.Id == "anime-1")
+                .Should().BeOfType<BackupAnime>().Subject;
+            anime.Title.Should().Be("Frieren");
+            anime.Episodes.Should().Be(28);
+            var manga = restored.Single(item => item.Id == "manga-1")
+                .Should().BeOfType<BackupManga>().Subject;
+            manga.Title.Should().Be("Witch Hat Atelier");
+            manga.Volumes.Should().Be(14);
         });
     }
 
@@ -336,6 +375,25 @@ public sealed class BackupRecoverySpec
     }
 
     private sealed class OtherRecord : Entity<OtherRecord>;
+
+    private class BackupMedia : Entity<BackupMedia>
+    {
+        public string? Title { get; set; }
+    }
+
+    private sealed class BackupAnime :
+        BackupMedia,
+        IEntityFamilyVariant<BackupMedia, BackupAnime, string>
+    {
+        public int? Episodes { get; set; }
+    }
+
+    private sealed class BackupManga :
+        BackupMedia,
+        IEntityFamilyVariant<BackupMedia, BackupManga, string>
+    {
+        public int? Volumes { get; set; }
+    }
 
     private sealed class BackupStreamProbe
     {

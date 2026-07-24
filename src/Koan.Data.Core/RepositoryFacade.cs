@@ -9,6 +9,7 @@ using Koan.Data.Core.Axes;
 using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Lifecycle;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 
 namespace Koan.Data.Core;
@@ -44,7 +45,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 {
     private readonly IDataRepository<TEntity, TKey> _inner;
     private readonly StorageWritePlan _writePlan;
+    private readonly StorageFieldTransformPlan _fieldTransforms;
     private readonly StorageFieldTransformPlan.Compiled _fieldTransform;
+    private readonly bool _isEntityFamily;
     private readonly IStorageGuard[] _guards;
     private readonly IReadFilterContributor[] _readContributors;
     private readonly IReadOnlyList<ManagedFieldDescriptor> _managed;
@@ -63,13 +66,15 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         IReadFilterContributor[]? readContributors = null,
         EntityLifecyclePlan<TEntity, TKey>? lifecycle = null,
         DataSegmentationPlan.DataSegmentationScope? segmentation = null,
-        StorageFieldTransformPlan.Compiled? fieldTransform = null)
+        StorageFieldTransformPlan? fieldTransforms = null)
     {
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
         _readContributors = readContributors ?? Array.Empty<IReadFilterContributor>();
         _writePlan = StorageWritePlan.For(typeof(TEntity));
-        _fieldTransform = fieldTransform ?? StorageFieldTransformPlan.Compiled.Empty;
+        _fieldTransforms = fieldTransforms ?? new StorageFieldTransformPlan([]);
+        _fieldTransform = _fieldTransforms.For(typeof(TEntity));
+        _isEntityFamily = EntityTypeCatalog.HasVariants(typeof(TEntity));
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _segmentation = segmentation ?? DataSegmentationPlan.DataSegmentationScope.Empty;
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
@@ -125,25 +130,44 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     // --- field-transform helpers (ARCH-0098 §0). All are no-op fast paths when the type has no transform. ---
 
+    private StorageWritePlan WritePlanFor(TEntity entity)
+        => !_isEntityFamily || entity.GetType() == typeof(TEntity)
+            ? _writePlan
+            : StorageWritePlan.For(entity.GetType());
+
+    private StorageFieldTransformPlan.Compiled FieldTransformFor(TEntity entity)
+        => !_isEntityFamily || entity.GetType() == typeof(TEntity)
+            ? _fieldTransform
+            : _fieldTransforms.For(entity.GetType());
+
     /// <summary>The persist payload for a write: an encrypted clone when a transform exists, else the entity itself.</summary>
     private TEntity WritePayload(TEntity entity)
-        => _fieldTransform.HasTransforms ? (TEntity)_fieldTransform.CloneForWrite(entity) : entity;
+    {
+        var transform = FieldTransformFor(entity);
+        return transform.HasTransforms ? (TEntity)transform.CloneForWrite(entity) : entity;
+    }
 
     /// <summary>Restore plaintext on a single returned entity, in place.</summary>
     private TEntity? Reverse(TEntity? entity)
     {
-        if (entity is not null && _fieldTransform.HasTransforms) _fieldTransform.ApplyOnRead(entity);
+        if (entity is not null)
+        {
+            var transform = FieldTransformFor(entity);
+            if (transform.HasTransforms) transform.ApplyOnRead(entity);
+        }
         return entity;
     }
 
     /// <summary>Restore plaintext on every entity in a query result, in place.</summary>
     private RepositoryQueryResult<TEntity> Reverse(RepositoryQueryResult<TEntity> result)
     {
-        if (_fieldTransform.HasTransforms)
+        if (_fieldTransform.HasTransforms || _isEntityFamily)
             for (var i = 0; i < result.Items.Count; i++)
             {
                 var e = result.Items[i];
-                if (e is not null) _fieldTransform.ApplyOnRead(e);
+                if (e is null) continue;
+                var transform = FieldTransformFor(e);
+                if (transform.HasTransforms) transform.ApplyOnRead(e);
             }
         return result;
     }
@@ -151,13 +175,23 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     /// <summary>Restore plaintext on every non-null entity in a get-many result, in place.</summary>
     private IReadOnlyList<TEntity?> Reverse(IReadOnlyList<TEntity?> items)
     {
-        if (_fieldTransform.HasTransforms)
+        if (_fieldTransform.HasTransforms || _isEntityFamily)
             for (var i = 0; i < items.Count; i++)
             {
                 var e = items[i];
-                if (e is not null) _fieldTransform.ApplyOnRead(e);
+                if (e is null) continue;
+                var transform = FieldTransformFor(e);
+                if (transform.HasTransforms) transform.ApplyOnRead(e);
             }
         return items;
+    }
+
+    private bool AnyFieldTransforms(IList<TEntity> entities)
+    {
+        if (!_isEntityFamily) return _fieldTransform.HasTransforms;
+        for (var i = 0; i < entities.Count; i++)
+            if (FieldTransformFor(entities[i]).HasTransforms) return true;
+        return false;
     }
 
     /// <summary>Persist an Upsert under the current managed write scope (the shared tenant/managed-field path).</summary>
@@ -283,7 +317,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         CancellationToken ct)
     {
         Reverse(row);                       // ensure plaintext before re-encrypting on write (no-op without a transform)
-        _writePlan.ApplyAll(row);           // identity + [Timestamp(OnSave)] — the override IS a write
+        WritePlanFor(row).ApplyAll(row);    // identity + [Timestamp(OnSave)] — the override IS a write
         var overrides = new Dictionary<string, object?>(StringComparer.Ordinal) { [ov.Field] = ov.OnDeleteValue };
         var values = CurrentManagedValues(segmentation);
         var payload = WritePayload(row);
@@ -457,11 +491,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             managed is null ? query : ApplyManaged(query, managed),
             maxCandidates,
             ct);
-        if (_fieldTransform.HasTransforms)
-        {
+        if (_fieldTransform.HasTransforms || _isEntityFamily)
             foreach (var entity in result.Items)
-                _fieldTransform.ApplyOnRead(entity);
-        }
+            {
+                var transform = FieldTransformFor(entity);
+                if (transform.HasTransforms) transform.ApplyOnRead(entity);
+            }
         await ApplyLoadLifecycle(result.Items, ct);
         return result;
     }
@@ -523,9 +558,10 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         DataSegmentationBinding segmentation,
         CancellationToken ct)
     {
-        _writePlan.ApplyAll(model);
-        if (!_fieldTransform.HasTransforms) return await PersistUpsert(model, segmentation, ct);
-        await PersistUpsert(WritePayload(model), segmentation, ct);
+        WritePlanFor(model).ApplyAll(model);
+        var payload = WritePayload(model);
+        if (ReferenceEquals(payload, model)) return await PersistUpsert(model, segmentation, ct);
+        await PersistUpsert(payload, segmentation, ct);
         return model;
     }
 
@@ -567,9 +603,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         foreach (var m in list)
         {
             ct.ThrowIfCancellationRequested();
-            _writePlan.ApplyAll(m);
+            WritePlanFor(m).ApplyAll(m);
         }
-        var payloads = _fieldTransform.HasTransforms
+        var payloads = AnyFieldTransforms(list)
             ? (IList<TEntity>)list.Select(WritePayload).ToList()   // encrypted clones; the caller's list stays plaintext
             : list;
         var values = CurrentManagedValues(segmentation);
@@ -748,7 +784,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct);
 
         var current = context?.Current ?? model;
-        _writePlan.ApplyAll(current);
+        WritePlanFor(current).ApplyAll(current);
         // Field transform (ARCH-0098 Blocker 2): persist an encrypted clone so a CAS write never stores plaintext.
         // A classified property must NOT appear in the guard (it compares stored ciphertext to caller plaintext).
         var replaced = await cas.ConditionalReplaceAsync(WritePayload(current), guard, ct);
@@ -842,8 +878,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
             var deletes = removeContexts.Count == 0 ? _deletes : removeContexts.Select(context => context.Current.Id).ToList();
 
             // Batch path applies the batch-eligible write-stamps (identity; NOT [Timestamp] — the shipped invariant).
-            foreach (var entity in adds) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(entity); }
-            foreach (var entity in updates) { ct.ThrowIfCancellationRequested(); _outer._writePlan.ApplyBatch(entity); }
+            foreach (var entity in adds) { ct.ThrowIfCancellationRequested(); _outer.WritePlanFor(entity).ApplyBatch(entity); }
+            foreach (var entity in updates) { ct.ThrowIfCancellationRequested(); _outer.WritePlanFor(entity).ApplyBatch(entity); }
 
             var native = _outer._inner.CreateBatch();
             // Field transform (ARCH-0098 Blocker 1): the native batch persists encrypted CLONES, so a batch write —

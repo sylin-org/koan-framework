@@ -186,6 +186,121 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
             });
     }
 
+    // ==================== Polymorphic entity roots (DATA-0109) ====================
+
+    [Fact(DisplayName = "DATA-0109: variants share one root set and preserve their leaf payloads")]
+    public async Task Polymorphic_variants_share_the_root_set_and_round_trip_leaf_payloads()
+    {
+        RequireBackingStore();
+        var ct = TestContext.Current.CancellationToken;
+        var partition = NewPartition("polymorphic-root");
+        var familyTag = Guid.NewGuid().ToString("N");
+        string animeId;
+
+        await using (var host = await BootAsync())
+        using (Lease(partition))
+        {
+            var root = await new PolyMedia
+            {
+                Id = $"{familyTag}-01",
+                FamilyTag = familyTag,
+                Kind = "Media",
+                Title = "Root title",
+                SortOrder = 1
+            }.Save(ct);
+            PolyAnime anime = await new PolyAnime
+            {
+                Id = $"{familyTag}-02",
+                FamilyTag = familyTag,
+                Kind = "Anime",
+                Title = "Anime title",
+                SortOrder = 2,
+                Episodes = 24
+            }.Save(ct);
+            PolyManga manga = await new PolyManga
+            {
+                Id = $"{familyTag}-03",
+                FamilyTag = familyTag,
+                Kind = "Manga",
+                Title = "Manga title",
+                SortOrder = 3,
+                Volumes = 12,
+                Chapters = 108
+            }.Save(ct);
+            animeId = anime.Id;
+
+            var animeFromRoot = await PolyMedia.Get(anime.Id, ct);
+            var hydratedAnime = animeFromRoot.Should().BeOfType<PolyAnime>().Which;
+            hydratedAnime.Episodes.Should().Be(24);
+
+            PolyAnime? animeFromLeaf = await PolyAnime.Get(anime.Id, ct);
+            animeFromLeaf.Should().NotBeNull();
+            animeFromLeaf!.Episodes.Should().Be(24);
+            animeFromLeaf.Title.Should().Be("Anime title");
+
+            var family = await PolyMedia.Query(media => media.FamilyTag == familyTag, ct);
+            family.Should().HaveCount(3);
+        family.Select(static media => media.GetType()).Should().BeEquivalentTo(
+            new[] { typeof(PolyMedia), typeof(PolyAnime), typeof(PolyManga) });
+            var queriedManga = family.Single(media => media.Id == manga.Id)
+                .Should().BeOfType<PolyManga>().Which;
+            queriedManga.Volumes.Should().Be(12);
+            queriedManga.Chapters.Should().Be(108);
+            (await PolyMedia.Count.Where(
+                media => media.FamilyTag == familyTag,
+                CountStrategy.Exact,
+                ct)).Should().Be(3);
+            (await PolyMedia.Count.Exact(ct)).Should().Be(
+                3,
+                "the unique partition must contain only this family before unfiltered paging");
+
+            var firstPage = await PolyMedia.Page(
+                1,
+                2,
+                sort => sort.OrderBy(media => media.SortOrder),
+                ct);
+            var secondPage = await PolyMedia.Page(
+                2,
+                2,
+                sort => sort.OrderBy(media => media.SortOrder),
+                ct);
+            firstPage.Select(static media => media.Id).Should().Equal(root.Id, anime.Id);
+            secondPage.Select(static media => media.Id).Should().Equal(manga.Id);
+            firstPage[1].Should().BeOfType<PolyAnime>();
+            secondPage[0].Should().BeOfType<PolyManga>();
+
+            PolyMedia? rootTypedAnime = await PolyMedia.Get(anime.Id, ct);
+            rootTypedAnime.Should().NotBeNull();
+            rootTypedAnime!.Title = "Anime title after root save";
+            PolyMedia resaved = await rootTypedAnime.Save(ct);
+            resaved.Should().BeOfType<PolyAnime>();
+
+            PolyAnime? animeAfterRootSave = await PolyAnime.Get(anime.Id, ct);
+            animeAfterRootSave.Should().NotBeNull();
+            animeAfterRootSave!.Episodes.Should().Be(24);
+            animeAfterRootSave.Title.Should().Be("Anime title after root save");
+        }
+
+        // InMemory is intentionally host-owned, while JsonFixture intentionally provisions a fresh directory per
+        // boot. Shared-store fixtures can additionally prove hydration after DataService and its repository cache die.
+        if (Fixture is InMemoryFixture || Fixture is JsonFixture)
+        {
+            return;
+        }
+
+        await using var coldHost = await BootAsync();
+        using var coldLease = Lease(partition);
+        var coldRootRead = await PolyMedia.Get(animeId, ct);
+        var coldAnime = coldRootRead.Should().BeOfType<PolyAnime>().Which;
+        coldAnime.Episodes.Should().Be(24);
+        coldAnime.Title.Should().Be("Anime title after root save");
+
+        PolyAnime? coldTypedRead = await PolyAnime.Get(animeId, ct);
+        coldTypedRead.Should().NotBeNull();
+        coldTypedRead!.Episodes.Should().Be(24);
+        coldTypedRead.Title.Should().Be("Anime title after root save");
+    }
+
     // ==================== Shared (FieldFilter → managed-record persistence) ====================
 
     [Fact(DisplayName = "AODB Shared: the framework-managed discriminator isolates reads/writes/deletes (no leak)")]

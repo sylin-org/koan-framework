@@ -9,6 +9,7 @@ using Koan.Data.Backup.Infrastructure;
 using Koan.Data.Backup.Models;
 using Koan.Data.Backup.Storage;
 using Koan.Data.Core;
+using Koan.Data.Core.Polymorphism;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Keys;
 
@@ -144,7 +145,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         var count = 0;
         await foreach (var entity in Data<TEntity, TKey>.AllStream(pageSize, ct).WithCancellation(ct))
         {
-            var bytes = JsonSerializer.SerializeToUtf8Bytes(entity, Json);
+            var bytes = Encoding.UTF8.GetBytes(EntityJsonSerialization.SerializeDocument(entity));
             await output.WriteAsync(bytes, ct);
             await output.WriteAsync("\n"u8.ToArray(), ct);
             hash.AppendData(bytes);
@@ -219,7 +220,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         {
             throw;
         }
-        catch (Exception ex) when (ex is JsonException or IOException)
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or Newtonsoft.Json.JsonException or IOException)
         {
             throw new InvalidDataException("The backup archive is malformed and no records were restored.", ex);
         }
@@ -247,10 +248,9 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         {
             try
             {
-                _ = JsonSerializer.Deserialize<TEntity>(line, Json)
-                    ?? throw new JsonException("An archived record deserialized to null.");
+                _ = (TEntity)EntityJsonSerialization.DeserializeDocument(line, typeof(TEntity));
             }
-            catch (JsonException ex)
+            catch (Newtonsoft.Json.JsonException ex)
             {
                 throw new InvalidDataException($"Archived record {count + 1} is malformed.", ex);
             }
@@ -280,7 +280,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
 
         await foreach (var line in ReadLines(archive, BackupConstants.DataEntry, ct))
         {
-            batch.Add(JsonSerializer.Deserialize<TEntity>(line, Json)!);
+            batch.Add((TEntity)EntityJsonSerialization.DeserializeDocument(line, typeof(TEntity)));
             if (batch.Count < batchSize)
                 continue;
 

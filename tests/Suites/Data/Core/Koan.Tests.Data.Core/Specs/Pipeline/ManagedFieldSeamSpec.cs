@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Xunit;
@@ -50,6 +51,17 @@ public sealed class ManagedFieldSeamSpec : IDisposable
     {
         var act = () => ManagedFieldRegistry.Register(Field(name, _ => true));
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(EntityFamilyStorage.TypeField)]
+    [InlineData("__KOAN_TYPE")]
+    public void Register_rejects_the_reserved_entity_family_field(string name)
+    {
+        var act = () => ManagedFieldRegistry.Register(Field(name, _ => true));
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage($"*reserved*{EntityFamilyStorage.TypeField}*");
     }
 
     [Fact]

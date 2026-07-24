@@ -1,5 +1,6 @@
 using System.Globalization;
 using Koan.Data.Core;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 
@@ -88,7 +89,7 @@ public static class ComparableScalarEncoding
         // whole relational trio (all three call Apply).
         var naming = (settings.ContractResolver as Newtonsoft.Json.Serialization.DefaultContractResolver)?.NamingStrategy;
         settings.ContractResolver = new ManagedFieldJsonInjector(segmentationFields) { NamingStrategy = naming };
-        return settings;
+        return EntityJsonSerialization.Apply(settings);
     }
 
     // Non-generic base so CanConvert matches both T and T? (Newtonsoft does not route T? through a

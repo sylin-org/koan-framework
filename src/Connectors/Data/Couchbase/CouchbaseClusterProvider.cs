@@ -7,12 +7,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Couchbase;
 using Couchbase.Core.IO.Authentication.Authenticators;
+using Couchbase.Core.IO.Serializers;
 using Couchbase.KeyValue;
 using Couchbase.Management.Collections;
 using Koan.Core;
 using Koan.Core.Adapters;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Data.Core.Polymorphism;
+using Newtonsoft.Json;
 
 namespace Koan.Data.Connector.Couchbase;
 
@@ -488,6 +491,12 @@ internal sealed class CouchbaseClusterProvider : IAsyncDisposable, IAdapterReadi
                     username,
                     password,
                     options.ConnectionString.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)));
+                var couchbaseDefaults = new DefaultSerializer();
+                var writeJson = EntityJsonSerialization.Apply(
+                    new JsonSerializerSettings(couchbaseDefaults.SerializerSettings));
+                var readJson = EntityJsonSerialization.Apply(
+                    new JsonSerializerSettings(couchbaseDefaults.DeserializationSettings));
+                clusterOptions.WithSerializer(new DefaultSerializer(writeJson, readJson));
 
                 _logger?.LogDebug("Connecting to Couchbase cluster at {ConnectionString}", Redaction.DeIdentify(options.ConnectionString));
                 _cluster = await Cluster.ConnectAsync(options.ConnectionString, clusterOptions);
