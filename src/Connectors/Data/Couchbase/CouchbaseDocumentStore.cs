@@ -28,6 +28,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Document;
 using Koan.Data.Core.Optimization;
+using Koan.Data.Core.Polymorphism;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -71,7 +72,8 @@ internal sealed class CouchbaseDocumentStore<TEntity, TKey> :
     // expressions the translator emits AND deserialize back through the SDK on read. Only the managed path builds a
     // JObject; the plain path stores the POCO directly (byte-identical to pre-fold).
     private static readonly JsonSerializer DocSerializer =
-        JsonSerializer.Create(new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() });
+        JsonSerializer.Create(EntityJsonSerialization.Apply(
+            new JsonSerializerSettings { ContractResolver = new CamelCasePropertyNamesContractResolver() }));
 
     private readonly CouchbaseClusterProvider _provider;
     private readonly IOptionsMonitor<CouchbaseOptions> _options;

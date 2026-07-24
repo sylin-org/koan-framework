@@ -20,6 +20,7 @@ using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Document;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Sorting;
+using Koan.Data.Connector.Mongo.Initialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -75,6 +76,7 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
         _logger = sp.GetService<ILogger<MongoDocumentStore<TEntity, TKey>>>();
         _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
         _translator = new MongoFilterTranslator<TEntity>(MapFieldName);
+        MongoEntityDiscriminatorConvention.EnsureRegistered(typeof(TEntity));
     }
 
     public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
@@ -293,14 +295,21 @@ internal sealed class MongoDocumentStore<TEntity, TKey> :
     // the ISOLATION values only (Current). A foreign-owned doc fails the filter → INSERT same _id → E11000 → reject.
     private static async Task ManagedUpsertOneAsync(IMongoCollection<TEntity> collection, TEntity model, IReadOnlyDictionary<string, object?> inject, IReadOnlyDictionary<string, object?>? guard, CancellationToken ct)
     {
-        var doc = model.ToBsonDocument();
-        foreach (var kv in inject) doc[kv.Key] = ToBson(kv.Value);
+        var doc = model.ToBsonDocument(typeof(TEntity));
+        foreach (var kv in inject)
+        {
+            EntityFamilyStorage.EnsureFieldAvailable(kv.Key, "A framework-managed field");
+            doc[kv.Key] = ToBson(kv.Value);
+        }
 
         var docs = collection.Database.GetCollection<BsonDocument>(collection.CollectionNamespace.CollectionName);
         var filter = Builders<BsonDocument>.Filter.Eq("_id", doc["_id"]);
         if (guard is not null)
             foreach (var kv in guard)
+            {
+                EntityFamilyStorage.EnsureFieldAvailable(kv.Key, "A framework-managed field");
                 filter = Builders<BsonDocument>.Filter.And(filter, Builders<BsonDocument>.Filter.Eq(kv.Key, ToBson(kv.Value)));
+            }
 
         try
         {

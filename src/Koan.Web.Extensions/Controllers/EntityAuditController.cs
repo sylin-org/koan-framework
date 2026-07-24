@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Polymorphism;
 using Koan.Web.Contracts;
 using Koan.Web.Infrastructure;
 
@@ -35,8 +36,8 @@ public abstract class EntityAuditController<TEntity> : ControllerBase
         if (current is null) return NotFound();
         var nextVersion = await GetNextVersion(id, ct);
         var snapshotId = ComposeSnapshotId(id, nextVersion);
-        var json = System.Text.Json.JsonSerializer.Serialize(current);
-        var clone = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json)!;
+        var json = EntityJsonSerialization.SerializeDocument(current);
+        var clone = (TEntity)EntityJsonSerialization.DeserializeDocument(json, typeof(TEntity));
         SetEntityId(clone, snapshotId);
         using var _ = Data<TEntity, string>.WithPartition(AuditSet);
         await Data<TEntity, string>.Upsert(clone, ct);

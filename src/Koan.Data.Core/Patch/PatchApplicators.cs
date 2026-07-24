@@ -15,7 +15,7 @@ public sealed class MergePatchApplicator<TEntity>
         if (target is null) throw new ArgumentNullException(nameof(target));
         var targetObj = JObject.FromObject(target);
         ApplyMerge(targetObj, _patch);
-        var updated = targetObj.ToObject<TEntity>()!;
+        var updated = (TEntity)targetObj.ToObject(target.GetType())!;
         Copy(updated, target);
     }
 
@@ -78,7 +78,7 @@ public sealed class PartialJsonApplicator<TEntity>
         if (_patch.Type != JTokenType.Object) throw new ArgumentException("Partial JSON payload must be an object");
         var targetObj = JObject.FromObject(target);
         ApplyPartial(targetObj, (JObject)_patch);
-        var updated = targetObj.ToObject<TEntity>()!;
+        var updated = (TEntity)targetObj.ToObject(target.GetType())!;
         Copy(updated, target);
     }
 

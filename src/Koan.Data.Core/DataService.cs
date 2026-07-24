@@ -2,7 +2,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Configuration;
+using Koan.Data.Core.Polymorphism;
 using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace Koan.Data.Core;
 
@@ -13,6 +15,12 @@ namespace Koan.Data.Core;
 public sealed class DataService(IServiceProvider sp) : IDataService
 {
     private readonly ConcurrentDictionary<CacheKey, object> _cache = new();
+    private readonly ConcurrentDictionary<(Type Variant, Type Key), object> _variantCache = new();
+
+    private static readonly MethodInfo CreateVariantRepositoryMethod = typeof(DataService)
+        .GetMethod(nameof(CreateVariantRepositoryCore), BindingFlags.Instance | BindingFlags.NonPublic)!;
+    private static readonly MethodInfo GetRootScopeDiagnosticsMethod = typeof(DataService)
+        .GetMethod(nameof(GetRootScopeDiagnosticsCore), BindingFlags.Instance | BindingFlags.NonPublic)!;
 
     private record CacheKey(
         Type EntityType,
@@ -25,7 +33,23 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        EntityShapeGuard.EnsureValid(typeof(TEntity));
+        var descriptor = EntityRootDescriptor.For(typeof(TEntity));
+        if (descriptor.KeyType != typeof(TKey))
+        {
+            throw new InvalidOperationException(
+                $"Entity '{typeof(TEntity).FullName}' uses key '{descriptor.KeyType.FullName}', not '{typeof(TKey).FullName}'.");
+        }
+
+        if (descriptor.IsVariant)
+        {
+            return (IDataRepository<TEntity, TKey>)_variantCache.GetOrAdd(
+                (typeof(TEntity), typeof(TKey)),
+                _ => CreateVariantRepositoryMethod
+                    .MakeGenericMethod(descriptor.RootType, typeof(TEntity), typeof(TKey))
+                    .Invoke(this, null)
+                    ?? throw new InvalidOperationException(
+                        $"Could not create the '{typeof(TEntity).FullName}' view of Entity root '{descriptor.RootType.FullName}'."));
+        }
 
         var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
         var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
@@ -60,7 +84,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
         var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>().For(typeof(TEntity));
+        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         var facade = new RepositoryFacade<TEntity, TKey>(
             decorated, guards, readContributors, lifecycle, segmentation, fieldTransforms);
 
@@ -81,7 +105,16 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        EntityShapeGuard.EnsureValid(typeof(TEntity));
+        var descriptor = EntityRootDescriptor.For(typeof(TEntity));
+        if (descriptor.IsVariant)
+        {
+            return (Axes.IAxisScopeDiagnostics)(
+                GetRootScopeDiagnosticsMethod
+                    .MakeGenericMethod(descriptor.RootType, typeof(TKey))
+                    .Invoke(this, null)
+                ?? throw new InvalidOperationException(
+                    $"Could not inspect Entity root '{descriptor.RootType.FullName}'."));
+        }
 
         // Mirror GetRepository's raw-adapter resolution but return the UNDECORATED facade (the diagnostic authority that
         // holds the raw adapter for the IQueryRepository check). Cheap + connection-free: capability description is
@@ -95,7 +128,7 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
         var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
         var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>().For(typeof(TEntity));
+        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         return new RepositoryFacade<TEntity, TKey>(
             repo, guards, readContributors, lifecycle, segmentation, fieldTransforms);
     }
@@ -135,5 +168,20 @@ public sealed class DataService(IServiceProvider sp) : IDataService
 
         return (IDataRepository<TEntity, TKey>)current;
     }
+
+    private IDataRepository<TVariant, TKey> CreateVariantRepositoryCore<TRoot, TVariant, TKey>()
+        where TRoot : class, IEntity<TKey>
+        where TVariant : TRoot, IEntity<TKey>
+        where TKey : notnull
+    {
+        EntityTypeCatalog.Register(typeof(TVariant));
+        return new EntityVariantRepository<TRoot, TVariant, TKey>(
+            () => GetRepository<TRoot, TKey>());
+    }
+
+    private Axes.IAxisScopeDiagnostics GetRootScopeDiagnosticsCore<TRoot, TKey>()
+        where TRoot : class, IEntity<TKey>
+        where TKey : notnull
+        => GetScopeDiagnostics<TRoot, TKey>();
 
 }

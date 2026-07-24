@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Polymorphism;
 using Koan.Web.Contracts;
 using Koan.Web.Infrastructure;
 using System.Text.Json;
@@ -50,10 +51,10 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         TEntity? baseModel = await Data<TEntity, TKey>.Get(id!, ct);
         if (body?.Snapshot != null)
         {
-            baseModel ??= Activator.CreateInstance<TEntity>();
             var json = System.Text.Json.JsonSerializer.Serialize(body.Snapshot);
-            var updated = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json);
-            if (updated is not null) baseModel = updated;
+            baseModel = (TEntity)EntityJsonSerialization.DeserializeDocument(
+                json,
+                baseModel?.GetType() ?? typeof(TEntity));
         }
         baseModel ??= Activator.CreateInstance<TEntity>();
         typeof(TEntity).GetProperty("Id")?.SetValue(baseModel, id);
@@ -87,7 +88,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (body?.Snapshot != null)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(body.Snapshot);
-            var updated = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json);
+            var updated = (TEntity)EntityJsonSerialization.DeserializeDocument(json, draft.GetType());
             if (updated is not null)
             {
                 typeof(TEntity).GetProperty("Id")?.SetValue(updated, id);
@@ -265,12 +266,11 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     {
         try
         {
-            var srcNode = JsonNode.Parse(JsonSerializer.Serialize(source)) as JsonObject ?? new JsonObject();
+            var srcNode = JsonNode.Parse(EntityJsonSerialization.SerializeDocument(source)) as JsonObject ?? new JsonObject();
             var patchNode = JsonNode.Parse(JsonSerializer.Serialize(transform)) as JsonObject;
             if (patchNode is null) return source;
             MergeJson(srcNode, patchNode);
-            var merged = JsonSerializer.Deserialize<TEntity>(srcNode.ToJsonString());
-            return merged ?? source;
+            return (TEntity)EntityJsonSerialization.DeserializeDocument(srcNode.ToJsonString(), source.GetType());
         }
         catch
         {

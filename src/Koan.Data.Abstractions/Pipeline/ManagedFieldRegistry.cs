@@ -91,6 +91,7 @@ public static class ManagedFieldRegistry
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("A managed field StorageName must be a non-empty value.", nameof(name));
+        EntityFamilyStorage.EnsureFieldAvailable(name, "A managed field");
         var stable = name[0] == '_' || !name.Any(char.IsUpper);
         if (!stable)
             throw new ArgumentException(

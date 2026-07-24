@@ -10,6 +10,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 using System.Collections.Concurrent;
 
@@ -58,6 +59,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
     {
         _baseDir = options.Value.DirectoryPath;
         Directory.CreateDirectory(_baseDir);
+        EntityJsonSerialization.Apply(_json);
         _serializer = JsonSerializer.Create(_json);
         _segmentationFields = segmentation.For(typeof(TEntity)).Fields;
         _naming = naming;
@@ -179,7 +181,7 @@ internal sealed class JsonRepository<TEntity, TKey> : KeyValueStore<TEntity, TKe
                 // Extract the managed __-keys back into the envelope's sidecar (null off-axis), then deserialize the
                 // entity (it ignores the unknown __-keys, exactly as the relational read does).
                 var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);
-                var entity = jo.ToObject<TEntity>(_serializer);
+                var entity = (TEntity)EntityJsonSerialization.MaterializeStored(jo, typeof(TEntity), _serializer);
                 if (entity is null) continue;
                 store[entity.Id] = new KvRecord<TEntity>(entity, managed);
             }

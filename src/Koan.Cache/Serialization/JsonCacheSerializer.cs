@@ -5,12 +5,16 @@ using Koan.Cache.Abstractions;
 using Koan.Cache.Abstractions.Primitives;
 using Koan.Cache.Abstractions.Serialization;
 using Koan.Core.Json;
+using Koan.Data.Core.Polymorphism;
 using Newtonsoft.Json;
 
 namespace Koan.Cache.Serialization;
 
 public sealed class JsonCacheSerializer : ICacheSerializer
 {
+    private static readonly JsonSerializerSettings EntityJsonSettings =
+        EntityJsonSerialization.Apply(new JsonSerializerSettings(JsonDefaults.Settings));
+
     public string ContentType => CacheConstants.ContentTypes.Json;
 
     public bool CanHandle(Type type)
@@ -39,7 +43,8 @@ public sealed class JsonCacheSerializer : ICacheSerializer
             return ValueTask.FromResult(CacheValue.FromJson("null", runtimeType));
         }
 
-        var json = JsonConvert.SerializeObject(value, runtimeType, JsonDefaults.Settings);
+        var actualType = value.GetType();
+        var json = JsonConvert.SerializeObject(value, actualType, EntityJsonSettings);
         return ValueTask.FromResult(CacheValue.FromJson(json, runtimeType));
     }
 
@@ -57,7 +62,7 @@ public sealed class JsonCacheSerializer : ICacheSerializer
             return ValueTask.FromResult(default(T));
         }
 
-        var result = JsonConvert.DeserializeObject(text, runtimeType, JsonDefaults.Settings);
+        var result = JsonConvert.DeserializeObject(text, runtimeType, EntityJsonSettings);
         return ValueTask.FromResult((T?)result);
     }
 }

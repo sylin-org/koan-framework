@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using Koan.Core.Semantics.Segmentation;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Data.Core.Semantics;
@@ -41,7 +42,12 @@ public sealed class DataSegmentationPlan(SegmentationPlan segmentation) : ISegme
         {
             _scope = scope;
             Fields = scope.DimensionIds
-                .Select(static id => new DataSegmentationField(id, ManagedPrefix + id, typeof(string)))
+                .Select(static id =>
+                {
+                    var storageName = ManagedPrefix + id;
+                    EntityFamilyStorage.EnsureFieldAvailable(storageName, $"Segmentation dimension '{id}'");
+                    return new DataSegmentationField(id, storageName, typeof(string));
+                })
                 .ToImmutableArray();
         }
 

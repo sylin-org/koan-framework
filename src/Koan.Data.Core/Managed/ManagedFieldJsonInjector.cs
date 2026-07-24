@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -30,7 +32,7 @@ namespace Koan.Data.Core;
 /// managed keys lead with <c>'_'</c> (a fixed point of camel-casing) so the write literal and the read literal stay
 /// identical on adapters that camel-case property names.</para>
 /// </summary>
-public sealed class ManagedFieldJsonInjector : DefaultContractResolver
+public sealed class ManagedFieldJsonInjector : EntityJsonContractResolver
 {
     private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
 
@@ -69,6 +71,7 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
         string name,
         Type clrType)
     {
+        EntityFamilyStorage.EnsureFieldAvailable(name, "A framework-managed field");
         if (props.Any(p => string.Equals(p.PropertyName, name, StringComparison.Ordinal)))
             return;
 
@@ -113,7 +116,10 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
     {
         if (managed is null || managed.Count == 0) return;
         foreach (var kv in managed)
+        {
+            EntityFamilyStorage.EnsureFieldAvailable(kv.Key, "A framework-managed field");
             json[kv.Key] = kv.Value is null ? JValue.CreateNull() : JToken.FromObject(kv.Value);
+        }
     }
 
     /// <summary>
@@ -137,12 +143,14 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
         Dictionary<string, object?>? dict = null;
         foreach (var d in managed)
         {
+            EntityFamilyStorage.EnsureFieldAvailable(d.StorageName, "A framework-managed field");
             if (!json.TryGetValue(d.StorageName, out var tok)) continue;
             dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);
             dict[d.StorageName] = tok.Type == JTokenType.Null ? null : tok.ToObject(d.ClrType);
         }
         foreach (var field in segmented)
         {
+            EntityFamilyStorage.EnsureFieldAvailable(field.StorageName, $"Segmentation dimension '{field.DimensionId}'");
             if (dict?.ContainsKey(field.StorageName) == true) continue;
             if (!json.TryGetValue(field.StorageName, out var tok)) continue;
             dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);

@@ -7,7 +7,9 @@ using Koan.Data.Core.KeyValue;
 using Koan.Data.Core.Semantics;
 using StackExchange.Redis;
 using System.Reflection;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Koan.Data.Core.Polymorphism;
 
 namespace Koan.Data.Connector.Redis;
 
@@ -29,6 +31,9 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    private static readonly JsonSerializerSettings EntityJsonSettings =
+        EntityJsonSerialization.Apply(new JsonSerializerSettings());
+
     private readonly IConnectionMultiplexer _muxer;
     private readonly int _database;
     private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
@@ -149,7 +154,7 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
 
     private static string Serialize(KvRecord<TEntity> record)
     {
-        var jo = JObject.FromObject(record.Entity);
+        var jo = JObject.FromObject(record.Entity, JsonSerializer.Create(EntityJsonSettings));
         ManagedFieldJsonInjector.InjectManaged(jo, record.Managed);   // off/host-context ⇒ no key added ⇒ byte-identical
         return jo.ToString(Newtonsoft.Json.Formatting.None);
     }
@@ -158,7 +163,10 @@ internal sealed class RedisRepository<TEntity, TKey> : KeyValueStore<TEntity, TK
     {
         var jo = JObject.Parse(json);
         var managed = ManagedFieldJsonInjector.ExtractManaged(jo, typeof(TEntity), _segmentationFields);   // null off-axis
-        var entity = jo.ToObject<TEntity>()!;
+        var entity = (TEntity)EntityJsonSerialization.Materialize(
+            jo,
+            typeof(TEntity),
+            JsonSerializer.Create(EntityJsonSettings));
         return new KvRecord<TEntity>(entity, managed);
     }
 

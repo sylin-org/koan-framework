@@ -4,7 +4,7 @@ domain: data
 title: "Persist and query business state"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-07-24
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
@@ -72,6 +72,60 @@ generated REST controllers, and generated MCP tools.
 Use `Entity<T, TKey>` when the identifier is not the default string key. The lower-level
 `Data<TEntity, TKey>` facade, direct provider instructions, and raw access are expert escape hatches,
 not an application architecture requirement.
+
+## Keep a polymorphic family in one set
+
+Declare one Entity root when several runtime shapes must share one searchable table or collection.
+Put shared searchable and policy-bearing fields on the root, then close each variant through Koan's
+generated same-name companion:
+
+```csharp
+public class Media : Entity<Media>
+{
+    public string Kind { get; set; } = "";
+    public string Title { get; set; } = "";
+}
+
+public sealed class Anime : Media<Anime>
+{
+    public int? Episodes { get; set; }
+}
+
+public sealed class Manga : Media<Manga>
+{
+    public int? Volumes { get; set; }
+    public int? Chapters { get; set; }
+}
+```
+
+Use the variant for typed point operations and the root for set operations:
+
+```csharp
+await new Anime { Kind = "Anime", Title = "Cowboy Bebop", Episodes = 26 }.Save(ct);
+
+Anime? anime = await Anime.Get(id, ct);
+Media? media = await Media.Get(id, ct); // runtime type is Anime for that row
+
+var animePage = await Media.Query(item => item.Kind == "Anime", ct);
+var page = await Media.Page(1, 25, ct);
+```
+
+`Anime`, `Manga`, and `Media` resolve to the Media repository, so root filtering, sorting, counting,
+and paging keep the connector's normal provider pushdown. Derived-only fields remain stored with the
+record; put fields on `Media` when they need portable set-wide query, index, segmentation, lifecycle,
+or set-policy semantics. Record-local write stamps and field transforms still follow the record's
+runtime type.
+
+Koan generates `Media<TVariant>` from the root and writes its reserved `__koan_type` source hint for
+every record in a known family, including plain `Media`. Do not add attributes or infer the runtime type from `Kind`.
+Existing rows without
+that hint remain readable as `Media`; a typed point read such as `Anime.Get(id)` can supply the target
+for a known legacy row when the adapter materializes it on demand, but a mixed root query cannot safely
+recover legacy variant identity. Eager stores also hydrate before a point-read target exists. Migrate or
+backfill discriminator-free derived rows before depending on runtime variants in root results.
+
+Use a generic shared base with separate `Entity<Self>` leaves instead when the types only reuse
+properties and should own independent tables or collections.
 
 ## Choose a provider by business need
 
