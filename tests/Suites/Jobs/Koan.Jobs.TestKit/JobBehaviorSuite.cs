@@ -28,6 +28,42 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
+    public async Task retired_work_types_are_dead_lettered_without_blocking_valid_work()
+    {
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var now = host.Clock.GetUtcNow();
+        const string retiredJobId = "retired-work-type";
+        await host.Ledger.Append(new JobRecord
+        {
+            Id = retiredJobId,
+            WorkType = "Example.RetiredWork",
+            WorkId = "old-work",
+            Action = "run",
+            Status = JobStatus.Queued,
+            Lane = "default",
+            VisibleAt = now,
+            FirstSubmittedAt = now
+        }, TestContext.Current.CancellationToken);
+
+        var valid = new GreetJob { Name = "still-runs" };
+        await valid.Job.Submit();
+        var run = await host.Driver.RunOneAsync(TestContext.Current.CancellationToken);
+
+        var retired = await host.Ledger.Get(retiredJobId, TestContext.Current.CancellationToken);
+        retired.Should().NotBeNull();
+        retired!.Status.Should().Be(JobStatus.Dead);
+        retired.DeadReason.Should().Be(nameof(DeadReason.UnregisteredWorkType));
+        retired.Owner.Should().BeNull();
+        retired.LeaseUntil.Should().BeNull();
+        retired.Attempt.Should().Be(1);
+        retired.Transitions.Should().ContainSingle(value => value.To == JobStatus.Dead);
+        run.Should().NotBeNull("one-stage execution must continue past retired durable rows");
+        run!.WorkType.Should().Be(typeof(GreetJob).FullName);
+        GreetJob.Executions.Should().Be(1, "retired durable rows must not make a drain look empty");
+    }
+
+    [Fact]
     public async Task single_action_runs_and_mutates_work_item()
     {
         GreetJob.Reset();

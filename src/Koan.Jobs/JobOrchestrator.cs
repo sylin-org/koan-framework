@@ -28,6 +28,7 @@ internal sealed class JobOrchestrator
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _unregisteredWorkTypeWarnings = new(StringComparer.Ordinal);
     private readonly JobMetricsRecorder _metrics;
 
     public JobOrchestrator(
@@ -71,10 +72,10 @@ internal sealed class JobOrchestrator
 
                 var now = _clock.GetUtcNow();
                 var pools = await ResolvePoolContextsAsync(ct);
-                var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
-                if (rec is not null)
+                var claimed = await ClaimBoundNextAsync(now, SaturatedLanes(), pools, ct);
+                if (claimed is { } work)
                 {
-                    var binding = _registry.Require(rec.WorkType);
+                    var (rec, binding) = work;
                     var policy = binding.ResolvePolicy(rec.Action, _options);
                     var sem = LaneSem(policy.Lane, policy.MaxConcurrency);
                     if (!sem.Wait(0)) await sem.WaitAsync(ct); // claim guarantees a slot; fallback is defensive
@@ -125,10 +126,10 @@ internal sealed class JobOrchestrator
     {
         var now = _clock.GetUtcNow();
         var pools = await ResolvePoolContextsAsync(ct);
-        var rec = await _ledger.ClaimNext(_owner, now, now + _options.LeaseDuration, SaturatedLanes(), ct, pools);
-        if (rec is null) return null;
+        var claimed = await ClaimBoundNextAsync(now, SaturatedLanes(), pools, ct);
+        if (claimed is not { } work) return null;
 
-        var binding = _registry.Require(rec.WorkType);
+        var (rec, binding) = work;
         var policy = binding.ResolvePolicy(rec.Action, _options);
         var sem = LaneSem(policy.Lane, policy.MaxConcurrency);
         if (!sem.Wait(0)) await sem.WaitAsync(ct);
@@ -318,6 +319,30 @@ internal sealed class JobOrchestrator
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
     }
 
+    private async Task SettleUnregisteredWorkTypeAsync(JobRecord rec)
+    {
+        var now = _clock.GetUtcNow();
+        rec.Owner = null;
+        rec.LeaseUntil = null;
+        rec.LastError = $"No job binding is registered for work type '{rec.WorkType}'.";
+        rec.LastSettledAt = now;
+        rec.DeadReason = DeadReason.UnregisteredWorkType.ToString();
+        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+        SetStatus(rec, JobStatus.Dead, now, $"unregistered work type: {rec.WorkType}");
+        await _ledger.Update(rec, CancellationToken.None);
+        _metrics.Record(rec.WorkType, JobStatus.Dead, now);
+        if (_unregisteredWorkTypeWarnings.TryAdd(rec.WorkType, 0))
+            _logger.LogWarning(
+                "Dead-lettered jobs for unregistered work type {WorkType}; the first observed job was {JobId}",
+                rec.WorkType,
+                rec.Id);
+        else
+            _logger.LogDebug(
+                "Dead-lettered job {JobId} because work type {WorkType} is not registered",
+                rec.Id,
+                rec.WorkType);
+    }
+
     private async Task ApplyDeferralAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy,
         DateTimeOffset until, bool gate, string? gateKeyOverride, bool hasOverride, string reason)
     {
@@ -426,6 +451,37 @@ internal sealed class JobOrchestrator
     }
 
     // --- helpers ---
+
+    /// <summary>
+    /// Claims the next executable row. Durable rows can outlive the application code that registered their work type;
+    /// those rows are deterministic poison, so the orchestrator terminalizes them and keeps looking instead of leaking
+    /// a Running lease or making a caller mistake a retired row for an empty queue.
+    /// </summary>
+    private async Task<(JobRecord Record, JobTypeBinding Binding)?> ClaimBoundNextAsync(
+        DateTimeOffset now,
+        IReadOnlyCollection<string> saturatedLanes,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools,
+        CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var rec = await _ledger.ClaimNext(
+                _owner,
+                now,
+                now + _options.LeaseDuration,
+                saturatedLanes,
+                ct,
+                pools);
+            if (rec is null) return null;
+
+            var binding = _registry.Get(rec.WorkType);
+            if (binding is not null) return (rec, binding);
+
+            await SettleUnregisteredWorkTypeAsync(rec);
+        }
+
+        return null;
+    }
 
     private async Task<IReadOnlyDictionary<string, PoolDispatchContext>?> ResolvePoolContextsAsync(CancellationToken ct)
     {
