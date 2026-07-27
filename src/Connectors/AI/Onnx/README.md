@@ -41,7 +41,8 @@ configured, it is explicit intent: a missing model or vocabulary fails startup w
 silently removing embeddings.
 
 The provider publishes one in-process `onnx` source with Embedding capability. The ONNX session is a DI-owned
-singleton and is disposed with the host.
+singleton and is disposed with the host. Runtime health is inspected by that loaded adapter: `inproc://onnx` is an
+identity for routing and diagnostics, not an HTTP endpoint, so no network probe is made.
 
 ## Boundaries
 
