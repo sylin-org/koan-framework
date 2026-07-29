@@ -7,14 +7,7 @@ namespace Koan.Data.Connector.InMemory.Runtime;
 
 internal static class InMemoryFeatures
 {
-    private static readonly IReadOnlyList<Capability> Backend =
-    [
-        DataCaps.Query.FilterExecution,
-        DataCaps.Write.BulkUpsert,
-        DataCaps.Write.BulkDelete
-    ];
-
-    private static readonly IReadOnlyList<Capability> All =
+    private static readonly Capability[] Claims =
     [
         DataCaps.Query.Linq,
         DataCaps.Query.Filter,
@@ -26,16 +19,14 @@ internal static class InMemoryFeatures
         DataCaps.Isolation.DatabaseScoped
     ];
 
-    public static void Declare(IDataClaims claims)
+    internal static void Declare(IDataClaims claims)
     {
-        foreach (var capability in All) claims.Capability(capability);
+        foreach (var capability in Claims) claims.Capability(capability);
     }
 
-    public static void DescribeBackend(ICapabilities capabilities)
-    {
-        foreach (var capability in Backend) capabilities.Add(capability);
-        capabilities.Add(
-            DataCaps.Query.FilterExecution,
-            new FilterExecutionProfile(FilterExecutionKind.InMemory, SupportsBoundedCandidates: true));
-    }
+    internal static void DescribeBackend(ICapabilities capabilities) => capabilities
+        .Add(DataCaps.Query.FilterExecution,
+            new FilterExecutionProfile(FilterExecutionKind.InMemory, SupportsBoundedCandidates: true))
+        .Add(DataCaps.Write.BulkUpsert)
+        .Add(DataCaps.Write.BulkDelete);
 }

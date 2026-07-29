@@ -23,8 +23,8 @@ namespace Koan.Data.Connector.InMemory.Tests.Specs.Routing;
 /// (<see cref="InMemShardAmbient"/>), with <b>no explicit <c>EntityContext.Source</c></b> — proven through a real
 /// <c>AddKoan()</c> boot with two in-memory sources. Docker-free.
 ///
-/// <para>The mechanism is the data-plane twin of the P1 <c>InMemoryVector</c> proof: <c>InMemoryDataStore</c> keys each
-/// physical store by <c>(routed source, entity type, partition)</c>, and <c>InMemoryAdapterFactory</c> threads the
+/// <para>The mechanism is the data-plane twin of the P1 <c>InMemoryVector</c> proof: <c>InMemoryState</c> keys each
+/// physical store by <c>(routed source, entity root, partition)</c>, and <c>InMemoryAdapterFactory</c> threads the
 /// routed source into the repository — so two shards land in two store dictionaries with no shared state. Physical
 /// isolation is asserted by reading back under each shard (each sees only its own row) and cross-shard get-by-id
 /// returning <c>null</c>; a fail-closed case proves the external-only posture.</para>

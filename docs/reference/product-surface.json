@@ -1519,7 +1519,7 @@
       "packageId": "Sylin.Koan.Data.Connector.InMemory",
       "versionIntent": "0.20",
       "shape": "library",
-      "description": "In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.",
+      "description": "Host-ephemeral Koan Entity adapter with detached snapshots, exact isolation, and bounded in-process state.",
       "targetFrameworks": [
         "net10.0"
       ],
