@@ -177,7 +177,7 @@ function Test-GeneratedCatalog([object]$Document, [string]$Path) {
     }
 }
 
-function Read-SuiteCells([string]$Path, [object[]]$Catalog) {
+function Read-SuiteCells([string]$Path, [object[]]$Catalog, [bool]$RequireCells = $true) {
     $knownIds = @{}; foreach ($item in $Catalog) { $knownIds[$item.id] = $item }
     $text = Get-Content -LiteralPath $Path -Raw
     $facts = [regex]::Matches($text, '\[Fact\(DisplayName\s*=\s*"(?<display>[^"]+)"\)\]')
@@ -201,8 +201,10 @@ function Read-SuiteCells([string]$Path, [object[]]$Catalog) {
                 evidenceKinds = @($knownIds[$id].evidenceKinds)
             }) | Out-Null
     }
-    if ($cells.Count -eq 0) { throw "Conformance suite '$(Get-RelativePath $Path)' declares no primer cells." }
-    foreach ($duplicate in @($cells.key | Group-Object | Where-Object Count -ne 1)) {
+    if ($RequireCells -and $cells.Count -eq 0) {
+        throw "Conformance suite '$(Get-RelativePath $Path)' declares no primer cells."
+    }
+    foreach ($duplicate in @($cells | ForEach-Object { $_.key } | Group-Object | Where-Object Count -ne 1)) {
         throw "Conformance suite '$(Get-RelativePath $Path)' contains duplicate row '$($duplicate.Name)'."
     }
     @($cells | Sort-Object key)
@@ -219,7 +221,7 @@ function Find-Project([IO.FileInfo]$Spec) {
     $null
 }
 
-function Discover-Targets([hashtable]$CellsByPlane) {
+function Discover-Targets([hashtable]$CellsByPlane, [object[]]$Catalog) {
     $targets = New-Object System.Collections.Generic.List[object]
     $specs = @(Get-ChildItem -LiteralPath $dataSuitesRoot -Recurse -Filter '*AodbConformanceSpec.cs' -File |
             Sort-Object FullName)
@@ -228,6 +230,13 @@ function Discover-Targets([hashtable]$CellsByPlane) {
         $targetPlane = if ($isVector) { 'vector' } else { 'record' }
         $suffix = if ($isVector) { 'VectorAodbConformanceSpec.cs' } else { 'AodbConformanceSpec.cs' }
         $name = $spec.Name.Substring(0, $spec.Name.Length - $suffix.Length)
+        $expectedCells = @(
+            @($CellsByPlane[$targetPlane])
+            @(Read-SuiteCells $spec.FullName $Catalog $false)
+        ) | Sort-Object key
+        foreach ($duplicate in @($expectedCells | ForEach-Object { $_.key } | Group-Object | Where-Object Count -ne 1)) {
+            throw "Conformance target '$targetPlane/$name' contains duplicate row '$($duplicate.Name)'."
+        }
         $targets.Add([pscustomobject]@{
                 adapter = $name
                 plane = $targetPlane
@@ -235,7 +244,7 @@ function Discover-Targets([hashtable]$CellsByPlane) {
                 className = $spec.BaseName
                 project = Find-Project $spec
                 spec = Get-RelativePath $spec.FullName
-                expectedCells = @($CellsByPlane[$targetPlane])
+                expectedCells = @($expectedCells)
             }) | Out-Null
     }
     foreach ($duplicate in @($targets.key | Group-Object | Where-Object Count -ne 1)) {
@@ -362,7 +371,11 @@ try {
     foreach ($entry in $suiteSources.GetEnumerator()) {
         $cellsByPlane[$entry.Key] = @(Read-SuiteCells $entry.Value $catalog)
     }
-    $boundIds = @($cellsByPlane.Values | ForEach-Object { $_.id } | Sort-Object -Unique)
+    $targets = @(Discover-Targets $cellsByPlane $catalog)
+    $boundIds = @(
+        $cellsByPlane.Values
+        $targets.expectedCells
+    ) | ForEach-Object { $_.id } | Sort-Object -Unique
     $catalogReport = [pscustomobject]@{
         count = $catalog.Count
         primer = Get-RelativePath $primerPath
@@ -397,7 +410,6 @@ try {
         exit 0
     }
 
-    $targets = @(Discover-Targets $cellsByPlane)
     $dockerFreeTargets = @('record/InMemory', 'record/Json', 'record/Sqlite', 'vector/InMemory', 'vector/SqliteVec')
     $selected = @($targets)
     if ($DockerFree) {

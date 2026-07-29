@@ -12,7 +12,7 @@ public sealed class MongoSourceIntegrationSpec(MongoFixture fixture, ITestOutput
     : KoanDataSpec<MongoFixture>(fixture, output)
 {
     [Fact]
-    public async Task Named_pipelines_and_inspection_form_one_source_first_journey()
+    public async Task Named_pipelines_execute_record_and_scalar_results()
     {
         RequireBackingStore();
         var collectionName = $"source_journey_{Guid.NewGuid():N}";
@@ -43,34 +43,6 @@ public sealed class MongoSourceIntegrationSpec(MongoFixture fixture, ITestOutput
         ready.Project<WorkItem>().Should().ContainSingle()
             .Which.Should().Be(new WorkItem(2, "ship"));
         (await source.Scalar<long>("work.count")).Should().Be(2);
-
-        var inspector = source.Inspect();
-        var containers = new List<StorageContainerDescriptor>();
-        string? continuation = null;
-        do
-        {
-            var page = await inspector.Containers(10, continuation);
-            containers.AddRange(page.Containers);
-            continuation = page.Continuation;
-        } while (continuation is not null);
-
-        var descriptor = containers.Should().ContainSingle(item => item.Address.Name == collectionName).Which;
-        descriptor.ProviderKind.Should().Be("collection");
-        descriptor.Traits.Should().HaveFlag(StorageContainerTraits.Records);
-        descriptor.EffectiveOperations.Should().HaveFlag(StorageContainerOperations.Sample);
-
-        var reference = await inspector.Resolve(StorageAddress.From(collectionName));
-        var described = await inspector.Describe(reference);
-        described.RecordShape.Should().BeNull("MongoDB collections do not promise one fixed document shape");
-
-        var complete = await inspector.Sample(reference, 10);
-        complete.Records.Should().HaveCount(2);
-        complete.Fields.Select(field => field.Name).Should().Equal("_id", "title", "priority");
-        complete.Completion.Should().Be(RecordSetCompletion.Complete);
-
-        var bounded = await inspector.Sample(reference, 1);
-        bounded.Records.Should().ContainSingle();
-        bounded.Completion.Should().Be(RecordSetCompletion.ProviderLimit);
     }
 
     [Fact]

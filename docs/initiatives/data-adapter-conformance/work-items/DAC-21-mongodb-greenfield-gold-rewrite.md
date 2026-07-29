@@ -167,6 +167,36 @@ disposal must remain race-safe; a cached no-restore build is the strongest permi
 7. Complete the new-source, compile/registration, one-execution-path, moving-parts, evidence, and retirement-absence
    manifests. The accepted change deletes the former implementation atomically; it never contains old and new routes.
 
+## Provider-local Forge cells explore
+
+**Task:** Bind provider-specific record conformance facts without a registry.
+
+**Application intent:** Adapter authors keep focused ordinary tests; Forge recognizes exact primer-keyed facts
+contributed by that adapter.
+
+**Public expression:** No application change. Test facts retain the existing
+`<Acceptance ID>/<Case>/<Owner>: <title>` display-name grammar.
+
+**Guarantee/correction:** MongoDB's D-01 through D-05 claims gain real-provider facts. A missing, duplicate, skipped,
+or failing local cell remains non-green.
+
+**Complete intent surface:** The shared base cells plus exact facts physically declared in the concrete AODB spec.
+No behavior is inferred from unrelated tests.
+
+**Reusing:** The primer catalog, row-key parser, MongoDB source inspector, real MongoDB fixture, and current source
+journey.
+
+**Creating new:** No runtime type, registry, or manifest. Forge reads optional local cells from the concrete spec and
+the existing MongoDB AODB spec adds five focused facts.
+
+**Coalescence:** The broad inspection journey is harvested and reduced. Forge remains the sole process orchestrator.
+
+**Constraints satisfied:** No entity hot-path change, packet stub, or second catalog. D-05 exposed one bounded
+inspection defect and justified the smallest provider correction.
+
+**Risks:** Each local fact must prove its complete named case. D-01 through D-05 stay separate; framework-owned
+negative edge cases remain separate evidence instead of being falsely attributed to the live-provider fact.
+
 ## Verification
 
 - Clean build and complete MongoDB, Document, Data Core, AdapterSurface, and strict Forge suites on every claimed real
@@ -191,8 +221,13 @@ Recovery verification on 2026-07-29 restored all MongoDB source byte-identically
 existing exact-source 34-case binary against a fresh MongoDB 8.3.4 container with zero failures and provider skips. The
 follow-up lifecycle correction then removed synchronous discovery from options materialization, moved bounded
 single-flight resolution to first provider use, and proved that caller cancellation does not poison the shared route.
-An explicitly offline restore from the installed package cache produced a fresh zero-warning build; the resulting
-35-case suite passed against MongoDB 8.3.4. The greenfield gate reports `source=23 parts=9 retired=11`.
+An explicitly offline restore from the installed package cache produced a fresh zero-warning build. Five focused,
+primer-keyed real-provider facts now prove bounded container listing, source-bound resolution, honest description,
+bounded sampling, and lossless MongoDB records. D-05 exposed that the driver's ordinary `BsonDocument` deserializer
+rejects legal duplicate field names; the bounded inspection path now reads raw BSON, preserves duplicate occurrences
+and field order, copies values into the neutral algebra, and immediately disposes the native buffers. The resulting
+40-case suite passes against MongoDB 8.3.4. Canonical Forge is green on all 11 expected MongoDB rows. The greenfield
+gate reports `source=23 parts=9 retired=11`, all 23 source hashes match, and the initiative gate passes.
 
 Strict packet emission, topology expansion, stable performance evidence, broad shared/Web regressions, and independent
 certification remain deferred. The existing packet compiler and validator do not yet provide an adapter-evidence

@@ -6,6 +6,7 @@ namespace Koan.Data.Connector.Mongo.Runtime;
 internal sealed class MongoNeutralReader : INeutralRecordReader
 {
     private readonly IReadOnlyList<DataRecord> _records;
+    private readonly IReadOnlyList<(string Name, int Occurrence)> _slots;
     private int _next;
 
     private MongoNeutralReader(
@@ -13,7 +14,7 @@ internal sealed class MongoNeutralReader : INeutralRecordReader
         NeutralRecordReaderCompletion completion)
     {
         Completion = completion;
-        Fields = Shape(documents);
+        (Fields, _slots) = Shape(documents);
         _records = documents.Select(Record).ToArray();
     }
 
@@ -39,21 +40,36 @@ internal sealed class MongoNeutralReader : INeutralRecordReader
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    private static IReadOnlyList<DataField> Shape(IReadOnlyList<BsonDocument> documents)
+    private static (IReadOnlyList<DataField> Fields, IReadOnlyList<(string Name, int Occurrence)> Slots) Shape(
+        IReadOnlyList<BsonDocument> documents)
     {
-        var names = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var slots = new List<(string Name, int Occurrence)>();
+        var seen = new HashSet<(string Name, int Occurrence)>();
         foreach (var document in documents)
-            foreach (var element in document)
-                if (seen.Add(element.Name)) names.Add(element.Name);
-
-        return names.Select((name, ordinal) =>
         {
-            var values = documents
-                .Where(document => document.TryGetValue(name, out _))
-                .Select(document => document[name])
-                .Where(static value => !value.IsBsonNull)
-                .ToArray();
+            var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var element in document)
+            {
+                occurrences.TryGetValue(element.Name, out var occurrence);
+                occurrences[element.Name] = occurrence + 1;
+                if (seen.Add((element.Name, occurrence))) slots.Add((element.Name, occurrence));
+            }
+        }
+
+        var fields = slots.Select((slot, ordinal) =>
+        {
+            var values = new List<BsonValue>();
+            var nullable = false;
+            foreach (var document in documents)
+            {
+                if (!TryGetValue(document, slot, out var value))
+                {
+                    nullable = true;
+                    continue;
+                }
+                if (value.IsBsonNull) nullable = true;
+                else values.Add(value);
+            }
             var types = values.Select(static value => value.BsonType).Distinct().ToArray();
             var clr = values.Select(value => MongoValues.ToNeutral(value)?.GetType())
                 .Where(static type => type is not null)
@@ -61,11 +77,12 @@ internal sealed class MongoNeutralReader : INeutralRecordReader
                 .ToArray();
             return new DataField(
                 ordinal,
-                name,
+                slot.Name,
                 clr.Length == 1 ? clr[0] : null,
                 types.Length == 1 ? types[0].ToString() : null,
-                documents.Any(document => !document.TryGetValue(name, out var value) || value.IsBsonNull));
+                nullable);
         }).ToArray();
+        return (fields, slots);
     }
 
     private DataRecord Record(BsonDocument document)
@@ -74,10 +91,28 @@ internal sealed class MongoNeutralReader : INeutralRecordReader
         var presence = new bool[Fields.Count];
         for (var ordinal = 0; ordinal < Fields.Count; ordinal++)
         {
-            if (!document.TryGetValue(Fields[ordinal].Name, out var value)) continue;
+            if (!TryGetValue(document, _slots[ordinal], out var value)) continue;
             presence[ordinal] = true;
             values[ordinal] = MongoValues.ToNeutral(value);
         }
         return new DataRecord(Fields, values, presence);
+    }
+
+    private static bool TryGetValue(
+        BsonDocument document,
+        (string Name, int Occurrence) slot,
+        out BsonValue value)
+    {
+        var occurrence = 0;
+        foreach (var element in document)
+        {
+            if (!string.Equals(element.Name, slot.Name, StringComparison.Ordinal)) continue;
+            if (occurrence++ != slot.Occurrence) continue;
+            value = element.Value;
+            return true;
+        }
+
+        value = BsonNull.Value;
+        return false;
     }
 }

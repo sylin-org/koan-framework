@@ -67,8 +67,8 @@ RecordSet sample = await source.Inspect().Sample(customer, take: 20);
 ```
 
 The vocabulary stays provider-neutral: sources contain addressable containers with traits and operations. MongoDB
-returns collections and views through that surface. Samples preserve top-level BSON fields, missing values, nested
-objects, arrays, nulls, and explicit result bounds.
+returns collections and views through that surface. Samples preserve top-level BSON field order and duplicate names,
+missing values, binary and temporal values, nested objects, arrays, nulls, and explicit result bounds.
 
 ## Give a native pipeline a business name
 

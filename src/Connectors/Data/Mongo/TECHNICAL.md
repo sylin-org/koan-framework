@@ -58,7 +58,9 @@ MongoDB's native zero-second expiry index.
 Inspection exposes database-relative `StorageAddress` values, collection/view traits, effective read/write operations,
 bounded pagination, and bounded samples. MongoDB collections have no promised fixed shape, so `Describe` reports no
 synthetic schema. A sample builds a neutral union of observed top-level fields; each record preserves missing separately
-from null and converts nested BSON to `DataObject`/`DataArray`.
+from null, retains duplicate-name occurrences by ordinal, and converts binary, temporal, and nested BSON to the neutral
+value algebra. Inspection reads raw BSON so the driver's ordinary document deserializer cannot discard or reject legal
+duplicate elements; raw buffers are disposed immediately after the bounded neutral copy is complete.
 
 `MongoPipelineBinding` stores validated JSON stages and the target collection. It rejects `$out` and `$merge` during
 composition and therefore carries `ValidatedRead` proof. Execution parses immutable stages, structurally substitutes
@@ -85,10 +87,11 @@ report only work completed by MongoDB.
 
 ## Verification
 
-The connector project and test project build with zero warnings. The real MongoDB 8.3 suite passes 35/35, covering
+The connector project and test project build with zero warnings. The real MongoDB 8.3 suite passes 40/40, covering
 managed CRUD, filtering convergence, comparable values, identity types, partitions, routing, discovery, health,
 instructions, batching, capability truth, managed-field isolation, explicit legacy mapping, read-only/external policy,
-inspection, registered pipelines, pure options, single-flight first use, and cancellation-safe discovery.
+lossless bounded inspection, registered pipelines, pure options, single-flight first use, and cancellation-safe
+discovery. Canonical Forge also executes 11 exact MongoDB rows, including provider-specific D-01 through D-05.
 
 - [Data adapter development primer](../../../../docs/architecture/data-adapter-development-primer.md)
 - [Adapter responsibility map](../../../../docs/architecture/data-adapter-responsibility-map.md)

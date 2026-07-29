@@ -38,7 +38,7 @@ only the orchestrator edits this ledger; workers publish scoped handoffs under `
 | DAC-15 | passed | DAC-10, DAC-20 | SQLite and MongoDB common bases, source manifests, moving parts, and retirement inventories are sealed | complete |
 | DAC-11 | ready | DAC-15 | empty-root SQLite rebuild; 47/47 provider, 16/16 Relational, 471/471 Core; greenfield replacement gate passes | rebuild Web surface when packages are available; strict packet and stable performance runner remain explicit defers |
 | DAC-13 | pending | DAC-11 | — | complete SQLite replacement manifest and tests ready for independent review |
-| DAC-21 | in-progress | DAC-15 | clean-room MongoDB replacement; 34/34 live recovery run; greenfield gate `source=23 parts=9 retired=11`; source hashes pass | fresh build/shared regressions, strict packet emission, topology/performance evidence, and independent review |
+| DAC-21 | in-progress | DAC-15 | clean-room MongoDB replacement; fresh zero-warning build; 40/40 live; Forge GREEN on 11 exact rows including D-01–D-05; greenfield `source=23 parts=9 retired=11`; 23/23 source hashes | shared/Web regressions, remaining provider rows, topology/performance evidence, strict packet emission, and independent review |
 | DAC-24 | pending | DAC-21 | — | complete MongoDB replacement manifest and tests ready for independent review |
 | DAC-23 | pending | DAC-13, DAC-24 | — | both reviewed atomic replacement bundles sealed from the common base |
 | DAC-12 | pending | DAC-23 | — | integrated gold checkpoint sealed |

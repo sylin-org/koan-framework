@@ -84,11 +84,18 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
         var mongo = Require(reference);
         var database = await clients.Database(route, ct).ConfigureAwait(false);
         var documents = await database
-            .GetCollection<BsonDocument>(mongo.Address.Name)
-            .Find(FilterDefinition<BsonDocument>.Empty)
+            .GetCollection<RawBsonDocument>(mongo.Address.Name)
+            .Find(FilterDefinition<RawBsonDocument>.Empty)
             .Limit(checked(take + 1))
             .ToListAsync(ct).ConfigureAwait(false);
-        return MongoNeutralReader.Bounded(documents, take);
+        try
+        {
+            return MongoNeutralReader.Bounded(documents, take);
+        }
+        finally
+        {
+            foreach (var document in documents) document.Dispose();
+        }
     }
 
     internal static void ValidateAddress(MongoRoute route, StorageAddress address)
