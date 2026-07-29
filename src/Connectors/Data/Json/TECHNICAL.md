@@ -1,73 +1,80 @@
 ---
 uid: reference.modules.Koan.data.json
 title: Koan.Data.Connector.Json - Technical Reference
-description: JSON file storage adapter for Koan data.
+description: Bounded local JSON Entity persistence for Koan Data.
 packages: [Sylin.Koan.Data.Connector.Json]
 source: src/Connectors/Data/Json/
-last_updated: 2026-07-17
+last_updated: 2026-07-29
 ---
 
 ## Contract
 
-- Local file storage semantics; simple filtering; limited concurrency.
-- The repository creates its configured directory on first use.
-- Package presence means provider availability, not provider selection.
-- The adapter does not declare `DataCaps.Query.ProviderBoundedPaging`; current reads materialize the
-  file-backed source before caller-visible paging is applied.
+The connector is an automatic Data floor with provider identity `json` and priority `0`. Package presence makes it
+available; source election or runtime use activates it. Application access remains the provider-neutral Entity API.
 
-## Streaming boundary
+`JsonDataOptions` exposes one provider decision: `DirectoryPath`, defaulting to `data`.
 
-- `AllStream` and `QueryStream` fail correctively with `QueryStreamRejectedException` before yielding;
-  there is no complete-result materializing fallback.
-- Use `All`/`Query` only for known-small files. Use `FirstPage`/`Page` to limit the result returned to
-  application code, without inferring a provider-side read bound.
-- A later incremental file implementation must earn a separate capability claim through shared
-  conformance before these Entity streams become available.
+- Global: `Koan:Data:Json:DirectoryPath`
+- Per source: `Koan:Data:Sources:{source}:json:DirectoryPath`
+- Selection: `Koan:Data:Sources:{source}:Adapter=json`
 
-## Persistence and corruption behavior
+The physical name is the Entity root plus Koan's standard partition token. One file contains a JSON array of Entity
+objects. Entity-family type identity and framework-managed fields are stored by the shared Data Core codecs.
 
-- Writes are serialized per physical aggregate file inside one Koan process.
-- A complete snapshot is written beside the target and then moved over it; cancellation or serialization failure does
-  not deliberately truncate the last complete file.
-- Mutations build a detached candidate, persist it, and only then publish the new in-memory view. Reads are detached
-  materializations, so failed writes and unsaved caller edits cannot leak into visible state.
-- Invalid JSON throws a corrective `InvalidDataException` containing the affected path. The repository does not
-  reinterpret corrupt persisted state as an empty aggregate.
-- There is no cross-process writer coordination, transaction log, crash recovery protocol, or incremental update path.
-  Use a database connector when those guarantees matter.
+## Runtime ownership
 
-## Configuration
+One DI-owned registry admits at most 1,024 canonical file paths per host. Each admitted path owns one immutable live
+snapshot and one write gate, so different repositories or source aliases cannot hold divergent views of the same
+file. Windows path identity is case-insensitive; other platforms use ordinal identity. Resolution is lexical and does
+not attempt filesystem/symlink identity discovery.
 
-- Adapter default: `Koan:Data:Json:DirectoryPath`.
-- Per source: `Koan:Data:Sources:{source}:json:DirectoryPath`.
-- A configured source selects JSON with `Koan:Data:Sources:{source}:Adapter=json`.
-- `Managed/ReadWrite` may provision its directory. Read-only or `External` routes require an existing directory;
-  `External` also requires the addressed Entity file and never creates it.
-- Explicit physical mappings reject because the adapter implements one Koan-owned Entity-array file shape.
+Factory creation and pure scope diagnostics resolve plans only; they perform no filesystem I/O. Warm reads retrieve a
+stored record string from the immutable snapshot and materialize a fresh Entity. Bounded scans stop dictionary
+enumeration at the candidate ceiling rather than first snapshotting the whole collection.
 
-## Health and readiness
+Changed records are serialized once. A mutation copies the immutable key/string index, changes only the requested
+entries, writes the complete array to a same-directory temporary file, checks cancellation, replaces the target, and
+then publishes the candidate. Failed serialization, write, cancellation, or replacement leaves the published snapshot
+and last complete target unchanged.
 
-`JsonHealthContributor` uses the data pillar's selection-aware health base. JSON participates in
-readiness when it wins default adapter election or appears in
-an observed entity configuration. Otherwise it reports `Unknown`, is non-critical, and performs no
-filesystem work.
+The file is intentionally aggregate-based: unchanged record strings are reused, but every successful mutation still
+replaces the complete file.
 
-For every active source, the contributor resolves the source-specific directory through
-`AdapterConnectionResolver`. Managed/read-write readiness creates and write-probes it. Read-only and External readiness
-only validates and enumerates an existing directory, performing no probe write. A selected source that cannot satisfy
-its declared posture reports `Unhealthy`; Koan does not substitute another adapter.
+## Bounds and persisted-input validation
 
-## Claims and bounds
+- Maximum canonical files per host: 1,024.
+- Maximum UTF-8 bytes per Entity file: 64 MiB, enforced before read materialization and before write.
+- Every array member must be an object assignable to the file's Entity root.
+- Every persisted identity must be unique.
+- One canonical file cannot be interpreted by conflicting Entity root/key pairs in the same host.
 
-The factory and repository share one claim authority: LINQ/full-filter semantics with scan execution, plus
-row/container/database isolation. Native bulk, atomic batch, fast remove, indexes, and provider-bounded paging remain
-unclaimed. A repository caches at most 1024 physical Entity/partition files and their write gates.
+Violations throw corrective errors naming the affected path and the remediation. Corrupt or ambiguous storage is never
+treated as empty.
 
-The real-file connector suite passes 28/28 across CRUD, restart, corruption, failed persistence, polymorphism, source
-postures, mapping rejection, health, routing, partitions, managed isolation, instructions, and batch decline behavior.
+## Source policy and health
 
-## References
+Managed/read-write reads may observe an absent file as empty; the first write or explicit ensure creates the directory
+and file. Read-only and External routes never create storage. A read-only route requires its directory to exist;
+External additionally requires the addressed Entity file.
 
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+Health is selection-aware. Inactive JSON reports `Unknown` and touches no disk. Active managed/read-write health creates
+and probe-writes its directory. Active read-only/External health only verifies and enumerates an existing directory.
 
+## Capabilities
+
+The KeyValue family supplies LINQ/full-filter behavior and row/container/database isolation. JSON declares scan filter
+execution plus `BulkUpsert` and `BulkDelete` because each bulk request is one physical replacement. It does not declare
+atomic batch, fast remove, indexes, native string queries, or provider-bounded paging.
+
+`AllStream` and `QueryStream` therefore throw `QueryStreamRejectedException` before yielding. Required atomic batches
+also reject before execution. Physical compatibility maps reject because the provider owns its file shape.
+
+## Durability boundary
+
+Same-directory replacement protects the last complete file from ordinary serialization and write failures. It is not
+an fsync/power-loss guarantee, transaction log, backup system, cross-process lock, or recovery protocol. The host cache
+does not observe concurrent external edits. Select a database connector when those guarantees or larger stores matter.
+
+The real-file connector ledger passes 34/34 across CRUD, bulk, detached writes, restart, polymorphism, corruption,
+duplicate identity, byte/file bounds, canonical aliases, concurrent writes, policy, health, routing, partitions,
+managed isolation, mapping decline, instructions, atomic decline, and streaming decline.

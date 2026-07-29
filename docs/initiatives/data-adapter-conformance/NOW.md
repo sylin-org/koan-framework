@@ -27,9 +27,10 @@ implementation roots:
 - DAC-57 Weaviate: 28/28 live against Weaviate 1.37.6; strict packet generation deferred.
 - DAC-58 Milvus: three 28/28 live passes against Milvus 2.6.20 with pinned etcd and MinIO; strict packet generation deferred.
 
-The Entity fleet has resumed with DAC-40 InMemory. Its old execution root is gone; one bounded host state and one thin
-KeyValue repository now store detached, root-aware snapshots. The live-in-process ledger passes 56/56, with Data Core
-471/471, JSON 28/28, and live Redis 17/17 regressions green. Strict packet generation remains deferred.
+The Entity fleet has resumed with DAC-40 InMemory and DAC-41 JSON. JSON's old execution root is gone; one canonical
+route, bounded host file registry, and thin KeyValue repository now own detached persist-then-publish snapshots. Its
+real-file ledger passes 34/34, including canonical aliases, concurrent writes, duplicate/oversized input, and exact
+capacity. Strict packet generation remains deferred.
 
 Elasticsearch and OpenSearch now independently realize the same Koan vector decisions through native mappings,
 queries, scores, failures, and source policy. Comparing the proven implementations found no provider-neutral runtime
@@ -47,7 +48,7 @@ no remaining owner and was deleted from source, solution membership, and the pac
 | SearchEngine retirement | no production, solution, claim, or current package-inventory owner remains |
 | Strict packet | deferred because the shared versioned packet generator is absent |
 | InMemory Entity | 56/56; detached graphs, root/variant round trips, exact source/partition isolation, finite host state |
-| KeyValue regressions | Data Core 471/471; JSON 28/28; live Redis 17/17 |
+| KeyValue regressions | Data Core 471/471; JSON 34/34; live Redis 17/17 |
 
 Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, DAC-55,
 DAC-56, DAC-57, and DAC-58 remain `in-progress` in the certification ledger until the shared control plane can emit the
@@ -55,9 +56,9 @@ required artifact.
 
 ## Next action
 
-Proceed with DAC-41 JSON as the next dependency-ready Entity adapter. Empty its provider-owned implementation root,
-retain only stable provider facts and the proven KeyValue family contract, and use DAC-40 as a behavioral oracle—not as
-code to copy. Do not enter DAC-90 while any discovered adapter card remains pending.
+Reconcile the remaining Entity fleet cards against work already implemented, then take the first genuinely pending
+provider through the same empty-root acceptance loop. Do not enter DAC-90 while any discovered adapter card remains
+pending.
 
 ## Guardrails
 

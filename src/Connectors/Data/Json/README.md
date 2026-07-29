@@ -1,77 +1,68 @@
 # Sylin.Koan.Data.Connector.Json
 
-Zero-configuration JSON persistence for small Koan applications, tests, and local development.
+Persist ordinary Koan Entities in inspectable local JSON files without running a database server.
 
-- Target framework: net10.0
-- License: Apache-2.0
-
-## What it adds
-
-- local file persistence with simple filtering and paging semantics
-- automatic data-directory creation on first elected use
-- an inspectable storage floor for the `Sylin.Koan` foundation bundle
-- explicit rejection of provider-bounded streams it cannot truthfully execute
-
-## Install
+## Use it
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Json
 ```
 
-## Meaningful result
-
-Reference the package and keep the normal `AddKoan()` bootstrap. When JSON is elected, the first Entity write creates
-its data directory and file; application code remains provider-neutral:
+Keep the normal Koan bootstrap and Entity API:
 
 ```csharp
-var todo = new Todo { Title = "Prove the first result" };
-await todo.Save(ct);
+builder.Services.AddKoan();
 
-var saved = await Todo.Get(todo.Id, ct);
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+}
+
+var saved = await new Todo { Title = "Ship" }.Save(ct);
+var same = await Todo.Get(saved.Id, ct);
 ```
 
-Use `FirstPage`/`Page` for UI-like reads and reserve `All`/`Query` for deliberately small files.
+The managed default directory is `data`. Choose another root only when placement matters:
 
-## Streaming boundary
+```json
+{
+  "Koan": {
+    "Data": {
+      "Json": { "DirectoryPath": "state" }
+    }
+  }
+}
+```
 
-`AllStream` and `QueryStream` reject correctively with `QueryStreamRejectedException` before yielding because the
-current JSON query path loads the file-backed source before slicing. Koan does not hide that work behind a
-streaming-shaped API.
+Named sources use the standard source grammar and may choose their own `json:DirectoryPath`.
 
-Numbered pages limit the result returned to application code; they do not make file loading provider-bounded.
+## What succeeds
 
-## Readiness and inspection
-
-Package presence makes JSON available; it does not make JSON an application dependency. The health contributor becomes
-critical only when JSON is default-elected, explicitly configured for a source, or observed in Entity use. An inactive
-connector reports `Unknown` and does not touch disk.
-
-For active sources, readiness creates the directory through the same contract as the repository and verifies that it can
-create and remove a probe file. Failure reports the selected connector as unhealthy instead of silently falling back.
+- Managed/read-write use creates the directory and Entity file on the first write.
+- Every read returns a detached Entity. Editing it changes nothing until `Save()` succeeds.
+- A write builds a complete candidate file, replaces the target, then publishes the new live snapshot.
+- Bulk upsert and delete each perform one physical file replacement.
+- A new Koan host restores root/variant identity and managed isolation fields from disk.
+- Two source path spellings that resolve to the same canonical file share one in-process snapshot and write gate.
 
 ## Boundaries and failures
 
-- JSON is a local, single-process persistence floor, not a multi-process database. Concurrent writers in different
-  processes are unsupported and can overwrite each other's snapshots.
-- Each write persists the aggregate file. This favors an inspectable first result over high write throughput or large
-  datasets; there are no transactions, indexes, server-side queries, or cross-process coordination.
-- Writes replace the previous file only after a complete temporary snapshot is written. Invalid existing JSON fails
-  with a corrective `InvalidDataException`; Koan never interprets corrupt storage as an empty database.
-- A failed serialization or replacement leaves both the visible in-memory snapshot and the last complete file
-  unchanged. Reads return detached materializations, so editing an Entity does not alter storage until `Save()` succeeds.
-- `External` opens only an existing directory and existing Entity file; repository use and health never provision or
-  probe-write provider-owned storage. Read-only writes reject before an Entity file is created.
-- Physical `Map<T>` declarations reject because this adapter owns Koan's Entity-array file format and cannot honestly
-  couple arbitrary legacy field layouts.
-- Package presence makes the provider available. Election, explicit source selection, or actual Entity use activates
-  readiness and storage access.
+- Corrupt JSON, duplicate identities, incompatible Entity roots, and files larger than 64 MiB never become an empty
+  successful store.
+- Read-only writes fail before filesystem mutation.
+- `External` requires an existing directory and Entity file; Koan never provisions either.
+- Physical `Map<T>` declarations reject because the connector owns one Entity-array file shape.
+- Required atomic batches and provider-bounded Entity streams reject before partial work.
+- The 1,025th canonical Entity/partition file in one host rejects; the fixed 1,024-file ceiling keeps host state finite.
 
-Repository state is bounded to 1024 physical files. JSON publishes scan-backed filter/query claims and deliberately
-does not claim native bulk, atomic batch, fast remove, indexes, or provider-bounded paging. The current real-file suite
-passes 28/28.
+## Choose a database connector when
 
-## References
+You need multi-process writers, transactions, indexes, provider-side queries, crash-recovery guarantees, files above
+64 MiB, or dynamically unbounded partitions. JSON is a deliberately small local persistence floor. It does not watch
+for external edits after a file enters the host cache, and lexical path canonicalization does not promise to collapse
+every symlink alias.
 
-- [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/Json/TECHNICAL.md)
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+Use `FirstPage`/`Page` to limit results returned to application code. `AllStream` and `QueryStream` remain unavailable
+because loading a whole file before yielding would not be provider-bounded streaming.
+
+See [TECHNICAL.md](TECHNICAL.md) for the exact storage and capability contract.

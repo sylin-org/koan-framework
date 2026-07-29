@@ -1,71 +1,62 @@
-using Koan.Core.Semantics.Segmentation;
+using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Data.AdapterSurface.TestKit;
-using Koan.Data.Core.Polymorphism;
-using Koan.Data.Core.Semantics;
-using Microsoft.Extensions.Options;
+using Koan.Testing.Integration;
 
 namespace Koan.Data.Connector.Json.Tests.Specs.Persistence;
 
 public sealed class JsonPolymorphicColdLoadSpec
 {
     [Fact]
-    public async Task First_typed_get_classifies_each_row_from_storage_during_eager_file_hydration()
+    public async Task First_root_read_after_restart_preserves_each_concrete_variant()
     {
         var root = Path.Combine(Path.GetTempPath(), $"koan-json-polymorphic-{Guid.CreateVersion7():N}");
 
         try
         {
-            var anime = new PolyAnime
+            await using (var writer = await Boot(root))
             {
-                Id = "anime",
-                Kind = "Anime",
-                Title = "Frieren",
-                Episodes = 28
-            };
-            var manga = new PolyManga
-            {
-                Id = "manga",
-                Kind = "Manga",
-                Title = "Witch Hat Atelier",
-                Volumes = 13,
-                Chapters = 80
-            };
-            var writer = Repository(root);
-            await writer.Upsert(anime);
-            await writer.Upsert(manga);
-
-            var cold = Repository(root);
-            using (EntityMaterializationScope.Enter(typeof(PolyMedia), typeof(PolyAnime)))
-            {
-                var loaded = await cold.Get(anime.Id);
-                loaded.Should().BeOfType<PolyAnime>()
-                    .Which.Episodes.Should().Be(28);
+                AppHost.Current = writer.Services;
+                await new PolyAnime
+                {
+                    Id = "anime",
+                    Kind = "Anime",
+                    Title = "Frieren",
+                    Episodes = 28
+                }.Save();
+                await new PolyManga
+                {
+                    Id = "manga",
+                    Kind = "Manga",
+                    Title = "Witch Hat Atelier",
+                    Volumes = 13,
+                    Chapters = 80
+                }.Save();
             }
 
-            (await cold.Get(manga.Id)).Should().BeOfType<PolyManga>()
+            await using var reader = await Boot(root);
+            AppHost.Current = reader.Services;
+
+            (await PolyMedia.Get("anime")).Should().BeOfType<PolyAnime>()
+                .Which.Episodes.Should().Be(28);
+            (await PolyMedia.Get("manga")).Should().BeOfType<PolyManga>()
                 .Which.Chapters.Should().Be(80);
         }
         finally
         {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            AppHost.Current = null;
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
 
-    private static JsonRepository<PolyMedia, string> Repository(string root)
-        => new(
-            new JsonRoute("Test", root, Koan.Data.Abstractions.Sources.StorageLifecycle.Managed,
-                Koan.Data.Abstractions.Sources.DataSourceAccess.ReadWrite),
-            new DataSegmentationPlan(SegmentationPlan.Empty),
-            new JsonAdapterFactory(),
-            EmptyServiceProvider.Instance);
-
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        internal static readonly EmptyServiceProvider Instance = new();
-
-        public object? GetService(Type serviceType) => null;
-    }
+    private static Task<IntegrationHost> Boot(string root) => KoanIntegrationHost.Configure()
+        .WithSettings(new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Koan:Environment"] = "Test",
+            ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
+            ["Koan:Data:Sources:Default:Adapter"] = "json",
+            ["Koan:Data:Json:DirectoryPath"] = root
+        })
+        .ConfigureServices(static services => services.AddKoan())
+        .StartAsync(TestContext.Current.CancellationToken);
 }

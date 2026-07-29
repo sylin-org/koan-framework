@@ -12,18 +12,22 @@ internal static class JsonFeatures
         DataCaps.Query.Linq,
         DataCaps.Query.Filter,
         DataCaps.Query.FilterExecution,
+        DataCaps.Write.BulkUpsert,
+        DataCaps.Write.BulkDelete,
         DataCaps.Isolation.RowScoped,
         DataCaps.Isolation.ContainerScoped,
         DataCaps.Isolation.DatabaseScoped
     ];
 
-    public static void Declare(IDataClaims claims)
+    internal static void Declare(IDataClaims claims)
     {
         foreach (var capability in All) claims.Capability(capability);
     }
 
-    public static void DescribeBackend(ICapabilities capabilities) =>
-        capabilities.Add(
+    internal static void DescribeBackend(ICapabilities capabilities) => capabilities
+        .Add(DataCaps.Write.BulkUpsert)
+        .Add(DataCaps.Write.BulkDelete)
+        .Add(
             DataCaps.Query.FilterExecution,
             new FilterExecutionProfile(FilterExecutionKind.Scan, SupportsBoundedCandidates: true));
 }
