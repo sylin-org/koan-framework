@@ -38,15 +38,15 @@ public static class EntityEmbeddingExtensions
 
         // Search for similar vectors
         var vectorResults = await Vector<TEntity>.Search(
-            vector: queryEmbedding,
-            topK: limit,
-            ct: ct);
+            queryEmbedding,
+            vectorQuery => vectorQuery.Top(limit),
+            ct);
 
         // Load full entities from search results
         var entities = new List<TEntity>();
-        foreach (var match in vectorResults.Matches)
+        foreach (var match in vectorResults.Items)
         {
-            if (match.Score < threshold)
+            if (match.Similarity < threshold)
                 continue;
 
             var entity = await LoadEntity<TEntity>(match.Id, partition, ct);
@@ -87,15 +87,15 @@ public static class EntityEmbeddingExtensions
         // Search for similar vectors (fetch +1 to account for filtering source)
         var searchLimit = includeSource ? limit : limit + 1;
         var vectorResults = await Vector<TEntity>.Search(
-            vector: queryEmbedding,
-            topK: searchLimit,
-            ct: ct);
+            queryEmbedding,
+            vectorQuery => vectorQuery.Top(searchLimit),
+            ct);
 
         // Load full entities and optionally filter out source
         var entities = new List<TEntity>();
-        foreach (var match in vectorResults.Matches)
+        foreach (var match in vectorResults.Items)
         {
-            if (match.Score < threshold)
+            if (match.Similarity < threshold)
                 continue;
 
             if (!includeSource && match.Id == entity.Id)

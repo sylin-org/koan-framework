@@ -116,8 +116,8 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
     {
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
             extraSettings: new Dictionary<string, string?> { ["Koan:Tenancy:Posture"] = "Closed" },
-            configureServices: s => s.AddSingleton<IReadFilterContributor>(new VisReadContributor()));
-        RegisterAxis();
+            configureServices: s => s.AddSingleton<IReadFilterContributor>(new VisReadContributor()),
+            configureDeclarations: RegisterAxis);
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
 
@@ -159,8 +159,8 @@ public sealed class ReadFilterCacheExclusionSpec : IDisposable
     [Fact(DisplayName = "no leak: a Data-only equality axis is cache-excluded until it joins cross-pillar segmentation")]
     public async Task Cacheable_with_a_data_only_equality_axis_is_excluded()
     {
-        await using var runtime = await TenancyRuntimeFixture.CreateAsync();
-        RegisterDataLocalEqualityAxis();
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(
+            configureDeclarations: RegisterDataLocalEqualityAxis);
         runtime.ResetEntityCaches();
         using var _iso = Isolate();
 

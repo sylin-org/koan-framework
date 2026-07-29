@@ -1,38 +1,41 @@
 title: Sylin.Koan.Data.Vector.Connector.InMemory - Technical Reference
-description: Managed automatic-floor vector provider for Koan.
+description: Bounded exact automatic-floor Vector provider for Koan.
 packages: [Sylin.Koan.Data.Vector.Connector.InMemory]
 source: src/Connectors/Data/Vector/InMemory/
 
-## Composition and election
+## Composition
 
-The package references `Sylin.Koan.Data.Vector`, so one connector reference supplies both provider and functional
-runtime. `InMemoryVectorModule` registers one singleton factory. The factory declares provider `inmemory`, aliases
-`memory` and `inproc`, priority `-100`, and `IsAutomaticFloor = true`.
+`InMemoryVectorModule` registers typed options and one singleton factory. The factory declares provider `inmemory`,
+aliases `memory` and `inproc`, priority `-100`, and `IsAutomaticFloor = true`. Vector Core resolves source policy and
+one immutable `VectorSpacePlan` before it creates a repository.
 
-Direct provider references participate in normal Vector election. When no direct candidate owns the decision, the
-catalog may elect this provider as its automatic floor. Explicit `[VectorAdapter]` and configured Vector defaults remain
-exact.
+The factory owns one bounded store catalog for the application-host lifetime. Vector Core owns a bounded repository
+cache keyed by Entity, key type, provider, source, and the complete space shape. Host disposal releases both. There is
+no process-global store and no public reset API.
 
-## Lifetime and naming
+## Storage and hot path
 
-One factory owns concurrent dictionaries for the application service-provider lifetime. Repositories are memoized by
-Vector Core per entity and routed source. Each operation asks `VectorAdapterNaming` for the selected provider's current
-entity/partition/source name; the adapter does not repeat election or maintain a second isolation naming rule.
+Each physical route stores immutable snapshots keyed by compiled scope identity plus Entity ID. Save clones embeddings
+and atomically replaces one complete point under a short store lock. Search takes one point-in-time array snapshot,
+applies the compiled metadata predicate, computes exact similarity with `System.Numerics.Tensors`, and sorts by
+descending similarity then stable ordinal ID. Caller arrays and metadata cannot mutate stored state.
 
-There is no public reset API. Tests and isolated applications obtain a fresh store by creating a fresh application
-service provider.
+The adapter never performs provider election, source-policy evaluation, reflection, JSON round-trips, or metadata-shape
+compilation on its hot path. Those cross-provider meanings belong to Vector Core.
 
-## Capability behavior
+## Capabilities
 
-The provider declares kNN, full unified metadata filters, hybrid scoring, native continuation, streaming export, bulk
-upsert/delete, normalized scores, and dynamic collections. It does not declare atomic batch or multiple vectors per
-entity. Ranking is exact brute-force cosine similarity; memory and CPU therefore grow with the active dataset.
+The adapter declares kNN, full metadata filters, bulk upsert/delete, normalized scores, and dynamic collections. It
+does not declare hybrid search, native continuation, streaming results, multi-vector points, or atomic batch.
 
-Vector Core applies segmentation before repository calls. Tenant metadata is stamped and filtered because this
-provider declares filter support. Partition and Database-source isolation are physical dictionary-name folds.
+Session visibility is immediate. `Sync` is therefore a completed barrier. Eventual spaces are rejected at repository
+creation instead of being simulated. `Clear` is scoped data mutation; source policy decides whether it is allowed.
 
-## Health and failure boundary
+## Bounds
 
-There is no connector health contributor because there is no external or persistent dependency to probe. Invalid
-vector/filter operations fail through the shared Vector contracts. Process exit is data loss by design.
+Typed options under `Koan:Data:Vector:InMemory` bound physical spaces, points per space, dimensions, and metadata bytes
+per point. Capacity failure occurs before replacement or insertion. Exact search is O(points × dimensions), so these
+limits are part of the adapter contract rather than incidental tuning.
 
+There is no external health dependency. Cancellation is checked before mutation and throughout batch/search loops;
+host disposal makes later catalog access fail with `ObjectDisposedException`.

@@ -4,63 +4,73 @@ domain: ai
 title: "Store and search Entity vectors"
 audience: [developers, operators, architects, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-07-28
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-22
+  date_last_tested: 2026-07-28
   status: verified
-  scope: Entity embedding lifecycle, vector provider election, bounded search, and inspection
+  scope: source-owned vector spaces, complete points, bounded search, policy, and capability correction
 ---
 
 # Store and search Entity vectors
 
-Use Koan Vector when an application must find Entities by semantic or nearest-neighbor similarity.
-`Vector<TEntity>` keeps the query independent of the chosen store; the referenced connector owns its
-schema, wire protocol, filtering, consistency, and operating limits.
-
-## Smallest useful result
-
-Mark which Entity text should be embedded, then save and search:
+Declare the vector decision once, then use ordinary Entity-centered terminals.
 
 ```csharp
-[Embedding(Properties = new[] { nameof(Title), nameof(Synopsis) })]
-public sealed class Media : Entity<Media>
+builder.Services.AddKoan(koan =>
 {
-    public string Title { get; set; } = "";
-    public string Synopsis { get; set; } = "";
-}
+    koan.Data.Source("Semantic").Vector<Media>(space => space
+        .Name("media")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session));
+});
 
-await media.Save(ct);
+await Vector<Media>.Save(media.Id, embedding, new { media.Genre }, ct);
 
-var queryVector = await Client.Embed("cozy science fiction", ct);
-var hits = await Vector<Media>.Search(queryVector, topK: 20, ct: ct);
+VectorSearchResult<string> related = await Vector<Media>.Search(
+    embedding,
+    query => query
+        .Top(20)
+        .Where(Filter.Eq("Genre", "science-fiction"))
+        .AtLeast(.80),
+    ct);
 ```
 
-Reference `Sylin.Koan.Data.Vector` plus one connector. In-memory provides an ephemeral local floor;
-`SqliteVec` adds embedded durability; Qdrant, Milvus, and Weaviate add external-service choices.
-The [product surface](../product-surface.md) is the authority for current package maturity.
+`Name`, `Dimensions`, `Metric`, and `Visibility` are immutable source-owned decisions. Koan binds them before adapter
+creation, applies source access and lifecycle policy at the first execution boundary, and gives the selected adapter one
+complete `VectorSpacePlan`.
 
-## Selection and cost
+## The compact surface
 
-- `[VectorAdapter("weaviate")]` pins an Entity when more than one vector connector is available.
-- `Vector<T>.WithPartition(...)` scopes a query to one logical partition.
-- `topK` is an exact positive caller request; omitted means 10. Connectors do not silently substitute
-  a preferred page size, though a provider may reject values outside its native limits.
-- Metadata-filter pushdown and hybrid text/vector search are provider capabilities, not universal
-  behavior.
-- Connector availability alone is non-critical. Resolution of an Entity/source route makes that
-  provider participating and therefore part of readiness.
+- `Save`, `Get`, `Delete`, `Clear`, and `Sync` operate on complete vector points.
+- Batch `Save`, `Get`, and `Delete` preserve input order; get-many preserves missing positions.
+- `Search` accepts `Top`, `Where`, `Space`, `AtLeast`, `Text`, `SemanticWeight`, and `After`.
+- `VectorMatch.Similarity` is finite `[0,1]`, with higher values always closer.
+- `VectorSearchResult.Execution` says which metric ran, whether work was exact or approximate, and how many candidates
+  were considered when the provider can know.
+- Metadata is `DataObject`/`DataArray`, not a provider dictionary or JSON DOM.
 
-Use `Vector<T>.GetCapabilities()`, startup facts, `/health/ready`, and runtime facts to inspect the
-selected provider and supported operations. An unavailable configured provider or unsupported
-operation rejects with a correction rather than falling back to another store.
+A clause is available only when the selected adapter announces and implements it. Unsupported hybrid search,
+continuation, filtering, named spaces, visibility, export, or atomic batch behavior fails with a correction; Koan does
+not simulate a stronger provider.
 
-## Embedding lifecycle
+## Routing and policy
 
-`[Embedding]` opts ordinary Entity saves into vector synchronization. `Async = true` delegates the
-work to a captured-context job; it does not mutate a `float[]` property on the Entity. For an explicit
-one-off transformation, use `EntityAi.Embed(entity)`. For migrations or rebuilds, use the supported
-embedding migrator rather than inventing a second indexing pipeline.
+`EntityContext.Source(...)` selects among declared source spaces. `Vector<T>.WithPartition(...)` applies the same
+partition and isolation plan as Entity data. Read-only sources reject saves, deletes, clears, and lifecycle mutation
+before adapter creation or I/O. External lifecycle rejects schema creation or repair but does not imply read-only data.
 
-The [AI reference](index.md) owns provider-neutral model operations. The
-[AI and vector guide](../../guides/ai-vector-howto.md) owns multi-step embedding and migration tasks.
+Use `Vector<T>.GetCapabilities()` to inspect the selected provider. A configured provider failure or unsupported
+operation never falls back silently to another store.
+
+## InMemory as the exact floor
+
+`Sylin.Koan.Data.Vector.Connector.InMemory` supplies an ephemeral, bounded, exact brute-force implementation. It is the
+zero-infrastructure semantic oracle for Session visibility, full metadata filters, bulk operations, normalized scores,
+and isolation. It deliberately declines durability, Eventual visibility, hybrid search, continuation, multi-vector
+points, export, and atomic batches.
+
+Use a durable or networked connector when the application needs persistence, multi-process sharing, approximate
+indexes, or provider-native capabilities. The [data adapter development primer](../../architecture/data-adapter-development-primer.md)
+is the normative adapter contract.

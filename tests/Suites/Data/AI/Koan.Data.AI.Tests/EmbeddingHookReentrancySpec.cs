@@ -56,8 +56,13 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
                     options.GlobalRateLimitPerMinute = 0;
                 });
                 s.AddSingleton<IAiAdapterRegistry>(_adapters);
-                s.AddKoan(() =>
-                    AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts)));
+                s.AddKoan(koan =>
+                {
+                    var source = koan.Data.Source("Default");
+                    source.Vector<ReentrancyDoc>(space => Space(space, "reentrancy"));
+                    source.Vector<AsyncEmbeddingDoc>(space => Space(space, "async-embedding"));
+                    AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts));
+                });
             })
             .StartAsync();
 
@@ -82,6 +87,13 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             Origin = "in-process",
         });
     }
+
+    private static void Space<TEntity>(VectorSpaceBuilder<TEntity> space, string name)
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string> => space
+        .Name(name)
+        .Dimensions(3)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session);
 
     private sealed class MutableTestAdapterRegistry : IAiAdapterRegistry
     {
@@ -116,8 +128,8 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         await new ReentrancyDoc { Id = "d1", Text = "ripe red tomatoes on the vine" }.Save();
 
         // And the hook actually stored exactly one vector (vector-only path still works).
-        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 5);
-        hit.Matches.Should().ContainSingle(m => (string)(object)m.Id == "d1",
+        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(5));
+        hit.Items.Should().ContainSingle(m => (string)(object)m.Id == "d1",
             "the AfterUpsert hook must store the embedding once via the vector-only path");
     }
 
@@ -142,8 +154,8 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         (_embedder.RequestedInputs - before).Should().Be(2,
             "the finite-set operation must not discover or re-embed unrelated entities");
 
-        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 10);
-        hit.Matches.Select(match => (string)(object)match.Id)
+        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(10));
+        hit.Items.Select(match => (string)(object)match.Id)
             .Should().Contain(new[] { "subset-1", "subset-2" });
     }
 
@@ -184,8 +196,8 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         Volatile.Read(ref _asyncDomainUpserts).Should().Be(1,
             "the worker owns a vector write, not a second persistence operation over the domain Entity");
 
-        var hit = await Vector<AsyncEmbeddingDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 5);
-        hit.Matches.Should().ContainSingle(match => (string)(object)match.Id == id);
+        var hit = await Vector<AsyncEmbeddingDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(5));
+        hit.Items.Should().ContainSingle(match => (string)(object)match.Id == id);
     }
 }
 

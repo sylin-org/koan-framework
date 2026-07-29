@@ -2,7 +2,6 @@ using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Transactions;
-using Koan.Data.Vector;
 using Koan.Testing.Integration;
 using Koan.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,14 +13,12 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
     private readonly IntegrationHost _host;
     private readonly string _rootPath;
     private readonly string? _sqlitePath;
-    private readonly FakeVectorService _vectorService;
 
-    private DataCoreRuntimeFixture(IntegrationHost host, string rootPath, string? sqlitePath, FakeVectorService vectorService)
+    private DataCoreRuntimeFixture(IntegrationHost host, string rootPath, string? sqlitePath)
     {
         _host = host;
         _rootPath = rootPath;
         _sqlitePath = sqlitePath;
-        _vectorService = vectorService;
     }
 
     public IServiceProvider Services => _host.Services;
@@ -29,8 +26,6 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
     public string RootPath => _rootPath;
 
     public string? SqlitePath => _sqlitePath;
-
-    public FakeVectorService VectorService => _vectorService;
 
     public static async Task<DataCoreRuntimeFixture> CreateAsync(bool includeSqlite = false, IReadOnlyDictionary<string, string?>? extraSettings = null, Action<IServiceCollection>? configureServices = null)
     {
@@ -57,8 +52,6 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
                 settings[kv.Key] = kv.Value;
         }
 
-        var vectorService = new FakeVectorService();
-
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
             .ConfigureServices(s =>
@@ -68,8 +61,6 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
                 // The deliberately non-isolating fake (inert unless a source names "fake-noniso") — the fail-closed
                 // safety-net counter-example now that every real KV adapter announces isolation (ARCH-0103).
                 s.AddSingleton<IDataAdapterFactory, NonIsolatingFakeAdapterFactory>();
-                // FakeVectorService registered AFTER AddKoan() so it wins.
-                s.AddSingleton<IVectorService>(vectorService);
                 // Spec hooks run inside AddKoan's host composition so they can declare both DI contributors and
                 // Entity lifecycle behavior without process-static test resets.
             })
@@ -78,7 +69,7 @@ internal sealed class DataCoreRuntimeFixture : IAsyncDisposable
 
         AppHost.Current = host.Services;
 
-        return new DataCoreRuntimeFixture(host, root, sqlitePath, vectorService);
+        return new DataCoreRuntimeFixture(host, root, sqlitePath);
     }
 
     public EntityPartitionLease UsePartition(string? name = null)

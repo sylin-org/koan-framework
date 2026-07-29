@@ -297,7 +297,10 @@ internal sealed class QdrantVectorRepository<TEntity, TKey> :
             if (idStr is null) continue;
 
             var score = hit.Value<double?>("score") ?? 0d;
-            object? metadata = payload?[_options.MetadataField]?.ToObject<object?>();
+            var metadataToken = payload?[_options.MetadataField];
+            var metadata = metadataToken is null
+                ? null
+                : VectorMetadata.FromJson(metadataToken.ToString(Newtonsoft.Json.Formatting.None));
             matches.Add(new VectorMatch<TKey>(ConvertId(idStr), score, metadata));
         }
 

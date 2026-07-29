@@ -281,11 +281,11 @@ public sealed class SearchEngineVectorRepository<TEntity, TKey> :
 
             var score = hit.Value<double?>("_score") ?? 0d;
             var source = hit["_source"] as JObject;
-            object? metadata = null;
+            DataObject? metadata = null;
             if (source is not null)
             {
-                metadata = source[_options.MetadataField]?.ToObject<object?>();
-                metadata ??= source.ToObject<object?>();
+                var metadataToken = source[_options.MetadataField] ?? source;
+                metadata = VectorMetadata.FromJson(metadataToken.ToString(Newtonsoft.Json.Formatting.None));
             }
 
             matches.Add(new VectorMatch<TKey>(ConvertId(id), score, metadata));

@@ -81,9 +81,13 @@ public sealed class VectorAdapterParticipationSpec
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddKoanDataCore();
-        services.AddKoanDataVector();
         services.AddSingleton<IVectorAdapterFactory>(factory);
+        services.AddKoan(koan =>
+        {
+            var source = koan.Data.Source("Default");
+            source.Vector<ParticipationEntity>(space => space.Name("participation").Dimensions(1));
+            source.Vector<VectorOnlyEntity>(space => space.Name("vector-only").Dimensions(1));
+        });
         return services.BuildServiceProvider();
     }
 
@@ -110,7 +114,7 @@ public sealed class VectorAdapterParticipationSpec
 
         public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(
             IServiceProvider services,
-            string source = "Default")
+            VectorSpacePlan plan)
             where TEntity : class, IEntity<TKey>
             where TKey : notnull =>
             failCreate
@@ -129,19 +133,6 @@ public sealed class VectorAdapterParticipationSpec
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default) =>
-            Task.CompletedTask;
-
-        public Task<int> UpsertMany(
-            IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items,
-            CancellationToken ct = default) => Task.FromResult(0);
-
-        public Task<bool> Delete(TKey id, CancellationToken ct = default) => Task.FromResult(true);
-
-        public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default) => Task.FromResult(0);
-
-        public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default) =>
-            Task.FromResult(new VectorQueryResult<TKey>([], null));
     }
 
     [VectorAdapter("test")]

@@ -250,7 +250,10 @@ internal sealed class MilvusVectorRepository<TEntity, TKey> :
             if (idToken is null) continue;
 
             var score = row.Value<double?>("score") ?? row.Value<double?>("distance") ?? 0d;
-            var metadata = row[_options.MetadataFieldName]?.ToObject<object?>();
+            var metadataToken = row[_options.MetadataFieldName];
+            var metadata = metadataToken is null
+                ? null
+                : VectorMetadata.FromJson(metadataToken.ToString(Newtonsoft.Json.Formatting.None));
             matches.Add(new VectorMatch<TKey>(ConvertId(idToken), score, metadata));
         }
 

@@ -5,10 +5,14 @@ namespace Koan.Data.Vector.Abstractions;
 
 public interface IVectorSearchRepository<TEntity, TKey> where TEntity : IEntity<TKey> where TKey : notnull
 {
-    Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default);
-    Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default);
-    Task<bool> Delete(TKey id, CancellationToken ct = default);
-    Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default);
+    Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Legacy vector upsert is not supported by '{GetType().Name}'.");
+    Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Legacy vector batch upsert is not supported by '{GetType().Name}'.");
+    Task<bool> Delete(TKey id, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Unscoped vector delete is not supported by '{GetType().Name}'.");
+    Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Legacy vector batch delete is not supported by '{GetType().Name}'.");
 
     /// <summary>
     /// Retrieves the embedding vector for a specific entity by ID.
@@ -39,7 +43,43 @@ public interface IVectorSearchRepository<TEntity, TKey> where TEntity : IEntity<
     }
 
     Task VectorEnsureCreated(CancellationToken ct = default) => Task.CompletedTask; // optional convenience
-    Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default);
+    Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Legacy vector query execution is not supported by '{GetType().Name}'.");
+
+    /// <summary>Saves one complete point through the ratified Vector contract.</summary>
+    Task Save(VectorPoint<TKey> point, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Vector point save is not supported by '{GetType().Name}'.");
+
+    /// <summary>Saves an ordered batch and returns one outcome per input item.</summary>
+    Task<BatchResult<TKey>> Save(IReadOnlyList<VectorPoint<TKey>> points, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Vector batch save is not supported by '{GetType().Name}'.");
+
+    /// <summary>Gets one complete point or null.</summary>
+    Task<VectorPoint<TKey>?> Get(TKey id, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Complete vector point retrieval is not supported by '{GetType().Name}'.");
+
+    /// <summary>Deletes one point inside the compiled scope.</summary>
+    Task<bool> Delete(TKey id, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Scoped vector delete is not supported by '{GetType().Name}'.");
+
+    /// <summary>Gets one positional result per input identity.</summary>
+    Task<IReadOnlyList<VectorPoint<TKey>?>> Get(IReadOnlyList<TKey> ids, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Positional vector retrieval is not supported by '{GetType().Name}'.");
+
+    /// <summary>Deletes an ordered batch and returns one outcome per input item.</summary>
+    Task<BatchResult<TKey>> Delete(IReadOnlyList<TKey> ids, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Vector batch delete is not supported by '{GetType().Name}'.");
+
+    /// <summary>Runs the ratified vector query contract.</summary>
+    Task<VectorSearchResult<TKey>> Search(VectorSearchRequest request, VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Current vector search is not supported by '{GetType().Name}'.");
+
+    /// <summary>Semantically deletes every point in the current source/space.</summary>
+    Task Clear(VectorScope scope, CancellationToken ct = default) =>
+        throw new NotSupportedException($"Vector clear is not supported by '{GetType().Name}'.");
+
+    /// <summary>Waits for visibility of every earlier accepted mutation.</summary>
+    Task Sync(VectorScope scope, CancellationToken ct = default) => Task.CompletedTask;
 
     /// <summary>
     /// Flush (clear) all vectors from the index. This is a destructive operation.

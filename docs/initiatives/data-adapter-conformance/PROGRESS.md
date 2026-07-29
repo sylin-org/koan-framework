@@ -51,7 +51,7 @@ only the orchestrator edits this ledger; workers publish scoped handoffs under `
 | DAC-44 | pending | DAC-42 | — | PostgreSQL/Npgsql evidence green |
 | DAC-45 | pending | DAC-30 | — | gold contract and stable shared runner proven |
 | DAC-46 | pending | DAC-40 | — | InMemory/KeyValue family oracle green |
-| DAC-51 | pending | DAC-30 | — | gold workflow and Vector control plane green |
+| DAC-51 | in-progress | DAC-30 | empty-root InMemory rebuild; 50/50 surface tests, V-01–V-24 and G-09 Forge behavior green; solution build clean | strict versioned packet generation is available from the conformance control plane |
 | DAC-52 | pending | DAC-51 | — | Vector oracle green |
 | DAC-53 | pending | DAC-51 | — | Vector oracle green |
 | DAC-54 | pending | DAC-30 | — | gold workflow and Vector control plane green |

@@ -206,7 +206,7 @@ public class QdrantQuantizationSpecs : IAsyncLifetime
         var embed = Embed("alpha", 1);
         await Vector<TodoVector>.Save("v1", embed);
 
-        var hits = await Vector<TodoVector>.Search(embed, topK: 1);
+        var hits = await Vector<TodoVector>.SearchLegacy(embed, topK: 1);
         hits.Matches.Should().HaveCount(1, $"{quantizationType} quantization should still return the upserted point under exact-vector search.");
         hits.Matches[0].Id.Should().Be("v1");
     }

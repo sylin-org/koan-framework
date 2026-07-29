@@ -7,6 +7,9 @@ public sealed class DataSourceBuilder
 
     internal DataSourceBuilder(string source) => _source = source;
 
+    /// <summary>The source currently being declared.</summary>
+    public string Name => _source;
+
     public DataSourceBuilder Map<TEntity>(Action<EntityMapBuilder<TEntity>> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);

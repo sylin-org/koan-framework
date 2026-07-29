@@ -977,7 +977,7 @@ internal sealed class WeaviateVectorRepository<TEntity, TKey> : IVectorSearchRep
                         metadata[p.Name] = value;
                     }
                 }
-                list.Add(new VectorMatch<TKey>(id, score, metadata));
+                list.Add(new VectorMatch<TKey>(id, score, VectorMetadata.FromDictionary(metadata)));
 
                 if (uuid != null)
                 {

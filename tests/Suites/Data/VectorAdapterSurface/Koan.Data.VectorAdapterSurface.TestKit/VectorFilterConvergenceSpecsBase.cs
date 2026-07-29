@@ -95,7 +95,7 @@ public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IAsyncLifetim
             var oracle = Corpus.Where(c => DictionaryFilterEvaluator.Compile(filter)(c.Meta)).Select(c => c.Id).ToHashSet();
             try
             {
-                var hits = await Vector<TodoVector>.Search(query, topK: 100, filter: filter);
+                var hits = await Vector<TodoVector>.SearchLegacy(query, topK: 100, filter: filter);
                 var ids = hits.Matches.Select(m => (string)(object)m.Id).ToHashSet();
                 ids.Should().BeEquivalentTo(oracle, $"supported operator '{name}' must converge with the oracle");
                 supported++;

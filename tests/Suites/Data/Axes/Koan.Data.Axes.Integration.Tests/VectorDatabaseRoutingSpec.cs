@@ -103,14 +103,14 @@ public sealed class VectorDatabaseRoutingSpec : IAsyncLifetime
         {
             (await Vector<T>.GetEmbedding("a")).Should().NotBeNull();
             (await Vector<T>.GetEmbedding("b")).Should().BeNull();   // tenant_b's vector is unreachable from tenant_a
-            (await Vector<T>.Search(ea, topK: 10)).Matches.Select(m => m.Id).Should().Equal("a");
+            (await Vector<T>.SearchLegacy(ea, topK: 10)).Matches.Select(m => m.Id).Should().Equal("a");
         }
 
         using (ShardAmbient.Use("tenant_b"))
         {
             (await Vector<T>.GetEmbedding("b")).Should().NotBeNull();
             (await Vector<T>.GetEmbedding("a")).Should().BeNull();   // and vice-versa
-            (await Vector<T>.Search(eb, topK: 10)).Matches.Select(m => m.Id).Should().Equal("b");
+            (await Vector<T>.SearchLegacy(eb, topK: 10)).Matches.Select(m => m.Id).Should().Equal("b");
         }
     }
 }

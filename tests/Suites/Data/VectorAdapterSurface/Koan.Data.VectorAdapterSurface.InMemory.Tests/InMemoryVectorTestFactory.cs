@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Koan.Core;
+using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Connector.InMemory;
 using Koan.Data.VectorAdapterSurface.TestKit;
 
 namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
@@ -16,8 +18,7 @@ namespace Koan.Data.VectorAdapterSurface.InMemory.Tests;
 /// </summary>
 public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
 {
-    private InMemoryVectorAdapterFactory _adapter = new();
-    private ServiceProvider? _sp;
+    private IHost? _host;
 
     public bool IsAvailable => true;
     public string? UnavailableReason => null;
@@ -27,49 +28,62 @@ public sealed class InMemoryVectorTestFactory : IVectorAdapterTestFactory
         {
             // Lazy init on first access — supports both spec base lifecycles (factory's own
             // IAsyncLifetime.InitializeAsync, and access from within a spec's InitializeAsync).
-            if (_sp is null) _sp = BuildProvider();
-            return _sp;
+            if (_host is null) _host = BuildHost();
+            return _host.Services;
         }
     }
     public int EmbeddingDimension => 8;
 
-    // Capability overrides — the in-memory reference implements every capability it can model
-    // in-process (AI-0036 §9). Multi-vector-per-entity and atomic-batch are honestly omitted (a
-    // single-vector, non-transactional dictionary cannot model them).
+    // Capability declaration is deliberately narrow. The floor proves only the semantics it owns.
     public bool SupportsGetEmbedding         => true;
     public bool SupportsBulkOperations       => true;
     public bool SupportsFlush                => true;
-    public bool SupportsExportAll            => true;
-    public bool SupportsHybridSearch         => true;  // vector+keyword blend (Alpha + SearchText)
-    public bool SupportsMetadataFilters      => true;  // unified Filter via DictionaryFilterEvaluator (the oracle)
-    public bool SupportsContinuationToken    => true;  // offset-based paging
+    public bool SupportsExportAll            => false;
+    public bool SupportsIndexStats           => false;
+    public bool SupportsHybridSearch         => false;
+    public bool SupportsMetadataFilters      => true;
+    public bool SupportsContinuationToken    => false;
     public bool SupportsPartitionIsolation   => true;
     public bool SupportsDynamicCollections   => true;
     public bool SupportsScoreNormalization   => true;
 
-    private ServiceProvider BuildProvider()
+    private IHost BuildHost()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddVectorAdapterTestRuntime();
-        services.AddSingleton<IVectorAdapterFactory>(_adapter);
-        return services.BuildServiceProvider();
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Environment"] = "Test",
+                ["Koan:Tenancy:Posture"] = "Open"
+            }))
+            .ConfigureServices(services => services.AddKoan(koan =>
+                koan.Data.Source("VectorTests").Vector<TodoVector>(space => space
+                    .Name("TodosVector")
+                    .Dimensions(EmbeddingDimension)
+                    .Metric(VectorMetric.Cosine)
+                    .Visibility(VectorVisibility.Session))))
+            .Build();
+        host.Start();
+        return host;
     }
 
     public ValueTask InitializeAsync() { _ = Services; return ValueTask.CompletedTask; }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        _sp?.Dispose();
-        return ValueTask.CompletedTask;
+        if (_host is null) return;
+        await _host.StopAsync().ConfigureAwait(false);
+        _host.Dispose();
+        _host = null;
     }
 
-    public Task ResetAsync(CancellationToken ct = default)
+    public async Task ResetAsync(CancellationToken ct = default)
     {
-        _sp?.Dispose();
-        _sp = null;
-        _adapter = new InMemoryVectorAdapterFactory();
+        if (_host is not null)
+        {
+            await _host.StopAsync(ct).ConfigureAwait(false);
+            _host.Dispose();
+            _host = null;
+        }
         Koan.Core.Hosting.App.AppHost.Current = Services;
-        return Task.CompletedTask;
     }
 }

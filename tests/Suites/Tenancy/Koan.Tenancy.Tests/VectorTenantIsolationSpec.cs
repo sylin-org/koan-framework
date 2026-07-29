@@ -52,13 +52,13 @@ public sealed class VectorTenantIsolationSpec
         // isolation, the __koan_tenant filter excludes g1, so only acme's a1 comes back.
         using (Tenant.Use("acme"))
         {
-            var r = await Vector<VecDoc>.Search(new VectorQueryOptions(Query: GlobexPoint, TopK: 10));
-            r.Matches.Select(m => m.Id).Should().Equal("a1");
+            var r = await Vector<VecDoc>.Search(GlobexPoint, query => query.Top(10));
+            r.Items.Select(m => m.Id).Should().Equal("a1");
         }
         using (Tenant.Use("globex"))
         {
-            var r = await Vector<VecDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
-            r.Matches.Select(m => m.Id).Should().Equal("g1");
+            var r = await Vector<VecDoc>.Search(AcmePoint, query => query.Top(10));
+            r.Items.Select(m => m.Id).Should().Equal("g1");
         }
     }
 
@@ -74,7 +74,7 @@ public sealed class VectorTenantIsolationSpec
         var write = async () => await Vector<VecDoc>.Save("x", AcmePoint);
         await write.Should().ThrowAsync<InvalidOperationException>();
 
-        var search = async () => await Vector<VecDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
+        var search = async () => await Vector<VecDoc>.Search(AcmePoint, query => query.Top(10));
         await search.Should().ThrowAsync<InvalidOperationException>();
     }
 
@@ -121,8 +121,8 @@ public sealed class VectorTenantIsolationSpec
     {
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
             extraSettings: Posture("Closed"),
-            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ModReadContributor()));
-        RegisterModAxis();
+            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ModReadContributor()),
+            configureDeclarations: RegisterModAxis);
         try
         {
             runtime.ResetEntityCaches();
@@ -132,21 +132,20 @@ public sealed class VectorTenantIsolationSpec
 
             // A non-moderator KNN: the contributor's non-equality predicate (__vis != hidden) hides h1 — vector folds the
             // registered IReadFilterContributor through the SAME ReadScopeFold the data path uses; no equality assumption.
-            var r = await Vector<ModDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
-            r.Matches.Select(m => m.Id).Should().Equal("p1");
+            var r = await Vector<ModDoc>.Search(AcmePoint, query => query.Top(10));
+            r.Items.Select(m => m.Id).Should().Equal("p1");
 
             // A moderator sees both (the contributor returns no predicate).
             using (Set(_moderator, true))
             {
-                var rm = await Vector<ModDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
-                rm.Matches.Select(m => m.Id).Should().BeEquivalentTo(new[] { "h1", "p1" });
+                var rm = await Vector<ModDoc>.Search(AcmePoint, query => query.Top(10));
+                rm.Items.Select(m => m.Id).Should().BeEquivalentTo(new[] { "h1", "p1" });
             }
         }
         finally
         {
             _moderator.Value = false;
             _writeVis.Value = null;
-            ManagedFieldRegistry.Reset();   // the tenancy registrar re-registers __koan_tenant on the next boot (idempotent)
         }
     }
 
@@ -172,32 +171,25 @@ public sealed class VectorTenantIsolationSpec
     {
         await using var runtime = await TenancyRuntimeFixture.CreateAsync(
             extraSettings: Posture("Closed"),
-            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ArchiveReadContributor()));
+            configureServices: s => s.AddSingleton<IReadFilterContributor>(new ArchiveReadContributor()),
+            configureDeclarations: () => ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+                StorageName: "__archived", ClrType: typeof(bool), ValueProvider: () => null,
+                AppliesTo: t => t == typeof(ArchDoc), AutoReadFilter: false,
+                Provenance: FieldProvenance.OperationSourced)));
         // __archived is an OPERATION-SOURCED managed field (the soft-delete shape: set on delete, ValueProvider null ⇒
         // never ambient-stamped). The composer reads its provenance flag (ARCH-0102 §3), so CombineWriteStamped excludes
         // its predicate from the vector push — no OperationOverrideRegistry cross-reference; the Phase-1a flag is the authority.
-        ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
-            StorageName: "__archived", ClrType: typeof(bool), ValueProvider: () => null,
-            AppliesTo: t => t == typeof(ArchDoc), AutoReadFilter: false,
-            Provenance: FieldProvenance.OperationSourced));
-        try
-        {
-            runtime.ResetEntityCaches();
+        runtime.ResetEntityCaches();
 
-            using (Tenant.Use("acme")) { await Vector<ArchDoc>.Save("a1", AcmePoint); await Vector<ArchDoc>.Save("a2", GlobexPoint); }
-            using (Tenant.Use("globex")) await Vector<ArchDoc>.Save("g1", AcmePoint);
+        using (Tenant.Use("acme")) { await Vector<ArchDoc>.Save("a1", AcmePoint); await Vector<ArchDoc>.Save("a2", GlobexPoint); }
+        using (Tenant.Use("globex")) await Vector<ArchDoc>.Save("g1", AcmePoint);
 
-            using (Tenant.Use("acme"))
-            {
-                var r = await Vector<ArchDoc>.Search(new VectorQueryOptions(Query: AcmePoint, TopK: 10));
-                // override predicate EXCLUDED ⇒ both acme vectors returned (not zero from the unenforceable
-                // __archived==live); tenant predicate KEPT ⇒ globex's g1 excluded.
-                r.Matches.Select(m => m.Id).Should().BeEquivalentTo(new[] { "a1", "a2" });
-            }
-        }
-        finally
+        using (Tenant.Use("acme"))
         {
-            ManagedFieldRegistry.Reset();
+            var r = await Vector<ArchDoc>.Search(AcmePoint, query => query.Top(10));
+            // override predicate EXCLUDED ⇒ both acme vectors returned (not zero from the unenforceable
+            // __archived==live); tenant predicate KEPT ⇒ globex's g1 excluded.
+            r.Items.Select(m => m.Id).Should().BeEquivalentTo(new[] { "a1", "a2" });
         }
     }
 
@@ -214,8 +206,10 @@ public sealed class VectorTenantIsolationSpec
         // A user metadata filter (kind == report) ANDs with the scope filter; globex's g1 (same kind) is still excluded.
         using (Tenant.Use("acme"))
         {
-            var r = await Vector<VecDoc>.Search(GlobexPoint, filter: new Dictionary<string, object> { ["kind"] = "report" }, topK: 10);
-            r.Matches.Select(m => m.Id).Should().Equal("a1");
+            var r = await Vector<VecDoc>.Search(
+                GlobexPoint,
+                query => query.Top(10).Where(Filter.Eq("kind", "report")));
+            r.Items.Select(m => m.Id).Should().Equal("a1");
         }
     }
 }

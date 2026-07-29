@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Aodb;
@@ -105,6 +108,91 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         var segmented = _segmentation.Bind("vector batch write").Values;
         RunGuards();
         return _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata, segmented))), ct);
+    }
+
+    public Task Save(VectorPoint<TKey> point, VectorScope ignored, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(point);
+        var scope = CompileScope("vector save");
+        return _inner.Save(point with { Metadata = StampScope(point.Metadata, scope.Values) }, scope, ct);
+    }
+
+    public Task<BatchResult<TKey>> Save(
+        IReadOnlyList<VectorPoint<TKey>> points,
+        VectorScope ignored,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        var scope = CompileScope("vector batch save");
+        var stamped = points.Select(point => point with
+        {
+            Metadata = StampScope(point.Metadata, scope.Values)
+        }).ToArray();
+        return _inner.Save(stamped, scope, ct);
+    }
+
+    public Task<VectorPoint<TKey>?> Get(TKey id, VectorScope ignored, CancellationToken ct = default)
+    {
+        var scope = CompileScope("vector get");
+        return _inner.Get(id, scope, ct);
+    }
+
+    public Task<IReadOnlyList<VectorPoint<TKey>?>> Get(
+        IReadOnlyList<TKey> ids,
+        VectorScope ignored,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var scope = CompileScope("vector get many");
+        return _inner.Get(ids, scope, ct);
+    }
+
+    public Task<bool> Delete(TKey id, VectorScope ignored, CancellationToken ct = default)
+    {
+        var scope = CompileScope("vector delete");
+        return _inner.Delete(id, scope, ct);
+    }
+
+    public Task<BatchResult<TKey>> Delete(
+        IReadOnlyList<TKey> ids,
+        VectorScope ignored,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var scope = CompileScope("vector batch delete");
+        return _inner.Delete(ids, scope, ct);
+    }
+
+    public Task<VectorSearchResult<TKey>> Search(
+        VectorSearchRequest request,
+        VectorScope ignored,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var scope = CompileScope("vector search");
+        var combined = scope.Predicate is null
+            ? request.Filter
+            : request.Filter is null
+                ? scope.Predicate
+                : Filter.All(request.Filter, scope.Predicate);
+        if (combined is not null && !_canFilter)
+            throw new NotSupportedException(
+                $"Vector search for '{typeof(TEntity).Name}' requires metadata filtering, but adapter " +
+                $"'{_inner.GetType().Name}' does not announce {nameof(VectorCaps.Filters)}. " +
+                "Remove the filter or select an adapter that can enforce it.");
+        return _inner.Search(request with { Filter = combined }, scope, ct);
+    }
+
+    public Task Clear(VectorScope ignored, CancellationToken ct = default)
+    {
+        var scope = CompileScope("vector clear");
+        return _inner.Clear(scope, ct);
+    }
+
+    public Task Sync(VectorScope ignored, CancellationToken ct = default)
+    {
+        var scope = CompileScope("vector sync");
+        return _inner.Sync(scope, ct);
     }
 
     public Task<VectorQueryResult<TKey>> Search(VectorQueryOptions options, CancellationToken ct = default)
@@ -231,6 +319,59 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
             stamped = true;
         }
         return stamped ? dict : metadata;
+    }
+
+    private DataObject? StampScope(DataObject? metadata, DataObject scopeValues)
+    {
+        if (scopeValues.Properties.Count == 0) return metadata;
+        var properties = new List<DataProperty>((metadata?.Properties.Count ?? 0) + scopeValues.Properties.Count);
+        if (metadata is not null) properties.AddRange(metadata.Properties);
+        properties.AddRange(scopeValues.Properties);
+        return new DataObject(properties);
+    }
+
+    private VectorScope CompileScope(string operation)
+    {
+        var segmented = _segmentation.Bind(operation);
+        RunGuards();
+
+        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (segmented.Values is not null)
+            foreach (var value in segmented.Values) values[Rename(value.Key)] = value.Value;
+        var identity = ScopeIdentity(
+            values.OrderBy(static item => item.Key, StringComparer.Ordinal).ToArray());
+        var managed = ManagedFieldRegistry.ForType(typeof(TEntity));
+        for (var index = 0; index < managed.Count; index++)
+        {
+            var value = managed[index].ValueProvider();
+            if (value is not null) values[Rename(managed[index].StorageName)] = value;
+        }
+
+        var contributed = ReadScopeFold.Compose(_readContributors, typeof(TEntity)).CombineWriteStamped();
+        var predicate = contributed is null
+            ? segmented.ReadFilter
+            : segmented.ReadFilter is null
+                ? contributed
+                : Filter.All(contributed, segmented.ReadFilter);
+        if (predicate is not null) predicate = RenameOverlayFields(predicate);
+
+        if (values.Count == 0 && predicate is null) return VectorScope.Unscoped;
+        var ordered = values.OrderBy(static item => item.Key, StringComparer.Ordinal).ToArray();
+        var data = new DataObject(ordered.Select(static item => new DataProperty(item.Key, item.Value)));
+        return new VectorScope(identity, data, predicate);
+    }
+
+    private static string ScopeIdentity(IReadOnlyList<KeyValuePair<string, object?>> values)
+    {
+        if (values.Count == 0) return string.Empty;
+        var text = new StringBuilder();
+        foreach (var value in values)
+        {
+            text.Append(value.Key).Append('\u001f');
+            text.Append(value.Value?.GetType().FullName).Append('\u001f');
+            text.Append(Convert.ToString(value.Value, CultureInfo.InvariantCulture)).Append('\u001e');
+        }
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString()))).ToLowerInvariant();
     }
 
     // §5 — spell an overlay field name per the adapter's declared rule (null ⇒ unchanged). The SAME rule renames

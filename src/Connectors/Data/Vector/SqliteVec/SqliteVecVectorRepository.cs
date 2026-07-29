@@ -255,7 +255,7 @@ internal sealed class SqliteVecVectorRepository<TEntity, TKey>
             {
                 var id = ParseKey(reader.GetString(0));
                 var distance = reader.GetDouble(1);
-                object? meta = reader.IsDBNull(2) ? null : reader.GetString(2);
+                var meta = reader.IsDBNull(2) ? null : VectorMetadata.FromJson(reader.GetString(2));
                 // cosine distance in [0,2] -> similarity in [-1,1]; for L2/L1 fall back to negative distance.
                 var score = string.Equals(_options.DistanceMetric, "cosine", StringComparison.OrdinalIgnoreCase)
                     ? 1.0 - distance

@@ -54,7 +54,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("cooking-2", Embed("cooking", 2));
         await Vector<TodoVector>.Save("cooking-3", Embed("cooking", 3));
 
-        var hits = await Vector<TodoVector>.Search(Embed("tech", 0), topK: 6);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("tech", 0), topK: 6);
         var topThree = hits.Matches.Take(3).Select(m => (string)(object)m.Id);
         topThree.Should().AllSatisfy(id => id.Should().StartWith("tech-"));
     }
@@ -73,7 +73,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("books-1", Embed("books", 1));
         await Vector<TodoVector>.Save("books-2", Embed("books", 2));
 
-        var hits = await Vector<TodoVector>.Search(queryVec, topK: 3);
+        var hits = await Vector<TodoVector>.SearchLegacy(queryVec, topK: 3);
         var ids = hits.Matches.Select(m => (string)(object)m.Id).ToList();
         ids.Should().Contain("query-anchor");
         ids.Should().Contain(id => id.StartsWith("electronics-"));
@@ -90,7 +90,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("dup-b", Embed("topic", 5));  // same seed → very similar vector
         await Vector<TodoVector>.Save("different", Embed("other-topic", 5));
 
-        var hits = await Vector<TodoVector>.Search(Embed("topic", 5), topK: 3);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("topic", 5), topK: 3);
         var topTwo = hits.Matches.Take(2).Select(m => (string)(object)m.Id).ToList();
         topTwo.Should().Contain("dup-a");
         topTwo.Should().Contain("dup-b");
@@ -109,7 +109,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         // Pure-keyword leaning search. We can't assert exact ranking across adapters (BM25
         // implementations vary), but we can assert the search runs without throwing and returns
         // results.
-        var hits = await Vector<TodoVector>.Search(
+        var hits = await Vector<TodoVector>.SearchLegacy(
             vector: Embed("topic", 0),
             text: "hybrid",
             alpha: 0.5);
