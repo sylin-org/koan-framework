@@ -1,54 +1,87 @@
+---
 title: Sylin.Koan.Data.Vector.Connector.SqliteVec - Technical Reference
-description: Embedded durable sqlite-vec provider for Koan.
+description: Durable embedded exact Vector provider for Koan.
 packages: [Sylin.Koan.Data.Vector.Connector.SqliteVec]
 source: src/Connectors/Data/Vector/SqliteVec/
+---
 
-## Composition and election
+## Composition
 
-The package references `Sylin.Koan.Data.Vector`, so one connector reference supplies its functional runtime.
-`SqliteVectorModule` registers one singleton `SqliteVecAdapterFactory`, exposes it through `IVectorAdapterFactory`, and
-registers one participation-aware health contributor. Provider identity is `sqlitevec`; aliases `sqlite` and
-`sqlite-vec` let Vector election pair it with the SQLite record provider. Priority is `40`.
+`SqliteVectorModule` registers typed options, one host-owned native loader, one factory, and one non-provisioning health
+probe. Vector Core elects the provider, compiles `DataSourcePlan` and `VectorSpacePlan`, enforces operation policy, and
+caches the scoped repository. The adapter receives those decisions; it does not repeat provider election or invent a
+second metric, visibility, or source model.
 
-## Placement decision
+The implementation has five runtime responsibilities:
 
-`SqliteVecRoute` is the single side-effect-free placement owner used by repository construction, readiness, and startup
-projection. Precedence is:
+1. `SqliteVecRoute` compiles placement without I/O.
+2. `SqliteVecNative` selects one exact RID payload and verifies its hash, entry point, and reported version.
+3. `SqliteVecRepository` owns schema validation, float32 encoding, transactions, and native SQL.
+4. `VectorMetadata` encodes the closed neutral algebra without reflection or provider objects.
+5. `SqliteVecHealthContributor` observes an existing source without creating it.
 
-1. source-specific sqlite-vec placement;
-2. `Koan:Data:SqliteVec:ConnectionString`;
-3. `ConnectionStrings:SqliteVec`;
-4. source-specific or default SQLite placement;
-5. `Koan:Data:Sqlite:ConnectionString`;
-6. `ConnectionStrings:Sqlite`;
-7. `Data Source=.koan/data/Koan.sqlite`.
+## Physical model
 
-Generic source connections are consumed only when source ownership matches the factory's declared identity/aliases.
-Route calculation creates no directory and opens no connection. Repository use or active readiness owns those effects.
+Each compiled Entity/source/partition/space name resolves to one deterministic `vec0` virtual table:
 
-## Repository and isolation
+```sql
+CREATE VIRTUAL TABLE <physical-name> USING vec0(
+  id TEXT PRIMARY KEY,
+  embedding float[N] distance_metric=cosine|L2,
+  scope TEXT PARTITION KEY,
+  +metadata TEXT
+)
+```
 
-Vector Core memoizes one repository per entity/source and disposes it with `VectorService`. The repository holds one
-open `Microsoft.Data.Sqlite` connection, loads vec0, and serializes operations through a semaphore. It creates one
-`vec0` virtual table per `VectorAdapterNaming` result, so provider-selected entity, ambient partition, and non-default
-source folds share the framework naming policy without re-election.
+Physical names use a short readable prefix plus a SHA-256-derived suffix. Ambient partition and routed source are
+resolved on every operation through `VectorAdapterNaming`, so a host-cached repository remains isolation-correct.
+Koan hard scopes use vec0's partition key. Arbitrary metadata predicates are not accepted because the auxiliary JSON
+value cannot provide native filter-before-rank semantics.
 
-The provider declares kNN, bulk upsert/delete, atomic batch, score normalization, and dynamic collections. It does not
-declare metadata filters. `ScopedVectorRepository` therefore fails closed when tenant/Shared read isolation would
-require filter pushdown. Database-mode sources can route to distinct files and are also source-folded in table names;
-partition isolation uses distinct tables.
+Existing tables are validated for dimensions, metric, identity, scope, and metadata shape. Incompatible External
+shape rejects; it is never repaired. Managed shape creation is guarded by `DataSourcePlan.Demand`. Missing reads return
+empty without creating a directory, file, table, or native extraction.
 
-## Native loading
+## Mutation and search
 
-vec0 v0.1.9 is embedded for win-x64, linux-x64, and linux-arm64. On first selected use, `Vec0Native` hashes the embedded
-payload, validates any versioned cached extraction, writes a unique temporary file when repair is needed, and moves it
-into place before loading the `sqlite3_vec_init` entry point. Unsupported platforms fail before a repository operation
-can imply availability.
+Single save and batch save prevalidate every embedding and metadata value, then execute delete-plus-insert inside one
+SQLite transaction. Delete batches also use one transaction and report each input position. `Clear` deletes only the
+current physical container/scope; it does not drop shape.
 
-## Health
+Search sends a float32 query blob to native vec0 exact KNN. Results normalize cosine distance with `1 - distance / 2`
+and Euclidean distance with `1 / (1 + distance)`. Native results are stabilized by distance then ordinal identity.
+When a cutoff tie is incomplete, the adapter expands `k` within `MaxSearchCandidates`; it rejects if the configured
+bound cannot establish a stable cutoff. There is no managed ranking fallback.
 
-`SqliteVecHealthContributor` derives from the Vector participation base. With no active source it is non-critical and
-returns `Unknown` without filesystem or native work. After selection it resolves the same route as the factory, opens
-the database, loads vec0, executes `SELECT 1`, and reports all active source identities. Probe errors are de-identified
-by the shared health base.
+Each file operation uses a short-lived pooled provider connection. Shared in-memory placement keeps one host-owned
+keeper connection. No global connection, repository semaphore, process-static native decision, or public reset path
+exists.
 
+## Native supply chain
+
+The package embeds sqlite-vec v0.1.9 for win-x64, linux-x64, and linux-arm64. Extraction targets a versioned temporary
+path and uses race-safe replacement. The loader accepts only `sqlite3_vec_init`, verifies the embedded SHA-256 before
+loading, and requires `SELECT vec_version()` to return `v0.1.9`. Platform, integrity, load, entry-point, and version
+failures are distinct corrective errors.
+
+## Capability truth
+
+The adapter declares exact kNN, normalized scores, dynamic collections, native hard-scope isolation, bulk upsert,
+bulk delete, and atomic batch. Session visibility is immediate and `Sync` is a completed barrier. DotProduct and
+Eventual plans reject at repository creation. Filters, hybrid search, native continuation, streaming results, and
+multi-vector points remain unclaimed and fail closed at the shared Vector boundary.
+
+## Adapter-author checklist
+
+Use this connector as a reference for the execution boundary, not as a template for SQLite-specific mechanics:
+
+- accept an immutable source and space decision;
+- keep provider-specific configuration to irreducible placement or bounded work;
+- validate complete input before mutation;
+- implement isolation on every read and mutation surface;
+- make capability declarations executable;
+- preserve source policy before any implicit provisioning;
+- report exact/approximate, score, visibility, and batch facts honestly;
+- keep native/client lifetime host-owned and the warm path free of election, reflection, or fallback branches.
+
+The complete cross-provider contract is the [data adapter development primer](../../../../../docs/architecture/data-adapter-development-primer.md).

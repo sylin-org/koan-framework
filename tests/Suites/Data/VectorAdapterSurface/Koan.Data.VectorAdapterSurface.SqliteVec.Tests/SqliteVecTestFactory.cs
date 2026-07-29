@@ -1,37 +1,36 @@
-using Koan.Data.Abstractions.Naming;
+using Koan.Core;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Connector.SqliteVec;
 using Koan.Data.VectorAdapterSurface.TestKit;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Data.VectorAdapterSurface.SqliteVec.Tests;
 
-/// <summary>Runs the shared Vector contract against the shipping embedded sqlite-vec provider.</summary>
 public sealed class SqliteVecTestFactory : IVectorAdapterTestFactory
 {
-    private const string ConnectionString = "Data Source=:memory:";
-    private ServiceProvider? _services;
+    private IHost? _host;
+    private string? _root;
 
     public bool IsAvailable => true;
     public string? UnavailableReason => null;
-    public IServiceProvider Services => _services ??= BuildProvider();
     public int EmbeddingDimension => 8;
-
-    public bool SupportsGetEmbedding => true;
-    public bool SupportsBulkOperations => true;
-    public bool SupportsFlush => true;
     public bool SupportsExportAll => false;
     public bool SupportsIndexStats => false;
     public bool SupportsHybridSearch => false;
     public bool SupportsMetadataFilters => false;
     public bool SupportsContinuationToken => false;
-    public bool SupportsPartitionIsolation => true;
-    public bool SupportsDynamicCollections => true;
     public bool SupportsScoreNormalization => true;
-    public bool SupportsDeleteImmediatelyVisibleToSearch => true;
+
+    public IServiceProvider Services
+    {
+        get
+        {
+            _host ??= BuildHost();
+            return _host.Services;
+        }
+    }
 
     public ValueTask InitializeAsync()
     {
@@ -39,37 +38,70 @@ public sealed class SqliteVecTestFactory : IVectorAdapterTestFactory
         return ValueTask.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_services is not null)
-            await _services.DisposeAsync().ConfigureAwait(false);
-    }
+    public async ValueTask DisposeAsync() => await Reset().ConfigureAwait(false);
 
     public async Task ResetAsync(CancellationToken ct = default)
     {
-        if (_services is not null)
-            await _services.DisposeAsync().ConfigureAwait(false);
-
-        _services = BuildProvider();
-        Koan.Core.Hosting.App.AppHost.Current = _services;
+        await Reset(ct).ConfigureAwait(false);
+        AggregateConfigs.Reset();
+        Koan.Core.Hosting.App.AppHost.Current = Services;
     }
 
-    private static ServiceProvider BuildProvider()
+    public async Task RestartPreservingStoreAsync(CancellationToken ct = default)
     {
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddVectorAdapterTestRuntime();
-        services.AddSingleton<DataSourceRegistry>();
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddOptions<SqliteVecOptions>().Configure(options =>
-        {
-            options.ConnectionString = ConnectionString;
-            options.DistanceMetric = "cosine";
-        });
-        services.AddSingleton<SqliteVecAdapterFactory>();
-        services.AddSingleton<IVectorAdapterFactory>(provider =>
-            provider.GetRequiredService<SqliteVecAdapterFactory>());
-        return services.BuildServiceProvider();
+        await StopHost(ct).ConfigureAwait(false);
+        AggregateConfigs.Reset();
+        Koan.Core.Hosting.App.AppHost.Current = Services;
     }
+
+    private IHost BuildHost()
+    {
+        _root ??= Path.Combine(Path.GetTempPath(), "koan-sqlitevec-tests", Guid.NewGuid().ToString("N"));
+        var connection = $"Data Source={Path.Combine(_root, "vectors.db")};Pooling=False";
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Environment"] = "Test",
+                ["Koan:Tenancy:Posture"] = "Open",
+                ["Koan:Data:Sources:VectorTests:Adapter"] = "sqlitevec",
+                ["Koan:Data:Sources:VectorTests:SqliteVec:ConnectionString"] = connection
+            }))
+            .ConfigureServices(services => services.AddKoan(koan =>
+            {
+                var source = koan.Data.Source("VectorTests");
+                source.Vector<TodoVector>(space => Space(space, "todos", VectorMetric.Cosine));
+                source.Vector<SqliteVecEuclideanDoc>(space => Space(space, "euclidean", VectorMetric.Euclidean));
+                source.Vector<SqliteVecDotProductDoc>(space => Space(space, "dot", VectorMetric.DotProduct));
+                source.Vector<SqliteVecDurableDoc>(space => Space(space, "durable", VectorMetric.Cosine));
+                source.Vector<SqliteVecMetadataDoc>(space => Space(space, "metadata", VectorMetric.Cosine));
+            }))
+            .Build();
+        host.Start();
+        return host;
+    }
+
+    private async ValueTask Reset(CancellationToken ct = default)
+    {
+        await StopHost(ct).ConfigureAwait(false);
+        if (_root is not null && Directory.Exists(_root))
+        {
+            Directory.Delete(_root, true);
+            _root = null;
+        }
+    }
+
+    private async ValueTask StopHost(CancellationToken ct)
+    {
+        if (_host is null) return;
+        await _host.StopAsync(ct).ConfigureAwait(false);
+        _host.Dispose();
+        _host = null;
+    }
+
+    private void Space<TEntity>(VectorSpaceBuilder<TEntity> space, string name, VectorMetric metric)
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string> => space
+        .Name(name)
+        .Dimensions(EmbeddingDimension)
+        .Metric(metric)
+        .Visibility(VectorVisibility.Session);
 }

@@ -1,50 +1,67 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
 using Koan.Core;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Vector.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Vector.Connector.SqliteVec;
 
-/// <summary>
-/// Vector adapter factory for sqlite-vec. The declarative <c>sqlite</c> alias lets it auto-pair
-/// with the SQLite data adapter (the standard vector election derives the desired provider from the data
-/// provider) — referencing both gives you durable, co-located vectors with zero config. Additional identities
-/// <c>sqlitevec</c>/<c>sqlite-vec</c> for an explicit <c>[VectorAdapter]</c> choice.
-/// </summary>
-[ProviderPriority(40)]
-public sealed class SqliteVecAdapterFactory : IVectorAdapterFactory
+/// <summary>Creates plan-bound repositories for the embedded stable sqlite-vec provider.</summary>
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+public sealed class SqliteVecAdapterFactory(
+    IConfiguration configuration,
+    DataSourceRegistry sources,
+    IOptions<SqliteVecOptions> options) : IVectorAdapterFactory
 {
+    private readonly SqliteVecOptions _options = Validate(options.Value);
+
     public string Provider => Infrastructure.Constants.Provider.Name;
     public IReadOnlyCollection<string> Aliases => Infrastructure.Constants.Provider.Aliases;
 
-    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
-        => new()
-        {
-            Style = StorageNamingStyle.EntityType,
-            Casing = NameCasing.AsIs,
-            PartitionSeparator = '_',
-            Partition = new PartitionTokenPolicy { GuidFormat = "D", AllowedExtraChars = "_" },
-        };
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
+    {
+        Style = StorageNamingStyle.EntityType,
+        Casing = NameCasing.AsIs,
+        PartitionSeparator = '#',
+        Partition = PartitionTokenPolicy.Default
+    };
 
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider services,
+        VectorSpacePlan plan)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var baseOpts = sp.GetService<IOptions<SqliteVecOptions>>()?.Value ?? new SqliteVecOptions();
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Metric == VectorMetric.DotProduct)
+            throw new NotSupportedException(
+                "SqliteVec stable vec0 supports Cosine and Euclidean spaces, not DotProduct. Choose a supported metric or another adapter.");
+        if (plan.Visibility != VectorVisibility.Session)
+            throw new NotSupportedException(
+                "SqliteVec commits awaited mutations with Session visibility and does not simulate Eventual visibility.");
+        return new SqliteVecRepository<TEntity, TKey>(
+            services,
+            this,
+            plan,
+            ResolveRoute(plan.Source),
+            _options,
+            services.GetRequiredService<SqliteVecNative>());
+    }
 
-        var config = sp.GetRequiredService<IConfiguration>();
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var route = SqliteVecRoute.Resolve(config, sourceRegistry, baseOpts, this, source);
+    internal SqliteVecRoute ResolveRoute(string source) =>
+        SqliteVecRoute.Resolve(configuration, sources, _options, this, source);
 
-        var sourceOpts = new SqliteVecOptions
-        {
-            ConnectionString = route.ConnectionString,
-            DistanceMetric = baseOpts.DistanceMetric
-        };
-        return new SqliteVecVectorRepository<TEntity, TKey>(this, sp, sourceOpts, source);
+    private static SqliteVecOptions Validate(SqliteVecOptions value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (value.MaxMetadataBytesPerPoint <= 0)
+            throw new InvalidOperationException("SqliteVecOptions.MaxMetadataBytesPerPoint must be greater than zero.");
+        if (value.MaxSearchCandidates <= 0)
+            throw new InvalidOperationException("SqliteVecOptions.MaxSearchCandidates must be greater than zero.");
+        return value;
     }
 }

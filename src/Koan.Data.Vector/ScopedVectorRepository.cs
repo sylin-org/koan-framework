@@ -60,6 +60,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     private readonly IStorageGuard[] _guards;
     private readonly DataSegmentationPlan.DataSegmentationScope _segmentation;
     private readonly bool _canFilter;
+    private readonly bool _canScope;
     private readonly OverlayNamingRule? _overlayNaming;
     private int _disposed;
 
@@ -70,7 +71,9 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         _readContributors = sp.GetServices<IReadFilterContributor>().ToArray();
         _guards = sp.GetServices<IStorageGuard>().ToArray();
         _segmentation = sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity));
-        _canFilter = VectorCaps.Describe(inner, inner.GetType().Name).Has(VectorCaps.Filters);
+        var capabilities = VectorCaps.Describe(inner, inner.GetType().Name);
+        _canFilter = capabilities.Has(VectorCaps.Filters);
+        _canScope = capabilities.Has(VectorCaps.ScopeIsolation);
         // ARCH-0102 §5: the adapter DECLARES how to spell overlay (__-marked) fields in its store; the framework
         // applies it at write-stamp AND read-filter from this one declaration. null ⇒ the __ default (no rename).
         _overlayNaming = (inner as IOverlayNamingAware)?.OverlayNaming;
@@ -170,16 +173,23 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     {
         ArgumentNullException.ThrowIfNull(request);
         var scope = CompileScope("vector search");
-        var combined = scope.Predicate is null
-            ? request.Filter
-            : request.Filter is null
-                ? scope.Predicate
-                : Filter.All(request.Filter, scope.Predicate);
-        if (combined is not null && !_canFilter)
+        if (request.Filter is not null && !_canFilter)
             throw new NotSupportedException(
-                $"Vector search for '{typeof(TEntity).Name}' requires metadata filtering, but adapter " +
+                $"Vector search for '{typeof(TEntity).Name}' uses Where(...), but adapter " +
                 $"'{_inner.GetType().Name}' does not announce {nameof(VectorCaps.Filters)}. " +
                 "Remove the filter or select an adapter that can enforce it.");
+        if (scope.Predicate is not null && !_canFilter &&
+            (!_canScope || scope.ResidualPredicate is not null))
+            throw new NotSupportedException(
+                $"Vector search for '{typeof(TEntity).Name}' requires a row predicate that adapter " +
+                $"'{_inner.GetType().Name}' cannot enforce. Select an adapter with metadata filtering or native scope isolation.");
+        var combined = _canFilter
+            ? scope.Predicate is null
+                ? request.Filter
+                : request.Filter is null
+                    ? scope.Predicate
+                    : Filter.All(request.Filter, scope.Predicate)
+            : request.Filter;
         return _inner.Search(request with { Filter = combined }, scope, ct);
     }
 
@@ -274,7 +284,9 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         //     absence, so the token is gated on the same bit. Each token is co-defined with its proof
         //     (ARCH-0094) by VectorAodbConformanceSpecsBase — declare-but-not-realize goes red.
         caps.Add(DataCaps.Isolation.ContainerScoped).Add(DataCaps.Isolation.DatabaseScoped);
-        if (_canFilter) caps.Add(DataCaps.Isolation.RowScoped);
+        // Row isolation may be realized either through general provider-side filtering or through a provider-native
+        // opaque scope identity. The latter intentionally does not imply arbitrary user Where(...) support.
+        if (_canFilter || _canScope) caps.Add(DataCaps.Isolation.RowScoped);
     }
 
     public Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -358,7 +370,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         if (values.Count == 0 && predicate is null) return VectorScope.Unscoped;
         var ordered = values.OrderBy(static item => item.Key, StringComparer.Ordinal).ToArray();
         var data = new DataObject(ordered.Select(static item => new DataProperty(item.Key, item.Value)));
-        return new VectorScope(identity, data, predicate);
+        return new VectorScope(identity, data, predicate, contributed);
     }
 
     private static string ScopeIdentity(IReadOnlyList<KeyValuePair<string, object?>> values)

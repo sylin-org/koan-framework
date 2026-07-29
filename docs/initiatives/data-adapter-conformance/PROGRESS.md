@@ -52,7 +52,7 @@ only the orchestrator edits this ledger; workers publish scoped handoffs under `
 | DAC-45 | pending | DAC-30 | — | gold contract and stable shared runner proven |
 | DAC-46 | pending | DAC-40 | — | InMemory/KeyValue family oracle green |
 | DAC-51 | in-progress | DAC-30 | empty-root InMemory rebuild; 50/50 surface tests, V-01–V-24 and G-09 Forge behavior green; solution build clean | strict versioned packet generation is available from the conformance control plane |
-| DAC-52 | pending | DAC-51 | — | Vector oracle green |
+| DAC-52 | in-progress | DAC-51 | empty-root native rebuild; 58 suite passes, 28/28 Forge cells, source policy/isolation/restart/metric proofs, and clean solution build | strict packet is explicitly deferred; linux-x64/linux-arm64 execution remains external-runner evidence |
 | DAC-53 | pending | DAC-51 | — | Vector oracle green |
 | DAC-54 | pending | DAC-30 | — | gold workflow and Vector control plane green |
 | DAC-55 | pending | DAC-54 | — | SearchEngine family green |
