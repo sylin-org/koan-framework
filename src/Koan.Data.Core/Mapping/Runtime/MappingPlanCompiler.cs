@@ -96,8 +96,9 @@ public static class MappingPlanCompiler
                     continue;
                 }
 
-                var access = MappingMemberAccess.Compile(descriptor.EntityType, binding.LogicalPath, requireWrite: true);
-                compiled.Add(CompileBinding(descriptor, binding, access.Get, access.Set));
+                var canonical = binding.Authority == MappingAuthority.Canonical;
+                var access = MappingMemberAccess.Compile(descriptor.EntityType, binding.LogicalPath, requireWrite: canonical);
+                compiled.Add(CompileBinding(descriptor, binding, access.Get, canonical ? access.Set : null));
             }
 
             var ordered = descriptor.Bindings

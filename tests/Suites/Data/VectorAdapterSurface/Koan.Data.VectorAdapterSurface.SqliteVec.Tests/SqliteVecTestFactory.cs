@@ -57,7 +57,7 @@ public sealed class SqliteVecTestFactory : IVectorAdapterTestFactory
     private IHost BuildHost()
     {
         _root ??= Path.Combine(Path.GetTempPath(), "koan-sqlitevec-tests", Guid.NewGuid().ToString("N"));
-        var connection = $"Data Source={Path.Combine(_root, "vectors.db")};Pooling=False";
+        var connection = $"Data Source={Path.Combine(_root, "vectors.db")}";
         var host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(new Dictionary<string, string?>
             {

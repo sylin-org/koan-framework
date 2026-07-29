@@ -74,6 +74,25 @@ public sealed class MappingConformanceSpec
     }
 
     [Fact]
+    public void Managed_identity_object_accepts_getter_only_derived_paths_without_granting_hydration_authority()
+    {
+        var plan = RelationalManagedMapping.Compile<ComputedIdentity>(
+            "Default",
+            StorageAddress.From("SENSORS"));
+        var record = plan.Write(new ComputedIdentity { Id = "sensor-1", DisplayName = "North bed" });
+
+        var serial = plan.Use(MappingPath.Of(nameof(ComputedIdentity.Serial)), MappingConsumer.Filter)
+            .Bindings.Should().ContainSingle().Which;
+        var copy = plan.Hydrate<ComputedIdentity>(record.Values);
+
+        serial.Descriptor.Authority.Should().Be(MappingAuthority.Derived);
+        plan.Read().Bindings.Should().NotContain(serial, "derived paths do not independently hydrate the aggregate");
+        copy.Id.Should().Be("sensor-1");
+        copy.Serial.Should().Be("sensor-1");
+        copy.DisplayName.Should().Be("North bed");
+    }
+
+    [Fact]
     public void Composite_and_generated_identity_are_complete_pre_dispatch_decisions()
     {
         using var provider = Host(source => source
@@ -404,6 +423,13 @@ public sealed class MappingConformanceSpec
     {
         public long Id { get; set; }
         public string NameFull { get; set; } = "";
+    }
+
+    public sealed class ComputedIdentity
+    {
+        public string Id { get; set; } = "";
+        public string Serial => Id;
+        public string DisplayName { get; set; } = "";
     }
 
     public sealed class TwoNames

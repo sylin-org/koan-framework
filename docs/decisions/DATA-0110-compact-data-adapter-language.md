@@ -85,6 +85,9 @@ codec, direction, generation, and authority modifiers
 ```
 
 Adapters consume the compiled plan. They do not implement or reinterpret the fluent grammar.
+For a canonical whole-object binding, expanded logical paths are derived query/projection metadata rather than
+independent hydration authority. A getter-only computed member may therefore remain addressable without acquiring a
+setter; canonical property bindings still require a writable hydration path.
 
 ## Consequences
 

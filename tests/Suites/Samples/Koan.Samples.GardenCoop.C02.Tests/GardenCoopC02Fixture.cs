@@ -34,7 +34,7 @@ public sealed class GardenCoopC02Fixture : IAsyncLifetime
         AppHost.Current = null;
 
         var database = Path.Combine(_dataDirectory, "gardencoop.db");
-        _host = await Host.CreateDefaultBuilder()
+        _host = Host.CreateDefaultBuilder()
             .ConfigureWebHost(web => web
                 .UseTestServer()
                 .UseEnvironment("Development")
@@ -50,11 +50,21 @@ public sealed class GardenCoopC02Fixture : IAsyncLifetime
                 }))
                 .ConfigureServices(services =>
                 {
-                    services.AddKoan();
+                    services.AddKoan(GardenCoopModule.Compose);
                     services.AddKoanControllersFrom<ProduceSearchController>();
                 })
                 .Configure(_ => { }))
-            .StartAsync(TestContext.Current.CancellationToken);
+            .Build();
+        try
+        {
+            await _host.StartAsync(TestContext.Current.CancellationToken);
+        }
+        catch
+        {
+            _host.Dispose();
+            _host = null;
+            throw;
+        }
     }
 
     public async ValueTask DisposeAsync()

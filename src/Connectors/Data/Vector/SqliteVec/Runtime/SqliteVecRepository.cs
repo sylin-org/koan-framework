@@ -32,6 +32,7 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
     private readonly Lazy<Task<SqliteConnection>>? _memoryKeeper;
     private readonly SemaphoreSlim _shapeGate = new(1, 1);
     private readonly ConcurrentDictionary<string, byte> _readyShapes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _poolGroups = new(StringComparer.Ordinal);
     private int _disposed;
 
     internal SqliteVecRepository(
@@ -272,7 +273,7 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         if (_memoryKeeper is { IsValueCreated: true } && _memoryKeeper.Value.IsCompletedSuccessfully)
             _memoryKeeper.Value.Result.Dispose();
-        SqliteConnection.ClearPool(new SqliteConnection(_connectionString));
+        ClearPools();
         _shapeGate.Dispose();
     }
 
@@ -281,7 +282,7 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         if (_memoryKeeper is { IsValueCreated: true })
             await (await _memoryKeeper.Value.ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false);
-        SqliteConnection.ClearPool(new SqliteConnection(_connectionString));
+        ClearPools();
         _shapeGate.Dispose();
     }
 
@@ -349,7 +350,9 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
                 parsed.Mode = exists ? SqliteOpenMode.ReadWrite : SqliteOpenMode.ReadWriteCreate;
         }
 
-        var connection = new SqliteConnection(parsed.ToString());
+        var effectiveConnection = parsed.ToString();
+        _poolGroups.TryAdd(effectiveConnection, 0);
+        var connection = new SqliteConnection(effectiveConnection);
         try
         {
             await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -368,6 +371,13 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
         var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync().ConfigureAwait(false);
         return connection;
+    }
+
+    private void ClearPools()
+    {
+        foreach (var connectionString in _poolGroups.Keys)
+            SqliteConnection.ClearPool(new SqliteConnection(connectionString));
+        _poolGroups.Clear();
     }
 
     private async Task<MutationOutcome> Upsert(
