@@ -62,8 +62,8 @@ internal sealed class VectorService : IVectorService, IVectorRuntime, IDisposabl
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
 
-        var routed = RoutedSource.Resolve<TEntity>().Source;
-        var space = _spaces.Resolve(typeof(TEntity), routed);
+        var route = RoutedSource.Resolve<TEntity>();
+        var space = _spaces.Resolve(typeof(TEntity), route);
         var factory = SelectFactory<TEntity>(space.Source);
         var source = _sources.GetPlan(space.Source, factory.Provider);
         source.Demand(effect, operation);

@@ -7,6 +7,7 @@ using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
@@ -65,7 +66,12 @@ public sealed class VectorDatabaseRoutingSpec : IAsyncLifetime
 
         _host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(s => s.AddKoan())
+            .ConfigureServices(s => s.AddKoan(koan =>
+            {
+                var source = koan.Data.Source("Default");
+                source.Vector<MemVec>(space => space.Name("mem-vec").Dimensions(8));
+                source.Vector<SqlVec>(space => space.Name("sql-vec").Dimensions(8));
+            }))
             .StartAsync()
             .ConfigureAwait(false);
         AppHost.Current = _host.Services;

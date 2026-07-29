@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using Koan.Core.Composition;
+using Koan.Data.Core.Routing;
 using Koan.Data.Vector.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,6 +10,7 @@ internal sealed class VectorSpaceDeclarationCatalog
 {
     private readonly object _gate = new();
     private Dictionary<(Type Entity, string Source), VectorSpacePlan> _plans = new();
+    private readonly ConcurrentDictionary<(Type Entity, string Source), VectorSpacePlan> _axisPlans = new();
     private bool _frozen;
 
     public static void Declare(Type entityType, VectorSpacePlan plan)
@@ -29,20 +32,41 @@ internal sealed class VectorSpaceDeclarationCatalog
         catalog.Add(entityType, plan);
     }
 
-    public VectorSpacePlan Resolve(Type entityType, string? routedSource)
+    public VectorSpacePlan Resolve(Type entityType, RoutedSource route)
     {
         ArgumentNullException.ThrowIfNull(entityType);
         Freeze();
+        var routedSource = route.Source;
         if (!string.IsNullOrWhiteSpace(routedSource))
         {
             var key = Key(entityType, routedSource);
-            return _plans.TryGetValue(key, out var exact)
-                ? exact
-                : throw new InvalidOperationException(
-                    $"Vector entity '{entityType.Name}' has no space declared for routed source '{routedSource}'. " +
-                    "Declare it with koan.Data.Source(...).Vector<TEntity>(...) or correct the source context.");
+            if (_plans.TryGetValue(key, out var exact)) return exact;
+            if (route.Kind == RouteKind.DatabaseAxis)
+            {
+                if (_axisPlans.TryGetValue(key, out var routed)) return routed;
+                var template = SinglePlan(entityType, routedSource);
+                return _axisPlans.GetOrAdd(
+                    key,
+                    static (_, state) => new VectorSpacePlan(
+                        state.Source,
+                        state.Template.Name,
+                        state.Template.Dimensions,
+                        state.Template.Metric,
+                        state.Template.Visibility,
+                        state.Template.Model),
+                    (Source: routedSource, Template: template));
+            }
+
+            throw new InvalidOperationException(
+                $"Vector entity '{entityType.Name}' has no space declared for routed source '{routedSource}'. " +
+                "Declare it with koan.Data.Source(...).Vector<TEntity>(...) or correct the source context.");
         }
 
+        return SinglePlan(entityType, routedSource: null);
+    }
+
+    private VectorSpacePlan SinglePlan(Type entityType, string? routedSource)
+    {
         var candidates = _plans
             .Where(entry => entry.Key.Entity == entityType)
             .Select(static entry => entry.Value)
@@ -55,9 +79,14 @@ internal sealed class VectorSpaceDeclarationCatalog
                 $"Vector entity '{entityType.Name}' has no declared space. Declare one inside " +
                 "AddKoan(koan => koan.Data.Source(...).Vector<TEntity>(...))."),
             _ => throw new InvalidOperationException(
-                $"Vector entity '{entityType.Name}' has spaces on multiple sources: " +
-                $"{string.Join(", ", candidates.Select(static plan => plan.Source))}. " +
-                "Select one with EntityContext.Source(...).")
+                routedSource is null
+                    ? $"Vector entity '{entityType.Name}' has spaces on multiple sources: " +
+                      $"{string.Join(", ", candidates.Select(static plan => plan.Source))}. " +
+                      "Select one with EntityContext.Source(...)."
+                    : $"Database-axis route '{routedSource}' cannot choose a vector shape for entity " +
+                      $"'{entityType.Name}' because it has spaces on multiple sources: " +
+                      $"{string.Join(", ", candidates.Select(static plan => plan.Source))}. " +
+                      "Declare that routed source explicitly or keep one source-independent vector shape.")
         };
     }
 

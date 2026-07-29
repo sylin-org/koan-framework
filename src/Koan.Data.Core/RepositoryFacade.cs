@@ -1223,7 +1223,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                     typeof(TEntity).FullName ?? typeof(TEntity).Name,
                     "Complete item outcomes were reported by a batch that did not qualify that execution seam.",
                     DataCommitOutcome.Unknown);
-            if (nativeCapabilities.HasFlag(BatchExecutionCapabilities.CompleteItemOutcomes))
+            if (nativeCapabilities.HasFlag(BatchExecutionCapabilities.CompleteItemOutcomes) && !lowerSoftDeletes)
             {
                 ValidateCompleteOutcomes(
                     result,
