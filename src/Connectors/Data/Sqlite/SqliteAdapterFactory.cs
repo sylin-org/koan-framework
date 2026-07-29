@@ -1,12 +1,13 @@
 using Koan.Core;
-using Koan.Core.Capabilities;
 using Koan.Core.Services;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sources;
-using Koan.Data.Core;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Connector.Sqlite.Runtime;
+using Koan.Data.Core;
+using Koan.Data.Relational;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -14,7 +15,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Data.Connector.Sqlite;
 
 [ProviderPriority(10)]
-[KoanService(ServiceKind.Database, shortCode: "sqlite", name: "SQLite",
+[KoanService(ServiceKind.Database, shortCode: Constants.Provider, name: "SQLite",
     DeploymentKind = DeploymentKind.InProcess,
     Capabilities = ["protocol=file"],
     Volumes = ["./Data/sqlite:/data"],
@@ -36,40 +37,33 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
-        SourceInspectionCapabilities.ListContainers |
-        SourceInspectionCapabilities.ResolveAddress |
-        SourceInspectionCapabilities.DescribeContainer |
-        SourceInspectionCapabilities.SampleRecords,
+        SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
+        SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords,
         ["sql"],
         enforcesReadLanes: true);
 
     public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
     {
         var route = ResolveRoute(services, source);
-        return new SqliteSourceIntegration(
-            route,
-            services.GetRequiredService<SqliteConnectionManager>());
+        var connections = services.GetRequiredService<SqliteConnections>();
+        return new RelationalSourceIntegration(
+            lane => connections.Create(route.ReadLanes[lane], route.Source, nonCreating: true),
+            route.ReadLanes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            static async (connection, ct) =>
+            {
+                await using var pragma = connection.CreateCommand();
+                pragma.CommandText = "PRAGMA query_only = ON";
+                await pragma.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                return ((SqliteConnection)connection).BeginTransaction(deferred: true);
+            },
+            new SqliteInspector(route, connections));
     }
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = "Default")
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider services,
+        string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var route = ResolveRoute(services, source);
-        var mapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(route.Source);
-        if (mapping is not null)
-            return new SqliteMappedRepository<TEntity, TKey>(
-                services,
-                route,
-                mapping,
-                services.GetRequiredService<SqliteConnectionManager>());
-        return new SqliteRepository<TEntity, TKey>(
-            services,
-            route.Options,
-            services.GetRequiredService<IStorageNameResolver>(),
-            services.GetRequiredService<SqliteConnectionManager>(),
-            route.Source);
-    }
+        where TKey : notnull => new SqliteRepository<TEntity, TKey>(services, ResolveRoute(services, source));
 
     internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
     {
@@ -80,30 +74,17 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         var connection = AdapterConnectionResolver.ResolveRoutedConnection(
             configuration, registry, Provider, resolvedSource, defaults.ConnectionString, this);
         var readLanes = registry.GetSource(resolvedSource)?.ReadLanes?
-            .Where(static lane =>
-                !string.IsNullOrWhiteSpace(lane.Value.ConnectionString) &&
-                !string.Equals(lane.Value.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
-            .ToDictionary(
-                static lane => lane.Key,
-                static lane => lane.Value.ConnectionString,
+            .Where(static lane => !string.IsNullOrWhiteSpace(lane.Value.ConnectionString) &&
+                                  !string.Equals(lane.Value.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(static lane => lane.Key, static lane => lane.Value.ConnectionString,
                 StringComparer.OrdinalIgnoreCase)
             ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var definition = registry.GetSource(resolvedSource);
         return new SqliteRoute(
             resolvedSource,
-            new SqliteOptions
-            {
-                ConnectionString = connection,
-                NamingStyle = defaults.NamingStyle,
-                Separator = defaults.Separator,
-                DdlPolicy = defaults.DdlPolicy,
-                SchemaMatching = defaults.SchemaMatching,
-                AllowProductionDdl = defaults.AllowProductionDdl,
-                Readiness = defaults.Readiness
-            },
-            readLanes,
-            definition?.StorageLifecycle ?? StorageLifecycle.Managed,
-            definition?.Access ?? DataSourceAccess.ReadWrite);
+            connection,
+            defaults,
+            registry.GetPlan(resolvedSource, Provider, connection),
+            readLanes);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
@@ -119,10 +100,3 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         };
     }
 }
-
-internal sealed record SqliteRoute(
-    string Source,
-    SqliteOptions Options,
-    IReadOnlyDictionary<string, string> ReadLanes,
-    StorageLifecycle StorageLifecycle,
-    DataSourceAccess Access);

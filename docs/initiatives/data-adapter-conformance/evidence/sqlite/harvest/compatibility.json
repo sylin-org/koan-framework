@@ -1,6 +1,14 @@
 {
   "schemaVersion": 1,
-  "status": "pending",
+  "status": "sealed",
   "provider": "sqlite",
-  "candidates": []
+  "candidates": [
+    { "surface": "provider", "decision": "retain", "value": "sqlite", "reason": "Public adapter identity." },
+    { "surface": "alias", "decision": "retain", "value": "sqlite3", "reason": "Stable provider alias." },
+    { "surface": "options", "decision": "retain", "value": "SqliteOptions", "reason": "Typed native configuration." },
+    { "surface": "zero-config", "decision": "retain", "value": "Data Source=.koan/data/Koan.sqlite", "reason": "Embedded-store delight path." },
+    { "surface": "managed-shape", "decision": "retain-as-map", "value": "Id + Json", "reason": "Framework-generated MappingPlan, not a special executor." },
+    { "surface": "discovery", "decision": "retire", "value": "SqliteDiscoveryAdapter", "reason": "An embedded file needs deterministic local resolution, not async service discovery." },
+    { "surface": "mapped-repository", "decision": "retire", "value": "SqliteMappedRepository", "reason": "Mapping shape does not justify a second execution path." }
+  ]
 }

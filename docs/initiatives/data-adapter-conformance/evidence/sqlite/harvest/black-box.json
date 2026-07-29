@@ -1,6 +1,19 @@
 {
   "schemaVersion": 1,
-  "status": "pending",
+  "status": "sealed",
   "provider": "sqlite",
-  "scenarios": []
+  "scenarios": [
+    "zero-configuration Entity CRUD and exact query receipts",
+    "managed and explicit maps resolve the same repository execution type",
+    "flat, object, nested-path, composite-key, and generated-key mappings round-trip",
+    "nested JSON updates preserve unmapped legacy siblings",
+    "read-only writes reject before mutation",
+    "missing external databases reject without file creation",
+    "health is non-creating and probes every active routed source",
+    "registered SQL executes only through a configured provider-enforced read lane",
+    "bulk upsert is one bounded native dispatch and batch outcomes are atomic and ordered",
+    "polymorphic root variants survive a cold host restart",
+    "file, private-memory, named-memory, source isolation, disposal, and redaction remain bounded",
+    "filters, nested sorts, paging, counts, managed fields, partitions, and raw-query declines report truthfully"
+  ]
 }

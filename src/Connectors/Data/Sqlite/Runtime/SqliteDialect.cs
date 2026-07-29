@@ -19,9 +19,7 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
     {
         var root = $"koan_row.{Quote(path.Name)}";
         if (!path.IsNested) return root;
-        var jsonPath = "$" + string.Concat(path.Segments.Select(static segment =>
-            ".\"" + segment.Replace("\"", "\\\"", StringComparison.Ordinal) + "\""));
-        var extracted = $"json_extract({root}, '{jsonPath.Replace("'", "''", StringComparison.Ordinal)}')";
+        var extracted = $"json_extract({root}, '{JsonPath(path.Segments)}')";
         var type = Nullable.GetUnderlyingType(physicalType) ?? physicalType;
         return IsNumeric(type) || type == typeof(bool) || type == typeof(TimeSpan)
             ? $"CAST({extracted} AS NUMERIC)"
@@ -30,6 +28,9 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
 
     internal static string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+
+    internal static string JsonPath(IEnumerable<string> segments) => "$" + string.Concat(segments.Select(segment =>
+        ".\"" + segment.Replace("\"", "\\\"", StringComparison.Ordinal) + "\""));
 
     private static bool IsNumeric(Type type) =>
         type == typeof(byte) || type == typeof(sbyte) || type == typeof(short) || type == typeof(ushort) ||

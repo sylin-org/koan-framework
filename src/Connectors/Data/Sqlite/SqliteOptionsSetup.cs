@@ -1,5 +1,3 @@
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Relational.Orchestration;
@@ -8,15 +6,13 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Sqlite;
 
-internal sealed class SqliteOptionsConfigurator(
-    IConfiguration configuration,
-    IServiceDiscoveryCoordinator? discovery = null) : IConfigureOptions<SqliteOptions>
+internal sealed class SqliteOptionsSetup(IConfiguration configuration) : IConfigureOptions<SqliteOptions>
 {
     public void Configure(SqliteOptions options)
     {
         var owner = configuration["Koan:Data:Sources:Default:Adapter"];
-        var genericBelongs = string.IsNullOrWhiteSpace(owner) || SqliteAdapterFactory.HandlesProvider(owner);
-        var requested = genericBelongs
+        var ownsDefault = string.IsNullOrWhiteSpace(owner) || SqliteAdapterFactory.HandlesProvider(owner);
+        var requested = ownsDefault
             ? First(
                 Constants.Configuration.Keys.DefaultSourceConnectionString,
                 Constants.Configuration.Keys.ProviderSourceConnectionString,
@@ -28,54 +24,32 @@ internal sealed class SqliteOptionsConfigurator(
                 Constants.Configuration.Keys.ConnectionString,
                 Constants.Configuration.Keys.ConnectionStringsSqlite);
 
-        requested = string.IsNullOrWhiteSpace(requested) ? options.ConnectionString : requested;
-        options.ConnectionString = IsAuto(requested) ? Discover() : requested!;
-
-        options.NamingStyle = EnumValue(
-            options.NamingStyle,
+        var candidate = requested ?? options.ConnectionString;
+        options.ConnectionString = IsAuto(candidate)
+            ? Constants.DefaultConnection
+            : candidate.Trim();
+        options.NamingStyle = ReadEnum(options.NamingStyle,
             Constants.Configuration.Keys.ProviderNamingStyle,
             Constants.Configuration.Keys.NamingStyle);
         options.Separator = First(
             Constants.Configuration.Keys.ProviderSeparator,
             Constants.Configuration.Keys.Separator) ?? options.Separator;
-        options.DdlPolicy = EnumValue(
-            options.DdlPolicy,
+        options.DdlPolicy = ReadEnum(options.DdlPolicy,
             Constants.Configuration.Keys.ProviderDdlPolicy,
             Constants.Configuration.Keys.DdlPolicy);
-        options.SchemaMatching = EnumValue(
-            options.SchemaMatching,
+        options.SchemaMatching = ReadEnum(options.SchemaMatching,
             Constants.Configuration.Keys.ProviderSchemaMatching,
             Constants.Configuration.Keys.SchemaMatching);
         options.AllowProductionDdl = options.DdlPolicy == RelationalDdlPolicy.AutoCreate;
     }
 
-    private string Discover()
-    {
-        if (configuration.GetValue(Constants.Configuration.Keys.DisableAutoDetection, false) || discovery is null)
-            return Constants.DefaultConnection;
-
-        var result = discovery.DiscoverService(
-                Constants.Provider,
-                new DiscoveryContext { Configuration = configuration, RequireHealthValidation = false })
-            .GetAwaiter().GetResult();
-        return result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl)
-            ? result.ServiceUrl
-            : Constants.DefaultConnection;
-    }
-
-    private T EnumValue<T>(T fallback, params string[] keys) where T : struct, Enum
-    {
-        var value = First(keys);
-        return Enum.TryParse<T>(value, ignoreCase: true, out var parsed) ? parsed : fallback;
-    }
+    private T ReadEnum<T>(T fallback, params string[] keys) where T : struct, Enum =>
+        Enum.TryParse<T>(First(keys), true, out var value) ? value : fallback;
 
     private string? First(params string[] keys)
     {
         foreach (var key in keys)
-        {
-            var value = configuration[key];
-            if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
-        }
+            if (configuration[key] is { } value && !string.IsNullOrWhiteSpace(value)) return value.Trim();
         return null;
     }
 

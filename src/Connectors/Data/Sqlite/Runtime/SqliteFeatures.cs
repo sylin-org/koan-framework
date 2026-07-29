@@ -8,7 +8,7 @@ namespace Koan.Data.Connector.Sqlite.Runtime;
 
 internal static class SqliteFeatures
 {
-    public static readonly IReadOnlyList<Capability> All =
+    internal static readonly IReadOnlyList<Capability> All =
     [
         DataCaps.Query.Linq,
         DataCaps.Query.String,
@@ -25,12 +25,12 @@ internal static class SqliteFeatures
         DataCaps.Isolation.DatabaseScoped
     ];
 
-    public static void Declare(IDataClaims claims)
+    internal static void Declare(IDataClaims claims)
     {
         foreach (var capability in All) claims.Capability(capability);
     }
 
-    public static void Describe(ICapabilities capabilities)
+    internal static void Describe(ICapabilities capabilities)
     {
         foreach (var capability in All) capabilities.Add(capability);
         capabilities

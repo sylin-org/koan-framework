@@ -123,7 +123,7 @@ public sealed class SqliteHealthContributorSpec
     }
 
     [Fact]
-    public async Task Elected_sqlite_health_probes_the_authoritative_default_source()
+    public async Task Elected_sqlite_health_is_non_creating_and_then_probes_the_provisioned_default_source()
     {
         var databasePath = TempDatabase("active");
         var fallbackPath = TempDatabase("unused-fallback");
@@ -138,16 +138,18 @@ public sealed class SqliteHealthContributorSpec
                              .StartAsync())
             {
                 var contributor = SqliteHealth(host.Services);
-                var report = await contributor.Check();
+                var absent = await contributor.Check();
 
                 contributor.IsCritical.Should().BeTrue();
-                report.State.Should().Be(HealthState.Healthy);
-                File.Exists(databasePath).Should().BeTrue();
+                absent.State.Should().Be(HealthState.Unhealthy);
+                File.Exists(databasePath).Should().BeFalse("health is an observation, not a provisioning path");
                 File.Exists(fallbackPath).Should().BeFalse(
                     "health must inspect the same configured Default source used by repositories");
 
                 var saved = await new HealthRecord { Value = "same-target" }.Save();
                 (await HealthRecord.Get(saved.Id))!.Value.Should().Be("same-target");
+                (await contributor.Check()).State.Should().Be(HealthState.Healthy);
+                File.Exists(databasePath).Should().BeTrue();
                 File.Exists(fallbackPath).Should().BeFalse(
                     "repository operations and readiness must agree on the authoritative Default source");
 
@@ -264,6 +266,8 @@ public sealed class SqliteHealthContributorSpec
                     .GetRequiredService<IDataService>()
                     .GetRepository<HealthRecord, string>();
             }
+
+            await new HealthRecord { Value = "healthy-default" }.Save();
 
             var report = await SqliteHealth(host.Services).Check();
 

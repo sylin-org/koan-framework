@@ -6,13 +6,14 @@ public static class Constants
     public const string DefaultSource = "Default";
     public const string DefaultConnection = "Data Source=.koan/data/Koan.sqlite";
     public const int MaximumMemorySources = 256;
-    public const int MaximumSchemaEntries = 512;
+    public const int MaximumPlans = 512;
+    public const int MaximumBatchItems = 4_096;
+    public const int MaximumParameters = 30_000;
 
     public static class Configuration
     {
         public const string Section = "Koan:Data:Sqlite";
         public const string DefaultSourceSection = "Koan:Data:Sources:Default:sqlite";
-        public const string SourceSection = "Koan:Data:Sources";
 
         public static class Keys
         {
@@ -29,7 +30,6 @@ public static class Constants
             public const string ProviderDdlPolicy = DefaultSourceSection + ":DdlPolicy";
             public const string SchemaMatching = Section + ":SchemaMatchingMode";
             public const string ProviderSchemaMatching = DefaultSourceSection + ":SchemaMatchingMode";
-            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
         }
     }
 }

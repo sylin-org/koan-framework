@@ -9,6 +9,40 @@ namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 public sealed class SqliteLegacyMappingSpec(SqliteFixture fixture)
 {
     [Fact]
+    public async Task Missing_external_database_rejects_without_creating_a_file()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"koan-sqlite-external-{Guid.CreateVersion7():N}.db");
+        var settings = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            ["Koan:Environment"] = "Test",
+            ["Koan:Data:Sources:Missing:Adapter"] = "sqlite",
+            ["Koan:Data:Sources:Missing:ConnectionString"] = $"Data Source={path};Pooling=True",
+            ["Koan:Data:Sources:Missing:StorageLifecycle"] = StorageLifecycle.External.ToString()
+        };
+        try
+        {
+            await using var host = await KoanIntegrationHost.Configure()
+                .WithSettings(settings)
+                .ConfigureServices(services => services.AddKoan(koan =>
+                    koan.Data.Source("Missing").Map<ReadOnlyCustomer>(map => map
+                        .Container("CUSTOMER")
+                        .Key(customer => customer.Id).Name("CUSTOMER_NO")
+                        .Property(customer => customer.DisplayName).Name("DISPLAY_NM"))))
+                .StartAsync(TestContext.Current.CancellationToken);
+
+            using (EntityContext.Source("Missing"))
+                await FluentActions.Invoking(() => ReadOnlyCustomer.Get(1))
+                    .Should().ThrowAsync<Koan.Data.Relational.Orchestration.SchemaMismatchException>();
+
+            File.Exists(path).Should().BeFalse("external validation must never materialize a missing database");
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Flat_and_structured_legacy_shape_uses_the_ordinary_entity_surface()
     {
         await Seed();

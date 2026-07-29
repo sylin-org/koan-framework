@@ -65,9 +65,9 @@ public sealed class SqliteProviderBoundedPagingSpec(SqliteFixture fixture, ITest
             .WithPagination(page: 1, pageSize: 2);
 
         var nestedSort = await queryRepository.Query(nestedSortQuery);
-        nestedSort.PaginationHandled.Should().BeFalse("SQLite cannot bound a page before completing a nested sort");
-        nestedSort.SortFullyHandled(nestedSortQuery).Should().BeFalse();
-        nestedSort.Items.Should().HaveCount(3, "the coordinator needs the complete candidate set for its sort fallback");
+        nestedSort.PaginationHandled.Should().BeTrue("the compiled mapping lowers nested structured paths to SQLite JSON");
+        nestedSort.SortFullyHandled(nestedSortQuery).Should().BeTrue();
+        nestedSort.Items.Select(static probe => probe.Detail.Rank).Should().Equal(10, 20);
         nestedSort.TotalCount.Should().BeNull();
     }
 

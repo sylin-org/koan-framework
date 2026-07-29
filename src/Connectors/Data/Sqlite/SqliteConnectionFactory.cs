@@ -7,13 +7,10 @@ namespace Koan.Data.Connector.Sqlite;
 internal sealed class SqliteConnectionFactory(
     IServiceProvider services,
     SqliteAdapterFactory factory,
-    SqliteConnectionManager connections) : IDataProviderConnectionFactory
+    SqliteConnections connections) : IDataProviderConnectionFactory
 {
     public bool CanHandle(string provider) => SqliteAdapterFactory.HandlesProvider(provider);
-
     public DbConnection Create(string connectionString) => connections.Create(connectionString, "Direct");
-
     public DbConnection Create(string connectionString, string source) => connections.Create(connectionString, source);
-
-    public string? ResolveConnectionString(string source) => factory.ResolveRoute(services, source).Options.ConnectionString;
+    public string? ResolveConnectionString(string source) => factory.ResolveRoute(services, source).ConnectionString;
 }

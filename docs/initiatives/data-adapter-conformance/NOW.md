@@ -32,6 +32,11 @@ route, bounded host file registry, and thin KeyValue repository now own detached
 real-file ledger passes 34/34, including canonical aliases, concurrent writes, duplicate/oversized input, and exact
 capacity. Strict packet generation remains deferred.
 
+DAC-11 SQLite has now been rebuilt from an empty implementation root. Managed `Id + Json` and explicit legacy maps
+share one repository and mapping-plan executor; 17 former implementation files are absent. SQLite passes 47/47,
+Relational 16/16, Data Core 471/471, and the greenfield integrity/hash gate. The offline runner cannot rebuild the Web
+surface, and strict packet/performance infrastructure remains unavailable, so certification is explicitly deferred.
+
 Elasticsearch and OpenSearch now independently realize the same Koan vector decisions through native mappings,
 queries, scores, failures, and source policy. Comparing the proven implementations found no provider-neutral runtime
 whose extraction would be smaller or clearer than the two provider-owned paths. `Koan.Data.SearchEngine` therefore had
@@ -49,6 +54,7 @@ no remaining owner and was deleted from source, solution membership, and the pac
 | Strict packet | deferred because the shared versioned packet generator is absent |
 | InMemory Entity | 56/56; detached graphs, root/variant round trips, exact source/partition isolation, finite host state |
 | KeyValue regressions | Data Core 471/471; JSON 34/34; live Redis 17/17 |
+| SQLite gold replacement | SQLite 47/47; Relational 16/16; Data Core 471/471; greenfield replacement gate PASS |
 
 Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, DAC-55,
 DAC-56, DAC-57, and DAC-58 remain `in-progress` in the certification ledger until the shared control plane can emit the
@@ -56,9 +62,8 @@ required artifact.
 
 ## Next action
 
-Reconcile the remaining Entity fleet cards against work already implemented, then take the first genuinely pending
-provider through the same empty-root acceptance loop. Do not enter DAC-90 while any discovered adapter card remains
-pending.
+Commit the reproducible SQLite checkpoint, then take MongoDB through the same empty-root acceptance loop. Do not
+enter DAC-90 while any discovered adapter card remains pending.
 
 ## Guardrails
 

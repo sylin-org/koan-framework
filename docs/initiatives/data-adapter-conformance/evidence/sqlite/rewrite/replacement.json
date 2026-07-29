@@ -1,14 +1,50 @@
 {
   "schemaVersion": 1,
-  "status": "pending",
+  "status": "sealed",
   "provider": "sqlite",
-  "commonBase": null,
-  "startedEmpty": null,
-  "sourceExport": [],
-  "compileItems": [],
-  "registrations": [],
-  "movingParts": [],
-  "executionPaths": [],
+  "commonBase": "ccebfee938b9ee60c5c29354e015154b0a059f28",
+  "startedEmpty": true,
+  "sourceExport": [
+    { "path": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs", "sha256": "526adc5c0c31ec1f580a376638aa30835837978298acd1d29c9238138b8923b9" },
+    { "path": "src/Connectors/Data/Sqlite/Initialization/SqliteModule.cs", "sha256": "f36e2bc82b579e44994478ba79f908673bd328486d4314af27f8a6cf0a752dd2" },
+    { "path": "src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj", "sha256": "9448322a00b94111ca8f9e2e86047c7becb26d0c9ea80213eb343de93ce51d5f" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteConnections.cs", "sha256": "121dc57e6ed698f6abb8df967dc3aa315826216c98e8f3a45986b86e7f0f76a3" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteDialect.cs", "sha256": "01accdaeb541351a42c11c75e349302ab5c6523927cd4e767d4bdb1c21c7a117" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteEntityPlan.cs", "sha256": "61beb6b1be08fbd85cae0aa4425a8f99f27dd9a3d19df807697eaecf9b4e2e80" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteFeatures.cs", "sha256": "274ff06ae5725ffa1273e1307d8f4658dc9d9c7dc3943e9f0db8fbbe3831b428" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteInspector.cs", "sha256": "b7d5ca07f72a3cdd1260c91ba1a06e4f385cdc6057fcaed97892f75f6efba166" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteRepository.cs", "sha256": "84c49b032ad6660f549ac647fbf035959f00789b4836d26ef3a37b6b497b3d57" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteRoute.cs", "sha256": "b694e797e6bb18b7becfebdba971743ce0eb82c0d17f46c5e23f8bc196c3bbc3" },
+    { "path": "src/Connectors/Data/Sqlite/Runtime/SqliteSchema.cs", "sha256": "6799a6053fb10408b4ba654e7e79c659088e230b346dff09e0e93ab131be849a" },
+    { "path": "src/Connectors/Data/Sqlite/SqliteAdapterFactory.cs", "sha256": "45cb88884f0e59dae82bf46b827fb96de897273f7036d0de85aaa4aeffe688fb" },
+    { "path": "src/Connectors/Data/Sqlite/SqliteConnectionFactory.cs", "sha256": "9c83be9ac90ab0f9a089fbb7a54c38df19c5e1cb6ebcb47a9853aaa35502fbec" },
+    { "path": "src/Connectors/Data/Sqlite/SqliteHealthContributor.cs", "sha256": "aa12a72ead91cc2d60741cbb9518e9924068ecf18c58b326b0b17f1b26929bf9" },
+    { "path": "src/Connectors/Data/Sqlite/SqliteOptions.cs", "sha256": "b88f9c62f60dbae2b189cfae88cd294d3732c3bf63d7f06e472667e40d2e22a3" },
+    { "path": "src/Connectors/Data/Sqlite/SqliteOptionsSetup.cs", "sha256": "cb01b391a54b24e79b4037c40196af2b7a46ecb74c07e56a97b740fc55a7e39f" }
+  ],
+  "compileItems": [
+    "Infrastructure/Constants.cs", "Initialization/SqliteModule.cs", "Runtime/SqliteConnections.cs",
+    "Runtime/SqliteDialect.cs", "Runtime/SqliteEntityPlan.cs", "Runtime/SqliteFeatures.cs",
+    "Runtime/SqliteInspector.cs", "Runtime/SqliteRepository.cs", "Runtime/SqliteRoute.cs",
+    "Runtime/SqliteSchema.cs", "SqliteAdapterFactory.cs", "SqliteConnectionFactory.cs",
+    "SqliteHealthContributor.cs", "SqliteOptions.cs", "SqliteOptionsSetup.cs"
+  ],
+  "registrations": [
+    "SqliteAdapterFactory", "IDataAdapterFactory", "IDataSourceIntegrationFactory",
+    "SqliteConnections", "IHealthContributor:SqliteHealthContributor",
+    "IDataProviderConnectionFactory:SqliteConnectionFactory"
+  ],
+  "movingParts": [
+    { "id": "module", "kind": "contract", "reason": "Registers the public connector once and reports provenance." },
+    { "id": "factory-route", "kind": "contract", "reason": "Compiles source configuration and policy into one immutable route." },
+    { "id": "repository", "kind": "contract", "reason": "Realizes every managed and explicit Entity mapping through one native path." },
+    { "id": "entity-plan", "kind": "hot-path", "reason": "Caches bounded compiled mapping, hydration, and command decisions off warm operations." },
+    { "id": "connections", "kind": "hot-path", "reason": "Owns exact pools and source-isolated in-memory keepers for the host lifetime." },
+    { "id": "dialect-schema", "kind": "shared-mechanics", "reason": "Lowers SQLite syntax and validates or provisions declared physical shape." },
+    { "id": "source-inspection", "kind": "contract", "reason": "Lowers SQLite topology into provider-neutral containers and records." },
+    { "id": "claims-health", "kind": "contract", "reason": "Publishes native capability truth and performs non-mutating active-route probes." }
+  ],
+  "executionPaths": ["Runtime.SqliteRepository<TEntity,TKey> + Runtime.SqliteEntityPlan<TEntity,TKey>"],
   "shadowPaths": [],
   "retirementRef": "../restricted/retirement.json"
 }

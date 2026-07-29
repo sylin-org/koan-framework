@@ -9,14 +9,14 @@ last_updated: 2026-07-28
 
 ## Execution model
 
-SQLite has two deliberate repository paths selected once at repository construction:
+SQLite has one repository and one compiled mapping path. A managed Entity map is simply the framework-generated
+`Id + Json` mapping; an explicit `Map<TEntity>` supplies another immutable mapping plan to the same executor. CRUD,
+hydration, identity predicates, filters, sorts, counts, bulk work, conditional writes, and schema checks therefore
+cannot drift between managed and legacy shapes.
 
-- managed compatibility storage uses `Id + Json`, including framework-managed fields and polymorphic Entity JSON;
-- an explicit `Map<TEntity>` uses the immutable compiled mapping plan and the declared physical container.
-
-There is no legacy/V2 bridge. Both paths share one connection manager, query receipt contract, capability
-declaration, atomic batch boundary, and source route. Warm mapping accessors and mapping-use decisions are compiled
-and cached by the host; repository operations do not reflect over mapped members.
+There is no compatibility bridge, mapped-repository variant, adapter-local object mapper, or query compiler. The
+host bounds compiled entity plans, memory-source keepers, batch items, and native parameters. Mapping accessors and
+mapping-use decisions are compiled outside warm operations; mapped member access performs no reflection.
 
 ## Source integration
 
@@ -62,6 +62,14 @@ Managed sources with `AutoCreate` create the required table on first use. Extern
 and never create, alter, or drop a physical object. `Access: ReadOnly` is enforced by Data before repository
 construction or provider I/O. The two decisions are independent.
 
+## Bulk and batch
+
+`UpsertMany` emits one bounded multi-statement SQLite command inside one transaction and consumes each `RETURNING`
+result in input order, including provider-generated identities. Oversized batches or parameter sets reject before
+dispatch. `DeleteMany` uses one predicate command. The Entity batch surface uses one transaction and reports a
+complete ordered outcome for every queued operation; mutate-by-id necessarily reads the target inside that same
+transaction.
+
 ## Connection ownership
 
 File connections use Microsoft.Data.Sqlite pooling. The host records only the exact pool groups it uses and clears
@@ -76,3 +84,5 @@ Connection and provenance output are redacted.
 - Explicit mapped containers do not combine with ambient partitions or managed row fields.
 - SQLite attached databases are not inferred from mapping namespaces.
 - Provider exceptions surface directly; commands are not replayed after failure.
+- Native bulk accepts at most 4,096 items and 30,000 parameters per dispatch.
+- A host accepts at most 256 distinct in-memory source targets and 512 compiled entity plans per repository.

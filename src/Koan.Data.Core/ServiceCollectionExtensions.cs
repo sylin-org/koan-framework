@@ -203,6 +203,7 @@ public static class ServiceCollectionExtensions
     {
         private IHost? _host = host;
         private IDisposable? _lease;
+        private int _started;
 
         public IServiceProvider Services => this;
 
@@ -217,13 +218,15 @@ public static class ServiceCollectionExtensions
             var current = Volatile.Read(ref _host)
                 ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
             current.Start();
+            Volatile.Write(ref _started, 1);
         }
 
-        public Task StartAsync(CancellationToken cancellationToken = default)
+        public async Task StartAsync(CancellationToken cancellationToken = default)
         {
             var current = Volatile.Read(ref _host)
                 ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
-            return current.StartAsync(cancellationToken);
+            await current.StartAsync(cancellationToken).ConfigureAwait(false);
+            Volatile.Write(ref _started, 1);
         }
 
         public Task StopAsync(CancellationToken cancellationToken = default)
@@ -251,7 +254,8 @@ public static class ServiceCollectionExtensions
 
             try
             {
-                await current.StopAsync().ConfigureAwait(false);
+                if (Volatile.Read(ref _started) != 0)
+                    await current.StopAsync().ConfigureAwait(false);
             }
             finally
             {

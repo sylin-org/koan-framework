@@ -3,13 +3,13 @@ type: SPEC
 domain: data
 title: "DAC-11 Build the SQLite Gold Adapter from an Empty Implementation"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
+status: in-progress
 last_updated: 2026-07-28
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-28
-  status: reviewed
-  scope: SQLite ground-up whole-adapter replacement
+  status: behavior-pass-strict-defer
+  scope: SQLite replacement, greenfield integrity, connector/Relational/Core behavior; Web rebuild unavailable offline
 ---
 
 # DAC-11 — Build the SQLite gold adapter from an empty implementation
@@ -56,31 +56,38 @@ Data, relational mechanics to the family, and native translation to SQLite; DATA
 the engineering index and architecture principles require thin adapters and explicit ownership; SQLite README and
 TECHNICAL describe compatibility candidates rather than implementation authority.
 
-**Code read:** `IDataRepository`/`IQueryRepository` define the native seam; `RepositoryQueryResult` defines exact
-receipts; `SqlFilterTranslator`, `AdoCommands`, and mapping/schema plans are reusable family mechanics;
-`EntityJsonSerialization` and `ManagedFieldJsonInjector` own safe polymorphic/managed JSON; the former
-`SqliteRepository` is only negative evidence (1,500+ lines, mixed CRUD/query/schema/raw/batch/serialization concerns).
+**Code read:** `IDataRepository`/`IQueryRepository` define the native seam; `MappingPlan` and
+`RelationalCommandPlanner` own logical/physical decisions; `RelationalManagedMapping`, `SqlFilterTranslator`,
+`RelationalSourceIntegration`, and `RelationalNeutralReader` are reusable family mechanics; the accepted Npgsql and
+SQL Server replacements prove that managed and explicit maps can share one repository path. The current SQLite
+factory, two repositories, configurator, query compilers, mapped write/schema helpers, neutral reader, source
+integration, and readiness caches are retirement evidence only.
 
 **Reusing:** public package/type/configuration identities; Data source resolution and semantic facade; Relational
 filter/mapping/schema contracts; shared Entity JSON; Microsoft.Data.Sqlite. No former SQLite helper, control flow,
 cache, repository structure, or test structure is reused.
 
-**Creating new:** 
+**Creating new:**
 
 | New code | Location | Justification |
 |---|---|---|
-| activation and inert claims | `SqliteAdapterFactory.cs` | one connector entry and claim authority |
-| host-owned native connections | `Runtime/SqliteConnectionManager.cs` | file/memory lifetime, redaction, disposal |
-| immutable entity command plan | `Runtime/SqliteEntityPlan.cs` | compile reflection, names, SQL, and JSON wiring once |
-| SQLite query lowering | `Runtime/SqliteQueryCompiler.cs` | native filter/sort/page/count SQL plus exact receipts |
-| SQLite schema realization | `Runtime/SqliteSchema.cs` | the only DDL/native introspection owner |
-| repository boundary | `SqliteRepository.cs` | thin implementation of required/earned repository seams |
-| atomic batch boundary | `Runtime/SqliteBatch.cs` | one transaction and one explicit outcome path |
+| stable identities and bounds | `Infrastructure/Constants.cs` | one owner for provider identity, configuration keys, and finite limits |
+| typed configuration | `SqliteOptions.cs` | the complete SQLite-native configuration surface |
+| activation and route compilation | `SqliteAdapterFactory.cs`, `Initialization/SqliteModule.cs` | one connector entry, one immutable source route, and one module |
+| host-owned physical connections | `Runtime/SqliteConnections.cs` | canonical file/memory identity, keepers, pools, redaction, and disposal |
+| immutable entity/native plan | `Runtime/SqliteEntityPlan.cs` | one managed-or-explicit `MappingPlan`, command planner, dialect, and precompiled hydration state |
+| one native execution path | `Runtime/SqliteRepository.cs` | CRUD, query, exact receipts, bulk, conditional write, raw instructions, and nested atomic batch |
+| declared-shape realization | `Runtime/SqliteSchema.cs` | the only SQLite DDL and definition-validation owner |
+| neutral source topology | `Runtime/SqliteInspector.cs` | SQLite metadata lowering only; registered SQL uses the Relational family owner |
+| truthful claims and health | `Runtime/SqliteFeatures.cs`, `SqliteHealthContributor.cs` | one claim declaration and one non-mutating provider probe |
 
-**Coalescence:** the closest code is the Relational Family translator/planner, which is kept as family law. The old
-SQLite repository is deleted; provider execution is rebuilt behind one repository boundary. SQLite owns SQL dialect,
-commands, driver resources, and failure facts; Data owns policy/receipts; Relational owns shared mapping/translation.
-No compatibility, V2, legacy, replay, or shadow path is allowed.
+**Coalescence:** the closest pattern is the contract seam used by the accepted Npgsql and SQL Server replacements,
+not either provider's file graph. Its useful fact is one `MappingPlan`/`RelationalCommandPlanner` path for managed and
+explicit shapes. Specificity is Relational Family for mapping, filtering, neutral rows, and registered SQL; Adapter
+for SQLite names, JSON functions, connection modes, schema facts, dispatch, and error codes. Disposition is
+`REBUILD`: delete both old repositories and every SQLite-local duplicate of family mechanics. The one target owner is
+the new SQLite repository consuming family plans; moving it wider would leak SQLite syntax and moving family
+materialization narrower would duplicate shared law.
 
 **Ergonomics:** the common path remains package + `AddKoan()` + `Entity<T>`. IntelliSense exposes no provider assembly
 machinery. Adapter code reads as plan, command, execute, receipt; each concern has one discoverable owner.
@@ -89,9 +96,10 @@ machinery. Adapter code reads as plan, command, execute, receipt; each concern h
 identifiers live in connector constants; tunables remain typed options; Entity statics are the user surface; large
 reads require provider-bounded paging; README/TECHNICAL and this card change with behavior.
 
-**Risks:** SQLite concurrency/locking and schema gates need real-provider proof; mapped legacy shapes may expose a
-missing Relational seam; polymorphic and managed-field storage must use the shared serializer without a second JSON
-interpretation; claims may require the deferred R05 seam, but only after a concrete SQLite test demonstrates it.
+**Risks:** SQLite concurrency/locking, generated keys, JSON path preservation, file aliasing, and schema gates need
+real-provider proof. The shared structured-value codec must preserve polymorphic roots and managed fields without a
+second object mapper. The 44/44 untouched suite is only a behavioral baseline; it does not prove empty-root lineage,
+one execution path, strict packets, fault injection, or stable performance.
 
 ## Required work
 
@@ -126,10 +134,22 @@ interpretation; claims may require the deferred R05 seam, but only after a concr
 ## Definition of done
 
 - [ ] Every ratified SQLite row passes and every decline fails closed.
-- [ ] The connector contains only SQLite-native responsibilities behind certified shared contracts.
-- [ ] One activation, registration, repository/native execution, claim, and adapter-test authority remains.
-- [ ] Every moving part has a necessary contract/shared-mechanics/hot-path reason.
+- [x] The connector contains only SQLite-native responsibilities behind certified shared contracts.
+- [x] One activation, registration, repository/native execution, claim, and adapter-test authority remains.
+- [x] Every moving part has a necessary contract/shared-mechanics/hot-path reason.
 - [ ] Setup, limits, diagnostics, native behavior, and performance are exemplary and reproducible.
+
+## Implementation checkpoint
+
+- Empty-root replacement integrity: PASS; 16 current source items, eight justified moving parts, 17 retired files,
+  one execution path, zero shadow paths.
+- SQLite behavior: 47/47, zero skips, including mapping shapes, source policy, inspection/named reads, bulk/batch,
+  health, connection lifecycle, filters/paging, isolation, and polymorphic cold restart.
+- Shared regressions: Relational 16/16 and Data Core 471/471, zero skips. The Core run disables the unavailable
+  Windows Event Log sink in this unprivileged runner; no test behavior is changed.
+- Web AdapterSurface: not evidenced. Its required packages are absent from the offline cache, and the available
+  binary predates the replacement, so it is explicitly rejected as proof.
+- Strict packet and stable performance runner: unavailable; no certificate is claimed.
 
 ## Stop conditions
 
