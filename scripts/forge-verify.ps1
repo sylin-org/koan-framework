@@ -9,6 +9,9 @@
 
   Exit code: 0 = all passed; 1 = a test failed; 2 = one or more tests skipped; 3 = runner error.
 
+.PARAMETER NoBuild
+  Trusts existing test outputs. The caller owns their freshness and configuration.
+
 .EXAMPLE
   pwsh scripts/forge-verify.ps1 -Adapter Mongo -Plane record
   pwsh scripts/forge-verify.ps1 -DockerFree
@@ -123,6 +126,11 @@ try {
         $console = & dotnet @arguments 2>&1
         $exitCode = $LASTEXITCODE
         if (-not (Test-Path -LiteralPath $trxPath)) {
+            $tail = (($console | Select-Object -Last 3) -join ' ').Trim()
+            if (-not $tail) {
+                $tail = if ($NoBuild) { 'No current test output was found; build this project first.' }
+                    else { 'The test host produced no console diagnostics.' }
+            }
             $reports.Add([pscustomobject]@{
                     Adapter = $target.Adapter
                     Plane = $target.Plane
@@ -130,7 +138,7 @@ try {
                     Passed = 0
                     Failed = 0
                     Skipped = 0
-                    Reason = "dotnet test exited $exitCode without a TRX: $(($console | Select-Object -Last 3) -join ' ')"
+                    Reason = "dotnet test exited $exitCode without a TRX: $tail"
                 }) | Out-Null
             continue
         }
@@ -146,7 +154,13 @@ try {
             elseif ($exitCode -ne 0 -or $outcomes.Count -eq 0 -or $unknown -gt 0) { 'ERROR' }
             elseif ($skipped -gt 0) { 'INCONCLUSIVE' }
             else { 'GREEN' }
-        $reason = if ($exitCode -ne 0 -and $failed -eq 0) { "dotnet test exited $exitCode" }
+        $firstFailure = @($trx.TestRun.Results.UnitTestResult |
+                Where-Object { [string]$_.outcome -eq 'Failed' } |
+                ForEach-Object { [string]$_.Output.ErrorInfo.Message } |
+                Where-Object { $_ }) | Select-Object -First 1
+        $reason = if ($failed -gt 0 -and $firstFailure) { ($firstFailure -split '\r?\n')[0] }
+            elseif ($failed -gt 0) { "$failed tests failed; inspect the project test output." }
+            elseif ($exitCode -ne 0) { "dotnet test exited $exitCode" }
             elseif ($outcomes.Count -eq 0) { 'No tests were discovered.' }
             elseif ($unknown -gt 0) { "$unknown test outcomes were unrecognized." }
             else { '' }
@@ -182,7 +196,7 @@ try {
                 inconclusive = $inconclusive
                 errors = $errors
             }
-            adapters = @($reports)
+            adapters = $reports.ToArray()
         } | ConvertTo-Json -Depth 5
     }
     else {
