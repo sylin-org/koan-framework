@@ -6,6 +6,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Routing;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sources;
 
 namespace Koan.Data.Connector.Json;
 
@@ -51,8 +52,18 @@ internal sealed class JsonHealthContributor : DataAdapterHealthContributorBase
                 $"JSON directory is not configured for source '{source}'.");
         }
 
-        // JsonRepository provisions its directory on first use. Readiness exercises that same
-        // contract so a fresh, selected JSON store is ready without manual scaffolding.
+        var definition = _sourceRegistry.GetSource(source);
+        var lifecycle = definition?.StorageLifecycle ?? StorageLifecycle.Managed;
+        var access = definition?.Access ?? DataSourceAccess.ReadWrite;
+        if (lifecycle != StorageLifecycle.Managed || access != DataSourceAccess.ReadWrite)
+        {
+            if (!Directory.Exists(path))
+                throw new DirectoryNotFoundException(
+                    $"JSON source '{source}' requires existing directory '{path}' for {lifecycle}/{access}.");
+            _ = Directory.EnumerateFileSystemEntries(path).Take(1).ToArray();
+            return Task.CompletedTask;
+        }
+
         Directory.CreateDirectory(path);
         var probe = Path.Combine(path, $".__koan-health-{Guid.NewGuid():N}.tmp");
         using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }

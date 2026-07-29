@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,7 +13,7 @@ public static class StorageOptimizationExtensions
 {
     // Optimization analysis is a pure function of (TEntity, TKey) types — no SP dependence —
     // so a static cache by type pair is safe regardless of how many service providers exist.
-    private static readonly ConcurrentDictionary<(Type, Type), StorageOptimizationInfo> Cache = new();
+    private static readonly ConditionalWeakTable<Type, KeyOptimizations> Cache = new();
 
     /// <summary>
     /// Gets storage optimization info for an entity type. Analysis runs once per (TEntity, TKey).
@@ -32,7 +32,11 @@ public static class StorageOptimizationExtensions
     /// <see cref="Type"/>. Cached per (entityType, keyType).
     /// </summary>
     public static StorageOptimizationInfo GetStorageOptimization(Type entityType, Type keyType)
-        => Cache.GetOrAdd((entityType, keyType), key => AnalyzeEntityOptimization(key.Item1, key.Item2));
+    {
+        ArgumentNullException.ThrowIfNull(entityType);
+        ArgumentNullException.ThrowIfNull(keyType);
+        return Cache.GetValue(entityType, static _ => new KeyOptimizations()).For(entityType, keyType);
+    }
 
     /// <summary>
     /// Analyzes an entity type for storage optimization at startup.
@@ -146,4 +150,13 @@ public static class StorageOptimizationExtensions
             Reason = "No optimization for direct IEntity<string> implementation (explicit string choice)"
         };
     }
+
+    private sealed class KeyOptimizations
+    {
+        private readonly ConditionalWeakTable<Type, Optimization> _keys = new();
+        public StorageOptimizationInfo For(Type entityType, Type keyType) =>
+            _keys.GetValue(keyType, type => new Optimization(AnalyzeEntityOptimization(entityType, type))).Value;
+    }
+
+    private sealed record Optimization(StorageOptimizationInfo Value);
 }

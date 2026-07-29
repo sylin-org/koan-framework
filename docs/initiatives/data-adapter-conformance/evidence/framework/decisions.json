@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "status": "finite",
+  "count": 18,
+  "ratification": {
+    "status": "ratified",
+    "authority": "user",
+    "date": "2026-07-27",
+    "evidence": "ratification.json"
+  },
+  "decisions": [
+    {
+      "id": "DEC-01",
+      "title": "Public source root",
+      "proposedDecision": "Adopt Data.Source(name) as the provider-neutral root for source policy, inspection, mapping, and operations.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-02",
+      "title": "Source composition",
+      "proposedDecision": "Freeze duplicate-rejecting, immutable, host-scoped source and catalog plans at composition.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-03",
+      "title": "Source policy",
+      "proposedDecision": "Adopt StorageLifecycle Managed/External, Access ReadWrite/ReadOnly, and explicit ReadLanes with one fail-fast gate.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-04",
+      "title": "Alternate paths",
+      "proposedDecision": "Require every Entity, batch, transaction, Direct, instruction, patch, transfer, and connection override path to carry an effect and pass the same source gate.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-05",
+      "title": "Readiness boundary",
+      "proposedDecision": "Split route readiness from explicit shape provisioning; forbid operation replay after possible provider dispatch and map failures by exact type/code.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-06",
+      "title": "Neutral inspection",
+      "proposedDecision": "Use collection/address/reference/traits descriptors rather than table/schema vocabulary, with opaque provider-safe resolution.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-07",
+      "title": "Neutral results",
+      "proposedDecision": "Adopt bounded RecordSet with ordered fields, duplicate-name preservation, ordinals, provider values/types, multiple channels, limits, and completion reason.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-08",
+      "title": "Projection materializer",
+      "proposedDecision": "Compile and reuse ordinal DTO plans for mutable, immutable, and positional targets without per-row JSON conversion.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-09",
+      "title": "Mapping grammar",
+      "proposedDecision": "Adopt Map, Container, Key, Property, Name, Path, and Object as the compact provider-neutral mapping grammar.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-10",
+      "title": "Mapping semantics",
+      "proposedDecision": "Compile one authoritative immutable mapping plan including composite/generated keys, codecs, structured ownership, indexes, and mutation maintenance.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-11",
+      "title": "Registered operations",
+      "proposedDecision": "Adopt a frozen per-source operation catalog addressed by Query, Scalar, Lane, and Template.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-12",
+      "title": "Operation contract",
+      "proposedDecision": "Model operation effect, result kind, delivery, parameters, bounds, and native binding explicitly; Unknown fails closed.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-13",
+      "title": "Native payloads",
+      "proposedDecision": "Keep provider payloads behind explicit Sql, Pipeline, Function, or adapter-native bindings; do not leak provider vocabulary into common descriptors.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-14",
+      "title": "Plans and receipts",
+      "proposedDecision": "Make capabilities, Describe, Explain, execution receipts, telemetry, facts, health, and errors project the same compiled decision identities.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-15",
+      "title": "Atomicity",
+      "proposedDecision": "Claim atomicity only for one proved native boundary; name cross-adapter coordination as non-atomic unless an explicit distributed protocol exists.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-16",
+      "title": "Ownership and hot path",
+      "proposedDecision": "Make route/readiness/mapping/materializer/operation caches host-scoped, immutable, bounded, and free of warm-path reflection or structural work.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-17",
+      "title": "Diagnostics and truth",
+      "proposedDecision": "Redact secrets, values, tenant/entity identifiers, and raw native messages; reconcile docs and product claims to executable evidence.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    },
+    {
+      "id": "DEC-18",
+      "title": "Vector boundary",
+      "proposedDecision": "Ratify a stable Vector annex before applying the record-adapter runner to Vector connectors.",
+      "status": "ratified",
+      "implementationOwner": "DAC-02"
+    }
+  ]
+}

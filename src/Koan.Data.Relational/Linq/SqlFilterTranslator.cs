@@ -1,5 +1,8 @@
 using System.Globalization;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Core;
+using Koan.Data.Relational.Mapping;
 
 namespace Koan.Data.Relational.Linq;
 
@@ -22,6 +25,9 @@ public sealed class SqlFilterTranslator
     private readonly ILinqSqlDialect _dialect;
     private readonly Type _entityType;
     private readonly Func<FieldPath, ResolvedField, string> _columnResolver;
+    private readonly MappingPlan? _mapping;
+    private readonly IRelationalMappingDialect? _mappingDialect;
+    private readonly Func<ResolvedField, string>? _managedResolver;
     private readonly List<object?> _parameters = new();
 
     /// <param name="dialect">Provider dialect for quoting, LIKE escaping, parameters, JSON-array containment.</param>
@@ -35,6 +41,20 @@ public sealed class SqlFilterTranslator
         _dialect = dialect;
         _entityType = entityType;
         _columnResolver = columnResolver;
+    }
+
+    /// <summary>Creates a translator whose physical paths and encodings come only from one compiled map.</summary>
+    public SqlFilterTranslator(
+        IRelationalMappingDialect dialect,
+        MappingPlan mapping,
+        Func<ResolvedField, string>? managedResolver = null)
+    {
+        _dialect = dialect ?? throw new ArgumentNullException(nameof(dialect));
+        _mappingDialect = dialect;
+        _mapping = mapping ?? throw new ArgumentNullException(nameof(mapping));
+        _managedResolver = managedResolver;
+        _entityType = mapping.EntityType;
+        _columnResolver = (_, _) => throw new InvalidOperationException("Mapped translation does not use a caller-owned column resolver.");
     }
 
     /// <summary>Translates the whole filter into a WHERE fragment plus its ordered parameter values.</summary>
@@ -68,15 +88,34 @@ public sealed class SqlFilterTranslator
         // case-sensitive JSON paths. Hand adapters the canonical resolved member path rather than the
         // caller's spelling (for example, `subject` resolves to `Subject`). Manually-built filters from
         // older callers remain compatible because CanonicalPath is optional on ResolvedField.
-        var column = _columnResolver(resolved.CanonicalPath ?? f.Field, resolved);
+        MappingBindingPlan? mapped = null;
+        string column;
+        if (_mapping is not null)
+        {
+            if (resolved.IsManaged)
+            {
+                column = _managedResolver?.Invoke(resolved)
+                    ?? throw new MappingValueException(
+                        _mapping.Id,
+                        resolved.StorageName ?? f.Field.ToString(),
+                        "This relational mapping has no physical binding for framework-managed fields.");
+            }
+            else
+            {
+                var use = _mapping.Use(resolved.CanonicalPath ?? f.Field, MappingConsumer.Filter);
+                mapped = use.Bindings.Single();
+                column = _mappingDialect!.Read(mapped.PhysicalPath, mapped.Shape, mapped.PhysicalType);
+            }
+        }
+        else column = _columnResolver(resolved.CanonicalPath ?? f.Field, resolved);
 
         if (resolved.TargetsCollection)
             return VisitCollection(f, resolved, column);
 
-        return VisitScalar(f, resolved, column);
+        return VisitScalar(f, resolved, column, mapped);
     }
 
-    private string VisitScalar(FieldFilter f, ResolvedField field, string column)
+    private string VisitScalar(FieldFilter f, ResolvedField field, string column, MappingBindingPlan? mapped)
     {
         switch (f.Operator)
         {
@@ -89,7 +128,7 @@ public sealed class SqlFilterTranslator
             {
                 var raw = ScalarValue(f.Value, field.ComparableType);
                 if (raw is null) return $"({column} IS NULL)";
-                return $"({column} = {AddParam(raw)})";
+                return $"({column} = {AddParam(raw, mapped)})";
             }
             case FilterOperator.Ne:
             {
@@ -97,17 +136,17 @@ public sealed class SqlFilterTranslator
                 // Locked semantics: comparisons treat null specially. Ne null -> "is not null".
                 if (raw is null) return $"({column} IS NOT NULL)";
                 // SQL <> drops NULL rows; the floor also reports Ne false when the value is null, so this matches.
-                return $"({column} <> {AddParam(raw)})";
+                return $"({column} <> {AddParam(raw, mapped)})";
             }
-            case FilterOperator.Gt: return Compare(column, ">", f.Value, field.ComparableType);
-            case FilterOperator.Gte: return Compare(column, ">=", f.Value, field.ComparableType);
-            case FilterOperator.Lt: return Compare(column, "<", f.Value, field.ComparableType);
-            case FilterOperator.Lte: return Compare(column, "<=", f.Value, field.ComparableType);
-            case FilterOperator.StartsWith: return Like(column, f, suffix: "%");
-            case FilterOperator.EndsWith: return Like(column, f, prefix: "%");
-            case FilterOperator.Contains: return Like(column, f, prefix: "%", suffix: "%");
-            case FilterOperator.In: return InList(column, f, field, negate: false);
-            case FilterOperator.Nin: return InList(column, f, field, negate: true);
+            case FilterOperator.Gt: return Compare(column, ">", f.Value, field.ComparableType, mapped);
+            case FilterOperator.Gte: return Compare(column, ">=", f.Value, field.ComparableType, mapped);
+            case FilterOperator.Lt: return Compare(column, "<", f.Value, field.ComparableType, mapped);
+            case FilterOperator.Lte: return Compare(column, "<=", f.Value, field.ComparableType, mapped);
+            case FilterOperator.StartsWith: return Like(column, f, mapped, suffix: "%");
+            case FilterOperator.EndsWith: return Like(column, f, mapped, prefix: "%");
+            case FilterOperator.Contains: return Like(column, f, mapped, prefix: "%", suffix: "%");
+            case FilterOperator.In: return InList(column, f, field, mapped, negate: false);
+            case FilterOperator.Nin: return InList(column, f, field, mapped, negate: true);
             default:
                 throw new NotSupportedException($"Operator '{f.Operator}' is not valid on scalar field '{f.Field}'.");
         }
@@ -156,31 +195,31 @@ public sealed class SqlFilterTranslator
         }
     }
 
-    private string Compare(string column, string op, FilterValue value, Type comparable)
+    private string Compare(string column, string op, FilterValue value, Type comparable, MappingBindingPlan? mapped)
     {
         var raw = ScalarValue(value, comparable);
         // Comparisons with null are false (locked semantics); SQL 3-valued logic already drops NULL rows
         // from a positive predicate, so emit an always-false clause for a null operand.
         if (raw is null) return "1=0";
-        return $"({column} {op} {AddParam(raw)})";
+        return $"({column} {op} {AddParam(raw, mapped)})";
     }
 
-    private string Like(string column, FieldFilter f, string prefix = "", string suffix = "")
+    private string Like(string column, FieldFilter f, MappingBindingPlan? mapped, string prefix = "", string suffix = "")
     {
         var raw = ScalarValue(f.Value, typeof(string)) as string ?? string.Empty;
         var escaped = _dialect.EscapeLike(raw);
         var pattern = prefix + escaped + suffix;
-        return $"({column} LIKE {AddParam(pattern)} ESCAPE '\\')";
+        return $"({column} LIKE {AddParam(pattern, mapped)} ESCAPE '\\')";
     }
 
-    private string InList(string column, FieldFilter f, ResolvedField field, bool negate)
+    private string InList(string column, FieldFilter f, ResolvedField field, MappingBindingPlan? mapped, bool negate)
     {
         var values = SetValues(f.Value, field.ComparableType).ToList();
         if (values.Count == 0)
             // "in empty set" matches nothing; "not in empty set" matches everything (incl. null).
             return negate ? "1=1" : "1=0";
 
-        var placeholders = string.Join(", ", values.Select(AddParam));
+        var placeholders = string.Join(", ", values.Select(value => AddParam(value, mapped)));
         if (!negate)
             return $"({column} IN ({placeholders}))";
 
@@ -194,7 +233,7 @@ public sealed class SqlFilterTranslator
     private static string Conjoin(List<string> preds, string emptyResult)
         => preds.Count == 0 ? emptyResult : preds.Count == 1 ? preds[0] : "(" + string.Join(" AND ", preds) + ")";
 
-    private string AddParam(object? value)
+    private string AddParam(object? value, MappingBindingPlan? mapped = null)
     {
         var idx = _parameters.Count;
         // Comparable-encoding contract (DATA-0100): encode the comparand to the SAME canonical store form
@@ -202,7 +241,10 @@ public sealed class SqlFilterTranslator
         // fixed text), so a pushed comparison is like-for-like. The ADO.NET drivers otherwise bind these
         // CLR types in a form that does not match the stored JSON text (or cannot bind them at all).
         // Non-governed types pass through unchanged.
-        _parameters.Add(ComparableScalarEncoding.EncodeComparand(value));
+        var encoded = mapped is null ? value : mapped.Encode(value);
+        _parameters.Add(mapped is { PhysicalPath.IsNested: false, Shape: MappingValueShape.Scalar }
+            ? encoded
+            : ComparableScalarEncoding.EncodeComparand(encoded));
         return _dialect.Parameter(idx);
     }
 

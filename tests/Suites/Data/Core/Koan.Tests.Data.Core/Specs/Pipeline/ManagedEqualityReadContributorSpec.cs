@@ -1,10 +1,12 @@
 using System;
 using System.Threading;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
@@ -16,11 +18,12 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// <see cref="ManagedFieldDescriptor.AutoReadFilter"/> = <c>false</c> (non-equality) descriptor is skipped (it
 /// supplies its own predicate). This is the re-home that makes tenancy's read-filter a registered contributor.
 /// </summary>
-[Collection("managed-field-registry")]   // serialize: the registry is process-global static state
 public sealed class ManagedEqualityReadContributorSpec : IDisposable
 {
-    public ManagedEqualityReadContributorSpec() => ManagedFieldRegistry.Reset();
-    public void Dispose() { _a.Value = null; _b.Value = null; ManagedFieldRegistry.Reset(); }
+    private readonly IDisposable _composition;
+
+    public ManagedEqualityReadContributorSpec() => _composition = KoanCompositionScope.Enter(new ServiceCollection());
+    public void Dispose() { _a.Value = null; _b.Value = null; _composition.Dispose(); }
 
     private static readonly AsyncLocal<string?> _a = new();
     private static readonly AsyncLocal<string?> _b = new();

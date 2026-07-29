@@ -36,6 +36,25 @@ public static class AggregateExtensions
         where TKey : notnull
         => model.Upsert<TEntity, TKey>(ct);
 
+    /// <summary>
+    /// Key-inferred Save for entities whose key is not string. The constructed Entity base exposes both generic
+    /// arguments to C# inference; exact receiver overloads remain preferred for derived/polymorphic string entities.
+    /// </summary>
+    public static Task<TEntity> Save<TEntity, TKey>(
+        this Model.Entity<TEntity, TKey> model,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => Model.Entity<TEntity, TKey>.Upsert((TEntity)(object)model, ct);
+
+    /// <summary>Save and return the exact native insert/update outcome when the adapter proves it.</summary>
+    public static Task<MutationResult<TEntity, TKey>> SaveWithOutcome<TEntity, TKey>(
+        this TEntity model,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => Model.Entity<TEntity, TKey>.UpsertWithOutcome(model, ct);
+
     // Instance-level convenience: model.Upsert("partition") (generic key)
     /// <summary>
     /// Insert or update a model into a specific logical partition for the aggregate using its configured repository.
@@ -70,6 +89,13 @@ public static class AggregateExtensions
     public static Task<TEntity> Save<TEntity>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
         => model.Upsert(ct);
+
+    /// <summary>String-key convenience for an exact native insert/update outcome.</summary>
+    public static Task<MutationResult<TEntity, string>> SaveWithOutcome<TEntity>(
+        this TEntity model,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+        => Model.Entity<TEntity, string>.UpsertWithOutcome(model, ct);
 
     // Non-generic convenience: model.Upsert("partition") (string key)
     /// <summary>
@@ -154,6 +180,14 @@ public static class AggregateExtensions
         where TKey : notnull
     => Model.Entity<TEntity, TKey>.Remove(id: model.Id, ct: ct);
 
+    /// <summary>Remove and distinguish deleted, missing, and lost-race outcomes.</summary>
+    public static Task<MutationResult<TEntity, TKey>> RemoveWithOutcome<TEntity, TKey>(
+        this TEntity model,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => Model.Entity<TEntity, TKey>.RemoveWithOutcome(model.Id, ct);
+
     // String-key convenience
     /// <summary>
     /// Remove a single entity (string-key convenience).
@@ -161,6 +195,13 @@ public static class AggregateExtensions
     public static Task<bool> Remove<TEntity>(this TEntity model, CancellationToken ct = default)
         where TEntity : class, IEntity<string>
     => Model.Entity<TEntity, string>.Remove(id: model.Id, ct: ct);
+
+    /// <summary>String-key convenience for an exact delete outcome.</summary>
+    public static Task<MutationResult<TEntity, string>> RemoveWithOutcome<TEntity>(
+        this TEntity model,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<string>
+        => Model.Entity<TEntity, string>.RemoveWithOutcome(model.Id, ct);
 
     private static (Type Aggregate, Type Key) ResolveAggregateContract(Type t)
     {

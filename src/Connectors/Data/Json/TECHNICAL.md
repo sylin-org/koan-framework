@@ -29,6 +29,8 @@ last_updated: 2026-07-17
 - Writes are serialized per physical aggregate file inside one Koan process.
 - A complete snapshot is written beside the target and then moved over it; cancellation or serialization failure does
   not deliberately truncate the last complete file.
+- Mutations build a detached candidate, persist it, and only then publish the new in-memory view. Reads are detached
+  materializations, so failed writes and unsaved caller edits cannot leak into visible state.
 - Invalid JSON throws a corrective `InvalidDataException` containing the affected path. The repository does not
   reinterpret corrupt persisted state as an empty aggregate.
 - There is no cross-process writer coordination, transaction log, crash recovery protocol, or incremental update path.
@@ -39,6 +41,9 @@ last_updated: 2026-07-17
 - Adapter default: `Koan:Data:Json:DirectoryPath`.
 - Per source: `Koan:Data:Sources:{source}:json:DirectoryPath`.
 - A configured source selects JSON with `Koan:Data:Sources:{source}:Adapter=json`.
+- `Managed/ReadWrite` may provision its directory. Read-only or `External` routes require an existing directory;
+  `External` also requires the addressed Entity file and never creates it.
+- Explicit physical mappings reject because the adapter implements one Koan-owned Entity-array file shape.
 
 ## Health and readiness
 
@@ -48,9 +53,18 @@ an observed entity configuration. Otherwise it reports `Unknown`, is non-critica
 filesystem work.
 
 For every active source, the contributor resolves the source-specific directory through
-`AdapterConnectionResolver`, creates it as `JsonRepository` would, and verifies write/delete access.
-Probe files use unique names and are removed when the probe closes. A selected source that cannot be
-provisioned or written reports `Unhealthy`; Koan does not substitute another adapter.
+`AdapterConnectionResolver`. Managed/read-write readiness creates and write-probes it. Read-only and External readiness
+only validates and enumerates an existing directory, performing no probe write. A selected source that cannot satisfy
+its declared posture reports `Unhealthy`; Koan does not substitute another adapter.
+
+## Claims and bounds
+
+The factory and repository share one claim authority: LINQ/full-filter semantics with scan execution, plus
+row/container/database isolation. Native bulk, atomic batch, fast remove, indexes, and provider-bounded paging remain
+unclaimed. A repository caches at most 1024 physical Entity/partition files and their write gates.
+
+The real-file connector suite passes 28/28 across CRUD, restart, corruption, failed persistence, polymorphism, source
+postures, mapping rejection, health, routing, partitions, managed isolation, instructions, and batch decline behavior.
 
 ## References
 

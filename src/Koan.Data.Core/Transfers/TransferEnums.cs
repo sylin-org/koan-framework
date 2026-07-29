@@ -26,30 +26,6 @@ public enum TransferKind
 }
 
 /// <summary>
-/// Controls when source entities are deleted during a <see cref="TransferKind.Move"/> operation.
-/// </summary>
-public enum DeleteStrategy
-{
-    /// <summary>
-    /// All entities are copied first, then deleted from source in a second pass.
-    /// Safest option — destination is fully populated before any source records are removed.
-    /// </summary>
-    AfterCopy,
-
-    /// <summary>
-    /// Source entities are deleted in batches interleaved with the copy.
-    /// Reduces peak memory and storage, but partial failures leave the source in a mixed state.
-    /// </summary>
-    Batched,
-
-    /// <summary>
-    /// Each entity is deleted from source immediately after it is confirmed written to destination.
-    /// Lowest storage overhead; highest sensitivity to write failures.
-    /// </summary>
-    Synced
-}
-
-/// <summary>
 /// Controls the directionality of a <see cref="TransferKind.Mirror"/> operation.
 /// </summary>
 public enum MirrorMode
@@ -71,4 +47,20 @@ public enum MirrorMode
     /// are propagated to the other; conflicts are resolved by last-write-wins (by default).
     /// </summary>
     Bidirectional
+}
+
+/// <summary>Chooses the winner when both sides of a bidirectional mirror contain the same identity.</summary>
+public enum MirrorConflict
+{
+    /// <summary>Use the entity with the greatest supported <c>[Timestamp]</c> value.</summary>
+    Latest,
+
+    /// <summary>The entity selected by <c>From(...)</c> wins.</summary>
+    Source,
+
+    /// <summary>The entity selected by <c>To(...)</c> wins.</summary>
+    Destination,
+
+    /// <summary>Report the overlap without changing either entity.</summary>
+    Report
 }

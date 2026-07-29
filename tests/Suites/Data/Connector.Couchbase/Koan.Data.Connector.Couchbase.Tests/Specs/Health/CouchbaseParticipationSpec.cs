@@ -3,6 +3,7 @@ using Koan.Core.Adapters;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Couchbase.Initialization;
+using Koan.Data.Connector.Couchbase.Runtime;
 using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -40,14 +41,14 @@ public sealed class CouchbaseParticipationSpec
     {
         var services = new ServiceCollection();
 
-        new CouchbaseDataModule().Register(services);
+        new CouchbaseModule().Register(services);
 
         services.Should().NotContain(descriptor =>
             descriptor.ServiceType == typeof(IAsyncAdapterInitializer)
-            && descriptor.ImplementationType == typeof(CouchbaseClusterProvider));
+            && descriptor.ImplementationType == typeof(CouchbaseResourcePool));
         services.Should().NotContain(descriptor =>
             descriptor.ServiceType == typeof(IAdapterReadiness)
-            && descriptor.ImplementationType == typeof(CouchbaseClusterProvider));
+            && descriptor.ImplementationType == typeof(CouchbaseResourcePool));
     }
 
     private static CouchbaseHealthContributor Contributor(
@@ -57,12 +58,18 @@ public sealed class CouchbaseParticipationSpec
         var providers = new DataProviderCatalog(services.GetServices<IDataAdapterFactory>(), null);
         var registry = new DataSourceRegistry();
         var defaultProvider = new DataDefaultProviderPlan(providers, registry);
-        return new CouchbaseHealthContributor(services, diagnostics, providers, defaultProvider);
+        return new CouchbaseHealthContributor(
+            services,
+            diagnostics,
+            providers,
+            defaultProvider,
+            services.GetRequiredService<CouchbaseResourcePool>());
     }
 
     private static ServiceProvider Services(bool includeHigherPriorityAdapter)
     {
         var services = new ServiceCollection();
+        services.AddSingleton<CouchbaseResourcePool>();
         services.AddSingleton<IDataAdapterFactory, CouchbaseAdapterFactory>();
         if (includeHigherPriorityAdapter)
         {

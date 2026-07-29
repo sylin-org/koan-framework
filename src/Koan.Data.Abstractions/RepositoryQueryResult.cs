@@ -17,6 +17,9 @@ public sealed class RepositoryQueryResult<TEntity>
     /// <summary>Items returned by the adapter, in the order it intends (sorted iff it pushed sort down).</summary>
     public required IReadOnlyList<TEntity> Items { get; init; }
 
+    /// <summary>True only when the provider applied the complete filter present in its query definition.</summary>
+    public bool FilterHandled { get; init; }
+
     /// <summary>
     /// Total cardinality of the unpaginated result when the query requested a count and the adapter
     /// supplied one; null when no count was requested or no total is available.
@@ -25,6 +28,9 @@ public sealed class RepositoryQueryResult<TEntity>
 
     /// <summary>True when <see cref="TotalCount"/> is approximate (e.g. from table stats).</summary>
     public bool IsEstimate { get; init; }
+
+    /// <summary>The count work actually performed; <see cref="CountExecutionKind.None"/> when no total was produced.</summary>
+    public CountExecutionKind CountExecution { get; init; }
 
     /// <summary>Sort specs the adapter pushed down. Empty means none — coordinator sorts in memory.</summary>
     public IReadOnlySet<SortSpec> SortHandled { get; init; } = NoSortHandled;

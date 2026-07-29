@@ -22,9 +22,11 @@ public sealed class RedisCapabilitiesSpec(RedisFixture fixture, ITestOutputHelpe
         caps.Has(DataCaps.Query.String).Should().BeFalse();
         caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
         caps.Has(DataCaps.Retention.TtlIndex).Should().BeTrue(); // DATA-0101 native key TTL
-        caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
-        caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
+        caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
+        caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
+        caps.Has(DataCaps.Write.ConditionalReplace).Should().BeTrue();
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
+        caps.Has(DataCaps.Query.ProviderBoundedPaging).Should().BeFalse();
 
         var partition = NewPartition();
         using var lease = Lease(partition);

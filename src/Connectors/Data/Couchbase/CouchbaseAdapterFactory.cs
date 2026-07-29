@@ -1,211 +1,164 @@
-using System;
-using System.Collections.Concurrent;
-using System.Threading.Tasks;
+using Koan.Core;
+using Koan.Core.Services;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Connector.Couchbase.Infrastructure;
+using Koan.Data.Connector.Couchbase.Runtime;
+using Koan.Data.Core;
+using Couchbase.KeyValue;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Core;
-using Koan.Core.Services;
 
 namespace Koan.Data.Connector.Couchbase;
 
-[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
-[KoanService(ServiceKind.Database, shortCode: "couchbase", name: "Couchbase",
-    ContainerImage = "couchbase/server",
-    DefaultTag = "8.0.2",
-    DefaultPorts = new[] { 8091, 8092, 8093, 8094, 11210 },
-    Capabilities = new[] { "protocol=couchbase" },
-    Volumes = new[] { "./Data/couchbase-8.0:/opt/couchbase/var" },
-    AppEnv = new[] { "Koan__Data__Couchbase__ConnectionString=couchbase://{host}", "Koan__Data__Couchbase__Bucket=Koan" },
-    Scheme = "couchbase", Host = "couchbase", EndpointPort = 8091,
-    UriPattern = "couchbase://{host}", LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
-public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IAsyncDisposable, IDisposable
+[ProviderPriority(Constants.Priority)]
+[KoanService(ServiceKind.Database, shortCode: Constants.Provider, name: "Couchbase",
+    ContainerImage = "couchbase/server", DefaultTag = "8.0.2",
+    DefaultPorts = [8091, 8092, 8093, 8094, 11210], Capabilities = ["protocol=couchbase"],
+    Volumes = ["./Data/couchbase-8.0:/opt/couchbase/var"],
+    AppEnv = ["Koan__Data__Couchbase__ConnectionString=couchbase://{host}", "Koan__Data__Couchbase__Bucket=Koan"],
+    Scheme = "couchbase", Host = "couchbase", EndpointPort = 8091, UriPattern = "couchbase://{host}",
+    LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
+public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
 {
-    // One CouchbaseClusterProvider (one cluster connection + one bucket) per resolved source — keyed by connection+bucket,
-    // so every entity type on a source SHARES one provider instead of opening one per (entity, source). The Default source
-    // uses the DI-managed provider (which also drives boot-time readiness); a routed source that physically coincides with
-    // Default reuses that same DI provider (the dedup below) rather than opening a duplicate cluster connection. Database
-    // mode (ARCH-0103) = a distinct native BUCKET per routed source.
-    //
-    // Lifetime (ARCH-0103 §9.15): each cached provider lives for the factory's lifetime (a DI singleton disposed on host
-    // teardown). There is deliberately NO eviction: the repositories created here are cached upstream per (entity, key,
-    // adapter, source) and HOLD their provider, so evicting+disposing one would kill a live repository's connection. The
-    // cache is bounded by the deployment's distinct-physical-source count, not by entity count.
-    private readonly ConcurrentDictionary<(string Connection, string Bucket, string? Username, string? Password, string? ManagementUrl), CouchbaseClusterProvider> _sourceProviders = new();
+    public string Provider => Constants.Provider;
+    public IReadOnlyCollection<string> Aliases => [Constants.Alias];
+    public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Couchbase"];
 
-    /// <summary>Test-support: the number of distinct non-Default per-source providers currently pooled (the Default and
-    /// any Default-coinciding source reuse the DI-managed provider and are NOT counted here).</summary>
-    internal int SourceProviderCount => _sourceProviders.Count;
+    public void DescribeClaims(IDataClaims claims) => CouchbaseFeatures.Declare(claims);
 
-    public string Provider => Infrastructure.Constants.Provider.Name;
+    public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
+        SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
+        SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
+        SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords,
+        ["sql"],
+        enforcesReadLanes: true);
+
+    public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return new CouchbaseSourceIntegration(route, services.GetRequiredService<CouchbaseResourcePool>());
+    }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
-        IServiceProvider sp,
-        string source = "Default")
+        IServiceProvider services,
+        string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var route = ResolveRoute(sp, source);
-        return new CouchbaseDocumentStore<TEntity, TKey>(route.Provider, route.Options, this, sp, route.Source);
+        var route = ResolveRoute(services, source);
+        var mapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(route.Source);
+        return new CouchbaseRepository<TEntity, TKey>(
+            services,
+            this,
+            route,
+            services.GetRequiredService<CouchbaseResourcePool>(),
+            mapping);
     }
 
-    internal CouchbaseSourceRoute ResolveRoute(IServiceProvider sp, string source)
+    internal CouchbaseRoute ResolveRoute(IServiceProvider services, string source)
     {
-        var globalOptions = sp.GetRequiredService<IOptionsMonitor<CouchbaseOptions>>();
-
-        if (string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
-        {
-            // Reuse the DI-managed provider so readiness monitoring and discovery outputs stay in sync.
-            var sharedProvider = sp.GetRequiredService<CouchbaseClusterProvider>();
-            return new CouchbaseSourceRoute(sharedProvider, globalOptions, "Default");
-        }
-
-        var baseOptions = globalOptions.CurrentValue;
-        var config = sp.GetRequiredService<IConfiguration>();
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-
-        // Resolve the source's physical placement (connection + bucket) — Database mode (ARCH-0103). The shared resolver
-        // collapses a non-Default source's "auto"/blank discovery sentinel onto the discovery-resolved Default (so the
-        // per-source pool never keys on the unresolved literal) — the fleet form of the local helper this replaces.
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, Infrastructure.Constants.Provider.ConfigurationName, source, baseOptions.ConnectionString, this);
-        var bucket = AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, Infrastructure.Constants.Provider.ConfigurationName, source, "Bucket", baseOptions.Bucket, this);
-        var username = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, Infrastructure.Constants.Provider.ConfigurationName, source, "Username", baseOptions.Username ?? "", this));
-        var password = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, Infrastructure.Constants.Provider.ConfigurationName, source, "Password", baseOptions.Password ?? "", this));
-        var managementUrl = NullIfBlank(AdapterConnectionResolver.GetSourceSetting(
-            config, sourceRegistry, Infrastructure.Constants.Provider.ConfigurationName, source, "ManagementUrl", baseOptions.ManagementUrl ?? "", this));
-
-        // Dedup (ARCH-0103 §9.15): a routed source whose resolved physical placement coincides with Default — same
-        // connection, bucket, AND credentials/management endpoint (so reusing Default's provider can't cross to a
-        // different cluster identity) — reuses the DI-managed provider (one cluster connection + shared readiness) and
-        // Default's full options, instead of opening a duplicate keyed under a different cache entry.
-        if (!string.IsNullOrWhiteSpace(baseOptions.ConnectionString)
-            && string.Equals(connectionString, baseOptions.ConnectionString, StringComparison.Ordinal)
-            && string.Equals(bucket, baseOptions.Bucket, StringComparison.Ordinal)
-            && string.Equals(username, NullIfBlank(baseOptions.Username), StringComparison.Ordinal)
-            && string.Equals(password, NullIfBlank(baseOptions.Password), StringComparison.Ordinal)
-            && string.Equals(managementUrl, NullIfBlank(baseOptions.ManagementUrl), StringComparison.Ordinal))
-        {
-            var sharedProvider = sp.GetRequiredService<CouchbaseClusterProvider>();
-            return new CouchbaseSourceRoute(sharedProvider, globalOptions, source);
-        }
-
-        var sourceOptions = new CouchbaseOptions
-        {
-            ConnectionString = connectionString,
-            Bucket = bucket,
-            Username = username,
-            Password = password,
-            ManagementUrl = managementUrl,
-            Scope = baseOptions.Scope,
-            Collection = baseOptions.Collection,
-            CollectionName = baseOptions.CollectionName,
-            NamingStyle = baseOptions.NamingStyle,
-            QueryTimeout = baseOptions.QueryTimeout,
-            DurabilityLevel = baseOptions.DurabilityLevel,
-            Readiness = baseOptions.Readiness,
-        };
-        var optionsMonitor = new Core.Configuration.FixedOptionsMonitor<CouchbaseOptions>(sourceOptions);
-
-        // One provider per distinct physical placement — keyed by the FULL cluster identity (the same five fields the
-        // Default-dedup compares), not just connection+bucket: two sources with the same connection+bucket but DIFFERENT
-        // credentials are distinct clusters and must NOT share a provider (a narrower key would authenticate one as the
-        // other — a cross-source credential leak). A value-tuple key compares the parts ordinally with no delimiter risk.
-        var provider = _sourceProviders.GetOrAdd(
-            (connectionString, bucket, username, password, managementUrl),
-            _ => new CouchbaseClusterProvider(optionsMonitor, sp.GetService<ILogger<CouchbaseClusterProvider>>()));
-
-        return new CouchbaseSourceRoute(provider, optionsMonitor, source);
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var defaults = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? Constants.DefaultSource : source;
+        var connection = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, registry, Provider, resolvedSource, defaults.ConnectionString, this);
+        var bucket = Setting(configuration, registry, resolvedSource, "Bucket", defaults.Bucket);
+        var scope = Setting(configuration, registry, resolvedSource, "Scope", defaults.Scope);
+        var username = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Username", defaults.Username ?? ""));
+        var password = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Password", defaults.Password ?? ""));
+        var definition = registry.GetSource(resolvedSource);
+        var lanes = definition?.ReadLanes?
+            .Where(static lane => !string.IsNullOrWhiteSpace(lane.Value.ConnectionString))
+            .ToDictionary(static lane => lane.Key, static lane => lane.Value.ConnectionString, StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return new CouchbaseRoute(
+            resolvedSource,
+            connection,
+            bucket,
+            scope,
+            defaults.Collection,
+            username,
+            password,
+            defaults.QueryTimeout,
+            defaults.BootstrapTimeout,
+            defaults.BootstrapPollInterval,
+            ResolveDurability(defaults.Durability),
+            definition?.StorageLifecycle ?? StorageLifecycle.Managed,
+            definition?.Access ?? DataSourceAccess.ReadWrite,
+            registry.GetPlan(resolvedSource, Provider, connection),
+            lanes);
     }
 
-    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private string Setting(
+        IConfiguration configuration,
+        DataSourceRegistry registry,
+        string source,
+        string key,
+        string fallback) => AdapterConnectionResolver.GetSourceSetting(
+            configuration, registry, Provider, source, key, fallback, this);
 
-    public async ValueTask DisposeAsync()
-    {
-        foreach (var provider in _sourceProviders.Values)
-            await provider.DisposeAsync().ConfigureAwait(false);
-        _sourceProviders.Clear();
-    }
-
-    // The factory is a DI singleton; the host disposes it async on teardown. Implement IDisposable too so a SYNC
-    // ServiceProvider.Dispose() doesn't throw on this IAsyncDisposable-only singleton.
-    public void Dispose()
-    {
-        foreach (var provider in _sourceProviders.Values)
-            provider.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        _sourceProviders.Clear();
-    }
-
-    // Couchbase isolates a partition through a native scope (bucket.scope.collection), not a name suffix —
-    // CouchbaseClusterProvider.GetCollectionContext routes EntityContext.Current.Partition into the scope
-    // position via FormatScope. So the capability announces EncodePartitionInName = false: the framework
-    // generates just the collection name, and a fixed Collection / CollectionName callback overrides it.
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
         var options = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value;
         return new StorageNamingCapability
         {
             Style = options.NamingStyle,
-            // Couchbase collection names allow only [A-Za-z0-9_-%] — a '.' separator (the FullNamespace
-            // default) produces an invalid collection name and CreateCollectionAsync fails. Use '_'.
-            Separator = "_",
+            Separator = options.Separator,
             Casing = NameCasing.AsIs,
-            // Collection names cap at 251 bytes; announce it so the framework hashes overlong names down rather
-            // than handing Couchbase an invalid identifier (partition rides the scope, so this bounds the name).
-            MaxIdentifierBytes = 251,
             EncodePartitionInName = false,
-            NameOverride = entityType => !string.IsNullOrWhiteSpace(options.Collection)
-                ? options.Collection!.Trim()
-                : options.CollectionName?.Invoke(entityType),
+            NameOverride = entity => !string.IsNullOrWhiteSpace(options.Collection)
+                ? options.Collection.Trim()
+                : options.CollectionName?.Invoke(entity),
+            MaxIdentifierBytes = Constants.MaximumCollectionBytes
         };
     }
 
-    /// <summary>
-    /// Format a partition value as a Couchbase scope identifier (alphanumeric / underscore / hyphen /
-    /// percent, max 30 bytes). Used by CouchbaseClusterProvider when mapping EntityContext.Current.Partition
-    /// onto bucket.scope.collection.
-    /// </summary>
-    internal static string FormatScope(string partition) => FormatIdentifier(partition, 30);
+    internal static string FormatScope(string value) => FormatIdentifier(value, Constants.MaximumScopeBytes);
+    internal static string FormatCollection(string value) => FormatIdentifier(value, Constants.MaximumCollectionBytes);
 
-    /// <summary>
-    /// Format an entity collection name to Couchbase's collection-identifier charset (alphanumeric / underscore /
-    /// hyphen / percent, max 251 bytes). The framework's <c>StorageNameResolver</c> replaces only <c>'.'</c> with the
-    /// separator, so a NESTED-type entity (e.g. <c>ManagedFieldNoLeak+ScopedDoc</c>) keeps a <c>'+'</c> the Couchbase
-    /// collection manager rejects. This closes that gap the same way <see cref="FormatScope"/> closes it for scopes —
-    /// applied once where the name is resolved (<see cref="CouchbaseDocumentStore{TEntity,TKey}"/>) so create and query
-    /// agree. A name already in the charset passes through unchanged (the common top-level-entity case).
-    /// </summary>
-    internal static string FormatCollectionName(string name) => FormatIdentifier(name, 251);
-
-    // The shared Couchbase identifier rule (scope + collection): keep [A-Za-z0-9_-%]; replace any other char with '_';
-    // when the sanitized form is FAITHFUL (no char replaced) AND fits the byte budget, return it as-is — otherwise
-    // append a deterministic hash of the ORIGINAL so two distinct inputs can never collapse onto one identifier (both
-    // lossy '_' replacement and over-length truncation are collision sources; hashing the original closes both).
-    private static string FormatIdentifier(string value, int maxBytes)
+    private static string FormatIdentifier(string value, int maximumBytes)
     {
-        if (string.IsNullOrEmpty(value)) return value;
-        var sb = new System.Text.StringBuilder(value.Length);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        var builder = new System.Text.StringBuilder(value.Length);
         var faithful = true;
-        foreach (var c in value)
-        {
-            if (char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == '%') sb.Append(c);
-            else { sb.Append('_'); faithful = false; }
-        }
-        var sanitized = sb.ToString();
-        if (faithful && NamingUtils.ByteLength(sanitized) <= maxBytes) return sanitized;
+        foreach (var character in value)
+            if (char.IsAsciiLetterOrDigit(character) || character is '_' or '-' or '%') builder.Append(character);
+            else { builder.Append('_'); faithful = false; }
+        var sanitized = builder.ToString();
+        if (faithful && NamingUtils.ByteLength(sanitized) <= maximumBytes) return sanitized;
         var hash = NamingUtils.ShortHash(value, 8);
-        return NamingUtils.TrimToBytes(sanitized, maxBytes - hash.Length - 1) + "_" + hash;
+        return NamingUtils.TrimToBytes(sanitized, maximumBytes - hash.Length - 1) + "_" + hash;
+    }
+
+    private static string? EmptyAsNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static DurabilityLevel ResolveDurability(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return DurabilityLevel.None;
+        if (Enum.TryParse<DurabilityLevel>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+            return parsed;
+        throw new InvalidOperationException(
+            $"Couchbase durability '{value}' is invalid. Use None, Majority, MajorityAndPersistToActive, or PersistToMajority.");
     }
 }
 
-internal sealed record CouchbaseSourceRoute(
-    CouchbaseClusterProvider Provider,
-    IOptionsMonitor<CouchbaseOptions> Options,
-    string Source);
+internal sealed record CouchbaseRoute(
+    string Source,
+    string ConnectionString,
+    string Bucket,
+    string DefaultScope,
+    string? FixedCollection,
+    string? Username,
+    string? Password,
+    TimeSpan QueryTimeout,
+    TimeSpan BootstrapTimeout,
+    TimeSpan BootstrapPollInterval,
+    DurabilityLevel Durability,
+    StorageLifecycle StorageLifecycle,
+    DataSourceAccess Access,
+    DataSourcePlan Plan,
+    IReadOnlyDictionary<string, string> ReadLanes);

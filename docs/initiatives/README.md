@@ -4,10 +4,10 @@ domain: framework
 title: "Koan Initiatives"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-27
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-27
   status: verified
   scope: initiative index and links
 ---
@@ -29,6 +29,7 @@ architecture canon:
 | Initiative | Mission | State |
 |---|---|---|
 | [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R09 Semantic Composition Kernel |
+| [Data adapter conformance](data-adapter-conformance/README.md) | Make Koan.Data and every shipped adapter conform to the Data Adapter Development Primer with executable evidence | Active — DAC-00 bootstrap ready |
 
 ## Initiative contract
 

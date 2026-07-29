@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Json.Tests.Specs.Capabilities;
@@ -25,6 +26,17 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
         caps.Has(DataCaps.Write.FastRemove).Should().BeFalse();
 
+        var published = new ClaimCapture();
+        new JsonAdapterFactory().DescribeClaims(published);
+        published.Capabilities.Should().Contain([
+            DataCaps.Query.Linq,
+            DataCaps.Query.Filter,
+            DataCaps.Isolation.RowScoped,
+            DataCaps.Isolation.ContainerScoped,
+            DataCaps.Isolation.DatabaseScoped
+        ]);
+        published.Capabilities.Should().NotContain(DataCaps.Write.AtomicBatch);
+
         var partition = NewPartition("capabilities");
         using var lease = Lease(partition);
 
@@ -36,5 +48,16 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
         public string Name { get; set; } = "";
+    }
+
+    private sealed class ClaimCapture : IDataClaims
+    {
+        public HashSet<Capability> Capabilities { get; } = [];
+        public IDataClaims Profile(string profile, string? qualifier = null, bool advertised = true) => this;
+        public IDataClaims Capability(Capability capability, bool advertised = true)
+        {
+            if (advertised) Capabilities.Add(capability);
+            return this;
+        }
     }
 }

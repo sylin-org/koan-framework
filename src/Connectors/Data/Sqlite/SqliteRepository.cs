@@ -1,1546 +1,503 @@
-using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Koan.Core;
-using Koan.Core.Infrastructure;
-using Koan.Core.Logging;
+using System.Data.Common;
+using System.Linq.Expressions;
+using System.Text.RegularExpressions;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
-using Koan.Data.Abstractions.Sorting;
-using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
-using Koan.Data.Core.Semantics;
+using Koan.Data.Connector.Sqlite.Runtime;
 using Koan.Data.Relational;
-using Koan.Data.Relational.Ado;
-using Koan.Data.Relational.Linq;
-using Koan.Data.Relational.Orchestration;
-using System.Collections.Concurrent;
-using System.Collections.Frozen;
-using System.Data;
-using System.Linq.Expressions;
-using Newtonsoft.Json;
+using Microsoft.Data.Sqlite;
 
 namespace Koan.Data.Connector.Sqlite;
 
 internal sealed class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
-    IOptimizedDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
+    IBoundedQueryRepository<TEntity, TKey>,
+    IOptimizedDataRepository<TEntity, TKey>,
+    IConditionalWriteRepository<TEntity, TKey>,
+    IInstructionExecutor<TEntity>,
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
-    IBulkDelete<TKey>,
-    IConditionalWriteRepository<TEntity, TKey>,
-    IInstructionExecutor<TEntity>
+    IBulkDelete<TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    public void Describe(ICapabilities caps) => caps
-        .Add(DataCaps.Query.Linq).Add(DataCaps.Query.String)
-        .Add(DataCaps.Query.ProviderBoundedPaging)
-        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete)
-        .Add(DataCaps.Write.AtomicBatch).Add(DataCaps.Write.FastRemove)
-        .Add(DataCaps.Write.ConditionalReplace)
-        // The AODB three-mode ledger (ARCH-0103 §6). Shared (DATA-0105 §3b): persists a framework-managed discriminator
-        // inside the (Id, Json) envelope + pushes scalar equality (json_extract) + a conflict-aware upsert verifies
-        // ownership. Container: a distinct partition-suffixed table per ambient partition. Database: a per-source file
-        // connection. Co-defined with the AodbConformanceSpecsBase cells that prove each.
-        .Add(DataCaps.Isolation.RowScoped)
-        .Add(DataCaps.Isolation.ContainerScoped)
-        .Add(DataCaps.Isolation.DatabaseScoped)
-        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native))
-        .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default);
-
-    private readonly IServiceProvider _sp;
+    private const int ParameterBatch = 400;
     private readonly SqliteOptions _options;
-    private readonly IStorageNameResolver _nameResolver;
-    private readonly StorageNameResolver.Convention _conv;
-    private readonly ILinqSqlDialect _dialect = new SqliteDialect();
-    private readonly ILogger _logger;
-    private readonly RelationalSchemaPolicy _schemaPolicy;
-    private readonly StorageOptimizationInfo _optimizationInfo;
-    private readonly SqliteConnectionLifecycle _connections;
+    private readonly SqliteConnectionManager _connections;
     private readonly string _source;
-    private readonly ConcurrentDictionary<string, bool> _healthyCache = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, bool> _visibilityCache = new(StringComparer.Ordinal);
-    private readonly JsonSerializerSettings _json;
-
-    // Immutable reflection metadata is safe to share across repositories and host lifetimes.
-    private static readonly ConcurrentDictionary<string, System.Reflection.PropertyInfo?> _propertyInfoCache = new(StringComparer.Ordinal);
-
-    private static string BuildCacheKey(SqliteConnection conn, string table)
-        => ($"{conn.DataSource}/{conn.Database}::{table}");
-
-    private static class LogActions
-    {
-        public const string RepositoryInit = "repository.init";
-        public const string Ensure = "ensure";
-    }
-
-    private void InvalidateHealth(SqliteConnection conn, string table)
-    {
-        try
-        {
-            var key = BuildCacheKey(conn, table);
-            _healthyCache.TryRemove(key, out _);
-            _visibilityCache.TryRemove(key, out _);
-        }
-        catch (Exception ex)
-        {
-            // Degradable: failing to evict the schema-health cache only forces an extra re-validate
-            // next call; it cannot corrupt data. Log so a recurring failure is visible.
-            KoanLog.DataDebug(_logger, "invalidate_health", "failed", ("table", table), ("error", ex.Message));
-        }
-    }
-
-    // Storage optimization support
-    public StorageOptimizationInfo OptimizationInfo => _optimizationInfo;
+    private readonly SqliteEntityPlan<TEntity, TKey> _entity;
+    private readonly SqliteQueryCompiler<TEntity> _queries;
+    private readonly SqliteSchema<TEntity> _schema;
 
     public SqliteRepository(
-        IServiceProvider sp,
+        IServiceProvider services,
         SqliteOptions options,
-        IStorageNameResolver resolver,
-        SqliteConnectionLifecycle connections,
+        IStorageNameResolver names,
+        SqliteConnectionManager connections,
         string source)
     {
-        _sp = sp;
+        _ = names;
         _options = options;
-        _nameResolver = resolver;
         _connections = connections;
-        _source = string.IsNullOrWhiteSpace(source) ? "Default" : source;
-        // Initialize runtime snapshot so AllowMagicInProduction and environment are honored in tests and apps
-        KoanEnv.TryInitialize(sp);
-        // Logger: prefer typed logger; fall back to category
-        _logger = (sp.GetService(typeof(ILogger<SqliteRepository<TEntity, TKey>>)) as ILogger)
-                  ?? (sp.GetService(typeof(ILoggerFactory)) is ILoggerFactory lf
-                      ? lf.CreateLogger($"Koan.Data.Connector.Sqlite[{typeof(TEntity).FullName}]")
-                      : NullLogger.Instance);
-        _conv = new StorageNameResolver.Convention(options.NamingStyle, options.Separator, NameCasing.AsIs);
-        _schemaPolicy = new RelationalSchemaPolicy
-        {
-            Projections = RelationalProjectionMode.PhysicalColumns,
-            Ddl = typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), false).Any()
-                ? RelationalDdlPolicy.NoDdl
-                : options.DdlPolicy,
-            Matching = options.SchemaMatching,
-            AllowProductionDdl = options.AllowProductionDdl,
-            DefaultSchema = "main"
-        };
-
-        // Get storage optimization info from AggregateBag
-        _optimizationInfo = sp.GetStorageOptimization<TEntity, TKey>();
-        var segmentation = sp.GetRequiredService<DataSegmentationPlan>().For(typeof(TEntity));
-        _json = ComparableScalarEncoding.Apply(
-            new JsonSerializerSettings(),
-            segmentation.Fields);
-
-        KoanLog.DataDebug(_logger, LogActions.RepositoryInit, "ready",
-            ("entity", typeof(TEntity).FullName),
-            ("optimization", _optimizationInfo.OptimizationType.ToString()),
-            ("isOptimized", _optimizationInfo.IsOptimized));
+        _source = source;
+        _entity = new SqliteEntityPlan<TEntity, TKey>(services);
+        _queries = new SqliteQueryCompiler<TEntity>(_entity.IdentityName);
+        _schema = new SqliteSchema<TEntity>(options, connections, source);
     }
 
-    // Adapter factory handles partition appending via EntityContext.Current.Partition.
-    // Format: {BaseTableName}#{partition_id} (e.g., "DocumentChunk#019a5aff79cb78158dae3700a698f840" or adapter-specific variant)
-    private string TableName => Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_sp);
+    public StorageOptimizationInfo OptimizationInfo => _entity.Optimization;
 
-    private SqliteConnection CreateConnection()
-    {
-        var conn = _connections.Create(_options.ConnectionString, _source);
-        conn.Open();
-        return conn;
-    }
+    public void Describe(ICapabilities capabilities) => SqliteFeatures.Describe(capabilities);
 
-    private SqliteConnection Open()
-    {
-        var conn = CreateConnection();
-        try
-        {
-            EnsureOrchestrated(conn);
-
-            // Extra barrier: ensure the table and projected columns are visible on this connection.
-            var cacheKey = BuildCacheKey(conn, TableName);
-            if (_visibilityCache.TryGetValue(cacheKey, out var visible) && visible) return conn;
-
-            try
-            {
-                var ddl = new SqliteDdlExecutor(conn, TableName);
-                var projections = ProjectionResolver.Get(typeof(TEntity));
-                var required = projections.Select(p => p.ColumnName).ToArray();
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var maxMs = 2000;
-                var delay = 5;
-                while (sw.ElapsedMilliseconds < maxMs)
-                {
-                    try
-                    {
-                        if (ddl.TableExists("", TableName) && required.All(cn => ddl.ColumnExists("", TableName, cn)))
-                        {
-                            _visibilityCache[cacheKey] = true;
-                            break;
-                        }
-                    }
-                    catch (SqliteException)
-                    {
-                        // A transient PRAGMA/probe error mid-poll means "not visible yet"; retry with backoff.
-                    }
-                    Thread.Sleep(delay);
-                    delay = Math.Min(200, delay * 2);
-                }
-            }
-            catch (Exception ex)
-            {
-                // This is only a visibility warm-up barrier. The real query path retains its ensure-and-retry.
-                KoanLog.DataDebug(_logger, "visibility_barrier", "failed", ("table", TableName), ("error", ex.Message));
-            }
-
-            return conn;
-        }
-        catch
-        {
-            conn.Dispose();
-            throw;
-        }
-    }
-
-    private Task EnsureOrchestrated(SqliteConnection conn, CancellationToken ct)
-    {
-        var table = TableName;
-        var cacheKey = BuildCacheKey(conn, table);
-        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return Task.CompletedTask;
-        KoanLog.DataDebug(_logger, LogActions.Ensure, "requested",
-            ("table", table),
-            ("dataSource", conn.DataSource));
-        // Singleflight: dedupe in-flight ensure per DataSource::Table
-        return Singleflight.Run(cacheKey, token => EnsureOrchestratedCore(conn, table, cacheKey, token), ct);
-    }
-
-    private void EnsureOrchestrated(SqliteConnection conn)
-        => EnsureOrchestrated(conn, CancellationToken.None).GetAwaiter().GetResult();
-
-    public async Task EnsureReady(CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var conn = CreateConnection();
-        await EnsureOrchestrated(conn, ct);
-    }
-
-    private async Task EnsureOrchestratedCore(SqliteConnection conn, string table, string cacheKey, CancellationToken ct)
-    {
-        if (_healthyCache.TryGetValue(cacheKey, out var healthy) && healthy) return;
-        var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-        var ddl = new SqliteDdlExecutor(conn, table);
-        var feats = new SqliteStoreFeatures();
-        var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
-        var ddlAllowed = report.TryGetValue("DdlAllowed", out var da) && da is true;
-        if (ddlAllowed)
-        {
-            KoanLog.DataDebug(_logger, LogActions.Ensure, "create", ("table", table));
-            await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
-            report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, table, _schemaPolicy, ct);
-        }
-
-        var state = report.TryGetValue("State", out var value) ? value as string : null;
-        if (_schemaPolicy.Matching == RelationalSchemaMatchingMode.Strict && state != "Healthy")
-        {
-            var missing = report.TryGetValue("MissingColumns", out var columns) && columns is string[] names ? names : [];
-            throw new SchemaMismatchException(typeof(TEntity).FullName!, table, _schemaPolicy.Projections.ToString(), missing, [], ddlAllowed);
-        }
-
-        if (report.TryGetValue("TableExists", out var exists) && exists is true)
-            _healthyCache[cacheKey] = true;
-    }
-
-    // Comparable-encoding contract (DATA-0100): the canonical converters make DateTimeOffset (UTC-ISO
-    // text), TimeSpan (ticks), DateOnly/TimeOnly (fixed text) persist in an order-preserving form that
-    // matches the filter comparand. Default (PascalCase) naming is preserved — ResolveColumnSql reads
-    // json_extract($.{prop}) with the PascalCase property name.
-    // Basic serialization helpers
-    private TEntity FromRow((string Id, string Json) row)
-        => JsonConvert.DeserializeObject<TEntity>(row.Json, _json)!;
-    private (string Id, string Json) ToRow(TEntity e)
-    {
-        // Apply optimization before serialization
-        OptimizeEntityForStorage(e, _optimizationInfo);
-
-        var json = JsonConvert.SerializeObject(e, _json);
-        var id = e.Id!.ToString()!;
-        return (id, json);
-    }
-
-    /// <summary>
-    /// Applies storage optimization to entity before writing to database.
-    /// This follows the clean optimization approach using pre-write transformation.
-    /// </summary>
-    private static void OptimizeEntityForStorage(TEntity entity, StorageOptimizationInfo optimizationInfo)
-    {
-        if (!optimizationInfo.IsOptimized || typeof(TKey) != typeof(string))
-            return;
-
-        // Cache PropertyInfo lookup to avoid reflection on every entity write
-        var cacheKey = $"{typeof(TEntity).FullName}:{optimizationInfo.IdPropertyName}";
-        if (!_propertyInfoCache.TryGetValue(cacheKey, out var idProperty))
-        {
-            idProperty = typeof(TEntity).GetProperty(optimizationInfo.IdPropertyName);
-            _propertyInfoCache[cacheKey] = idProperty;
-        }
-
-        if (idProperty?.GetValue(entity) is not string stringId || string.IsNullOrEmpty(stringId))
-            return;
-
-        switch (optimizationInfo.OptimizationType)
-        {
-            case StorageOptimizationType.Guid:
-                if (Guid.TryParse(stringId, out var guid))
-                {
-                    // For SQLite, we keep as normalized string format
-                    idProperty.SetValue(entity, guid.ToString("D"));
-                }
-                break;
-        }
-    }
-
-    private static Type GetIdStorageType(StorageOptimizationInfo optimizationInfo)
-    {
-        // For non-string keys, use the key type directly (no optimization needed)
-        if (typeof(TKey) != typeof(string))
-            return typeof(TKey);
-
-        // For string keys, check if optimization is enabled
-        if (!optimizationInfo.IsOptimized)
-            return typeof(string);
-
-        // SQLite doesn't have native GUID types, so we keep as string but apply normalization
-        // The optimization happens during entity processing rather than storage type
-        return typeof(string);
-    }
+    public Task EnsureReady(CancellationToken ct = default) => _schema.Ensure(_entity.Table, ct);
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        var rows = await AdoCommands.QueryIdJsonAsync(conn, $"SELECT Id, Json FROM [{TableName}] WHERE Id = @Id", new SqlParameters().Add("Id", id!.ToString()!), null, ct);
-        return rows.Count == 0 ? null : FromRow(rows[0]);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SELECT \"Json\" FROM {Table()} WHERE \"Id\" = @id LIMIT 1";
+        command.Parameters.AddWithValue("@id", _entity.Key(id));
+        var json = await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        return json is null ? null : _entity.Read(json);
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.get.many");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        if (idList.Count == 0)
+        ArgumentNullException.ThrowIfNull(ids);
+        var requested = ids as IReadOnlyList<TKey> ?? ids.ToArray();
+        if (requested.Count == 0) return [];
+        var found = new Dictionary<string, TEntity>(StringComparer.Ordinal);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        for (var offset = 0; offset < requested.Count; offset += ParameterBatch)
         {
-            return [];
+            var take = Math.Min(ParameterBatch, requested.Count - offset);
+            await using var command = connection.CreateCommand();
+            var names = new string[take];
+            for (var index = 0; index < take; index++)
+            {
+                names[index] = $"@p{index}";
+                command.Parameters.AddWithValue(names[index], _entity.Key(requested[offset + index]));
+            }
+            command.CommandText = $"SELECT \"Id\", \"Json\" FROM {Table()} WHERE \"Id\" IN ({string.Join(",", names)})";
+            await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await reader.ReadAsync(ct).ConfigureAwait(false)) found[reader.GetString(0)] = _entity.Read(reader.GetString(1));
         }
 
-        using var conn = Open();
-        var stringIds = idList.Select(id => id!.ToString()!).ToArray();
-
-        // Use IN clause for bulk query
-        var rows = await AdoCommands.QueryIdJsonAsync(conn,
-            $"SELECT Id, Json FROM [{TableName}] WHERE Id IN @Ids",
-            new SqlParameters().Add("Ids", stringIds), null, ct);
-
-        // Build dictionary for O(1) lookup
-        var entityMap = rows.Select(FromRow).ToDictionary(e => e.Id);
-
-        // Preserve order and include nulls
-        var results = new TEntity?[idList.Count];
-        for (var i = 0; i < idList.Count; i++)
-        {
-            results[i] = entityMap.TryGetValue(idList[i], out var entity) ? entity : null;
-        }
-
-        return results;
+        var result = new TEntity?[requested.Count];
+        for (var index = 0; index < requested.Count; index++)
+            if (found.TryGetValue(_entity.Key(requested[index]), out var entity)) result[index] = entity;
+        return result;
     }
 
+    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await Upsert(connection, transaction: null, model, ct).ConfigureAwait(false);
+        return model;
+    }
 
-    // ==================== Unified Query (DATA-XXXX) ====================
+    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        var values = models as IReadOnlyList<TEntity> ?? models.ToArray();
+        if (values.Count == 0) return 0;
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        foreach (var model in values) await Upsert(connection, transaction, model, ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return values.Count;
+    }
+
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DELETE FROM {Table()} WHERE \"Id\" = @id";
+        command.Parameters.AddWithValue("@id", _entity.Key(id));
+        return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
+    }
+
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var values = ids as IReadOnlyList<TKey> ?? ids.ToArray();
+        if (values.Count == 0) return 0;
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var deleted = 0;
+        for (var offset = 0; offset < values.Count; offset += ParameterBatch)
+        {
+            var take = Math.Min(ParameterBatch, values.Count - offset);
+            await using var command = connection.CreateCommand();
+            command.Transaction = (SqliteTransaction)transaction;
+            var names = new string[take];
+            for (var index = 0; index < take; index++)
+            {
+                names[index] = $"@p{index}";
+                command.Parameters.AddWithValue(names[index], _entity.Key(values[offset + index]));
+            }
+            command.CommandText = $"DELETE FROM {Table()} WHERE \"Id\" IN ({string.Join(",", names)})";
+            deleted += await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return deleted;
+    }
+
+    public async Task<int> DeleteAll(CancellationToken ct = default)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"DELETE FROM {Table()}";
+        return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+    }
+
+    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default) =>
+        await DeleteAll(ct).ConfigureAwait(false);
 
     public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-
-        var (whereSql, parameters) = BuildWhere(query.Filter);
-        var (orderBy, sortHandled) = BuildOrderBy(query.Sort);
-
-        var sb = new System.Text.StringBuilder();
-        sb.Append("SELECT Id, Json FROM [").Append(TableName).Append(']');
-        if (whereSql is not null) sb.Append(" WHERE ").Append(whereSql);
-        sb.Append(' ').Append(orderBy);
-
-        // LIMIT/OFFSET is only a correct candidate bound when SQLite owns the complete requested
-        // ordering. Otherwise the coordinator must materialize, finish the sort, and page afterwards.
-        var sortFullyHandled = query.Sort is null || query.Sort.Count == 0 || sortHandled.Count == query.Sort.Count;
-        var paginationHandled = false;
-        if (query.HasPagination && sortFullyHandled)
+        var plan = _queries.Compile(_entity.Table, query);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        long? total = null;
+        if (plan.CountSql is not null)
         {
-            var size = query.EffectivePageSize();
-            var offset = query.EffectiveOffset();
-            sb.Append(" LIMIT ").Append(size).Append(" OFFSET ").Append(offset);
-            paginationHandled = true;
+            await using var count = connection.CreateCommand();
+            count.CommandText = plan.CountSql;
+            Bind(count, plan.Parameters);
+            total = Convert.ToInt64(await count.ExecuteScalarAsync(ct).ConfigureAwait(false));
         }
 
-        var items = await ExecuteRows(sb.ToString(), SqlParameters.Positional(parameters), ct);
-
-        long? totalCount = null;
-        if (query.CountStrategy is not null)
-            totalCount = paginationHandled
-                ? await CountCore(whereSql, parameters, ct)
-                : items.Count;
-
+        var items = await ReadEntities(connection, plan.Sql, plan.Parameters, ct).ConfigureAwait(false);
         return new RepositoryQueryResult<TEntity>
         {
             Items = items,
-            TotalCount = totalCount,
-            IsEstimate = false,
-            SortHandled = sortHandled,
-            PaginationHandled = paginationHandled,
+            FilterHandled = plan.FilterHandled,
+            TotalCount = total,
+            CountExecution = plan.CountExecution,
+            SortHandled = plan.SortHandled,
+            PaginationHandled = plan.PaginationHandled,
+            ProjectionHandled = false
         };
     }
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.count");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        var (whereSql, parameters) = BuildWhere(query.Filter);
-        var count = await CountCore(whereSql, parameters, ct);
-        return CountResult.Exact(count);
+        var counted = query.WithoutPagination().WithCountStrategy(CountStrategy.Exact);
+        var plan = _queries.Compile(_entity.Table, counted);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = plan.CountSql!;
+        Bind(command, plan.Parameters);
+        return CountResult.Exact(Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false)));
     }
 
-    private async Task<long> CountCore(string? whereSql, IReadOnlyList<object?> parameters, CancellationToken ct)
+    public async Task<BoundedQueryResult<TEntity>> QueryBoundedCandidates(
+        QueryDefinition query,
+        int maxCandidates,
+        CancellationToken ct = default)
     {
-        using var conn = Open();
-        var sql = whereSql is null
-            ? $"SELECT COUNT(1) FROM [{TableName}]"
-            : $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-        var p = SqlParameters.Positional(parameters);
-        try
+        if (maxCandidates <= 0) throw new ArgumentOutOfRangeException(nameof(maxCandidates));
+        var unpaged = query.WithoutPagination().WithCountStrategy(null);
+        var plan = _queries.Compile(_entity.Table, unpaged, checked(maxCandidates + 1));
+        if (query.Sort.Count != plan.SortHandled.Count)
+            throw new NotSupportedException("SQLite cannot provide a stable bounded candidate page for this sort.");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        var rows = await ReadEntities(connection, plan.Sql, plan.Parameters, ct).ConfigureAwait(false);
+        var exceeded = rows.Count > maxCandidates;
+        return new BoundedQueryResult<TEntity>(
+            exceeded ? rows.Take(maxCandidates).ToArray() : rows,
+            rows.Count,
+            exceeded);
+    }
+
+    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(
+        string query,
+        object? parameters,
+        QueryDefinition shaping,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        var sql = RewriteEntity(query.Trim());
+        if (!StartsSelect(sql)) sql = $"SELECT \"Id\", \"Json\" FROM {Table()} WHERE {sql}";
+        var paged = shaping.HasPagination;
+        if (paged) sql = sql.TrimEnd().TrimEnd(';') + $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}";
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        var items = await ReadEntities(connection, sql, Values(parameters), ct).ConfigureAwait(false);
+        return new RepositoryQueryResult<TEntity>
         {
-            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            return await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct);
-        }
-    }
-
-    private async Task<IReadOnlyList<TEntity>> ExecuteRows(string sql, SqlParameters p, CancellationToken ct)
-    {
-        using var conn = Open();
-        try
-        {
-            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
-            return rows.Select(FromRow).ToList();
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, ct);
-            return rows.Select(FromRow).ToList();
-        }
-    }
-
-    /// <summary>Translates the (fully-pushable) filter to a WHERE fragment; null filter -> no WHERE.</summary>
-    private (string? whereSql, IReadOnlyList<object?> parameters) BuildWhere(Filter? filter)
-    {
-        if (filter is null) return (null, Array.Empty<object?>());
-        var translator = new SqlFilterTranslator(_dialect, typeof(TEntity), ResolveColumnSql);
-        return translator.Translate(filter);
-    }
-
-    /// <summary>Maps a flat property name to its SQL value expression (projected column or json_extract).</summary>
-    private string ResolveColumnSql(FieldPath field, ResolvedField resolved)
-    {
-        var prop = field.Leaf;
-        // Qualify every column reference with the table. Bare names work in the main WHERE, but inside a
-        // correlated json_each(...) subquery (collection operators Has/HasAny/HasAll/HasNone) SQLite does
-        // NOT bind a bare column to the outer row — json_each then iterates nothing, so containment matched
-        // zero rows and its negation matched everything. Qualifying the column fixes the correlation.
-        var t = $"[{TableName}]";
-        if (string.Equals(prop, "Id", StringComparison.Ordinal)) return $"{t}.[Id]";
-        if (string.Equals(prop, "Json", StringComparison.Ordinal)) return $"{t}.[Json]";
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var proj = projections.FirstOrDefault(p => string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-        var json = $"json_extract({t}.[Json], '$.{prop}')";
-        var expr = proj is not null ? $"COALESCE({t}.[{proj.ColumnName}], {json})" : json;
-        return ApplyScalarCast(expr, resolved);
-    }
-
-    // Comparable-encoding contract (DATA-0100): TimeSpan persists as Int64 ticks (a JSON number); cast the
-    // extraction to INTEGER so it compares by duration. DateTimeOffset / DateOnly / TimeOnly persist as
-    // monotonic fixed-width TEXT and compare correctly without a cast.
-    private static string ApplyScalarCast(string expr, ResolvedField? resolved)
-    {
-        var type = resolved?.ComparableType;
-        if (type is null || (resolved?.TargetsCollection ?? false)) return expr;
-        var t = Nullable.GetUnderlyingType(type) ?? type;
-        return t == typeof(TimeSpan) ? $"CAST({expr} AS INTEGER)" : expr;
-    }
-
-    /// <summary>Builds an ORDER BY clause from the sort specs; falls back to a stable Id order.</summary>
-    private (string orderBy, IReadOnlySet<SortSpec> sortHandled) BuildOrderBy(IReadOnlyList<SortSpec> sort)
-    {
-        if (sort is null || sort.Count == 0)
-            return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
-
-        var parts = new List<string>(sort.Count);
-        var handled = new HashSet<SortSpec>();
-        foreach (var spec in sort)
-        {
-            // The SQLite JSON expression below addresses one top-level scalar. Nested and collection
-            // paths require the coordinator's full-set sorter and therefore cannot be claimed here.
-            if (spec.Path.TraversesCollection || spec.Path.Members.Count != 1) continue;
-
-            var leaf = spec.Path.Members[spec.Path.Members.Count - 1].Name;
-            // Resolve the leaf so ResolveColumnSql applies the comparable-encoding cast (TimeSpan ->
-            // INTEGER) to the ORDER BY column too, not only to filter predicates (DATA-0100). Fall back
-            // to the bare expression on an unresolvable path.
-            ResolvedField? rf = null;
-            // Degradable: an unresolvable leaf (e.g. a JSON-only path with no CLR projection) just means
-            // no comparable-encoding cast — ResolveColumnSql falls back to the bare json_extract expression.
-            try { rf = FieldPathResolver.Resolve(typeof(TEntity), FieldPath.Of(leaf)); }
-            catch (InvalidFilterFieldException) { /* leave null — bare expression is correct for sort */ }
-            var col = ResolveColumnSql(FieldPath.Of(leaf), rf!);
-            parts.Add($"{col} {(spec.Desc ? "DESC" : "ASC")}");
-            handled.Add(spec);
-        }
-
-        if (parts.Count == 0)
-            return ("ORDER BY Id", RepositoryQueryResult<TEntity>.NoSortHandled);
-
-        var orderBy = "ORDER BY " + string.Join(", ", parts);
-        return (orderBy, handled.ToFrozenSet());
-    }
-
-    // ==================== Conditional compare-and-set (IConditionalWriteRepository) ====================
-
-    /// <summary>Atomic CAS (JOBS-0005 §20.3): replace the row IFF the stored Json still matches <paramref name="guard"/>.
-    /// The guard lowers to the same JSON-path WHERE the query path uses; one row affected = applied, zero = lost.</summary>
-    public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
-    {
-        var (whereSql, parameters) = BuildWhere(LinqFilterCompiler.Compile(guard));
-        var p = SqlParameters.Positional(parameters);
-        var (id, json) = ToRow(model);
-        p.Add("__id", id);
-        p.Add("__json", json);
-        var guardClause = whereSql is null ? string.Empty : $" AND ({whereSql})";
-        var sql = $"UPDATE [{TableName}] SET Json = @__json WHERE Id = @__id{guardClause}";
-        using var conn = Open();
-        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
-        return affected > 0;
-    }
-
-    // ==================== Raw provider query (IRawQueryRepository) ====================
-
-    public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
-    {
-        ct.ThrowIfCancellationRequested();
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.query:raw");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = Open();
-        if (IsFullSelect(query))
-        {
-            var rewritten = RewriteEntityToken(query);
-            rewritten = RewriteSelectForProjection(rewritten);
-            rewritten = RewriteWhereInFullSelect(rewritten);
-            var rows = await QueryDynamicWithRetry(conn, rewritten, parameters);
-            var items = MapRowsToEntities(rows);
-            return new RepositoryQueryResult<TEntity> { Items = items };
-        }
-        else
-        {
-            var whereSql = RewriteWhereForProjection(query);
-            var paging = shaping.HasPagination
-                ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}"
-                : string.Empty;
-            var sql = $"SELECT Id, Json FROM [{TableName}] WHERE {whereSql}{paging}";
-            var items = await QueryRowsWithRetry(conn, sql, parameters);
-            return new RepositoryQueryResult<TEntity>
-            {
-                Items = items,
-                PaginationHandled = shaping.HasPagination,
-            };
-        }
+            Items = items,
+            FilterHandled = true,
+            PaginationHandled = paged,
+            CountExecution = CountExecutionKind.None
+        };
     }
 
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
-        ct.ThrowIfCancellationRequested();
-        using var conn = Open();
-        var whereSql = RewriteWhereForProjection(query);
-        var sql = $"SELECT COUNT(1) FROM [{TableName}] WHERE {whereSql}";
-        var p = ToSqlParameters(parameters);
-        try
-        {
-            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            return CountResult.Exact(await AdoCommands.ExecuteScalarInt64Async(conn, sql, p, null, ct));
-        }
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        var rewritten = RewriteEntity(query.Trim());
+        var sql = StartsSelect(rewritten)
+            ? $"SELECT COUNT(*) FROM ({rewritten.TrimEnd().TrimEnd(';')}) AS koan_count"
+            : $"SELECT COUNT(*) FROM {Table()} WHERE {rewritten}";
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        Bind(command, parameters);
+        return CountResult.Exact(Convert.ToInt64(await command.ExecuteScalarAsync(ct).ConfigureAwait(false)));
     }
 
-    private async Task<IReadOnlyList<TEntity>> QueryRowsWithRetry(IDbConnection conn, string sql, object? parameters)
+    public async Task<bool> ConditionalReplaceAsync(
+        TEntity model,
+        Expression<Func<TEntity, bool>> guard,
+        CancellationToken ct = default)
     {
-        var p = ToSqlParameters(parameters);
-        try
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(guard);
+        var predicate = Filter.All(
+            Filter.Eq(_entity.IdentityName, model.Id),
+            LinqFilterCompiler.Compile(guard));
+        var compiled = _queries.CompilePredicate(predicate);
+        var row = _entity.Write(model);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"UPDATE {Table()} AS koan_row SET \"Json\" = @json WHERE {compiled.Sql}";
+        command.Parameters.AddWithValue("@json", row.Json);
+        Bind(command, compiled.Parameters);
+        return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
+    }
+
+    public IBatchSet<TEntity, TKey> CreateBatch() => new SqliteBatch<TEntity, TKey>(CommitBatch);
+
+    internal async Task<BatchResult> CommitBatch(
+        IReadOnlyList<TEntity> adds,
+        IReadOnlyList<TEntity> updates,
+        IReadOnlyList<(TKey Id, Action<TEntity> Mutate)> mutations,
+        IReadOnlyList<TKey> deletes,
+        BatchOptions? options,
+        CancellationToken ct)
+    {
+        var total = checked(adds.Count + updates.Count + mutations.Count + deletes.Count);
+        if (options?.MaxItems is { } bound && total > bound)
+            throw new InvalidOperationException($"SQLite batch contains {total} operations, exceeding MaxItems={bound}.");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        foreach (var model in adds) await Upsert(connection, transaction, model, ct).ConfigureAwait(false);
+        foreach (var model in updates) await Upsert(connection, transaction, model, ct).ConfigureAwait(false);
+        foreach (var (id, mutate) in mutations)
         {
-            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
-            return rows.Select(FromRow).ToList();
+            var current = await Get(connection, transaction, id, ct).ConfigureAwait(false);
+            if (current is null) continue;
+            mutate(current);
+            await Upsert(connection, transaction, current, ct).ConfigureAwait(false);
         }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
+        var deleted = await Delete(connection, transaction, deletes, ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return new BatchResult(adds.Count, updates.Count + mutations.Count, deleted)
         {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            var rows = await AdoCommands.QueryIdJsonAsync(conn, sql, p, null, CancellationToken.None);
-            return rows.Select(FromRow).ToList();
-        }
+            Atomicity = BatchAtomicity.Atomic
+        };
     }
 
-    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QueryDynamicWithRetry(IDbConnection conn, string sql, object? parameters)
-    {
-        var p = ToSqlParameters(parameters);
-        try
-        {
-            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
-        }
-        catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-        {
-            Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-            var sqliteConn = (SqliteConnection)conn;
-            InvalidateHealth(sqliteConn, TableName);
-            EnsureOrchestrated(sqliteConn);
-            return await AdoCommands.QueryRowsAsync(conn, sql, p, null, CancellationToken.None);
-        }
-    }
-
-
-    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
-    {
-        await UpsertMany(new[] { model }, ct);
-        return model;
-    }
-
-    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
-        => await DeleteMany(new[] { id }, ct).ContinueWith(t => t.Result > 0, ct);
-
-    public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
-    {
-        var rows = models as IReadOnlyCollection<TEntity> ?? models.ToList();
-        if (rows.Count == 0) return 0;
-        using var conn = Open();
-        try
-        {
-            return await UpsertBatch(conn, rows, ct);
-        }
-        catch (SqliteException ex) when (IsNoSuchTable(ex))
-        {
-            // Table may not exist yet due to governance gating; ensure then retry the whole batch once.
-            if (conn is SqliteConnection sc)
-            {
-                Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                InvalidateHealth(sc, TableName);
-                EnsureOrchestrated(sc);
-            }
-            return await UpsertBatch(conn, rows, ct);
-        }
-    }
-
-    /// <summary>One transaction per batch: N inserts commit with a single fsync instead of one fsync per row
-    /// (autocommit). The bulk-write path — <c>AppendMany</c>/<c>list.Submit()</c> and windowed saves — is otherwise
-    /// O(N) fsyncs, the write-amplification cliff JOBS-0005 §19 calls out. The connection is freshly opened per call
-    /// (no ambient transaction shares it), so a local transaction is safe and atomic.</summary>
-    private async Task<int> UpsertBatch(IDbConnection conn, IReadOnlyCollection<TEntity> models, CancellationToken ct)
-    {
-        using var tx = conn.BeginTransaction();
-        var (sql, managed, guarded) = ManagedUpsert(TableName);
-        var count = 0;
-        foreach (var e in models)
-        {
-            ct.ThrowIfCancellationRequested();
-            var row = ToRow(e);
-            var affected = await AdoCommands.ExecuteAsync(conn, sql,
-                WithManaged(new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), managed), tx, ct);
-            if (guarded && affected == 0) throw CrossScopeWrite(TableName, row.Id);
-            count++;
-        }
-        tx.Commit();
-        return count;
-    }
-
-    // Managed-field conflict-aware upsert (DATA-0105 §3b — the write-verify half). When a managed write-scope is
-    // active, the row's JSON already carries the managed keys (the ManagedFieldJsonInjector injected them on
-    // serialize) AND the ON CONFLICT update is guarded so an existing row owned by a DIFFERENT managed scope is
-    // NOT overwritten — rows-affected = 0 then means a rejected cross-scope write (e.g. tenant B upserting tenant
-    // A's id). Generic: reads the scope dict, never names tenant/classification. Off ⇒ the original SQL verbatim.
-    private static (string Sql, KeyValuePair<string, object?>[] Managed, bool Guarded) ManagedUpsert(string table)
-    {
-        var scope = ManagedFieldWriteScope.Current;
-        if (scope is null || scope.Count == 0)
-            return ($"INSERT INTO [{table}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json;",
-                    Array.Empty<KeyValuePair<string, object?>>(), false);
-
-        var conds = new List<string>(scope.Count);
-        var prms = new List<KeyValuePair<string, object?>>(scope.Count);
-        var i = 0;
-        foreach (var kv in scope)
-        {
-            var p = "mf" + i++;
-            // Unqualified Json in the DO UPDATE clause refers to the EXISTING row's value (excluded.* is the new row).
-            conds.Add($"json_extract(Json, '$.{kv.Key}') = @{p}");
-            prms.Add(new KeyValuePair<string, object?>(p, kv.Value));
-        }
-        var sql = $"INSERT INTO [{table}] (Id, Json) VALUES (@Id, @Json) ON CONFLICT(Id) DO UPDATE SET Json = excluded.Json WHERE {string.Join(" AND ", conds)};";
-        return (sql, prms.ToArray(), true);
-    }
-
-    private static SqlParameters WithManaged(SqlParameters p, KeyValuePair<string, object?>[] managed)
-    {
-        foreach (var kv in managed) p.Add(kv.Key, kv.Value);
-        return p;
-    }
-
-    private static InvalidOperationException CrossScopeWrite(string table, string id)
-        => new($"Rejected a cross-scope write to '{table}' id '{id}': the row is owned by a different managed scope " +
-               "(e.g. tenant/classification). A managed-field-scoped entity cannot overwrite another scope's row.");
-
-    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-    {
-        using var conn = Open();
-        var count = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", ids.Select(i => i!.ToString()!).ToArray()), null, ct);
-        return count;
-    }
-
-    public async Task<int> DeleteAll(CancellationToken ct = default)
-    {
-        using var conn = Open();
-        return await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
-    }
-
-    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
-    {
-        using var conn = Open();
-
-        // Resolve Optimized strategy based on provider capabilities
-        var effectiveStrategy = strategy == RemoveStrategy.Optimized
-            ? RemoveStrategy.Fast // this adapter declares write.fastRemove
-            : strategy;
-
-        // SQLite has no TRUNCATE - both strategies use DELETE
-        var countResult = await Count(QueryDefinition.All, ct);
-        await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
-
-        if (effectiveStrategy == RemoveStrategy.Fast)
-        {
-            // Fast strategy: reclaim space via VACUUM
-            await AdoCommands.ExecuteAsync(conn, "VACUUM", null, null, ct);
-        }
-
-        return countResult.Value;
-    }
-
-    public IBatchSet<TEntity, TKey> CreateBatch() => new SqliteBatch(this);
-
-    private sealed class SqliteBatch(SqliteRepository<TEntity, TKey> repo) : IBatchSet<TEntity, TKey>
-    {
-        private readonly List<TEntity> _adds = new();
-        private readonly List<TEntity> _updates = new();
-        private readonly List<TKey> _deletes = new();
-        private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
-
-        public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
-        public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
-        public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
-        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
-
-        public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
-        {
-            // Apply mutations by loading entities then queueing as updates
-            foreach (var (id, mutate) in _mutations)
-            {
-                var current = await repo.Get(id, ct);
-                if (current is not null) { mutate(current); _updates.Add(current); }
-            }
-            var upserts = _adds.Concat(_updates);
-            var added = _adds.Count; var updated = _updates.Count;
-            var deleted = 0;
-            var requireAtomic = options?.RequireAtomic == true;
-            if (!requireAtomic)
-            {
-                if (upserts.Any()) await repo.UpsertMany(upserts, ct);
-                if (_deletes.Any()) deleted = await repo.DeleteMany(_deletes, ct);
-                return new BatchResult(added, updated, deleted);
-            }
-
-            // Atomic path: use autocommit (no explicit transaction)
-            using var conn = repo.Open();
-            var (upsertSql, managed, guarded) = ManagedUpsert(repo.TableName);
-            foreach (var e in upserts)
-            {
-                ct.ThrowIfCancellationRequested();
-                var row = repo.ToRow(e);
-                var affected = await AdoCommands.ExecuteAsync(conn, upsertSql,
-                    WithManaged(new SqlParameters().Add("Id", row.Id).Add("Json", row.Json), managed), null, ct);
-                if (guarded && affected == 0) throw CrossScopeWrite(repo.TableName, row.Id);
-            }
-            if (_deletes.Any())
-            {
-                deleted = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{repo.TableName}] WHERE Id IN @Ids", new SqlParameters().Add("Ids", _deletes.Select(i => i!.ToString()!).ToArray()), null, ct);
-            }
-            return new BatchResult(added, updated, deleted);
-        }
-    }
-
-    // Minimal SQLite dialect for the relational filter translator
-    private sealed class SqliteDialect : ILinqSqlDialect
-    {
-        public string QuoteIdent(string ident) => $"[{ident}]";
-        public string EscapeLike(string fragment)
-            => fragment.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
-        public string Parameter(int index) => $"@p{index}";
-
-        // List<string> is stored as a JSON array inside the Json column. json_each iterates it.
-        public string JsonArrayContains(string columnSql, string parameter)
-            => $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE value = {parameter})";
-
-        public string JsonArrayLength(string columnSql)
-            => $"json_array_length({columnSql})";
-    }
-
-    // IInstructionExecutor implementation for schema and raw SQL helpers
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
-        using var act = SqliteTelemetry.Activity.StartActivity("sqlite.instruction");
-        act?.SetTag("entity", typeof(TEntity).FullName);
-        using var conn = _connections.Create(_options.ConnectionString, _source);
-        await conn.OpenAsync(ct);
+        ArgumentNullException.ThrowIfNull(instruction);
         switch (instruction.Name)
         {
-            case RelationalInstructions.SchemaValidate:
-                {
-                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                    var ddl = new SqliteDdlExecutor(conn, TableName);
-                    var feats = new SqliteStoreFeatures();
-                    var report = await orch.ValidateAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
-                    return (TResult)report;
-                }
             case DataInstructions.EnsureCreated:
-                {
-                    if (typeof(TEntity).GetCustomAttributes(typeof(ReadOnlyAttribute), inherit: false).Any())
-                    {
-                        object ok_readonly = true; return (TResult)ok_readonly;
-                    }
-                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                    var ddl = new SqliteDdlExecutor(conn, TableName);
-                    var feats = new SqliteStoreFeatures();
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
-                    object d_ok = true; return (TResult)d_ok;
-                }
-            case RelationalInstructions.SchemaClear:
-                {
-                    // Remove the table if present; do not create it.
-                    var drop = $"DROP TABLE IF EXISTS \"{TableName}\";";
-                    try { await AdoCommands.ExecuteAsync(conn, drop, null, null, ct); }
-                    catch (SqliteException ex)
-                    {
-                        // Correctness path: SchemaClear's contract is to drop the table. A failed DROP must
-                        // not be silently reported as success — surface it (log-error; behavior preserved).
-                        KoanLog.DataError(_logger, "schema_clear", "drop-failed", ("table", TableName), ("code", ex.SqliteErrorCode), ("error", ex.Message));
-                    }
-                    // Invalidate health cache so a subsequent operation will re-ensure the schema
-                    try { InvalidateHealth(conn, TableName); }
-                    catch (Exception ex)
-                    {
-                        KoanLog.DataDebug(_logger, "schema_clear", "invalidate-failed", ("table", TableName), ("error", ex.Message));
-                    }
-                    object res = 0; return (TResult)res;
-                }
-            case DataInstructions.Clear:
-                EnsureOrchestrated(conn);
-                var del = await AdoCommands.ExecuteAsync(conn, $"DELETE FROM [{TableName}]", null, null, ct);
-                object d_res = del;
-                return (TResult)d_res;
             case RelationalInstructions.SchemaEnsureCreated:
-                {
-                    var orch = (IRelationalSchemaOrchestrator)_sp.GetRequiredService(typeof(IRelationalSchemaOrchestrator));
-                    var ddl = new SqliteDdlExecutor(conn, TableName);
-                    var feats = new SqliteStoreFeatures();
-                    await orch.EnsureCreatedAsync<TEntity, TKey>(ddl, feats, TableName, _schemaPolicy, ct);
-                    object ok = true; return (TResult)ok;
-                }
-            case RelationalInstructions.SqlScalar:
-                {
-                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                    var p = GetParamsFromInstruction(instruction);
-                    try
-                    {
-                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
-                        return CastScalar<TResult>(result);
-                    }
-                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                    {
-                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                        InvalidateHealth(conn, TableName);
-                        EnsureOrchestrated(conn);
-                        var result = await AdoCommands.ExecuteScalarAsync(conn, sql, p, null, ct);
-                        return CastScalar<TResult>(result);
-                    }
-                }
-            case RelationalInstructions.SqlNonQuery:
-                {
-                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                    sql = MaybeRewriteInsertForProjection(sql);
-                    // Ensure table exists if targeting this entity table
-                    // Degradable: this is a best-effort pre-ensure; the no-such-table retry below re-ensures.
-                    try { EnsureOrchestrated(conn); }
-                    catch (Exception ex)
-                    {
-                        KoanLog.DataDebug(_logger, "sql_nonquery", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
-                    }
-                    var p = GetParamsFromInstruction(instruction);
-                    try
-                    {
-                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
-                        object res = affected;
-                        return (TResult)res;
-                    }
-                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                    {
-                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                        InvalidateHealth(conn, TableName);
-                        EnsureOrchestrated(conn);
-                        var affected = await AdoCommands.ExecuteAsync(conn, sql, p, null, ct);
-                        object res = affected;
-                        return (TResult)res;
-                    }
-                }
-            case RelationalInstructions.SqlQuery:
-                {
-                    var sql = RewriteEntityToken(GetSqlFromInstruction(instruction));
-                    var p = GetParamsFromInstruction(instruction);
-                    // Best-effort ensure for entity table
-                    // Degradable: best-effort pre-ensure; the no-such-table retry below re-ensures.
-                    try { EnsureOrchestrated(conn); }
-                    catch (Exception ex)
-                    {
-                        KoanLog.DataDebug(_logger, "sql_query", "pre-ensure-failed", ("table", TableName), ("error", ex.Message));
-                    }
-                    try
-                    {
-                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
-                        var list = MapDynamicRows(rows);
-                        return (TResult)(object)list;
-                    }
-                    catch (SqliteException ex) when (IsNoSuchTableForEntity(ex))
-                    {
-                        Log.RetryMissingTable(_logger, TableName, ex.SqliteErrorCode);
-                        InvalidateHealth(conn, TableName);
-                        EnsureOrchestrated(conn);
-                        var rows = await AdoCommands.QueryRowsAsync(conn, sql, p, null, ct);
-                        var list = MapDynamicRows(rows);
-                        return (TResult)(object)list;
-                    }
-                }
-            default:
-                throw new NotSupportedException($"Instruction '{instruction.Name}' not supported by SQLite adapter for {typeof(TEntity).Name}.");
+                await EnsureReady(ct).ConfigureAwait(false);
+                return Cast<TResult>(true);
+            case DataInstructions.Clear:
+            case RelationalInstructions.SchemaClear:
+                return Cast<TResult>(await DeleteAll(ct).ConfigureAwait(false));
+            case RelationalInstructions.SchemaValidate:
+                await EnsureReady(ct).ConfigureAwait(false);
+                return Cast<TResult>(true);
+        }
+
+        var sql = RewriteEntity(Sql(instruction));
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        Bind(command, instruction.Parameters);
+        return instruction.Name switch
+        {
+            RelationalInstructions.SqlNonQuery => Cast<TResult>(await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false)),
+            RelationalInstructions.SqlScalar => Cast<TResult>(await command.ExecuteScalarAsync(ct).ConfigureAwait(false)),
+            RelationalInstructions.SqlQuery => Cast<TResult>(await ReadDynamic(command, ct).ConfigureAwait(false)),
+            _ => throw new NotSupportedException(
+                $"Instruction '{instruction.Name}' is not supported by SQLite for '{typeof(TEntity).Name}'.")
+        };
+    }
+
+    private async Task<SqliteConnection> Open(CancellationToken ct)
+    {
+        var connection = _connections.Create(_options.ConnectionString, _source);
+        try
+        {
+            await connection.OpenAsync(ct).ConfigureAwait(false);
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
         }
     }
 
-
-    private static string GetSqlFromInstruction(Instruction instruction)
+    private async Task Upsert(SqliteConnection connection, DbTransaction? transaction, TEntity model, CancellationToken ct)
     {
-        var payload = instruction.Payload;
-        var sqlProp = payload?.GetType().GetProperty("Sql");
-        var sql = sqlProp?.GetValue(payload) as string;
-        if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("Instruction payload missing Sql.");
-        return sql!;
-    }
-    private static SqlParameters GetParamsFromInstruction(Instruction instruction)
-        => instruction.Parameters is null ? SqlParameters.None : SqlParameters.FromDictionary(instruction.Parameters);
-
-    // Raw-query escape hatch: normalise the open `object?` parameter into the AOT-clean SqlParameters model.
-    // Dictionaries and SqlParameters pass through; a POCO/anonymous object is reflected (as Dapper did) — that
-    // reflective branch is the only AOT-soft spot, confined to the rarely-used raw path.
-    private static SqlParameters ToSqlParameters(object? parameters)
-    {
-        switch (parameters)
+        var row = _entity.Write(model);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction?)transaction;
+        var guard = ManagedFieldWriteScope.Current;
+        var where = "";
+        if (guard is { Count: > 0 })
         {
-            case null: return SqlParameters.None;
-            case SqlParameters sp: return sp;
-            case IReadOnlyDictionary<string, object?> rod: return SqlParameters.FromDictionary(rod);
-            case IDictionary<string, object?> dict:
+            var predicates = new List<string>(guard.Count);
+            var index = 0;
+            foreach (var value in guard)
             {
-                var bag = new SqlParameters();
-                foreach (var kv in dict) bag.Add(kv.Key, kv.Value);
-                return bag;
+                var name = $"@m{index++}";
+                predicates.Add($"json_extract(\"Json\", '{JsonPath(value.Key)}') IS {name}");
+                command.Parameters.AddWithValue(name, ComparableScalarEncoding.EncodeComparand(value.Value) ?? DBNull.Value);
             }
-            default:
-            {
-                var bag = new SqlParameters();
-                foreach (var prop in parameters.GetType().GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
-                {
-                    if (prop.CanRead && prop.GetIndexParameters().Length == 0) bag.Add(prop.Name, prop.GetValue(parameters));
-                }
-                return bag;
-            }
+            where = " WHERE " + string.Join(" AND ", predicates);
         }
+        command.CommandText = $"INSERT INTO {Table()} (\"Id\", \"Json\") VALUES (@id, @json) " +
+                              $"ON CONFLICT(\"Id\") DO UPDATE SET \"Json\" = excluded.\"Json\"{where}";
+        command.Parameters.AddWithValue("@id", row.Id);
+        command.Parameters.AddWithValue("@json", row.Json);
+        if (await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) != 1)
+            throw new InvalidOperationException(
+                $"Rejected a cross-scope write to '{typeof(TEntity).Name}' id '{row.Id}'.");
     }
 
-    private static bool IsFullSelect(string sql)
+    private async Task<TEntity?> Get(SqliteConnection connection, DbTransaction transaction, TKey id, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(sql)) return false;
-        var s = sql.TrimStart();
-        return s.StartsWith("select ", StringComparison.OrdinalIgnoreCase);
+        await using var command = connection.CreateCommand();
+        command.Transaction = (SqliteTransaction)transaction;
+        command.CommandText = $"SELECT \"Json\" FROM {Table()} WHERE \"Id\" = @id LIMIT 1";
+        command.Parameters.AddWithValue("@id", _entity.Key(id));
+        var json = await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+        return json is null ? null : _entity.Read(json);
     }
 
-    // Relational orchestration primitives for SQLite
-    private sealed class SqliteDdlExecutor : IRelationalDdlExecutor
+    private async Task<int> Delete(
+        SqliteConnection connection,
+        DbTransaction transaction,
+        IReadOnlyList<TKey> ids,
+        CancellationToken ct)
     {
-        private readonly SqliteConnection conn;
-        private readonly string tableName;
-        public SqliteDdlExecutor(SqliteConnection conn, string tableName)
+        var deleted = 0;
+        for (var offset = 0; offset < ids.Count; offset += ParameterBatch)
         {
-            this.conn = conn;
-            this.tableName = tableName;
+            var take = Math.Min(ParameterBatch, ids.Count - offset);
+            await using var command = connection.CreateCommand();
+            command.Transaction = (SqliteTransaction)transaction;
+            var names = new string[take];
+            for (var index = 0; index < take; index++)
+            {
+                names[index] = $"@p{index}";
+                command.Parameters.AddWithValue(names[index], _entity.Key(ids[offset + index]));
+            }
+            command.CommandText = $"DELETE FROM {Table()} WHERE \"Id\" IN ({string.Join(",", names)})";
+            deleted += await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
-        // New: Create table with all columns in one statement
-        public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns)
+        return deleted;
+    }
+
+    private async Task<IReadOnlyList<TEntity>> ReadEntities(
+        SqliteConnection connection,
+        string sql,
+        object? parameters,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        Bind(command, parameters);
+        var items = new List<TEntity>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        var jsonOrdinal = reader.GetOrdinal("Json");
+        while (await reader.ReadAsync(ct).ConfigureAwait(false)) items.Add(_entity.Read(reader.GetString(jsonOrdinal)));
+        return items;
+    }
+
+    private static async Task<List<Dictionary<string, object?>>> ReadDynamic(SqliteCommand command, CancellationToken ct)
+    {
+        var rows = new List<Dictionary<string, object?>>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
         {
-            var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
-            var colDefs = new List<string>();
-            foreach (var col in columns)
-            {
-                string type;
-                if (col.Name == "Id")
-                    type = "TEXT PRIMARY KEY";
-                else if (col.Name == "Json")
-                    type = "TEXT NOT NULL";
-                else if (col.ClrType == typeof(int) || col.ClrType == typeof(long) || col.ClrType == typeof(bool))
-                    type = "INTEGER" + (col.Nullable ? "" : " NOT NULL");
-                else if (col.ClrType == typeof(double))
-                    type = "REAL" + (col.Nullable ? "" : " NOT NULL");
-                else
-                    type = "TEXT" + (col.Nullable ? "" : " NOT NULL");
-                colDefs.Add($"[{col.Name}] {type}");
-            }
-            var sql = $"CREATE TABLE IF NOT EXISTS [{tname}] (" + string.Join(", ", colDefs) + ")";
-            System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableWithColumns: {sql}");
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = sql;
-            var result = cmd.ExecuteNonQuery();
-            System.Diagnostics.Debug.WriteLine($"[DDL] CREATE TABLE result: {result}");
-            // Emit PRAGMA table_info for debugging (debug builds only)
-#if DEBUG
-            try
-            {
-                using var c2 = conn.CreateCommand();
-                c2.CommandText = $"PRAGMA table_info('{tname}')";
-                using var r2 = c2.ExecuteReader();
-                System.Diagnostics.Debug.WriteLine($"[DDL] PRAGMA table_info for {tname} after CREATE:");
-                while (r2.Read())
-                {
-                    var cid = r2.GetInt32(0);
-                    var name = r2.IsDBNull(1) ? "(null)" : r2.GetString(1);
-                    var type = r2.IsDBNull(2) ? "(null)" : r2.GetString(2);
-                    var notnull = r2.GetInt32(3);
-                    System.Diagnostics.Debug.WriteLine($"[DDL]   cid={cid}, name={name}, type={type}, notnull={notnull}");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[DDL] Failed to PRAGMA table_info for {tname}: {ex.Message}");
-            }
-#endif
-            // Defensive: ensure all expected columns exist. Some SQLite environments or DDL fallbacks
-            // may create the table without all projection columns (computed vs physical). Add
-            // any missing physical columns to reach the expected shape.
-            try
-            {
-                foreach (var col in columns)
-                {
-                    try
-                    {
-                        if (!ColumnExists(schema, tname, col.Name))
-                        {
-                            System.Diagnostics.Debug.WriteLine($"[DDL] Column {col.Name} missing after CREATE TABLE, adding as physical column");
-                            AddPhysicalColumn(schema, tname, col.Name, col.ClrType, col.Nullable);
-                        }
-                    }
-                    catch (Exception exCol)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[DDL] Error while ensuring column {col.Name}: {exCol.Message}");
-                        // continue with other columns
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Degradable: per-column ensure is best-effort shape repair; each column already has its own
-                // typed catch above. This outer guard only catches an enumeration-level fault.
-                System.Diagnostics.Debug.WriteLine($"[DDL] Error ensuring columns for {tname}: {ex.Message}");
-            }
-            // Wait for table and required columns to be visible to other connections.
-            try
-            {
-                var required = columns.Select(c => c.Name).ToArray();
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var maxMs = 2000; // total wait time
-                var delay = 5;
-                while (sw.ElapsedMilliseconds < maxMs)
-                {
-                    try
-                    {
-                        if (TableExists("", tname) && required.All(cn => ColumnExists("", tname, cn)))
-                        {
-                            break;
-                        }
-                    }
-                    catch (SqliteException)
-                    {
-                        // Degradable: a transient probe error mid-poll means "not visible yet"; loop retries.
-                    }
-                    Thread.Sleep(delay);
-                    delay = Math.Min(200, delay * 2);
-                }
-                if (sw.ElapsedMilliseconds >= maxMs)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[DDL] Timeout waiting for table '{tname}' and columns to become visible ({required.Length} columns)");
-                }
-            }
-            catch (Exception ex)
-            {
-                // Degradable: visibility wait is a cross-connection settle barrier; the query path re-ensures.
-                System.Diagnostics.Debug.WriteLine($"[DDL] Visibility wait failed for {tname}: {ex.Message}");
-            }
+            var row = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < reader.FieldCount; index++)
+                row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+            rows.Add(row);
         }
-        public bool TableExists(string schema, string table)
+        return rows;
+    }
+
+    private static void Bind(SqliteCommand command, object? parameters)
+    {
+        if (parameters is IReadOnlyList<object?> positional)
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=@t";
-            cmd.Parameters.AddWithValue("@t", table);
-            return cmd.ExecuteScalar() is not null;
+            for (var index = 0; index < positional.Count; index++)
+                command.Parameters.AddWithValue($"@p{index}", ComparableScalarEncoding.EncodeComparand(positional[index]) ?? DBNull.Value);
+            return;
         }
-        public bool ColumnExists(string schema, string table, string column)
+        foreach (var value in Values(parameters))
         {
-            using var cmd = conn.CreateCommand();
-            // PRAGMA table_info expects a literal table name; use single-quote quoting and escape any single quotes in the name.
-            var safe = table?.Replace("'", "''") ?? table;
-            cmd.CommandText = $"PRAGMA table_info('{safe}')";
-            using var r = cmd.ExecuteReader();
-            while (r.Read())
-            {
-                var colName = r.IsDBNull(1) ? null : r.GetString(1);
-#if DEBUG
-                System.Diagnostics.Debug.WriteLine($"[DDL] PRAGMA row: name={colName}");
-#endif
-                if (colName is not null && string.Equals(colName, column, StringComparison.Ordinal))
-                {
-                    System.Diagnostics.Debug.WriteLine($"[DDL] ColumnExists: table={table}, column={column} => TRUE");
-                    return true;
-                }
-            }
-            System.Diagnostics.Debug.WriteLine($"[DDL] ColumnExists: table={table}, column={column} => FALSE");
-            return false;
-        }
-        public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json")
-        {
-            using var cmd = conn.CreateCommand();
-            // Use provided table parameter by default; fall back to ctor tableName if empty
-            var tname = string.IsNullOrWhiteSpace(table) ? tableName : table;
-            System.Diagnostics.Debug.WriteLine($"[DDL] CreateTableIdJson: table={tname}, idColumn={idColumn}, jsonColumn={jsonColumn}");
-            cmd.CommandText = $"CREATE TABLE IF NOT EXISTS [{tname}] ([{idColumn}] TEXT PRIMARY KEY, [{jsonColumn}] TEXT NOT NULL)";
-            cmd.ExecuteNonQuery();
-        }
-        public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted)
-        {
-            System.Diagnostics.Debug.WriteLine($"[DDL] AddComputedColumnFromJson: table={table}, column={column}, jsonPath={jsonPath ?? "(null)"}, persisted={persisted}");
-            // SQLite has limited generated columns; emulate as TEXT column and leave materialization to query-time.
-            AddPhysicalColumn(schema, table, column, typeof(string), true);
-        }
-        public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable)
-        {
-            string type = clrType == typeof(int) ? "INTEGER" : clrType == typeof(long) ? "INTEGER" : clrType == typeof(bool) ? "INTEGER" : clrType == typeof(double) ? "REAL" : "TEXT";
-            System.Diagnostics.Debug.WriteLine($"[DDL] AddPhysicalColumn: table={table}, column={column}, type={type}, nullable={nullable}, conn.State={conn.State}, conn.DataSource={conn.DataSource}");
-            try
-            {
-                using var cmd = conn.CreateCommand();
-                cmd.CommandText = $"ALTER TABLE [{table}] ADD COLUMN [{column}] {type}";
-                var result = cmd.ExecuteNonQuery();
-                System.Diagnostics.Debug.WriteLine($"[DDL] ALTER TABLE result: {result}");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"[DDL][ERROR] Failed to add column {column} to {table}: {ex.Message}\n{ex}");
-                throw;
-            }
-        }
-        public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique)
-        {
-            var cols = string.Join(", ", columns.Select(c => $"[{c}]"));
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"CREATE {(unique ? "UNIQUE " : "")}INDEX IF NOT EXISTS [{indexName}] ON [{table}] ({cols})";
-            cmd.ExecuteNonQuery();
+            var name = value.Key.StartsWith('@') ? value.Key : "@" + value.Key;
+            command.Parameters.AddWithValue(name, ComparableScalarEncoding.EncodeComparand(value.Value) ?? DBNull.Value);
         }
     }
 
-    private sealed class SqliteStoreFeatures : IRelationalStoreFeatures
+    private static IReadOnlyDictionary<string, object?> Values(object? value)
     {
-        public bool SupportsJsonFunctions => false;
-        public bool SupportsPersistedComputedColumns => false;
-        public bool SupportsIndexesOnComputedColumns => true;
-        public string ProviderName => "sqlite";
+        if (value is null) return new Dictionary<string, object?>();
+        if (value is IReadOnlyDictionary<string, object?> readOnly) return readOnly;
+        if (value is IDictionary<string, object?> dictionary) return new Dictionary<string, object?>(dictionary);
+        return value.GetType().GetProperties().Where(static property => property.GetIndexParameters().Length == 0).ToDictionary(
+            static property => property.Name,
+            property => property.GetValue(value),
+            StringComparer.OrdinalIgnoreCase);
     }
 
-    private string RewriteEntityToken(string sql)
+    private string Table() => SqliteDialect.Quote(_entity.Table);
+
+    private string RewriteEntity(string sql)
     {
-        var token = typeof(TEntity).Name;
-        var physical = TableName;
-        // Use simple word-boundary replace; bracket the physical name
-        // Case-insensitive replacement
-        var pattern = $"\\b{System.Text.RegularExpressions.Regex.Escape(token)}\\b";
-        return System.Text.RegularExpressions.Regex.Replace(sql, pattern, $"[{physical}]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var pattern = $"\\b{Regex.Escape(typeof(TEntity).Name)}\\b";
+        return Regex.Replace(sql, pattern, Table(), RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     }
 
-    private bool IsNoSuchTableForEntity(SqliteException ex)
+    private static bool StartsSelect(string sql) => sql.StartsWith("select", StringComparison.OrdinalIgnoreCase);
+
+    private static string JsonPath(string name) =>
+        ("$.\"" + name.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"")
+        .Replace("'", "''", StringComparison.Ordinal);
+
+    private static string Sql(Instruction instruction)
     {
-        if (ex.SqliteErrorCode != 1) return false; // generic SQL error; 1 often maps to no such table
-        var name = TableName;
-        var msg = ex.Message ?? "";
-        // Relax: treat any "no such table" as retriable; we still ensure our table and retry once
-        return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
+        if (instruction.Payload is string text) return text;
+        var value = instruction.Payload?.GetType().GetProperty("Sql")?.GetValue(instruction.Payload) as string;
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException("Instruction payload is missing Sql.", nameof(instruction))
+            : value;
     }
 
-
-    private static bool IsNoSuchTable(SqliteException ex)
+    private static TResult Cast<TResult>(object? value)
     {
-        if (ex.SqliteErrorCode != 1) return false;
-        var msg = ex.Message ?? "";
-        return msg.IndexOf("no such table", StringComparison.OrdinalIgnoreCase) >= 0;
-    }
-
-    private List<TEntity> MapRowsToEntities(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
-    {
-        var list = new List<TEntity>();
-        var t = typeof(TEntity);
-        var idProp = t.GetProperty("Id");
-        foreach (var dict in rows)
-        {
-            // Prefer Json column if present
-            if (dict.TryGetValue("Json", out var jsonVal) && jsonVal is string jsonStr && !string.IsNullOrWhiteSpace(jsonStr))
-            {
-                var ent = JsonConvert.DeserializeObject<TEntity>(jsonStr, _json);
-                if (ent is not null) list.Add(ent);
-                continue;
-            }
-            // otherwise map known columns
-            var ent2 = Activator.CreateInstance<TEntity>();
-            if (idProp is not null && dict.TryGetValue("Id", out var idv) && idv is not null)
-            {
-                // TKey may not be string; attempt change type if needed.
-                // Benign conversion fallback: when the raw id can't be coerced to TKey, set it verbatim.
-                try { idProp.SetValue(ent2, (TKey)Convert.ChangeType(idv, typeof(TKey))); }
-                catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
-                {
-                    idProp.SetValue(ent2, idv);
-                }
-            }
-            var titleProp = t.GetProperty("Title", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
-            if (titleProp is not null && dict.TryGetValue("Title", out var tv))
-            {
-                // Degradable: 'Title' is an optional convenience column in the rare non-Json raw-row path.
-                try { titleProp.SetValue(ent2, tv?.ToString()); }
-                catch (Exception ex) when (ex is ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Title on {t.Name}: {ex.Message}");
-                }
-            }
-            var metaProp = t.GetProperty("Meta", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.IgnoreCase);
-            if (metaProp is not null && dict.TryGetValue("Meta", out var mv))
-            {
-                try
-                {
-                    if (mv is string ms && !string.IsNullOrWhiteSpace(ms) && ms.TrimStart().StartsWith("{"))
-                    {
-                        var obj = JsonConvert.DeserializeObject(ms, metaProp.PropertyType);
-                        if (obj is not null) metaProp.SetValue(ent2, obj);
-                    }
-                }
-                catch (Exception ex) when (ex is JsonException or ArgumentException or System.Reflection.TargetException or System.Reflection.TargetInvocationException)
-                {
-                    // Degradable: 'Meta' is an optional column; malformed/incompatible JSON leaves it unset.
-                    System.Diagnostics.Debug.WriteLine($"[MAP] Failed to set Meta on {t.Name}: {ex.Message}");
-                }
-            }
-            list.Add(ent2);
-        }
-        return list;
-    }
-
-    // Rewrite SELECT clause to map bare property names to projected columns or JSON extraction
-    private string RewriteSelectForProjection(string selectSql)
-    {
-        // Only handle simple 'SELECT ... FROM [Table]' patterns. Leave complex SQL alone.
-        var rx = new System.Text.RegularExpressions.Regex(
-            @"^\s*select\s+(?<cols>.+?)\s+from\s+(?<from>.+)$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-        var m = rx.Match(selectSql);
-        if (!m.Success) return selectSql;
-        var cols = m.Groups["cols"].Value;
-        var fromPart = m.Groups["from"].Value;
-
-        // If wildcard, ensure Id, Json selected (works as-is)
-        if (cols.Trim() == "*") return selectSql;
-
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var p in projections)
-        {
-            var prop = p.Property.Name;
-            var phys = $"[{p.ColumnName}]";
-            var json = $"json_extract(Json, '$.{prop}')";
-            // Always prefer COALESCE so SELECT returns values even when physical projections are not backfilled yet
-            map[prop] = $"COALESCE({phys}, {json})";
-        }
-
-        // Replace comma-separated identifiers when bare
-        var pieces = cols.Split(',').Select(p => p.Trim()).ToArray();
-        for (int i = 0; i < pieces.Length; i++)
-        {
-            var piece = pieces[i];
-            if (piece.StartsWith("[")) continue; // assume already quoted/explicit
-            // If it's a known property name, project from column; else use JSON1
-            if (string.Equals(piece, "Id", StringComparison.Ordinal)) { pieces[i] = "[Id]"; continue; }
-            if (string.Equals(piece, "Json", StringComparison.Ordinal)) { pieces[i] = "[Json]"; continue; }
-            if (map.TryGetValue(piece, out var col)) pieces[i] = col + $" AS [{piece}]";
-            else pieces[i] = $"json_extract(Json, '$.{piece}') AS [{piece}]";
-        }
-        var newCols = string.Join(", ", pieces);
-        return $"SELECT {newCols} FROM {fromPart}";
-    }
-
-    private static TResult CastScalar<TResult>(object? value)
-    {
+        if (value is TResult exact) return exact;
         if (value is null) return default!;
-        var t = typeof(TResult);
-        if (t.IsAssignableFrom(value.GetType())) return (TResult)value;
-        // Benign coercion fallback: an unconvertible scalar (e.g. NULL-ish or shape mismatch) yields default.
-        try { return (TResult)Convert.ChangeType(value, t); }
-        catch (Exception ex) when (ex is InvalidCastException or FormatException or OverflowException or ArgumentException)
-        {
-            System.Diagnostics.Debug.WriteLine($"[SCALAR] Cannot coerce '{value}' to {t.Name}: {ex.Message}");
-            return default!;
-        }
-    }
-
-    private static IReadOnlyList<Dictionary<string, object?>> MapDynamicRows(IEnumerable<IReadOnlyDictionary<string, object?>> rows)
-    {
-        var list = new List<Dictionary<string, object?>>();
-        foreach (var row in rows)
-        {
-            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var kv in row) dict[kv.Key] = kv.Value;
-            list.Add(dict);
-        }
-        return list;
-    }
-
-    // For full SELECT statements, only rewrite the WHERE part to avoid syntax issues
-    private string RewriteWhereInFullSelect(string selectSql)
-    {
-        if (string.IsNullOrWhiteSpace(selectSql)) return selectSql;
-        // naive split on WHERE that is not inside quotes; keep simple for our test shapes
-        var rx = new System.Text.RegularExpressions.Regex(
-            @"^(?<head>\s*select\s+.+?\s+from\s+.+?)(\s+where\s+)(?<where>.+)$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-        var m = rx.Match(selectSql);
-        if (!m.Success) return selectSql;
-        var head = m.Groups["head"].Value;
-        var where = m.Groups["where"].Value;
-        var rewrittenWhere = RewriteWhereForProjection(where);
-        return head + " WHERE " + rewrittenWhere;
-    }
-
-    // Projection-aware rewrite: if identifiers are already quoted ([Prop]), only rewrite bracketed tokens.
-    // If unquoted, replace bare words with projected columns or JSON1 extraction.
-    private string RewriteWhereForProjection(string whereSql)
-    {
-        var projections = ProjectionResolver.Get(typeof(TEntity));
-        bool hasBrackets = whereSql.IndexOf('[', StringComparison.Ordinal) >= 0;
-        if (hasBrackets)
-        {
-            return System.Text.RegularExpressions.Regex.Replace(
-                whereSql,
-                "\\[(?<prop>[A-Za-z_][A-Za-z0-9_]*)\\]",
-                m =>
-                {
-                    var prop = m.Groups["prop"].Value;
-                    if (string.Equals(prop, "Id", StringComparison.Ordinal)) return "[Id]";
-                    if (string.Equals(prop, "Json", StringComparison.Ordinal)) return "[Json]";
-                    var proj = projections.FirstOrDefault(p => string.Equals(p.ColumnName, prop, StringComparison.Ordinal) || string.Equals(p.Property.Name, prop, StringComparison.Ordinal));
-                    var logical = proj?.Property.Name ?? prop;
-                    // Prefer COALESCE(physical, json_extract(Json,'$.Prop')) so we don't rely on backfilled physical columns
-                    var phys = proj is not null ? $"[{proj.ColumnName}]" : null;
-                    var json = $"json_extract(Json, '$.{logical}')";
-                    return phys is null ? json : $"COALESCE({phys}, {json})";
-                });
-        }
-
-        // No brackets: rewrite bare identifiers
-        // Map of property name -> projected column or JSON extraction depending on materialization
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var p in projections)
-        {
-            var prop = p.Property.Name;
-            var phys = $"[{p.ColumnName}]";
-            var json = $"json_extract(Json, '$.{prop}')";
-            map[prop] = $"COALESCE({phys}, {json})";
-        }
-        // Replace bare words
-        whereSql = System.Text.RegularExpressions.Regex.Replace(
-            whereSql,
-            "\n|\r",
-            " ");
-        foreach (var kv in map)
-        {
-            var ident = kv.Key;
-            var col = kv.Value;
-            whereSql = System.Text.RegularExpressions.Regex.Replace(
-                whereSql,
-                $"\\b{System.Text.RegularExpressions.Regex.Escape(ident)}\\b",
-                col);
-        }
-        // Replace any remaining likely props (simple identifiers) with JSON extraction when they are not SQL keywords/operators/parameters
-        whereSql = System.Text.RegularExpressions.Regex.Replace(
-            whereSql,
-            "(?<![@:])\b([A-Za-z_][A-Za-z0-9_]*)\b",
-            m =>
-            {
-                var token = m.Groups[1].Value;
-                // Leave common SQL keywords/operators untouched
-                switch (token.ToUpperInvariant())
-                {
-                    case "AND":
-                    case "OR":
-                    case "NOT":
-                    case "NULL":
-                    case "LIKE":
-                    case "IN":
-                    case "IS":
-                    case "BETWEEN":
-                    case "EXISTS":
-                    case "SELECT":
-                    case "FROM":
-                    case "WHERE":
-                    case "GROUP":
-                    case "BY":
-                    case "ORDER":
-                    case "LIMIT":
-                    case "OFFSET":
-                    case "ASC":
-                    case "DESC":
-                        return token;
-                }
-                // If special columns, keep as-is
-                if (string.Equals(token, "Id", StringComparison.Ordinal)) return "[Id]";
-                if (string.Equals(token, "Json", StringComparison.Ordinal)) return "[Json]";
-                // If it already got mapped, skip
-                if (map.ContainsKey(token)) return map[token];
-                return $"json_extract(Json, '$.{token}')";
-            });
-        return whereSql;
-    }
-
-    // If user tries to INSERT into projected columns, rewrite to insert into Json via json_set
-    private string MaybeRewriteInsertForProjection(string sql)
-    {
-        if (string.IsNullOrWhiteSpace(sql)) return sql;
-        var s = sql.TrimStart();
-        if (!s.StartsWith("insert into", StringComparison.OrdinalIgnoreCase)) return sql;
-        // Match: INSERT INTO [Table] (col1, col2, ...) VALUES (v1, v2, ...)
-        var rx = new System.Text.RegularExpressions.Regex(
-            @"^\s*insert\s+into\s+(?<table>\[[^\]]+\]|[A-Za-z_][A-Za-z0-9_\.]*?)\s*\((?<cols>[^\)]+)\)\s*values\s*\((?<vals>[^\)]+)\)",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
-        var m = rx.Match(sql);
-        if (!m.Success) return sql;
-        var table = m.Groups["table"].Value.Trim();
-        // Only rewrite if targeting this entity's table (after RewriteEntityToken it should be [Physical])
-        var physical = $"[{TableName}]";
-        if (!string.Equals(table, physical, StringComparison.Ordinal)) return sql;
-
-        var cols = m.Groups["cols"].Value.Split(',').Select(c => c.Trim()).ToArray();
-        var vals = m.Groups["vals"].Value.Split(',').Select(v => v.Trim()).ToArray();
-        if (cols.Length != vals.Length) return sql;
-
-        // Collect Id value and JSON setters for others
-        string? idExpr = null;
-        var jsonArgs = new List<string>();
-        for (int i = 0; i < cols.Length; i++)
-        {
-            var col = cols[i].Trim();
-            if (col.StartsWith("[")) col = col.Trim('[', ']');
-            var val = vals[i].Trim();
-            if (string.Equals(col, "Id", StringComparison.Ordinal))
-            {
-                idExpr = val;
-            }
-            else if (string.Equals(col, "Json", StringComparison.Ordinal))
-            {
-                // Start json with provided value
-                jsonArgs.Add($"({val})");
-            }
-            else
-            {
-                // Set $.Col = val
-                jsonArgs.Add($"'$.{col}'");
-                jsonArgs.Add(val);
-            }
-        }
-        if (idExpr is null) return sql; // don't handle
-
-        // Build json_set expression
-        string jsonExpr;
-        if (jsonArgs.Count == 0)
-        {
-            jsonExpr = "'{}'";
-        }
-        else
-        {
-            string baseExpr = jsonArgs.Count > 0 && jsonArgs[0].StartsWith("(") ? jsonArgs[0] : "'{}'";
-            var setters = jsonArgs[0].StartsWith("(") ? jsonArgs.Skip(1) : jsonArgs.AsEnumerable();
-            jsonExpr = $"json_set({baseExpr}, {string.Join(", ", setters)})";
-        }
-
-        var rewritten = $"INSERT INTO {physical} (Id, Json) VALUES ({idExpr}, {jsonExpr})";
-        return rewritten;
+        return (TResult)Convert.ChangeType(value, Nullable.GetUnderlyingType(typeof(TResult)) ?? typeof(TResult));
     }
 }

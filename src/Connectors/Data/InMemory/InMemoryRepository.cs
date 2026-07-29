@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core.KeyValue;
+using Koan.Data.Connector.InMemory.Runtime;
 
 namespace Koan.Data.Connector.InMemory;
 
@@ -31,7 +31,7 @@ internal sealed class InMemoryRepository<TEntity, TKey> : KeyValueStore<TEntity,
     // The current physical store: per (routed source, entity type, ambient partition).
     private ConcurrentDictionary<TKey, KvRecord<TEntity>> Store()
     {
-        var partition = Koan.Data.Core.EntityContext.Current?.Partition ?? "default";
+        var partition = Koan.Data.Core.EntityContext.Current?.Partition ?? Infrastructure.Constants.Storage.DefaultPartition;
         return _dataStore.GetOrCreateStore<TEntity, TKey>(_source, partition);
     }
 
@@ -64,8 +64,5 @@ internal sealed class InMemoryRepository<TEntity, TKey> : KeyValueStore<TEntity,
         return Task.FromResult(count);
     }
 
-    // The in-memory floor honours full LINQ-to-objects + atomic bulk writes.
-    protected override void DescribeBackend(ICapabilities caps) => caps
-        .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.InMemory, true))
-        .Add(DataCaps.Write.BulkUpsert).Add(DataCaps.Write.BulkDelete).Add(DataCaps.Write.AtomicBatch);
+    protected override void DescribeBackend(ICapabilities caps) => InMemoryFeatures.DescribeBackend(caps);
 }

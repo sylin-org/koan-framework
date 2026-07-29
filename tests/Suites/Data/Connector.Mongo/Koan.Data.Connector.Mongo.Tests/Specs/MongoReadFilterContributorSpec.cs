@@ -19,7 +19,7 @@ namespace Koan.Data.Connector.Mongo.Tests.Specs;
 
 /// <summary>
 /// DATA-0106 §2 — the read-filter contributor seam proven <b>adapter-agnostic</b> on MongoDB (a different store
-/// family: BSON document, the MongoFilterTranslator, non-Newtonsoft). The identical fake moderation axis used on
+/// family: native BSON document filters). The identical fake moderation axis used on
 /// SQLite rides Mongo unchanged: a flattened managed field <c>__mod_status</c> (<see cref="ManagedFieldDescriptor.AutoReadFilter"/>
 /// = <c>false</c>) injected as a BSON element + an <see cref="IReadFilterContributor"/> whose <b>non-equality</b>
 /// predicate (<c>__mod_status $ne "hidden"</c>) folds — through the SAME <c>FieldPathResolver</c>, no Mongo-specific
@@ -83,8 +83,9 @@ public sealed class MongoReadFilterContributorSpec(MongoFixture fixture, ITestOu
     public async Task Non_equality_predicate_scopes_query_and_count()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            services => services.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;
@@ -102,8 +103,9 @@ public sealed class MongoReadFilterContributorSpec(MongoFixture fixture, ITestOu
     public async Task Non_equality_predicate_protects_key_operations()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            services => services.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;
@@ -123,8 +125,9 @@ public sealed class MongoReadFilterContributorSpec(MongoFixture fixture, ITestOu
     public async Task Non_equality_predicate_scopes_mass_deletes()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            services => services.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;

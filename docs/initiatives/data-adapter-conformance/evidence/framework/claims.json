@@ -1,0 +1,245 @@
+{
+  "schemaVersion": 1,
+  "scope": "framework",
+  "status": "complete-audit",
+  "sourceCommit": "86c18819cf03160c20a001d91f3bd2f257fd1a0d",
+  "rule": "Observed is current surface evidence, not certification. Target is primer intent and remains RED until executable conformance passes.",
+  "claims": [
+    {
+      "id": "CLM-FW-001",
+      "name": "Source Core",
+      "scope": "Observed+Target",
+      "publication": "Unadvertised",
+      "surfaces": [
+        "SUR-FWK-SOURCE-CATALOG",
+        "SUR-FWK-ROUTING-CONTEXT",
+        "SUR-FWK-READINESS-DIAGNOSTICS",
+        "SUR-FWK-REPOSITORY-CHOKEPOINT"
+      ],
+      "acceptanceIds": [
+        "A-01",
+        "A-02",
+        "A-03",
+        "A-04",
+        "A-06",
+        "A-08",
+        "A-09",
+        "C-01",
+        "C-02",
+        "C-04",
+        "C-06",
+        "G-01",
+        "G-02",
+        "P-01",
+        "P-03"
+      ]
+    },
+    {
+      "id": "CLM-FW-002",
+      "name": "Entity Persistence",
+      "scope": "Observed",
+      "publication": "Advertised",
+      "surfaces": [
+        "SUR-FWK-ENTITY-READ",
+        "SUR-FWK-ENTITY-QUERY",
+        "SUR-FWK-ENTITY-STREAM",
+        "SUR-FWK-ENTITY-WRITE",
+        "SUR-FWK-ENTITY-BULK",
+        "SUR-FWK-LIFECYCLE",
+        "SUR-FWK-REPOSITORY-CONTRACT",
+        "SUR-FWK-REPOSITORY-CHOKEPOINT"
+      ],
+      "acceptanceIds": [
+        "B-01",
+        "B-02",
+        "B-03",
+        "B-04",
+        "B-05",
+        "B-06",
+        "B-07",
+        "B-08",
+        "B-09",
+        "G-05",
+        "G-06",
+        "G-09"
+      ]
+    },
+    {
+      "id": "CLM-FW-003",
+      "name": "Direct Native Access",
+      "scope": "Observed+Target",
+      "publication": "Advertised",
+      "surfaces": [
+        "SUR-FWK-DIRECT",
+        "SUR-FWK-INSTRUCTION"
+      ],
+      "acceptanceIds": [
+        "C-04",
+        "D-05",
+        "D-06",
+        "D-07",
+        "D-08",
+        "F-11"
+      ]
+    },
+    {
+      "id": "CLM-FW-004",
+      "name": "Transactions and Transfers",
+      "scope": "Observed",
+      "publication": "Advertised",
+      "surfaces": [
+        "SUR-FWK-TRANSACTION",
+        "SUR-FWK-TRANSFER"
+      ],
+      "acceptanceIds": [
+        "C-04",
+        "G-04",
+        "G-05"
+      ]
+    },
+    {
+      "id": "CLM-FW-005",
+      "name": "Source Integration and Record Results",
+      "scope": "Target",
+      "publication": "Proposed",
+      "surfaces": [
+        "SUR-FWK-INSPECTION-RECORDS",
+        "SUR-FWK-DIRECT"
+      ],
+      "acceptanceIds": [
+        "D-01",
+        "D-02",
+        "D-03",
+        "D-04",
+        "D-05",
+        "D-06",
+        "D-07",
+        "D-08",
+        "D-09"
+      ]
+    },
+    {
+      "id": "CLM-FW-006",
+      "name": "Compact Mapping",
+      "scope": "Target",
+      "publication": "Proposed",
+      "surfaces": [
+        "SUR-FWK-MAPPING",
+        "SUR-FAM-RELATIONAL-CONTRACT",
+        "SUR-FAM-RELATIONAL-EXECUTION"
+      ],
+      "acceptanceIds": [
+        "E-01",
+        "E-02",
+        "E-03",
+        "E-04",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-08",
+        "E-09",
+        "E-10",
+        "E-11",
+        "E-12",
+        "E-13",
+        "E-14",
+        "E-15"
+      ]
+    },
+    {
+      "id": "CLM-FW-007",
+      "name": "Registered Operations",
+      "scope": "Target",
+      "publication": "Proposed",
+      "surfaces": [
+        "SUR-FWK-REGISTERED-OPERATIONS",
+        "SUR-FWK-DIRECT",
+        "SUR-FWK-INSTRUCTION"
+      ],
+      "acceptanceIds": [
+        "F-01",
+        "F-02",
+        "F-03",
+        "F-04",
+        "F-05",
+        "F-06",
+        "F-07",
+        "F-08",
+        "F-09",
+        "F-10",
+        "F-11",
+        "F-12"
+      ]
+    },
+    {
+      "id": "CLM-FW-008",
+      "name": "Explainability and Hot Path",
+      "scope": "Observed+Target",
+      "publication": "Proposed",
+      "surfaces": [
+        "SUR-FWK-READINESS-DIAGNOSTICS",
+        "SUR-FWK-CAPS-RECEIPTS",
+        "SUR-FWK-SOURCE-CATALOG",
+        "SUR-FWK-MAPPING"
+      ],
+      "acceptanceIds": [
+        "H-01",
+        "H-02",
+        "H-03",
+        "H-04",
+        "H-05",
+        "H-06",
+        "P-01",
+        "P-02",
+        "P-03",
+        "P-04",
+        "P-05",
+        "P-06"
+      ]
+    },
+    {
+      "id": "CLM-FW-009",
+      "name": "Family and Adapter Native Dispatch",
+      "scope": "Observed",
+      "publication": "Advertised",
+      "surfaces": [
+        "SUR-FAM-DOCUMENT",
+        "SUR-FAM-KEYVALUE",
+        "SUR-FAM-RELATIONAL-CONTRACT",
+        "SUR-FAM-RELATIONAL-EXECUTION",
+        "SUR-FAM-RELATIONAL-NPGSQL",
+        "SUR-FAM-SEARCHENGINE",
+        "SUR-FAM-VECTOR-CONTRACT",
+        "SUR-FAM-VECTOR-RUNTIME",
+        "SUR-ADAPTER-COCKROACH",
+        "SUR-ADAPTER-COUCHBASE",
+        "SUR-ADAPTER-ELASTICSEARCH",
+        "SUR-ADAPTER-INMEMORY",
+        "SUR-ADAPTER-JSON",
+        "SUR-ADAPTER-MONGO",
+        "SUR-ADAPTER-OPENSEARCH",
+        "SUR-ADAPTER-POSTGRES",
+        "SUR-ADAPTER-REDIS",
+        "SUR-ADAPTER-SQLITE",
+        "SUR-ADAPTER-SQLSERVER",
+        "SUR-ADAPTER-VECTOR-INMEMORY",
+        "SUR-ADAPTER-VECTOR-MILVUS",
+        "SUR-ADAPTER-VECTOR-QDRANT",
+        "SUR-ADAPTER-VECTOR-SQLITEVEC",
+        "SUR-ADAPTER-VECTOR-WEAVIATE"
+      ],
+      "acceptanceIds": [
+        "A-05",
+        "A-07",
+        "B-01",
+        "B-06",
+        "G-04",
+        "G-07",
+        "G-08",
+        "H-06",
+        "P-04",
+        "P-05"
+      ]
+    }
+  ]
+}

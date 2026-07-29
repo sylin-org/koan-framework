@@ -63,18 +63,21 @@ public abstract class DataAdapterHealthContributorBase(
             }
             catch (Exception ex)
             {
+                _ = ex;
+                var plan = FindPlan(source);
                 return new HealthReport(
                     Name,
                     HealthState.Unhealthy,
-                    $"Data source '{source}' is unavailable",
+                    "An active Data source is unavailable",
                     null,
                     new Dictionary<string, object?>
                     {
                         ["active"] = true,
                         ["provider"] = Provider,
-                        ["sources"] = string.Join(",", sources),
-                        ["failedSource"] = source,
-                        ["error"] = Redaction.DeIdentify(ex.Message)
+                        ["sourceCount"] = sources.Count,
+                        ["failedDecision"] = plan?.RouteIdentity,
+                        ["failureCode"] = "koan.data.health.probe-failed",
+                        ["claims"] = plan is null ? string.Empty : string.Join(",", plan.ClaimReferences)
                     });
             }
         }
@@ -97,8 +100,17 @@ public abstract class DataAdapterHealthContributorBase(
         {
             ["active"] = true,
             ["provider"] = Provider,
-            ["sources"] = string.Join(",", sources)
+            ["sourceCount"] = sources.Count,
+            ["decisions"] = string.Join(",", sources.Select(FindPlan)
+                .Where(static plan => plan is not null).Select(static plan => plan!.RouteIdentity)),
+            ["claims"] = string.Join(",", sources.Select(FindPlan)
+                .Where(static plan => plan is not null)
+                .SelectMany(static plan => plan!.ClaimReferences).Distinct(StringComparer.Ordinal))
         };
+
+    private DataSourcePlanInfo? FindPlan(string source) =>
+        _runtimeDiagnostics.GetSourcePlansSnapshot().FirstOrDefault(plan =>
+            string.Equals(plan.Source, source, StringComparison.OrdinalIgnoreCase) && Matches(plan.Adapter));
 
     private IReadOnlyCollection<string> GetActiveSources()
     {

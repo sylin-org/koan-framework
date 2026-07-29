@@ -22,8 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ARCH-0094 Phase 1: the capability-driven Conformance Gate, LINK-compiled (not project-referenced) so the
-         two planes share its source, not an assembly — this testkit's discoverable conformance axis stays unshared. -->
+    <!-- One test-only dispatcher source serves both AODB planes without adding a runtime package edge to adapters. -->
     <Compile Include="..\..\..\_shared\CapabilityConformanceGate.cs" Link="Support\CapabilityConformanceGate.cs" />
   </ItemGroup>
 

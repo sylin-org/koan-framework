@@ -4,7 +4,7 @@
     <PackageValidationBaselineVersion>0.20.1</PackageValidationBaselineVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>Couchbase data provider for Koan: options binding and repository integration for document databases.</Description>
+    <Description>Couchbase provider for Koan Data with direct KV, SQL++, CAS, compact mappings, and neutral source integration.</Description>
     <PackageTags>$(CommonPackageTags);data;couchbase;documentdb;repository</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -14,7 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="CouchbaseNetClient" />
-    <PackageReference Include="Couchbase.Transactions" />
+    <PackageReference Include="Newtonsoft.Json" />
     <!-- Pin transitive Snappier to 1.3.1 to clear GHSA-pggp-6c3x-2xmx (HIGH).
          CouchbaseNetClient 3.8.1 still pulls Snappier 1.2.0 which is affected
          (advisory range <= 1.3.0). 1.3.1 is API-compatible. -->

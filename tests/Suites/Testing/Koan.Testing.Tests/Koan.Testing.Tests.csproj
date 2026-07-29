@@ -21,6 +21,7 @@
          exercises the default L1 memory cache. -->
     <ProjectReference Include="..\..\..\..\src\Koan.Testing\Koan.Testing.csproj" />
     <ProjectReference Include="..\..\..\..\src\Connectors\Data\InMemory\Koan.Data.Connector.InMemory.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Cache\Koan.Cache.csproj" />
   </ItemGroup>
 </Project>

@@ -5,10 +5,8 @@ using Koan.Data.Connector.Json.Infrastructure;
 namespace Koan.Data.Connector.Json;
 
 /// <summary>
-/// Auto-registers the JSON adapter and health contributor during Koan initialization.
+/// Resolves the default JSON directory from Koan configuration.
 /// </summary>
-// legacy initializer removed in favor of standardized auto-registrar
-
 internal sealed class JsonDataOptionsConfigurator : IConfigureOptions<JsonDataOptions>
 {
     private readonly IConfiguration? _config;

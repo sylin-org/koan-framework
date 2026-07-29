@@ -7,30 +7,16 @@ namespace Koan.Data.Core;
 /// </summary>
 public static class DataServiceExecuteExtensions
 {
-
-    public static async Task<TResult> Execute<TEntity, TResult>(this IDataService data, string sql, object? parameters = null, CancellationToken ct = default) where TEntity : class
-    {
-        if (string.IsNullOrWhiteSpace(sql)) throw new ArgumentException("SQL must be provided.", nameof(sql));
-        var trimmed = sql.TrimStart();
-        if (trimmed.StartsWith("select ", StringComparison.OrdinalIgnoreCase))
-        {
-            // Delegate to query/scalar based on TResult; consumers can explicitly call InstructionSql.Scalar/Query.
-            var instr = InstructionSql.Query(sql, parameters);
-            return await data.Execute<TEntity, TResult>(instr, ct);
-        }
-        var nonQuery = InstructionSql.NonQuery(sql, parameters);
-        if (typeof(TResult) == typeof(bool))
-        {
-            var affected = await data.Execute<TEntity, int>(nonQuery, ct);
-            return (TResult)(object)(affected > 0);
-        }
-        return await data.Execute<TEntity, TResult>(nonQuery, ct);
-    }
     /// <summary>
     /// Execute an instruction for the specified aggregate, resolving its key type from metadata.
     /// </summary>
     public static async Task<TResult> Execute<TEntity, TResult>(this IDataService data, Instruction instruction, CancellationToken ct = default) where TEntity : class
     {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(instruction);
+        if (data is DataService core)
+            core.DemandForEntity<TEntity>(instruction.EffectiveEffect(), "entity instruction");
+
         // Determine the key type via AggregateMetadata and call GetRepository<TEntity,TKey>() reflectively
         var id = AggregateMetadata.GetIdSpec(typeof(TEntity)) ?? throw new InvalidOperationException($"No Identifier on {typeof(TEntity).Name}");
         var keyType = id.Prop.PropertyType;
@@ -58,6 +44,11 @@ public static class DataServiceExecuteExtensions
         where TEntity : class, Abstractions.IEntity<TKey>
         where TKey : notnull
     {
+        ArgumentNullException.ThrowIfNull(data);
+        ArgumentNullException.ThrowIfNull(instruction);
+        if (data is DataService core)
+            core.DemandForEntity<TEntity>(instruction.EffectiveEffect(), "entity instruction");
+
         var repo = data.GetRepository<TEntity, TKey>();
         if (repo is IInstructionExecutor<TEntity> exec)
         {

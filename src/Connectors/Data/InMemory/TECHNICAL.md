@@ -24,7 +24,7 @@ The repository declares:
 - `FilterExecutionProfile(InMemory, fullyEvaluated: true)`;
 - bulk upsert;
 - bulk delete; and
-- atomic batch within the process-local store.
+- ordered batch execution without an atomic guarantee.
 
 It does not declare `DataCaps.Query.ProviderBoundedPaging`. Its query path starts from the resident
 full-source dictionary, so slicing a numbered page is not evidence of provider-bounded traversal.
@@ -32,6 +32,10 @@ full-source dictionary, so slicing a numbered page is not evidence of provider-b
 The common key-value family supplies managed-field guards, isolation modes, instructions, and the
 provider-neutral Entity repository contract. This connector does not infer remote durability,
 distributed atomicity, or production recovery from those shared semantics.
+
+The factory publishes the same executable claims and rejects two inapplicable source decisions rather than silently
+weakening them: physical `Map<T>` declarations and `StorageLifecycle.External`. `RequireAtomic=true` rejects before
+dispatch because the KeyValue batch has no single all-or-nothing native boundary.
 
 ## Streaming boundary
 
@@ -44,8 +48,9 @@ distributed atomicity, or production recovery from those shared semantics.
 
 ## Concurrency and isolation
 
-Each physical store is a `ConcurrentDictionary`. Individual key operations and the connector's
-declared batch contract are process-local. There is no cross-process coordination, durable journal,
+Each physical store is a `ConcurrentDictionary`. The host owns at most 4096 source/type/partition stores; exceeding the
+bound rejects instead of growing process state indefinitely. Individual key operations and the connector's batch
+contract are process-local. There is no cross-process coordination, durable journal,
 replication, backup, or restart recovery.
 
 `EntityContext.Partition` changes the physical store. Routed data sources also remain distinct. Test
@@ -56,7 +61,7 @@ every inherited Entity battery.
 
 `Koan.Data.Connector.InMemory.Tests` covers CRUD, filtering/capabilities, sorting, batch behavior,
 instructions, isolation modes, partitions, host ownership, and managed-field no-leak behavior. The
-current suite passes 56/56.
+current suite passes 53/53.
 
 ## Unsupported
 

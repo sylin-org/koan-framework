@@ -1,76 +1,128 @@
-using System;
-using System.Text;
+using Koan.Core;
+using Koan.Core.Capabilities;
+using Koan.Core.Services;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Core;
+using Koan.Data.Connector.Sqlite.Infrastructure;
+using Koan.Data.Connector.Sqlite.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Core;
-using Koan.Core.Services;
 
 namespace Koan.Data.Connector.Sqlite;
 
 [ProviderPriority(10)]
 [KoanService(ServiceKind.Database, shortCode: "sqlite", name: "SQLite",
     DeploymentKind = DeploymentKind.InProcess,
-    DefaultPorts = new int[] { }, // SQLite is file-based, no network ports
-    Capabilities = new[] { "protocol=file" },
-    Volumes = new[] { "./Data/sqlite:/data" },
-    AppEnv = new[] { "Koan__Data__Sqlite__ConnectionString=Data Source=/data/app.db" },
+    Capabilities = ["protocol=file"],
+    Volumes = ["./Data/sqlite:/data"],
+    AppEnv = ["Koan__Data__Sqlite__ConnectionString=Data Source=/data/app.db"],
     Scheme = "file", Host = "", EndpointPort = 0,
-    UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0, LocalPattern = "Data Source={path}")]
-public sealed class SqliteAdapterFactory : IDataAdapterFactory
+    UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0,
+    LocalPattern = "Data Source={path}")]
+public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
 {
-    public string Provider => "sqlite";
+    public string Provider => Constants.Provider;
+    public IReadOnlyCollection<string> Aliases => ["sqlite3"];
+    public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Sqlite"];
 
-    internal static bool HandlesProvider(string provider)
-        => string.Equals(provider, "sqlite", StringComparison.OrdinalIgnoreCase);
+    internal static bool HandlesProvider(string provider) =>
+        string.Equals(provider, Constants.Provider, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(provider, "sqlite3", StringComparison.OrdinalIgnoreCase);
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
-        IServiceProvider sp,
-        string source = "Default")
+    public void DescribeClaims(IDataClaims claims) => SqliteFeatures.Declare(claims);
+
+    public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
+        SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
+        SourceInspectionCapabilities.ListContainers |
+        SourceInspectionCapabilities.ResolveAddress |
+        SourceInspectionCapabilities.DescribeContainer |
+        SourceInspectionCapabilities.SampleRecords,
+        ["sql"],
+        enforcesReadLanes: true);
+
+    public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return new SqliteSourceIntegration(
+            route,
+            services.GetRequiredService<SqliteConnectionManager>());
+    }
+
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var config = sp.GetRequiredService<IConfiguration>();
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var baseOpts = sp.GetRequiredService<IOptions<SqliteOptions>>().Value;
-        var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        var connections = sp.GetRequiredService<SqliteConnectionLifecycle>();
+        var route = ResolveRoute(services, source);
+        var mapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(route.Source);
+        if (mapping is not null)
+            return new SqliteMappedRepository<TEntity, TKey>(
+                services,
+                route,
+                mapping,
+                services.GetRequiredService<SqliteConnectionManager>());
+        return new SqliteRepository<TEntity, TKey>(
+            services,
+            route.Options,
+            services.GetRequiredService<IStorageNameResolver>(),
+            services.GetRequiredService<SqliteConnectionManager>(),
+            route.Source);
+    }
 
-        // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
-        // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
-        // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Sqlite", source, baseOpts.ConnectionString, this);
-
-        // Create source-specific options
-        var sourceOpts = new SqliteOptions
-        {
-            ConnectionString = connectionString,
-            NamingStyle = baseOpts.NamingStyle,
-            Separator = baseOpts.Separator,
-            DdlPolicy = baseOpts.DdlPolicy,
-            SchemaMatching = baseOpts.SchemaMatching,
-            AllowProductionDdl = baseOpts.AllowProductionDdl,
-            Readiness = baseOpts.Readiness
-        };
-
-        return new SqliteRepository<TEntity, TKey>(sp, sourceOpts, resolver, connections, source);
+    internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var defaults = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? Constants.DefaultSource : source;
+        var connection = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, registry, Provider, resolvedSource, defaults.ConnectionString, this);
+        var readLanes = registry.GetSource(resolvedSource)?.ReadLanes?
+            .Where(static lane =>
+                !string.IsNullOrWhiteSpace(lane.Value.ConnectionString) &&
+                !string.Equals(lane.Value.ConnectionString, "auto", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(
+                static lane => lane.Key,
+                static lane => lane.Value.ConnectionString,
+                StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var definition = registry.GetSource(resolvedSource);
+        return new SqliteRoute(
+            resolvedSource,
+            new SqliteOptions
+            {
+                ConnectionString = connection,
+                NamingStyle = defaults.NamingStyle,
+                Separator = defaults.Separator,
+                DdlPolicy = defaults.DdlPolicy,
+                SchemaMatching = defaults.SchemaMatching,
+                AllowProductionDdl = defaults.AllowProductionDdl,
+                Readiness = defaults.Readiness
+            },
+            readLanes,
+            definition?.StorageLifecycle ?? StorageLifecycle.Managed,
+            definition?.Access ?? DataSourceAccess.ReadWrite);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<SqliteOptions>>().Value;
         return new StorageNamingCapability
         {
-            Style = opts.NamingStyle,
-            Separator = opts.Separator,
+            Style = options.NamingStyle,
+            Separator = options.Separator,
             Casing = NameCasing.AsIs,
             PartitionSeparator = '#',
-            // SQLite keeps letters/digits and - . _ ; no practical identifier-length limit.
-            Partition = PartitionTokenPolicy.Default,
+            Partition = PartitionTokenPolicy.Default
         };
     }
 }
+
+internal sealed record SqliteRoute(
+    string Source,
+    SqliteOptions Options,
+    IReadOnlyDictionary<string, string> ReadLanes,
+    StorageLifecycle StorageLifecycle,
+    DataSourceAccess Access);

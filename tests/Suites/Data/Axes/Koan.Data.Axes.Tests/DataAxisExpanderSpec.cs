@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
@@ -25,8 +26,11 @@ namespace Koan.Data.Axes.Tests;
 /// </summary>
 public sealed class DataAxisExpanderSpec : IDisposable
 {
-    public DataAxisExpanderSpec() => AxisRegistries.ResetAll();
-    public void Dispose() => AxisRegistries.ResetAll();
+    private readonly ServiceCollection _services = new();
+    private readonly IDisposable _composition;
+
+    public DataAxisExpanderSpec() => _composition = KoanCompositionScope.Enter(_services);
+    public void Dispose() => _composition.Dispose();
 
     private sealed class Doc { }
     private sealed class Other { }
@@ -38,7 +42,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void Empty_batch_registers_nothing()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         DataAxisExpander.ExpandAxes(Array.Empty<Axis>(), services);
 
         ManagedFieldRegistry.IsEmpty.Should().BeTrue();
@@ -52,7 +56,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void A_soft_delete_shaped_axis_expands_to_the_raw_seams()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis()
@@ -96,7 +100,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void An_equality_axis_registers_an_auto_equality_field_and_no_extra_contributor()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("tenant").AppliesTo(t => t == typeof(Doc)).Field("__koan_tenant", () => "acme"),
@@ -119,7 +123,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void A_database_axis_expands_its_field_into_a_route_without_services()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis()
@@ -131,7 +135,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
 
         DatabaseRouteRegistry.ResolveSourceKey(typeof(Doc)).Should().Be("tenant_a");
         DatabaseRouteRegistry.ResolveSourceKey(typeof(Other)).Should().BeNull();
-        services.Should().BeEmpty();
+        services.Should().NotBeEmpty("the route catalog is owned by this host");
     }
 
     // --- ARCH-0102 §3: provenance is a [Flags] type, so a field can be BOTH ambient-stamped AND operation-sourced
@@ -160,14 +164,14 @@ public sealed class DataAxisExpanderSpec : IDisposable
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("a").AppliesTo(t => t == typeof(Doc)).Reads(_ => Hide).Field("__a", () => null, typeof(bool)),
-        }, new ServiceCollection());
+        }, _services);
         var readsFirst = ManagedFieldRegistry.ForType(typeof(Doc)).Single().AutoReadFilter;
 
         AxisRegistries.ResetAll();
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("a").AppliesTo(t => t == typeof(Doc)).Field("__a", () => null, typeof(bool)).Reads(_ => Hide),
-        }, new ServiceCollection());
+        }, _services);
         var fieldFirst = ManagedFieldRegistry.ForType(typeof(Doc)).Single().AutoReadFilter;
 
         readsFirst.Should().BeFalse();
@@ -179,7 +183,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void Multiple_reads_axes_register_distinct_contributors_not_one()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("a").AppliesTo(t => t == typeof(Doc)).Reads(_ => Hide),
@@ -200,7 +204,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
         {
             new Axis().Named("dup").Field("__a", () => "v"),
             new Axis().Named("dup").Field("__b", () => "v"),
-        }, new ServiceCollection()))
+        }, _services))
             .Should().Throw<InvalidOperationException>().WithMessage("*share the logical id 'dup'*");
 
     [Fact]
@@ -209,7 +213,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
         {
             new Axis().Named("a").Field("__same", () => "v"),
             new Axis().Named("b").Field("__same", () => "v"),
-        }, new ServiceCollection()))
+        }, _services))
             .Should().Throw<InvalidOperationException>().WithMessage("*both declare the managed field '__same'*");
 
     [Fact]
@@ -220,7 +224,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
         {
             new Axis().Named("a").Field("__a", () => "v"),
             new Axis().Named("a").Field("__b", () => "v"),
-        }, new ServiceCollection())).Should().Throw<InvalidOperationException>();
+        }, _services)).Should().Throw<InvalidOperationException>();
 
         ManagedFieldRegistry.IsEmpty.Should().BeTrue();
     }
@@ -237,7 +241,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
         FluentActions.Invoking(() => DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("evil").AppliesTo(t => t == typeof(Doc)).Field("__deleted", () => null, typeof(bool)),
-        }, new ServiceCollection()))
+        }, _services))
             .Should().Throw<InvalidOperationException>().WithMessage("*already registered by another source*");
     }
 
@@ -248,8 +252,8 @@ public sealed class DataAxisExpanderSpec : IDisposable
         // clash — the field-ownership ledger recognizes itself.
         static Axis Make() => new Axis().Named("a").AppliesTo(t => t == typeof(Doc)).Field("__a", () => "v");
 
-        DataAxisExpander.ExpandAxes(new[] { Make() }, new ServiceCollection());
-        FluentActions.Invoking(() => DataAxisExpander.ExpandAxes(new[] { Make() }, new ServiceCollection())).Should().NotThrow();
+        DataAxisExpander.ExpandAxes(new[] { Make() }, _services);
+        FluentActions.Invoking(() => DataAxisExpander.ExpandAxes(new[] { Make() }, _services)).Should().NotThrow();
         ManagedFieldRegistry.ForType(typeof(Doc)).Should().ContainSingle(d => d.StorageName == "__a");
     }
 
@@ -258,7 +262,7 @@ public sealed class DataAxisExpanderSpec : IDisposable
     [Fact]
     public void Expand_skips_abstract_and_ctor_param_axis_types()
     {
-        var services = new ServiceCollection();
+        var services = _services;
         FluentActions.Invoking(() => DataAxisExpander.Expand(
             new[] { typeof(AbstractTestAxis), typeof(CtorParamTestAxis), typeof(GoodTestAxis) }, services))
             .Should().NotThrow();   // the two non-instantiable types are skipped, not a boot crash

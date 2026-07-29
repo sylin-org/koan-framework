@@ -2,51 +2,42 @@ namespace Koan.Data.Connector.Couchbase.Infrastructure;
 
 internal static class Constants
 {
-    internal static class Provider
-    {
-        internal const string Name = "couchbase";
-        internal const string ConfigurationName = "Couchbase";
-        internal const int Priority = 30;
-    }
-
-    public const string Section = "Koan:Data:Couchbase";
+    internal const string Provider = "couchbase";
+    internal const string Alias = "cb";
+    internal const string DefaultSource = "Default";
+    internal const string DefaultBucket = "Koan";
+    internal const string DefaultScope = "_default";
+    internal const int Priority = 30;
+    internal const int MaximumRoutes = 128;
+    internal const int MaximumContainersPerRoute = 1024;
+    internal const int MaximumKeyBytes = 250;
+    internal const int MaximumScopeBytes = 30;
+    internal const int MaximumCollectionBytes = 251;
 
     internal static class Configuration
     {
-        internal static class Keys
-        {
-            public const string ConnectionString = Section + ":ConnectionString";
-            public const string ConnectionStringsCouchbase = "ConnectionStrings:Couchbase";
-            public const string DefaultSourceConnectionString = "Koan:Data:Sources:Default:couchbase:ConnectionString";
-            public const string Bucket = Section + ":Bucket";
-            public const string DefaultSourceBucket = "Koan:Data:Sources:Default:couchbase:Bucket";
-            public const string Scope = Section + ":Scope";
-            public const string Collection = Section + ":Collection";
-            public const string Username = Section + ":Username";
-            public const string DefaultSourceUsername = "Koan:Data:Sources:Default:couchbase:Username";
-            public const string Password = Section + ":Password";
-            public const string DefaultSourcePassword = "Koan:Data:Sources:Default:couchbase:Password";
-            public const string QueryTimeout = Section + ":QueryTimeoutSeconds";
-            public const string DurabilityLevel = Section + ":Durability";
-            public const string Hosts = Section + ":Hosts";
-            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
-            public const string ManagementUrl = Section + ":ManagementUrl";
-        }
+        internal const string Section = "Koan:Data:Couchbase";
+        internal const string ConnectionString = Section + ":ConnectionString";
+        internal const string Bucket = Section + ":Bucket";
+        internal const string Scope = Section + ":Scope";
+        internal const string Collection = Section + ":Collection";
+        internal const string Username = Section + ":Username";
+        internal const string Password = Section + ":Password";
+        internal const string QueryTimeout = Section + ":QueryTimeout";
+        internal const string Durability = Section + ":Durability";
+        internal const string DisableAutoDetection = Section + ":DisableAutoDetection";
+        internal const string StandardConnectionString = "ConnectionStrings:Couchbase";
     }
 
     internal static class Discovery
     {
-        public const string ServiceName = "couchbase";
-        public const string CouchbaseUrls = "COUCHBASE_URLS";
-        public const string CouchbaseAliasUrls = "CB_URLS";
-        public const string CouchbaseHosts = "COUCHBASE_HOSTS";
-        public const int KvPort = 11210;
-        public const int ManagerPort = 8091;
+        internal const string ServiceName = "couchbase";
+        internal const string CouchbaseUrls = "COUCHBASE_URLS";
+        internal const string CouchbaseAliasUrls = "CB_URLS";
     }
 
-    internal static class Bootstrap
+    internal static class Storage
     {
-        public const string EnsureCreatedSupported = "data:couchbase:ensureCreated";
+        internal const string Identity = "id";
     }
 }
-

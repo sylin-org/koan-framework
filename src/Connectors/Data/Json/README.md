@@ -57,8 +57,18 @@ create and remove a probe file. Failure reports the selected connector as unheal
   datasets; there are no transactions, indexes, server-side queries, or cross-process coordination.
 - Writes replace the previous file only after a complete temporary snapshot is written. Invalid existing JSON fails
   with a corrective `InvalidDataException`; Koan never interprets corrupt storage as an empty database.
+- A failed serialization or replacement leaves both the visible in-memory snapshot and the last complete file
+  unchanged. Reads return detached materializations, so editing an Entity does not alter storage until `Save()` succeeds.
+- `External` opens only an existing directory and existing Entity file; repository use and health never provision or
+  probe-write provider-owned storage. Read-only writes reject before an Entity file is created.
+- Physical `Map<T>` declarations reject because this adapter owns Koan's Entity-array file format and cannot honestly
+  couple arbitrary legacy field layouts.
 - Package presence makes the provider available. Election, explicit source selection, or actual Entity use activates
   readiness and storage access.
+
+Repository state is bounded to 1024 physical files. JSON publishes scan-backed filter/query claims and deliberately
+does not claim native bulk, atomic batch, fast remove, indexes, or provider-bounded paging. The current real-file suite
+passes 28/28.
 
 ## References
 

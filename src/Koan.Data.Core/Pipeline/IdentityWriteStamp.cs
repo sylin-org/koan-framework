@@ -10,8 +10,6 @@ internal sealed class IdentityWriteStamp : IWriteStamp
 
     public IdentityWriteStamp(Type entityType) => _spec = AggregateMetadata.GetIdSpec(entityType);
 
-    public bool AppliesInBatch => true;
-
     /// <summary>0 — identity always stamps first, so every later contributor sees a populated id.</summary>
     public int Priority => 0;
 

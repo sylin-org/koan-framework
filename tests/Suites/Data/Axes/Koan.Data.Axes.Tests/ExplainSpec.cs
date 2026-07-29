@@ -175,14 +175,16 @@ public sealed class ExplainSpec : IDisposable
     [Fact]
     public void Summarize_lists_the_active_planes()
     {
+        var services = new ServiceCollection();
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("tenant").AppliesTo(t => t == typeof(Doc)).Field("__koan_tenant", () => "acme"),
             new Axis().Named("archived").AppliesTo(t => t == typeof(Plain))
                 .Field("__archived", () => null, typeof(bool)).Reads(_ => Hide).OnDelete(Logical.SetTrue("__archived")),
-        }, new ServiceCollection());
+        }, services);
+        using var provider = services.BuildServiceProvider();
 
-        var summary = DataAxisReport.Summarize();
+        var summary = DataAxisReport.Summarize(provider);
         summary.Should().NotBeNull();
         summary.Should().Contain("__koan_tenant:isolation.rowScoped");
         summary.Should().Contain("__archived:isolation.rowScoped/predicate");   // AutoReadFilter=false ⇒ predicate axis

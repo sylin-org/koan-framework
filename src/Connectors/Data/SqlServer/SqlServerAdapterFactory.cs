@@ -1,78 +1,111 @@
-using System;
+using Koan.Core;
+using Koan.Core.Services;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Core;
+using Koan.Data.Connector.SqlServer.Infrastructure;
+using Koan.Data.Connector.SqlServer.Runtime;
+using Koan.Data.Relational;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Core;
-using Koan.Core.Services;
 
 namespace Koan.Data.Connector.SqlServer;
 
 [ProviderPriority(15)]
-[KoanService(ServiceKind.Database, shortCode: "mssql", name: "SQL Server",
-    ContainerImage = "mcr.microsoft.com/mssql/server",
-    DefaultTag = "2025-CU6-GDR1-ubuntu-24.04",
-    DefaultPorts = new[] { 1433 },
-    Capabilities = new[] { "protocol=mssql" },
-    Env = new[] { "ACCEPT_EULA=Y", "MSSQL_SA_PASSWORD" },
-    Volumes = new[] { "./Data/mssql-2025:/var/opt/mssql" },
-    AppEnv = new[] { "Koan__Data__SqlServer__ConnectionString={scheme}://{host}:{port}" },
+[KoanService(ServiceKind.Database, shortCode: Constants.Service, name: "SQL Server",
+    ContainerImage = "mcr.microsoft.com/mssql/server", DefaultTag = "2025-CU6-GDR1-ubuntu-24.04",
+    DefaultPorts = [1433], Capabilities = ["protocol=mssql"],
+    Env = ["ACCEPT_EULA=Y", "MSSQL_SA_PASSWORD"], Volumes = ["./Data/mssql-2025:/var/opt/mssql"],
+    AppEnv = ["Koan__Data__SqlServer__ConnectionString={scheme}://{host}:{port}"],
     Scheme = "mssql", Host = "mssql", EndpointPort = 1433, UriPattern = "mssql://{host}:{port}",
     LocalScheme = "mssql", LocalHost = "localhost", LocalPort = 1433, LocalPattern = "mssql://{host}:{port}")]
-public sealed class SqlServerAdapterFactory : IDataAdapterFactory
+public sealed class SqlServerAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
 {
-    public string Provider => "mssql";
-    public IReadOnlyCollection<string> Aliases => ["sqlserver", "microsoft.sqlserver"];
+    public string Provider => Constants.Provider;
+    public IReadOnlyCollection<string> Aliases => [Constants.Service, "microsoft.sqlserver"];
+    public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.SqlServer"];
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
-        IServiceProvider sp,
-        string source = "Default")
+    public void DescribeClaims(IDataClaims claims) => SqlServerFeatures.Declare(claims);
+
+    public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
+        SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
+        SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
+        SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords,
+        ["sql"],
+        enforcesReadLanes: true);
+
+    public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return new RelationalSourceIntegration(
+            lane => new SqlConnection(route.ReadLanes[lane]),
+            route.ReadLanes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            static (connection, ct) => connection.BeginTransactionAsync(ct).AsTask(),
+            new SqlServerInspector(route));
+    }
+
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var config = sp.GetRequiredService<IConfiguration>();
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var baseOpts = sp.GetRequiredService<IOptions<SqlServerOptions>>().Value;
-        var resolver = sp.GetRequiredService<IStorageNameResolver>();
-
-        // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
-        // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
-        // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "SqlServer", source, baseOpts.ConnectionString, this);
-
-        // Create source-specific options
-        var sourceOpts = new SqlServerOptions
+        var route = ResolveRoute(services, source);
+        return new SqlServerRepository<TEntity, TKey>(services, new SqlServerRepositoryOptions
         {
-            ConnectionString = connectionString,
-            JsonCaseInsensitive = baseOpts.JsonCaseInsensitive,
-            JsonWriteIndented = baseOpts.JsonWriteIndented,
-            JsonIgnoreNullValues = baseOpts.JsonIgnoreNullValues,
-            DdlPolicy = baseOpts.DdlPolicy,
-            SchemaMatching = baseOpts.SchemaMatching,
-            AllowProductionDdl = baseOpts.AllowProductionDdl,
-            NamingStyle = baseOpts.NamingStyle,
-            Separator = baseOpts.Separator,
-            Readiness = baseOpts.Readiness
-        };
+            ConnectionString = route.ConnectionString,
+            Source = route.Source,
+            Schema = route.Schema,
+            DdlPolicy = route.Options.DdlPolicy,
+            SchemaMatching = route.Options.SchemaMatching,
+            AllowProductionDdl = route.Options.AllowProductionDdl,
+            SourcePlan = route.Plan
+        });
+    }
 
-        return new SqlServerRepository<TEntity, TKey>(sp, sourceOpts, resolver);
+    internal SqlServerRoute ResolveRoute(IServiceProvider services, string source)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var options = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? Constants.DefaultSource : source;
+        var connection = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, registry, Provider, resolvedSource, options.ConnectionString, this);
+        var schema = AdapterConnectionResolver.GetSourceSetting(
+            configuration, registry, Provider, resolvedSource, "Schema", options.Schema, this);
+        var readLanes = registry.GetSource(resolvedSource)?.ReadLanes?
+            .Where(static lane => !string.IsNullOrWhiteSpace(lane.Value.ConnectionString))
+            .ToDictionary(
+                static lane => lane.Key,
+                static lane => lane.Value.ConnectionString,
+                StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return new SqlServerRoute(
+            resolvedSource, connection, schema, options,
+            registry.GetPlan(resolvedSource, Provider, connection),
+            readLanes);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<SqlServerOptions>>().Value;
         return new StorageNamingCapability
         {
-            Style = opts.NamingStyle,
-            Separator = opts.Separator,
+            Style = options.NamingStyle,
+            Separator = options.Separator,
             Casing = NameCasing.AsIs,
             PartitionSeparator = '#',
             Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
-            MaxIdentifierBytes = 128, // SQL Server sysname limit
+            MaxIdentifierBytes = 128
         };
     }
 }
 
+internal sealed record SqlServerRoute(
+    string Source,
+    string ConnectionString,
+    string Schema,
+    SqlServerOptions Options,
+    DataSourcePlan Plan,
+    IReadOnlyDictionary<string, string> ReadLanes);

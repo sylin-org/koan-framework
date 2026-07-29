@@ -169,7 +169,8 @@ public sealed class EntityLifecycleSpec
                 .AfterUpsert(_ => { }));
 
         var fact = runtime.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
-            .Single(item => item.Code == DataConstants.Diagnostics.Codes.LifecycleSelected);
+            .Single(item => item.Code == DataConstants.Diagnostics.Codes.LifecycleSelected &&
+                            item.Subject == "data:lifecycle:lifecycleentity");
 
         fact.Subject.Should().Be("data:lifecycle:lifecycleentity");
         fact.Summary.Should().Contain("2 persistence lifecycle handler(s)");

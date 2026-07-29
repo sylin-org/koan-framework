@@ -1,91 +1,78 @@
 ---
 uid: reference.modules.Koan.data.sqlite
 title: Koan.Data.Connector.Sqlite - Technical Reference
-description: SQLite adapter for Koan data.
+description: SQLite gold-reference adapter for managed and externally mapped data.
 packages: [Sylin.Koan.Data.Connector.Sqlite]
 source: src/Connectors/Data/Sqlite/
-last_updated: 2026-07-17
+last_updated: 2026-07-28
 ---
 
-## Contract
+## Execution model
 
-- The adapter declares `DataCaps.Query.ProviderBoundedPaging` and applies numbered pages in SQLite
-  before candidate rows are materialized into application memory.
-- Schema governance follows DATA-0046 except that SQLite's embedded-store `AutoCreate` selection is itself
-  production permission. `Validate`, `NoDdl`, and `[ReadOnly]` still prohibit DDL.
+SQLite has two deliberate repository paths selected once at repository construction:
 
-## Configuration
+- managed compatibility storage uses `Id + Json`, including framework-managed fields and polymorphic Entity JSON;
+- an explicit `Map<TEntity>` uses the immutable compiled mapping plan and the declared physical container.
 
-Reference the connector and call the application's normal `AddKoan()` bootstrap. With no configuration, SQLite
-uses `.koan/data/Koan.sqlite`; the directory is created on first elected use, not while an available-but-unused
-connector reports its boot facts.
+There is no legacy/V2 bridge. Both paths share one connection manager, query receipt contract, capability
+declaration, atomic batch boundary, and source route. Warm mapping accessors and mapping-use decisions are compiled
+and cached by the host; repository operations do not reflect over mapped members.
 
-SQLite is application-owned embedded storage, so its default `AutoCreate` policy retains its literal meaning when
-the .NET Generic Host defaults to `Production`; no global magic flag is required. Select `Validate` or `NoDdl` for
-an externally provisioned file. `[ReadOnly]` models never create or alter schema.
+## Source integration
 
-The effective Default-source connection is selected in this order:
+The adapter exposes registered SQL record/scalar operations and provider-neutral inspection of tables and views.
+Container continuations are bounded, opaque after Data wraps them, and resumable. Sampling reads at most `take + 1`
+native rows so it reports `Complete` versus `ProviderLimit` truthfully.
 
-1. `Koan:Data:Sources:Default:ConnectionString`
-2. `Koan:Data:Sources:Default:sqlite:ConnectionString`
-3. `Koan:Data:Sqlite:ConnectionString`
-4. `ConnectionStrings:Sqlite`
-5. `ConnectionStrings:Default`, only when Default is unowned or owned by SQLite
-6. autonomous discovery, then `.koan/data/Koan.sqlite`
+`SqlOperationBinding` is opaque. A registered SQL operation therefore selects a configured read lane. SQLite opens
+that lane's connection and enables native `query_only` before executing the command; an effective write fails at
+the provider boundary. Connection strings remain outside public plans and diagnostics.
 
-Blank values are absent. Generic Default-source declarations are consumed only when SQLite owns that source; a
-generic `auto` delegates to SQLite's provider path. At provider levels 2–4, the first present `auto` requests
-discovery and does not fall through to a lower configuration key. Named sources use
-`Koan:Data:Sources:{name}:{Adapter,ConnectionString}`. Use a complete
-`Data Source=...` connection string; raw path shorthand is not supported.
+## Mapping
 
-`Data Source=:memory:` and explicit `Mode=Memory` targets are source-isolated and host-owned. The connector maps
-each to a named shared-memory database, keeps it alive for the Koan host lifetime, and disables driver pooling for
-that target. For file databases, `Microsoft.Data.Sqlite` owns process-wide pooling; Koan records the exact
-connection-string pool groups observed by a host and clears those groups on host disposal. Two simultaneous hosts
-using an identical connection string can therefore share a driver pool group; clearing it preserves correctness
-but may make the other host reopen an idle connection. Live caller-owned direct connections must still be disposed
-by their caller.
+An explicit map supports:
 
-## LINQ and pushdowns
+- one scalar or composite identity;
+- provider-generated single-column identity;
+- scalar physical names;
+- structured object values stored as SQLite JSON text;
+- scalar logical values at nested JSON paths; and
+- symmetric codecs compiled by Data's mapping plan.
 
-- Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
-- String matching uses `LIKE`; case sensitivity depends on collation.
-- Paging uses `LIMIT`/`OFFSET`. Every caller-requested provider-bounded stream sort component must be a
-  top-level, non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other
-  caller sort, including an explicit Entity identifier sort, rejects before provider I/O. Data.Core
-  appends the usual string Entity identifier only as an opaque provider-stable tie-breaker; that is not
-  a CLR or cross-provider collation promise.
+The same physical binding is used for hydration, parameters, filters, order expressions, conditional replace, and
+writes. Sibling nested-path writes use `json_set` against the existing value, preserving unrelated legacy fields.
+Whole-object bindings replace the whole declared object by design.
 
-## Provider-bounded streaming
+SQLite accepts an empty mapping namespace or `main`. Explicit mappings reject framework-managed row fields and
+ambient partitions until those concerns have explicit physical bindings; this is a fail-closed boundary, not a
+fallback to a shared container.
 
-- `AllStream` and `QueryStream` are coordinated as lazy numbered pages by Data.Core.
-- `batchSize` is the maximum Koan-visible candidate page, not a promise about opaque SQLite driver
-  buffers.
-- Deep or collection ordering rejects correctively before provider I/O rather than falling back to a
-  complete-result sort.
-- Offset paging is not snapshot isolation and does not provide mutation-safe traversal, resume tokens,
-  or a public cursor.
+## Query guarantees
 
-## Error modes
+Supported Filter AST operations are lowered through `Koan.Data.Relational`. Filter, fully handled sort, numbered
+page, and exact-count receipts reflect only provider-executed work. Provider-bounded candidate reads request one
+extra row to prove whether the bound was exceeded. Collection operations use SQLite JSON functions.
 
-- Provider errors (SqliteException) surfaced; retries are limited (single-node engine).
-- Unsupported predicates surface explicitly; simplify the predicate or materialize a known-small page.
-  Provider-bounded streams may apply supported pointwise residuals but never hide a full-source fallback.
+Raw Entity queries are an explicit escape hatch. Registered named SQL is preferred for stable application intent
+and is independently bounded by Source Integration limits.
 
-## Operations
+## Schema and policy
 
-- Readiness is critical only when SQLite wins provider election or participates in a
-  runtime repository or Direct connection request. Available-but-unused SQLite reports `Unknown` and does not
-  touch disk.
-- Active readiness resolves and probes every participating source through the same routing path repositories use.
-- Host disposal closes its in-memory keepers and clears the driver pool groups it observed; a new host may recreate
-  the same file path.
-- Connection and discovery logs de-identify credentials and other connection-string secrets.
+Managed sources with `AutoCreate` create the required table on first use. External sources perform validation only
+and never create, alter, or drop a physical object. `Access: ReadOnly` is enforced by Data before repository
+construction or provider I/O. The two decisions are independent.
 
-## References
+## Connection ownership
 
-- DATA-0046 SQLite DDL policy: `/docs/decisions/DATA-0046-sqlite-schema-governance-ddl-policy.md`
-- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
+File connections use Microsoft.Data.Sqlite pooling. The host records only the exact pool groups it uses and clears
+them on disposal. Private and named memory targets receive source-isolated shared-memory identities plus one
+host-owned keeper connection, so per-operation connections observe the same database for that host lifetime.
+Connection and provenance output are redacted.
 
+## Limits
+
+- Repository operations are buffered; Entity streaming is coordinated as bounded numbered pages.
+- Offset paging is not snapshot isolation or a resumable cursor.
+- Explicit mapped containers do not combine with ambient partitions or managed row fields.
+- SQLite attached databases are not inferred from mapping namespaces.
+- Provider exceptions surface directly; commands are not replayed after failure.

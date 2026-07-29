@@ -1,9 +1,11 @@
 using System;
 using System.Threading;
 using AwesomeAssertions;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core.Model;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Specs.Naming;
 
@@ -12,8 +14,23 @@ namespace Koan.Tests.Data.Core.Specs.Naming;
 /// independent of partition. Resolving a NEW partition for an already-seen (provider, entity) must reuse the
 /// cached anchor (not re-run the grammar / NameOverride), while the partition is still applied to the name.
 /// </summary>
-public class StorageAnchorCacheSpec
+public class StorageAnchorCacheSpec : IDisposable
 {
+    private readonly ServiceProvider _provider;
+    private readonly IDisposable _host;
+
+    public StorageAnchorCacheSpec()
+    {
+        _provider = new ServiceCollection().AddSingleton(new StorageNameCache(32)).BuildServiceProvider();
+        _host = AppHost.PushScope(_provider);
+    }
+
+    public void Dispose()
+    {
+        _host.Dispose();
+        _provider.Dispose();
+    }
+
     public class Widget : Entity<Widget>
     {
         public string Name { get; set; } = "";
@@ -23,7 +40,7 @@ public class StorageAnchorCacheSpec
     public void Anchor_is_resolved_once_and_reused_across_partitions()
     {
         var anchorCalls = 0;
-        const string provider = "anchor-split-spec-A"; // unique provider isolates the static caches per test
+        const string provider = "anchor-split-spec-A";
         Func<StorageNamingCapability> cap = () => new StorageNamingCapability
         {
             NameOverride = _ => { Interlocked.Increment(ref anchorCalls); return "base"; },

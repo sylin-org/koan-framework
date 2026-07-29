@@ -1,0 +1,397 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-28T14:07:16.3785530+00:00",
+  "sourceCommit": "working-tree",
+  "primerSha256": "5727df1efb1cf87385f5708f5c7dbf02b91b7fe8da4ce8af25ee4dc68c15befe",
+  "note": "Exact public declaration names only; similarly named internal or unrelated members do not count.",
+  "terms": [
+    {
+      "term": "Data.Source",
+      "primerOccurrences": 12,
+      "publicApiOccurrences": 0,
+      "publicApiIds": [],
+      "disposition": "Absent"
+    },
+    {
+      "term": "StorageLifecycle",
+      "primerOccurrences": 4,
+      "publicApiOccurrences": 4,
+      "publicApiIds": [
+        "API-05534407e99c6c1e",
+        "API-70e740b38f246d94",
+        "API-89df010013d161f7",
+        "API-ef24720c1f186788"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Access",
+      "primerOccurrences": 22,
+      "publicApiOccurrences": 5,
+      "publicApiIds": [
+        "API-2be8fba34d816d19",
+        "API-4b5268afdc47e7e8",
+        "API-604c0c9667ab9f84",
+        "API-60ccbebe7d1088f6",
+        "API-6ee516446852f030"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "ReadLanes",
+      "primerOccurrences": 2,
+      "publicApiOccurrences": 1,
+      "publicApiIds": [
+        "API-afb866a68a17f74b"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Inspect",
+      "primerOccurrences": 27,
+      "publicApiOccurrences": 7,
+      "publicApiIds": [
+        "API-16b0639c9d81b397",
+        "API-2115c3e047d35902",
+        "API-592ad2f025a3d4f1",
+        "API-71421c8e75cee1cf",
+        "API-d9d09282472b39eb",
+        "API-dbd47697a59864d1",
+        "API-f9969a7ee1505dea"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "RecordSet",
+      "primerOccurrences": 24,
+      "publicApiOccurrences": 7,
+      "publicApiIds": [
+        "API-0e296667cadefc5c",
+        "API-31cd11be0c724774",
+        "API-333907c00e8b63fc",
+        "API-8cb562743563409b",
+        "API-965ca7c6d2e3df5f",
+        "API-a79ad6f328db6e99",
+        "API-c2a7a01b05eb0b28"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Query",
+      "primerOccurrences": 43,
+      "publicApiOccurrences": 53,
+      "publicApiIds": [
+        "API-05468f7e1f92843f",
+        "API-06a8a4156a2b0d9c",
+        "API-0cdc445bdc47d840",
+        "API-15db7e3a58012fcb",
+        "API-1a474f3aecf2f724",
+        "API-1c1df9a8caf446de",
+        "API-1cd6259ce5a4add5",
+        "API-213fcf750400235e",
+        "API-293d39d12c2fd576",
+        "API-424aa85b830d1236",
+        "API-4c0e12feab5a988c",
+        "API-53943e8e0ba486dc",
+        "API-56659ac9f62ce41e",
+        "API-56d1a69d30fab441",
+        "API-5d378e94f0743e40",
+        "API-61b41c2e99d8786f",
+        "API-6772e63b1d65d430",
+        "API-6b0aa5b5c9d11912",
+        "API-6f705c8bc873cf5b",
+        "API-703ed2a8c977d1d2",
+        "API-7194430f7337e9b5",
+        "API-727c32d7076be300",
+        "API-738a4018afa78ada",
+        "API-754459fd0802f38e",
+        "API-7a84999ac505c68a",
+        "API-801cb4f7e790dfc3",
+        "API-835f43d47f9a7abd",
+        "API-83aa268c4ff46d81",
+        "API-89c3bbf46fc7c656",
+        "API-8c39d7ba9ff33533",
+        "API-93df379ea3544f32",
+        "API-9b6699cc2e88044f",
+        "API-9b889eccbe4f0214",
+        "API-9e9531a6c2f0f511",
+        "API-9f795b96b7aeeb32",
+        "API-a2b1b7e0da447ba1",
+        "API-a8f3dcca88f00a31",
+        "API-b909d4c818d11a4c",
+        "API-c19dbf5dc12d46c2",
+        "API-caf143039c63e584",
+        "API-cd53d98b7981a477",
+        "API-cf914104faa76ad5",
+        "API-cfd16c2beb4d8625",
+        "API-d28f3ad23e65c763",
+        "API-d2d934a452cc6e36",
+        "API-d7e628029e03cc80",
+        "API-db29845fa0e6dc91",
+        "API-e5041d05bcf7d58f",
+        "API-ea08cff991a77b4e",
+        "API-f18cfa6d9a2eb1bf",
+        "API-f3d746a3a6056bd8",
+        "API-f94cbaf514d34852",
+        "API-fbce9f571a7522ef"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Scalar",
+      "primerOccurrences": 33,
+      "publicApiOccurrences": 15,
+      "publicApiIds": [
+        "API-12d95070e15c84fa",
+        "API-16fe26bd576bde55",
+        "API-2d128fe018514110",
+        "API-3135777ad179d1c4",
+        "API-3c7c5275d411d8b5",
+        "API-5b37f6addc444d5e",
+        "API-669f927eecad49f9",
+        "API-7194430f7337e9b5",
+        "API-b3c9d206a2c41d09",
+        "API-bbd62e339989821b",
+        "API-cf40ba9b0ba4b245",
+        "API-d98eb036bfd5c404",
+        "API-e5f427a7effbb392",
+        "API-ecf566ee0694e602",
+        "API-ed657f3d97e6b63b"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Lane",
+      "primerOccurrences": 18,
+      "publicApiOccurrences": 4,
+      "publicApiIds": [
+        "API-4c66a74d164c65f2",
+        "API-99848ec5e1b7340d",
+        "API-bfedb8468271cf93",
+        "API-ce9b78682db69ddc"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Template",
+      "primerOccurrences": 5,
+      "publicApiOccurrences": 2,
+      "publicApiIds": [
+        "API-2a5fdae539dac590",
+        "API-eee2f21ffb1c6b21"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Map",
+      "primerOccurrences": 79,
+      "publicApiOccurrences": 42,
+      "publicApiIds": [
+        "API-06ee802d1c8d32bc",
+        "API-0896dd2033513ed0",
+        "API-0c58543f12848263",
+        "API-1773f3e62821cca6",
+        "API-18ba9f0249f93813",
+        "API-1f218432975a88be",
+        "API-28be6b0c3955c050",
+        "API-372783365a6aa931",
+        "API-3c02f92978b35a2c",
+        "API-3f1d911faea996a7",
+        "API-4bc47e2863e5831e",
+        "API-4c9b93d4c75f162a",
+        "API-4e4f01f98240988d",
+        "API-54c9714d382590ae",
+        "API-5d3545a4ece23d0b",
+        "API-5e00ae25d2366716",
+        "API-6ea66317bf060585",
+        "API-6ee698dd9c547819",
+        "API-7a93a06d2f40398a",
+        "API-909865bd4579fdb1",
+        "API-9555babd6f5a9c7b",
+        "API-95a1d034fb3aa1d0",
+        "API-a3a542efe7fa4410",
+        "API-a3c1b0999ff6ad72",
+        "API-a51b3a9839b9f400",
+        "API-a5cc85a9f93f2980",
+        "API-af29791371e573d3",
+        "API-ba1dbfeb5745b26c",
+        "API-bbcc4affba05bfa9",
+        "API-bee11ed6a2070660",
+        "API-bf4a27ed9750fffb",
+        "API-c572d35c98a432a2",
+        "API-c9fd7e52553c3db4",
+        "API-dae9caf9867053b1",
+        "API-dafe3af54442120e",
+        "API-dcec8e11df2b1484",
+        "API-e15bd8637b89374b",
+        "API-e24e4523c508e4e7",
+        "API-e36b40aa967f5660",
+        "API-e6d6940c7516fbe2",
+        "API-f62c1799eaec2014",
+        "API-f85daa5e1346bb32"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Container",
+      "primerOccurrences": 33,
+      "publicApiOccurrences": 16,
+      "publicApiIds": [
+        "API-5baf608f48d4a05d",
+        "API-5fa2fc2849abef38",
+        "API-8562a62d02c1fc5c",
+        "API-9bcc76b289b2a6eb",
+        "API-a17be50c8d78602d",
+        "API-a4bf52cc98e767e4",
+        "API-a5e3c0dc6a2fe2e2",
+        "API-b5253997275353a5",
+        "API-b6a7c38c1427397b",
+        "API-ba27e9415e74af49",
+        "API-c78f9b7799b45196",
+        "API-d80fbd288f82b792",
+        "API-e88fb98aeb276a47",
+        "API-ef69c264395e09c9",
+        "API-f15100bbe6c7cd27",
+        "API-f443ddb0d227d252"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Key",
+      "primerOccurrences": 39,
+      "publicApiOccurrences": 14,
+      "publicApiIds": [
+        "API-0167a2c8439df9a9",
+        "API-0c6eb6b990029413",
+        "API-2f8fbc137e048a21",
+        "API-6122ce4758abb666",
+        "API-72e3112ce0fe88ad",
+        "API-887e80dc937051a7",
+        "API-890c9d312cbff7ca",
+        "API-9852daf14e798611",
+        "API-b32ef09e6ef7adfd",
+        "API-cd83140d50fed79f",
+        "API-d836e4dece38401b",
+        "API-db2b72fff7c5d1b6",
+        "API-f252fd259b40f358",
+        "API-f5d3966d3034e76b"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Property",
+      "primerOccurrences": 22,
+      "publicApiOccurrences": 12,
+      "publicApiIds": [
+        "API-0025e069a7c63667",
+        "API-12cd912784d3f3c0",
+        "API-1fe612dac7b926a5",
+        "API-2c91fa2c3b619a8e",
+        "API-3afa5a0403d8fc7a",
+        "API-65d61c9ecfed1714",
+        "API-6f1f4500a6a09971",
+        "API-909865bd4579fdb1",
+        "API-9626ff5066c6fd17",
+        "API-a7a677f7f39b5a74",
+        "API-dae9caf9867053b1",
+        "API-fff5c2f9088d8c23"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Name",
+      "primerOccurrences": 100,
+      "publicApiOccurrences": 36,
+      "publicApiIds": [
+        "API-086598b3de14e71c",
+        "API-0c2d6f2f473dc9c7",
+        "API-0de243d7589697a9",
+        "API-0e5e79cadc8239ea",
+        "API-1471b20aaddffc95",
+        "API-1956237c1bf6e1dc",
+        "API-1fb47c56fd69f1d0",
+        "API-1fbef13ec5162a72",
+        "API-2242c16654fa9496",
+        "API-33c8578a90d16fae",
+        "API-372c10bf65825bd2",
+        "API-42a04ee0a09377a8",
+        "API-44328f8d6f846136",
+        "API-4acd0d8e76043aa2",
+        "API-4e8568a945d2afc4",
+        "API-5256e93ac1b7a548",
+        "API-5c8087461719e261",
+        "API-6b629355894a4f78",
+        "API-70c7262471bf11b6",
+        "API-7265f3902c60a48b",
+        "API-7af74fdef40b9855",
+        "API-87a27ed399a8facd",
+        "API-904aae02597b3007",
+        "API-9098790e92a979b1",
+        "API-92b4c3a63f472e9d",
+        "API-942ec1a13575a83b",
+        "API-a9816744118fa196",
+        "API-c17908e76454e675",
+        "API-c5bcb5b48a145dae",
+        "API-ccc9975e564bb324",
+        "API-e3a25196e45a8e5c",
+        "API-ea27533cf107bf41",
+        "API-ece70b13f6bb4d17",
+        "API-f00b5b95deaf7299",
+        "API-fa17b1555474a54f",
+        "API-fe0913596aa41370"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Path",
+      "primerOccurrences": 71,
+      "publicApiOccurrences": 10,
+      "publicApiIds": [
+        "API-014c14ada2f370ea",
+        "API-4bc47e2863e5831e",
+        "API-54d493e6d5fe73f2",
+        "API-6ea66317bf060585",
+        "API-7e5c85b20a76c276",
+        "API-8ea642bbbf0dfab2",
+        "API-93bdf430badf5426",
+        "API-a4b6c6db2ca25cfe",
+        "API-c1b3e3e9735d098d",
+        "API-cdcf4e67b7472307"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "Object",
+      "primerOccurrences": 36,
+      "publicApiOccurrences": 5,
+      "publicApiIds": [
+        "API-19d1d859a8e78b33",
+        "API-1b18f90b8302db70",
+        "API-4e17d8a75a0300ae",
+        "API-707ebe4dd9db58b1",
+        "API-acfac5fe7837b605"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "OperationPlan",
+      "primerOccurrences": 1,
+      "publicApiOccurrences": 1,
+      "publicApiIds": [
+        "API-76138335d0e3ea32"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    },
+    {
+      "term": "MappingPlan",
+      "primerOccurrences": 0,
+      "publicApiOccurrences": 3,
+      "publicApiIds": [
+        "API-18ba9f0249f93813",
+        "API-5d3545a4ece23d0b",
+        "API-95a1d034fb3aa1d0"
+      ],
+      "disposition": "PresentNameReviewRequired"
+    }
+  ]
+}

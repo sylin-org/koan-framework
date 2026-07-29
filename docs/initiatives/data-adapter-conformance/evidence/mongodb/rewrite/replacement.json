@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "provider": "mongodb",
+  "commonBase": null,
+  "startedEmpty": null,
+  "sourceExport": [],
+  "compileItems": [],
+  "registrations": [],
+  "movingParts": [],
+  "executionPaths": [],
+  "shadowPaths": [],
+  "retirementRef": "../restricted/retirement.json"
+}

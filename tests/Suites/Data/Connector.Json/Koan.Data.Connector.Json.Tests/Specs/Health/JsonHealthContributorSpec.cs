@@ -148,6 +148,41 @@ public sealed class JsonHealthContributorSpec
         }
     }
 
+    [Fact]
+    public async Task External_source_health_never_provisions_or_writes_the_directory()
+    {
+        var root = TempPath();
+        var external = Path.Combine(root, "external");
+        var configuration = Configuration(new Dictionary<string, string?>
+        {
+            ["Koan:Data:Sources:Archive:Adapter"] = "json",
+            ["Koan:Data:Sources:Archive:json:DirectoryPath"] = external,
+            ["Koan:Data:Sources:Archive:StorageLifecycle"] = "External"
+        });
+        var registry = Registry(configuration);
+        using var services = Services(includeHigherPriorityAdapter: true);
+        var diagnostics = new StubDiagnostics(participations:
+        [
+            new DataAdapterParticipationInfo("json", "Archive")
+        ]);
+
+        try
+        {
+            var missing = await Contributor(services, configuration, registry, root, diagnostics).Check();
+            missing.State.Should().Be(HealthState.Unhealthy);
+            Directory.Exists(external).Should().BeFalse();
+
+            Directory.CreateDirectory(external);
+            var existing = await Contributor(services, configuration, registry, root, diagnostics).Check();
+            existing.State.Should().Be(HealthState.Healthy);
+            Directory.EnumerateFileSystemEntries(external).Should().BeEmpty();
+        }
+        finally
+        {
+            DeleteDirectory(root);
+        }
+    }
+
     private static JsonHealthContributor Contributor(
         IServiceProvider services,
         IConfiguration configuration,

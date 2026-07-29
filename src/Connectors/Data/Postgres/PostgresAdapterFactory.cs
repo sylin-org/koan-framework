@@ -1,96 +1,135 @@
-using System;
+using Koan.Core;
+using Koan.Core.Services;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Core;
+using Koan.Data.Connector.Postgres.Infrastructure;
+using Koan.Data.Connector.Postgres.Runtime;
+using Koan.Data.Relational;
+using Koan.Data.Relational.Npgsql;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions;
-using Koan.Core;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Core;
-using Koan.Core.Services;
-using Koan.Data.Relational.Npgsql;
+using Npgsql;
 
 namespace Koan.Data.Connector.Postgres;
 
 [ProviderPriority(14)]
-[KoanService(ServiceKind.Database, shortCode: "postgres", name: "PostgreSQL",
-    ContainerImage = "postgres",
-    DefaultTag = "18.4",
-    DefaultPorts = new[] { 5432 },
-    Capabilities = new[] { "protocol=postgres" },
-    Env = new[] { "POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=Koan" },
-    Volumes = new[] { "./Data/postgres-18:/var/lib/postgresql" },
-    AppEnv = new[] { "Koan__Data__Postgres__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Postgres__Database=Koan" },
+[KoanService(ServiceKind.Database, shortCode: Constants.Provider, name: "PostgreSQL",
+    ContainerImage = "postgres", DefaultTag = "18.4", DefaultPorts = [5432],
+    Capabilities = ["protocol=postgres"],
+    Env = ["POSTGRES_USER=postgres", "POSTGRES_PASSWORD", "POSTGRES_DB=Koan"],
+    Volumes = ["./Data/postgres-18:/var/lib/postgresql"],
+    AppEnv = ["Koan__Data__Postgres__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Postgres__Database=Koan"],
     Scheme = "postgres", Host = "postgres", EndpointPort = 5432, UriPattern = "postgres://{host}:{port}",
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
-public sealed class PostgresAdapterFactory : IDataAdapterFactory
+public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
 {
-    public string Provider => "postgres";
+    public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["postgresql", "npgsql"];
+    public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Postgres"];
 
-    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
-        IServiceProvider sp,
-        string source = "Default")
+    public void DescribeClaims(IDataClaims claims) => NpgsqlFeatures.Declare(claims);
+
+    public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
+        SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
+        SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
+        SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords,
+        ["sql"],
+        enforcesReadLanes: true);
+
+    public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return new RelationalSourceIntegration(
+            lane => new NpgsqlConnection(route.ReadLanes[lane]),
+            route.ReadLanes.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
+            static async (connection, ct) =>
+            {
+                var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    await using var command = connection.CreateCommand();
+                    command.Transaction = transaction;
+                    command.CommandText = "SET TRANSACTION READ ONLY";
+                    await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                    return transaction;
+                }
+                catch
+                {
+                    await transaction.DisposeAsync().ConfigureAwait(false);
+                    throw;
+                }
+            },
+            new PostgresInspector(route));
+    }
+
+    public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        var resolver = sp.GetRequiredService<IStorageNameResolver>();
-        var options = ResolveOptions(sp, source);
-        return new NpgsqlRepository<TEntity, TKey>(sp, new NpgsqlRepositoryOptions
+        var route = ResolveRoute(services, source);
+        return new NpgsqlRepository<TEntity, TKey>(services, new NpgsqlRepositoryOptions
         {
             ProviderName = Provider,
-            ConnectionString = options.ConnectionString,
-            DdlPolicy = options.DdlPolicy,
-            SchemaMatching = options.SchemaMatching,
-            AllowProductionDdl = options.AllowProductionDdl,
-            SearchPath = options.SearchPath,
-            NamingStyle = options.NamingStyle,
-            Separator = options.Separator,
-            StableOrderClause = "ORDER BY ctid"
-        }, resolver);
+            ConnectionString = route.ConnectionString,
+            Source = route.Source,
+            SearchPath = route.SearchPath,
+            NamingStyle = route.Options.NamingStyle,
+            Separator = route.Options.Separator,
+            DdlPolicy = route.Options.DdlPolicy,
+            SchemaMatching = route.Options.SchemaMatching,
+            AllowProductionDdl = route.Options.AllowProductionDdl,
+            SourcePlan = route.Plan
+        }, services.GetRequiredService<IStorageNameResolver>());
     }
 
-    internal PostgresOptions ResolveOptions(IServiceProvider sp, string source)
+    internal PostgresRoute ResolveRoute(IServiceProvider services, string source)
     {
-        var config = sp.GetRequiredService<IConfiguration>();
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var baseOpts = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
-
-        // Resolve the source's connection through the shared resolver: the Default (or a non-Default whose source
-        // relies on discovery and resolves to "auto") collapses onto the discovery-resolved base connection, so a
-        // routed source never keys its store on the unresolved sentinel (ARCH-0103 P5 fleet hoist).
-        var connectionString = AdapterConnectionResolver.ResolveRoutedConnection(
-            config, sourceRegistry, "Postgres", source, baseOpts.ConnectionString, this);
-
-        // Create source-specific options
-        var sourceOpts = new PostgresOptions
-        {
-            ConnectionString = connectionString,
-            DdlPolicy = baseOpts.DdlPolicy,
-            SchemaMatching = baseOpts.SchemaMatching,
-            AllowProductionDdl = baseOpts.AllowProductionDdl,
-            SearchPath = baseOpts.SearchPath,
-            NamingStyle = baseOpts.NamingStyle,
-            Separator = baseOpts.Separator,
-            Readiness = baseOpts.Readiness
-        };
-
-        return sourceOpts;
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var options = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? Constants.DefaultSource : source;
+        var connection = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, registry, Provider, resolvedSource, options.ConnectionString, this);
+        var searchPath = AdapterConnectionResolver.GetSourceSetting(
+            configuration, registry, Provider, resolvedSource, "SearchPath", options.SearchPath, this);
+        var readLanes = registry.GetSource(resolvedSource)?.ReadLanes?
+            .Where(static lane => !string.IsNullOrWhiteSpace(lane.Value.ConnectionString))
+            .ToDictionary(
+                static lane => lane.Key,
+                static lane => lane.Value.ConnectionString,
+                StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return new PostgresRoute(
+            resolvedSource,
+            connection,
+            searchPath,
+            options,
+            registry.GetPlan(resolvedSource, Provider, connection),
+            readLanes);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)
     {
-        var opts = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<PostgresOptions>>().Value;
         return new StorageNamingCapability
         {
-            Style = opts.NamingStyle,
-            Separator = opts.Separator,
+            Style = options.NamingStyle,
+            Separator = options.Separator,
             Casing = NameCasing.AsIs,
             PartitionSeparator = '#',
-            // Named partitions lowercased; GUIDs as 32-hex. PostgreSQL truncates identifiers at 63 bytes,
-            // so the framework hashes the composed name when it would overflow (preserving isolation).
             Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = true },
-            MaxIdentifierBytes = 63,
+            MaxIdentifierBytes = 63
         };
     }
 }
 
+internal sealed record PostgresRoute(
+    string Source,
+    string ConnectionString,
+    string SearchPath,
+    PostgresOptions Options,
+    DataSourcePlan Plan,
+    IReadOnlyDictionary<string, string> ReadLanes);

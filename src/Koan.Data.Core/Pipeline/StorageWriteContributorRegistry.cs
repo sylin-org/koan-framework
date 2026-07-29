@@ -1,58 +1,67 @@
+using Koan.Core.Composition;
+using Koan.Core.Hosting.App;
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Koan.Data.Core.Pipeline;
 
-/// <summary>
-/// The boot-time index of external <see cref="WriteStampContributor"/>s (DATA-0105 §0 / ARCH-0098 §0) — the "open
-/// slot" on the write-stamp stage. A cross-cutting module registers its contributor from its
-/// <c>KoanModule.Register</c> (Reference = Intent); <see cref="StorageWritePlan.Build"/> reads them
-/// generically and never names the axis. Mirrors <c>ManagedFieldRegistry</c>'s mechanics (static boot index,
-/// <see cref="IsEmpty"/> volatile off-gate making the off path byte-identical, idempotent registration).
-///
-/// <para><b>Off = structurally absent:</b> when no module registers, <see cref="IsEmpty"/> is <c>true</c> and the
-/// plan composes exactly the built-in identity + <c>[Timestamp]</c> stamps. Registration is boot-only (registrars
-/// run before any data op); each registration invalidates the per-type plan memo.</para>
-/// </summary>
+/// <summary>Host-owned write-stamp contributors behind Koan's terse composition facade.</summary>
 public static class StorageWriteContributorRegistry
 {
-    private static readonly object _gate = new();
-    private static readonly List<WriteStampContributor> _contributors = new();
-    private static volatile bool _isEmpty = true;
+    public static bool IsEmpty => Current()?.IsEmpty ?? true;
+    public static IReadOnlyList<WriteStampContributor> All => Current()?.All ?? [];
 
-    /// <summary>Whether no external write contributor is registered — the hot-path off gate. Cheap volatile read.</summary>
-    public static bool IsEmpty => _isEmpty;
-
-    /// <summary>Every registered contributor, in registration order (the plan sorts the built stamps by priority).</summary>
-    public static IReadOnlyList<WriteStampContributor> All
-    {
-        get { lock (_gate) return _contributors.ToArray(); }
-    }
-
-    /// <summary>
-    /// Register a write contributor. Boot-only. Idempotent by <see cref="WriteStampContributor.Id"/> (a duplicate
-    /// is a no-op, so a re-entrant Reference = Intent registrar is safe). Invalidates the per-type plan memo.
-    /// </summary>
     public static void Register(WriteStampContributor contributor)
     {
         ArgumentNullException.ThrowIfNull(contributor);
         if (string.IsNullOrWhiteSpace(contributor.Id))
             throw new ArgumentException("A write-stamp contributor must have a non-empty Id.", nameof(contributor));
-        lock (_gate)
-        {
-            if (_contributors.Any(c => string.Equals(c.Id, contributor.Id, StringComparison.Ordinal)))
-                return;
-            _contributors.Add(contributor);
-            _isEmpty = false;
-        }
-        StorageWritePlan.InvalidateCache();   // boot-only ⇒ rare; rebuilt plans now include this contributor
+        Composition().Register(contributor);
     }
 
-    /// <summary>Test-support: clear all registrations and the plan memo (mirrors <c>ManagedFieldRegistry.Reset</c>).</summary>
     public static void Reset()
     {
-        lock (_gate)
+        Current()?.Reset();
+        (AppHost.Current?.GetService(typeof(StorageWritePlanCache)) as StorageWritePlanCache)?.Invalidate();
+    }
+
+    private static StorageWriteContributorCatalog Composition()
+    {
+        var services = KoanCompositionScope.RequireServices("Storage write-contributor registration");
+        var catalog = services.Where(static descriptor => descriptor.ServiceType == typeof(StorageWriteContributorCatalog))
+            .Select(static descriptor => descriptor.ImplementationInstance).OfType<StorageWriteContributorCatalog>().LastOrDefault();
+        if (catalog is not null) return catalog;
+        catalog = new StorageWriteContributorCatalog();
+        services.AddSingleton(catalog);
+        return catalog;
+    }
+
+    private static StorageWriteContributorCatalog? Current()
+    {
+        if (KoanCompositionScope.TryGetServices(out var services))
+            return services.Where(static descriptor => descriptor.ServiceType == typeof(StorageWriteContributorCatalog))
+                .Select(static descriptor => descriptor.ImplementationInstance).OfType<StorageWriteContributorCatalog>().LastOrDefault();
+        return AppHost.Current?.GetService(typeof(StorageWriteContributorCatalog)) as StorageWriteContributorCatalog;
+    }
+
+    internal sealed class StorageWriteContributorCatalog
+    {
+        private readonly object _gate = new();
+        private volatile WriteStampContributor[] _snapshot = [];
+        public bool IsEmpty => _snapshot.Length == 0;
+        public IReadOnlyList<WriteStampContributor> All => _snapshot;
+
+        public void Register(WriteStampContributor contributor)
         {
-            _contributors.Clear();
-            _isEmpty = true;
+            lock (_gate)
+            {
+                if (_snapshot.Any(item => string.Equals(item.Id, contributor.Id, StringComparison.Ordinal))) return;
+                _snapshot = [.. _snapshot, contributor];
+            }
         }
-        StorageWritePlan.InvalidateCache();
+
+        public void Reset()
+        {
+            lock (_gate) _snapshot = [];
+        }
     }
 }

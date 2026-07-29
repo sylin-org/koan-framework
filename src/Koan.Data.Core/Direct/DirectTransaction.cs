@@ -1,16 +1,26 @@
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Abstractions;
+using Koan.Data.Core.SourceIntegration.Runtime;
 
 namespace Koan.Data.Core.Direct;
 
-internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, TimeSpan timeout, int maxRows) : IDirectTransaction
+internal sealed class DirectTransaction(
+    DbConnection conn,
+    DbTransaction tx,
+    TimeSpan timeout,
+    int maxRows,
+    DataSourcePlan sourcePlan,
+    DataOperationEffect effect,
+    RecordSetMaterializer materializer) : IDirectTransaction
 {
     public async Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        sourcePlan.Demand(effect, "direct transaction execute");
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
         cmd.Transaction = tx;
@@ -31,6 +41,7 @@ internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, Tim
 
     public async Task<T?> Scalar<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        sourcePlan.Demand(effect, "direct transaction scalar");
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
         cmd.Transaction = tx;
@@ -52,6 +63,7 @@ internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, Tim
 
     public async Task<IReadOnlyList<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        sourcePlan.Demand(effect, "direct transaction query");
         await using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
         cmd.Transaction = tx;
@@ -68,35 +80,57 @@ internal sealed class DirectTransaction(DbConnection conn, DbTransaction tx, Tim
             }
         }
         using var reader = await cmd.ExecuteReaderAsync(ct);
-        return await DirectSession.MaterializeAsJsonObjects(reader, maxRows, ct);
+        return await DirectSession.MaterializeAsObjects(reader, maxRows, ct);
     }
 
     public async Task<IReadOnlyList<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
-        var rows = await Query(sql, parameters, ct);
-        var settings = JsonSettings.Default;
-        var list = new List<T>(rows.Count);
-        foreach (var row in rows)
+        sourcePlan.Demand(effect, "direct transaction typed query");
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.Transaction = tx;
+        cmd.CommandTimeout = (int)timeout.TotalSeconds;
+        var dict = DirectSession.ToDictionary(parameters);
+        if (dict is not null)
         {
-            var json = JsonConvert.SerializeObject(row, settings);
-            var item = JsonConvert.DeserializeObject<T>(json, settings);
-            if (item != null) list.Add(item);
+            foreach (var kv in dict)
+            {
+                var parameter = cmd.CreateParameter();
+                parameter.ParameterName = kv.Key.StartsWith("@") ? kv.Key : "@" + kv.Key;
+                parameter.Value = kv.Value ?? DBNull.Value;
+                cmd.Parameters.Add(parameter);
+            }
         }
-        return list;
+        var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        var limits = new RecordSetLimits(maxRows, long.MaxValue, long.MaxValue, timeout);
+        var records = await materializer.Materialize(
+                new DirectSession.AdoNeutralRecordReader(reader),
+                limits,
+                "direct transaction typed query",
+                ct)
+            .ConfigureAwait(false);
+        return records.Project<T>();
     }
 
-    public Task Commit(CancellationToken ct = default)
+    public async Task Commit(CancellationToken ct = default)
     {
-        tx.Commit(); return Task.CompletedTask;
+        sourcePlan.Demand(effect, "direct transaction commit");
+        await tx.CommitAsync(ct).ConfigureAwait(false);
     }
-    public Task Rollback(CancellationToken ct = default)
+    public async Task Rollback(CancellationToken ct = default)
     {
-        try { tx.Rollback(); } catch { }
-        return Task.CompletedTask;
+        await tx.RollbackAsync(ct).ConfigureAwait(false);
     }
 
     public async ValueTask DisposeAsync()
     {
-        try { await conn.DisposeAsync(); } catch { }
+        try
+        {
+            await tx.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            await conn.DisposeAsync().ConfigureAwait(false);
+        }
     }
 }

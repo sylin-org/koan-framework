@@ -48,28 +48,39 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     /// <c>Entity&lt;T&gt;</c> API resolves. Disposing (via <c>await using</c>) stops the host and releases
     /// that owner-checked binding.
     /// </summary>
-    protected Task<BoundHost> BootAsync() => BootAsync(null);
+    protected Task<BoundHost> BootAsync() => BootCoreAsync(Fixture.SettingsForBoot(), null, null);
+
+    /// <summary>
+    /// Boot a real Koan host and run <paramref name="declare"/> inside the owning <c>AddKoan(...)</c> composition.
+    /// Use this for host-owned declarations; use the service-collection overload for ordinary post-composition DI.
+    /// </summary>
+    protected Task<BoundHost> BootAsync(Action declare)
+    {
+        ArgumentNullException.ThrowIfNull(declare);
+        return BootCoreAsync(Fixture.SettingsForBoot(), declare, null);
+    }
 
     /// <summary>
     /// Boot a real Koan host (as <see cref="BootAsync()"/>) and additionally apply <paramref name="configure"/> to the
     /// service collection AFTER <c>AddKoan()</c> — so a spec can register a fake contributor (e.g. an
     /// <c>IReadFilterContributor</c>, DATA-0106) into the real boot's DI without a bespoke fixture.
     /// </summary>
-    protected async Task<BoundHost> BootAsync(Action<IServiceCollection>? configure)
+    protected Task<BoundHost> BootAsync(Action<IServiceCollection>? configure) =>
+        BootCoreAsync(Fixture.SettingsForBoot(), null, configure);
+
+    /// <summary>Boots with both composition-owned declarations and ordinary post-composition services.</summary>
+    protected Task<BoundHost> BootAsync(Action declare, Action<IServiceCollection> configure)
     {
-        var host = await KoanIntegrationHost.Configure()
-            .WithSettings(Fixture.SettingsForBoot())
-            .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
-            .StartAsync(TestContext.Current.CancellationToken)
-            .ConfigureAwait(false);
-        return new BoundHost(host);
+        ArgumentNullException.ThrowIfNull(declare);
+        ArgumentNullException.ThrowIfNull(configure);
+        return BootCoreAsync(Fixture.SettingsForBoot(), declare, configure);
     }
 
     /// <summary>
     /// Boot a real Koan host (as <see cref="BootAsync()"/>) with <paramref name="extraSettings"/> merged OVER the
     /// fixture's settings — e.g. extra routed data sources for an AODB Database-mode conformance cell. Later keys win.
     /// </summary>
-    protected async Task<BoundHost> BootAsync(
+    protected Task<BoundHost> BootAsync(
         IEnumerable<System.Collections.Generic.KeyValuePair<string, string?>> extraSettings,
         Action<IServiceCollection>? configure = null)
     {
@@ -77,9 +88,22 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
         foreach (var kv in Fixture.SettingsForBoot()) settings[kv.Key] = kv.Value;
         foreach (var kv in extraSettings) settings[kv.Key] = kv.Value;
 
+        return BootCoreAsync(settings, null, configure);
+    }
+
+    private async Task<BoundHost> BootCoreAsync(
+        IEnumerable<System.Collections.Generic.KeyValuePair<string, string?>> settings,
+        Action? declare,
+        Action<IServiceCollection>? configure)
+    {
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(s => { s.AddKoan(); configure?.Invoke(s); })
+            .ConfigureServices(services =>
+            {
+                if (declare is null) services.AddKoan();
+                else services.AddKoan(declare);
+                configure?.Invoke(services);
+            })
             .StartAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(false);
         return new BoundHost(host);

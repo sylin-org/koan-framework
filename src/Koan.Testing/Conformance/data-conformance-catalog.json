@@ -1,0 +1,1380 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "data-adapter-conformance/1",
+  "primerPath": "docs/architecture/data-adapter-development-primer.md",
+  "primerSha256": "5727df1efb1cf87385f5708f5c7dbf02b91b7fe8da4ce8af25ee4dc68c15befe",
+  "cells": [
+    {
+      "id": "A-01",
+      "evidence": [
+        "STATIC",
+        "BOOT"
+      ],
+      "requirement": "Referencing the connector makes it available through ordinary `AddKoan()` with no provider registration call.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-02",
+      "evidence": [
+        "BOOT",
+        "NEG"
+      ],
+      "requirement": "An explicit provider/source resolves exactly or fails with available choices and a correction.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-03",
+      "evidence": [
+        "BOOT",
+        "NEG"
+      ],
+      "requirement": "An available but unelected connector performs no connection, file, shape, or readiness I/O.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-04",
+      "evidence": [
+        "LIFE"
+      ],
+      "requirement": "Two Koan hosts do not share mutable plans, readiness state, keepers, or logical client state.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-05",
+      "evidence": [
+        "LIFE"
+      ],
+      "requirement": "Host disposal releases every host-owned provider resource.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-06",
+      "evidence": [
+        "BOOT"
+      ],
+      "requirement": "An ordinary source with no override resolves to `StorageLifecycle: Managed` and `Access: ReadWrite`.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-07",
+      "evidence": [
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "Every physical shape the connector claims to validate is compared by definition, not name. An incompatible same-named object is unhealthy; repair occurs only under explicit managed lifecycle policy.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-08",
+      "evidence": [
+        "LIVE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "External lifecycle policy performs no repair mutation or implicit provider auto-create.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "A-09",
+      "evidence": [
+        "LIVE",
+        "FAULT",
+        "PLAN"
+      ],
+      "requirement": "Explicitly authorized provision/repair creates or reconciles the declared shape, post-validates it, and is idempotent; a repeated healthy call performs no mutation.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-01",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Every supported identity and value boundary round-trips without culture- or JSON-induced drift.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-02",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Get-many returns one slot per requested identity in input order, with `null` for each missing or invisible record.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-03",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Upsert and delete report correct outcomes for insert, update, missing, conflict, and provider-failure cases.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-04",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Each exposed delete-all, remove strategy, native bulk path, and batch operation preserves active guards, transforms, Entity lifecycle callbacks, and isolation. Each path is a separate case; optimization never widens scope or changes announced atomicity.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-05",
+      "evidence": [
+        "LIVE",
+        "FAULT"
+      ],
+      "requirement": "Deferred batch mutation loads at commit time, has a specified missing-record outcome, and participates in the same conflict and atomicity contract as other queued work.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-06",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Query results match the shared CLR oracle for each declared filter operator.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-07",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN"
+      ],
+      "requirement": "Sort, page, projection, and count receipts match work the provider actually performed; each handled component is a separate case.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-08",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Each unsupported Entity operation rejects before unbounded work or partial mutation.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "B-09",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN",
+        "FAULT"
+      ],
+      "requirement": "A provider-bounded page/stream applies the requested bound and complete order natively, reports an accurate receipt, propagates cancellation, and releases resources on early disposal.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-01",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Each write surface fails before Entity callbacks, readiness, transaction creation, or provider I/O for that operation on a read-only source.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-02",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Each storage-lifecycle/provisioning surface fails at the same boundary on an external source.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-03",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN",
+        "NEG"
+      ],
+      "requirement": "External/read-write semantic `DeleteAll` remains legal. A clear primitive is legal only after Data proves equivalence; `Optimized` may downgrade, while explicitly structural `Fast` rejects.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-04",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Nested context, mapping, Direct/connection override, transaction, batch, instruction, and provider extension paths cannot elevate either source restriction; each exposed path is a case.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-05",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Every registered read has effective effect `Read`; `Unknown` rejects before execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "C-06",
+      "evidence": [
+        "STATIC",
+        "NEG"
+      ],
+      "requirement": "Facts and exceptions report effective policy without exposing the connection string.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-01",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Listing is bounded, distinguishes `Complete`, `MoreAvailable`, and `ProviderLimit`, and returns a source-bound opaque continuation exactly when the provider can resume.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-02",
+      "evidence": [
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "Resolution uses provider-safe identifier handling, returns a source-bound opaque reference, reports typed ambiguity and safe candidates, and rejects a reference used with the wrong source.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-03",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Description is non-mutating and reports honest provider kind, intrinsic traits, source-policy-projected effective operations, optional neutral shape, and diagnostic-only display path.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-04",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Sampling is available only for intrinsic `Records` and effective `Sample`, is bounded, uses the regular shared shape or one nested document value, reports completion, and never mutates.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-05",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Field order, duplicate names, provider type, missing, null, binary, temporal, numeric, JSON, and nested values survive neutral materialization.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-06",
+      "evidence": [
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "Ambiguous name lookup rejects, ordinal lookup remains lossless, and an additional result channel rejects rather than being discarded.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-07",
+      "evidence": [
+        "ORACLE",
+        "PERF"
+      ],
+      "requirement": "DTO projection uses a reused ordinal plan for immutable constructor/positional-record and writable-property binding, with corrective missing/duplicate/type failures and no dictionary-to-JSON conversion.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-08",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Every buffered result has positive record/value/aggregate/duration limits, uses the shared byte-accounting basis, omits rather than clips the first non-fitting record, and reports the first honest completion reason; cancellation, timeout, conversion, and provider failure remain failures.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "D-09",
+      "evidence": [
+        "STATIC",
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "Provider-native inspection preserves richer metadata in an explicit provider type and neither widens nor mislabels the neutral descriptor or `RecordSet` contract.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-01",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "An identity-plus-object mapping round-trips.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-02",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Flat scalar names, including nested logical property paths, round-trip.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-03",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Hybrid authoritative scalar bindings and structured subtrees round-trip without duplication drift.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-04",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "A flat logical scalar mapped inside a physical structured value round-trips in both directions.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-05",
+      "evidence": [
+        "BOOT",
+        "NEG"
+      ],
+      "requirement": "Logical/physical duplicates, ambiguous paths, missing required bindings, incompatible types, and undeclared asymmetry fail plan compilation with a correction; explicit generated/read-only bindings remain legal.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-06",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Single, generated, and composite identities use every declared component consistently; a partial or nullable composite identity rejects before execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-07",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Each declared legacy codec is symmetric, and query/write parameters use the same physical encoding as hydration.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-08",
+      "evidence": [
+        "LIVE",
+        "PLAN"
+      ],
+      "requirement": "Read projection fetches only physical values required by the compiled map when that optimization is announced.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-09",
+      "evidence": [
+        "LIVE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "External read/write mapping never causes DDL.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-10",
+      "evidence": [
+        "STATIC",
+        "PERF"
+      ],
+      "requirement": "Mapping plans are immutable, host-scoped, bounded, and reused on the warm path.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-11",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN"
+      ],
+      "requirement": "Every exposed consumer—hydration, writes, filters, ordering, patches, conditional writes, projections, and index expressions—uses the same compiled physical binding for each logical path. Each exposed consumer is a case; index-expression cases exist only with that separate profile.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-12",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN"
+      ],
+      "requirement": "A stored projection used by a query or index is maintained by every mutation case; otherwise the index derives from the canonical stored value. Fallback cannot conceal an inert index or false claim.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-13",
+      "evidence": [
+        "LIVE",
+        "PLAN"
+      ],
+      "requirement": "A declared usable index covers the same provider expression and scalar encoding emitted for its filter/order. Native plan evidence proves representative single and composite cases.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-14",
+      "evidence": [
+        "LIVE",
+        "PLAN"
+      ],
+      "requirement": "An announced rewrite-free derived/expression index benefits records already stored without rewrite. Required backfill is an explicit deployment operation and that capability remains unannounced.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "E-15",
+      "evidence": [
+        "LIVE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "TTL metadata is lowered only when native expiry semantics are announced and proved; it never becomes a meaningless ordinary index.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-01",
+      "evidence": [
+        "BOOT",
+        "NEG"
+      ],
+      "requirement": "Duplicate `(source, name)` declarations fail composition; the catalog cannot mutate afterward.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-02",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "`Query` resolves only `Read + Records + Buffered` and `Scalar<T>` only `Read + Scalar + Buffered`; result, delivery, or effect mismatch fails before provider execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-03",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Missing, extra, null-for-required, and incompatible parameters fail before provider execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-04",
+      "evidence": [
+        "STATIC",
+        "PERF"
+      ],
+      "requirement": "The adapter receives the selected binding, frozen execution lane, reused parameter plan, effective-read decision, timeout, and bounds without reparsing application configuration.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-05",
+      "evidence": [
+        "BOOT",
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "Detectable mutation under a read declaration fails composition. Every opaque read is bound permanently to provider-enforced read-only execution; inability to establish it fails composition/validation.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-06",
+      "evidence": [
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "`Unknown` never runs through `Query` or `Scalar` on any source.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-07",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "A record result satisfies Record Results. A scalar is exactly one provider scalar or one record × one field, respects the shared value/duration bounds, and rejects every other cardinality.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-08",
+      "evidence": [
+        "LIVE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "External registration may carry inline payload but never provisions a provider-managed artifact.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-09",
+      "evidence": [
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "A missing referenced provider-managed artifact fails diagnostically and is not created externally.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-10",
+      "evidence": [
+        "STATIC",
+        "NEG"
+      ],
+      "requirement": "Registered operations are uncached, are not automatically exposed through REST/MCP, and fail closed under active segmentation unless an explicit host/control-plane scope exists.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-11",
+      "evidence": [
+        "FAULT",
+        "PLAN"
+      ],
+      "requirement": "No registered operation is replayed after provider dispatch. Bounded transient acquisition retry is pre-dispatch; provider-transparent retry must be announced and proved as its own case.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "F-12",
+      "evidence": [
+        "STATIC",
+        "LIVE"
+      ],
+      "requirement": "Telemetry records source, stable name, provider, effect, result kind, duration, attempts, and result count—not payload text or parameter values.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-01",
+      "evidence": [
+        "LIVE",
+        "FAULT"
+      ],
+      "requirement": "Concurrent first legitimate shape use has one readiness/provisioning outcome and no partial race.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-02",
+      "evidence": [
+        "FAULT",
+        "LIFE"
+      ],
+      "requirement": "Route readiness and shape provisioning use distinct host-scoped single-flight state. Caller cancellation detaches one wait; shutdown owns shared cancellation; failure is never cached healthy.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-03",
+      "evidence": [
+        "LIVE",
+        "FAULT",
+        "LIFE"
+      ],
+      "requirement": "Pool saturation does not leak source, transaction, read-only, tenant, or provider session state to the next operation.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-04",
+      "evidence": [
+        "FAULT",
+        "LIFE"
+      ],
+      "requirement": "Caller cancellation and provider timeout remain distinct on each native operation; cancellation reaches provider dispatch and releases active request, result/cursor/stream, and transactional resources.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-05",
+      "evidence": [
+        "LIVE",
+        "FAULT"
+      ],
+      "requirement": "A claimed atomic batch leaves state wholly before/after. Pre-commit failure rolls back with a bounded independent cleanup token; an indeterminate commit reports outcome unknown and is never replayed.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-06",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Conditional replace is one native compare-and-set and reports a lost race without overwriting the winner.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-07",
+      "evidence": [
+        "LIVE",
+        "LIFE"
+      ],
+      "requirement": "Restart proves announced durability; an in-memory shim cannot pass.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-08",
+      "evidence": [
+        "LIFE",
+        "PERF"
+      ],
+      "requirement": "The standard bounded soak leaves client/pool, handle, result/cursor/stream, task, cache, and memory counts stable.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "G-09",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Each announced isolation token passes the shared adversarial cross-scope cell.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-01",
+      "evidence": [
+        "STATIC",
+        "BOOT"
+      ],
+      "requirement": "`Describe` is side-effect-free and matches compiled route, policy, mappings, and capabilities.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-02",
+      "evidence": [
+        "STATIC",
+        "BOOT"
+      ],
+      "requirement": "`Explain` reports provider work, client work, bounds, and unsupported semantics before execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-03",
+      "evidence": [
+        "LIVE",
+        "NEG"
+      ],
+      "requirement": "`Doctor` performs only documented non-mutating checks and gives a correction for every failure.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-04",
+      "evidence": [
+        "STATIC",
+        "BOOT"
+      ],
+      "requirement": "Startup, facts, health, errors, and tests project the same decision identities.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-05",
+      "evidence": [
+        "STATIC",
+        "NEG"
+      ],
+      "requirement": "General facts/logs exclude credentials, parameters, business values, tenant identifiers, and full raw provider errors; safe public exceptions and restricted native evidence stay separate.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "H-06",
+      "evidence": [
+        "LIVE",
+        "FAULT",
+        "NEG"
+      ],
+      "requirement": "Native failures use exact provider code/type and target, never message text. Timeout is not caller cancellation; `OperationCanceledException` survives only when non-commit is known. Retryability and replay safety remain separate, and a failed mutation/existence probe never becomes success/not-found.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-01",
+      "evidence": [
+        "PERF"
+      ],
+      "requirement": "Warm source routing performs no DI enumeration, adapter election, policy recomputation, readiness I/O, or structural plan compilation.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-02",
+      "evidence": [
+        "PERF"
+      ],
+      "requirement": "Warm Entity/mapping/record paths perform no repeated reflection, mapping conflict detection, dictionary-to-JSON materialization, equivalent lookup reconstruction, or repeated physical-JSON parsing.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-03",
+      "evidence": [
+        "STATIC",
+        "LIFE",
+        "PERF"
+      ],
+      "requirement": "Route, readiness, mapping, native-operation, and operation caches are host-scoped, bounded, and invalidated by stable structural/credential rules.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-04",
+      "evidence": [
+        "ORACLE",
+        "PLAN",
+        "PERF"
+      ],
+      "requirement": "No handled/optimized claim conceals a full-source materialization, client page, inert index, temporary sort, N+1 provider-dispatch loop, or other weaker execution.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-05",
+      "evidence": [
+        "PERF"
+      ],
+      "requirement": "Every applicable §7 benchmark records allocation, provider dispatch count, elapsed time, and provider work against a pinned baseline; structural warm-path regression or unexplained material regression fails.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "P-06",
+      "evidence": [
+        "STATIC"
+      ],
+      "requirement": "The one-page responsibility map has one owner for each policy, route, readiness, mapping, materializer, and provider-execution concern; duplicate adapter-local framework machinery fails placement review.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-01",
+      "evidence": [
+        "STATIC",
+        "BOOT",
+        "NEG"
+      ],
+      "requirement": "A vector-space plan binds source, safe physical name, dimensions, metric, visibility, optional model identity, and optional named space once; an unelected provider performs no I/O.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-02",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Empty, non-finite, wrong-dimension, or wrong-space embeddings reject before mutation; every valid boundary value round-trips without drift.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-03",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Saving a new identity inserts one point; saving it again atomically replaces embedding and metadata without a duplicate.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-04",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Delete returns the correct existing/missing outcome; provider failure never reports success and does not widen scope.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-05",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Get-one returns one complete point or `null`; get-many preserves input count, order, and duplicates, with `null` in every missing slot.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-06",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Metadata survives the neutral value algebra without reserved-field collision, shape invention, provider objects, or missing/null confusion.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-07",
+      "evidence": [
+        "LIVE",
+        "ORACLE"
+      ],
+      "requirement": "Search returns at most `Top`, no duplicate identity, descending similarity, and stable identity tie order; empty and fewer-than-requested results are normal.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-08",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN"
+      ],
+      "requirement": "Similarity is finite `[0,1]`, higher is closer, monotonic for the declared metric, and `AtLeast` is applied equivalently or rejected before unbounded work.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-09",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Search uses exactly the declared source, dimensions, metric, model, and named space; a point or query from another space never mixes silently.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-10",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "PLAN"
+      ],
+      "requirement": "Exact/Approximate and candidate facts report provider work honestly; approximation is never presented as an exact oracle result.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-11",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Default Session visibility makes each awaited save/delete observable to subsequent get and search operations in the same source without arbitrary sleeps.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-12",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Explicit Eventual visibility may defer search visibility; `Sync` is cancellable, bounded, and makes every earlier accepted mutation in that source visible or fails.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-13",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "`Where` constrains the candidate set before ranking. The shared filter oracle agrees for every announced operator; residual or post-filter fallback rejects before provider I/O or unbounded work.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-14",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Hybrid search defines `SemanticWeight` endpoints as pure lexical/vector modes, preserves normalized final rank, and rejects unsupported text/weight combinations before I/O.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-15",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Each named space keeps immutable dimensions, metric, and model; unsupported or ambiguous selection fails with safe available choices.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-16",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "A continuation is opaque and bound to source, space, query, filter, and ordering; resume has no duplicates or gaps inside its declared snapshot contract, and wrong-context reuse rejects.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-17",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT",
+        "PLAN"
+      ],
+      "requirement": "Native bulk save/delete preserves per-item outcomes, cancellation, guards, visibility, and isolation; dispatch count and partial failure are reported honestly.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-18",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "An Atomic Batch claim is all-or-nothing under injected mid-batch failure; otherwise the result is explicitly non-atomic and retains every item outcome.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-19",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "FAULT"
+      ],
+      "requirement": "Export is provider-bounded, cancellable, and yields every visible point exactly once under its stated snapshot or weak-consistency contract without materializing the corpus.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-20",
+      "evidence": [
+        "LIVE",
+        "NEG",
+        "PLAN"
+      ],
+      "requirement": "Ensure, validate, and clear obey lifecycle and access policy, compare the complete space shape, never auto-create under External, and keep visibility synchronization distinct from destructive clearing.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-21",
+      "evidence": [
+        "LIVE",
+        "ORACLE",
+        "NEG"
+      ],
+      "requirement": "Every announced vector isolation mode prevents cross-scope get, search, export, and delete and maps to the declared metadata or physical-address mechanism; a pinned conflicting name rejects at plan time.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-22",
+      "evidence": [
+        "LIVE",
+        "FAULT",
+        "NEG"
+      ],
+      "requirement": "Entity/vector coordination never invents cross-store atomicity; every injected stage failure exposes safe commit facts, retry disposition, and compensation guidance without provider secrets.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-23",
+      "evidence": [
+        "FAULT",
+        "NEG",
+        "LIFE"
+      ],
+      "requirement": "Cancellation, timeout, rate limit, schema mismatch, unavailable provider, and disposal map to the shared failure taxonomy; disposal releases clients, cursors, polling, and background work.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    },
+    {
+      "id": "V-24",
+      "evidence": [
+        "PERF",
+        "PLAN"
+      ],
+      "requirement": "Warm single save/get/search, native bulk, filtered search, and materialization meet pinned provider-relative budgets with one compiled immutable plan and no per-result reflection or metadata-shape rebuild.",
+      "verifier": "Koan.Testing.DataAdapterConformanceSpecs.Acceptance_cell_has_complete_evidence"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "Source Core",
+      "applicability": "every connector",
+      "acceptanceIds": [
+        "A-01",
+        "A-02",
+        "A-03",
+        "A-04",
+        "A-05",
+        "A-06",
+        "C-04",
+        "C-06",
+        "G-02",
+        "G-03",
+        "G-04",
+        "G-08",
+        "H-01",
+        "H-02",
+        "H-03",
+        "H-04",
+        "H-05",
+        "H-06",
+        "P-01",
+        "P-03",
+        "P-05",
+        "P-06"
+      ]
+    },
+    {
+      "id": "Entity Persistence",
+      "applicability": "ordinary Entity surface is exposed",
+      "acceptanceIds": [
+        "B-01",
+        "B-02",
+        "B-03",
+        "B-04",
+        "B-05",
+        "B-06",
+        "B-07",
+        "B-08",
+        "P-02",
+        "P-04"
+      ]
+    },
+    {
+      "id": "Declared-shape validation",
+      "applicability": "any mapping, projection, index, or other expected physical shape is declared",
+      "acceptanceIds": [
+        "A-07"
+      ]
+    },
+    {
+      "id": "Managed storage lifecycle",
+      "applicability": "connector may provision or repair physical shape",
+      "acceptanceIds": [
+        "A-07",
+        "A-09",
+        "G-01"
+      ]
+    },
+    {
+      "id": "Read-only source safety",
+      "applicability": "connector exposes any mutating surface",
+      "acceptanceIds": [
+        "C-01",
+        "C-04",
+        "C-06"
+      ]
+    },
+    {
+      "id": "External lifecycle safety",
+      "applicability": "connector can create/alter/drop or may implicitly create storage",
+      "acceptanceIds": [
+        "A-08",
+        "C-02",
+        "C-04",
+        "C-06"
+      ]
+    },
+    {
+      "id": "External data-write safety",
+      "applicability": "Entity Persistence exposes semantic data writes under `External + ReadWrite`",
+      "acceptanceIds": [
+        "C-03",
+        "C-04",
+        "C-06"
+      ]
+    },
+    {
+      "id": "Container listing",
+      "applicability": "provider honestly enumerates neutral containers",
+      "acceptanceIds": [
+        "D-01"
+      ]
+    },
+    {
+      "id": "Container address resolution",
+      "applicability": "provider resolves a neutral address",
+      "acceptanceIds": [
+        "D-02"
+      ]
+    },
+    {
+      "id": "Container description",
+      "applicability": "provider reports neutral traits/shape",
+      "acceptanceIds": [
+        "D-03"
+      ]
+    },
+    {
+      "id": "Record sampling",
+      "applicability": "provider samples a declared record-producing container",
+      "acceptanceIds": [
+        "D-04"
+      ]
+    },
+    {
+      "id": "Record Results",
+      "applicability": "neutral buffered records are returned by any surface",
+      "acceptanceIds": [
+        "D-05",
+        "D-06",
+        "D-07",
+        "D-08",
+        "P-02"
+      ]
+    },
+    {
+      "id": "Identity-plus-object mapping",
+      "applicability": "one identity value and one complete structured value are claimed",
+      "acceptanceIds": [
+        "A-07",
+        "E-01",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-09",
+        "E-10",
+        "E-11",
+        "P-02"
+      ]
+    },
+    {
+      "id": "Flat-name mapping",
+      "applicability": "scalar physical names, including nested logical paths, are claimed",
+      "acceptanceIds": [
+        "A-07",
+        "E-02",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-09",
+        "E-10",
+        "E-11",
+        "P-02"
+      ]
+    },
+    {
+      "id": "Hybrid mapping",
+      "applicability": "scalar values and a structured subtree are claimed together",
+      "acceptanceIds": [
+        "A-07",
+        "E-03",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-09",
+        "E-10",
+        "E-11",
+        "P-02"
+      ]
+    },
+    {
+      "id": "Scalar nested-path mapping",
+      "applicability": "a flat property binds inside a physical structured value",
+      "acceptanceIds": [
+        "A-07",
+        "E-04",
+        "E-05",
+        "E-06",
+        "E-07",
+        "E-09",
+        "E-10",
+        "E-11",
+        "P-02"
+      ]
+    },
+    {
+      "id": "Selective read projection",
+      "applicability": "provider column/value pruning is announced",
+      "acceptanceIds": [
+        "E-08",
+        "P-04"
+      ]
+    },
+    {
+      "id": "Physical projection and indexing",
+      "applicability": "projection/index metadata is announced",
+      "acceptanceIds": [
+        "A-07",
+        "E-12",
+        "E-13",
+        "P-04"
+      ]
+    },
+    {
+      "id": "Rewrite-free derived/expression index",
+      "applicability": "existing records are announced to benefit without rewrite",
+      "acceptanceIds": [
+        "E-14"
+      ]
+    },
+    {
+      "id": "Native TTL",
+      "applicability": "TTL metadata is announced",
+      "acceptanceIds": [
+        "E-15"
+      ]
+    },
+    {
+      "id": "Registered Reads",
+      "applicability": "`Query` or `Scalar<T>` is exposed",
+      "acceptanceIds": [
+        "C-05",
+        "F-01",
+        "F-02",
+        "F-03",
+        "F-04",
+        "F-05",
+        "F-06",
+        "F-07",
+        "F-08",
+        "F-09",
+        "F-10",
+        "F-11",
+        "F-12"
+      ]
+    },
+    {
+      "id": "Provider-bounded paging",
+      "applicability": "provider-bounded page/stream token is announced",
+      "acceptanceIds": [
+        "B-09",
+        "P-04"
+      ]
+    },
+    {
+      "id": "Atomic batch",
+      "applicability": "an all-or-nothing batch token is announced",
+      "acceptanceIds": [
+        "G-05"
+      ]
+    },
+    {
+      "id": "Conditional replace",
+      "applicability": "native compare-and-set token is announced",
+      "acceptanceIds": [
+        "G-06"
+      ]
+    },
+    {
+      "id": "Durability",
+      "applicability": "connector announces durable persistence",
+      "acceptanceIds": [
+        "G-07"
+      ]
+    },
+    {
+      "id": "Isolation",
+      "applicability": "each announced row/container/database isolation token",
+      "acceptanceIds": [
+        "G-09"
+      ]
+    },
+    {
+      "id": "Provider-native inspection",
+      "applicability": "richer native metadata extension is exposed",
+      "acceptanceIds": [
+        "D-09"
+      ]
+    },
+    {
+      "id": "Vector Core",
+      "applicability": "every connector exposing `Vector<TEntity>`",
+      "acceptanceIds": [
+        "V-01",
+        "V-02",
+        "V-03",
+        "V-04",
+        "V-05",
+        "V-06",
+        "V-07",
+        "V-08",
+        "V-09",
+        "V-10",
+        "V-11",
+        "V-20",
+        "V-23",
+        "V-24"
+      ]
+    },
+    {
+      "id": "Eventual Vector Visibility",
+      "applicability": "source explicitly selects `Eventual`",
+      "acceptanceIds": [
+        "V-12"
+      ]
+    },
+    {
+      "id": "Vector Filters",
+      "applicability": "metadata `Where` is announced",
+      "acceptanceIds": [
+        "V-13"
+      ]
+    },
+    {
+      "id": "Vector Hybrid",
+      "applicability": "`Text` search is announced",
+      "acceptanceIds": [
+        "V-14"
+      ]
+    },
+    {
+      "id": "Named Vector Spaces",
+      "applicability": "more than one vector space per point is announced",
+      "acceptanceIds": [
+        "V-15"
+      ]
+    },
+    {
+      "id": "Vector Continuation",
+      "applicability": "resumable search is announced",
+      "acceptanceIds": [
+        "V-16"
+      ]
+    },
+    {
+      "id": "Vector Bulk",
+      "applicability": "native bulk save or delete is announced",
+      "acceptanceIds": [
+        "V-17"
+      ]
+    },
+    {
+      "id": "Vector Atomic Batch",
+      "applicability": "all-or-nothing batch is announced",
+      "acceptanceIds": [
+        "G-05",
+        "V-18"
+      ]
+    },
+    {
+      "id": "Vector Export",
+      "applicability": "bounded export is announced",
+      "acceptanceIds": [
+        "V-19"
+      ]
+    },
+    {
+      "id": "Managed Vector Lifecycle",
+      "applicability": "create or repair is allowed",
+      "acceptanceIds": [
+        "A-07",
+        "A-09",
+        "G-01",
+        "V-20"
+      ]
+    },
+    {
+      "id": "Vector Isolation",
+      "applicability": "each announced row/container/database mode",
+      "acceptanceIds": [
+        "G-09",
+        "V-21"
+      ]
+    },
+    {
+      "id": "Entity/Vector Coordination",
+      "applicability": "`SaveWithVector` is exposed",
+      "acceptanceIds": [
+        "V-22"
+      ]
+    }
+  ]
+}

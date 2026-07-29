@@ -1,6 +1,6 @@
 # EntityController Surface — Per-Adapter Matrix
 
-End-to-end HTTP tests that exercise the full `EntityController<T>` surface against each Koan data adapter, plus partition routing (`?set=` / `EntityContext.With(partition: ...)`) and cross-partition transfer (`Entity<T>.Copy()` / `Move()` / `Mirror()`, `Data<T,K>.CopyPartition` / `MovePartition` / `MoveFrom().To()`).
+End-to-end HTTP tests that exercise the full `EntityController<T>` surface against each Koan data adapter, plus partition routing (`?set=` / `EntityContext.With(partition: ...)`) and bounded cross-partition transfer through the compact `Entity<T>` and `Data<T,K>` builders.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
   - **Three spec base classes**, all `IClassFixture<TFactory>`:
     - `AdapterSurfaceSpecsBase<TFactory>` — 31 HTTP surface specs (CRUD, sort, pagination, PATCH ×3 content types, DELETE bulk / by-query / all, body-query, filter)
     - `AdapterPartitionSpecsBase<TFactory>` — 8 partition routing specs (?set= isolation on read/write/delete/patch/bulk)
-    - `AdapterTransferSpecsBase<TFactory>` — 9 cross-partition transfer specs (`Copy`, `Move`, fluent `MoveFrom().To()`, `CopyPartition`, `MovePartition`, `ClearPartition`, predicate-filtered transfer)
+    - `AdapterTransferSpecsBase<TFactory>` — cross-partition `Copy`, `Move`, `Mirror`, same-context, partition-delete, and predicate-filtered transfer specs
   - `Containers/` — Web reset bridges over the public `Koan.Testing.Containers` fixtures for Mongo,
     Postgres, Redis, SqlServer, and Couchbase; the Web matrix owns no duplicate container constructor
 

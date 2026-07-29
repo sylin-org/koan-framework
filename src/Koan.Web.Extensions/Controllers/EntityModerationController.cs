@@ -147,7 +147,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeSubmit(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(DraftSet, SubmittedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: DraftSet).To(partition: SubmittedSet).Batch(500).Run(ct);
         await flow.AfterSubmitted(ctx, ct);
         return NoContent();
     }
@@ -178,7 +179,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeWithdraw(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DraftSet).Batch(500).Run(ct);
         await flow.AfterWithdrawn(ctx, ct);
         return NoContent();
     }
@@ -257,7 +259,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         {
             await Data<TEntity, TKey>.Upsert(ctx.SubmittedSnapshot!, ct);
         }
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, ApprovedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: ApprovedSet).Batch(500).Run(ct);
         await flow.AfterApproved(ctx, ct);
         return NoContent();
     }
@@ -330,7 +333,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeReject(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DeniedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DeniedSet).Batch(500).Run(ct);
         await flow.AfterRejected(ctx, ct);
         return NoContent();
     }
@@ -363,7 +367,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeReturn(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DraftSet).Batch(500).Run(ct);
         await flow.AfterReturned(ctx, ct);
         return NoContent();
     }

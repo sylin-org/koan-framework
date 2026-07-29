@@ -1,0 +1,4232 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-28T14:07:23.2198388+00:00",
+  "reviewer": "mechanical-coverage-critic",
+  "independence": "Separate search pass under the same exposed DAC-01 identity; not an independent human or agent certification.",
+  "pattern": "Direct|Instruction|Transaction|Background|Initializ|Provider|Patch|Raw|Connection|Readiness|Provision",
+  "result": "PASS",
+  "matchedDeclarations": 422,
+  "unclassified": 0,
+  "rows": [
+    {
+      "id": "API-471c80abb0e8eeaf",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Infrastructure.Constants+Configuration+Direct",
+      "member": "",
+      "file": "src/Koan.Data.Core/Infrastructure/Constants.cs",
+      "line": 78,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-16f23f189c8f1be1",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.MongoOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Mongo/MongoOptions.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-368508e2c2317450",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.MongoOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Mongo/MongoOptions.cs",
+      "line": 13,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-92a412f9a5e6fa57",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Infrastructure.Constants+Configuration+DataFallback",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Postgres/Infrastructure/Constants.cs",
+      "line": 36,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-fd9076168af8314e",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.MongoAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Mongo/MongoAdapterFactory.cs",
+      "line": 131,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-3ac9908f823b9ce4",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.MongoAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Mongo/MongoAdapterFactory.cs",
+      "line": 48,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d5d2e004ee3c6743",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.MongoAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Mongo/MongoAdapterFactory.cs",
+      "line": 45,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6fe95b1beacede04",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.Initialization.MongoModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Mongo/Initialization/MongoModule.cs",
+      "line": 52,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-7bc44ebf3fbde3ed",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Postgres/Infrastructure/Constants.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0f3dffedf29a123a",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Infrastructure.Constants+Configuration+Keys",
+      "member": "AltConnectionString()",
+      "file": "src/Connectors/Data/Postgres/Infrastructure/Constants.cs",
+      "line": 13,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f5525117a10857de",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsPostgres()",
+      "file": "src/Connectors/Data/Postgres/Infrastructure/Constants.cs",
+      "line": 14,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cd39fe98919f4d28",
+      "project": "Koan.Data.Connector.OpenSearch",
+      "type": "Koan.Data.Connector.OpenSearch.Initialization.OpenSearchDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/OpenSearch/Initialization/OpenSearchDataModule.cs",
+      "line": 14,
+      "surface": "SUR-ADAPTER-OPENSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6a4218170feb5b82",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsDefault()",
+      "file": "src/Connectors/Data/Postgres/Infrastructure/Constants.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-db0ce2c1676b1a82",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Failures.DataReplayDisposition",
+      "member": "BeforeDispatchOnly()",
+      "file": "src/Koan.Data.Abstractions/Failures/DataReplayDisposition.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4865f527fcd39e3c",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Failures.DataNativeTargetKind",
+      "member": "Transaction()",
+      "file": "src/Koan.Data.Abstractions/Failures/DataNativeTargetKind.cs",
+      "line": 9,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7c147be3134de006",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionEffect",
+      "member": "EffectiveEffect(this Instruction)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionEffect.cs",
+      "line": 8,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-51fdc5866df5dcc3",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.IInstructionExecutor`1",
+      "member": "ExecuteAsync(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Abstractions/Instructions/IInstructionExecutor.cs",
+      "line": 5,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7d83afd059e4748d",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.DataInstructions",
+      "member": "Patch()",
+      "file": "src/Koan.Data.Abstractions/Instructions/DataInstructions.cs",
+      "line": 10,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ff80a79eaa19f39e",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.DataInstructions",
+      "member": "Clear()",
+      "file": "src/Koan.Data.Abstractions/Instructions/DataInstructions.cs",
+      "line": 9,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1f9bf7454a11df55",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.DataInstructions",
+      "member": "EnsureCreated()",
+      "file": "src/Koan.Data.Abstractions/Instructions/DataInstructions.cs",
+      "line": 8,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c70089cd656f3477",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.IDataAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Koan.Data.Abstractions/IDataAdapterFactory.cs",
+      "line": 17,
+      "surface": "SUR-FWK-REPOSITORY-CONTRACT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6dc9a78a6817eef1",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "NonQuery(string,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 7,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b07a2ee70023f978",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "NonQuery(string,DataOperationEffect,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 10,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c59f18c00e53f86d",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Failures.DataRetryDisposition",
+      "member": "BeforeDispatchOnly()",
+      "file": "src/Koan.Data.Abstractions/Failures/DataRetryDisposition.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5b37f6addc444d5e",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "Scalar(string,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 16,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1e3cfc9910b6f898",
+      "project": "Koan.Data.Connector.OpenSearch",
+      "type": "Koan.Data.Connector.OpenSearch.Initialization.OpenSearchDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/OpenSearch/Initialization/OpenSearchDataModule.cs",
+      "line": 18,
+      "surface": "SUR-ADAPTER-OPENSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-29e50ce746447e29",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.Initialization.RedisDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Redis/Initialization/RedisDataModule.cs",
+      "line": 19,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0f37acf7c3243cff",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsDefault()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 21,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-ebef00f407e5c45e",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Configuration+DataFallback",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 42,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-ef50f62bfb3c0380",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.JsonAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Json/JsonAdapterFactory.cs",
+      "line": 18,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-ed759e39db8a4386",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.JsonAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Json/JsonAdapterFactory.cs",
+      "line": 51,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a0d02fd9644ded2e",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.JsonDataOptions",
+      "member": "DirectoryPath()",
+      "file": "src/Connectors/Data/Json/JsonDataOptions.cs",
+      "line": 10,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cd730418c28d40f4",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.PostgresOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Postgres/PostgresOptions.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-1e218b20265f7299",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.PostgresOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Postgres/PostgresOptions.cs",
+      "line": 11,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-c6b641d5ea027ff3",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Postgres/PostgresAdapterFactory.cs",
+      "line": 80,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0006091b4f0016ba",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Postgres/PostgresAdapterFactory.cs",
+      "line": 30,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-1d03972759b30bd3",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.PostgresAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Postgres/PostgresAdapterFactory.cs",
+      "line": 27,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-95c22c763e910ad3",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.Initialization.MongoModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Mongo/Initialization/MongoModule.cs",
+      "line": 34,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-e28df964ddf80dff",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Initialization.PostgresDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Postgres/Initialization/PostgresDataModule.cs",
+      "line": 45,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-8e81090ff8f5e631",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsDefault()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 16,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a4e816c8d75a21d2",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsSqlite()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f14b1a6dde03cfe4",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+Keys",
+      "member": "AltConnectionString()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 14,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-5714fbc82f5fb075",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 13,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-b91874288349ee5a",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+Keys",
+      "member": "DefaultSourceConnectionString()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6c01df70fee72be4",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.RedisOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Redis/RedisOptions.cs",
+      "line": 9,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-e8ffdd8b72ebd771",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.RedisAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Redis/RedisAdapterFactory.cs",
+      "line": 58,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-565e26af1804cc02",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.RedisAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Redis/RedisAdapterFactory.cs",
+      "line": 19,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-afa480049fe95bc5",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.RedisAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Redis/RedisAdapterFactory.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0e595f18c8c62980",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.Initialization.RedisDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Redis/Initialization/RedisDataModule.cs",
+      "line": 28,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-50f51918f4f170aa",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Initialization.PostgresDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Postgres/Initialization/PostgresDataModule.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-16fe26bd576bde55",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "Scalar(string,DataOperationEffect,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 19,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d7f1e3ed57572973",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SqlQuery()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 16,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4b78686735f69f46",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SqlNonQuery()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 15,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-aa2ecf54d55f4515",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "CommitOutcome()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 97,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0145427d2d9c1195",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "TrackSave(TEntity,EntityContext.ContextState)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 30,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c6fac03b97a04d81",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "IsCompleted()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 25,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1fbef13ec5162a72",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "Name()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 20,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ea888ba214c52b6a",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "FailedAdapter()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 96,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-776613196f56e678",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "RetryDisposition()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 98,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3594b39c74c52d50",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "LongRunningTransactionWarning()",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 36,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ef4d77b893c34e73",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TxCaps",
+      "member": "Compensation()",
+      "file": "src/Koan.Data.Core/Transactions/TxCaps.cs",
+      "line": 26,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c5b65c2558fced71",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TxCaps",
+      "member": "Distributed()",
+      "file": "src/Koan.Data.Core/Transactions/TxCaps.cs",
+      "line": 23,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6e1cbbff6c7777cf",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TxCaps",
+      "member": "DeferredCoordination()",
+      "file": "src/Koan.Data.Core/Transactions/TxCaps.cs",
+      "line": 20,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-425d4a20ada9459c",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "TrackDelete(TKey,EntityContext.ContextState)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 37,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-69a8d9dba6d0c518",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TxCaps",
+      "member": "Local()",
+      "file": "src/Koan.Data.Core/Transactions/TxCaps.cs",
+      "line": 17,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b02c2c865ce4aeeb",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "MaxTrackedOperations()",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 31,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-57555383d563d803",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "ReplayDisposition()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 99,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-752cc586594b76a5",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "EnableTelemetry()",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 25,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-cc1c14e5eaf8207f",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "AutoCommitOnDispose()",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 20,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7d97c530d72d0e32",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "DefaultTimeout()",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 13,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d1a081a286ac5948",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinatorFactory",
+      "member": "Create(string)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinatorFactory.cs",
+      "line": 13,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d4f84fe754db4e88",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "TransactionException(string,string,string,Exception?)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 111,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5eea8ddbecafe89e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "TransactionException(string,string,Exception?)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 102,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-674fa0033c230d42",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "CompletedOperationCount()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 100,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-fc8c1da297d4c77d",
+      "project": "Koan.Data.Relational.Abstractions",
+      "type": "Koan.Data.Relational.Mapping.RelationalOperationKind",
+      "member": "Patch()",
+      "file": "src/Koan.Data.Relational.Abstractions/Mapping/RelationalOperationKind.cs",
+      "line": 10,
+      "surface": "SUR-FAM-RELATIONAL-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-3502215e4a52e90f",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionServiceCollectionExtensions",
+      "member": "AddKoanTransactions(this IServiceCollection,Action<TransactionOptions>?)",
+      "file": "src/Koan.Data.Core/Transactions/TransactionServiceCollectionExtensions.cs",
+      "line": 15,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d6035a2a6c01654d",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "TrackVectorDelete(TKey,EntityContext.ContextState)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 57,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1ea81a5fe2598448",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "Commit(CancellationToken)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 67,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-184c57462ce8cfac",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "Rollback(CancellationToken)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 72,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d9b64e3c0445b5c6",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SqlScalar()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 14,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4c368e085020e8f9",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SchemaClear()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 11,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-25a1f27e4a7eabb8",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SchemaEnsureCreated()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 10,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-156a2a24f15cf051",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "SchemaValidate()",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 9,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-95d699cbe2e6fd49",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.ArrayBehavior",
+      "member": "Replace()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 36,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-9a64e8ecb8e648e9",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy",
+      "member": "Reject()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 15,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e938eb42e6dacbcb",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy",
+      "member": "Ignore()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 14,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e5bb824f1b528749",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy",
+      "member": "SetNull()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 13,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f8cadd5ff1106b78",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.MergePatchNullPolicy",
+      "member": "Reject()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 8,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a39e5f0da86e5d35",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.MergePatchNullPolicy",
+      "member": "SetDefault()",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 7,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0cdc445bdc47d840",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "Query(string,DataOperationEffect,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 28,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a8f3dcca88f00a31",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "Query(string,object?)",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 25,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a51d9d08b7dda73a",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Failures.DataCommitOutcome",
+      "member": "NotDispatched()",
+      "file": "src/Koan.Data.Abstractions/Failures/DataCommitOutcome.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f89c8d4f23862d17",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Capabilities.DataCaps+Query",
+      "member": "ProviderBoundedPaging()",
+      "file": "src/Koan.Data.Abstractions/Capabilities/DataCaps.cs",
+      "line": 36,
+      "surface": "SUR-FWK-CAPS-RECEIPTS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3fa68278665ddadd",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.DataAdapterAttribute",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Abstractions/DataAdapterAttribute.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-07f4db495e9f08b0",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.DataClaimSet",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Abstractions/Diagnostics/DataClaimSet.cs",
+      "line": 16,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a221e908e224deb4",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.DataClaimProfiles",
+      "member": "ProviderBoundedPaging()",
+      "file": "src/Koan.Data.Abstractions/Diagnostics/DataClaimProfiles.cs",
+      "line": 27,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-bdcba0b387fceeca",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.DataClaimProfiles",
+      "member": "ProviderNativeInspection()",
+      "file": "src/Koan.Data.Abstractions/Diagnostics/DataClaimProfiles.cs",
+      "line": 32,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7514b9699f493fb8",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "TrackVectorSave(TKey,ReadOnlyMemory<float>,IReadOnlyDictionary<string, object>?,EntityContext.ContextState)",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 45,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-bf4d0bea1b8cb476",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "TransactionName()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 95,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4aba16699a09398e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "TrackedOperationCount()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 87,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-9acaaf17c0e1c515",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "Adapters()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 82,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-39f03d9c5f4d3e19",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "Capabilities()",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 77,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-fbd2bb0e00fa83b3",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsCockroach()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 20,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-fc66295e8bdbb3c7",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Configuration+Keys",
+      "member": "AltConnectionString()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 19,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-313106279584942d",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.CockroachAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Cockroach/CockroachAdapterFactory.cs",
+      "line": 33,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-dcd0c77a78bfd7d1",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.CockroachAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Cockroach/CockroachAdapterFactory.cs",
+      "line": 84,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a4b905034bb1377a",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/SqlServer/SqlServerAdapterFactory.cs",
+      "line": 26,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-4fa364fe78dc3236",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Initialization.SqlServerDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/SqlServer/Initialization/SqlServerDataModule.cs",
+      "line": 45,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-20714f37a50230f5",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Initialization.SqlServerDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/SqlServer/Initialization/SqlServerDataModule.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-e46efbc9dae58cce",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Infrastructure.Constants+Configuration+DataFallback",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/SqlServer/Infrastructure/Constants.cs",
+      "line": 38,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0da657546a6b8e26",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.Initialization.InMemoryVectorModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Vector/InMemory/Initialization/InMemoryVectorModule.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-1db39d7339e695cb",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.MilvusOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Vector/Milvus/MilvusOptions.cs",
+      "line": 10,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-b91c3c553d35e694",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.Initialization.InMemoryVectorModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Vector/InMemory/Initialization/InMemoryVectorModule.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6da6100cd27123b5",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.Initialization.MilvusVectorModule",
+      "member": "Report(ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Vector/Milvus/Initialization/MilvusVectorModule.cs",
+      "line": 40,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a1db225c049e3ae1",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.Initialization.MilvusVectorModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Vector/Milvus/Initialization/MilvusVectorModule.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-dcbf7efd6020148f",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.InMemoryVectorAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Vector/InMemory/InMemoryVectorAdapterFactory.cs",
+      "line": 41,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d498bc4a13635f3c",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/SqlServer/SqlServerAdapterFactory.cs",
+      "line": 29,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-2cc0c811095468b1",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.InMemoryVectorAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Vector/InMemory/InMemoryVectorAdapterFactory.cs",
+      "line": 32,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-13538710d6bbc2f2",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.SqliteOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Sqlite/SqliteOptions.cs",
+      "line": 11,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-2eb34f623c8b65d6",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.SqliteAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Sqlite/SqliteAdapterFactory.cs",
+      "line": 63,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d108c07c9002473d",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.SqliteAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Sqlite/SqliteAdapterFactory.cs",
+      "line": 30,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-b4504f80293f0c3f",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.SqliteAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Sqlite/SqliteAdapterFactory.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-3c6d269337c48039",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Initialization.SqliteModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Sqlite/Initialization/SqliteModule.cs",
+      "line": 48,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-fb2af71a7f17631e",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Initialization.SqliteModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Sqlite/Initialization/SqliteModule.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a596631efadc2d5f",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Infrastructure.Constants+Configuration+DataFallback",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Sqlite/Infrastructure/Constants.cs",
+      "line": 36,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-9a03b2c17362e2c1",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsDefault()",
+      "file": "src/Connectors/Data/SqlServer/Infrastructure/Constants.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-b98da471dc0ffcbc",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionStringsSqlServer()",
+      "file": "src/Connectors/Data/SqlServer/Infrastructure/Constants.cs",
+      "line": 14,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-274700509cbb953f",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Infrastructure.Constants+Configuration+Keys",
+      "member": "AltConnectionString()",
+      "file": "src/Connectors/Data/SqlServer/Infrastructure/Constants.cs",
+      "line": 13,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-fcf709f96b188894",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.InMemoryVectorAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Vector/InMemory/InMemoryVectorAdapterFactory.cs",
+      "line": 28,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-1fe566f42a58decb",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.SqlServerOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/SqlServer/SqlServerOptions.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-7b68aed9d3c608ec",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.SqlServerAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/SqlServer/SqlServerAdapterFactory.cs",
+      "line": 64,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-7001cb08c326e9ac",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.SqlServerOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/SqlServer/SqlServerOptions.cs",
+      "line": 11,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-712992def3b1f2c0",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingDirection",
+      "member": "ReadWrite()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingDirection.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-520b7bd7d8df993d",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingConsumer",
+      "member": "Patch()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingConsumer.cs",
+      "line": 10,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-945fe952554534e5",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingDirection",
+      "member": "ReadOnly()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingDirection.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-05e26bafc2a5522f",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingGeneration",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingGeneration.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ae64d2de4a3908c4",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingBindingDescriptor",
+      "member": "Direction()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingBindingDescriptor.cs",
+      "line": 40,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-63c393e937b318c9",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingBindingDescriptor",
+      "member": "MappingBindingDescriptor(string,MappingPath,MappingRole,Type,PhysicalPath,MappingValueShape,MappingDirection,MappingGeneration,MappingAuthority,IDataMappingCodec?)",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingBindingDescriptor.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-efcc5cfe115ba0c6",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.StorageNameGenerator",
+      "member": "Resolve(string,Type,string?,string?,Func<StorageNamingCapability>,IServiceProvider?)",
+      "file": "src/Koan.Data.Abstractions/Naming/StorageNameGenerator.cs",
+      "line": 39,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-412a660cfbc43d8e",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.StorageNameGenerator",
+      "member": "Resolve(string,Type,string?,Func<StorageNamingCapability>,IServiceProvider?)",
+      "file": "src/Koan.Data.Abstractions/Naming/StorageNameGenerator.cs",
+      "line": 27,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-edbce9364c0e0fa4",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingWriteOperation",
+      "member": "Patch()",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingWriteOperation.cs",
+      "line": 8,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-81014f2c29436279",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.INamingProvider",
+      "member": "ResolveStorage(System.Type,string?,System.IServiceProvider)",
+      "file": "src/Koan.Data.Abstractions/Naming/INamingProvider.cs",
+      "line": 25,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-13d584c1d78be438",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.INamingProvider",
+      "member": "GetNamingCapability(System.IServiceProvider)",
+      "file": "src/Koan.Data.Abstractions/Naming/INamingProvider.cs",
+      "line": 18,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c3e81fdbdc4cdd25",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.INamingProvider",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Abstractions/Naming/INamingProvider.cs",
+      "line": 12,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7e1661dfdccc8aa7",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.SourceAdapterAttribute",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Abstractions/SourceAdapterAttribute.cs",
+      "line": 6,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-89e6bcab7e3ad860",
+      "project": "Koan.Data.AI",
+      "type": "Koan.Data.AI.Initialization.DataAiModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Koan.Data.AI/Initialization/DataAiModule.cs",
+      "line": 100,
+      "surface": "SUR-ADJ-DATA-AI",
+      "owner": "Adjacent"
+    },
+    {
+      "id": "API-924ff7c2102219c4",
+      "project": "Koan.Data.AI",
+      "type": "Koan.Data.AI.Initialization.DataAiModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.AI/Initialization/DataAiModule.cs",
+      "line": 25,
+      "surface": "SUR-ADJ-DATA-AI",
+      "owner": "Adjacent"
+    },
+    {
+      "id": "API-650e3f80c3cac9ea",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.IDataSourceIntegrationFactory",
+      "member": "CreateSource(IServiceProvider,string)",
+      "file": "src/Koan.Data.Abstractions/SourceIntegration/Operations/IDataSourceIntegrationFactory.cs",
+      "line": 9,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-02de3b94496ea766",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.NeutralRecordReaderCompletion",
+      "member": "ProviderLimit()",
+      "file": "src/Koan.Data.Abstractions/SourceIntegration/Operations/NeutralRecordReaderCompletion.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5e67611b5872a9b5",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.StorageContainerPageCompletion",
+      "member": "ProviderLimit()",
+      "file": "src/Koan.Data.Abstractions/SourceIntegration/Inspection/StorageContainerPageCompletion.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-10a2c0c08a49c722",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Sources.DataReadLanePlan",
+      "member": "ConnectionIdentity()",
+      "file": "src/Koan.Data.Abstractions/Sources/DataReadLanePlan.cs",
+      "line": 28,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-76451ab54b101529",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Sources.DataSourcePlan",
+      "member": "UsesLegacyProvisioningReadiness()",
+      "file": "src/Koan.Data.Abstractions/Sources/DataSourcePlan.cs",
+      "line": 66,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ae31ca9236d42c27",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Sources.DataSourcePlan",
+      "member": "ConnectionIdentity()",
+      "file": "src/Koan.Data.Abstractions/Sources/DataSourcePlan.cs",
+      "line": 62,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5adc4f09c3c6cf8b",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.IRawQueryRepository`2",
+      "member": "CountRaw(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Abstractions/IRawQueryRepository.cs",
+      "line": 20,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e53749ee853013e0",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.IRawQueryRepository`2",
+      "member": "QueryRaw(string,object?,QueryDefinition,CancellationToken)",
+      "file": "src/Koan.Data.Abstractions/IRawQueryRepository.cs",
+      "line": 17,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-8b90130039ddf7d2",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/SqlServer/Infrastructure/Constants.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-af5733e832168ef5",
+      "project": "Koan.Data.Relational.Abstractions",
+      "type": "Koan.Data.Relational.Orchestration.IRelationalStoreFeatures",
+      "member": "ProviderName()",
+      "file": "src/Koan.Data.Relational.Abstractions/Orchestration/IRelationalStoreFeatures.cs",
+      "line": 9,
+      "surface": "SUR-FAM-RELATIONAL-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-e593a8c40c105a9b",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.SqliteOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Sqlite/SqliteOptions.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-06f25de37fd17486",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs",
+      "line": 39,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-9caef3fd20c40d1e",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.CouchbaseOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Couchbase/CouchbaseOptions.cs",
+      "line": 77,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-4a45628599f451f6",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.Initialization.CouchbaseDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Couchbase/Initialization/CouchbaseDataModule.cs",
+      "line": 36,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-4ea3ee7147baf263",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.JsonAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Json/JsonAdapterFactory.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-20a057895585c643",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Initialization.JsonModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Json/Initialization/JsonModule.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-5b47ac8aef96a695",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Initialization.JsonModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Json/Initialization/JsonModule.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-63f46f5a51e6319f",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Infrastructure.Constants+Bootstrap",
+      "member": "DirectoryPath()",
+      "file": "src/Connectors/Data/Json/Infrastructure/Constants.cs",
+      "line": 23,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-95b9d74078ac4bc8",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Infrastructure.Constants+Configuration+Keys",
+      "member": "DirectoryPath()",
+      "file": "src/Connectors/Data/Json/Infrastructure/Constants.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-ccc9975e564bb324",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Infrastructure.Constants+Provider",
+      "member": "Name()",
+      "file": "src/Connectors/Data/Json/Infrastructure/Constants.cs",
+      "line": 7,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-7b6671fc6595ceb9",
+      "project": "Koan.Data.Connector.ElasticSearch",
+      "type": "Koan.Data.Connector.ElasticSearch.Initialization.ElasticSearchDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/ElasticSearch/Initialization/ElasticSearchDataModule.cs",
+      "line": 14,
+      "surface": "SUR-ADAPTER-ELASTICSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-75d634dba346441e",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.InMemoryAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/InMemory/InMemoryAdapterFactory.cs",
+      "line": 31,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-b4661b72473582de",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.CouchbaseAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Couchbase/CouchbaseAdapterFactory.cs",
+      "line": 44,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-8e96fdd94e01f6d4",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.InMemoryAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/InMemory/InMemoryAdapterFactory.cs",
+      "line": 19,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d023994dfa2e4a95",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.Initialization.InMemoryDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/InMemory/Initialization/InMemoryDataModule.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6422394af935c2d9",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.Initialization.InMemoryDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/InMemory/Initialization/InMemoryDataModule.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-e9a3d0ec2c8081b9",
+      "project": "Koan.Data.Connector.ElasticSearch",
+      "type": "Koan.Data.Connector.ElasticSearch.Initialization.ElasticSearchDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/ElasticSearch/Initialization/ElasticSearchDataModule.cs",
+      "line": 18,
+      "surface": "SUR-ADAPTER-ELASTICSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-aacba6fb873c834e",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Initialization.CockroachDataModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Cockroach/Initialization/CockroachDataModule.cs",
+      "line": 47,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-3a8f8234e4beb185",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Initialization.CockroachDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Cockroach/Initialization/CockroachDataModule.cs",
+      "line": 27,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-06f836faa7da1475",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Configuration+Keys",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 18,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-c2a76d0f1e8c20cf",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Provider",
+      "member": "Alias()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 8,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a9816744118fa196",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Provider",
+      "member": "Name()",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 7,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-62d4c2d0cc2609b2",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.CockroachOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Cockroach/CockroachOptions.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-be2f4e35bbefa9a8",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.CockroachOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Cockroach/CockroachOptions.cs",
+      "line": 11,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-322700f4934fc8c8",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.InMemoryAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/InMemory/InMemoryAdapterFactory.cs",
+      "line": 16,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-bcc58f867ee935a9",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.CouchbaseAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Couchbase/CouchbaseAdapterFactory.cs",
+      "line": 46,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-64169b6cd18c3b7c",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.CouchbaseAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Couchbase/CouchbaseAdapterFactory.cs",
+      "line": 150,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-8627684c8fade067",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.CouchbaseOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Couchbase/CouchbaseOptions.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-32296626baafbadf",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs",
+      "line": 35,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-2b2ffdbec1c94494",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.WeaviateOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Vector/Weaviate/WeaviateOptions.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-3e5d35a8f53a0ec8",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.WeaviateOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Vector/Weaviate/WeaviateOptions.cs",
+      "line": 9,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6d71513dc1bd5486",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.Initialization.WeaviateVectorModule",
+      "member": "Report(ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Vector/Weaviate/Initialization/WeaviateVectorModule.cs",
+      "line": 40,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a9f7dda34b1a02b0",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.Initialization.WeaviateVectorModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Vector/Weaviate/Initialization/WeaviateVectorModule.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6fcd918e9cee1f66",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.SqliteVecOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Vector/SqliteVec/SqliteVecOptions.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cc1ac6e0820c609a",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.SqliteVecAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Vector/SqliteVec/SqliteVecAdapterFactory.cs",
+      "line": 33,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d80851a50de9c746",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.SqliteVecAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Vector/SqliteVec/SqliteVecAdapterFactory.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-08ea683267b3a8a2",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.QdrantOptions",
+      "member": "ConnectionString()",
+      "file": "src/Connectors/Data/Vector/Qdrant/QdrantOptions.cs",
+      "line": 9,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cb2be5154dc90572",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.Initialization.QdrantVectorModule",
+      "member": "Report(ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Vector/Qdrant/Initialization/QdrantVectorModule.cs",
+      "line": 39,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0e6dac651695d10e",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.SqliteVecAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Vector/SqliteVec/SqliteVecAdapterFactory.cs",
+      "line": 21,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-64ac55b3d44e159e",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.Initialization.QdrantVectorModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Vector/Qdrant/Initialization/QdrantVectorModule.cs",
+      "line": 23,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cdf68d15b40ad942",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Vector/Milvus/MilvusVectorAdapterFactory.cs",
+      "line": 48,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-65f58e2c2e5ab055",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Vector/Milvus/MilvusVectorAdapterFactory.cs",
+      "line": 35,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-5e52d1974a41cf33",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.MilvusVectorAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Vector/Milvus/MilvusVectorAdapterFactory.cs",
+      "line": 31,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-0be958ba9400370b",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.MilvusOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Vector/Milvus/MilvusOptions.cs",
+      "line": 33,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-9dd8a1ea4fd98874",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.Initialization.SqliteVectorModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Connectors/Data/Vector/SqliteVec/Initialization/SqliteVectorModule.cs",
+      "line": 27,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-a340c26f74b4b21c",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.Initialization.SqliteVectorModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Vector/SqliteVec/Initialization/SqliteVectorModule.cs",
+      "line": 19,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-33fa9969d624d254",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.QdrantVectorAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Vector/Qdrant/QdrantVectorAdapterFactory.cs",
+      "line": 43,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6f5b2a898d6b05af",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.QdrantVectorAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Connectors/Data/Vector/Qdrant/QdrantVectorAdapterFactory.cs",
+      "line": 30,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-3b9106a7d9127f36",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.QdrantVectorAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Vector/Qdrant/QdrantVectorAdapterFactory.cs",
+      "line": 26,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-8bd8b40947f9d25c",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.QdrantOptions",
+      "member": "Readiness()",
+      "file": "src/Connectors/Data/Vector/Qdrant/QdrantOptions.cs",
+      "line": 91,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-d53fcdc487358b68",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.Initialization.CouchbaseDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Connectors/Data/Couchbase/Initialization/CouchbaseDataModule.cs",
+      "line": 24,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-ec7fb2b607f10a10",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.WeaviateVectorAdapterFactory",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Connectors/Data/Vector/Weaviate/WeaviateVectorAdapterFactory.cs",
+      "line": 53,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f000c72f3b4811dc",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transfers.MirrorMode",
+      "member": "Bidirectional()",
+      "file": "src/Koan.Data.Core/Transfers/TransferEnums.cs",
+      "line": 49,
+      "surface": "SUR-FWK-TRANSFER",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-66b7709cc5cd8efa",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "DataSourceReadinessCoordinator(IHostApplicationLifetime?,IOptions<DataRuntimeOptions>?)",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 20,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-61e268dab325b627",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Querying.QueryStreamRejectedException",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Core/Querying/QueryStreamRejectedException.cs",
+      "line": 25,
+      "surface": "SUR-FWK-QUERY-PLAN",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7a9afba89c45fab4",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Initialization.KoanDataCoreModule",
+      "member": "ReportComposition(KoanCompositionBuilder,IServiceProvider)",
+      "file": "src/Koan.Data.Core/Initialization/KoanDataCoreModule.cs",
+      "line": 63,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d596da6de3292be6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Initialization.KoanDataCoreModule",
+      "member": "Report(ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Koan.Data.Core/Initialization/KoanDataCoreModule.cs",
+      "line": 42,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ee2d12779f18aeee",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Initialization.KoanDataCoreModule",
+      "member": "Start(IServiceProvider,System.Threading.CancellationToken)",
+      "file": "src/Koan.Data.Core/Initialization/KoanDataCoreModule.cs",
+      "line": 32,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-91583c523285e6eb",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Initialization.KoanDataCoreModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.Core/Initialization/KoanDataCoreModule.cs",
+      "line": 26,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0da24f824f477a7e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Infrastructure.Constants+Configuration+Direct",
+      "member": "Section()",
+      "file": "src/Koan.Data.Core/Infrastructure/Constants.cs",
+      "line": 80,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-eea90a410f0ffff7",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.IDataService",
+      "member": "Direct(string?,string?)",
+      "file": "src/Koan.Data.Core/IDataService.cs",
+      "line": 33,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7236f0bccd787160",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Infrastructure.Constants+Diagnostics+Reasons",
+      "member": "MissingProviderBoundedPaging()",
+      "file": "src/Koan.Data.Core/Infrastructure/Constants.cs",
+      "line": 37,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-73572f62fbddaf3d",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Infrastructure.Constants+Diagnostics+Reasons",
+      "member": "ProviderBoundedPaging()",
+      "file": "src/Koan.Data.Core/Infrastructure/Constants.cs",
+      "line": 36,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-227f657821b9b19f",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.KeyValue.KeyValueStore`2",
+      "member": "ExecuteAsync(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Core/KeyValue/KeyValueStore.cs",
+      "line": 351,
+      "surface": "SUR-FAM-KEYVALUE",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f8a22be9a5bb052c",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.CockroachAdapterFactory",
+      "member": "Provider()",
+      "file": "src/Connectors/Data/Cockroach/CockroachAdapterFactory.cs",
+      "line": 30,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-5229bb036a422561",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Model.Entity`2",
+      "member": "Patch(TKey,object,Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Model/Entity.cs",
+      "line": 411,
+      "surface": "SUR-FWK-ENTITY-WRITE",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4e4f01f98240988d",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.MappingDirection",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Mapping/MappingDirection.cs",
+      "line": 4,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-cf00af122a9cc2e4",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.RelationalInstructions",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/RelationalInstructions.cs",
+      "line": 6,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-8fcb10bebbc623e5",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.ArrayBehavior",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 36,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c146928c045dab5b",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Naming.INamingProvider",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Naming/INamingProvider.cs",
+      "line": 9,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7f84a7243b1e7958",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PatchOp",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 38,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-afed33b67558b357",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PatchOptions",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 30,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1127b1cc347d1678",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PatchPayload`1",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 21,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d53a1b609bff1074",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.PartialJsonNullPolicy",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 11,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3b1298596b6cb408",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.MergePatchNullPolicy",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/PatchModels.cs",
+      "line": 5,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-34a6c54d5771c013",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionSql",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionSql.cs",
+      "line": 5,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-28e8e6e6a81ae78c",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.InstructionEffect",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/InstructionEffect.cs",
+      "line": 6,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a2b1b7e0da447ba1",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.IRawQueryRepository`2",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/IRawQueryRepository.cs",
+      "line": 12,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4976edb2d34f78df",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Model.Entity`2",
+      "member": "PatchMerge(TKey,object,Koan.Data.Abstractions.Instructions.MergePatchNullPolicy?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Model/Entity.cs",
+      "line": 454,
+      "surface": "SUR-FWK-ENTITY-WRITE",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7cbe95b353bd1ed7",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Optimization.StorageOptimizationExtensions",
+      "member": "GetStorageOptimization(this IServiceProvider)",
+      "file": "src/Koan.Data.Core/Optimization/StorageOptimizationExtensions.cs",
+      "line": 21,
+      "surface": "SUR-FWK-MAPPING",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f937fd270ad298f4",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Model.EntityMetadataProvider",
+      "member": "RelationshipMetadataAccessor()",
+      "file": "src/Koan.Data.Core/Model/EntityMetadataProvider.cs",
+      "line": 8,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-595e0b897bd26389",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "ResolveRoutedConnection(IConfiguration,DataSourceRegistry,string,string,string?)",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 84,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4e0db3dd987f900e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AggregateConfigs",
+      "member": "Get(IServiceProvider)",
+      "file": "src/Koan.Data.Core/AggregateConfigs.cs",
+      "line": 16,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0350309d2a336d70",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AggregateConfig`2",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Core/AggregateConfig.cs",
+      "line": 10,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f905b715593643ad",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "ResolveRoutedConnection(IConfiguration,DataSourceRegistry,string,string,string?,IAdapterFactory?)",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 98,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-22e4f0bdf8fc3870",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Adapters.Reporting.AdapterBootReporting",
+      "member": "ReportConnectionString(this ProvenanceModuleWriter,string,string,string)",
+      "file": "src/Koan.Data.Core/Adapters/Reporting/AdapterBootReporting.cs",
+      "line": 98,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-95155cd078751295",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Adapters.Reporting.AdapterBootReporting",
+      "member": "ConfigureForBootReportWithConfigurator(IConfiguration,Func<IConfiguration, IOptions<AdaptersReadinessOptions>, TConfigurator>,Func<TOptions>)",
+      "file": "src/Koan.Data.Core/Adapters/Reporting/AdapterBootReporting.cs",
+      "line": 76,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a5271649880d12a6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Adapters.Reporting.AdapterBootReporting",
+      "member": "ConfigureForBootReport(IConfiguration,Func<IConfiguration, IOptions<AdaptersReadinessOptions>, TOptions>)",
+      "file": "src/Koan.Data.Core/Adapters/Reporting/AdapterBootReporting.cs",
+      "line": 57,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-18dc2ba3135dcec4",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Adapters.Configuration.IAdapterOptions",
+      "member": "Readiness()",
+      "file": "src/Koan.Data.Core/Adapters/Configuration/IAdapterOptions.cs",
+      "line": 14,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-fe2980ec9321683c",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "GetSourceSetting(IConfiguration,DataSourceRegistry,string,string,string,T,IAdapterFactory?)",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 199,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4b3a35de3c0918c3",
+      "project": "Koan.Data.AI",
+      "type": "Koan.Data.AI.Telemetry.EmbeddingMetricEntry",
+      "member": "Provider()",
+      "file": "src/Koan.Data.AI/Telemetry/EmbeddingTelemetry.cs",
+      "line": 424,
+      "surface": "SUR-ADJ-DATA-AI",
+      "owner": "Adjacent"
+    },
+    {
+      "id": "API-ccb28067ab3a4207",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Axes.DataAxisReport",
+      "member": "Summarize(IServiceProvider)",
+      "file": "src/Koan.Data.Core/Axes/DataAxisReport.cs",
+      "line": 18,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-7fc6eb011c3a7ea3",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Axes.DataAxisPreflight",
+      "member": "DetectLeaks(IServiceProvider)",
+      "file": "src/Koan.Data.Core/Axes/DataAxisPreflight.cs",
+      "line": 66,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-169c803e80ff2c33",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Axes.DataAxisPreflight",
+      "member": "Run(IServiceProvider,IHostEnvironment,ILogger?)",
+      "file": "src/Koan.Data.Core/Axes/DataAxisPreflight.cs",
+      "line": 43,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6a15d7ef23c416d2",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Axes.DataAxis",
+      "member": "Explain(IServiceProvider,Type)",
+      "file": "src/Koan.Data.Core/Axes/DataAxis.cs",
+      "line": 32,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ab1b14aa8e18bf44",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Axes.DataAxis",
+      "member": "Explain(IServiceProvider)",
+      "file": "src/Koan.Data.Core/Axes/DataAxis.cs",
+      "line": 26,
+      "surface": "SUR-FWK-NAMING-SEGMENTATION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c3191c590e2b0bb3",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataProviderConnectionFactory",
+      "member": "Create(string,string)",
+      "file": "src/Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs",
+      "line": 28,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3f124c33494a91da",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataProviderConnectionFactory",
+      "member": "ResolveConnectionString(string)",
+      "file": "src/Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs",
+      "line": 22,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e0709b5b151748fd",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataProviderConnectionFactory",
+      "member": "Create(string)",
+      "file": "src/Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs",
+      "line": 15,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-be180c4fb3dbb39b",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataProviderConnectionFactory",
+      "member": "CanHandle(string)",
+      "file": "src/Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs",
+      "line": 12,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1da6a8b4a7450ac2",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataConnectionResolver",
+      "member": "Resolve(string,string)",
+      "file": "src/Koan.Data.Core/Configuration/IDataConnectionResolver.cs",
+      "line": 5,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-022b8aeca6cd82c5",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.AdapterNaming",
+      "member": "GetOrCompute(IServiceProvider)",
+      "file": "src/Koan.Data.Core/Configuration/AdapterNaming.cs",
+      "line": 12,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-51c4e64ea0cfc38d",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Model.Entity`2",
+      "member": "QueryRaw(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Model/Entity.cs",
+      "line": 109,
+      "surface": "SUR-FWK-ENTITY-QUERY",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-30e2ba9c6c3ae0dc",
+      "project": "Koan.Data.Core",
+      "type": "EntityMetadataProvider",
+      "member": "RelationshipMetadataAccessor()",
+      "file": "src/Koan.Data.Core/Model/Entity.cs",
+      "line": 825,
+      "surface": "SUR-FWK-ENTITY-READ",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5eca6f010108a265",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.Instruction",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/Instruction.cs",
+      "line": 5,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5369eae9986d84e6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "ResolveConnectionString(IConfiguration,DataSourceRegistry,string,string)",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 26,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ef6b798660def155",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.IInstructionExecutor`1",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/IInstructionExecutor.cs",
+      "line": 3,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3707666963be8ebe",
+      "project": "Koan.Data.Connector.Sqlite",
+      "type": "Koan.Data.Connector.Sqlite.Initialization.SqliteModule",
+      "member": "",
+      "file": "src/Connectors/Data/Sqlite/Initialization/SqliteModule.cs",
+      "line": 21,
+      "surface": "SUR-ADAPTER-SQLITE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-6ee8c48a11a70dbf",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataDefaultProviderPlan",
+      "member": "",
+      "file": "src/Koan.Data.Core/Routing/DataDefaultProviderPlan.cs",
+      "line": 7,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3595c980cb29f6a7",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.IVectorProviderResolver",
+      "member": "",
+      "file": "src/Koan.Data.Vector.Abstractions/IVectorProviderResolver.cs",
+      "line": 6,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-10aead08da494cd9",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorInstructions",
+      "member": "",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorInstructions.cs",
+      "line": 6,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-6aaa01e4e1c7fe3d",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.Initialization.VectorDataModule",
+      "member": "",
+      "file": "src/Koan.Data.Vector/Initialization/VectorDataModule.cs",
+      "line": 12,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-aa4bc8c3cd58fccf",
+      "project": "Koan.Data.SoftDelete",
+      "type": "Koan.Data.SoftDelete.Initialization.SoftDeleteModule",
+      "member": "",
+      "file": "src/Koan.Data.SoftDelete/Initialization/SoftDeleteModule.cs",
+      "line": 14,
+      "surface": "SUR-EXT-SOFTDELETE",
+      "owner": "Extension"
+    },
+    {
+      "id": "API-11aabde7ecce2610",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Initialization.RelationalModule",
+      "member": "",
+      "file": "src/Koan.Data.Relational/Initialization/RelationalModule.cs",
+      "line": 11,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-2cdc128211ca448b",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.PatchOpsExecutor",
+      "member": "",
+      "file": "src/Koan.Data.Core/Patch/PatchOpsExecutor.cs",
+      "line": 8,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-8b719f9096dd387c",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.PartialJsonApplicator`1",
+      "member": "",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 69,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e98e339ecec19828",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 12,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6ff4a3f42624a339",
+      "project": "Koan.Data.Backup",
+      "type": "Koan.Data.Backup.Initialization.DataBackupModule",
+      "member": "",
+      "file": "src/Koan.Data.Backup/Initialization/DataBackupModule.cs",
+      "line": 12,
+      "surface": "SUR-EXT-BACKUP",
+      "owner": "Extension"
+    },
+    {
+      "id": "API-39a34d72d6666b82",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 9,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d2dd36ce3e3c00c3",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.MergePatchApplicator`1",
+      "member": "",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 7,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-9339a2dba659ea81",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataConnectionResolver",
+      "member": "",
+      "file": "src/Koan.Data.Core/Configuration/IDataConnectionResolver.cs",
+      "line": 3,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e1d9e03125779ce7",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Options.DirectOptions",
+      "member": "",
+      "file": "src/Koan.Data.Core/Options/DirectOptions.cs",
+      "line": 3,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b7b169bc7eac0213",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Model.EntityMetadataProvider",
+      "member": "",
+      "file": "src/Koan.Data.Core/Model/EntityMetadataProvider.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-02b72f3caa3dd102",
+      "project": "Koan.Data.Core",
+      "type": "EntityMetadataProvider",
+      "member": "",
+      "file": "src/Koan.Data.Core/Model/Entity.cs",
+      "line": 823,
+      "surface": "SUR-FWK-ENTITY-READ",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2410012249e2593e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 3,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2e69a97cb96f7fa5",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 5,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-66f02c8b491ba47d",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectDataService",
+      "member": "",
+      "file": "src/Koan.Data.Core/Direct/IDirectDataService.cs",
+      "line": 3,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6417fea4feffa098",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Initialization.KoanDataCoreModule",
+      "member": "",
+      "file": "src/Koan.Data.Core/Initialization/KoanDataCoreModule.cs",
+      "line": 24,
+      "surface": "SUR-FWK-READINESS-DIAGNOSTICS",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2be8fba34d816d19",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataDirectAccess",
+      "member": "",
+      "file": "src/Koan.Data.Core/Data.DirectAccess.cs",
+      "line": 16,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6a9888582e128363",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Configuration.IDataProviderConnectionFactory",
+      "member": "",
+      "file": "src/Koan.Data.Core/Configuration/IDataProviderConnectionFactory.cs",
+      "line": 9,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3ae1cc238e1334eb",
+      "project": "Koan.Data.AI",
+      "type": "Koan.Data.AI.Initialization.DataAiModule",
+      "member": "",
+      "file": "src/Koan.Data.AI/Initialization/DataAiModule.cs",
+      "line": 21,
+      "surface": "SUR-ADJ-DATA-AI",
+      "owner": "Adjacent"
+    },
+    {
+      "id": "API-4354caa62837f459",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderSelection",
+      "member": "",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 148,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0b6c066e57151b68",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.ProvisioningPosture",
+      "member": "",
+      "file": "src/Koan.Data.Core/Routing/ProvisioningPosture.cs",
+      "line": 13,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6b83f0cd5dd8c16a",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 13,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2c08a2a12dee21f8",
+      "project": "Koan.Data.Connector.SqlServer",
+      "type": "Koan.Data.Connector.SqlServer.Initialization.SqlServerDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/SqlServer/Initialization/SqlServerDataModule.cs",
+      "line": 23,
+      "surface": "SUR-ADAPTER-SQLSERVER",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-75f02bc2243974f7",
+      "project": "Koan.Data.Connector.Redis",
+      "type": "Koan.Data.Connector.Redis.Initialization.RedisDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/Redis/Initialization/RedisDataModule.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-REDIS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f23d3951920311f1",
+      "project": "Koan.Data.Vector.Connector.InMemory",
+      "type": "Koan.Data.Vector.Connector.InMemory.Initialization.InMemoryVectorModule",
+      "member": "",
+      "file": "src/Connectors/Data/Vector/InMemory/Initialization/InMemoryVectorModule.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-VECTOR-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-14ae8f64b03f459f",
+      "project": "Koan.Data.Vector.Connector.Weaviate",
+      "type": "Koan.Data.Vector.Connector.Weaviate.Initialization.WeaviateVectorModule",
+      "member": "",
+      "file": "src/Connectors/Data/Vector/Weaviate/Initialization/WeaviateVectorModule.cs",
+      "line": 23,
+      "surface": "SUR-ADAPTER-VECTOR-WEAVIATE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-cce754baa10d34b6",
+      "project": "Koan.Data.Vector.Connector.SqliteVec",
+      "type": "Koan.Data.Vector.Connector.SqliteVec.Initialization.SqliteVectorModule",
+      "member": "",
+      "file": "src/Connectors/Data/Vector/SqliteVec/Initialization/SqliteVectorModule.cs",
+      "line": 17,
+      "surface": "SUR-ADAPTER-VECTOR-SQLITEVEC",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f4e33e06d1fbcfa5",
+      "project": "Koan.Data.Vector.Connector.Qdrant",
+      "type": "Koan.Data.Vector.Connector.Qdrant.Initialization.QdrantVectorModule",
+      "member": "",
+      "file": "src/Connectors/Data/Vector/Qdrant/Initialization/QdrantVectorModule.cs",
+      "line": 21,
+      "surface": "SUR-ADAPTER-VECTOR-QDRANT",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-7dd0833065e29533",
+      "project": "Koan.Data.Vector.Connector.Milvus",
+      "type": "Koan.Data.Vector.Connector.Milvus.Initialization.MilvusVectorModule",
+      "member": "",
+      "file": "src/Connectors/Data/Vector/Milvus/Initialization/MilvusVectorModule.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-VECTOR-MILVUS",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-979230a6bd357517",
+      "project": "Koan.Data.Connector.InMemory",
+      "type": "Koan.Data.Connector.InMemory.Initialization.InMemoryDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/InMemory/Initialization/InMemoryDataModule.cs",
+      "line": 15,
+      "surface": "SUR-ADAPTER-INMEMORY",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-65b5d716b58676d7",
+      "project": "Koan.Data.Connector.ElasticSearch",
+      "type": "Koan.Data.Connector.ElasticSearch.Initialization.ElasticSearchDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/ElasticSearch/Initialization/ElasticSearchDataModule.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-ELASTICSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-9f6ff3c6d895f1ba",
+      "project": "Koan.Data.Connector.Couchbase",
+      "type": "Koan.Data.Connector.Couchbase.Initialization.CouchbaseDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/Couchbase/Initialization/CouchbaseDataModule.cs",
+      "line": 22,
+      "surface": "SUR-ADAPTER-COUCHBASE",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-1e2e35c0ddeaaf2b",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Initialization.CockroachDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/Cockroach/Initialization/CockroachDataModule.cs",
+      "line": 25,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-dd51a1d9757dafb2",
+      "project": "Koan.Data.Connector.Cockroach",
+      "type": "Koan.Data.Connector.Cockroach.Infrastructure.Constants+Provider",
+      "member": "",
+      "file": "src/Connectors/Data/Cockroach/Infrastructure/Constants.cs",
+      "line": 5,
+      "surface": "SUR-ADAPTER-COCKROACH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-653958728c8f6dd8",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Infrastructure.Constants+Provider",
+      "member": "",
+      "file": "src/Connectors/Data/Json/Infrastructure/Constants.cs",
+      "line": 5,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-98c7cf6567170e71",
+      "project": "Koan.Data.Connector.Postgres",
+      "type": "Koan.Data.Connector.Postgres.Initialization.PostgresDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/Postgres/Initialization/PostgresDataModule.cs",
+      "line": 23,
+      "surface": "SUR-ADAPTER-POSTGRES",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-f320922d230bd870",
+      "project": "Koan.Data.Connector.OpenSearch",
+      "type": "Koan.Data.Connector.OpenSearch.Initialization.OpenSearchDataModule",
+      "member": "",
+      "file": "src/Connectors/Data/OpenSearch/Initialization/OpenSearchDataModule.cs",
+      "line": 12,
+      "surface": "SUR-ADAPTER-OPENSEARCH",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-e7aed10d646426a5",
+      "project": "Koan.Data.Connector.Mongo",
+      "type": "Koan.Data.Connector.Mongo.Initialization.MongoModule",
+      "member": "",
+      "file": "src/Connectors/Data/Mongo/Initialization/MongoModule.cs",
+      "line": 32,
+      "surface": "SUR-ADAPTER-MONGO",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-9556adb52089d587",
+      "project": "Koan.Data.Connector.Json",
+      "type": "Koan.Data.Connector.Json.Initialization.JsonModule",
+      "member": "",
+      "file": "src/Connectors/Data/Json/Initialization/JsonModule.cs",
+      "line": 13,
+      "surface": "SUR-ADAPTER-JSON",
+      "owner": "Adapter"
+    },
+    {
+      "id": "API-714279bcb458f9c2",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinator",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 15,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e84ee4fc7ea2f31b",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TxCaps",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/TxCaps.cs",
+      "line": 11,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f5835884bb45de2f",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionServiceCollectionExtensions",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/TransactionServiceCollectionExtensions.cs",
+      "line": 9,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c110ca183bed3d13",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionOptions",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/TransactionOptions.cs",
+      "line": 8,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f560198a110d8ca8",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.ITransactionCoordinatorFactory",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinatorFactory.cs",
+      "line": 7,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-12e6b3f322147f4e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Transactions.TransactionException",
+      "member": "",
+      "file": "src/Koan.Data.Core/Transactions/ITransactionCoordinator.cs",
+      "line": 93,
+      "surface": "SUR-FWK-TRANSACTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d7078918348821f4",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.Instructions.DataInstructions",
+      "member": "",
+      "file": "src/Koan.Data.Abstractions/Instructions/DataInstructions.cs",
+      "line": 6,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-994004e9bed7bf94",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.RecordSetCompletion",
+      "member": "ProviderLimit()",
+      "file": "src/Koan.Data.Abstractions/Records/RecordSetCompletion.cs",
+      "line": 10,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5d7e042465a74b16",
+      "project": "Koan.Data.AI",
+      "type": "Koan.Data.AI.VectorProvenance",
+      "member": "DeriveProvider(string?)",
+      "file": "src/Koan.Data.AI/VectorProvenance.cs",
+      "line": 60,
+      "surface": "SUR-ADJ-DATA-AI",
+      "owner": "Adjacent"
+    },
+    {
+      "id": "API-b3e0c847c0129051",
+      "project": "Koan.Data.Backup",
+      "type": "Koan.Data.Backup.Initialization.DataBackupModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Koan.Data.Backup/Initialization/DataBackupModule.cs",
+      "line": 17,
+      "surface": "SUR-EXT-BACKUP",
+      "owner": "Extension"
+    },
+    {
+      "id": "API-15ce925dfb3cb8ea",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorRepository`2",
+      "member": "ExecuteAsync(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineVectorRepository.cs",
+      "line": 416,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-0a42b9a3ea18aa53",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorRepository`2",
+      "member": "SearchEngineVectorRepository(HttpClient,ISearchEngineVectorOptions,ISearchEngineDialect,ActivitySource,ILogger?,IServiceProvider,INamingProvider,string)",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineVectorRepository.cs",
+      "line": 55,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-c9033e917f76df82",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.IVectorProviderResolver",
+      "member": "AvailableProviderIds()",
+      "file": "src/Koan.Data.Vector.Abstractions/IVectorProviderResolver.cs",
+      "line": 11,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-aeb439bc7aff8e20",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.IVectorProviderResolver",
+      "member": "SelectAutomatic()",
+      "file": "src/Koan.Data.Vector.Abstractions/IVectorProviderResolver.cs",
+      "line": 10,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-543672c557552e5d",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.IVectorProviderResolver",
+      "member": "Find(string?)",
+      "file": "src/Koan.Data.Vector.Abstractions/IVectorProviderResolver.cs",
+      "line": 9,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-01b367c90e89c0e6",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.IVectorAdapterFactory",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Koan.Data.Vector.Abstractions/IVectorAdapterFactory.cs",
+      "line": 20,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-fa8dd844a1273d37",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.VectorProvenanceKeys",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Vector/VectorProvenanceKeys.cs",
+      "line": 25,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-136009a6776a5f02",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.VectorFilterUnsupportedException",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Vector/VectorFilterUnsupportedException.cs",
+      "line": 27,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-ea6412f43c0d60fe",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.VectorDefaultsOptions",
+      "member": "DefaultProvider()",
+      "file": "src/Koan.Data.Vector/VectorDefaultsOptions.cs",
+      "line": 7,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-b4b678ea4a4c0eee",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.Initialization.VectorDataModule",
+      "member": "Report(global::Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Koan.Data.Vector/Initialization/VectorDataModule.cs",
+      "line": 19,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-93f28fbf17c5a0dd",
+      "project": "Koan.Data.SoftDelete",
+      "type": "Koan.Data.SoftDelete.Initialization.SoftDeleteModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.SoftDelete/Initialization/SoftDeleteModule.cs",
+      "line": 16,
+      "surface": "SUR-EXT-SOFTDELETE",
+      "owner": "Extension"
+    },
+    {
+      "id": "API-1185a417ea495550",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.Initialization.VectorDataModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.Vector/Initialization/VectorDataModule.cs",
+      "line": 14,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-700f5ba688a2a3dd",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorInstructions",
+      "member": "IndexClear()",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorInstructions.cs",
+      "line": 10,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-49622f6b42caa358",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorInstructions",
+      "member": "IndexRebuild()",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorInstructions.cs",
+      "line": 9,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-3c141858b683bd8d",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorInstructions",
+      "member": "IndexEnsureCreated()",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorInstructions.cs",
+      "line": 8,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-b1e6124f94ae82dd",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorAdapterAttribute",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorAdapterAttribute.cs",
+      "line": 6,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-aa25053875e5896f",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.Naming.VectorAdapterNaming",
+      "member": "GetOrCompute(IServiceProvider)",
+      "file": "src/Koan.Data.Vector/Naming/VectorAdapterNaming.cs",
+      "line": 29,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-c03f8910f39ba7d0",
+      "project": "Koan.Data.Vector",
+      "type": "Koan.Data.Vector.Naming.VectorAdapterNaming",
+      "member": "GetOrCompute(IServiceProvider,INamingProvider,string?)",
+      "file": "src/Koan.Data.Vector/Naming/VectorAdapterNaming.cs",
+      "line": 49,
+      "surface": "SUR-FAM-VECTOR-RUNTIME",
+      "owner": "Family"
+    },
+    {
+      "id": "API-d54fa96999b4771e",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Ado.AdoCommands",
+      "member": "ExecuteAsync(IDbConnection,string,SqlParameters?,IDbTransaction?,CancellationToken)",
+      "file": "src/Koan.Data.Relational/Ado/AdoCommands.cs",
+      "line": 38,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-9320b521576992cf",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Ado.AdoCommands",
+      "member": "QueryRowsAsync(IDbConnection,string,SqlParameters?,IDbTransaction?,CancellationToken)",
+      "file": "src/Koan.Data.Relational/Ado/AdoCommands.cs",
+      "line": 63,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-60855bf9caf97c76",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Ado.AdoCommands",
+      "member": "ExecuteScalarInt64Async(IDbConnection,string,SqlParameters?,IDbTransaction?,CancellationToken)",
+      "file": "src/Koan.Data.Relational/Ado/AdoCommands.cs",
+      "line": 55,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-8264af5bf05e6d60",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Ado.AdoCommands",
+      "member": "ExecuteScalarAsync(IDbConnection,string,SqlParameters?,IDbTransaction?,CancellationToken)",
+      "file": "src/Koan.Data.Relational/Ado/AdoCommands.cs",
+      "line": 46,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-7c376604febdad89",
+      "project": "Koan.Data.Vector.Abstractions",
+      "type": "Koan.Data.Vector.Abstractions.VectorInstructions",
+      "member": "IndexStats()",
+      "file": "src/Koan.Data.Vector.Abstractions/VectorInstructions.cs",
+      "line": 11,
+      "surface": "SUR-FAM-VECTOR-CONTRACT",
+      "owner": "Family"
+    },
+    {
+      "id": "API-48c5636717c108d7",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Relationships.RelationshipQueryRejectedException",
+      "member": "Provider()",
+      "file": "src/Koan.Data.Core/Relationships/RelationshipQueryRejectedException.cs",
+      "line": 29,
+      "surface": "SUR-FWK-RELATIONSHIP",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f8a5d6145c10407c",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "InvalidateShape(DataSourcePlan,string)",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 79,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2b1df3156493b539",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.ProvisioningPosture",
+      "member": "ExternalOnly()",
+      "file": "src/Koan.Data.Core/Routing/ProvisioningPosture.cs",
+      "line": 22,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1635341a142bf4ad",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.PartialJsonApplicator`1",
+      "member": "Apply(TEntity)",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 75,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-79646b6a001e1187",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.PatchOpsExecutor",
+      "member": "Apply(TEntity,PatchPayload<TKey>)",
+      "file": "src/Koan.Data.Core/Patch/PatchOpsExecutor.cs",
+      "line": 10,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3d2d04948bd85370",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.PartialJsonApplicator`1",
+      "member": "PartialJsonApplicator(JToken,PartialJsonNullPolicy)",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 73,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6ae002bed256686e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.MergePatchApplicator`1",
+      "member": "Apply(TEntity)",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 13,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f9eda15b2de54a00",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Patch.MergePatchApplicator`1",
+      "member": "MergePatchApplicator(JToken,MergePatchNullPolicy)",
+      "file": "src/Koan.Data.Core/Patch/PatchApplicators.cs",
+      "line": 11,
+      "surface": "SUR-FWK-INSTRUCTION",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5293dfbe55375754",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "EnsureReachable(DataSourcePlan,string,Func<CancellationToken, Task>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 36,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5dc20d87cd97a761",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "ValidateShape(DataSourcePlan,string,Func<CancellationToken, Task>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 47,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5e2f39037a3c3923",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Readiness.DataSourceReadinessCoordinator",
+      "member": "Provision(DataSourcePlan,string,Func<CancellationToken, Task>,Func<CancellationToken, Task>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Readiness/DataSourceReadinessCoordinator.cs",
+      "line": 58,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f36a50de786b9623",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "SelectAutomatic()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 35,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b9f31a8e88c99597",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.ProvisioningPosture",
+      "member": "Eager()",
+      "file": "src/Koan.Data.Core/Routing/ProvisioningPosture.cs",
+      "line": 19,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-894e1a127c51a762",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.ProvisioningPosture",
+      "member": "Lazy()",
+      "file": "src/Koan.Data.Core/Routing/ProvisioningPosture.cs",
+      "line": 16,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ebdf560e6916fca0",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderSelection",
+      "member": "DirectIntent()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 156,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c3a3dbc6b2e17226",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderSelection",
+      "member": "Priority()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 155,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-00f451da4b5fe4fa",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderSelection",
+      "member": "Via()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 154,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1b62e9f8280ba556",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderSelection",
+      "member": "ProviderId()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 153,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-11a38c61d26d5b05",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "Require(string,string,string,string)",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 37,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1c9d17fe4b63d3d2",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "Describe(IDataAdapterFactory)",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 32,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-06e879fe51cd8015",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "Find(string?)",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 30,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ed845c00e8ee0779",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "Candidates()",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 28,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-62737ec4666bdcd0",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataProviderCatalog",
+      "member": "DataProviderCatalog(IEnumerable<IDataAdapterFactory>,KoanApplicationReferenceManifest?)",
+      "file": "src/Koan.Data.Core/Routing/DataProviderCatalog.cs",
+      "line": 16,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-676d0f8f37032328",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataDefaultProviderPlan",
+      "member": "Receipt()",
+      "file": "src/Koan.Data.Core/Routing/DataDefaultProviderPlan.cs",
+      "line": 29,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-11e887bb43389f95",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataDefaultProviderPlan",
+      "member": "ProviderId()",
+      "file": "src/Koan.Data.Core/Routing/DataDefaultProviderPlan.cs",
+      "line": 28,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b140dfee1dbb1c71",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Routing.DataDefaultProviderPlan",
+      "member": "DataDefaultProviderPlan(DataProviderCatalog,DataSourceRegistry)",
+      "file": "src/Koan.Data.Core/Routing/DataDefaultProviderPlan.cs",
+      "line": 10,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-0ea2351bb9a7332f",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Ado.AdoCommands",
+      "member": "QueryIdJsonAsync(IDbConnection,string,SqlParameters?,IDbTransaction?,CancellationToken)",
+      "file": "src/Koan.Data.Relational/Ado/AdoCommands.cs",
+      "line": 22,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-fd38576408a98e17",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.AdapterConnectionResolver",
+      "member": "ResolveConnectionString(IConfiguration,DataSourceRegistry,string,string,IAdapterFactory?)",
+      "file": "src/Koan.Data.Core/AdapterConnectionResolver.cs",
+      "line": 37,
+      "surface": "SUR-FWK-SOURCE-CATALOG",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-2356783a6cd4c317",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Initialization.RelationalModule",
+      "member": "Report(Koan.Core.Provenance.ProvenanceModuleWriter,IConfiguration,IHostEnvironment)",
+      "file": "src/Koan.Data.Relational/Initialization/RelationalModule.cs",
+      "line": 20,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-9761a494cfcfce94",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepositoryOptions",
+      "member": "ProviderName()",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepositoryOptions.cs",
+      "line": 9,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-d3c1f20d10257431",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Rollback(CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 10,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4343b07c16de5468",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Commit(CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 9,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-738a4018afa78ada",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Query(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 8,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-81c4c6e81da6fdd5",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataService",
+      "member": "Direct(string?,string?)",
+      "file": "src/Koan.Data.Core/DataService.cs",
+      "line": 166,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3f8c10276cfa4b4a",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataServiceExecuteExtensions",
+      "member": "Execute(this IDataService,Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Core/DataServiceExecuteExtensions.cs",
+      "line": 43,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-024dd9159ac58563",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataServiceExecuteExtensions",
+      "member": "Execute(this IDataService,Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Core/DataServiceExecuteExtensions.cs",
+      "line": 13,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d28f3ad23e65c763",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Query(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 7,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-8a2bce000d45767b",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataService",
+      "member": "DataService(IServiceProvider,IOptions<DataRuntimeOptions>)",
+      "file": "src/Koan.Data.Core/DataService.cs",
+      "line": 35,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-1c4f7d6470a90702",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Decorators.IDataRepositoryDecorator",
+      "member": "TryDecorate(Type,Type,object,IServiceProvider)",
+      "file": "src/Koan.Data.Core/Decorators/IDataRepositoryDecorator.cs",
+      "line": 19,
+      "surface": "SUR-FWK-REPOSITORY-CONTRACT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-ecf566ee0694e602",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Scalar(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 6,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d7a564718ce12499",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.EntityContext+ContextState",
+      "member": "TransactionCoordinator()",
+      "file": "src/Koan.Data.Core/EntityContext.cs",
+      "line": 49,
+      "surface": "SUR-FWK-ROUTING-CONTEXT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-08cbf095f12cebe1",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectTransaction",
+      "member": "Execute(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectTransaction.cs",
+      "line": 5,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-56d1a69d30fab441",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Query(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 23,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e5f427a7effbb392",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Scalar(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 22,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-d1bb08dbd0af8fae",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Execute(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 21,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-62ed96a6fb8fef71",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Begin(CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 19,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a986ffa36f319c3a",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Effect(DataOperationEffect)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 18,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-e5b085a1743102bb",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "WithMaxRows(int)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 16,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-5f8eca10b66c24c8",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "WithTimeout(TimeSpan)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 15,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-71e24bfa5db9eded",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "WithConnectionString(string)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 14,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-4fae4d3a4f36115c",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectDataService",
+      "member": "Direct(string?,string?)",
+      "file": "src/Koan.Data.Core/Direct/IDirectDataService.cs",
+      "line": 9,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-8156910df8cdee88",
+      "project": "Koan.Data.Backup",
+      "type": "Koan.Data.Backup.Initialization.DataBackupModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.Backup/Initialization/DataBackupModule.cs",
+      "line": 14,
+      "surface": "SUR-EXT-BACKUP",
+      "owner": "Extension"
+    },
+    {
+      "id": "API-213fcf750400235e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Direct.IDirectSession",
+      "member": "Query(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Direct/IDirectSession.cs",
+      "line": 24,
+      "surface": "SUR-FWK-DIRECT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-3ab0dd912a35a18d",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.EntityContext",
+      "member": "InTransaction()",
+      "file": "src/Koan.Data.Core/EntityContext.cs",
+      "line": 101,
+      "surface": "SUR-FWK-ROUTING-CONTEXT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-fc69d1a19db8bff6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.EntityContext",
+      "member": "CurrentTransaction()",
+      "file": "src/Koan.Data.Core/EntityContext.cs",
+      "line": 109,
+      "surface": "SUR-FWK-ROUTING-CONTEXT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-c8a310cd50d6fc08",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.EntityContext+ContextState",
+      "member": "Transaction()",
+      "file": "src/Koan.Data.Core/EntityContext.cs",
+      "line": 37,
+      "surface": "SUR-FWK-ROUTING-CONTEXT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b0db6729e61bd59f",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepositoryOptions",
+      "member": "ConnectionString()",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepositoryOptions.cs",
+      "line": 8,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-d9d0c3f81935022f",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepository`2",
+      "member": "ExecuteAsync(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepository.cs",
+      "line": 822,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-1a86e09ebf1ab612",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepository`2",
+      "member": "CountRaw(string,object?,CancellationToken)",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepository.cs",
+      "line": 637,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-49e1c656eab43445",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepository`2",
+      "member": "QueryRaw(string,object?,QueryDefinition,CancellationToken)",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepository.cs",
+      "line": 608,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-dca3d8d6562e4822",
+      "project": "Koan.Data.Relational.Npgsql",
+      "type": "Koan.Data.Relational.Npgsql.NpgsqlRepository`2",
+      "member": "NpgsqlRepository(IServiceProvider,NpgsqlRepositoryOptions,IStorageNameResolver)",
+      "file": "src/Koan.Data.Relational.Npgsql/NpgsqlRepository.cs",
+      "line": 74,
+      "surface": "SUR-FAM-RELATIONAL-NPGSQL",
+      "owner": "Family"
+    },
+    {
+      "id": "API-f1ce9e543f0bec02",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.RelationalCommandPlanner",
+      "member": "Patch(object,IReadOnlyDictionary<MappingPath, object?>)",
+      "file": "src/Koan.Data.Relational/Mapping/RelationalCommandPlanner.cs",
+      "line": 70,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-75fcfdc2cbf0b7d7",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorAdapterFactory`1",
+      "member": "Provider()",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineConnectorMechanics.cs",
+      "line": 156,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-90021597961cadad",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorAdapterFactory`1",
+      "member": "Create(IServiceProvider,string)",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineConnectorMechanics.cs",
+      "line": 159,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-aa991b25227a0ddd",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorAdapterFactory`1",
+      "member": "GetNamingCapability(IServiceProvider)",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineConnectorMechanics.cs",
+      "line": 180,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-88435ff09c571e5f",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorOptions",
+      "member": "Readiness()",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineVectorOptions.cs",
+      "line": 17,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-9c2ba39f3ba3f811",
+      "project": "Koan.Data.SearchEngine",
+      "type": "Koan.Data.SearchEngine.SearchEngineVectorOptions",
+      "member": "ConnectionString()",
+      "file": "src/Koan.Data.SearchEngine/SearchEngineVectorOptions.cs",
+      "line": 14,
+      "surface": "SUR-FAM-SEARCHENGINE",
+      "owner": "Family"
+    },
+    {
+      "id": "API-33e6664c6f929f5e",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Options.DirectOptions",
+      "member": "MaxRows()",
+      "file": "src/Koan.Data.Core/Options/DirectOptions.cs",
+      "line": 6,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-684512d822d61f7f",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataRuntimeOptions",
+      "member": "ReadinessCacheEntries()",
+      "file": "src/Koan.Data.Core/DataRuntimeOptions.cs",
+      "line": 9,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-16fc13b19ac9bff2",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataDirectAccess",
+      "member": "Count(Expression<Func<TEntity, bool>>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.DirectAccess.cs",
+      "line": 32,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-6be871d97f3ad5e1",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataDirectAccess",
+      "member": "All(CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.DirectAccess.cs",
+      "line": 26,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-f94cbaf514d34852",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.DataDirectAccess",
+      "member": "Query(Expression<Func<TEntity, bool>>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.DirectAccess.cs",
+      "line": 19,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-a307f6650d8536e6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Data`2",
+      "member": "Execute(Instruction,IDataService,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.cs",
+      "line": 633,
+      "surface": "SUR-FWK-ENTITY-READ",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-035942ba5b80da66",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Data`2",
+      "member": "Execute(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.cs",
+      "line": 628,
+      "surface": "SUR-FWK-ENTITY-READ",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-06bf1de60edd0237",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Data`2",
+      "member": "QueryRaw(string,object?,QueryDefinition?,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.cs",
+      "line": 307,
+      "surface": "SUR-FWK-ENTITY-QUERY",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-025dc0597b1c9774",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Data`2",
+      "member": "Patch(Koan.Data.Abstractions.Instructions.PatchPayload<TKey>,CancellationToken)",
+      "file": "src/Koan.Data.Core/Data.cs",
+      "line": 364,
+      "surface": "SUR-FWK-ENTITY-WRITE",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-edbe521c905e54ad",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Options.DirectOptions",
+      "member": "TimeoutSeconds()",
+      "file": "src/Koan.Data.Core/Options/DirectOptions.cs",
+      "line": 5,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-090d7fb0e5d66160",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.Document.DocumentStore`2",
+      "member": "ExecuteAsync(Instruction,CancellationToken)",
+      "file": "src/Koan.Data.Core/Document/DocumentStore.cs",
+      "line": 210,
+      "surface": "SUR-FAM-DOCUMENT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-65516327f67236b6",
+      "project": "Koan.Data.Core",
+      "type": "Koan.Data.Core.EntityContext",
+      "member": "Transaction(string)",
+      "file": "src/Koan.Data.Core/EntityContext.cs",
+      "line": 232,
+      "surface": "SUR-FWK-ROUTING-CONTEXT",
+      "owner": "Framework"
+    },
+    {
+      "id": "API-b984a74c9f7c54ed",
+      "project": "Koan.Data.Relational",
+      "type": "Koan.Data.Relational.Initialization.RelationalModule",
+      "member": "Register(IServiceCollection)",
+      "file": "src/Koan.Data.Relational/Initialization/RelationalModule.cs",
+      "line": 13,
+      "surface": "SUR-FAM-RELATIONAL-EXECUTION",
+      "owner": "Family"
+    },
+    {
+      "id": "API-452497b4acc73d47",
+      "project": "Koan.Data.Abstractions",
+      "type": "Koan.Data.Abstractions.DataField",
+      "member": "ProviderTypeName()",
+      "file": "src/Koan.Data.Abstractions/Records/DataField.cs",
+      "line": 25,
+      "surface": "SUR-FWK-SUPPORT",
+      "owner": "Framework"
+    }
+  ]
+}

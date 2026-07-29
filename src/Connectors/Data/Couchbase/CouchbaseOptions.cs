@@ -1,79 +1,28 @@
-using System;
 using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
-using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Adapters.Configuration;
 
 namespace Koan.Data.Connector.Couchbase;
 
-/// <summary>
-/// Couchbase adapter configuration options.
-/// </summary>
 public sealed class CouchbaseOptions : IAdapterOptions
 {
-    /// <summary>
-    /// Couchbase connection string. Supports "auto" orchestration discovery by default.
-    /// </summary>
     [Required]
     public string ConnectionString { get; set; } = "auto";
 
-    /// <summary>
-    /// Optional Couchbase management URL (HTTP/REST endpoint). When omitted, the cluster provider
-    /// derives one from <see cref="ConnectionString"/> by replacing the scheme and defaulting to
-    /// port 8091. Set this explicitly when the management port is exposed on a different host/port
-    /// than the KV port — e.g. Testcontainers maps both ports to independent random host ports.
-    /// </summary>
-    public string? ManagementUrl { get; set; }
-
-    /// <summary>
-    /// Optional username for cluster authentication. When omitted, SDK defaults apply.
-    /// </summary>
-    public string? Username { get; set; }
-
-    /// <summary>
-    /// Optional password for cluster authentication.
-    /// </summary>
-    public string? Password { get; set; }
-
-    /// <summary>
-    /// Required bucket name housing application data.
-    /// </summary>
     [Required]
-    public string Bucket { get; set; } = "Koan";
+    public string Bucket { get; set; } = Infrastructure.Constants.DefaultBucket;
 
-    /// <summary>
-    /// Optional scope name; defaults to the Couchbase default scope.
-    /// </summary>
-    public string? Scope { get; set; }
-
-    /// <summary>
-    /// Optional static collection name override.
-    /// </summary>
+    public string Scope { get; set; } = Infrastructure.Constants.DefaultScope;
     public string? Collection { get; set; }
-
-    /// <summary>
-    /// Optional callback for dynamic collection naming per entity type.
-    /// </summary>
     public Func<Type, string?>? CollectionName { get; set; }
-
-    /// <summary>
-    /// Naming convention for dynamically computed collection names.
-    /// </summary>
+    public string? Username { get; set; }
+    public string? Password { get; set; }
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
-
-    /// <summary>
-    /// Optional timeout for N1QL queries.
-    /// </summary>
+    public string Separator { get; set; } = "_";
     public TimeSpan QueryTimeout { get; set; } = TimeSpan.FromSeconds(75);
-
-    /// <summary>
-    /// Optional durability level for mutations.
-    /// </summary>
-    public string? DurabilityLevel { get; set; }
-
-    /// <summary>
-    /// Readiness policy controlling adapter gating behaviour.
-    /// </summary>
+    public TimeSpan BootstrapTimeout { get; set; } = TimeSpan.FromSeconds(75);
+    public TimeSpan BootstrapPollInterval { get; set; } = TimeSpan.FromSeconds(1);
+    public string? Durability { get; set; }
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }
-

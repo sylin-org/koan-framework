@@ -6,12 +6,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Failures;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Core.Transactions;
 
 /// <summary>
-/// Coordinates entity operations across multiple adapters with best-effort atomicity.
+/// Coordinates deferred entity operations without claiming native or distributed atomicity.
 /// </summary>
 internal sealed class TransactionCoordinator : ITransactionCoordinator
 {
@@ -184,12 +185,17 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 "Transaction '{TransactionName}' commit failed",
                 Name);
 
-            _activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            _activity?.SetStatus(ActivityStatusCode.Error, "deferred coordination failed");
             _activity?.SetTag("transaction.outcome", "failed");
+            _isCompleted = true;
 
+            if (ex is TransactionException) throw;
             throw new TransactionException(
-                $"Transaction '{Name}' commit failed: {ex.Message}",
+                $"Deferred coordination '{Name}' failed. Its commit outcome is unknown and it will not be replayed.",
                 Name,
+                failedAdapter: null,
+                completedOperationCount: 0,
+                DataCommitOutcome.Unknown,
                 ex);
         }
         finally
@@ -237,9 +243,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    // ARCH-0084: capability flags as TxCaps tokens (only Local is supported today — best-effort
-    // coordination, no distributed atomicity / compensation); runtime state lives on the coordinator.
-    public CapabilitySet Capabilities { get; } = CapabilitySet.Build("transaction", c => c.Add(TxCaps.Local));
+    // Deferred coordination is useful but is neither a native local transaction nor distributed atomicity.
+    public CapabilitySet Capabilities { get; } = CapabilitySet.Build(
+        "transaction",
+        c => c.Add(TxCaps.DeferredCoordination));
 
     public IReadOnlyList<string> Adapters => _operationsByAdapter.Keys.ToArray();
 
@@ -248,6 +255,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private async Task ExecuteOperations(CancellationToken ct)
     {
         var executedAdapters = new List<string>();
+        var completedOperations = 0;
 
         // Temporarily clear transaction context to prevent recursion when operations execute
         var savedContext = EntityContext.Current;
@@ -284,6 +292,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 try
                 {
                     await operation.Execute(ct);
+                    completedOperations++;
                 }
                 catch (Exception ex)
                 {
@@ -296,11 +305,12 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                         string.Join(", ", executedAdapters));
 
                     throw new TransactionException(
-                        $"Operation failed on adapter '{adapter}': {ex.Message}. " +
-                        $"Completed adapters: [{string.Join(", ", executedAdapters)}]. " +
-                        $"This transaction is NOT atomic across adapters.",
+                        $"Deferred coordination '{Name}' failed after {completedOperations} completed operation(s). " +
+                        "Its commit outcome is unknown and it will not be replayed.",
                         Name,
                         adapter,
+                        completedOperations,
+                        DataCommitOutcome.Unknown,
                         ex);
                 }
             }

@@ -231,8 +231,7 @@ public sealed class SqliteHealthContributorSpec
 
             contributor.IsCritical.Should().BeTrue();
             report.State.Should().Be(HealthState.Unhealthy);
-            report.Description.Should().Be("Data source 'Default' is unavailable");
-            report.Data.Should().ContainKey("failedSource").WhoseValue.Should().Be("Default");
+            report.Description.Should().Be("An active Data source is unavailable");
         }
         finally
         {
@@ -269,7 +268,8 @@ public sealed class SqliteHealthContributorSpec
             var report = await SqliteHealth(host.Services).Check();
 
             report.State.Should().Be(HealthState.Unhealthy);
-            report.Data.Should().ContainKey("failedSource").WhoseValue.Should().Be("ZArchive");
+            report.Data.Should().NotContainKey("failedSource", "public health output identifies the redacted route decision instead");
+            report.Data.Should().ContainKey("failedDecision").WhoseValue.Should().NotBeNull();
             File.Exists(healthyPath).Should().BeTrue(
                 "the healthy source sorts first and must be probed before the later failing source");
         }

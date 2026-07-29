@@ -28,7 +28,7 @@ public sealed class CockroachParticipationSpec
         var contributor = Contributor(
             services,
             new StubDiagnostics([
-                new DataAdapterParticipationInfo(Infrastructure.Constants.Provider.Name, "Archive")
+                new DataAdapterParticipationInfo(Infrastructure.Constants.Provider, "Archive")
             ]));
 
         contributor.IsCritical.Should().BeTrue();

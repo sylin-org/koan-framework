@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Core.Polymorphism;
-using System.Collections.Concurrent;
 using System.Reflection;
+using Koan.Data.Core.Runtime;
+using Koan.Data.Core.Routing;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Core;
 
@@ -12,10 +15,11 @@ namespace Koan.Data.Core;
 /// Default <see cref="IDataService"/> implementation.
 /// Uses multi-dimensional caching per (entity, key, adapter, source) combination.
 /// </summary>
-public sealed class DataService(IServiceProvider sp) : IDataService
+public sealed class DataService : IDataService
 {
-    private readonly ConcurrentDictionary<CacheKey, object> _cache = new();
-    private readonly ConcurrentDictionary<(Type Variant, Type Key), object> _variantCache = new();
+    private readonly IServiceProvider _sp;
+    private readonly BoundedSingleFlightCache<CacheKey, object> _cache;
+    private readonly BoundedSingleFlightCache<(Type Variant, Type Key), object> _variantCache;
 
     private static readonly MethodInfo CreateVariantRepositoryMethod = typeof(DataService)
         .GetMethod(nameof(CreateVariantRepositoryCore), BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -27,6 +31,19 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         Type KeyType,
         string Adapter,
         string Source);
+
+    public DataService(IServiceProvider services, IOptions<DataRuntimeOptions> options)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(options);
+        _sp = services;
+        _cache = new BoundedSingleFlightCache<CacheKey, object>(
+            options.Value.RepositoryEntries,
+            "Entity repository cache");
+        _variantCache = new BoundedSingleFlightCache<(Type Variant, Type Key), object>(
+            options.Value.VariantRepositoryEntries,
+            "Entity variant repository cache");
+    }
 
     /// <inheritdoc />
     public IDataRepository<TEntity, TKey> GetRepository<TEntity, TKey>()
@@ -44,49 +61,60 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         {
             return (IDataRepository<TEntity, TKey>)_variantCache.GetOrAdd(
                 (typeof(TEntity), typeof(TKey)),
-                _ => CreateVariantRepositoryMethod
+                () => CreateVariantRepositoryMethod
                     .MakeGenericMethod(descriptor.RootType, typeof(TEntity), typeof(TKey))
                     .Invoke(this, null)
                     ?? throw new InvalidOperationException(
                         $"Could not create the '{typeof(TEntity).FullName}' view of Entity root '{descriptor.RootType.FullName}'."));
         }
 
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
+        var sourceRegistry = _sp.GetRequiredService<DataSourceRegistry>();
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(_sp, sourceRegistry);
         var adapter = decision.Adapter;
         var source = decision.Source;
+        var sourcePlan = sourceRegistry.GetPlan(source, adapter);
 
         var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source);
 
-        if (_cache.TryGetValue(key, out var existing))
-            return (IDataRepository<TEntity, TKey>)existing;
+        return (IDataRepository<TEntity, TKey>)_cache.GetOrAdd(
+            key,
+            () => CreateRepository<TEntity, TKey>(decision, sourcePlan));
+    }
 
+    private object CreateRepository<TEntity, TKey>(
+        AdapterResolutionDecision decision,
+        DataSourcePlan sourcePlan)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
         var factory = decision.Factory;
+        var source = decision.Source;
 
         // Selection is the activation boundary, including failed first use. From this point the
         // application depends on this route, so readiness must report it even when repository
         // construction or the first provider operation cannot connect.
-        var diagnostics = sp.GetService<DataDiagnostics>();
+        var diagnostics = _sp.GetService<DataDiagnostics>();
+        diagnostics?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory));
         diagnostics?.ObserveParticipation(factory.Provider, source);
 
         // Create repository with source context
-        var repo = factory.Create<TEntity, TKey>(sp, source);
+        var repo = factory.Create<TEntity, TKey>(_sp, source);
 
         // Provider/module decorators sit inside the Data-owned facade. They may cache or specialize
         // physical access, but cannot bypass guards, isolation, transforms, or Lifecycle by returning
         // early. The facade is therefore the one unavoidable application-facing repository boundary.
-        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, sp);
+        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, _sp);
 
-        // Wrap once with the Data-owned semantic boundary: guards, isolation, transforms, write stamps and Lifecycle.
-        // Schema readiness is the adapter's responsibility now (IDataRepository.EnsureReady);
-        // the facade calls it before every operation — no separate EntitySchemaGuard layer.
-        var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
-        var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
-        var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
-        var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
+        // Wrap once with the Data-owned semantic boundary: source policy, guards, isolation, transforms,
+        // write stamps and Lifecycle. The legacy provisioning-ready seam is used only for Managed + ReadWrite;
+        // constrained sources require adapter-earned non-creating readiness.
+        var guards = _sp.GetServices<Pipeline.IStorageGuard>().ToArray();
+        var readContributors = _sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
+        var lifecycle = _sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
+        var segmentation = _sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
+        var fieldTransforms = _sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         var facade = new RepositoryFacade<TEntity, TKey>(
-            decorated, guards, readContributors, lifecycle, segmentation, fieldTransforms);
+            decorated, guards, readContributors, lifecycle, segmentation, fieldTransforms, sourcePlan);
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
@@ -96,7 +124,6 @@ public sealed class DataService(IServiceProvider sp) : IDataService
             factory.Provider,
             AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name));
 
-        _cache[key] = facade;
         return facade;
     }
 
@@ -119,26 +146,37 @@ public sealed class DataService(IServiceProvider sp) : IDataService
         // Mirror GetRepository's raw-adapter resolution but return the UNDECORATED facade (the diagnostic authority that
         // holds the raw adapter for the IQueryRepository check). Cheap + connection-free: capability description is
         // static. Not cached — Explain / the boot pre-flight call it rarely, never on a hot path.
-        var sourceRegistry = sp.GetRequiredService<DataSourceRegistry>();
-        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(sp, sourceRegistry);
+        var sourceRegistry = _sp.GetRequiredService<DataSourceRegistry>();
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(_sp, sourceRegistry);
         var source = decision.Source;
+        var sourcePlan = sourceRegistry.GetPlan(source, decision.Adapter);
         var factory = decision.Factory;
-        var repo = factory.Create<TEntity, TKey>(sp, source);
-        var guards = sp.GetServices<Pipeline.IStorageGuard>().ToArray();
-        var readContributors = sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
-        var lifecycle = sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
-        var segmentation = sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
-        var fieldTransforms = sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
+        _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory));
+        var repo = factory.Create<TEntity, TKey>(_sp, source);
+        var guards = _sp.GetServices<Pipeline.IStorageGuard>().ToArray();
+        var readContributors = _sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();
+        var lifecycle = _sp.GetService<Lifecycle.EntityLifecyclePlan<TEntity, TKey>>();
+        var segmentation = _sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
+        var fieldTransforms = _sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         return new RepositoryFacade<TEntity, TKey>(
-            repo, guards, readContributors, lifecycle, segmentation, fieldTransforms);
+            repo, guards, readContributors, lifecycle, segmentation, fieldTransforms, sourcePlan);
     }
 
     /// <inheritdoc />
     public Direct.IDirectSession Direct(string? source = null, string? adapter = null)
     {
-        var svc = sp.GetService<Direct.IDirectDataService>()
+        var svc = _sp.GetService<Direct.IDirectDataService>()
             ?? throw new InvalidOperationException("IDirectDataService not registered. It is registered by default via AddKoanDataCore() (ARCH-0090 §1) — ensure Koan data core is initialized.");
         return svc.Direct(source, adapter);
+    }
+
+    /// <summary>Applies an Entity instruction's source ceiling before repository/provider construction.</summary>
+    internal void DemandForEntity<TEntity>(DataOperationEffect effect, string operation)
+        where TEntity : class
+    {
+        var sourceRegistry = _sp.GetRequiredService<DataSourceRegistry>();
+        var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(_sp, sourceRegistry);
+        sourceRegistry.GetPlan(decision.Source, decision.Adapter).Demand(effect, operation);
     }
 
     private static IDataRepository<TEntity, TKey> ApplyDecorators<TEntity, TKey>(

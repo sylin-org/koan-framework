@@ -40,8 +40,12 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<Koan.Data.Abstractions.Naming.IStorageNameResolver, Koan.Data.Abstractions.Naming.DefaultStorageNameResolver>();
         // Note: Partition context provided by EntityContext (static, no DI needed) - see DATA-0077
         services.AddKoanOptions<Options.DirectOptions>(Infrastructure.Constants.Configuration.Direct.Section);
+        services.AddKoanOptions<Options.SourceIntegrationOptions>(Infrastructure.Constants.Configuration.SourceIntegration);
+        services.AddKoanOptions<Options.MappingOptions>(Infrastructure.Constants.Configuration.Mapping);
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();
+        services.TryAddSingleton(sp => new Koan.Data.Abstractions.Naming.StorageNameCache(
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataRuntimeOptions>>().Value.StorageNameCacheEntries));
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
         services.TryAddSingleton(Koan.Core.Semantics.Segmentation.SegmentationPlan.Empty);
 
@@ -56,6 +60,7 @@ public static class ServiceCollectionExtensions
         // ⇒ this contributor returns null ⇒ the read fold is a no-op (structural absence).
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Pipeline.IReadFilterContributor, Pipeline.ManagedEqualityReadContributor>());
         services.TryAddSingleton<Pipeline.StorageFieldTransformPlan>();
+        services.TryAddSingleton<Pipeline.StorageWritePlanCache>();
         services.TryAddSingleton<Koan.Data.Abstractions.Pipeline.IFieldTransformInspector>(sp =>
             sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>());
 
@@ -70,17 +75,33 @@ public static class ServiceCollectionExtensions
         // Data source registry for source/adapter routing (DATA-0077)
         services.AddSingleton<DataSourceRegistry>(sp =>
         {
-            var registry = new DataSourceRegistry();
+            var runtime = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataRuntimeOptions>>().Value;
+            var registry = new DataSourceRegistry(runtime.SourceEntries, runtime.SourcePlanEntries);
             var config = sp.GetRequiredService<IConfiguration>();
             var logger = sp.GetService<Microsoft.Extensions.Logging.ILogger<DataSourceRegistry>>();
             registry.DiscoverFromConfiguration(config, logger);
+            registry.Freeze();
             return registry;
         });
+        services.TryAddSingleton(sp => new Readiness.DataSourceReadinessCoordinator(
+            sp.GetService<IHostApplicationLifetime>(),
+            sp.GetService<Microsoft.Extensions.Options.IOptions<DataRuntimeOptions>>()));
 
         services.AddSingleton<Routing.DataProviderCatalog>(sp => new Routing.DataProviderCatalog(
             sp.GetServices<IDataAdapterFactory>(),
             sp.GetService<Koan.Core.Composition.KoanApplicationReferenceManifest>()));
         services.AddSingleton<Routing.DataDefaultProviderPlan>();
+        services.TryAddSingleton<DataOperationCatalog>();
+        services.TryAddSingleton<Mapping.Composition.MappingDeclarationCatalog>();
+        services.TryAddSingleton<IDataMappingPlans, Mapping.Runtime.DataMappingPlans>();
+        services.TryAddSingleton<SourceIntegration.Runtime.DataSourceIntegrationService>();
+        services.TryAddSingleton<Diagnostics.DataSourceDiagnosticsService>();
+        services.TryAddSingleton<Diagnostics.DataNativeEvidenceStore>();
+        services.TryAddSingleton<Koan.Data.Abstractions.Failures.IDataNativeEvidenceSink>(sp =>
+            sp.GetRequiredService<Diagnostics.DataNativeEvidenceStore>());
+        services.TryAddSingleton<SourceIntegration.Runtime.SourceContinuationCodec>();
+        services.TryAddSingleton<SourceIntegration.Runtime.RecordSetMaterializer>();
+        services.TryAddSingleton<SourceIntegration.Runtime.RegisteredOperationExecutor>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<
             Koan.Core.Semantics.Segmentation.ISegmentationRealization,
             Semantics.DataSegmentationPlan>());

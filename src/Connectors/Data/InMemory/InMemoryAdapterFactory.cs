@@ -3,6 +3,7 @@ using Koan.Core;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Connector.InMemory.Infrastructure;
+using Koan.Data.Connector.InMemory.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.InMemory;
@@ -15,6 +16,9 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
 {
     public string Provider => Constants.Provider.Name;
     public IReadOnlyCollection<string> Aliases => [Constants.Provider.Alias];
+    public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.InMemory"];
+
+    public void DescribeClaims(IDataClaims claims) => InMemoryFeatures.Declare(claims);
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider sp,
@@ -22,10 +26,18 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        // The singleton store; the repo resolves its per-(source, partition) physical store from the ambient context
-        // on each op (ARCH-0103: Database mode = per routed source, Container mode = per ambient partition).
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? "Default" : source;
+        if (sp.GetRequiredService<IDataMappingPlans>().Find<TEntity>(resolvedSource) is not null)
+            throw new NotSupportedException(
+                $"InMemory does not expose a physical compatibility-mapping surface for '{typeof(TEntity).Name}'. " +
+                "Remove Map<T>(...) or route the source to an adapter that supports physical mappings.");
+        var definition = sp.GetRequiredService<DataSourceRegistry>().GetSource(resolvedSource);
+        if (definition?.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.External)
+            throw new NotSupportedException(
+                $"InMemory cannot open source '{resolvedSource}' as External because it owns only host-ephemeral stores. " +
+                "Use StorageLifecycle=Managed or select an adapter that can open provider-owned storage.");
         var dataStore = sp.GetRequiredService<InMemoryDataStore>();
-        return new InMemoryRepository<TEntity, TKey>(dataStore, source);
+        return new InMemoryRepository<TEntity, TKey>(dataStore, resolvedSource);
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services)

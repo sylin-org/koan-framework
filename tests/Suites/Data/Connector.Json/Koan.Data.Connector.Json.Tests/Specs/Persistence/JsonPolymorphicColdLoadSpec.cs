@@ -56,7 +56,8 @@ public sealed class JsonPolymorphicColdLoadSpec
 
     private static JsonRepository<PolyMedia, string> Repository(string root)
         => new(
-            Options.Create(new JsonDataOptions { DirectoryPath = root }),
+            new JsonRoute("Test", root, Koan.Data.Abstractions.Sources.StorageLifecycle.Managed,
+                Koan.Data.Abstractions.Sources.DataSourceAccess.ReadWrite),
             new DataSegmentationPlan(SegmentationPlan.Empty),
             new JsonAdapterFactory(),
             EmptyServiceProvider.Instance);

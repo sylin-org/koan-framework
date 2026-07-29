@@ -1,179 +1,84 @@
-using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using Koan.Core;
-using Koan.Core.Adapters;
-using Koan.Data.Adapters.Configuration;
-using Koan.Core.Infrastructure;
-using Koan.Core.Logging;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Relational.Orchestration;
-using SqliteConstants = Koan.Data.Connector.Sqlite.Infrastructure.Constants;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Sqlite;
 
-/// <summary>
-/// SQLite configuration using autonomous service discovery.
-/// Inherits from AdapterOptionsConfigurator for consistent provider patterns.
-/// </summary>
-internal sealed class SqliteOptionsConfigurator : AdapterOptionsConfigurator<SqliteOptions>
+internal sealed class SqliteOptionsConfigurator(
+    IConfiguration configuration,
+    IServiceDiscoveryCoordinator? discovery = null) : IConfigureOptions<SqliteOptions>
 {
-    private readonly IServiceDiscoveryCoordinator? _discoveryCoordinator;
-
-    protected override string ProviderName => "Sqlite";
-
-    public SqliteOptionsConfigurator(
-        IConfiguration config,
-        ILogger<SqliteOptionsConfigurator>? logger,
-        IOptions<AdaptersReadinessOptions> readinessOptions,
-        IServiceDiscoveryCoordinator? discoveryCoordinator = null)
-        : base(config, logger, readinessOptions)
+    public void Configure(SqliteOptions options)
     {
-        _discoveryCoordinator = discoveryCoordinator;
+        var owner = configuration["Koan:Data:Sources:Default:Adapter"];
+        var genericBelongs = string.IsNullOrWhiteSpace(owner) || SqliteAdapterFactory.HandlesProvider(owner);
+        var requested = genericBelongs
+            ? First(
+                Constants.Configuration.Keys.DefaultSourceConnectionString,
+                Constants.Configuration.Keys.ProviderSourceConnectionString,
+                Constants.Configuration.Keys.ConnectionString,
+                Constants.Configuration.Keys.ConnectionStringsSqlite,
+                Constants.Configuration.Keys.ConnectionStringsDefault)
+            : First(
+                Constants.Configuration.Keys.ProviderSourceConnectionString,
+                Constants.Configuration.Keys.ConnectionString,
+                Constants.Configuration.Keys.ConnectionStringsSqlite);
+
+        requested = string.IsNullOrWhiteSpace(requested) ? options.ConnectionString : requested;
+        options.ConnectionString = IsAuto(requested) ? Discover() : requested!;
+
+        options.NamingStyle = EnumValue(
+            options.NamingStyle,
+            Constants.Configuration.Keys.ProviderNamingStyle,
+            Constants.Configuration.Keys.NamingStyle);
+        options.Separator = First(
+            Constants.Configuration.Keys.ProviderSeparator,
+            Constants.Configuration.Keys.Separator) ?? options.Separator;
+        options.DdlPolicy = EnumValue(
+            options.DdlPolicy,
+            Constants.Configuration.Keys.ProviderDdlPolicy,
+            Constants.Configuration.Keys.DdlPolicy);
+        options.SchemaMatching = EnumValue(
+            options.SchemaMatching,
+            Constants.Configuration.Keys.ProviderSchemaMatching,
+            Constants.Configuration.Keys.SchemaMatching);
+        options.AllowProductionDdl = options.DdlPolicy == RelationalDdlPolicy.AutoCreate;
     }
 
-    // Simplified constructor for orchestration scenarios without DI
-    public SqliteOptionsConfigurator(IConfiguration config)
-        : base(config, NullLogger<SqliteOptionsConfigurator>.Instance,
-               Microsoft.Extensions.Options.Options.Create(new AdaptersReadinessOptions()))
+    private string Discover()
     {
-        _discoveryCoordinator = null;
+        if (configuration.GetValue(Constants.Configuration.Keys.DisableAutoDetection, false) || discovery is null)
+            return Constants.DefaultConnection;
+
+        var result = discovery.DiscoverService(
+                Constants.Provider,
+                new DiscoveryContext { Configuration = configuration, RequireHealthValidation = false })
+            .GetAwaiter().GetResult();
+        return result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl)
+            ? result.ServiceUrl
+            : Constants.DefaultConnection;
     }
 
-    protected override void ConfigureProviderSpecific(SqliteOptions options)
+    private T EnumValue<T>(T fallback, params string[] keys) where T : struct, Enum
     {
-        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Start);
-        KoanLog.ConfigInfo(Logger, LogActions.Config, "context",
-            ("environment", KoanEnv.EnvironmentName),
-            ("mode", KoanEnv.OrchestrationMode.ToString()));
-        KoanLog.ConfigDebug(Logger, LogActions.Config, "initial",
-            ("connection", Redaction.DeIdentify(options.ConnectionString)));
+        var value = First(keys);
+        return Enum.TryParse<T>(value, ignoreCase: true, out var parsed) ? parsed : fallback;
+    }
 
-        var explicitConnectionString = Infrastructure.SqliteConnectionConfiguration
-            .ReadProviderFallback(Configuration);
-
-        if (!string.IsNullOrWhiteSpace(explicitConnectionString) && !IsAuto(explicitConnectionString))
+    private string? First(params string[] keys)
+    {
+        foreach (var key in keys)
         {
-            KoanLog.ConfigInfo(Logger, LogActions.Config, "explicit",
-                ("source", "configuration"));
-            options.ConnectionString = explicitConnectionString;
+            var value = configuration[key];
+            if (!string.IsNullOrWhiteSpace(value)) return value.Trim();
         }
-        else if (IsAuto(explicitConnectionString) || IsAuto(options.ConnectionString) ||
-                 string.IsNullOrWhiteSpace(options.ConnectionString))
-        {
-            KoanLog.ConfigInfo(Logger, LogActions.Discovery, "auto");
-            options.ConnectionString = ResolveAutonomousConnection(Logger);
-        }
-        else
-        {
-            KoanLog.ConfigInfo(Logger, LogActions.Config, "preconfigured");
-        }
-
-        // Configure other SQLite-specific options
-        var ddlStr = ReadProviderConfiguration(options.DdlPolicy.ToString(),
-            Infrastructure.Constants.Configuration.Keys.DdlPolicy,
-            Infrastructure.Constants.Configuration.Keys.AltDdlPolicy);
-        if (!string.IsNullOrWhiteSpace(ddlStr) && Enum.TryParse<RelationalDdlPolicy>(ddlStr, true, out var ddl)) options.DdlPolicy = ddl;
-
-        var smStr = ReadProviderConfiguration(options.SchemaMatching.ToString(),
-            Infrastructure.Constants.Configuration.Keys.SchemaMatchingMode,
-            Infrastructure.Constants.Configuration.Keys.AltSchemaMatchingMode);
-        if (!string.IsNullOrWhiteSpace(smStr) && Enum.TryParse<RelationalSchemaMatchingMode>(smStr, true, out var sm)) options.SchemaMatching = sm;
-
-        // SQLite is an embedded, application-owned store. Selecting AutoCreate is already the explicit schema
-        // lifecycle decision, so it must keep its literal meaning under the Generic Host's Production default.
-        // Validate/NoDdl and [ReadOnly] continue to prohibit schema mutation in the repository policy.
-        options.AllowProductionDdl = options.DdlPolicy == RelationalDdlPolicy.AutoCreate ||
-                                     Koan.Core.Configuration.Read(
-                                         Configuration,
-                                         Constants.Configuration.Koan.AllowMagicInProduction,
-                                         options.AllowProductionDdl);
-
-        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomeValues.Final,
-            ("connection", Redaction.DeIdentify(options.ConnectionString)));
-        KoanLog.ConfigInfo(Logger, LogActions.Config, LogOutcomes.Complete);
+        return null;
     }
 
-    private string ResolveAutonomousConnection(ILogger? logger)
-    {
-        try
-        {
-            if (IsAutoDetectionDisabled())
-            {
-                KoanLog.ConfigInfo(logger, LogActions.Discovery, "disabled",
-                    ("reason", "config"));
-                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
-            }
-
-            if (_discoveryCoordinator == null)
-            {
-                KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
-                    ("reason", "no-coordinator"));
-                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
-            }
-
-            // Create discovery context with SQLite-specific parameters
-            var context = new DiscoveryContext
-            {
-                OrchestrationMode = KoanEnv.OrchestrationMode,
-                // Target selection is configuration, not readiness. Repository use and the active health contributor
-                // own authoritative I/O, so an available-but-unelected connector cannot create a database here.
-                RequireHealthValidation = false,
-                HealthCheckTimeout = TimeSpan.FromMilliseconds(500),
-                Parameters = new Dictionary<string, object>()
-            };
-
-            // Use autonomous discovery coordinator
-            var discoveryTask = _discoveryCoordinator.DiscoverService("sqlite", context);
-            var result = discoveryTask.GetAwaiter().GetResult();
-
-            if (result.IsSuccessful)
-            {
-                KoanLog.ConfigInfo(logger, LogActions.Discovery, LogOutcomeValues.Success,
-                    ("url", Redaction.DeIdentify(result.ServiceUrl)));
-                return result.ServiceUrl;
-            }
-            else
-            {
-                KoanLog.ConfigWarning(logger, LogActions.Discovery, LogOutcomeValues.Fallback,
-                    ("reason", result.ErrorMessage ?? "discovery-unresolved"),
-                    ("fallback", SqliteConstants.Configuration.DataFallback.DefaultSource));
-                return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
-            }
-        }
-        catch (Exception ex)
-        {
-            KoanLog.ConfigError(logger, LogActions.Discovery, "exception",
-                ("error", Redaction.DeIdentify(ex.Message)));
-            return BuildSqliteConnectionString(SqliteConstants.Configuration.DataFallback.DefaultSource);
-        }
-    }
-
-    private bool IsAutoDetectionDisabled()
-    {
-        return Koan.Core.Configuration.Read(Configuration, Infrastructure.Constants.Configuration.Keys.DisableAutoDetection, false);
-    }
-
-    private static string BuildSqliteConnectionString(string filePath)
-        => $"Data Source={filePath}";
-
-    private static bool IsAuto(string? value)
-        => Infrastructure.SqliteConnectionConfiguration.IsAuto(value);
-
-    private static class LogActions
-    {
-        public const string Config = "sqlite.config";
-        public const string Discovery = "sqlite.discovery";
-    }
-
-    private static class LogOutcomeValues
-    {
-        public const string Final = "final";
-        public const string Success = "success";
-        public const string Fallback = "fallback";
-    }
+    private static bool IsAuto(string? value) =>
+        string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
 }

@@ -189,6 +189,7 @@ public sealed class CrossAdapterTransactionsSpec
         var trackedCount = 0;
         var supportsLocal = false;
         var supportsDistributed = true;
+        var supportsDeferredCoordination = false;
 
         using (EntityContext.Transaction("capabilities-test"))
         {
@@ -210,14 +211,16 @@ public sealed class CrossAdapterTransactionsSpec
             trackedCount = tx.TrackedOperationCount;
             supportsLocal = tx.Capabilities.Has(TxCaps.Local);
             supportsDistributed = tx.Capabilities.Has(TxCaps.Distributed);
+            supportsDeferredCoordination = tx.Capabilities.Has(TxCaps.DeferredCoordination);
 
             await EntityContext.Commit();
         }
 
         adapters.Should().Contain(a => a == "Default" || a == "json");
         trackedCount.Should().Be(2);
-        supportsLocal.Should().BeTrue();
-        supportsDistributed.Should().BeFalse("best-effort atomicity only");
+        supportsLocal.Should().BeFalse("sequential Entity coordination is not a native local transaction");
+        supportsDistributed.Should().BeFalse("deferred coordination is not distributed atomicity");
+        supportsDeferredCoordination.Should().BeTrue();
     }
 
     [Fact]

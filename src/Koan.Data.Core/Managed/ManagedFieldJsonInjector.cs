@@ -14,16 +14,16 @@ namespace Koan.Data.Core;
 /// <summary>
 /// The one shared managed-field ⇄ JSON bridge (ARCH-0103 §5, §9 — lifted from the relational trio's
 /// <c>ManagedFieldContractResolver</c>). It centralises the knowledge of which invisible <c>__</c>-keys a type carries
-/// (<see cref="ManagedFieldRegistry"/>) and how they ride a serialized record, so both JSON-serializing storage families
+/// (<see cref="ManagedFieldRegistry"/>) and how they ride a serialized record, so JSON-serializing stores
 /// stamp the framework-managed discriminator the same way instead of each inventing its own:
 /// <list type="bullet">
 /// <item><b>The relational trio</b> (SQLite / Postgres / SqlServer) uses it as a <see cref="DefaultContractResolver"/>:
 /// it injects each applicable managed field into the entity's persisted JSON column from the ambient write scope
 /// (<see cref="ManagedFieldWriteScope.Effective"/>); the database then extracts them via <c>json_extract</c>.</item>
-/// <item><b>The <c>KeyValueStore</c> JSON-text family</b> (Json / Redis) uses the static <see cref="InjectManaged"/> /
+/// <item><b>JSON-text stores</b> (Json and Redis) use the static <see cref="InjectManaged"/> /
 /// <see cref="ExtractManaged"/> pair: it merges an explicit <b>per-record</b> managed dictionary into / out of the
 /// serialized value (the record carries its own stamped values, decoupled from the ambient scope at persist time), and
-/// the family's in-memory hybrid read-filter then matches it.</item>
+/// their bounded in-memory filter paths then match it.</item>
 /// </list>
 ///
 /// <para><b>Off ⇒ byte-identical:</b> when no module registers a managed field (<see cref="ManagedFieldRegistry.IsEmpty"/>)

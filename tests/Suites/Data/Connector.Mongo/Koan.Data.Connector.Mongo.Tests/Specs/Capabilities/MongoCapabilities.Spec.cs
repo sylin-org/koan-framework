@@ -22,8 +22,8 @@ public sealed class MongoCapabilitiesSpec(MongoFixture fixture, ITestOutputHelpe
         caps.Has(DataCaps.Query.String).Should().BeFalse();
         caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
         caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
-        caps.Has(DataCaps.Write.AtomicBatch).Should().BeTrue();
-        caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
+        caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
+        caps.Has(DataCaps.Write.FastRemove).Should().BeFalse();
 
         var partition = NewPartition();
         using var lease = Lease(partition);

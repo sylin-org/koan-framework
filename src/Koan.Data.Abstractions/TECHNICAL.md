@@ -4,7 +4,7 @@ title: Koan.Data.Abstractions - Technical Reference
 description: Provider-facing entity, query, result, and capability contracts.
 packages: [Sylin.Koan.Data.Abstractions]
 source: src/Koan.Data.Abstractions/
-last_updated: 2026-07-17
+last_updated: 2026-07-28
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
@@ -29,10 +29,58 @@ validation:
 - `IQueryRepository<TEntity, TKey>` — structured query and count execution.
 - `QueryDefinition` — filter AST, sort, projection, page, partition, and optional count strategy.
 - `RepositoryQueryResult<TEntity>` and `CountResult` — values plus execution/estimate facts.
+- `MutationResult<TEntity,TKey>`, `BatchResult`, and `BatchItemResult` — mutation, commit, atomicity, and ordered
+  per-operation facts.
 - `DataCaps` — query, write, isolation, and retention capability tokens.
+- `DataSourcePlan`, `StorageLifecycle`, `DataSourceAccess`, and `DataOperationEffect` — immutable source ceiling
+  and exact dispatch-effect vocabulary.
+- `DataFailure`, `DataFailureContext`, and `IDataFailureClassifier` — stable public failure/outcome contract and
+  the adapter-owned native type/code translation seam.
+- `IDataNativeEvidenceSink` — write-only restricted native evidence with an opaque bounded public reference.
+- `DataClaimSet`, `IDataClaims`, and `DataCapabilityProfiles` — one inert executable claim declaration and the exact
+  deterministic references shared by runtime and TestKit.
 - `PatchPayload<TKey>` and `PatchOp` — the provider-neutral patch operation accepted by Data.Core.
 - `IFieldTransform`, `IFieldTransformContributor`, and `IFieldTransformInspector` — neutral contracts for
   host-compiled round-trip storage transforms and cross-pillar inspection.
+- `IDataSourceIntegrationFactory`, `IDataSourceIntegration`, and `IDataSourceInspectorAdapter` — source-only
+  activation, registered reads, and neutral inspection without an Entity repository.
+- `StorageAddress`, `StorageContainerReference`, and `StorageContainerDescriptor` — provider-neutral addressing,
+  opaque source binding, intrinsic traits, and policy-projected operations.
+- `DataField`, `DataRecord`, `RecordSet`, and `RecordSetExecution` — ordered neutral shape/value/completion and
+  `MaterializedValueV1` accounting.
+- `OperationPlan`, `IDataOperationBinding`, and `BoundOperationParameter` — immutable registered-read decisions and
+  provider-native payload seam.
+- `MappingDescriptor`, `MappingBindingDescriptor`, `MappingIdentityDescriptor`, `MappingPath`, and `PhysicalPath` —
+  inert aggregate-to-record meaning shared by every Family.
+- `IDataMappingCodec`, `MappedRecord`, and `MappingReceipt` — one physical encoding, missing-preserving values, and
+  exact plan-use evidence for hydration, writes, queries, projections, and indexes.
+
+## Mapping vocabulary
+
+- Logical selection and physical location are separate. A logical path never carries a provider expression, and a
+  physical path is an ordered root plus neutral structured segments.
+- `Canonical` is the sole writable authority. `Derived` describes a provider-maintained or virtual read expression;
+  it cannot enter an ordinary write receipt.
+- A writable codec must encode and decode. An explicit read-only binding may use a decode-only codec, but it cannot
+  qualify filters, ordering, conditional writes, or indexes that require physical parameter encoding.
+- `MappingConvention` is an adapter-supplied managed-store default only. An application-declared map wins; external
+  shapes never depend on an adapter silently reinterpreting the fluent grammar.
+
+## Source Integration and neutral records
+
+- A named source resolves an exact `IDataSourceIntegrationFactory`; source-only use never enters the Entity provider
+  catalog or constructs a synthetic repository.
+- Inspection references and continuations are opaque and source-bound. Data Core validates capability, source,
+  descriptor shape, page bounds, and policy-projected operations before returning them.
+- Neutral values form a closed algebra. Provider objects, streams, cursors, arbitrary POCOs, and native document types
+  convert before `DataRecord` construction, reject, or remain on an explicit native surface.
+- A `RecordSet` fixes its shared field shape before the first row. Ordinal access is lossless; exact-case name access
+  requires one field; presence bits preserve missing separately from explicit null.
+- DTO projection compiles constructor/record or writable-property ordinal reads once per target type per result.
+  Direct ADO queries, registered reads, and inspection samples use this same path without dictionary/JSON conversion.
+- Registered operations are `Read + Records/Scalar + Buffered`. Opaque bindings require one frozen, provider-enforced
+  read lane. Active segmentation rejects unless an explicit host/control-plane surface exists. Calls are uncached and
+  never replayed after dispatch.
 
 ## Stored-field transform boundary
 
@@ -57,6 +105,12 @@ validation:
 
 - Data.Core plans pushdown and residual work. An adapter translates and executes the filter it is
   given; it does not invent a second query planner.
+- An adapter reports filter, sort, pagination, projection, total, and count execution independently. Data validates
+  the receipt before fallback or public materialization. A false handled flag is a contract failure, not permission
+  for a silent retry.
+- Data owns the only correctness order: provider candidates, residual predicate, unhandled sort, true total,
+  pagination, projection, then application-visible Lifecycle. Candidate rows discarded by those stages do not emit
+  load callbacks.
 - `QueryDefinition.CountStrategy == null` means no total was requested. Pagination alone must not
   cause an adapter to add count work.
 - `DataCaps.Query.ProviderBoundedPaging` means the adapter faithfully executes the
@@ -66,12 +120,29 @@ validation:
 - There is no public `Pager`, cursor, resume-token, or provider stream primitive in this assembly.
   Data.Core composes its qualified `AllStream`/`QueryStream` facade from numbered provider pages.
 
+## Entity and batch receipts
+
+- `GetMany` is positional: output cardinality equals input cardinality; identities remain in input order; duplicates
+  repeat the same visible result; missing or invisible identities occupy `null` slots.
+- Native bulk methods execute once for the prepared set. A mismatched affected count is outcome-unknown and is never
+  replayed. Lifecycle preparation completes for the whole set before dispatch; completion callbacks run only after
+  an exact successful receipt.
+- Exact upsert insert/update distinction is optional and requires both `DataCaps.Write.MutationOutcomes` and
+  `IMutationOutcomeRepository`. Ordinary `Save` remains the compact path when the distinction is irrelevant.
+- `IBatchSet.ExecutionCapabilities` qualifies the created execution seam. `BatchResult.Atomicity` and
+  `CommitOutcome` report what occurred. Complete item outcomes are returned in logical builder order even when the
+  provider groups native adds, updates, and deletes.
+- Data's transaction coordinator is deferred sequential coordination, published as `TxCaps.DeferredCoordination`.
+  It never advertises local/native atomicity; native transaction capabilities belong to the provider's Direct seam.
+
 ## Error and compatibility posture
 
 - Unsupported optional behavior should be reported through capability negotiation or a corrective
   `NotSupportedException`, not silently approximated as a stronger guarantee.
-- Provider errors are adapter-owned; shared contracts do not prescribe one universal exception
-  wrapper.
+- Data owns provider-neutral failure kind, commit outcome, retry disposition, and replay disposition. Adapters
+  classify native exception types/codes through `IDataFailureClassifier`; message-text classification is invalid.
+- `Committed` and commit `Unknown` outcomes require replay `Never`. Timeout is distinct from caller cancellation,
+  and retryability never implies business-operation replay safety.
 - Adding a capability token is not sufficient by itself: the adapter must implement and test the
   advertised behavior.
 

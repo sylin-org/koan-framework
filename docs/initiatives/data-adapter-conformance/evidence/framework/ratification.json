@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "card": "DAC-02",
+  "status": "ratified",
+  "date": "2026-07-27",
+  "authority": "user",
+  "record": [
+    "User approved the compact grammar after the systematic primer pass.",
+    "User explicitly authorized proceeding with the full implementation."
+  ],
+  "decisionIds": [
+    "DEC-01", "DEC-02", "DEC-03", "DEC-04", "DEC-05", "DEC-06",
+    "DEC-07", "DEC-08", "DEC-09", "DEC-10", "DEC-11", "DEC-12",
+    "DEC-13", "DEC-14", "DEC-15", "DEC-16", "DEC-17", "DEC-18"
+  ],
+  "contract": "public-contract.md",
+  "compileFixture": "consumer-contract.cs"
+}

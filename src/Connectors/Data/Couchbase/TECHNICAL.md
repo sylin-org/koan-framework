@@ -1,99 +1,106 @@
 ---
 uid: reference.modules.Koan.data.couchbase
 title: Koan.Data.Connector.Couchbase - Technical Reference
-description: Couchbase adapter for Koan Entity data.
+description: Greenfield Couchbase adapter for Koan Entity and source integration.
 packages: [Sylin.Koan.Data.Connector.Couchbase]
 source: src/Connectors/Data/Couchbase/
-last_updated: 2026-07-22
+last_updated: 2026-07-28
 ---
 
 ## Contract
 
-- Referencing the connector makes provider `couchbase` (priority 30) eligible for Data election.
-  `AddKoan()` performs all registration.
-- The selected factory owns source routing and cluster-provider pooling. Repository operations resolve
-  names through that selected provider and never re-enter election.
-- `All()` is unpaged. Couchbase appends `LIMIT`/`OFFSET` only when the caller supplies explicit
-  pagination.
-- The adapter declares `DataCaps.Query.ProviderBoundedPaging` for qualified Entity streams.
+- Provider identity is `couchbase`, alias `cb`, priority 30.
+- `AddKoan()` registers options, discovery, the adapter/source-integration factory, one host-owned
+  resource pool, and participation-aware health.
+- The adapter implements one current repository path. The retired document store, once gate,
+  cluster provider, query wrapper, translator, telemetry, and options configurator do not remain as
+  compatibility paths.
+- Namespace is Couchbase scope; Container is collection; named source selects bucket/connection and
+  policy; ambient Container partition selects a scope for managed entities.
+
+## Execution
+
+Known-key Get/Upsert/Delete use the KV service. Bulk methods use bounded concurrency of 16. Managed
+whole documents use Koan's polymorphic JSON serializer and managed-field injector. Explicit maps use
+the shared immutable `MappingPlan`; mapped replacement is read-CAS-patch so undeclared external
+fields survive.
+
+Set operations compile the framework filter AST to parameterized SQL++. Query results report exact
+filter, sorting, paging, and count receipts. Queries use `RequestPlus` scan consistency. Unsupported
+operators, multi-binding scalar uses, or sorts reject rather than fall back to an unbounded scan.
+
+Conditional replace reads the document, evaluates the logical guard, and replaces with the opaque
+CAS token. CAS mismatch and missing documents return `false`. Configured SDK durability is applied to
+Upsert, Insert, Replace, Remove, and CAS mutation variants.
+
+The adapter does not claim atomic batches. A non-atomic batch uses the ordinary repository methods;
+`RequireAtomic` and idempotency keys reject. This avoids replaying application delegates under the
+SDK transaction retry model.
+
+## Mapping and lifecycle
+
+One Couchbase map may bind scalar `.Name(...)`, structured `.Object(...)`, nested `.Path(...)`, and
+composite `.Parts(...)` values. Document keys are derived from the application identity and bounded
+to Couchbase's 250-byte key limit; oversized keys use a deterministic SHA-256 key. Provider-generated
+keys reject at mapping compilation.
+
+An explicit map pins one scope/collection and cannot also accept an ambient container partition.
+Explicit maps with framework-managed record fields reject because the external record cannot safely
+host an undeclared isolation/discriminator contract.
+
+Managed lifecycle creates a missing scope/collection and a primary query index when a set operation
+first needs it. External lifecycle only validates existence and performs no management mutation;
+query indexes remain external authority. ReadOnly is enforced by the shared `DataSourcePlan` before
+KV mutation. Lifecycle and access are independent.
+
+## Registered operations and inspection
+
+The provider-neutral `SqlOperationBinding` represents SQL and SQL++ native leaves. Couchbase supports
+registered record and scalar reads only when the operation declares a configured read lane. The lane
+connection is selected by the provider and every statement uses SDK `Readonly(true)`, bounded record
+limits, operation timeout, and named parameters. Mutating SQL++ therefore fails at the provider.
+
+Inspection lists scope/collection containers with bounded offset continuations, resolves and
+describes addresses, and samples with a bounded `LIMIT take + 1` query. Document collections do not
+claim a fixed record shape. Read-only policy removes Write from effective inspection operations.
+
+## Resource and readiness ownership
+
+`CouchbaseResourcePool` is a singleton owned by the Koan host. It is bounded to 128 cluster identities
+and keys clusters by connection string plus credentials, allowing multiple buckets and entity
+containers to share one SDK cluster. Bucket handles are cached inside the cluster resource.
+
+First selected use waits once for KV and Query, primes the initial bucket, and probes `SELECT RAW 1`
+with a bounded provider-readiness retry. Repository operations are not replayed. A failed connection
+entry is removed so a later operation can attempt a fresh resource. Successful resources are disposed
+once with the host; disposal exceptions are not silently swallowed.
 
 ## Configuration
 
-Default-source connection configuration is resolved from:
+Default options live under `Koan:Data:Couchbase`; `ConnectionStrings:Couchbase` is also recognized.
+Named sources use `Koan:Data:Sources:{name}:Adapter`, generic connection/policy keys, and provider
+settings under `Koan:Data:Sources:{name}:couchbase:{Bucket,Scope,Username,Password}`. Read lanes use
+`Koan:Data:Sources:{name}:ReadLanes:{lane}:ConnectionString`.
 
-1. `Koan:Data:Couchbase:ConnectionString`
-2. `ConnectionStrings:Couchbase`
-3. `Koan:Data:Sources:Default:couchbase:ConnectionString`
-4. the `CouchbaseOptions.ConnectionString` default (`auto`)
+`Durability` is parsed once into `DurabilityLevel`; accepted values are `None`, `Majority`,
+`MajorityAndPersistToActive`, and `PersistToMajority`. Query/bootstrap timeouts and polling intervals
+are typed `TimeSpan` options.
 
-Bucket and optional credentials use `Koan:Data:Couchbase:{Bucket,Username,Password}` or their
-provider-specific Default-source equivalents. `Scope`, `Collection`, `QueryTimeoutSeconds`,
-`Durability`, and `ManagementUrl` are provider-level native settings. Named sources use
-`Koan:Data:Sources:{name}:{Adapter,ConnectionString}` and provider settings under that source.
-Generic cross-provider connection, credential, bucket, and user aliases are not consumed.
+## Claims
 
-## Storage and routing
+The factory declares LINQ, native filter execution, provider-bounded paging, bulk upsert/delete,
+conditional replace, and Row/Container/Database isolation. It does not declare atomic batch,
+provider-generated identity, fixed document schema, resumable streams, or snapshot traversal.
 
-- The Default source reuses the DI-managed `CouchbaseClusterProvider`.
-- Named sources with the same resolved cluster identity reuse it. Distinct physical placements receive
-  one factory-owned provider per `(connection, bucket, username, password, management URL)`.
-- An Entity collection name comes from the already selected naming provider and is normalized to
-  Couchbase's identifier rules.
-- Ambient Data partitions map to native scopes; named Data sources map to native buckets.
-- Scope/collection ensure is memoized and driver handles are cached for the provider lifetime.
+## Evidence
 
-## Query and write behavior
+The greenfield suite passes 25/25 with zero skips against `couchbase:community-8.0.2` and
+`CouchbaseNetClient` 3.9.4. The observed complete run took 52 seconds after build. It covers CRUD,
+filter convergence, exact receipts, polymorphism, provider-bounded streaming, CAS, all declared
+isolation modes, resource sharing, compact flat/object/nested/composite mapping, preservation of
+external fields, managed/external/read-only policy, generated-key rejection, named SQL++ reads,
+mutation rejection, neutral inspection, identifier safety, health, and participation.
 
-- Supported filters lower to parameterized N1QL; unsupported residual work is coordinated by Data
-  Core.
-- Explicit pages use N1QL `LIMIT`/`OFFSET`; no adapter page default or cap exists.
-- Raw provider access accepts a N1QL string plus parameters through `Entity.QueryRaw`/Data Core. The
-  connector's query-definition wrapper is internal implementation detail.
-- Bulk operations, CAS conditional replace, and transactional batches use Couchbase-native mechanics.
-  `BatchOptions.RequireAtomic` requests the transaction guarantee explicitly.
-
-## Initialization and readiness
-
-`CouchbaseDataModule` registers options, discovery, the adapter factory, the shared
-cluster provider, and health through `AddKoan()`. It does not register Couchbase as an eager
-`IAsyncAdapterInitializer` or global readiness alias.
-
-Availability is not participation. A referenced but unelected connector reports non-critical
-`Unknown` health and remains cluster-connection free. Couchbase becomes critical when it wins default
-election or a runtime repository/direct-source request selects it. Selected use initializes the
-cluster and bucket once through a shared lazy task; health probes use the same provider route.
-
-A fresh real Couchbase instance can take substantial time to initialize management, query/index
-services, bucket access, and SDK bootstrap. The current focused run observed about 64 seconds for the
-first selected CRUD use; subsequent operations reuse the host-owned provider. This is current
-operational evidence, not a latency guarantee.
-
-## Observability
-
-Activities use the `Koan.Data.Connector.Couchbase` source and include Entity, selected source, and
-ambient partition. Health probes use SDK `PingAsync`. Startup and facts report effective storage
-targets and de-identify connection strings; credentials are never emitted.
-
-## Provider-bounded streaming
-
-`AllStream` and `QueryStream` are coordinated as lazy numbered pages by Data Core. `batchSize` bounds
-the Koan-visible candidate page, not opaque SDK buffers. DATA-0107's exact user-sort floor applies;
-other sorts reject before provider I/O. Offset traversal is not snapshot isolation, resumable, or
-mutation-safe.
-
-## Evidence boundary
-
-The complete connector suite passes 20/20 with zero skips against a real Couchbase Community 8.0.2
-container. It covers CRUD, native filter convergence, provider-bounded streaming, conditional
-replace, all three declared AODB isolation modes, source-provider deduplication, identifier safety,
-and participation-owned readiness. The observed run took 7 minutes 21 seconds because fresh selected
-uses repeatedly wait for cluster/query/index readiness; that is provider-specific operational
-evidence, not a normal merge-gate requirement or a latency guarantee.
-
-First-publication pack and external-consumer evidence is recorded by
-[R13-10](../../../../docs/initiatives/koan-v1/work-items/r13/R13-10-couchbase-provider-promotion.md).
-
-## References
-
-- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
+The retired baseline passed 17/21 in 8 minutes 11 seconds. Its four failures were ordinary query,
+filter convergence, polymorphism, and streaming receipt failures. Those results are retained only as
+negative acceptance evidence in DAC-45.

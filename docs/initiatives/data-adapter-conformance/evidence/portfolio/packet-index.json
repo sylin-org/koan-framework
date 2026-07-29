@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "generatedFrom": "portfolio/roster.json",
+  "rosterHash": "6fb18153d029916894cf5d88dcbc7ae71588d93da71b1a9e911bf58d6a0d0573",
+  "requiredFiles": [
+    "identity.md",
+    "probes.md",
+    "claims.json",
+    "surfaces.md",
+    "scorecard.json",
+    "evidence.json",
+    "dependencies.json",
+    "remediation.md",
+    "README.md"
+  ],
+  "goldRequiredFiles": [
+    "harvest/lessons.md",
+    "harvest/compatibility.json",
+    "harvest/black-box.json",
+    "restricted/retirement.json",
+    "rewrite/replacement.json",
+    "rewrite/lineage.md"
+  ],
+  "scopes": [
+    {
+      "id": "framework",
+      "kind": "framework",
+      "display": "Koan.Data Framework"
+    },
+    {
+      "id": "family-core-document",
+      "kind": "family",
+      "display": "Koan.Data.Core.Document"
+    },
+    {
+      "id": "family-core-keyvalue",
+      "kind": "family",
+      "display": "Koan.Data.Core.KeyValue"
+    },
+    {
+      "id": "family-relational",
+      "kind": "family",
+      "display": "Koan.Data.Relational"
+    },
+    {
+      "id": "family-relational-npgsql",
+      "kind": "family",
+      "display": "Koan.Data.Relational.Npgsql"
+    },
+    {
+      "id": "family-searchengine",
+      "kind": "family",
+      "display": "Koan.Data.SearchEngine"
+    },
+    {
+      "id": "cockroach",
+      "kind": "entity-persistence",
+      "display": "Cockroach"
+    },
+    {
+      "id": "couchbase",
+      "kind": "entity-persistence",
+      "display": "Couchbase"
+    },
+    {
+      "id": "elasticsearch",
+      "kind": "vector",
+      "display": "ElasticSearch"
+    },
+    {
+      "id": "inmemory",
+      "kind": "entity-persistence",
+      "display": "InMemory"
+    },
+    {
+      "id": "json",
+      "kind": "entity-persistence",
+      "display": "Json"
+    },
+    {
+      "id": "mongodb",
+      "kind": "entity-persistence",
+      "display": "Mongo"
+    },
+    {
+      "id": "opensearch",
+      "kind": "vector",
+      "display": "OpenSearch"
+    },
+    {
+      "id": "postgres",
+      "kind": "entity-persistence",
+      "display": "Postgres"
+    },
+    {
+      "id": "redis",
+      "kind": "entity-persistence",
+      "display": "Redis"
+    },
+    {
+      "id": "sqlite",
+      "kind": "entity-persistence",
+      "display": "Sqlite"
+    },
+    {
+      "id": "sqlserver",
+      "kind": "entity-persistence",
+      "display": "SqlServer"
+    },
+    {
+      "id": "vector-inmemory",
+      "kind": "vector",
+      "display": "InMemory"
+    },
+    {
+      "id": "milvus",
+      "kind": "vector",
+      "display": "Milvus"
+    },
+    {
+      "id": "qdrant",
+      "kind": "vector",
+      "display": "Qdrant"
+    },
+    {
+      "id": "sqlitevec",
+      "kind": "vector",
+      "display": "SqliteVec"
+    },
+    {
+      "id": "weaviate",
+      "kind": "vector",
+      "display": "Weaviate"
+    }
+  ]
+}

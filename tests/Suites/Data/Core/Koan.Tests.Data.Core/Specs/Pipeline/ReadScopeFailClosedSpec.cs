@@ -29,13 +29,9 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// contributor union.</item>
 /// </list>
 /// </summary>
-[Collection("managed-field-registry")]   // serialize: the registry is process-global static state
-public sealed class ReadScopeFailClosedSpec : IDisposable
+public sealed class ReadScopeFailClosedSpec
 {
     private static readonly AsyncLocal<string?> _scope = new();
-
-    public ReadScopeFailClosedSpec() => ManagedFieldRegistry.Reset();
-    public void Dispose() { _scope.Value = null; ManagedFieldRegistry.Reset(); }
 
     // Force the deliberately non-isolating fake adapter (FilterSupport.Full, but NO Isolation.RowScoped).
     private static IReadOnlyDictionary<string, string?> ForceNonIsolating()
@@ -57,20 +53,24 @@ public sealed class ReadScopeFailClosedSpec : IDisposable
     [Fact(DisplayName = "fail-closed: a READ under an active equality axis throws on a non-isolating adapter")]
     public async Task Read_under_an_equality_axis_fails_closed_on_a_non_isolating_adapter()
     {
-        ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
-            StorageName: "__scope",
-            ClrType: typeof(string),
-            ValueProvider: () => _scope.Value,
-            AppliesTo: t => t == typeof(JNote),
-            RequiredCapability: DataCaps.Isolation.RowScoped));
-
-        await using var fx = await DataCoreRuntimeFixture.CreateAsync(extraSettings: ForceNonIsolating());
+        await using var fx = await DataCoreRuntimeFixture.CreateAsync(
+            extraSettings: ForceNonIsolating(),
+            configureServices: _ => ManagedFieldRegistry.Register(new ManagedFieldDescriptor(
+                StorageName: "__scope",
+                ClrType: typeof(string),
+                ValueProvider: () => _scope.Value,
+                AppliesTo: t => t == typeof(JNote),
+                RequiredCapability: DataCaps.Isolation.RowScoped)));
         fx.ResetEntityCaches();
         _scope.Value = "acme";
         using var _ = fx.UsePartition();
 
-        var act = async () => await JNote.All();   // the read folds Eq(__scope, acme) → fails closed (no RowScoped)
-        await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*does not announce*");
+        try
+        {
+            var act = async () => await JNote.All();   // the read folds Eq(__scope, acme) → fails closed (no RowScoped)
+            await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*does not announce*");
+        }
+        finally { _scope.Value = null; }
     }
 
     [Fact(DisplayName = "fail-closed (CRITICAL): a pure predicate contributor with no managed field throws on a non-isolating adapter")]

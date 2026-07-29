@@ -90,14 +90,19 @@ internal sealed class RelationshipQueryExecutor(IServiceProvider services, IData
                             Infrastructure.Constants.Diagnostics.Reasons.ResultLimit,
                             $"Narrow the relationship or raise its explicit result limit above {nativeLimit}.", nativeLimit);
                 }
-                items = (await queryRepo.Query(adapterQuery, ct).ConfigureAwait(false)).Items;
+                var native = await DataQueryExecution<TChild, TKey>
+                    .QueryCandidates(repo, queryRepo, adapterQuery, ct)
+                    .ConfigureAwait(false);
+                items = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, native).Page;
                 break;
 
             case FilterExecutionKind.InMemory:
             {
                 mode = RelationshipExecutionMode.InMemory;
-                var raw = await queryRepo.Query(adapterQuery, ct).ConfigureAwait(false);
-                items = FilterPushdownCoordinator.Finalize(query, residual, raw).Page;
+                var raw = await DataQueryExecution<TChild, TKey>
+                    .QueryCandidates(repo, queryRepo, adapterQuery, ct)
+                    .ConfigureAwait(false);
+                items = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, raw).Page;
                 break;
             }
 
@@ -114,15 +119,17 @@ internal sealed class RelationshipQueryExecutor(IServiceProvider services, IData
                         Infrastructure.Constants.Diagnostics.Reasons.MissingExecutionProfile,
                         "Use an adapter that advertises provider-enforced bounded candidates or native filtering.");
 
-                var result = await bounded.QueryBoundedCandidates(adapterQuery, scanLimit, ct).ConfigureAwait(false);
+                var result = await DataQueryExecution<TChild, TKey>
+                    .QueryBoundedCandidates(repo, bounded, adapterQuery, scanLimit, ct)
+                    .ConfigureAwait(false);
                 candidatesExamined = result.CandidatesExamined;
                 if (result.CandidateLimitExceeded)
                     throw Reject<TChild, TKey>(provider, subject, correlation, referenceProperty,
                         Infrastructure.Constants.Diagnostics.Reasons.FallbackLimit,
                         $"Narrow the data set, raise the explicit candidate limit above {scanLimit}, or use native filtering.", scanLimit);
 
-                var raw = AsRepositoryResult(result.Items);
-                items = FilterPushdownCoordinator.Finalize(query, residual, raw).Page;
+                var raw = AsRepositoryResult(result.Items, adapterQuery.Filter is not null);
+                items = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, raw).Page;
                 mode = RelationshipExecutionMode.BoundedScan;
                 break;
             }
@@ -142,8 +149,10 @@ internal sealed class RelationshipQueryExecutor(IServiceProvider services, IData
                         Infrastructure.Constants.Diagnostics.Reasons.FallbackLimit,
                         $"Narrow the predicate, raise the explicit candidate limit above {fallbackLimit.Value}, or use native filtering.", fallbackLimit);
 
-                var raw = await queryRepo.Query(adapterQuery, ct).ConfigureAwait(false);
-                items = FilterPushdownCoordinator.Finalize(query, residual, raw).Page;
+                var raw = await DataQueryExecution<TChild, TKey>
+                    .QueryCandidates(repo, queryRepo, adapterQuery, ct)
+                    .ConfigureAwait(false);
+                items = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, raw).Page;
                 mode = RelationshipExecutionMode.BoundedFallback;
                 break;
             }
@@ -158,6 +167,8 @@ internal sealed class RelationshipQueryExecutor(IServiceProvider services, IData
             throw Reject<TChild, TKey>(provider, subject, correlation, referenceProperty,
                 Infrastructure.Constants.Diagnostics.Reasons.ResultLimit,
                 $"Narrow the relationship or raise its explicit result limit above {resultLimit}.", resultLimit);
+
+        await DataQueryExecution<TChild, TKey>.MaterializeVisible(repo, items, ct).ConfigureAwait(false);
 
         var buckets = ids.ToDictionary(id => id, _ => new List<TChild>());
         foreach (var item in items)
@@ -227,12 +238,13 @@ internal sealed class RelationshipQueryExecutor(IServiceProvider services, IData
             "Koan.Data.Core.Relationships",
             correlation));
 
-    private static RepositoryQueryResult<TChild> AsRepositoryResult<TChild>(IReadOnlyList<TChild> items)
+    private static RepositoryQueryResult<TChild> AsRepositoryResult<TChild>(
+        IReadOnlyList<TChild> items,
+        bool filterHandled)
         => new()
         {
             Items = items,
-            TotalCount = items.Count,
-            IsEstimate = false,
+            FilterHandled = filterHandled,
             PaginationHandled = false
         };
 

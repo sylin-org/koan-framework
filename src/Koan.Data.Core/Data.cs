@@ -14,8 +14,11 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core.Querying;
 using Koan.Data.Core.Sorting;
+using Koan.Data.Core.Execution;
+using Koan.Data.Core.Transfers;
 
 namespace Koan.Data.Core;
 
@@ -48,7 +51,14 @@ public static class Data<TEntity, TKey>
     /// <summary>The resolved repository cast to an optional capability interface (e.g.
     /// <see cref="IConditionalWriteRepository{TEntity,TKey}"/>), or <c>null</c> if the backing adapter doesn't
     /// implement it. The cast IS the capability probe — callers branch on null to a fallback.</summary>
-    public static TCapability? As<TCapability>() where TCapability : class => Repo as TCapability;
+    public static TCapability? As<TCapability>() where TCapability : class
+    {
+        var repo = Repo;
+        if (typeof(TCapability) == typeof(IConditionalWriteRepository<TEntity, TKey>) &&
+            !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.ConditionalReplace))
+            return null;
+        return repo as TCapability;
+    }
 
     // ARCH-0084: the adapter's filter support is the FilterSupport detail on its DataCaps.Query.Filter
     // capability token (no separate property). Absent token => None => every filter node is residual.
@@ -83,6 +93,7 @@ public static class Data<TEntity, TKey>
         CancellationToken ct = default,
         int? absoluteMaxRecords = null)
     {
+        if (absoluteMaxRecords is < 0) throw new ArgumentOutOfRangeException(nameof(absoluteMaxRecords));
         var repo = Repo;
         var q = repo as IQueryRepository<TEntity, TKey> ?? RequireQuery(repo);
         var filterSupport = ResolveFilterSupport(repo);
@@ -90,26 +101,53 @@ public static class Data<TEntity, TKey>
         query = query.WithCountStrategy(countStrategy);
 
         var hasPagination = query.HasPagination;
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
 
         // Safety cap on unpaged queries: count first, refuse if over the cap.
         if (!hasPagination && absoluteMaxRecords.HasValue)
         {
-            var planForCount = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
             // Only a clean count when nothing residual; otherwise we must materialize to know the true total.
-            if (planForCount.Residual is null)
+            if (residual is null)
             {
-                var pre = await q.Count(planForCount.AdapterQuery, ct);
+                var pre = ValidateCountResult(
+                    await q.Count(adapterQuery, ct),
+                    countStrategy,
+                    DataCaps.Describe(repo, repo.GetType().Name));
                 if (pre.Value > absoluteMaxRecords.Value)
                     return Exceeded(pre.Value, pre.IsEstimate);
             }
         }
 
-        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
-        var adapterResult = await q.Query(adapterQuery, ct);
-        var finalized = FilterPushdownCoordinator.Finalize(query, residual, adapterResult);
+        RepositoryQueryResult<TEntity> adapterResult;
+        if (!hasPagination && absoluteMaxRecords.HasValue && residual is not null)
+        {
+            if (repo is not IBoundedQueryRepository<TEntity, TKey> bounded)
+                throw new NotSupportedException(
+                    $"The adapter backing {typeof(TEntity).Name} cannot enforce the requested residual-query safety bound. " +
+                    "Use a natively pushable filter, explicit provider-bounded paging, or a bounded-capable adapter.");
+            var candidateLimit = absoluteMaxRecords.Value == int.MaxValue
+                ? int.MaxValue
+                : absoluteMaxRecords.Value + 1;
+            var boundedResult = await DataQueryExecution<TEntity, TKey>.QueryBoundedCandidates(
+                repo, bounded, adapterQuery, candidateLimit, ct);
+            if (boundedResult.CandidateLimitExceeded || boundedResult.CandidatesExamined > candidateLimit)
+                return Exceeded(candidateLimit, estimate: false);
+            adapterResult = new RepositoryQueryResult<TEntity>
+            {
+                Items = boundedResult.Items,
+                FilterHandled = adapterQuery.Filter is not null
+            };
+        }
+        else
+        {
+            adapterResult = await DataQueryExecution<TEntity, TKey>.QueryCandidates(repo, q, adapterQuery, ct);
+        }
+        var finalized = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, adapterResult);
 
         if (!hasPagination && absoluteMaxRecords.HasValue && finalized.TotalCount > absoluteMaxRecords.Value)
             return Exceeded(finalized.TotalCount, finalized.IsEstimate);
+
+        await DataQueryExecution<TEntity, TKey>.MaterializeVisible(repo, finalized.Page, ct);
 
         if (!hasPagination)
         {
@@ -157,12 +195,41 @@ public static class Data<TEntity, TKey>
         query = query.WithCountStrategy(strategy);
         var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
         if (residual is null)
-            return (await q.Count(adapterQuery, ct)).Value;
+            return ValidateCountResult(
+                await q.Count(adapterQuery, ct),
+                strategy,
+                DataCaps.Describe(repo, repo.GetType().Name)).Value;
 
         // Residual present → adapter count would be wrong; materialize the pushable set + finalize.
-        var adapterResult = await q.Query(adapterQuery.WithoutPagination(), ct);
-        var finalized = FilterPushdownCoordinator.Finalize(query.WithoutPagination(), residual, adapterResult);
+        var adapterResult = await DataQueryExecution<TEntity, TKey>.QueryCandidates(
+            repo, q, adapterQuery.WithoutPagination(), ct);
+        var unpaged = query.WithoutPagination();
+        var finalized = FilterPushdownCoordinator.Finalize(unpaged, adapterQuery.WithoutPagination(), residual, adapterResult);
         return finalized.TotalCount;
+    }
+
+    private static CountResult ValidateCountResult(
+        CountResult result,
+        CountStrategy requested,
+        CapabilitySet capabilities)
+    {
+        QueryReceiptRejectedException Reject(string correction)
+            => new(typeof(TEntity).FullName ?? typeof(TEntity).Name, QueryReceiptAxis.Count, correction);
+
+        if (result.Value < 0)
+            throw Reject("A count result cannot be negative.");
+        if (result.Execution == CountExecutionKind.None)
+            throw Reject("The adapter returned a count value without reporting the count execution it performed.");
+        if (result.Execution is CountExecutionKind.Exact or CountExecutionKind.Optimized && result.IsEstimate)
+            throw Reject("An exact count execution cannot be marked as an estimate.");
+        if (requested is CountStrategy.Exact or CountStrategy.Optimized &&
+            result.Execution == CountExecutionKind.Fast)
+            throw Reject("The requested exact total was answered by a fast/estimate execution.");
+        if (result.Execution == CountExecutionKind.Fast && !capabilities.Has(DataCaps.Query.FastCount))
+            throw Reject("The adapter reported fast-count execution without advertising that capability.");
+        if (result.Execution == CountExecutionKind.Optimized && !capabilities.Has(DataCaps.Query.OptimizedCount))
+            throw Reject("The adapter reported optimized-count execution without advertising that capability.");
+        return result;
     }
 
     public static Task<TEntity?> Get(TKey id, CancellationToken ct = default) => Repo.Get(id, ct);
@@ -278,6 +345,8 @@ public static class Data<TEntity, TKey>
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
+            var repo = Repo;
+            ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred entity delete");
             context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context);
             return Task.FromResult(true);
         }
@@ -308,12 +377,36 @@ public static class Data<TEntity, TKey>
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
+            var repo = Repo;
+            ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred entity upsert");
             var manager = AppHost.GetRequiredService<IAggregateIdentityManager>(IdentityOperation);
             await manager.EnsureIdAsync<TEntity, TKey>(model, ct);
             context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
             return model;
         }
         return await Repo.Upsert(model, ct);
+    }
+
+    public static Task<MutationResult<TEntity, TKey>> UpsertWithOutcome(
+        TEntity model,
+        CancellationToken ct = default)
+    {
+        if (EntityContext.Current?.TransactionCoordinator is not null)
+            throw new NotSupportedException(
+                "A deferred coordination scope cannot return an upsert outcome before commit. Use Save, or perform SaveWithOutcome outside that scope.");
+        var repo = Repo;
+        return ((IDataMutationOutcomes<TEntity, TKey>)repo).UpsertWithOutcome(model, ct);
+    }
+
+    public static Task<MutationResult<TEntity, TKey>> DeleteWithOutcome(
+        TKey id,
+        CancellationToken ct = default)
+    {
+        if (EntityContext.Current?.TransactionCoordinator is not null)
+            throw new NotSupportedException(
+                "A deferred coordination scope cannot return a delete outcome before commit. Use Remove, or perform RemoveWithOutcome outside that scope.");
+        var repo = Repo;
+        return ((IDataMutationOutcomes<TEntity, TKey>)repo).DeleteWithOutcome(id, ct);
     }
     public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertMany(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
@@ -454,8 +547,10 @@ public static class Data<TEntity, TKey>
         var q = RequireQuery(repo);
         var filterSupport = ResolveFilterSupport(repo);
         var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(requested, filterSupport, typeof(TEntity));
-        var adapterResult = await q.Query(adapterQuery, ct);
-        return FilterPushdownCoordinator.Finalize(requested, residual, adapterResult).Page;
+        var adapterResult = await DataQueryExecution<TEntity, TKey>.QueryCandidates(repo, q, adapterQuery, ct);
+        var pageResult = FilterPushdownCoordinator.Finalize(requested, adapterQuery, residual, adapterResult).Page;
+        await DataQueryExecution<TEntity, TKey>.MaterializeVisible(repo, pageResult, ct);
+        return pageResult;
     }
 
     // ------------------------------------------------------------------
@@ -487,6 +582,8 @@ public static class Data<TEntity, TKey>
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
+            var repo = Repo;
+            ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred partition entity upsert");
             context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context with { Partition = partition });
             return Task.FromResult(model);
         }
@@ -499,6 +596,8 @@ public static class Data<TEntity, TKey>
         var context = EntityContext.Current;
         if (context?.TransactionCoordinator != null)
         {
+            var repo = Repo;
+            ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred partition entity delete");
             context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context with { Partition = partition });
             return Task.FromResult(true);
         }
@@ -542,81 +641,43 @@ public static class Data<TEntity, TKey>
     public static Task<int> Execute(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)
         => DataServiceExecuteExtensions.Execute<TEntity, int>(data, InstructionSql.NonQuery(sql, parameters), ct);
 
-    public static Task<TResult> Execute<TResult>(string sql, CancellationToken ct = default)
-    {
-        var instr = typeof(TResult) == typeof(int) ? InstructionSql.NonQuery(sql) : InstructionSql.Scalar(sql);
-        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(Service, instr, ct);
-    }
+    public static Task<int> Execute(
+        string sql,
+        DataOperationEffect effect,
+        object? parameters = null,
+        CancellationToken ct = default)
+        => DataServiceExecuteExtensions.Execute<TEntity, int>(
+            Service,
+            InstructionSql.NonQuery(sql, effect, parameters),
+            ct);
 
-    public static Task<TResult> Execute<TResult>(string sql, IDataService data, object? parameters = null, CancellationToken ct = default)
-    {
-        var instr = typeof(TResult) == typeof(int) ? InstructionSql.NonQuery(sql, parameters) : InstructionSql.Scalar(sql, parameters);
-        return DataServiceExecuteExtensions.Execute<TEntity, TResult>(data, instr, ct);
-    }
+    public static Task<int> Execute(
+        string sql,
+        DataOperationEffect effect,
+        IDataService data,
+        object? parameters = null,
+        CancellationToken ct = default)
+        => DataServiceExecuteExtensions.Execute<TEntity, int>(
+            data,
+            InstructionSql.NonQuery(sql, effect, parameters),
+            ct);
 
 
     // ------------------------------------------------------------------
-    // Partition migration helpers (copy/move/clear/replace) + fluent builder
+    // Bounded cross-context movement
     // ------------------------------------------------------------------
-    public static Task<int> ClearPartition(string partition, CancellationToken ct = default)
-        => Delete(static _ => true, partition, ct);
-
-    public static async Task<int> CopyPartition(
-        string fromPartition, string toPartition,
-        Expression<Func<TEntity, bool>>? predicate = null,
-        Func<TEntity, TEntity>? map = null, int batchSize = 500, CancellationToken ct = default)
-    {
-        if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
-        using var _from = WithPartition(fromPartition);
-        var query = predicate is null ? QueryDefinition.All : QueryDefinition.All.Where(Lower(predicate));
-        var source = (await QueryWithCount(query, ct)).Items;
-        if (source.Count == 0) return 0;
-        var total = 0;
-        foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
-        {
-            ct.ThrowIfCancellationRequested();
-            var items = map is null ? chunk : chunk.Select(map).ToArray();
-            using var _to = WithPartition(toPartition);
-            total += await Repo.UpsertMany(items, ct);
-        }
-        return total;
-    }
-
-    public static async Task<int> MovePartition(
-        string fromPartition, string toPartition,
-        Expression<Func<TEntity, bool>>? predicate = null,
-        Func<TEntity, TEntity>? map = null, int batchSize = 500, CancellationToken ct = default)
-    {
-        if (string.Equals(fromPartition, toPartition, StringComparison.Ordinal)) return 0;
-        using var _from = WithPartition(fromPartition);
-        var query = predicate is null ? QueryDefinition.All : QueryDefinition.All.Where(Lower(predicate));
-        var source = (await QueryWithCount(query, ct)).Items;
-        if (source.Count == 0) return 0;
-        var total = 0;
-        foreach (var chunk in source.Chunk(Math.Max(1, batchSize)))
-        {
-            ct.ThrowIfCancellationRequested();
-            var items = map is null ? chunk : chunk.Select(map).ToArray();
-            using (WithPartition(toPartition)) total += await Repo.UpsertMany(items, ct);
-            using (WithPartition(fromPartition)) await Repo.DeleteMany(items.Select(e => e.Id), ct);
-        }
-        return total;
-    }
-
-    public static async Task<int> ReplacePartition(
-        string targetPartition, IEnumerable<TEntity> items, int batchSize = 500, CancellationToken ct = default)
-    {
-        await ClearPartition(targetPartition, ct);
-        var total = 0;
-        foreach (var chunk in items.Chunk(Math.Max(1, batchSize)))
-        {
-            using var _ = WithPartition(targetPartition);
-            total += await Repo.UpsertMany(chunk, ct);
-        }
-        return total;
-    }
-
-    public static PartitionMoveBuilder<TEntity, TKey> MoveFrom(string fromPartition) => new(fromPartition);
+    public static CopyTransferBuilder<TEntity, TKey> Copy() => new(null);
+    public static CopyTransferBuilder<TEntity, TKey> Copy(Expression<Func<TEntity, bool>> predicate)
+        => new(predicate ?? throw new ArgumentNullException(nameof(predicate)));
+    public static MoveTransferBuilder<TEntity, TKey> Move() => new(null);
+    public static MoveTransferBuilder<TEntity, TKey> Move(Expression<Func<TEntity, bool>> predicate)
+        => new(predicate ?? throw new ArgumentNullException(nameof(predicate)));
+    public static MirrorTransferBuilder<TEntity, TKey> Mirror(MirrorMode mode = MirrorMode.Push)
+        => new(mode, null);
+    public static MirrorTransferBuilder<TEntity, TKey> Mirror(
+        Expression<Func<TEntity, bool>> predicate,
+        MirrorMode mode = MirrorMode.Push)
+        => new(mode, predicate ?? throw new ArgumentNullException(nameof(predicate)));
 
     private sealed class NoOpDisposable : IDisposable
     {

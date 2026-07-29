@@ -1,61 +1,72 @@
-using System.Linq;
+using Koan.Core.Composition;
+using Koan.Core.Hosting.App;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Abstractions.Pipeline;
 
-/// <summary>
-/// The boot-time index of <see cref="OperationOverrideDescriptor"/>s (ARCH-0101 §4 — the operation-semantics override
-/// plane). A cross-cutting module (e.g. <c>Koan.Data.SoftDelete</c>) registers its override from its
-/// <c>KoanModule</c> (Reference = Intent); the data core's <c>RepositoryFacade</c> reads it generically at the
-/// delete chokepoint and never names the axis.
-///
-/// <para>Deliberate static index (not DI) — the same declared deviation as <c>ManagedFieldRegistry</c> / DATA-0105 §4.
-/// <b>Off = structurally absent:</b> when no module registers, <see cref="IsEmpty"/> is <c>true</c> and the facade's
-/// delete paths are byte-identical (physical remove).</para>
-/// </summary>
+/// <summary>Host-owned operation overrides behind Koan's terse composition facade.</summary>
 public static class OperationOverrideRegistry
 {
-    private static readonly object _gate = new();
-    private static readonly List<OperationOverrideDescriptor> _descriptors = new();
-    private static volatile bool _isEmpty = true;
+    public static bool IsEmpty => Current()?.IsEmpty ?? true;
 
-    /// <summary>Whether no override is registered — the hot-path off gate. Cheap volatile read.</summary>
-    public static bool IsEmpty => _isEmpty;
-
-    /// <summary>Register an operation override. Boot-only. Idempotent by <see cref="OperationOverrideDescriptor.Field"/>.</summary>
     public static void Register(OperationOverrideDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        lock (_gate)
-        {
-            if (_descriptors.Any(d => string.Equals(d.Field, descriptor.Field, StringComparison.Ordinal))) return;
-            _descriptors.Add(descriptor);
-            _isEmpty = false;
-        }
+        Composition().Register(descriptor);
     }
 
-    /// <summary>
-    /// The single delete override governing <paramref name="entityType"/>, or <c>null</c> when none applies. (Soft-delete
-    /// registers one; a second delete-override on the same type would be a misconfiguration — the first wins.)
-    /// </summary>
     public static OperationOverrideDescriptor? ForDelete(Type entityType)
     {
         ArgumentNullException.ThrowIfNull(entityType);
-        if (_isEmpty) return null;
-        lock (_gate)
-        {
-            foreach (var d in _descriptors)
-                if (d.AppliesTo(entityType)) return d;
-        }
-        return null;
+        return Current()?.ForDelete(entityType);
     }
 
-    /// <summary>Test-support: clear all registrations (mirrors <c>ManagedFieldRegistry.Reset</c>).</summary>
-    public static void Reset()
+    public static void Reset() => Current()?.Reset();
+
+    private static OperationOverrideCatalog Composition()
     {
-        lock (_gate)
+        var services = KoanCompositionScope.RequireServices("Data operation-override registration");
+        var catalog = services.Where(static descriptor => descriptor.ServiceType == typeof(OperationOverrideCatalog))
+            .Select(static descriptor => descriptor.ImplementationInstance).OfType<OperationOverrideCatalog>().LastOrDefault();
+        if (catalog is not null) return catalog;
+        catalog = new OperationOverrideCatalog();
+        services.AddSingleton(catalog);
+        return catalog;
+    }
+
+    private static OperationOverrideCatalog? Current()
+    {
+        if (KoanCompositionScope.TryGetServices(out var services))
+            return services.Where(static descriptor => descriptor.ServiceType == typeof(OperationOverrideCatalog))
+                .Select(static descriptor => descriptor.ImplementationInstance).OfType<OperationOverrideCatalog>().LastOrDefault();
+        return AppHost.Current?.GetService(typeof(OperationOverrideCatalog)) as OperationOverrideCatalog;
+    }
+
+    internal sealed class OperationOverrideCatalog
+    {
+        private readonly object _gate = new();
+        private volatile OperationOverrideDescriptor[] _snapshot = [];
+        public bool IsEmpty => _snapshot.Length == 0;
+
+        public void Register(OperationOverrideDescriptor descriptor)
         {
-            _descriptors.Clear();
-            _isEmpty = true;
+            lock (_gate)
+            {
+                if (_snapshot.Any(item => string.Equals(item.Field, descriptor.Field, StringComparison.Ordinal))) return;
+                _snapshot = [.. _snapshot, descriptor];
+            }
+        }
+
+        public OperationOverrideDescriptor? ForDelete(Type type)
+        {
+            foreach (var descriptor in _snapshot)
+                if (descriptor.AppliesTo(type)) return descriptor;
+            return null;
+        }
+
+        public void Reset()
+        {
+            lock (_gate) _snapshot = [];
         }
     }
 }

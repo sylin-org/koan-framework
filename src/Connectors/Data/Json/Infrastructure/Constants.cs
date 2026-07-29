@@ -5,6 +5,7 @@ public static class Constants
     public static class Provider
     {
         public const string Name = "json";
+        public const int MaximumFilesPerRepository = 1024;
     }
 
     public static class Configuration

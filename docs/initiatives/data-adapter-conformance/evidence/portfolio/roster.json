@@ -1,0 +1,735 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-28T01:37:38.0591742Z",
+  "discoveryExposure": {
+    "sequence": 1,
+    "recordHash": "61a709900f0c051f5588229f89872934e686b5b9f58178d96e20c73b6abf65a4",
+    "timestamp": "2026-07-28T00:42:00.7702030Z"
+  },
+  "source": {
+    "baseCommit": "86c18819cf03160c20a001d91f3bd2f257fd1a0d",
+    "dirty": true,
+    "primer": "docs/architecture/data-adapter-development-primer.md",
+    "primerSha256": "68a65d762d3facc0561eb92107020c4b21f7800bf0ea46f01b09c8ef20650382",
+    "primerCatalogIds": 81,
+    "sdk": "10.0.302",
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "architecture": "x64",
+    "dockerCli": true,
+    "dockerDaemon": true
+  },
+  "counts": {
+    "adapters": 16,
+    "entityPersistence": 9,
+    "vector": 7,
+    "hybrid": 0,
+    "families": 5
+  },
+  "adapters": [
+    {
+      "id": "cockroach",
+      "provider": "Cockroach",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Cockroach\\Koan.Data.Connector.Cockroach.csproj",
+      "package": "Sylin.Koan.Data.Connector.Cockroach",
+      "inSolution": true,
+      "projectHash": "bcadb354fc48a6b283fc0be70b3f7185ccd0467a6523b720fb032850a0502064",
+      "modules": [
+        "src\\Connectors\\Data\\Cockroach\\Initialization\\CockroachDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Cockroach\\CockroachAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Relational.Npgsql"
+      ],
+      "frameworkProjects": [],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Cockroach\\Koan.Data.Connector.Cockroach.Tests\\Koan.Data.Connector.Cockroach.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.Cockroach\\Koan.Data.Connector.Cockroach.Tests\\Koan.Data.Connector.Cockroach.Tests.csproj",
+        "tests\\Suites\\Data\\Relational\\Koan.Data.Relational.Tests\\Koan.Data.Relational.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Cockroach\\README.md",
+        "src\\Connectors\\Data\\Cockroach\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "cockroachdb-data-provider"
+      ]
+    },
+    {
+      "id": "couchbase",
+      "provider": "Couchbase",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Couchbase\\Koan.Data.Connector.Couchbase.csproj",
+      "package": "Sylin.Koan.Data.Connector.Couchbase",
+      "inSolution": true,
+      "projectHash": "0d5cbe3b5c7ee504fdb676bf6724f63d9f7bc5b6b33723a2370d84e711b921c8",
+      "modules": [
+        "src\\Connectors\\Data\\Couchbase\\Initialization\\CouchbaseDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Couchbase\\CouchbaseAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Core.Document"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Couchbase\\Koan.Data.Connector.Couchbase.Tests\\Koan.Data.Connector.Couchbase.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.Couchbase\\Koan.Data.Connector.Couchbase.Tests\\Koan.Data.Connector.Couchbase.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\Couchbase\\CouchbaseDocumentStore.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\Couchbase\\README.md",
+        "src\\Connectors\\Data\\Couchbase\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "couchbase-data-provider"
+      ]
+    },
+    {
+      "id": "elasticsearch",
+      "provider": "ElasticSearch",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\ElasticSearch\\Koan.Data.Connector.ElasticSearch.csproj",
+      "package": "Sylin.Koan.Data.Connector.ElasticSearch",
+      "inSolution": true,
+      "projectHash": "0487b57828bea4dbd2c5daa843249a4884bef727acd687124359a1aa520d7bd4",
+      "modules": [
+        "src\\Connectors\\Data\\ElasticSearch\\Initialization\\ElasticSearchDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\ElasticSearch\\ElasticSearchVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.SearchEngine"
+      ],
+      "frameworkProjects": [
+        "Koan.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.ElasticSearch.Tests\\Koan.Data.VectorAdapterSurface.ElasticSearch.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.ElasticSearch.Tests\\Koan.Data.VectorAdapterSurface.ElasticSearch.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\ElasticSearch\\README.md",
+        "src\\Connectors\\Data\\ElasticSearch\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "search-engine-vector-providers"
+      ]
+    },
+    {
+      "id": "inmemory",
+      "provider": "InMemory",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\InMemory\\Koan.Data.Connector.InMemory.csproj",
+      "package": "Sylin.Koan.Data.Connector.InMemory",
+      "inSolution": true,
+      "projectHash": "73200b258a1e8bbd5aa0fce6ac23939429a0f15725a3b4e1959e72026950f5ac",
+      "modules": [
+        "src\\Connectors\\Data\\InMemory\\Initialization\\InMemoryDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\InMemory\\InMemoryAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Core.KeyValue"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.InMemory\\Koan.Data.Connector.InMemory.Tests\\Koan.Data.Connector.InMemory.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\AI\\Koan.Data.AI.Tests\\Koan.Data.AI.Tests.csproj",
+        "tests\\Suites\\Data\\Backup\\Koan.Data.Backup.Tests\\Koan.Data.Backup.Tests.csproj",
+        "tests\\Suites\\Data\\Connector.InMemory\\Koan.Data.Connector.InMemory.Tests\\Koan.Data.Connector.InMemory.Tests.csproj",
+        "tests\\Suites\\Data\\Core\\Koan.Tests.Data.Core\\Koan.Tests.Data.Core.csproj",
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.InMemory.Tests\\Koan.Data.VectorAdapterSurface.InMemory.Tests.csproj",
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\InMemory\\InMemoryRepository.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\InMemory\\README.md",
+        "src\\Connectors\\Data\\InMemory\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "local-data-providers"
+      ]
+    },
+    {
+      "id": "json",
+      "provider": "Json",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Json\\Koan.Data.Connector.Json.csproj",
+      "package": "Sylin.Koan.Data.Connector.Json",
+      "inSolution": true,
+      "projectHash": "b0acd7b4c9df4de06047b1c38e0c63cd4aff9d92b7f9ce13ab81abe2b6f2a4a2",
+      "modules": [
+        "src\\Connectors\\Data\\Json\\Initialization\\JsonModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Json\\JsonAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Core.KeyValue"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Json\\Koan.Data.Connector.Json.Tests\\Koan.Data.Connector.Json.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Backup\\Koan.Data.Backup.Tests\\Koan.Data.Backup.Tests.csproj",
+        "tests\\Suites\\Data\\Connector.Json\\Koan.Data.Connector.Json.Tests\\Koan.Data.Connector.Json.Tests.csproj",
+        "tests\\Suites\\Data\\Core\\Koan.Tests.Data.Core\\Koan.Tests.Data.Core.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\Json\\JsonRepository.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\Json\\README.md",
+        "src\\Connectors\\Data\\Json\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "local-data-providers"
+      ]
+    },
+    {
+      "id": "mongodb",
+      "provider": "Mongo",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Mongo\\Koan.Data.Connector.Mongo.csproj",
+      "package": "Sylin.Koan.Data.Connector.Mongo",
+      "inSolution": true,
+      "projectHash": "613d733f98d46fbd74efa3965c0268982d293cb26849271fd30f17ed0fe9181a",
+      "modules": [
+        "src\\Connectors\\Data\\Mongo\\Initialization\\MongoModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Mongo\\MongoAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Core.Document"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Mongo\\Koan.Data.Connector.Mongo.Tests\\Koan.Data.Connector.Mongo.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.Mongo\\Koan.Data.Connector.Mongo.Tests\\Koan.Data.Connector.Mongo.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\Mongo\\MongoDocumentStore.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\Mongo\\README.md",
+        "src\\Connectors\\Data\\Mongo\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "mongodb-data-provider"
+      ]
+    },
+    {
+      "id": "opensearch",
+      "provider": "OpenSearch",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\OpenSearch\\Koan.Data.Connector.OpenSearch.csproj",
+      "package": "Sylin.Koan.Data.Connector.OpenSearch",
+      "inSolution": true,
+      "projectHash": "4a9e97d6379a5d865620631902fd9a34982e9b163596ac560bdbd68768a7ea49",
+      "modules": [
+        "src\\Connectors\\Data\\OpenSearch\\Initialization\\OpenSearchDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\OpenSearch\\OpenSearchVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.SearchEngine"
+      ],
+      "frameworkProjects": [
+        "Koan.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.OpenSearch.Tests\\Koan.Data.VectorAdapterSurface.OpenSearch.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.OpenSearch.Tests\\Koan.Data.VectorAdapterSurface.OpenSearch.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\OpenSearch\\README.md",
+        "src\\Connectors\\Data\\OpenSearch\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "search-engine-vector-providers"
+      ]
+    },
+    {
+      "id": "postgres",
+      "provider": "Postgres",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Postgres\\Koan.Data.Connector.Postgres.csproj",
+      "package": "Sylin.Koan.Data.Connector.Postgres",
+      "inSolution": true,
+      "projectHash": "deed9727282e3d28f03aad8d57415f6819873406896b4f1d00f76aac728e4004",
+      "modules": [
+        "src\\Connectors\\Data\\Postgres\\Initialization\\PostgresDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Postgres\\PostgresAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Relational",
+        "Koan.Data.Relational.Npgsql"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Postgres\\Koan.Data.Connector.Postgres.Tests\\Koan.Data.Connector.Postgres.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.Postgres\\Koan.Data.Connector.Postgres.Tests\\Koan.Data.Connector.Postgres.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Postgres\\README.md",
+        "src\\Connectors\\Data\\Postgres\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "postgresql-data-provider"
+      ]
+    },
+    {
+      "id": "redis",
+      "provider": "Redis",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Redis\\Koan.Data.Connector.Redis.csproj",
+      "package": "Sylin.Koan.Data.Connector.Redis",
+      "inSolution": true,
+      "projectHash": "a1c46eb16c63fc97b8a43404ee7df538e45ebd3c9010f0563b82173a0250347f",
+      "modules": [
+        "src\\Connectors\\Data\\Redis\\Initialization\\RedisDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Redis\\RedisAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Core.KeyValue"
+      ],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Redis\\Koan.Data.Connector.Redis.Tests\\Koan.Data.Connector.Redis.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.Redis\\Koan.Data.Connector.Redis.Tests\\Koan.Data.Connector.Redis.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\Redis\\RedisRepository.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\Redis\\README.md",
+        "src\\Connectors\\Data\\Redis\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "redis-data-provider"
+      ]
+    },
+    {
+      "id": "sqlite",
+      "provider": "Sqlite",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\Sqlite\\Koan.Data.Connector.Sqlite.csproj",
+      "package": "Sylin.Koan.Data.Connector.Sqlite",
+      "inSolution": true,
+      "projectHash": "af675b695dc6344c3bb8b7c98a3ed750667619dbcb11cbb5e5125a25902a2e06",
+      "modules": [
+        "src\\Connectors\\Data\\Sqlite\\Initialization\\SqliteModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Sqlite\\SqliteAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Relational"
+      ],
+      "frameworkProjects": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Sqlite\\Koan.Data.Connector.Sqlite.Tests\\Koan.Data.Connector.Sqlite.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Axes\\Koan.Data.Axes.Integration.Tests\\Koan.Data.Axes.Integration.Tests.csproj",
+        "tests\\Suites\\Data\\Backup\\Koan.Data.Backup.Tests\\Koan.Data.Backup.Tests.csproj",
+        "tests\\Suites\\Data\\Connector.Sqlite\\Koan.Data.Connector.Sqlite.Tests\\Koan.Data.Connector.Sqlite.Tests.csproj",
+        "tests\\Suites\\Data\\Core\\Koan.Tests.Data.Core\\Koan.Tests.Data.Core.csproj",
+        "tests\\Suites\\Data\\SoftDelete\\Koan.Data.SoftDelete.Tests\\Koan.Data.SoftDelete.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\Sqlite\\SqliteRepository.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\Sqlite\\README.md",
+        "src\\Connectors\\Data\\Sqlite\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "sqlite-data-foundation"
+      ]
+    },
+    {
+      "id": "sqlserver",
+      "provider": "SqlServer",
+      "plane": "entity-persistence",
+      "project": "src\\Connectors\\Data\\SqlServer\\Koan.Data.Connector.SqlServer.csproj",
+      "package": "Sylin.Koan.Data.Connector.SqlServer",
+      "inSolution": true,
+      "projectHash": "4849322273c13202ffcc3bde3345818cb1825d0d5e267481fea9db89490a583f",
+      "modules": [
+        "src\\Connectors\\Data\\SqlServer\\Initialization\\SqlServerDataModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\SqlServer\\SqlServerAdapterFactory.cs"
+      ],
+      "familyProjects": [
+        "Koan.Data.Relational"
+      ],
+      "frameworkProjects": [
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.SqlServer\\Koan.Data.Connector.SqlServer.Tests\\Koan.Data.Connector.SqlServer.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Connector.SqlServer\\Koan.Data.Connector.SqlServer.Tests\\Koan.Data.Connector.SqlServer.Tests.csproj"
+      ],
+      "capabilitySources": [
+        "src\\Connectors\\Data\\SqlServer\\SqlServerRepository.cs"
+      ],
+      "docs": [
+        "src\\Connectors\\Data\\SqlServer\\README.md",
+        "src\\Connectors\\Data\\SqlServer\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "sqlserver-data-provider"
+      ]
+    },
+    {
+      "id": "vector-inmemory",
+      "provider": "InMemory",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\Vector\\InMemory\\Koan.Data.Vector.Connector.InMemory.csproj",
+      "package": "Sylin.Koan.Data.Vector.Connector.InMemory",
+      "inSolution": true,
+      "projectHash": "7a869aabdacb1370708cd2e4887ba421c0eebf19b1e51946aa0998bda56fcdcc",
+      "modules": [
+        "src\\Connectors\\Data\\Vector\\InMemory\\Initialization\\InMemoryVectorModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Vector\\InMemory\\InMemoryVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.InMemory.Tests\\Koan.Data.VectorAdapterSurface.InMemory.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\AI\\Koan.Data.AI.Tests\\Koan.Data.AI.Tests.csproj",
+        "tests\\Suites\\Data\\Axes\\Koan.Data.Axes.Integration.Tests\\Koan.Data.Axes.Integration.Tests.csproj",
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.InMemory.Tests\\Koan.Data.VectorAdapterSurface.InMemory.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Vector\\InMemory\\README.md",
+        "src\\Connectors\\Data\\Vector\\InMemory\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "local-vector-providers"
+      ]
+    },
+    {
+      "id": "milvus",
+      "provider": "Milvus",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\Vector\\Milvus\\Koan.Data.Vector.Connector.Milvus.csproj",
+      "package": "Sylin.Koan.Data.Vector.Connector.Milvus",
+      "inSolution": true,
+      "projectHash": "e5677f412a00bde0cd8c047106c6bbf027ccd5d2dd20155adb78b4c9efd4c110",
+      "modules": [
+        "src\\Connectors\\Data\\Vector\\Milvus\\Initialization\\MilvusVectorModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Vector\\Milvus\\MilvusVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Milvus.Tests\\Koan.Data.VectorAdapterSurface.Milvus.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Milvus.Tests\\Koan.Data.VectorAdapterSurface.Milvus.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Vector\\Milvus\\README.md",
+        "src\\Connectors\\Data\\Vector\\Milvus\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "external-vector-providers"
+      ]
+    },
+    {
+      "id": "qdrant",
+      "provider": "Qdrant",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\Vector\\Qdrant\\Koan.Data.Vector.Connector.Qdrant.csproj",
+      "package": "Sylin.Koan.Data.Vector.Connector.Qdrant",
+      "inSolution": true,
+      "projectHash": "a561cdf3b6a2be8adb07d5a111e004953f9cfff9cbd179471d9307077be1a1dc",
+      "modules": [
+        "src\\Connectors\\Data\\Vector\\Qdrant\\Initialization\\QdrantVectorModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Vector\\Qdrant\\QdrantVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Qdrant.Tests\\Koan.Data.VectorAdapterSurface.Qdrant.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Core\\Koan.Tests.Data.Core\\Koan.Tests.Data.Core.csproj",
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Qdrant.Tests\\Koan.Data.VectorAdapterSurface.Qdrant.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Vector\\Qdrant\\README.md",
+        "src\\Connectors\\Data\\Vector\\Qdrant\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "external-vector-providers"
+      ]
+    },
+    {
+      "id": "sqlitevec",
+      "provider": "SqliteVec",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\Vector\\SqliteVec\\Koan.Data.Vector.Connector.SqliteVec.csproj",
+      "package": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
+      "inSolution": true,
+      "projectHash": "d37b031370e0d782ca395545317cfab278d4ea81ce30fa1f1cfcbc363eaa3c3d",
+      "modules": [
+        "src\\Connectors\\Data\\Vector\\SqliteVec\\Initialization\\SqliteVectorModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Vector\\SqliteVec\\SqliteVecAdapterFactory.cs"
+      ],
+      "familyProjects": [],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\Axes\\Koan.Data.Axes.Integration.Tests\\Koan.Data.Axes.Integration.Tests.csproj",
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests\\Koan.Data.VectorAdapterSurface.SqliteVec.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Vector\\SqliteVec\\README.md",
+        "src\\Connectors\\Data\\Vector\\SqliteVec\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "local-vector-providers"
+      ]
+    },
+    {
+      "id": "weaviate",
+      "provider": "Weaviate",
+      "plane": "vector",
+      "project": "src\\Connectors\\Data\\Vector\\Weaviate\\Koan.Data.Vector.Connector.Weaviate.csproj",
+      "package": "Sylin.Koan.Data.Vector.Connector.Weaviate",
+      "inSolution": true,
+      "projectHash": "7470d804819f3b198be78e9b04f71548cee07f9b8e62d31e7ec460530c420618",
+      "modules": [
+        "src\\Connectors\\Data\\Vector\\Weaviate\\Initialization\\WeaviateVectorModule.cs"
+      ],
+      "factories": [
+        "src\\Connectors\\Data\\Vector\\Weaviate\\WeaviateVectorAdapterFactory.cs"
+      ],
+      "familyProjects": [],
+      "frameworkProjects": [
+        "Koan.Core",
+        "Koan.Data.Abstractions",
+        "Koan.Data.Core",
+        "Koan.Data.Vector",
+        "Koan.Data.Vector.Abstractions"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Weaviate.Tests\\Koan.Data.VectorAdapterSurface.Weaviate.Tests.csproj"
+      ],
+      "testConsumers": [
+        "tests\\Suites\\Data\\VectorAdapterSurface\\Koan.Data.VectorAdapterSurface.Weaviate.Tests\\Koan.Data.VectorAdapterSurface.Weaviate.Tests.csproj"
+      ],
+      "capabilitySources": [],
+      "docs": [
+        "src\\Connectors\\Data\\Vector\\Weaviate\\README.md",
+        "src\\Connectors\\Data\\Vector\\Weaviate\\TECHNICAL.md"
+      ],
+      "productClaims": [
+        "external-vector-providers"
+      ]
+    }
+  ],
+  "families": [
+    {
+      "id": "core-document",
+      "name": "Koan.Data.Core.Document",
+      "project": null,
+      "sourceRoot": "src\\Koan.Data.Core\\Document",
+      "factories": [],
+      "modules": [],
+      "tests": [],
+      "consumers": [
+        "couchbase",
+        "mongodb"
+      ]
+    },
+    {
+      "id": "core-keyvalue",
+      "name": "Koan.Data.Core.KeyValue",
+      "project": null,
+      "sourceRoot": "src\\Koan.Data.Core\\KeyValue",
+      "factories": [],
+      "modules": [],
+      "tests": [],
+      "consumers": [
+        "inmemory",
+        "json",
+        "redis"
+      ]
+    },
+    {
+      "id": "relational",
+      "name": "Koan.Data.Relational",
+      "project": "src\\Koan.Data.Relational\\Koan.Data.Relational.csproj",
+      "sourceRoot": "src\\Koan.Data.Relational",
+      "factories": [],
+      "modules": [
+        "src\\Koan.Data.Relational\\Initialization\\RelationalModule.cs"
+      ],
+      "tests": [
+        "tests\\Suites\\Data\\Connector.Cockroach\\Koan.Data.Connector.Cockroach.Tests\\Koan.Data.Connector.Cockroach.Tests.csproj",
+        "tests\\Suites\\Data\\Connector.Postgres\\Koan.Data.Connector.Postgres.Tests\\Koan.Data.Connector.Postgres.Tests.csproj",
+        "tests\\Suites\\Data\\Connector.SqlServer\\Koan.Data.Connector.SqlServer.Tests\\Koan.Data.Connector.SqlServer.Tests.csproj",
+        "tests\\Suites\\Data\\Relational\\Koan.Data.Relational.Tests\\Koan.Data.Relational.Tests.csproj"
+      ],
+      "consumers": [
+        "postgres",
+        "sqlite",
+        "sqlserver"
+      ]
+    },
+    {
+      "id": "relational-npgsql",
+      "name": "Koan.Data.Relational.Npgsql",
+      "project": "src\\Koan.Data.Relational.Npgsql\\Koan.Data.Relational.Npgsql.csproj",
+      "sourceRoot": "src\\Koan.Data.Relational.Npgsql",
+      "factories": [],
+      "modules": [],
+      "tests": [
+        "tests\\Suites\\Data\\Relational\\Koan.Data.Relational.Tests\\Koan.Data.Relational.Tests.csproj"
+      ],
+      "consumers": [
+        "cockroach",
+        "postgres"
+      ]
+    },
+    {
+      "id": "searchengine",
+      "name": "Koan.Data.SearchEngine",
+      "project": "src\\Koan.Data.SearchEngine\\Koan.Data.SearchEngine.csproj",
+      "sourceRoot": "src\\Koan.Data.SearchEngine",
+      "factories": [
+        "src\\Koan.Data.SearchEngine\\SearchEngineConnectorMechanics.cs"
+      ],
+      "modules": [],
+      "tests": [],
+      "consumers": [
+        "elasticsearch",
+        "opensearch"
+      ]
+    }
+  ],
+  "adjacency": {
+    "excluded": [
+      {
+        "area": "cache",
+        "reason": "separate Koan.Cache adapter contract"
+      },
+      {
+        "area": "ai",
+        "reason": "Koan.Data.AI is not a storage adapter"
+      }
+    ]
+  }
+}

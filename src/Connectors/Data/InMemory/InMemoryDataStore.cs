@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Koan.Data.Core.KeyValue;
+using Koan.Data.Connector.InMemory.Infrastructure;
 
 namespace Koan.Data.Connector.InMemory;
 
@@ -13,7 +14,8 @@ namespace Koan.Data.Connector.InMemory;
 /// </summary>
 internal sealed class InMemoryDataStore
 {
-    private readonly ConcurrentDictionary<StoreKey, object> _stores = new();
+    private readonly ConcurrentDictionary<StoreKey, Lazy<object>> _stores = new();
+    private int _storeCount;
 
     /// <summary>
     /// Gets or creates a thread-safe store for the specified routed source, entity type, and partition.
@@ -23,10 +25,24 @@ internal sealed class InMemoryDataStore
         where TKey : notnull
     {
         var key = new StoreKey(source, typeof(TEntity), partition);
-        return (ConcurrentDictionary<TKey, KvRecord<TEntity>>)_stores.GetOrAdd(
+        var store = _stores.GetOrAdd(
             key,
-            _ => new ConcurrentDictionary<TKey, KvRecord<TEntity>>()
-        );
+            _ => new Lazy<object>(
+                CreateStore<TEntity, TKey>,
+                LazyThreadSafetyMode.ExecutionAndPublication));
+        return (ConcurrentDictionary<TKey, KvRecord<TEntity>>)store.Value;
+    }
+
+    private object CreateStore<TEntity, TKey>()
+        where TEntity : class
+        where TKey : notnull
+    {
+        var count = Interlocked.Increment(ref _storeCount);
+        if (count <= Constants.Provider.MaximumStoresPerHost)
+            return new ConcurrentDictionary<TKey, KvRecord<TEntity>>();
+        Interlocked.Decrement(ref _storeCount);
+        throw new InvalidOperationException(
+            $"InMemory reached the host bound of {Constants.Provider.MaximumStoresPerHost} source/type/partition stores.");
     }
 
     private readonly record struct StoreKey(string Source, Type EntityType, string Partition);

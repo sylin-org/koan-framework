@@ -81,3 +81,34 @@ The meta-suite proves positive batteries, trait gating, a deliberately failing p
 provider selection, host-owner preservation, and concurrent same-Entity specifications resolving
 distinct hosts through generated module composition. TaskGraph provides an application-level consumer
 proof using the one-method inheritance grammar.
+
+## Data adapter conformance protocol
+
+The Data Adapter Development Primer is the semantic authority. `scripts/forge-verify.ps1 -CatalogOnly` parses its 105
+stable IDs, evidence conjunctions, and 27 applicability profiles into the embedded
+`Conformance/data-conformance-catalog.json`; the generated resource is a projection, not a manually maintained second
+catalog. Startup validation rejects a missing cell, duplicate ID, unknown evidence kind, unknown profile reference, or
+stale protocol identity.
+
+`DataConformanceManifest` records Observed, Target, and Declined profile claims. `Source Core` is automatic; runtime
+`DataCaps` map through a registry whose completeness is reflection-tested; every omitted optional profile becomes an
+explicit unproved decline. `DataConformancePacket.Compile` expands positive claims into exact
+`<Acceptance ID>/<Case>/<Owner>` rows, computes verdicts from their required evidence, sorts every collection, embeds
+the primer/catalog fingerprints, and records owner/source/tool/profile/fixture dependencies. Artifact references must
+be repository-relative and traversal-free.
+
+`DataConformancePacket.Validate` independently recomputes row verdicts and distinguishes:
+
+- `Pass` / exit 0: all selected evidence and corrective decline proofs pass;
+- `Red` / exit 1: behavioral failure, unsupported path without corrective proof, or false advertised claim;
+- `Deferred` / exit 2: an explicit blocker or deferred evidence;
+- `Error` / exit 3: malformed, incomplete, duplicated, unresolved, or stale protocol data;
+- `Infrastructure` / exit 4: required live evidence could not run against the provider.
+
+`DataAdapterConformanceSpecs` is the reusable 105-case xUnit projection. Strict Forge invokes the same C# validator at
+the process boundary and only classifies its stable status marker; packet rules are not reimplemented in PowerShell.
+
+`DataScenarioCatalog` is the shared fault/lifecycle module inventory. Each definition names its stable acceptance
+cells and whether it needs a live provider, second host, restart, or minimum operation count. Provider fixtures supply
+mechanics and receipts without redefining applicability. `DataBenchmarkRunner` captures the four P-05 measurements
+for a pinned `DataBenchmarkFixture`; it emits observations and never owns cross-provider thresholds.

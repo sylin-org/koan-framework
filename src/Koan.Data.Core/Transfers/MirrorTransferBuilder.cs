@@ -1,236 +1,216 @@
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Diagnostics;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
-using TimestampAttribute = Koan.Data.Abstractions.Annotations.TimestampAttribute;
 
 namespace Koan.Data.Core.Transfers;
 
-public sealed class MirrorTransferBuilder<TEntity, TKey> : EntityTransferBuilderBase<TEntity, TKey, MirrorTransferBuilder<TEntity, TKey>>
+public sealed class MirrorTransferBuilder<TEntity, TKey>
+    : EntityTransferBuilderBase<TEntity, TKey, MirrorTransferBuilder<TEntity, TKey>>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
     private readonly MirrorMode _mode;
+    private MirrorConflict _conflict = MirrorConflict.Latest;
 
-    internal MirrorTransferBuilder(MirrorMode mode, Expression<Func<TEntity, bool>>? predicate, Func<IQueryable<TEntity>, IQueryable<TEntity>>? queryShaper)
-        : base(predicate, queryShaper)
+    internal MirrorTransferBuilder(MirrorMode mode, Expression<Func<TEntity, bool>>? predicate)
+        : base(predicate)
+        => _mode = mode;
+
+    public MirrorTransferBuilder<TEntity, TKey> Conflict(MirrorConflict policy)
     {
-        _mode = mode;
+        _conflict = policy;
+        return this;
     }
 
-    public async Task<TransferResult<TKey>> Run(CancellationToken cancellationToken = default)
+    public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
-        if (ToContext is null)
-            throw new InvalidOperationException("Destination context must be specified via To().");
-
-        var stopwatch = Stopwatch.StartNew();
-        var audit = new List<TransferAuditBatch>();
-        var batchCounter = 0;
-        var totalProcessed = 0;
-        var conflicts = new List<TransferConflict<TKey>>();
-
-        int readCount;
-        int copied;
-
-        switch (_mode)
+        DemandDestination();
+        if (HasSameContext())
+            return Complete(TransferKind.Mirror, 0, 0, 0, new TransferProgress());
+        return _mode switch
         {
-            case MirrorMode.Push:
-            {
-                var items = await FetchEntities(FromContext, cancellationToken);
-                readCount = items.Count;
-                var pushProgress = await UpsertBatches(
-                    items,
-                    FromContext,
-                    ToContext,
-                    TransferKind.Mirror,
-                    stopwatch,
-                    audit,
-                    cancellationToken,
-                    batchCounter,
-                    totalProcessed);
-                copied = pushProgress.Copied;
-                batchCounter = pushProgress.BatchCounter;
-                totalProcessed = pushProgress.TotalProcessed;
-                break;
-            }
-            case MirrorMode.Pull:
-            {
-                var items = await FetchEntities(ToContext, cancellationToken);
-                readCount = items.Count;
-                var pullProgress = await UpsertBatches(
-                    items,
-                    ToContext,
-                    FromContext,
-                    TransferKind.Mirror,
-                    stopwatch,
-                    audit,
-                    cancellationToken,
-                    batchCounter,
-                    totalProcessed);
-                copied = pullProgress.Copied;
-                batchCounter = pullProgress.BatchCounter;
-                totalProcessed = pullProgress.TotalProcessed;
-                break;
-            }
-            case MirrorMode.Bidirectional:
-            {
-                var sourceItems = await FetchEntities(FromContext, cancellationToken);
-                var targetItems = await FetchEntities(ToContext, cancellationToken);
-                readCount = sourceItems.Count + targetItems.Count;
+            MirrorMode.Push => await RunOneWay(FromContext, ToContext, ct).ConfigureAwait(false),
+            MirrorMode.Pull => await RunOneWay(ToContext, FromContext, ct).ConfigureAwait(false),
+            MirrorMode.Bidirectional => await RunBidirectional(ct).ConfigureAwait(false),
+            _ => throw new ArgumentOutOfRangeException(nameof(_mode))
+        };
+    }
 
-                var timestampProperty = ResolveTimestampProperty();
-                if (timestampProperty is null)
-                {
-                    AddWarning($"No [Timestamp] property found on {typeof(TEntity).Name}; conflicts will be reported without automatic resolution.");
-                }
+    private async Task<TransferResult<TKey>> RunOneWay(
+        TransferContextOptions? authoritative,
+        TransferContextOptions? replica,
+        CancellationToken ct)
+    {
+        var progress = new TransferProgress();
+        var read = 0;
+        var copied = 0;
+        await using var absent = new TransferJournal<TKey>();
 
-                var copyToDestination = new List<TEntity>();
-                var copyToSource = new List<TEntity>();
-                var processed = new HashSet<TKey>();
-                var targetLookup = targetItems.ToDictionary(e => e.Id);
-
-                foreach (var entity in sourceItems)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var id = entity.Id;
-                    if (!targetLookup.TryGetValue(id, out var target))
-                    {
-                        copyToDestination.Add(entity);
-                        continue;
-                    }
-
-                    processed.Add(id);
-
-                    if (timestampProperty is null)
-                    {
-                        conflicts.Add(new TransferConflict<TKey>(id, "No timestamp available to resolve conflict."));
-                        continue;
-                    }
-
-                    if (!TryCompareTimestamp(timestampProperty, entity, target, out var comparison, out var failureReason))
-                    {
-                        conflicts.Add(new TransferConflict<TKey>(id, failureReason ?? "Unable to compare timestamp values."));
-                        continue;
-                    }
-
-                    if (comparison > 0)
-                    {
-                        copyToDestination.Add(entity);
-                    }
-                    else if (comparison < 0)
-                    {
-                        copyToSource.Add(target);
-                    }
-                }
-
-                foreach (var target in targetItems)
-                {
-                    if (processed.Contains(target.Id))
-                        continue;
-                    copyToSource.Add(target);
-                }
-
-                copied = 0;
-                var destProgress = await UpsertBatches(
-                    copyToDestination,
-                    FromContext,
-                    ToContext,
-                    TransferKind.Mirror,
-                    stopwatch,
-                    audit,
-                    cancellationToken,
-                    batchCounter,
-                    totalProcessed);
-                copied += destProgress.Copied;
-                batchCounter = destProgress.BatchCounter;
-                totalProcessed = destProgress.TotalProcessed;
-
-                var sourceProgress = await UpsertBatches(
-                    copyToSource,
-                    ToContext,
-                    FromContext,
-                    TransferKind.Mirror,
-                    stopwatch,
-                    audit,
-                    cancellationToken,
-                    batchCounter,
-                    totalProcessed);
-                copied += sourceProgress.Copied;
-                batchCounter = sourceProgress.BatchCounter;
-                totalProcessed = sourceProgress.TotalProcessed;
-                break;
-            }
-            default:
-                throw new ArgumentOutOfRangeException();
+        await foreach (var batch in ReadBatches(authoritative, ct).ConfigureAwait(false))
+        {
+            read = checked(read + batch.Count);
+            copied = checked(copied + await WriteBatch(
+                batch, authoritative, replica, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
-        EmitSummary(TransferKind.Mirror, totalProcessed, stopwatch, audit);
-        stopwatch.Stop();
-
-        return new TransferResult<TKey>
+        // Do not mutate a numbered-page source while it is being read. First discover replica-only
+        // identities through provider-bounded pages, then delete the confirmed set from the journal.
+        await foreach (var batch in ReadBatches(replica, ct).ConfigureAwait(false))
         {
-            Kind = TransferKind.Mirror,
-            ReadCount = readCount,
-            CopiedCount = totalProcessed,
-            DeletedCount = 0,
-            Duration = stopwatch.Elapsed,
-            Audit = audit.ToArray(),
-            Conflicts = conflicts.ToArray(),
-            Warnings = Warnings.ToArray()
-        };
+            read = checked(read + batch.Count);
+            var existing = await ReadMany(batch.Select(entity => entity.Id).ToArray(), authoritative, ct)
+                .ConfigureAwait(false);
+            for (var index = 0; index < batch.Count; index++)
+            {
+                if (existing[index] is null)
+                    await absent.Append(batch[index].Id, ct).ConfigureAwait(false);
+            }
+        }
+
+        var deleted = await DeleteJournal(absent, replica, ct).ConfigureAwait(false);
+        return Complete(TransferKind.Mirror, read, copied, deleted, progress);
+    }
+
+    private async Task<TransferResult<TKey>> RunBidirectional(CancellationToken ct)
+    {
+        var progress = new TransferProgress();
+        var conflicts = new List<TransferConflict<TKey>>();
+        var read = 0;
+        var copied = 0;
+        var timestamp = _conflict == MirrorConflict.Latest ? ResolveTimestampProperty() : null;
+        if (_conflict == MirrorConflict.Latest && timestamp is null)
+            AddWarning($"No [Timestamp] property found on {typeof(TEntity).Name}; overlapping identities are reported without automatic resolution.");
+
+        // Writes aimed at the source are deferred until its provider-bounded stream has completed.
+        // This prevents a conflict resolution from changing predicate membership between numbered pages.
+        await using var sourceWrites = new TransferJournal<TEntity>();
+        await foreach (var sourceBatch in ReadBatches(FromContext, ct).ConfigureAwait(false))
+        {
+            read = checked(read + sourceBatch.Count);
+            var targetWrites = new List<TEntity>(sourceBatch.Count);
+            var targets = await ReadMany(sourceBatch.Select(entity => entity.Id).ToArray(), ToContext, ct)
+                .ConfigureAwait(false);
+            for (var index = 0; index < sourceBatch.Count; index++)
+            {
+                var source = sourceBatch[index];
+                var target = targets[index];
+                if (target is null)
+                {
+                    targetWrites.Add(source);
+                    continue;
+                }
+
+                switch (_conflict)
+                {
+                    case MirrorConflict.Source:
+                        targetWrites.Add(source);
+                        break;
+                    case MirrorConflict.Destination:
+                        await sourceWrites.Append(target, ct).ConfigureAwait(false);
+                        break;
+                    case MirrorConflict.Report:
+                        AddConflict(conflicts, source.Id, "Both mirror sides contain this identity.");
+                        break;
+                    case MirrorConflict.Latest:
+                        if (timestamp is null)
+                        {
+                            AddConflict(conflicts, source.Id, "No timestamp is available to resolve the overlap.");
+                            break;
+                        }
+                        if (!TryCompareTimestamp(timestamp, source, target, out var comparison, out var reason))
+                        {
+                            AddConflict(conflicts, source.Id, reason ?? "The timestamps cannot be compared.");
+                            break;
+                        }
+                        if (comparison > 0) targetWrites.Add(source);
+                        else if (comparison < 0) await sourceWrites.Append(target, ct).ConfigureAwait(false);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(_conflict));
+                }
+            }
+
+            copied = checked(copied + await WriteBatch(
+                targetWrites, FromContext, ToContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+        }
+
+        await foreach (var deferred in sourceWrites.ReadBatches(BatchSize, ct).ConfigureAwait(false))
+            copied = checked(copied + await WriteBatch(
+                deferred, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+
+        // A second bounded pass admits only target-only identities. Overlaps were resolved exactly once
+        // during the source pass; source-only rows copied above now have a source counterpart and are skipped.
+        await foreach (var targetBatch in ReadBatches(ToContext, ct).ConfigureAwait(false))
+        {
+            read = checked(read + targetBatch.Count);
+            var sourceAdds = new List<TEntity>(targetBatch.Count);
+            var sources = await ReadMany(targetBatch.Select(entity => entity.Id).ToArray(), FromContext, ct)
+                .ConfigureAwait(false);
+            for (var index = 0; index < targetBatch.Count; index++)
+                if (sources[index] is null) sourceAdds.Add(targetBatch[index]);
+
+            copied = checked(copied + await WriteBatch(
+                sourceAdds, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+        }
+
+        return Complete(TransferKind.Mirror, read, copied, 0, progress, conflicts);
+    }
+
+    private void AddConflict(List<TransferConflict<TKey>> conflicts, TKey id, string reason)
+    {
+        if (conflicts.Count == BatchSize)
+            throw new InvalidOperationException(
+                $"The bidirectional mirror exceeded its explicit conflict-result bound of {BatchSize}. " +
+                "Choose Source or Destination conflict resolution, provide comparable [Timestamp] values, or narrow the predicate.");
+        conflicts.Add(new TransferConflict<TKey>(id, reason));
     }
 
     private static PropertyInfo? ResolveTimestampProperty()
         => typeof(TEntity).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(p => p.GetCustomAttributes(typeof(TimestampAttribute), inherit: true).Any());
+            .FirstOrDefault(property => property.GetCustomAttributes(typeof(TimestampAttribute), true).Length != 0);
 
-    private static bool TryCompareTimestamp(PropertyInfo property, TEntity left, TEntity right, out int comparison, out string? failureReason)
+    private static bool TryCompareTimestamp(
+        PropertyInfo property,
+        TEntity left,
+        TEntity right,
+        out int comparison,
+        out string? failure)
     {
         var leftValue = property.GetValue(left);
         var rightValue = property.GetValue(right);
-
         if (leftValue is null || rightValue is null)
         {
             comparison = 0;
-            failureReason = "Timestamp value missing.";
+            failure = "A timestamp value is missing.";
             return false;
         }
 
         switch (leftValue)
         {
-            case DateTime leftDate when rightValue is DateTime rightDate:
-                comparison = DateTime.Compare(leftDate, rightDate);
-                failureReason = null;
-                return true;
-            case DateTimeOffset leftOffset when rightValue is DateTimeOffset rightOffset:
-                comparison = DateTimeOffset.Compare(leftOffset, rightOffset);
-                failureReason = null;
-                return true;
-            case long leftLong when rightValue is long rightLong:
-                comparison = leftLong.CompareTo(rightLong);
-                failureReason = null;
-                return true;
-            case int leftInt when rightValue is int rightInt:
-                comparison = leftInt.CompareTo(rightInt);
-                failureReason = null;
-                return true;
-            case byte[] leftBytes when rightValue is byte[] rightBytes:
-                comparison = StructuralComparisons.StructuralComparer.Compare(leftBytes, rightBytes);
-                failureReason = null;
-                return true;
+            case DateTime value when rightValue is DateTime other:
+                comparison = DateTime.Compare(value, other);
+                break;
+            case DateTimeOffset value when rightValue is DateTimeOffset other:
+                comparison = DateTimeOffset.Compare(value, other);
+                break;
+            case long value when rightValue is long other:
+                comparison = value.CompareTo(other);
+                break;
+            case int value when rightValue is int other:
+                comparison = value.CompareTo(other);
+                break;
+            case byte[] value when rightValue is byte[] other:
+                comparison = StructuralComparisons.StructuralComparer.Compare(value, other);
+                break;
             default:
                 comparison = 0;
-                failureReason = $"Unsupported timestamp type '{property.PropertyType.FullName}'.";
+                failure = $"Timestamp type '{property.PropertyType.FullName}' is not supported.";
                 return false;
         }
+
+        failure = null;
+        return true;
     }
 }
-

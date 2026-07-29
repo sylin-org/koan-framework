@@ -1,29 +1,30 @@
+using Koan.Data.Connector.Couchbase.Runtime;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Connector.Couchbase;
 
-/// <summary>Reports readiness only for Couchbase sources that participate in this application.</summary>
 internal sealed class CouchbaseHealthContributor : DataAdapterHealthContributorBase
 {
-    private const string ProviderName = Infrastructure.Constants.Provider.Name;
     private readonly IServiceProvider _services;
     private readonly CouchbaseAdapterFactory _factory;
+    private readonly CouchbaseResourcePool _resources;
 
     public CouchbaseHealthContributor(
         IServiceProvider services,
         IDataDiagnostics diagnostics,
         DataProviderCatalog providers,
-        DataDefaultProviderPlan defaultProvider)
-        : base(ProviderName, services, diagnostics, defaultProvider)
+        DataDefaultProviderPlan defaultProvider,
+        CouchbaseResourcePool resources)
+        : base(Infrastructure.Constants.Provider, services, diagnostics, defaultProvider)
     {
         _services = services;
-        _factory = providers.Find(ProviderName) as CouchbaseAdapterFactory
-            ?? throw new InvalidOperationException("The Couchbase provider is absent from the host Data catalog.");
+        _resources = resources;
+        _factory = providers.Find(Infrastructure.Constants.Provider) as CouchbaseAdapterFactory
+            ?? throw new InvalidOperationException("The Couchbase adapter is absent from the data catalog.");
     }
 
-    protected override Task ProbeSource(string source, CancellationToken ct)
-        => _factory.ResolveRoute(_services, source).Provider.Probe(ct);
+    protected override Task ProbeSource(string source, CancellationToken ct) =>
+        _resources.Probe(_factory.ResolveRoute(_services, source), ct);
 }
-

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "scope": "couchbase",
+  "status": "pending",
+  "dependencies": []
+}

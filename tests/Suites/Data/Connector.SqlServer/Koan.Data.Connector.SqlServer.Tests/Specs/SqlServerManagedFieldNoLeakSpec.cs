@@ -15,7 +15,7 @@ public sealed class SqlServerManagedFieldNoLeakSpec(SqlServerFixture fixture, IT
     public async Task Managed_field_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(ManagedFieldNoLeak.Declare);
         await ManagedFieldNoLeak.AssertNoLeakAsync();
     }
 }

@@ -1,6 +1,5 @@
 using Xunit;
 
-// The [DataAxis] expander writes into process-global static registries (ManagedFieldRegistry,
-// StorageNameParticleRegistry, OperationOverrideRegistry). Serialize the whole assembly so concurrent specs never
-// race that shared state; each spec resets the registries it touches in its ctor/dispose.
+// Keep declaration-facade specs sequential so their flow-scoped composition setup and failure diagnostics remain
+// deterministic. Each catalog is host-owned; this scheduling rule is not a runtime ownership requirement.
 [assembly: CollectionBehavior(DisableTestParallelization = true)]

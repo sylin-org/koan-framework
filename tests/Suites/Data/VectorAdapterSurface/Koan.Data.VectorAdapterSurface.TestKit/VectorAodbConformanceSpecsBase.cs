@@ -152,9 +152,91 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
     /// (which merges the inner adapter's set with the framework isolation guarantees).</summary>
     private CapabilitySet ResolveCaps() => DataCaps.Describe(ResolveScopedRepo(), "scoped-vector");
 
+    private void DeferAnnexCell(string acceptanceId, string proof)
+    {
+        SkipIfUnavailable();
+        Assert.Skip($"{acceptanceId} provider proof seam is registered but not yet supplied: {proof}.");
+    }
+
+    // DAC-50 projects every ratified Vector cell into the existing inherited provider fixture. These explicit seams
+    // remain loud skips until the owning Framework/Family/Adapter implementation card supplies the proof; Forge treats
+    // every skip as non-green, so current package status cannot become certification by omission.
+
+    [Fact(DisplayName = "V-01/space-plan/Framework: immutable vector space plan is bound before provider I/O")]
+    public void Vector_space_plan_proof_seam() => DeferAnnexCell("V-01", "compiled source and space plan");
+
+    [Fact(DisplayName = "V-02/embedding-boundaries/Framework: embedding shape and values validate before mutation")]
+    public void Embedding_boundary_proof_seam() => DeferAnnexCell("V-02", "dimension and finite-value oracle");
+
+    [Fact(DisplayName = "V-03/upsert/Adapter: repeated identity atomically replaces one vector point")]
+    public void Vector_upsert_proof_seam() => DeferAnnexCell("V-03", "provider upsert oracle");
+
+    [Fact(DisplayName = "V-04/delete-outcome/Adapter: vector delete reports existing missing and failure honestly")]
+    public void Vector_delete_proof_seam() => DeferAnnexCell("V-04", "delete outcome and injected failure");
+
+    [Fact(DisplayName = "V-05/get-many/Framework: vector get-many preserves positional missing slots")]
+    public void Vector_get_many_proof_seam() => DeferAnnexCell("V-05", "positional retrieval oracle");
+
+    [Fact(DisplayName = "V-06/metadata/Framework: vector metadata uses the neutral value algebra")]
+    public void Vector_metadata_proof_seam() => DeferAnnexCell("V-06", "neutral metadata materializer");
+
+    [Fact(DisplayName = "V-07/search-order/Framework: vector search is bounded unique and deterministically ordered")]
+    public void Vector_search_order_proof_seam() => DeferAnnexCell("V-07", "bounded rank oracle");
+
+    [Fact(DisplayName = "V-08/similarity/Family: similarity normalization is finite monotonic and higher-is-closer")]
+    public void Vector_similarity_proof_seam() => DeferAnnexCell("V-08", "metric normalization oracle and native plan");
+
+    [Fact(DisplayName = "V-09/space-integrity/Framework: vector queries cannot mix source space metric or model")]
+    public void Vector_space_integrity_proof_seam() => DeferAnnexCell("V-09", "cross-space negative matrix");
+
+    [Fact(DisplayName = "V-10/execution-truth/Adapter: exact approximate and candidate facts report actual work")]
+    public void Vector_execution_truth_proof_seam() => DeferAnnexCell("V-10", "native execution receipt");
+
+    [Fact(DisplayName = "V-11/session-visibility/Adapter: awaited mutations are visible in Session mode")]
+    public void Vector_session_visibility_proof_seam() => DeferAnnexCell("V-11", "read-your-writes oracle without sleeps");
+
+    [Fact(DisplayName = "V-12/eventual-sync/Adapter: Sync is a bounded visibility barrier for Eventual mode")]
+    public void Vector_eventual_sync_proof_seam() => DeferAnnexCell("V-12", "settling and cancellation fixture");
+
+    [Fact(DisplayName = "V-13/native-prefilter/Family: metadata Where filters candidates before ranking or fails closed")]
+    public void Vector_filter_proof_seam() => DeferAnnexCell("V-13", "filter oracle and captured native plan");
+
+    [Fact(DisplayName = "V-14/hybrid/Adapter: hybrid weighting has portable endpoints and normalized rank")]
+    public void Vector_hybrid_proof_seam() => DeferAnnexCell("V-14", "lexical and semantic endpoint oracle");
+
+    [Fact(DisplayName = "V-15/named-spaces/Adapter: named vector spaces preserve independent immutable shape")]
+    public void Vector_named_spaces_proof_seam() => DeferAnnexCell("V-15", "named-space shape and ambiguity matrix");
+
+    [Fact(DisplayName = "V-16/continuation/Adapter: vector continuation is opaque source-bound and gap-free")]
+    public void Vector_continuation_proof_seam() => DeferAnnexCell("V-16", "snapshot continuation oracle");
+
+    [Fact(DisplayName = "V-17/native-bulk/Adapter: vector bulk preserves per-item outcomes guards and isolation")]
+    public void Vector_bulk_proof_seam() => DeferAnnexCell("V-17", "bulk dispatch and partial-failure fixture");
+
+    [Fact(DisplayName = "V-18/atomic-batch/Adapter: claimed vector atomic batch is all-or-nothing under fault")]
+    public void Vector_atomic_batch_proof_seam() => DeferAnnexCell("V-18", "mid-batch fault oracle");
+
+    [Fact(DisplayName = "V-19/export/Adapter: vector export is provider-bounded complete and cancellable")]
+    public void Vector_export_proof_seam() => DeferAnnexCell("V-19", "bounded export fixture");
+
+    [Fact(DisplayName = "V-20/lifecycle-policy/Framework: vector ensure validate clear and sync obey source policy")]
+    public void Vector_lifecycle_proof_seam() => DeferAnnexCell("V-20", "lifecycle and access-policy matrix");
+
+    [Fact(DisplayName = "V-21/isolation/Adapter: vector isolation protects every read and mutation surface")]
+    public void Vector_isolation_proof_seam() => DeferAnnexCell("V-21", "cross-scope vector surface matrix");
+
+    [Fact(DisplayName = "V-22/coordination/Framework: entity vector coordination reports partial commit truth")]
+    public void Vector_coordination_proof_seam() => DeferAnnexCell("V-22", "stage-fault coordination matrix");
+
+    [Fact(DisplayName = "V-23/failure-lifecycle/Adapter: vector failures and disposal use shared safe semantics")]
+    public void Vector_failure_lifecycle_proof_seam() => DeferAnnexCell("V-23", "failure taxonomy and disposal fixture");
+
+    [Fact(DisplayName = "V-24/warm-path/Adapter: vector warm paths reuse one compiled plan within pinned budgets")]
+    public void Vector_warm_path_proof_seam() => DeferAnnexCell("V-24", "provider-relative benchmark and allocation evidence");
+
     // ==================== The co-definition: the decorator declares the modes it realizes ====================
 
-    [Fact(DisplayName = "Vector AODB ledger: the ScopedVectorRepository declares the universal floor modes (ContainerScoped + DatabaseScoped); RowScoped is co-defined by the Shared cell")]
+    [Fact(DisplayName = "G-09/declarations/Adapter: vector isolation claims are mandatory and executable")]
     [Trait("Category", "Integration")]
     public void Declares_realized_isolation_modes()
     {
@@ -172,7 +254,7 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     // ==================== Shared (FieldFilter → __koan_tenant overlay stamp + read-filter) ====================
 
-    [Fact(DisplayName = "Vector AODB Shared: RowScoped is co-defined — declared ⇒ the __koan_tenant overlay isolates a kNN; under-claimed ⇒ a scoped read fails closed")]
+    [Fact(DisplayName = "G-09/row/Adapter: vector row scope isolates or fails closed")]
     [Trait("Category", "Integration")]
     public async Task Shared_tenant_overlay_isolates()
     {
@@ -209,7 +291,7 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     // ==================== Container (Particle → distinct physical container per partition) ====================
 
-    [Fact(DisplayName = "Vector AODB Container: a distinct ambient partition resolves to a distinct physical container (no cross-partition leak)")]
+    [Fact(DisplayName = "G-09/container/Adapter: each vector partition resolves to an isolated container")]
     [Trait("Category", "Integration")]
     public async Task Container_partition_isolates()
     {
@@ -248,7 +330,7 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     // ==================== Database (Moniker → per-source physical isolation) ====================
 
-    [Fact(DisplayName = "Vector AODB Database: a Database-mode axis routes by ambient shard to distinct physical isolation per source")]
+    [Fact(DisplayName = "G-09/database/Adapter: each vector shard resolves to an isolated source")]
     [Trait("Category", "Integration")]
     public async Task Database_shard_isolates()
     {

@@ -8,6 +8,8 @@ internal static class Constants
         internal const string Alias = "mongodb";
         internal const string ConfigurationName = "Mongo";
         internal const int Priority = 20;
+        internal const int MaximumRoutes = 128;
+        internal const int MaximumCollectionsPerRepository = 1024;
     }
 
     internal static class Configuration
@@ -33,5 +35,11 @@ internal static class Constants
         internal const string MongoUrls = "MONGO_URLS";
         internal const string MongoDbUrls = "MONGODB_URLS";
         internal const int DefaultPort = 27017;
+    }
+
+    internal static class Storage
+    {
+        internal const string Identity = "_id";
+        internal const string ManagedDocument = "__koan_document";
     }
 }
