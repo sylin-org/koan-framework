@@ -20,8 +20,8 @@ using Xunit;
 namespace Koan.Data.VectorAdapterSurface.TestKit;
 
 /// <summary>
-/// The one reusable vector AODB conformance ledger (ARCH-0103 §6), the vector-plane twin of the record-plane
-/// <c>AodbConformanceSpecsBase</c>. A per-adapter cell subclasses this with a real <c>AddKoan()</c> host (the adapter
+/// The reusable vector AODB conformance suite (ARCH-0103 §6), the vector-plane twin of the record-plane
+/// <c>AodbConformanceSpecsBase</c>. Each adapter subclasses this with a real <c>AddKoan()</c> host (the adapter
 /// configured + tenancy + the discoverable <see cref="VectorConformanceShardAxis"/>); the base proves, end-to-end, that
 /// the vector plane realizes ALL THREE AODB isolation modes — and that the <see cref="ScopedVectorRepository"/> decorator
 /// <b>declares</b> the matching capability tokens.
@@ -54,7 +54,7 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
 
     /// <summary>
     /// Boot the adapter's <c>AddKoan()</c> conformance host (tenancy + the shard axis discovered). Return a skip reason
-    /// (e.g. Docker/backend unavailable) instead of a host to skip the whole ledger. The base sets
+    /// (e.g. Docker/backend unavailable) instead of a host to skip the whole suite. The base sets
     /// a flow-owned <see cref="AppHost"/> scope and tears the host down.
     /// </summary>
     protected abstract Task<(IntegrationHost? host, string? skip)> BootHostAsync();
@@ -159,9 +159,8 @@ public abstract class VectorAodbConformanceSpecsBase : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    // DAC-50 projects every ratified Vector cell into the existing inherited provider fixture. These explicit seams
-    // remain loud skips until the owning Framework/Family/Adapter implementation card supplies the proof; Forge treats
-    // every skip as non-green, so current package status cannot become certification by omission.
+    // Each provider supplies these focused vector behaviors through its existing live fixture. Missing proofs remain
+    // loud skips, and the Forge runner reports any skipped suite as inconclusive.
 
     [Fact(DisplayName = "V-01/space-plan/Framework: immutable vector space plan is bound before provider I/O")]
     public Task Vector_space_plan_proof_seam() => ProveVectorAnnexCellAsync("V-01", "compiled source and space plan");

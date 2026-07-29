@@ -19,7 +19,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Milvus.Tests;
 
-/// <summary>Executable DAC-58 ledger for the empty-root Milvus adapter.</summary>
+/// <summary>Live conformance suite for the Milvus adapter.</summary>
 public sealed class MilvusVectorAodbConformanceSpec(MilvusTestFactory fixture)
     : VectorAodbConformanceSpecsBase
 {

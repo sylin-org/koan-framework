@@ -18,7 +18,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Weaviate.Tests;
 
-/// <summary>Executable DAC-57 ledger for the empty-root Weaviate adapter.</summary>
+/// <summary>Live conformance suite for the Weaviate adapter.</summary>
 public sealed class WeaviateVectorAodbConformanceSpec(WeaviateTestFactory fixture)
     : VectorAodbConformanceSpecsBase
 {

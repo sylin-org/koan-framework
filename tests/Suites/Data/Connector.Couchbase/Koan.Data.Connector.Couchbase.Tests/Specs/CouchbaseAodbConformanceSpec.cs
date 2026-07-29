@@ -5,7 +5,7 @@ using Koan.Data.AdapterSurface.TestKit;
 namespace Koan.Data.Connector.Couchbase.Tests.Specs;
 
 /// <summary>
-/// Couchbase's AODB conformance ledger cell. Proves through a real <c>AddKoan()</c> boot that the greenfield connector
+/// Couchbase's AODB conformance suite proves through a real <c>AddKoan()</c> boot that the greenfield connector
 /// realizes all three declared isolation modes. Couchbase's
 /// 3-level keyspace maps each mode to a distinct native level: Shared (the framework-managed discriminator injected into
 /// the document JSON + a CAS conflict guard), Container (a distinct native <b>scope</b> per ambient partition), Database

@@ -6,7 +6,7 @@ using Npgsql;
 namespace Koan.Data.Connector.Postgres.Tests.Specs;
 
 /// <summary>
-/// PostgreSQL's AODB conformance ledger cell (ARCH-0103 §6 / P5). Proves the relational realization of all three AODB
+/// PostgreSQL's AODB conformance suite (ARCH-0103 §6 / P5) proves the relational realization of all three AODB
 /// modes on Postgres AND declares the tokens. For the Database cell the two routed conformance sources point to
 /// freshly-created physical databases on the fixture's server (Database mode = a distinct physical database per source).
 /// </summary>

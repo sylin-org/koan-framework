@@ -26,10 +26,10 @@ reports the exact outcome. Every concern below has one owner.
 | Entity lifecycle and managed fields | `RepositoryFacade`, host-owned write/read/transform plans, lifecycle pipeline, and final-visible-row rules | none unless a family primitive is truly identical | persist the final physical record and report item/commit outcomes | callbacks, stamps, soft-delete, isolation, or load lifecycle are duplicated below Core |
 | Mutation and transaction truth | Framework batch/mutation result contracts and transaction coordinator | family can expose a genuinely shared native transaction primitive | one native dispatch, atomicity/commit facts, positional item outcomes | stronger atomicity is inferred from sequencing or missing outcomes are synthesized |
 | Failures and restricted evidence | `DataFailure`, stable corrections, retry/replay/commit vocabulary, and bounded `DataNativeEvidenceStore` | translate a family failure only when semantics are exact | classify native type/code and write restricted evidence without raw prose | native message, command text, business value, secret, or exception object reaches public facts |
-| Claims and applicability | `DataClaimSet`, `DataCapabilityProfiles`, and deterministic claim references | add no parallel capability registry | inertly declare exact observed/target/declined provider claims | claims differ between runtime, facts, health, descriptions, TestKit, or packet |
+| Claims and applicability | `DataClaimSet`, `DataCapabilityProfiles`, and deterministic claim references | add no parallel capability registry | inertly declare exact observed/target/declined provider claims | claims differ between runtime, facts, health, descriptions, or executable tests |
 | Describe, Explain, Doctor, facts, and health | `DataSourceDiagnosticsService`, `DataDiagnostics`, shared facts, and stable health vocabulary | provide pure family descriptors when useful | pure descriptor plus explicit non-mutating Doctor probe | Describe/Explain activates a client; Doctor provisions; public output leaks native evidence |
 | Client, pool, cache, and integration lifetime | host owns bounded catalogs, source-integration activation, disposal, and cancellation boundary | family may own a host-scoped shared client abstraction | create/dispose native client resources inside that host boundary | mutable process-static runtime state, unbounded key space, orphan client, or caller-cancellation corruption |
-| Conformance and performance evidence | `DataConformanceCatalog`, manifest/packet protocol, standard scenarios, and benchmark observation grammar | family TestKit may provide reusable mechanics | live fixture, native receipts, and fixture-relative expectations | adapter copies verifier policy, skips an applicable cell, or uses a global threshold |
+| Conformance and performance evidence | shared executable TestKits and consumer compile contracts | family TestKit may provide reusable mechanics | focused real-provider tests, native receipts, and fixture-relative measurements | adapter copies verifier policy, treats a skip as success, or uses a global threshold |
 
 ## Adapter review
 
@@ -39,7 +39,7 @@ An adapter is correctly placed only when all answers are yes:
    ownership, native topology, or exact native evidence?
 2. Does every operation consume an immutable Framework or Family plan rather than reconstructing one?
 3. Are all caches host-owned, bounded, and removable without changing semantics?
-4. Do claims, execution receipts, public diagnostics, and TestKit applicability use the same claim references?
+4. Do claims, execution receipts, public diagnostics, and executable tests describe the same behavior?
 5. Would deleting adapter-local orchestration leave a missing provider-neutral concern? If so, that concern belongs in
    the Framework or a justified Family before the adapter can pass P-06.
 

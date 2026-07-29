@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 
-/// <summary>One pinned live Qdrant runtime shared by the executable DAC-53 ledger.</summary>
+/// <summary>One pinned live Qdrant runtime shared by the provider suite.</summary>
 public sealed class QdrantTestFactory : IAsyncLifetime
 {
     private IContainer? _container;

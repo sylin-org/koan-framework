@@ -29,7 +29,6 @@ architecture canon:
 | Initiative | Mission | State |
 |---|---|---|
 | [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R09 Semantic Composition Kernel |
-| [Data adapter conformance](data-adapter-conformance/README.md) | Make Koan.Data and every shipped adapter conform to the Data Adapter Development Primer with executable evidence | Active — DAC-00 bootstrap ready |
 
 ## Initiative contract
 

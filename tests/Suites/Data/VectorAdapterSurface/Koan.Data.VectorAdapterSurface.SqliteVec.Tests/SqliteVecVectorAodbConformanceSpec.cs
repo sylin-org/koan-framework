@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.SqliteVec.Tests;
 
-/// <summary>Executable DAC-50 ledger for the stable sqlite-vec reference adapter.</summary>
+/// <summary>Live conformance suite for the stable sqlite-vec reference adapter.</summary>
 public sealed class SqliteVecVectorAodbConformanceSpec : VectorAodbConformanceSpecsBase
 {
     private string? _root;

@@ -21,42 +21,6 @@ dotnet add package Sylin.Koan.Testing
 Use `Koan.Testing.Hosting` when you need a custom compiled-composition host without inherited batteries. Use
 `Koan.Testing.Containers` for adapter development against reusable real backing-store fixtures.
 
-## Certify a Data adapter
-
-`DataConformanceManifest` is the one executable claim declaration. It projects runtime `DataCaps` into the primer's
-profiles, keeps targets and declines explicit, and compiles with evidence into a deterministic
-`DataConformancePacket`. An adapter certification suite inherits `DataAdapterConformanceSpecs`; the inherited theory
-executes all 105 stable primer IDs and refuses missing, deferred, infrastructure-only, or contradictory evidence.
-
-```csharp
-var manifest = DataConformanceManifest.For("acme", claims => claims
-    .From(DataCaps.Describe(repository, repository.GetType().Name))
-    .Observe(DataConformanceProfiles.RegisteredReads, advertised: true));
-
-var packet = DataConformancePacket.Compile(
-    manifest,
-    new DataConformancePacket.Identity(sourceSha, providerVersion, driverVersion, fixtureVersion),
-    evidence,
-    dependencies,
-    rowCases);
-```
-
-Generate or validate the catalog directly from the primer, then run a packet-aware adapter gate:
-
-```powershell
-pwsh scripts/forge-verify.ps1 -CatalogOnly
-pwsh scripts/forge-verify.ps1 -Adapter Acme -Plane record -Strict
-```
-
-Strict Forge exits `0` for PASS, `1` for behavioral RED/false claims, `2` for deferred proof, `3` for malformed or
-stale protocol data, and `4` for unavailable provider infrastructure. No non-green state is silently skipped.
-
-Every adapter fixture can use the same eight lifecycle modules through `DataScenarioCatalog`: fault, cancellation,
-pool saturation, two-host, restart, durability, isolation, and soak. `DataBenchmarkRunner.Observe(...)` records cold
-or warm elapsed time, allocations, provider dispatches, and provider work against a pinned provider/driver/runner
-fixture. The TestKit deliberately carries no global performance threshold; comparison policy belongs to the exact
-versioned fixture.
-
 ## Meaningful result: add one class per Entity
 
 ```csharp

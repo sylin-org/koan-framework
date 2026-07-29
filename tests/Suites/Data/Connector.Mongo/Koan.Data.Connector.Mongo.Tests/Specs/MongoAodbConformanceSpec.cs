@@ -8,7 +8,7 @@ using KoanData = Koan.Data.Core.Data;
 namespace Koan.Data.Connector.Mongo.Tests.Specs;
 
 /// <summary>
-/// Mongo's AODB conformance ledger cell (ARCH-0103 §6 / P5) — the golden reference. Proves, through a real
+/// Mongo's AODB conformance suite (ARCH-0103 §6 / P5) is the golden reference. It proves, through a real
 /// <c>AddKoan()</c> boot over one Mongo container, that the Mongo repository realizes all three AODB
 /// isolation modes AND declares the matching tokens. The two routed conformance sources share the one Mongo server but
 /// live in distinct physical <b>databases</b> (the placement <c>MongoAdapterFactory</c> pools by connection+database).

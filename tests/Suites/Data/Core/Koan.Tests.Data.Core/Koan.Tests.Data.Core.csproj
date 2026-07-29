@@ -48,8 +48,5 @@
   <ItemGroup>
     <!-- ARCH-0103 P2: the deliberately non-isolating fake adapter shared by the fail-closed safety-net suites. -->
     <Compile Include="..\..\..\_shared\NonIsolatingFakeAdapter.cs" Link="Support\NonIsolatingFakeAdapter.cs" />
-    <!-- DAC-09: the sealed public contract is an ordinary compilation input, never prose-only evidence. -->
-    <Compile Include="..\..\..\..\..\docs\initiatives\data-adapter-conformance\evidence\framework\consumer-contract.cs"
-             Link="Contracts\DataAdapterConsumerContract.cs" />
   </ItemGroup>
 </Project>

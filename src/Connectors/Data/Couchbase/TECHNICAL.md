@@ -103,4 +103,4 @@ mutation rejection, neutral inspection, identifier safety, health, and participa
 
 The retired baseline passed 17/21 in 8 minutes 11 seconds. Its four failures were ordinary query,
 filter convergence, polymorphism, and streaming receipt failures. Those results are retained only as
-negative acceptance evidence in DAC-45.
+negative acceptance tests in the provider suite.

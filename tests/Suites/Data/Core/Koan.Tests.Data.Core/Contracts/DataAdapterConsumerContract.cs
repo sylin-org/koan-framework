@@ -1,10 +1,9 @@
-// DAC-02 compile-contract fixture. Data contract tests compile this after DAC-03 introduces the surface.
 using Koan.Core;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Microsoft.Extensions.DependencyInjection;
 
-internal static class ConsumerContract
+internal static class DataAdapterConsumerContract
 {
     public static async Task Compile(IServiceCollection services, DateTimeOffset since, CancellationToken ct)
     {

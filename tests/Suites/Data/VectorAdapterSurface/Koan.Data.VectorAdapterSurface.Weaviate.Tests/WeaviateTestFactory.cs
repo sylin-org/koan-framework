@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Weaviate.Tests;
 
-/// <summary>One pinned live Weaviate runtime shared by the executable DAC-57 ledger.</summary>
+/// <summary>One pinned live Weaviate runtime shared by the provider suite.</summary>
 public sealed class WeaviateTestFactory : IAsyncLifetime
 {
     private IContainer? _container;

@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.OpenSearch.Tests;
 
-/// <summary>Executable DAC-56 ledger for the empty-root OpenSearch adapter.</summary>
+/// <summary>Live conformance suite for the OpenSearch adapter.</summary>
 public sealed class OpenSearchVectorAodbConformanceSpec(OpenSearchTestFactory fixture)
     : VectorAodbConformanceSpecsBase
 {

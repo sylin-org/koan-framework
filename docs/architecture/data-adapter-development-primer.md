@@ -4,10 +4,10 @@ domain: data
 title: "Koan Data Adapter Development Primer"
 audience: [developers, architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-27
+last_updated: 2026-07-29
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-27
+  date_last_tested: 2026-07-29
   status: reviewed
   scope: application ergonomics, adapter authoring workflow, behavioral conformance, and implementation change paths
 ---
@@ -24,8 +24,8 @@ This is one artifact with three jobs:
 1. **Design contract** — the first examples define the user delight every implementation must preserve.
 2. **Development blueprint** — the authoring sequence tells a human or agent how to research, place, implement,
    explain, and prove an adapter through the framework's shared ownership model.
-3. **Evaluation and change contract** — the profiles, scenarios, and scorecard identify a behavioral gap, assign it
-   to Data, a shared storage-family substrate, or one adapter, and require evidence for remediation or replacement.
+3. **Evaluation and change contract** — the applicability rules and acceptance catalog identify a behavioral gap,
+   assign it to Data, a shared storage-family substrate, or one adapter, and require executable proof.
 
 Choose the route that matches the work:
 
@@ -37,7 +37,7 @@ Choose the route that matches the work:
 | Replace an adapter from scratch | §10.6 greenfield boundary → §1 → §4 → Steps 2–10 in §5 → §§6–9; Step 1 connector reuse does not apply |
 | Remediate framework gaps | §10; repair shared semantics at the Data/family chokepoint and keep native translation local |
 
-Derive support from the claim manifest and its passing conformance evidence.
+Derive support from runtime claims and passing executable tests.
 
 **Must** and **required** identify conformance obligations. Core obligations apply to every Data adapter. Earned
 obligations apply when the adapter exposes or announces the corresponding capability. A smaller adapter remains
@@ -750,7 +750,7 @@ substrate. Provider-specific semantics stay in the adapter.
 This agent-executable workflow proceeds in order; repository code begins after the contract and provider facts are
 defined.
 
-**Whole-adapter `REBUILD` override:** when a ratified work item selects a ground-up replacement in §10.6, Step 1's
+**Whole-adapter `REBUILD` override:** when a ground-up replacement is selected, Step 1's
 connector reuse decision and closest-adapter pattern do not supply the design. Necessity and public continuity are
 already decided. The implementation starts from an empty adapter root and the ratified Framework/Family contracts.
 The former adapter may supply provider facts, public compatibility decisions, negative lessons, and black-box cases;
@@ -764,13 +764,13 @@ its type graph, helpers, control flow, tests, and compatibility branches are not
    key/value providers should first test whether the existing shared stores express their semantics.
 4. Record why reuse, a provider alias, or an application-owned SDK integration is insufficient.
 
-**Artifact / exit gate:** a reuse decision naming the intended conformance kind, family substrate, alternatives
+**Done when:** the reuse decision names the intended conformance kind, family substrate, alternatives
 checked, and the concrete gap. Stop when an existing conformant connector or ordinary SDK integration already
 satisfies it.
 
 ### Step 2 — Write the user contract and support profile
 
-Copy the relevant scenarios from §1 into the adapter work item. State:
+Start from the relevant scenarios in §1. State:
 
 - the package reference and zero-configuration outcome, if one is honest;
 - the explicit source configuration and runtime prerequisite;
@@ -781,8 +781,8 @@ Copy the relevant scenarios from §1 into the adapter work item. State:
 
 Select claims from capabilities the provider can realize and prove. A smaller truthful profile is conformant.
 
-**Artifact / exit gate:** an examples-first user contract plus initial claim manifest. The work does not proceed
-until Source Core, conformance kind, claimed profiles, and corrective unsupported outcomes are explicit.
+**Exit gate:** the examples-first user contract, intended capabilities, and corrective unsupported outcomes are
+explicit before implementation begins.
 
 ### Step 3 — Probe the real provider
 
@@ -798,10 +798,11 @@ Use official driver documentation and a live, least-privilege instance. Capture:
 - cancellation, timeout, retryable faults, and connection-pool behavior; and
 - provider-native registered operations and result shapes.
 
-Record every provider surprise as a focused integration fact with an explicit consequence for the claim manifest.
+Record every provider surprise as a focused integration test with an explicit consequence for capabilities or current
+documentation.
 
-**Artifact / exit gate:** a version-pinned provider probe ledger with official-source links, least-privilege posture,
-observed values, native operations/plans where relevant, and unknowns left unclaimed.
+**Exit gate:** provider-specific tests and the adapter technical reference name the provider/driver version,
+least-privilege posture, observed behavior, relevant native operations or plans, and unknowns left unclaimed.
 
 ### Step 4 — Declare only capabilities with a conformance cell
 
@@ -811,9 +812,9 @@ a real provider instance.
 
 Unverified support remains unclaimed and rejects correctively.
 
-**Artifact / exit gate:** a claim-to-acceptance-cell matrix. Every claim names its real-store cell and every
-unclaimed caller path names its fail-closed fact. Before Step 5, the author has read §§6–9 and bound every claim to
-its source-policy, readiness, hot-path, profile, and catalog obligations.
+**Done when:** every declared capability has a real-store test and every unsupported caller path has a focused
+fail-closed test. Before Step 5, the author has read §§6–9 and accounted for source policy, readiness, hot paths, and
+applicable acceptance obligations.
 
 ### Step 5 — Build the smallest provider package
 
@@ -841,8 +842,8 @@ is the package reference plus `AddKoan()`; it requires no provider-specific regi
 Use the [connector workbook](../engineering/adding-a-connector.md) for package mechanics, module discovery,
 versioning, and integration-test layout. This primer defines Data behavior.
 
-**Artifact / exit gate:** a responsibility/placement map and compiling package skeleton. Every class has one job,
-each shared concern points to its family/Data owner, and the package has one activation owner.
+**Done when:** the package compiles, every class has one job, shared concerns point to their Family/Data owner, and
+the package has one activation owner.
 
 ### Step 6 — Compile route and mapping state once
 
@@ -863,7 +864,7 @@ Pool native clients at the narrow physical-source owner. The provider's physical
 whether named sources share a pool. Host disposal releases host-owned keepers, clients, active requests,
 results/cursors/streams, and transactional resources.
 
-**Artifact / exit gate:** documented immutable plan keys, bounded cache ownership, credential-rotation behavior,
+**Done when:** immutable plan keys, bounded cache ownership, credential-rotation behavior,
 and cold/warm tests showing no structural recompilation or adapter election on the warm path.
 
 ### Step 7 — Implement the mandatory surface for the selected conformance kind
@@ -898,7 +899,7 @@ requires:
 An adapter never computes its own residual predicate or silently materializes the full source to imitate an
 unsupported provider operation. It never reports paging handled after applying a page in application memory.
 
-**Artifact / exit gate:** Source Core is green, and Entity Persistence cells B-01–B-08 are green when that kind is
+**Done when:** Source Core is green, and Entity Persistence cells B-01–B-08 are green when that kind is
 claimed. A Source Integration connector reaches this gate through its source capabilities alone.
 
 ### Step 8 — Add external-source features by earned capability
@@ -917,14 +918,14 @@ inventoried and source-policy-gated outside the Source Integration capability.
 
 Declare Source Integration support once in the pure `DescribeSource(source)` descriptor. Koan projects its
 registered-read, record-result, and granular inspection flags into the same runtime claim set used by diagnostics and
-certification; do not repeat those profiles in adapter-local claim code.
+tests; do not repeat those capabilities in adapter-local claim code.
 
 The Data-owned source plan gates effects before Entity lifecycle callbacks, storage readiness/provisioning, cache,
 transaction creation, or provider I/O.
 The adapter consumes the effective plan. Call-level switches, connection overrides, and instruction payloads cannot
 elevate it.
 
-**Artifact / exit gate:** each earned profile has its own green cell set; optional unclaimed paths have corrective
+**Done when:** each earned profile has its own green cell set; optional unclaimed paths have corrective
 negative facts. No adapter-local option bypasses the source plan.
 
 ### Step 9 — Explain every decision
@@ -960,12 +961,11 @@ the source, operation, missing capability or violated policy, and a concrete cor
 
 ### Step 10 — Prove behavior against a real store
 
-Connector certification uses Testcontainers or another repository-owned real-provider harness. Fakes test Data
+Adapter verification uses Testcontainers or another repository-owned real-provider harness. Fakes test Data
 orchestration only. Run the shared conformance profiles below, then add provider-specific boundary facts.
 
-**Artifact / exit gate:** the evidence packet defined in §10.7. Every Observed row is PASS, Declined paths have
-negative proof, every Target row is PASS before its claim is advertised, public claims match facts/docs, and
-cold/warm baselines exist before conformance.
+**Exit gate:** applicable shared and provider tests pass against the real store, unsupported paths fail correctively,
+public claims match facts and documentation, and relevant cold/warm baselines show no unexplained regression.
 
 ## 6. Source policy contract
 
@@ -1099,11 +1099,9 @@ Thresholds live with executable benchmarks after a stable baseline exists.
 An adapter earns small, explicit claims rather than universal parity. **Source Core** is mandatory for every connector
 in this primer. **Entity Persistence** applies only when ordinary Entity APIs are exposed. The remaining rows are
 earned capabilities or policy postures. A compound feature is conformant only when every listed dependency passes.
-For Observed scope, a predicate evaluates the pinned surface or public claim. For Target scope, it evaluates the
-explicit Target manifest as if that surface existed. “Announced” below refers to the surface in the evaluated scope; the
-Advertised/Unadvertised publication axis remains independent.
+“Announced” means the runtime capability or public documentation claims the behavior.
 
-| Profile or capability claim | Deterministic Observed/Target applicability | Acceptance cells |
+| Profile or capability claim | Applies when | Acceptance cells |
 |---|---|---|
 | Source Core | every connector | A-01–A-06, C-04, C-06, G-02–G-04, G-08, H-01–H-06, P-01, P-03, P-05, P-06 |
 | Entity Persistence | ordinary Entity surface is exposed | B-01–B-08, P-02, P-04 |
@@ -1145,21 +1143,16 @@ Advertised/Unadvertised publication axis remains independent.
 | Vector Isolation | each announced row/container/database mode | V-21 plus G-09, one case per mode |
 | Entity/Vector Coordination | `SaveWithVector` is exposed | V-22 |
 
-This table is the applicability rule. Each Observed surface or public claim and each Target claim matches one
-predicate above. Source Core's bounded soak is the common resource-hygiene gate; earned profiles add their own
-representative operations to that same soak. A golden-reference adapter publishes its exact manifest and passes
-every applicable cell; provider-specific claims and exclusions belong in its evidence packet.
+This table is the applicability rule. Every implemented or publicly claimed surface matches one predicate above.
+Source Core's bounded soak is the common resource-hygiene gate; earned profiles add representative operations to that
+same soak. A golden-reference adapter passes every applicable cell and proves unsupported paths fail correctively.
 
 ## 9. Normative requirement catalog and acceptance scenarios
 
-The stable IDs below are the one audit/conformance catalog. Earlier sections explain intent; build artifacts,
-scorecards, tests, findings, and remediation records reference these IDs. The bracketed codes are all required evidence
-kinds from §10.4 for each applicable case. Provider-specific tests supplement them; they never weaken them.
-
-An ID may expand into cases but never hide them. “Every,” “each,” an enumerated surface, a declared operator, or a
-capability token creates one scorecard row per discovered case. Mixed ownership creates separate linked rows. The
-row key is `<Acceptance ID>/<Case>/<Owner>`; the stable acceptance ID itself does not change. Every applicable
-case must pass.
+The stable IDs below keep adapter reviews and test names searchable. Earlier sections explain intent; executable tests
+use these IDs when the connection is useful. The bracketed codes name the kinds of proof described in §10.3.
+Provider-specific tests supplement the catalog; they never weaken it. “Every,” “each,” an enumerated surface, or a
+declared capability means every applicable case must pass; no separate scorecard or packet is required.
 
 ### A. Reference, routing, and storage lifecycle
 
@@ -1385,76 +1378,25 @@ case must pass.
 
 ## 10. Evaluate an adapter and choose its change path
 
-An evaluation records contract conformance. Begin with public behavior and claims, then inspect code to assign each
-observed fact to Framework, a shared Family substrate, or the Adapter. The contract establishes architectural
-authority; implementations supply evidence and lessons.
+Begin with public behavior and runtime claims, then inspect code only far enough to assign each finding to Framework,
+a shared Family substrate, or the Adapter. The goal is a smaller correct implementation, not an audit artifact.
 
-### 10.1 Pin the audit identity
+### 10.1 Pin what was tested
 
-Pin the audit identity before reading implementation or running tests:
+Record the source commit, provider and driver versions, real-store fixture, source policies exercised, and date in the
+test result or adapter technical reference. If the tree is dirty, commit the implementation before making a durable
+claim. Do not maintain a parallel source-hash manifest.
 
-| Adapter/package | Reproducible source identity | Primer revision/status | Provider and driver versions | Real-store fixture | Source policies exercised | Date |
-|---|---|---|---|---|---|---|
-|  |  |  |  |  | Managed/RW · Managed/RO · External/RW · External/RO |  |
+Exercise all four policy combinations where the provider supports them:
 
-A clean tree may use its commit as the source identity. Otherwise pin the base commit plus a content-addressed patch,
-added-file manifest, and resultant source fingerprint that reproduce in a disposable clean worktree. A commit that
-does not contain the code under test is not a valid identity.
+- Managed / ReadWrite;
+- Managed / ReadOnly;
+- External / ReadWrite; and
+- External / ReadOnly.
 
-Declare the conformance kind and separate Observed scope from Target scope:
+### 10.2 Inventory execution paths
 
-| Claim ref | Kind/profile/token | Scope | Publication | Observed/Target applicability fact | Fail-closed evidence when declined | Notes |
-|---|---|---|---|---|---|---|
-| CLM-001 | Source Core | Observed | Unadvertised | every connector | — | mandatory |
-| CLM-002 | Entity Persistence | Observed | Advertised | ordinary Entity APIs are public and trigger §8 | — |  |
-| CLM-003 | Native TTL | Declined | Unadvertised | no Observed or Target token | EV-… | corrective unsupported result |
-
-The two axes have one meaning:
-
-- **Scope = Observed** — a surface or public claim in the pinned audit identity selects the §8 predicate. Every
-  Advertised claim is Observed even when its implementation is absent.
-- **Scope = Target** — the product/maintainer-approved work-item examples and Target manifest select the §8 predicate.
-  Target is Unadvertised; an auditor cannot invent or remove Target scope to improve a verdict.
-- **Scope = Declined** — no Observed or Target predicate selects the optional capability; it is Unadvertised and has
-  corrective/fail-closed evidence.
-- **Publication = Advertised/Unadvertised** — whether the pinned API, capability facts, or documentation announces it.
-
-The pinned identity freezes publication. An Advertised capability is Observed/Advertised even when evidence fails;
-a withdrawal or non-shipping disposition requires explicit product/maintainer authority and a separately pinned audit
-identity. Observed and Target versions of one feature use separate `CLM-*` rows.
-
-Capture provider research in a reproducible ledger:
-
-| Probe ref | Concern | Provider/driver version | Least-privilege posture | Exact probe/fixture | Observation | Native artifact | Official source |
-|---|---|---|---|---|---|---|---|
-| PRB-001 |  |  |  |  |  |  |  |
-
-No real-store fixture means the provider behavior is unverified. A mock, code path, comment, capability self-report,
-or passing compile cannot upgrade that status to green.
-
-### 10.2 Inventory every execution surface
-
-Discover implementations and shared family layers dynamically from the repository. Inventory every public and
-optional path before selecting tests:
-
-| Surface | Paths that must be accounted for |
-|---|---|
-| Activation and participation | package/module discovery, exact election, startup initializer, health, readiness, disposal |
-| Keyed Entity access | get, get-many, upsert, delete, conditional replace, polymorphic root |
-| Query | filter, sort, page, count, projection, provider-bounded stream, execution receipt |
-| Bulk and coordinated writes | upsert-many, delete-many, delete-all, each remove strategy, batch add/update/mutate/delete, transaction |
-| Expert/alternate paths | Direct/raw, instructions, patch, storage-lifecycle commands, connection override, provider extensions |
-| External source access | inspect/list/resolve/describe/sample, `RecordSet`, DTO projection, named query/scalar |
-| Physical realization | mapping, codecs, storage naming, partition/axes, shape, projections, indexes, TTL |
-| Cross-cutting failure paths | cancellation, timeout, conflict, transient fault, ambiguous commit, retry/replay, redaction |
-
-Record the inventory in this table:
-
-| Surface ref | Public entry/path | Claim ref | Source postures | Effect/result | Plan + semantic owner | Native owner/dispatch | Failure/cancellation path | Acceptance cases | Unsupported outcome |
-|---|---|---|---|---|---|---|---|---|---|
-| SUR-001 |  |  | Managed/RW · Managed/RO · External/RW · External/RO |  |  |  |  |  |  |
-
-For each path, trace one direction:
+List each public entry point once and trace it through the actual runtime:
 
 ```text
 application intent
@@ -1462,168 +1404,80 @@ application intent
   → readiness or policy-gated provisioning
   → provider resource owner
   → native dispatch
-  → execution receipt, result, or stable failure outcome
+  → execution receipt, result, or stable failure
 ```
 
-If a path skips a stage, the audit records why that is safe. “Another path checks it” is not evidence.
+Check ordinary Entity operations, inspection, registered operations, direct/native escape hatches, lifecycle, health,
+bulk, transactions, and vector operations that the adapter exposes. If two routes realize the same operation, either
+coalesce them or explain the distinct guarantee. A hidden fallback, compatibility bridge, or second mapper is a defect
+until proven necessary.
 
-### 10.3 Map profiles to stable acceptance cells
+### 10.3 Run executable proof
 
-§8 determines applicability. Expand every selected catalog ID using the §9 case rule and the SUR inventory. Split
-mixed Framework, Family, and Adapter concerns into linked rows. A row is atomic: one acceptance ID, one case, one
-owner.
+Use ordinary build and test projects:
 
-The claim-to-cell matrix is the bridge:
+1. compile the public consumer contract;
+2. run shared Framework or Family tests;
+3. run the complete provider suite against the real provider;
+4. prove read-only, external-lifecycle, unsupported, cancellation, and failure paths reject safely;
+5. inspect native plans, dispatch counts, or receipts where a capability claim depends on provider work;
+6. exercise restart, disposal, bounded paging/materialization, and concurrent-host ownership; and
+7. compare cold and warm measurements when the change can affect a hot path.
 
-| Claim ref | Observed/Target predicate | Acceptance IDs | Required cases from SUR/probe ledger | Scope | Publication | Declined-path evidence |
-|---|---|---|---|---|---|---|
-| CLM-001 | connector referenced | A-01–A-06, C-04, C-06, G-02–G-04, G-08, H-01–H-06, P-01, P-03, P-05, P-06 |  | Observed | Unadvertised | — |
-| CLM-… |  |  |  |  |  |  |
+A skip means the environment did not prove the behavior; it is never a pass. Fakes prove Framework orchestration only.
 
-The working scorecard is:
+The catalog uses these compact proof labels:
 
-| Row ID | Acceptance ID | Case | Claim ref/scope/publication | Owner | Linked rows | Required evidence | Evidence refs | Verdict | Gap/failure | Remediation ref | Re-entry proof |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| F-01/catalog/framework | F-01 | immutable catalog | CLM-…/Observed/Advertised | Framework | — | BOOT, NEG |  |  |  |  |  |
-| E-13/single-filter/adapter | E-13 | representative single-field filter | CLM-…/Observed/Advertised | Adapter | — | LIVE, PLAN |  |  |  |  |  |
-| A-05/pool/adapter | A-05 | pooled client disposal | CLM-001/Observed/Unadvertised | Adapter | — | LIFE |  |  |  |  |  |
+- `STATIC` — layer, API, capability, or forbidden-pattern inspection;
+- `BOOT` — consumer compilation and real `AddKoan()` activation;
+- `ORACLE` — black-box result compared with the shared CLR/reference oracle;
+- `LIVE` — integration behavior against the pinned real provider;
+- `NEG` — policy, unsupported, escape-path, and overclaim rejection;
+- `FAULT` — cancellation, timeout, conflict, provider fault, rollback, or indeterminate commit;
+- `PLAN` — native plan, operation trace/count, or execution receipt;
+- `LIFE` — host isolation, disposal, restart, durability, or bounded soak; and
+- `PERF` — allocations, dispatch count, readiness cost, provider work, or elapsed baseline.
 
-Where one case crosses owners, use row IDs such as `B-06/equals/framework` and `B-06/equals/adapter` and
-link them bidirectionally. Required evidence is copied exactly from §9; an audit may add evidence but cannot delete a
-required kind.
+Put the stable acceptance ID in a test display name when it materially improves discovery. Do not mirror test results
+into scorecards, evidence registries, packets, or progress ledgers.
 
-### 10.4 Require the right evidence
+### 10.4 Assign ownership before changing code
 
-- `STATIC` — layer/API/capability inspection and narrow forbidden-pattern checks.
-- `BOOT` — a consumer compiles and a real `AddKoan()` host activates and elects correctly.
-- `ORACLE` — black-box result compared with the shared CLR/reference oracle.
-- `LIVE` — integration fact against the pinned real provider; a fake cannot satisfy this evidence kind.
-- `NEG` — policy rejection, unsupported/fail-closed, escape-path, and overclaim facts.
-- `FAULT` — conflict, cancellation, timeout, network/storage fault, rollback, and indeterminate-commit injection.
-- `PLAN` — provider-native plan, operation trace/count, and execution receipt.
-- `LIFE` — two-host isolation, disposal, restart/durability, and bounded soak.
-- `PERF` — cold/warm allocations, provider dispatch count, readiness cost, and elapsed-time baseline.
+Classify each failure at the narrowest owner with the full meaning:
 
-All codes attached to a catalog cell are conjunctive. Register evidence once and reference it from every row it
-proves:
+- **Framework** owns provider-neutral policy, composition, mapping language, result contracts, and corrections.
+- **Family** owns mechanics whose meaning and lifecycle are identical across a real provider family.
+- **Adapter** owns native translation, dispatch, resource ownership, topology, and exact provider failures.
 
-| Evidence ref | Kind | Exact test/command/review | Fixture/environment | Framework/driver/provider versions | Date | Artifact/log/plan | Result |
-|---|---|---|---|---|---|---|---|
-| EV-001 | LIVE |  |  |  |  |  |  |
-
-An entry is reproducible only when another maintainer can run the exact command against the pinned fixture and find
-the retained artifact. High-blast adapters add a narrow critical-seam review for process-static mutable state, policy bypasses,
-sync-over-async, message-text failure classification, text-prefix effect inference, raw-error passthrough, and
-unbounded caches. Black-box proof remains mandatory; this review adds defense in depth.
-
-### 10.5 Apply mechanical verdict rules
-
-- **PASS** — every required proof for the row ran green against the pinned fixture and audit identity; no silent
-  fallback weakens it.
-- **RED** — applicable Observed/Target implementation or evidence is absent without a named external blocker,
-  executed evidence failed, an Advertised claim is false, a failure is swallowed, or a stronger claim hides fallback. Framework-owned
-  RED is still RED.
-- **DEFER** — the row is applicable but an exact missing framework prerequisite or unavailable external environment
-  blocks execution. It records blocker, owner, safe posture, re-entry condition, and the claim that cannot ship.
-  Ordinary pending work is RED; DEFER is not evidence.
-
-Capability honesty follows directly:
-
-- an Observed predicate absent from the manifest = RED;
-- Observed/Advertised and failed = RED;
-- any Observed row unrun = RED unless the DEFER rule's named blocker is present;
-- optional, Unadvertised, and corrective fail-closed = Scope `Declined`, not a positive-cell verdict;
-- implementation found without a declaration = declare and prove it, or retire/leave it unreachable; for a selected
-  whole-adapter `REBUILD`, every legacy implementation route must be retired rather than left unreachable; and
-- an unsupported feature that silently emulates, scans, flattens, mutates, or returns partial success = RED.
-
-The pinned adapter is conformant only when every Observed row is PASS and every Declined path has negative evidence.
-An Observed RED or DEFER blocks release of the pinned adapter and claim set. A Target RED or DEFER blocks only that
-Target claim's advertisement; it does not change the pinned Observed claim set. An Advertised feature retains
-Observed scope and publication throughout the audit snapshot.
-
-### 10.6 Assign ownership before changing code
-
-Assign **Framework** when the fact is provider-neutral: source policy, immutable plans, query/residual coordination,
-record/mapping/named-read contracts, common error and commit outcomes, capability gates, or TestKit. Assign a shared
-**Family** substrate when relational, document, or key/value mechanics repeat without provider meaning. Assign
-**Adapter** when the fact requires native knowledge: connection mode, identifier grammar, native types/codecs,
-native operations, transactions, cancellation wiring, error codes, metadata, or resource lifecycle.
-
-If both are involved, create two linked rows: Framework computes an immutable decision; Adapter realizes it and
-returns a receipt. Never close a Framework RED with an adapter-local workaround.
-
-Choose one remediation disposition for every non-PASS row:
-
-- `KEEP` — placement is correct; add or retain evidence;
-- `HOIST` — move duplicated provider-neutral behavior into Data or a family substrate;
-- `LOCALIZE` — retain provider dialect/SDK behavior in the adapter;
-- `SPLIT` — Framework emits the plan, Adapter executes and reports;
-- `RETIRE` — remove duplicate, misleading, swallowed, or unreachable machinery;
-- `REBUILD` — replace an adapter-owned slice or complete adapter behind a designated contract seam; or
-- `DECLINE` — abandon an Unadvertised Target and fail closed, or schedule withdrawal of an Advertised claim under a
-  separately pinned audit identity. It cannot close an Observed/Advertised RED in the same pinned identity.
-
-Record the decision separately from the finding:
-
-| Remediation ref | Decision | Rows | Evidence that forced it | Destination seam | Code retained | Code removed/replaced | Acceptance proof |
-|---|---|---|---|---|---|---|---|
-| R-01 | KEEP / HOIST / LOCALIZE / SPLIT / RETIRE / REBUILD / DECLINE |  |  |  |  |  |  |
+For each moving part choose `keep`, `absorb`, `rebuild`, or `delete`. Keep it only when removing it would leave
+a named contract or a measured hot-path need unowned. Do not preserve a helper merely because old code used it, and do
+not create a shared abstraction merely because two providers use similar nouns.
 
 #### Whole-adapter greenfield replacement
 
-When a work item selects whole-adapter `REBUILD`, the old implementation is evidence, not source material. Harvest may
-record provider facts, externally observable behavior, public contract requirements, regression scenarios,
-performance traps, and patterns not to repeat. It must not prescribe the new file/class graph, helper structure,
-control flow, caches, or internal test-fixture design.
+When an adapter is selected for a clean-room rebuild, the old implementation is useful only for provider facts,
+public compatibility requirements, regression scenarios, performance traps, and patterns not to repeat. Begin from an
+empty implementation root and derive every type, cache, resource owner, and dispatch boundary from the current
+contracts or measured need.
 
-The authoring boundary is architectural and testable, not biographical. Begin with empty adapter implementation files.
-Derive every runtime type, cache, resource owner, dispatch boundary, and abstraction from a ratified contract or a
-measured hot-path need. Review the result for copied structure and redundant concepts, but do not substitute role
-registries, access logs, or claims of cognitive isolation for behavioral and structural evidence.
+The final change leaves one activation route and one native execution route per declared operation. It contains no
+legacy, compatibility, shadow, or fallback implementation. If later testing reveals valid missing behavior, add that
+behavior as a requirement and black-box test; do not restore old structure.
 
-For the replaced Adapter owner, this choice overrides per-slice `KEEP`, `HOIST`, and `LOCALIZE`: record one complete
-`REBUILD`, retire every legacy implementation route, and set `Code retained` to `none`. A shared Framework/Family gap
-has its own contract-derived change; no old Adapter body moves into that owner.
+### 10.5 Completion
 
-| Lesson ref | Provider/public fact or negative lesson | Reproducible proof | Black-box consequence | Author-visible |
-|---|---|---|---|---|
-| L-001 |  | PRB-… / EV-… |  | yes / no |
+An adapter evaluation is complete when:
 
-Before authoring begins, freeze the rewrite inputs and empty the replaced adapter implementation. Valid inputs are this
-primer, ratified public contracts, shared Framework/Family contracts, provider facts and official documentation,
-public compatibility decisions, negative lessons, and black-box scenarios. Do not copy, port, mechanically transform,
-or structurally preserve the retired source. Package identity, public names, configuration keys, and provider
-dependencies continue only when explicitly ratified and are reimplemented as contracts.
+- the adapter and its test project build cleanly;
+- every applicable shared and provider test passes against the intended provider version;
+- unavailable infrastructure is reported as inconclusive;
+- unsupported and policy-forbidden paths fail before prohibited provider work;
+- runtime claims, diagnostics, README, and TECHNICAL documentation agree;
+- no duplicate execution, mapping, lifecycle, or resource-ownership path remains; and
+- relevant warm-path measurements show no unexplained material regression.
 
-The final change atomically deletes the old implementation and installs the new one. It leaves one activation path,
-one native execution path per declared operation, and no legacy/compatibility/shadow/fallback route. Certification
-includes a retirement manifest, compile/registration/type inventory, source-lineage review, and dead-path absence
-proof. A post-build comparison may discover a missed valid public behavior; that behavior becomes a requirement and
-black-box test for the new implementation, never a reason to restore old code or create a bridge.
-
-### 10.7 Produce the evidence packet
-
-An adapter evaluation is complete only when it publishes:
-
-1. the pinned identity header and `PRB-*` provider probe ledger;
-2. the conformance kind plus `CLM-*` Observed/Target/Declined scope and Advertised/Unadvertised publication manifest;
-3. the `SUR-*` execution-surface matrix covering all four source-policy postures and every alternate path;
-4. the claim-to-cell matrix and fully expanded atomic scorecard;
-5. the `EV-*` registry and retained plans, provider dispatch counts, fault artifacts, lifecycle results, and P-cell baselines;
-6. the verdict dependency index: consumed semantic owners, source path/hashes, conformance tool/schema and profile
-   fingerprints, and provider fixture identity;
-7. the `R-*` remediation ledger with linked owners, invalidated consumers, and re-entry proofs;
-8. for whole-adapter `REBUILD`, the frozen rewrite inputs, empty-root proof, legacy-retirement, new-source, absence,
-   architecture, and independent behavioral evidence; and
-9. README, capabilities, facts, diagnostics, and known limits reconciled to the same pinned truth.
-
-Run order is fixed: **pin → inventory → execute Source Core → execute every Observed cell → execute Target work
-cells → prove Declined paths fail closed → assign owners → select remediation dispositions → invalidate every packet
-that consumed a changed owner/path/tool/profile/fixture → rerun all affected rows on one new identity**.
-The packet is reproducible only when every scorecard evidence reference resolves to its registry entry/artifact and
-every public claim resolves back to `CLM-*` and green rows. Invalidation follows declared consumption, not the order of
-work items: an earlier gold or sibling packet is stale when it consumed a changed dependency.
+The source, tests, provider fixture, and current documentation are the evidence. No second certification system is
+required.
 
 ## Related
 

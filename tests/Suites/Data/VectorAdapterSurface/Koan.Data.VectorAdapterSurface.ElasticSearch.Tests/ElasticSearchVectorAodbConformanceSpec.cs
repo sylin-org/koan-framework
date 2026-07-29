@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.ElasticSearch.Tests;
 
-/// <summary>Executable DAC-55 ledger for the empty-root Elasticsearch adapter.</summary>
+/// <summary>Live conformance suite for the Elasticsearch adapter.</summary>
 public sealed class ElasticSearchVectorAodbConformanceSpec(ElasticSearchTestFactory fixture)
     : VectorAodbConformanceSpecsBase
 {

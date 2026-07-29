@@ -9,7 +9,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Milvus.Tests;
 
-/// <summary>One pinned live Milvus topology shared by the executable DAC-58 ledger.</summary>
+/// <summary>One pinned live Milvus topology shared by the provider suite.</summary>
 public sealed class MilvusTestFactory : IAsyncLifetime
 {
     private INetwork? _network;

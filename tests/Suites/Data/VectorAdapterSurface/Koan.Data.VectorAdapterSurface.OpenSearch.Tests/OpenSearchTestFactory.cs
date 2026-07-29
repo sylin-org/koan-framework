@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.OpenSearch.Tests;
 
-/// <summary>One pinned live OpenSearch runtime shared by the executable DAC-56 ledger.</summary>
+/// <summary>One pinned live OpenSearch runtime shared by the provider suite.</summary>
 public sealed class OpenSearchTestFactory : IAsyncLifetime
 {
     private IContainer? _container;

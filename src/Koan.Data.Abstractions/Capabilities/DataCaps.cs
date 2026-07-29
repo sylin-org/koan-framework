@@ -54,7 +54,7 @@ public static class DataCaps
         public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
     }
 
-    /// <summary>Isolation negotiation tokens — the AODB three-mode conformance ledger (ARCH-0103 §6; DATA-0105 /
+    /// <summary>Isolation negotiation tokens — the AODB three-mode conformance suite (ARCH-0103 §6; DATA-0105 /
     /// ARCH-0095). Axis-free: each token names the adapter <b>guarantee</b>, not the consumer that needs it
     /// (Koan.Tenancy <c>Require</c>s the mode its axis declares). Each token is <b>co-defined with its conformance
     /// check</b> (ARCH-0094): an adapter that declares a token but does not realize its mode fails the matching cell of

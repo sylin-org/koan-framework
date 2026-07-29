@@ -4,10 +4,10 @@ domain: data
 title: "DATA-0110 - Compact provider-neutral Data adapter language"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-27
+last_updated: 2026-07-29
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-27
+  date_last_tested: 2026-07-29
   status: reviewed
   scope: public mapping and registered-operation grammar
 ---
@@ -96,6 +96,9 @@ Adapters consume the compiled plan. They do not implement or reinterpret the flu
   properties and duplicate names are legal. It is not the typed mapping selector.
 - Provider-specific terminology remains appropriate for native probes, plans, diagnostics, and binding leaves.
 - The exact API is guarded by consumer compile specifications before adapter implementation begins.
+- Adapter conformance is proved by ordinary shared contract tests and focused real-provider tests. The primer remains
+  authoring guidance; Koan does not maintain a parallel certification catalog, evidence packet protocol, source-hash
+  manifest, or project-status ledger that can disagree with executable behavior.
 
 ## Related
 

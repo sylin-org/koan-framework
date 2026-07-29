@@ -4,7 +4,7 @@ using Koan.Data.AdapterSurface.TestKit;
 namespace Koan.Data.Connector.Redis.Tests.Specs;
 
 /// <summary>
-/// Redis's AODB conformance ledger cell. Proves the greenfield adapter realizes all three AODB
+/// Redis's AODB conformance suite proves the greenfield adapter realizes all three AODB
 /// modes and declares the matching tokens. The two routed conformance sources share one Redis connection
 /// (<c>ConnectionStrings:Redis</c>, set by the fixture) but isolate by per-source logical-database index.
 /// </summary>

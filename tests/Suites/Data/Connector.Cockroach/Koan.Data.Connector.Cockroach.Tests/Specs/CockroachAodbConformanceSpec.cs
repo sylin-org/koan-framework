@@ -6,7 +6,7 @@ using Npgsql;
 namespace Koan.Data.Connector.Cockroach.Tests.Specs;
 
 /// <summary>
-/// CockroachDB's AODB conformance ledger cell. Proves the relational realization of all three AODB modes through
+/// CockroachDB's AODB conformance suite proves the relational realization of all three AODB modes through
 /// CockroachDB's lean Npgsql-family connector. For the Database cell the two routed conformance sources point to
 /// freshly-created physical databases on the fixture's node.
 /// </summary>

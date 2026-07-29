@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.ElasticSearch.Tests;
 
-/// <summary>One pinned live Elasticsearch runtime shared by the executable DAC-55 ledger.</summary>
+/// <summary>One pinned live Elasticsearch runtime shared by the provider suite.</summary>
 public sealed class ElasticSearchTestFactory : IAsyncLifetime
 {
     private IContainer? _container;

@@ -18,7 +18,7 @@ using Xunit;
 namespace Koan.Data.AdapterSurface.TestKit;
 
 /// <summary>
-/// The one reusable AODB conformance ledger (ARCH-0103 §6 / P5). A per-adapter cell subclasses this with the adapter's
+/// The reusable AODB conformance suite (ARCH-0103 §6 / P5). Each adapter subclasses this with the adapter's
 /// container fixture and the per-source placement settings; the base proves, through a real <c>AddKoan()</c> boot, that
 /// the adapter realizes ALL THREE AODB isolation modes — and that it <b>declares</b> the matching capability tokens.
 /// <para>

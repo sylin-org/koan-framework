@@ -17,7 +17,7 @@ using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 
-/// <summary>Executable DAC-53 ledger for the empty-root Qdrant network reference adapter.</summary>
+/// <summary>Live conformance suite for the Qdrant network reference adapter.</summary>
 public sealed class QdrantVectorAodbConformanceSpec(QdrantTestFactory fixture)
     : VectorAodbConformanceSpecsBase
 {
