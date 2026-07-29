@@ -1,7 +1,7 @@
 # Sylin.Koan.Data.Connector.Sqlite
 
 SQLite is Koan's embedded relational reference adapter. It supports the ordinary Entity experience for a managed
-store and the same compact source-first experience for external or legacy files.
+store and the same compact source experience for external or legacy files.
 
 ## Install
 

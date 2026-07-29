@@ -4,10 +4,10 @@ domain: data
 title: "Data Adapter Conformance Current Handoff"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-28
+last_updated: 2026-07-29
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-28
+  date_last_tested: 2026-07-29
   status: reviewed
   scope: vector adapter rebuild lane handoff
 ---
@@ -16,49 +16,47 @@ validation:
 
 ## Current state
 
-The ratified Vector contract is V-01 through V-24 plus G-09. Four adapters have been rebuilt from empty implementation
-roots:
+The ratified Vector contract is V-01 through V-24 plus G-09. Five adapters have been rebuilt from empty
+implementation roots:
 
 - DAC-51 InMemory Vector: behavioral suite green; strict packet generation deferred;
 - DAC-52 SqliteVec: behavioral suite green; native RID matrix and strict packet generation deferred;
 - DAC-53 Qdrant: 28/28 live against `qdrant/qdrant:v1.18.3`; strict packet generation deferred;
-- DAC-55 Elasticsearch: 28/28 live against Elasticsearch 9.4.3; strict packet generation deferred.
+- DAC-55 Elasticsearch: 28/28 live against Elasticsearch 9.4.3; strict packet generation deferred;
+- DAC-56 OpenSearch: 28/28 live against OpenSearch 3.7.0; strict packet generation deferred.
 
-Elasticsearch is now independent of the retired SearchEngine execution design. Its application contract comes from
-`VectorSpacePlan` and `DataSourcePlan`; its options contain placement, credentials, timeout, and bounded-work controls
-only. The implementation has one source-aware route, one bounded client, one native filter compiler, and one
-plan-bound repository.
+Elasticsearch and OpenSearch now independently realize the same Koan vector decisions through native mappings,
+queries, scores, failures, and source policy. Comparing the proven implementations found no provider-neutral runtime
+whose extraction would be smaller or clearer than the two provider-owned paths. `Koan.Data.SearchEngine` therefore had
+no remaining owner and was deleted from source, solution membership, and the package/product surface.
 
 ## Latest validation
 
 | Gate | Result |
 |---|---|
-| Elasticsearch live Vector ledger | 28/28 passed, zero skipped, 17 seconds |
+| OpenSearch live Vector ledger | 28/28 passed, zero skipped, 30 seconds |
+| Elasticsearch live Vector ledger | 28/28 passed, zero skipped |
 | Filter convergence | every declared operator and boolean composition converges with the neutral oracle |
 | Metric normalization | Cosine, Euclidean, and DotProduct are finite, monotonic, and higher-is-closer |
-| Data Core Vector regression | 24/24 passed |
-| InMemory Vector regression | 50/50 passed |
-| SqliteVec regression | 58 passed; five deliberate capability skips unchanged |
-| Solution build | zero warnings, zero errors |
-| Documentation lint | zero errors; 1,472 existing warnings remain non-gating |
+| SearchEngine retirement | no production, solution, claim, or current package-inventory owner remains |
 | Strict packet | deferred because the shared versioned packet generator is absent |
 
-Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, and DAC-55
-remain `in-progress` in the certification ledger until the shared control plane can emit the required artifact.
+Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, DAC-55, and
+DAC-56 remain `in-progress` in the certification ledger until the shared control plane can emit the required artifact.
 
 ## Next action
 
-Execute DAC-56: rebuild OpenSearch from an empty implementation root against its pinned native behavior. Do not copy
-the Elasticsearch repository or preserve the current SearchEngine/OpenSearch control flow. After both independent
-providers are green, compare only their proven mechanical responsibilities; share nothing unless the repeated seam is
-smaller and clearer than two provider-owned implementations. Retire `Koan.Data.SearchEngine` only after OpenSearch no
-longer consumes it and repository references prove that it has no remaining owner.
+Execute DAC-57 as an empty-root Weaviate rebuild. First perform a systematic primer/provider exploration pass and
+replace the old audit-only card with an implementation-authorized brief. Harvest the existing adapter only for
+provider facts and failure cases. Do not copy Qdrant, Elasticsearch, OpenSearch, or the existing Weaviate control flow.
+Share code only if the final implementation demonstrates a smaller provider-neutral owner already required by the
+framework.
 
 ## Guardrails
 
 - Begin every adapter with the primer and an empty implementation root.
 - Reuse framework contracts, not legacy adapter structure or control flow.
-- Add a shared abstraction only when two rebuilt providers demonstrate the same stable responsibility.
+- Add a shared abstraction only when rebuilt providers demonstrate the same stable responsibility.
 - Keep schema, metric, lifecycle, visibility, and source decisions with their existing Koan owners.
 - Prefer fewer meaningful runtime parts; do not grow certification scaffolding inside adapter cards.
 - Real provider cells must run live; unavailable infrastructure is a skip or defer, never a pass.

@@ -163,3 +163,5 @@ transforms rather than relying on ranking alone.
 The source inventory, current Vector contract, three rebuilt reference adapters, provider fixtures, and official native
 documentation were compared. The current family package cannot express the ratified contract and its apparent code
 similarity does not establish semantic sameness. The replacement boundary is therefore **prove twice, share last**.
+DAC-55 and DAC-56 subsequently passed 28/28 live scenarios independently. Their final provider mechanics did not yield
+a smaller provider-neutral runtime owner, so `Koan.Data.SearchEngine` was retired rather than preserved as scaffolding.

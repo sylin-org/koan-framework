@@ -81,8 +81,8 @@ DAC-00 re-derives this roster dynamically. The current repository contains:
 - nine Entity-persistence adapters: SQLite, MongoDB, InMemory, JSON, PostgreSQL, SQL Server, CockroachDB,
   Couchbase, and Redis;
 - seven Vector adapters: InMemory Vector, SqliteVec, Qdrant, Elasticsearch, OpenSearch, Weaviate, and Milvus;
-- shared Family seams in `Koan.Data.Relational`, `Koan.Data.Relational.Npgsql`, `Koan.Data.Core.Document`,
-  `Koan.Data.Core.KeyValue`, and `Koan.Data.SearchEngine`; and
+- shared Family seams in `Koan.Data.Relational`, `Koan.Data.Relational.Npgsql`, `Koan.Data.Core.Document`, and
+  `Koan.Data.Core.KeyValue`; and
 - existing AdapterSurface and VectorAdapterSurface TestKits plus `scripts/forge-verify.ps1`.
 
 Cache adapters and `Koan.Data.AI` are adjacent consumers, not Data adapter certification targets in this epic.

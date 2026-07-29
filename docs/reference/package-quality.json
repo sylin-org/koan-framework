@@ -4,13 +4,38 @@
   "summary": {
     "packages": 93,
     "repairRequired": 0,
-    "reviewRequired": 0,
-    "structurallyReady": 93,
+    "reviewRequired": 10,
+    "structurallyReady": 83,
     "ownedReadmes": 93,
     "technicalCompanions": 93,
-    "findings": 0
+    "findings": 18
   },
-  "findingDefinitions": [],
+  "findingDefinitions": [
+    {
+      "code": "docs.readme.boundaries.missing",
+      "severity": "warning",
+      "summary": "The README has no recognizable guarantees, requirements, failure, or limitation section.",
+      "correction": "State defaults, prerequisites, corrective failures, and unsupported guarantees proportionate to the package role."
+    },
+    {
+      "code": "docs.readme.install.missing",
+      "severity": "warning",
+      "summary": "The README does not show the package-specific install or reference expression.",
+      "correction": "Add the shortest supported dotnet add/tool/template installation command and state any current publication boundary."
+    },
+    {
+      "code": "docs.readme.meaningful-use.missing",
+      "severity": "warning",
+      "summary": "The README has no recognizable meaningful-use or behavior section.",
+      "correction": "Show the smallest honest result and explain what referencing the package makes available."
+    },
+    {
+      "code": "docs.readme.package-title.missing",
+      "severity": "warning",
+      "summary": "The README does not use the exact package ID as its primary title.",
+      "correction": "Use the exact package ID as the primary title so the NuGet page and source companion identify the same product."
+    }
+  ],
   "packages": [
     {
       "packageId": "Sylin.Koan",
@@ -599,7 +624,7 @@
       "projectPath": "src/Koan.Data.Backup/Koan.Data.Backup.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "Integrity-checked, provider-bounded Entity archive creation and recovery through Koan Storage.",
       "targetFrameworks": [
         "net10.0"
@@ -614,7 +639,12 @@
       "readme": "src/Koan.Data.Backup/README.md",
       "technicalDocumentation": "src/Koan.Data.Backup/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.install.missing",
+        "docs.readme.meaningful-use.missing",
+        "docs.readme.package-title.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Cockroach",
@@ -622,15 +652,11 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql \u002B Dapper) with guardrails and governance.",
+      "description": "CockroachDB provider for Koan Data: a lean concrete connector over the shared Npgsql execution family.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
         "Sylin.Koan.Data.Relational.Npgsql"
       ],
       "readme": "src/Connectors/Data/Cockroach/README.md",
@@ -643,8 +669,8 @@
       "projectPath": "src/Connectors/Data/Couchbase/Koan.Data.Connector.Couchbase.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
-      "description": "Couchbase data provider for Koan: options binding and repository integration for document databases.",
+      "status": "review-required",
+      "description": "Couchbase provider for Koan Data with direct KV, SQL\u002B\u002B, CAS, compact mappings, and neutral source integration.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -656,7 +682,9 @@
       "readme": "src/Connectors/Data/Couchbase/README.md",
       "technicalDocumentation": "src/Connectors/Data/Couchbase/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",
@@ -664,13 +692,16 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "Elasticsearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the Elasticsearch REST API.",
+      "description": "Elasticsearch vector provider for Koan: plan-bound complete points, native filtered kNN search, normalized similarity, and session-visible mutations.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Data.SearchEngine"
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/ElasticSearch/TECHNICAL.md",
@@ -722,7 +753,7 @@
       "projectPath": "src/Connectors/Data/Mongo/Koan.Data.Connector.Mongo.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "MongoDB data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
         "net10.0"
@@ -736,7 +767,9 @@
       "readme": "src/Connectors/Data/Mongo/README.md",
       "technicalDocumentation": "src/Connectors/Data/Mongo/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",
@@ -744,13 +777,16 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "OpenSearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the OpenSearch REST API.",
+      "description": "OpenSearch vector provider for Koan: plan-bound complete points, native filtered k-NN search, normalized similarity, and session-visible mutations.",
       "targetFrameworks": [
         "net10.0"
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Data.SearchEngine"
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/OpenSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/OpenSearch/TECHNICAL.md",
@@ -784,8 +820,8 @@
       "projectPath": "src/Connectors/Data/Redis/Koan.Data.Connector.Redis.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
-      "description": "Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.",
+      "status": "review-required",
+      "description": "Redis keyed Entity persistence for Koan with native TTL, bounded managed sets, compact JSON mapping, read-only Functions, and shared connection ownership.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -799,14 +835,16 @@
       "readme": "src/Connectors/Data/Redis/README.md",
       "technicalDocumentation": "src/Connectors/Data/Redis/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
       "projectPath": "src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.",
       "targetFrameworks": [
         "net10.0"
@@ -819,7 +857,9 @@
       "readme": "src/Connectors/Data/Sqlite/README.md",
       "technicalDocumentation": "src/Connectors/Data/Sqlite/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.boundaries.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.SqlServer",
@@ -921,28 +961,6 @@
       "findings": []
     },
     {
-      "packageId": "Sylin.Koan.Data.SearchEngine",
-      "projectPath": "src/Koan.Data.SearchEngine/Koan.Data.SearchEngine.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "structurally-ready",
-      "description": "Shared core for Koan search-engine vector connectors (Elasticsearch / OpenSearch, both built on Apache Lucene): the shared SearchEngineVectorRepository behind a 3-member ISearchEngineDialect seam, plus the single source of truth for translating the unified Filter AST into the search-engine query DSL.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions"
-      ],
-      "readme": "src/Koan.Data.SearchEngine/README.md",
-      "technicalDocumentation": "src/Koan.Data.SearchEngine/TECHNICAL.md",
-      "packageIcon": "icon.png",
-      "findings": []
-    },
-    {
       "packageId": "Sylin.Koan.Data.SoftDelete",
       "projectPath": "src/Koan.Data.SoftDelete/Koan.Data.SoftDelete.csproj",
       "shape": "library",
@@ -1004,7 +1022,7 @@
       "projectPath": "src/Connectors/Data/Vector/InMemory/Koan.Data.Vector.Connector.InMemory.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.",
       "targetFrameworks": [
         "net10.0"
@@ -1019,7 +1037,10 @@
       "readme": "src/Connectors/Data/Vector/InMemory/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/InMemory/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.install.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
@@ -1048,8 +1069,8 @@
       "projectPath": "src/Connectors/Data/Vector/Qdrant/Koan.Data.Vector.Connector.Qdrant.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
-      "description": "Qdrant vector provider for Koan: entity-first KNN search, payload filtering, bulk operations, export, and visibility-aware writes over REST.",
+      "status": "review-required",
+      "description": "Qdrant vector provider for Koan: plan-bound Entity vector search, native payload filtering, and session-visible mutations over REST.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1063,14 +1084,16 @@
       "readme": "src/Connectors/Data/Vector/Qdrant/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Qdrant/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
       "projectPath": "src/Connectors/Data/Vector/SqliteVec/Koan.Data.Vector.Connector.SqliteVec.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [
         "net10.0"
@@ -1085,7 +1108,9 @@
       "readme": "src/Connectors/Data/Vector/SqliteVec/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/SqliteVec/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.install.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",
@@ -1190,6 +1215,27 @@
       "technicalDocumentation": "src/Koan.Jobs/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Jobs.Testing",
+      "projectPath": "src/Koan.Jobs.Testing/Koan.Jobs.Testing.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "review-required",
+      "description": "Deterministically drive Koan Jobs through its production execution engine from any test framework.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Jobs"
+      ],
+      "readme": "src/Koan.Jobs.Testing/README.md",
+      "technicalDocumentation": "src/Koan.Jobs.Testing/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Mcp",
@@ -1448,7 +1494,7 @@
       "projectPath": "src/Connectors/Storage/S3/Koan.Storage.Connector.S3.csproj",
       "shape": "library",
       "role": "provider",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "S3-compatible Remote provider for Koan Storage with explicit or optional Zen Garden endpoint discovery.",
       "targetFrameworks": [
         "net10.0"
@@ -1461,7 +1507,12 @@
       "readme": "src/Connectors/Storage/S3/README.md",
       "technicalDocumentation": "src/Connectors/Storage/S3/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.install.missing",
+        "docs.readme.meaningful-use.missing",
+        "docs.readme.package-title.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Templates",

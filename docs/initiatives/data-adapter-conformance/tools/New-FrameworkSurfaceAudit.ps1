@@ -95,7 +95,7 @@ function Get-ProjectRole {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($RelativeProject)
     if ($name -in @('Koan.Data.Abstractions', 'Koan.Data.Core')) { return 'Framework' }
     if ($name -in @('Koan.Data.Relational', 'Koan.Data.Relational.Abstractions', 'Koan.Data.Relational.Npgsql',
-                    'Koan.Data.SearchEngine', 'Koan.Data.Vector', 'Koan.Data.Vector.Abstractions')) { return 'Family' }
+                    'Koan.Data.Vector', 'Koan.Data.Vector.Abstractions')) { return 'Family' }
     if ($name -in @('Koan.Data.Backup', 'Koan.Data.SoftDelete')) { return 'Extension' }
     if ($name -eq 'Koan.Data.AI') { return 'Adjacent' }
     return 'Unclassified'

@@ -100,7 +100,6 @@ function Get-FrameworkSurfaceId {
     if ($project -eq 'Koan.Data.Relational.Abstractions') { return 'SUR-FAM-RELATIONAL-CONTRACT' }
     if ($project -eq 'Koan.Data.Relational') { return 'SUR-FAM-RELATIONAL-EXECUTION' }
     if ($project -eq 'Koan.Data.Relational.Npgsql') { return 'SUR-FAM-RELATIONAL-NPGSQL' }
-    if ($project -eq 'Koan.Data.SearchEngine') { return 'SUR-FAM-SEARCHENGINE' }
     if ($project -eq 'Koan.Data.Vector.Abstractions') { return 'SUR-FAM-VECTOR-CONTRACT' }
     if ($project -eq 'Koan.Data.Vector') { return 'SUR-FAM-VECTOR-RUNTIME' }
 

@@ -74,7 +74,7 @@ The epic covers:
 
 - `Koan.Data.Abstractions`, `Koan.Data.Core`, and shared Data family substrates;
 - all Entity-persistence connectors discovered under `src/Connectors/Data`;
-- `Koan.Data.Vector`, `Koan.Data.SearchEngine`, and every discovered Vector connector; and
+- `Koan.Data.Vector`, its abstractions, and every discovered Vector connector; and
 - the Data AdapterSurface, VectorAdapterSurface, provider fixtures, Forge, facts, docs, and product claims that
   communicate conformance.
 
