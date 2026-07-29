@@ -1,30 +1,97 @@
 using Koan.Core;
 using Koan.Core.Services;
-using Koan.Data.SearchEngine;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
+using Koan.Data.Vector.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.ElasticSearch;
 
 [ProviderPriority(Infrastructure.Constants.Provider.Priority)]
-[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Id, name: "Elasticsearch",
-    ContainerImage = "docker.elastic.co/elasticsearch/elasticsearch",
-    DefaultTag = "9.4.3",
+[KoanService(ServiceKind.Vector, shortCode: Infrastructure.Constants.Provider.Name, name: "Elasticsearch",
+    ContainerImage = "docker.elastic.co/elasticsearch/elasticsearch", DefaultTag = "9.4.3",
     DefaultPorts = new[] { 9200 },
-    Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true" },
-    Env = new[]
-    {
-        "discovery.type=single-node",
-        "xpack.security.enabled=false",
-        "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    },
+    Capabilities = new[] { "protocol=http", "vector-search=true", "filters=true", "session-visibility=true" },
+    Env = new[] { "discovery.type=single-node", "xpack.security.enabled=false", "ES_JAVA_OPTS=-Xms512m -Xmx512m" },
     Volumes = new[] { "./Data/elasticsearch-9.4:/usr/share/elasticsearch/data" },
     AppEnv = new[] { "Koan__Data__ElasticSearch__Endpoint=http://{serviceId}:{port}" },
-    HealthEndpoint = "/_cluster/health",
-    HealthIntervalSeconds = 5,
-    HealthTimeoutSeconds = 2,
-    HealthRetries = 12,
-    Scheme = "http", Host = Infrastructure.Constants.Provider.Id, EndpointPort = 9200, UriPattern = "http://{host}:{port}",
-    LocalScheme = "http", LocalHost = "localhost", LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
-public sealed class ElasticSearchVectorAdapterFactory : SearchEngineVectorAdapterFactory<ElasticSearchOptions>
+    HealthEndpoint = Infrastructure.Constants.HealthPath,
+    HealthIntervalSeconds = 5, HealthTimeoutSeconds = 3, HealthRetries = 12,
+    Scheme = "http", Host = Infrastructure.Constants.Provider.Name, EndpointPort = 9200,
+    UriPattern = "http://{host}:{port}", LocalScheme = "http", LocalHost = "localhost",
+    LocalPort = 9200, LocalPattern = "http://{host}:{port}")]
+public sealed class ElasticSearchVectorAdapterFactory(
+    IConfiguration configuration,
+    DataSourceRegistry sources,
+    IOptions<ElasticSearchOptions> options) : IVectorAdapterFactory
 {
-    protected override SearchEngineConnectorDescriptor Descriptor => Infrastructure.Constants.Descriptor;
+    private readonly ElasticSearchOptions _options = Validate(options.Value);
+
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => Infrastructure.Constants.Provider.Aliases;
+
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
+    {
+        Style = StorageNamingStyle.EntityType,
+        Separator = "-",
+        Casing = NameCasing.AsIs,
+        PartitionSeparator = '-',
+        MaxIdentifierBytes = 220,
+        Partition = new PartitionTokenPolicy { GuidFormat = "N", Lowercase = false, AllowedExtraChars = "-._" }
+    };
+
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider services,
+        VectorSpacePlan plan)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Visibility != VectorVisibility.Session)
+            throw new NotSupportedException(
+                "Elasticsearch realizes awaited Session visibility with an explicit refresh and does not simulate Eventual visibility.");
+        var http = services.GetService(typeof(IHttpClientFactory)) as IHttpClientFactory
+            ?? throw new InvalidOperationException(
+                "Elasticsearch requires IHttpClientFactory. Reference the connector and call AddKoan().");
+        return new ElasticSearchRepository<TEntity, TKey>(
+            services, this, plan, ResolveRoute(plan.Source), _options, http);
+    }
+
+    internal ElasticSearchRoute ResolveRoute(string source)
+    {
+        var name = string.IsNullOrWhiteSpace(source) ? "Default" : source;
+        var endpoint = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, sources, Provider, name, _options.Endpoint, this);
+        var apiKey = Setting(name, "ApiKey", _options.ApiKey);
+        var username = Setting(name, "Username", _options.Username);
+        var password = Setting(name, "Password", _options.Password);
+        return ElasticSearchRoute.Create(name, endpoint, apiKey, username, password, sources.GetPlan(name, Provider));
+    }
+
+    private string? Setting(string source, string key, string? fallback)
+    {
+        var value = AdapterConnectionResolver.GetSourceSetting(
+            configuration, sources, Provider, source, key, fallback ?? string.Empty, this);
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private static ElasticSearchOptions Validate(ElasticSearchOptions value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        _ = ElasticSearchRoute.NormalizeEndpoint(value.Endpoint);
+        if (value.TimeoutSeconds <= 0) throw Invalid(nameof(value.TimeoutSeconds));
+        if (value.MaxMetadataBytesPerPoint <= 0) throw Invalid(nameof(value.MaxMetadataBytesPerPoint));
+        if (value.MaxBatchPoints <= 0) throw Invalid(nameof(value.MaxBatchPoints));
+        if (value.MaxRequestBytes <= 0) throw Invalid(nameof(value.MaxRequestBytes));
+        if (value.MaxSearchCandidates <= 1 || value.MaxSearchCandidates > 10_000)
+            throw new InvalidOperationException("ElasticSearchOptions.MaxSearchCandidates must be between 2 and 10,000.");
+        if (value.MaxResponseBytes <= 0) throw Invalid(nameof(value.MaxResponseBytes));
+        return value;
+    }
+
+    private static InvalidOperationException Invalid(string name) =>
+        new($"ElasticSearchOptions.{name} must be greater than zero.");
 }
