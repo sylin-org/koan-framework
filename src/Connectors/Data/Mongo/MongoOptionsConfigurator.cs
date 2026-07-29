@@ -1,5 +1,3 @@
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Connector.Mongo.Infrastructure;
 using Microsoft.Extensions.Configuration;
@@ -7,9 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Mongo;
 
-internal sealed class MongoOptionsConfigurator(
-    IConfiguration configuration,
-    IServiceDiscoveryCoordinator? discovery = null) : IConfigureOptions<MongoOptions>
+internal sealed class MongoOptionsConfigurator(IConfiguration configuration) : IConfigureOptions<MongoOptions>
 {
     public void Configure(MongoOptions options)
     {
@@ -34,11 +30,9 @@ internal sealed class MongoOptionsConfigurator(
         if (!string.IsNullOrWhiteSpace(database)) options.Database = database.Trim();
 
         var requested = connection ?? options.ConnectionString;
-        options.ConnectionString = IsAuto(requested)
-            ? Discover(options.Database)
-            : IsZenGarden(requested)
-                ? ResolveRequired(requested!.Trim(), options.Database)
-                : requested!.Trim();
+        options.ConnectionString = string.IsNullOrWhiteSpace(requested)
+            ? Constants.Configuration.Auto
+            : requested.Trim();
 
         if (Enum.TryParse<StorageNamingStyle>(First(
                 "Koan:Data:Sources:Default:mongo:NamingStyle",
@@ -56,53 +50,4 @@ internal sealed class MongoOptionsConfigurator(
         return null;
     }
 
-    private string Discover(string database)
-    {
-        var fallback = $"mongodb://localhost:{Constants.Discovery.DefaultPort}";
-        if (configuration.GetValue(Constants.Configuration.DisableAutoDetection, false) || discovery is null)
-            return fallback;
-        var result = discovery.DiscoverService(
-                Constants.Discovery.ServiceName,
-                Context(database))
-            .GetAwaiter().GetResult();
-        return result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl)
-            ? result.ServiceUrl
-            : fallback;
-    }
-
-    private string ResolveRequired(string intent, string database)
-    {
-        if (discovery is null)
-            throw ExplicitIntentFailure("Koan's service-discovery coordinator is unavailable.");
-        var result = discovery.ResolveServiceIntent(
-                Constants.Discovery.ServiceName,
-                intent,
-                Context(database))
-            .GetAwaiter().GetResult();
-        if (!result.IsSuccessful || string.IsNullOrWhiteSpace(result.ServiceUrl))
-            throw ExplicitIntentFailure(result.ErrorMessage);
-        return result.ServiceUrl;
-    }
-
-    private DiscoveryContext Context(string database) => new()
-    {
-        Configuration = configuration,
-        RequireHealthValidation = true,
-        Parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["database"] = database
-        }
-    };
-
-    private static InvalidOperationException ExplicitIntentFailure(string? reason) => new(
-        "Mongo explicit Zen Garden intent for 'mongodb' could not be satisfied. " +
-        $"{reason ?? "No ready MongoDB offering was found."} " +
-        "Reference and enable Koan.ZenGarden with a ready 'mongodb' offering, choose 'auto', " +
-        "or provide a native MongoDB connection string.");
-
-    private static bool IsAuto(string? value) =>
-        string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsZenGarden(string? value) =>
-        value?.Trim().StartsWith("zen-garden://", StringComparison.OrdinalIgnoreCase) == true;
 }

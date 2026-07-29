@@ -23,7 +23,7 @@ internal sealed class MongoSourceIntegration(MongoRoute route, MongoClientManage
         CancellationToken ct = default)
     {
         var binding = Require(plan);
-        var collection = Collection(binding.Collection);
+        var collection = await Collection(binding.Collection, ct).ConfigureAwait(false);
         var pipeline = Bind(plan, binding, parameters);
         pipeline.Add(new BsonDocument("$limit", (long)plan.Limits.MaxRecords + 1));
         var records = await collection.Aggregate<BsonDocument>(
@@ -42,7 +42,8 @@ internal sealed class MongoSourceIntegration(MongoRoute route, MongoClientManage
         var binding = Require(plan);
         var pipeline = Bind(plan, binding, parameters);
         pipeline.Add(new BsonDocument("$limit", 2));
-        var records = await Collection(binding.Collection).Aggregate<BsonDocument>(
+        var collection = await Collection(binding.Collection, ct).ConfigureAwait(false);
+        var records = await collection.Aggregate<BsonDocument>(
                 pipeline,
                 new AggregateOptions { MaxTime = plan.Timeout },
                 ct)
@@ -54,10 +55,11 @@ internal sealed class MongoSourceIntegration(MongoRoute route, MongoClientManage
         return new SourceScalarResult(records.Count, document.ElementCount, value, type);
     }
 
-    private IMongoCollection<BsonDocument> Collection(StorageAddress address)
+    private async Task<IMongoCollection<BsonDocument>> Collection(StorageAddress address, CancellationToken ct)
     {
         MongoInspector.ValidateAddress(route, address);
-        return clients.Database(route).GetCollection<BsonDocument>(address.Name);
+        return (await clients.Database(route, ct).ConfigureAwait(false))
+            .GetCollection<BsonDocument>(address.Name);
     }
 
     private static MongoPipelineBinding Require(OperationPlan plan) =>

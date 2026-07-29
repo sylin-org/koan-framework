@@ -24,7 +24,8 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
         var offset = ParseContinuation(providerContinuation);
         var all = new List<(string Name, string Kind)>();
         var providerBound = false;
-        using var cursor = await clients.Database(route).ListCollectionsAsync(cancellationToken: ct)
+        var database = await clients.Database(route, ct).ConfigureAwait(false);
+        using var cursor = await database.ListCollectionsAsync(cancellationToken: ct)
             .ConfigureAwait(false);
         while (await cursor.MoveNextAsync(ct).ConfigureAwait(false))
         {
@@ -81,7 +82,8 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
     {
         if (take <= 0) throw new ArgumentOutOfRangeException(nameof(take));
         var mongo = Require(reference);
-        var documents = await clients.Database(route)
+        var database = await clients.Database(route, ct).ConfigureAwait(false);
+        var documents = await database
             .GetCollection<BsonDocument>(mongo.Address.Name)
             .Find(FilterDefinition<BsonDocument>.Empty)
             .Limit(checked(take + 1))
@@ -129,7 +131,8 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
 
     private async Task<string?> Kind(string name, CancellationToken ct)
     {
-        using var cursor = await clients.Database(route).ListCollectionsAsync(
+        var database = await clients.Database(route, ct).ConfigureAwait(false);
+        using var cursor = await database.ListCollectionsAsync(
                 new ListCollectionsOptions { Filter = new BsonDocument("name", name) },
                 ct)
             .ConfigureAwait(false);

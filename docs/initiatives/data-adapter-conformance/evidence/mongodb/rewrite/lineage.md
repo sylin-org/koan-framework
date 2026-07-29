@@ -25,7 +25,9 @@ owners, and one provider-neutral Source integration. No compatibility repository
 
 Recovery verification on 2026-07-29 restored every source file byte-identically to the pushed checkpoint and ran the
 existing exact-source test binary against a fresh MongoDB 8.3.4 container. All 34 cases passed with exit code zero and
-zero provider skips. A fresh build was not claimed because external NuGet restore permission was denied.
+zero provider skips. A subsequent lifecycle correction kept the same nine-part architecture while making options pure
+and moving discovery into bounded asynchronous first use. An explicitly offline restore from the installed package
+cache produced a fresh zero-warning build, and the resulting 35-case suite passed against MongoDB 8.3.4.
 
 Strict packet, topology matrix, stable performance, and independent certification remain deferred. The sealed
 greenfield documents prove only atomic replacement lineage, current source identity, justified moving parts, and

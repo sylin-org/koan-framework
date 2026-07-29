@@ -51,7 +51,7 @@ internal sealed class MongoSchema<TEntity, TKey>(
 
     private async Task EnsureCore(string collection, CancellationToken ct)
     {
-        var database = clients.Database(route);
+        var database = await clients.Database(route, ct).ConfigureAwait(false);
         var exists = await Exists(database, collection, ct).ConfigureAwait(false);
         if (!exists && route.StorageLifecycle == StorageLifecycle.External)
             throw new InvalidOperationException(

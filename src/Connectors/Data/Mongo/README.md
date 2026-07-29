@@ -89,8 +89,9 @@ and `$merge` are rejected when the operation is declared, so registered pipeline
 
 ## Configuration
 
-`auto` is the default. It asks Koan's discovery coordinator for MongoDB and falls back to
-`mongodb://localhost:27017` when automatic discovery has no result. A concrete connection string is authoritative.
+`auto` is the default. Options access remains pure; the first operation on an active MongoDB route asks Koan's
+discovery coordinator for MongoDB and falls back to `mongodb://localhost:27017` when automatic discovery has no result.
+Concurrent first callers share that one resolution. A concrete connection string is authoritative.
 
 ```json
 {

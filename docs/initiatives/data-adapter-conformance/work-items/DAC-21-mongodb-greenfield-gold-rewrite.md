@@ -9,7 +9,7 @@ framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-28
   status: behavior-pass-strict-defer
-  scope: MongoDB clean-room replacement, greenfield integrity, and live 34-case recovery verification
+  scope: MongoDB clean-room replacement, greenfield integrity, and live 35-case verification
 ---
 
 # DAC-21 — Build the MongoDB gold adapter from an empty implementation
@@ -97,6 +97,54 @@ runtime path, unbounded cache, or process-host state is introduced; README and T
 driver retryable writes can make commit outcome ambiguous; heterogeneous inspection must preserve missing/null and
 bounds; native BSON serialization must reject reserved Koan-field collisions without global mutable conventions.
 
+## Approved lifecycle correction
+
+**Task:** Remove provider I/O from MongoDB option materialization and resolve connection intent once, asynchronously,
+at first provider use.
+
+**Application intent:** Referencing MongoDB plus `AddKoan()` remains sufficient; application code uses `Entity<T>` and
+never manages discovery.
+
+**Public expression:** No change: package reference, `AddKoan()`, optional source configuration, then ordinary Entity or
+source operations.
+
+**Guarantee/correction:** Reading configuration is pure and immediate. The first MongoDB operation asynchronously
+resolves `auto` or explicit Zen Garden intent; explicit unresolved intent fails with the existing corrective message
+before database work.
+
+**Complete intent surface:** No new user action, decoration, service registration, or configuration is required.
+
+**Public concepts:** None added.
+
+**Docs read:** Architecture principles assign configuration and resource ownership clearly; the Data reference preserves
+the zero-ceremony Entity surface; the document-store catalogue makes MongoDB the resource-disciplined gold reference;
+this card requires discovery off warm operations.
+
+**Code read:** `MongoOptionsConfigurator` blocks twice on asynchronous discovery; `MongoAdapterFactory` creates immutable
+routes; `MongoClientManager` owns bounded physical resources; repository, schema, inspection, health, and registered
+operations are already asynchronous at the provider boundary; the current configuration specs incorrectly certify
+discovery during options access.
+
+**Reusing:** The existing discovery coordinator, route, constants, corrective error, client manager, and asynchronous
+operation boundaries.
+
+**Creating new:** No public or top-level type is created. Async route resolution and exact bounded single-flight
+admission live in `Runtime/MongoClientManager.cs`; pure intent normalization remains in `MongoOptionsConfigurator.cs`;
+lifecycle regression coverage lives in the existing Mongo configuration specs.
+
+**Coalescence:** `MongoClientManager` remains the sole adapter-level route/resource owner; discovery is absorbed there,
+configurator discovery methods are deleted, and no resolver service or family abstraction is introduced.
+
+**Ergonomics:** No application-visible branch, registration, or type is added. IntelliSense and the coding model remain
+unchanged.
+
+**Constraints satisfied:** Entity remains the application surface; no HTTP or streaming behavior is involved; existing
+constants and typed options are reused; no unbounded state, placeholder, global mutable state, or shadow execution path
+is introduced; connector technical documentation changes with the lifecycle guarantee.
+
+**Risks:** Shared first-use resolution must not be poisoned by one caller's cancellation; exact route capacity and
+disposal must remain race-safe; a cached no-restore build is the strongest permitted compilation check in this session.
+
 ## Required work
 
 1. Verify DAC-15's common base, empty MongoDB implementation root, ratified contract, target manifest, and complete
@@ -140,9 +188,11 @@ across the replacement, including one repository/native execution path. Eleven f
 absent; no compatibility or shadow repository remains.
 
 Recovery verification on 2026-07-29 restored all MongoDB source byte-identically to the pushed commit and ran the
-existing exact-source test binary against a fresh MongoDB 8.3.4 container. The 34-case provider suite exited zero with
-zero provider skips. The greenfield gate reports `source=23 parts=9 retired=11`, and every source-export hash matches.
-A fresh build remains unclaimed because permission to restore packages from NuGet was denied.
+existing exact-source 34-case binary against a fresh MongoDB 8.3.4 container with zero failures and provider skips. The
+follow-up lifecycle correction then removed synchronous discovery from options materialization, moved bounded
+single-flight resolution to first provider use, and proved that caller cancellation does not poison the shared route.
+An explicitly offline restore from the installed package cache produced a fresh zero-warning build; the resulting
+35-case suite passed against MongoDB 8.3.4. The greenfield gate reports `source=23 parts=9 retired=11`.
 
 Strict packet emission, topology expansion, stable performance evidence, broad shared/Web regressions, and independent
 certification remain deferred. The existing packet compiler and validator do not yet provide an adapter-evidence

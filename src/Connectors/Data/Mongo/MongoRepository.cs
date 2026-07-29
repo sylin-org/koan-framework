@@ -295,7 +295,8 @@ internal sealed class MongoRepository<TEntity, TKey> :
     {
         var name = CollectionName();
         await _schema.Ensure(name, ct).ConfigureAwait(false);
-        return _clients.Database(_route).GetCollection<BsonDocument>(name);
+        return (await _clients.Database(_route, ct).ConfigureAwait(false))
+            .GetCollection<BsonDocument>(name);
     }
 
     private string CollectionName()

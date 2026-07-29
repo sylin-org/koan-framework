@@ -4,7 +4,7 @@ title: Koan.Data.Connector.Mongo - Technical Reference
 description: MongoDB gold-reference adapter for Koan Data.
 packages: [Sylin.Koan.Data.Connector.Mongo]
 source: src/Connectors/Data/Mongo/
-last_updated: 2026-07-28
+last_updated: 2026-07-29
 ---
 
 ## Contract
@@ -12,7 +12,8 @@ last_updated: 2026-07-28
 - Provider `mongo` (alias `mongodb`, priority 20) is registered by `AddKoan()`.
 - `MongoAdapterFactory` is the sole route and repository authority. It also supplies source inspection and registered
   pipeline execution without manufacturing an Entity repository.
-- `MongoClientManager` owns one bounded, reusable `MongoClient` per resolved connection/database route.
+- `MongoClientManager` owns one bounded, reusable `MongoClient` per configured connection/database route and resolves
+  discovery intent once before publishing that route's database handle.
 - One `MongoRepository<TEntity,TKey>` implements managed and explicit-mapping behavior through one compiled
   `MongoEntityPlan`; there is no compatibility repository or alternate execution stack.
 
@@ -66,9 +67,11 @@ one-field scalar receipt.
 
 ## Discovery, readiness, and resources
 
-Default `auto` connection resolution uses `IServiceDiscoveryCoordinator`; explicit `zen-garden://` intent is required
-and fail-closed. Concrete native endpoints bypass discovery. Health probes use the same route and client owner as data
-operations. Referencing the package alone does not create a MongoDB client.
+Options materialization normalizes configuration without provider I/O. On first use, default `auto` connection
+resolution asynchronously uses `IServiceDiscoveryCoordinator`; explicit `zen-garden://` intent is required and
+fail-closed. Concurrent callers share one resolution, while cancellation abandons only the caller's wait. Concrete
+native endpoints bypass discovery. Health probes use the same route and client owner as data operations. Referencing
+the package alone does not create a MongoDB client or start discovery.
 
 Route clients and per-repository collection gates are bounded. Driver clients are reused for the host lifetime and
 disposed with the host. Collection enumeration, identity batches, pipeline results, and inspection samples all have
@@ -82,10 +85,10 @@ report only work completed by MongoDB.
 
 ## Verification
 
-The connector project and test project build with zero warnings. The real MongoDB 8.3 suite passes 34/34, covering
+The connector project and test project build with zero warnings. The real MongoDB 8.3 suite passes 35/35, covering
 managed CRUD, filtering convergence, comparable values, identity types, partitions, routing, discovery, health,
 instructions, batching, capability truth, managed-field isolation, explicit legacy mapping, read-only/external policy,
-inspection, and registered pipelines.
+inspection, registered pipelines, pure options, single-flight first use, and cancellation-safe discovery.
 
 - [Data adapter development primer](../../../../docs/architecture/data-adapter-development-primer.md)
 - [Adapter responsibility map](../../../../docs/architecture/data-adapter-responsibility-map.md)

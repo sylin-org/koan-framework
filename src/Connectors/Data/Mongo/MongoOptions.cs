@@ -8,7 +8,7 @@ namespace Koan.Data.Connector.Mongo;
 public sealed class MongoOptions : IAdapterOptions
 {
     [Required]
-    public string ConnectionString { get; set; } = "auto";
+    public string ConnectionString { get; set; } = Infrastructure.Constants.Configuration.Auto;
 
     [Required]
     public string Database { get; set; } = "Koan";
