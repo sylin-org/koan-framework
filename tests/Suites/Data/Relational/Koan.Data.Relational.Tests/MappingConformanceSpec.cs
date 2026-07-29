@@ -177,6 +177,47 @@ public sealed class MappingConformanceSpec
     }
 
     [Fact]
+    public void Managed_root_object_preserves_complex_collections_without_inventing_query_bindings()
+    {
+        var plan = RelationalManagedMapping.Compile<ManagedAggregate>(
+            "Default",
+            StorageAddress.From("MANAGED_AGGREGATE"));
+        var source = new ManagedAggregate
+        {
+            Id = "aggregate-1",
+            Tags = ["durable", "bounded"],
+            Facts = [new ManagedFact("candidate", 3)],
+            ActiveSince = new ManagedPartialDate(2024, 6, null),
+            Carriers = new Dictionary<string, string>(StringComparer.Ordinal) { ["tenant"] = "acme" }
+        };
+
+        var written = plan.Write(source);
+        var hydrated = plan.Hydrate<ManagedAggregate>(written.Values);
+
+        written.Values.Select(static value => value.Path.Name).Should().Equal("Id", "Json");
+        plan.Use(MappingPath.Of(nameof(ManagedAggregate.Tags)), MappingConsumer.Filter)
+            .Bindings.Should().ContainSingle()
+            .Which.PhysicalPath.Should().Be(new PhysicalPath("Json", nameof(ManagedAggregate.Tags)));
+        Action complexCollection = () => plan.Use(
+            MappingPath.Of(nameof(ManagedAggregate.Facts)),
+            MappingConsumer.Filter);
+        complexCollection.Should().Throw<MappingValueException>().WithMessage("*physical binding*");
+        plan.Use(
+                MappingPath.Of(nameof(ManagedAggregate.ActiveSince), nameof(ManagedPartialDate.Year)),
+                MappingConsumer.Filter)
+            .Bindings.Should().ContainSingle()
+            .Which.PhysicalPath.Should().Be(new PhysicalPath(
+                "Json",
+                nameof(ManagedAggregate.ActiveSince),
+                nameof(ManagedPartialDate.Year)));
+        hydrated.Id.Should().Be(source.Id);
+        hydrated.Tags.Should().Equal(source.Tags);
+        hydrated.Facts.Should().Equal(source.Facts);
+        hydrated.ActiveSince.Should().Be(source.ActiveSince);
+        hydrated.Carriers.Should().BeEquivalentTo(source.Carriers);
+    }
+
+    [Fact]
     public void Explicit_read_only_one_way_codec_is_legal_and_never_enters_a_write()
     {
         var codec = new DataMappingCodec<bool, string>(null, value => value == "Y", "legacy-read-only-flag");
@@ -472,6 +513,18 @@ public sealed class MappingConformanceSpec
         [Index(Ttl = true)]
         public DateTimeOffset ExpiresAt { get; set; }
     }
+
+    public sealed class ManagedAggregate
+    {
+        public string Id { get; set; } = "";
+        public string[] Tags { get; set; } = [];
+        public ManagedFact[] Facts { get; set; } = [];
+        public ManagedPartialDate? ActiveSince { get; set; }
+        public Dictionary<string, string> Carriers { get; set; } = new(StringComparer.Ordinal);
+    }
+
+    public sealed record ManagedFact(string Name, int Count);
+    public sealed record ManagedPartialDate(int? Year, int? Month, int? Day);
 
     private sealed class SpyDialect : IRelationalMappingDialect
     {

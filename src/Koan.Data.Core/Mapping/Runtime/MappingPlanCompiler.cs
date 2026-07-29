@@ -308,7 +308,18 @@ public static class MappingPlanCompiler
                 physicalBase.Segments.Concat(relative).ToArray());
             var shape = IsScalar(property.PropertyType) ? MappingValueShape.Scalar : MappingValueShape.Object;
             if (bindings.Any(binding => binding.LogicalPath.Equals(logical))) continue;
-            if (shape == MappingValueShape.Object && !IsCollection(property.PropertyType))
+            if (shape == MappingValueShape.Object && IsCollection(property.PropertyType))
+            {
+                // Collection predicates are defined only over scalar elements. A collection of records,
+                // dictionaries, transitions, or another object graph remains part of the authoritative root
+                // object, but it is not a separately queryable physical path. Compiling a derived Object binding
+                // for it incorrectly imposed mapped-object constructor rules on ordinary JSON values (for example
+                // KeyValuePair<,> and positional records) even though the binding can never participate in
+                // hydration or writes.
+                var element = CollectionElementType(property.PropertyType);
+                if (element is null || !IsScalar(element)) continue;
+            }
+            else if (shape == MappingValueShape.Object)
             {
                 Expand(property.PropertyType, logical, physical, identity, root: false, bindings, visited, depth + 1);
                 continue;
@@ -365,6 +376,18 @@ public static class MappingPlanCompiler
         var effective = Nullable.GetUnderlyingType(type) ?? type;
         return effective != typeof(string) && effective != typeof(byte[]) &&
                typeof(System.Collections.IEnumerable).IsAssignableFrom(effective);
+    }
+
+    private static Type? CollectionElementType(Type type)
+    {
+        var effective = Nullable.GetUnderlyingType(type) ?? type;
+        if (effective.IsArray) return effective.GetElementType();
+        if (effective.IsGenericType && effective.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            return effective.GetGenericArguments()[0];
+        return effective.GetInterfaces()
+            .FirstOrDefault(static candidate => candidate.IsGenericType &&
+                                                candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+            ?.GetGenericArguments()[0];
     }
 
     private static MappingCompilationException Error(MappingDescriptor descriptor, string correction) =>

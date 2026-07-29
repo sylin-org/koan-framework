@@ -33,9 +33,9 @@ internal sealed class MappingMemberAccess
                 throw new InvalidOperationException($"Logical path '{path}' contains an unreadable property '{name}'.");
             var setter = property.SetMethod is null ? null : CompileSetter(property);
             Func<object>? factory = null;
-            if (index < path.Segments.Count - 1)
+            var intermediate = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+            if (requireWrite && index < path.Segments.Count - 1)
             {
-                var intermediate = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
                 if (intermediate.IsValueType)
                     throw new InvalidOperationException(
                         $"Logical path '{path}' traverses value-type property '{name}'. Map the containing value as Object or provide a codec.");
@@ -44,7 +44,11 @@ internal sealed class MappingMemberAccess
                 factory = CompileFactory(intermediate, path);
             }
             segments.Add(new AccessSegment(CompileGetter(property), setter, factory, property.PropertyType));
-            current = property.PropertyType;
+            // Read-only derived paths are observations over an authoritative object value. They only need
+            // getters, and may safely traverse nullable structs and immutable records because they never
+            // construct or assign an intermediate instance. Writable canonical paths retain the stricter
+            // construction contract above.
+            current = intermediate;
         }
 
         var result = new MappingMemberAccess(path, current, segments.ToArray());
