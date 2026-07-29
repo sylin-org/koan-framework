@@ -13,7 +13,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// oracle over the same corpus. Per-provider capability variance is handled uniformly: an operator a
 /// provider declares it cannot push must fail loud (<see cref="VectorFilterUnsupportedException"/>) —
 /// never silently mis-return. So supported operators converge with the oracle; unsupported operators
-/// hard-error; nothing silently under/over-returns. Skips green when the container is unavailable.
+/// hard-error; nothing silently under/over-returns. Unavailable infrastructure remains an explicit skip.
 /// </summary>
 public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
@@ -81,12 +81,22 @@ public abstract class VectorFilterConvergenceSpecsBase<TFactory> : IAsyncLifetim
     };
 
     [Fact]
-    public async Task Filters_converge_with_oracle_or_hard_error()
+    public async Task Filters_converge_or_reject_correctively()
     {
-        Assert.SkipUnless(Factory.SupportsMetadataFilters, "Adapter does not advertise metadata filters.");
         Assert.SkipWhen(!Factory.IsAvailable, $"[{typeof(TFactory).Name}] {Factory.UnavailableReason ?? "infrastructure unavailable"}");
 
         var query = Embed("seed", 0);
+        if (!Factory.SupportsMetadataFilters)
+        {
+            Func<Task> rejection = async () =>
+                _ = await Vector<TodoVector>.SearchLegacy(
+                    query,
+                    topK: 100,
+                    filter: Filter.Eq("Category", "legal"));
+            await rejection.Should().ThrowAsync<VectorFilterUnsupportedException>();
+            return;
+        }
+
         var supported = 0;
         var unsupported = new List<string>();
 

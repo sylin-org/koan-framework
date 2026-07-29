@@ -1,14 +1,14 @@
 namespace Koan.Data.VectorAdapterSurface.TestKit;
 
 /// <summary>
-/// Capability declaration that gates per-spec execution for vector adapters. Adapters declare
-/// what they support; specs that need a missing capability skip cleanly with a clear reason.
+/// Fixture view of the capabilities each vector adapter declares. Specs prove the positive
+/// behavior when a capability is present and the corrective rejection when it is absent.
 /// </summary>
 /// <remarks>
 /// Defaults assume a fully-featured general-purpose vector store (Weaviate-ish). Adapters
 /// override the relevant flags to false when they don't support an operation. The matrix's
-/// job is to verify each adapter's CLAIMED capabilities actually work — not to force every
-/// adapter to support every operation.
+/// job is to verify each adapter's claimed capabilities actually work without treating an
+/// unclaimed operation as missing evidence.
 /// </remarks>
 public interface IVectorAdapterCapabilities
 {
