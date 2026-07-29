@@ -1911,7 +1911,7 @@
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",
       "versionIntent": "0.20",
       "shape": "library",
-      "description": "Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.",
+      "description": "Weaviate vector provider for Koan: plan-bound entity vectors, native filtering, complete points, and awaited Session visibility.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1920,8 +1920,7 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions",
-        "Sylin.Koan.ZenGarden.Contracts"
+        "Sylin.Koan.Data.Vector.Abstractions"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "ownsReadme": true,

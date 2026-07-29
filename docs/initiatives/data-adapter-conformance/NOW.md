@@ -16,7 +16,7 @@ validation:
 
 ## Current state
 
-The ratified Vector contract is V-01 through V-24 plus G-09. Five adapters have been rebuilt from empty
+The ratified Vector contract is V-01 through V-24 plus G-09. Six adapters have been rebuilt from empty
 implementation roots:
 
 - DAC-51 InMemory Vector: behavioral suite green; strict packet generation deferred;
@@ -24,6 +24,7 @@ implementation roots:
 - DAC-53 Qdrant: 28/28 live against `qdrant/qdrant:v1.18.3`; strict packet generation deferred;
 - DAC-55 Elasticsearch: 28/28 live against Elasticsearch 9.4.3; strict packet generation deferred;
 - DAC-56 OpenSearch: 28/28 live against OpenSearch 3.7.0; strict packet generation deferred.
+- DAC-57 Weaviate: 28/28 live against Weaviate 1.37.6; strict packet generation deferred.
 
 Elasticsearch and OpenSearch now independently realize the same Koan vector decisions through native mappings,
 queries, scores, failures, and source policy. Comparing the proven implementations found no provider-neutral runtime
@@ -34,23 +35,24 @@ no remaining owner and was deleted from source, solution membership, and the pac
 
 | Gate | Result |
 |---|---|
-| OpenSearch live Vector ledger | 28/28 passed, zero skipped, 30 seconds |
-| Elasticsearch live Vector ledger | 28/28 passed, zero skipped |
+| Weaviate live Vector ledger | 28/28 passed, zero skipped, 14 seconds |
+| Vector regressions | Data Core 24/24; InMemory 50/50; SqliteVec 58 plus five deliberate skips |
 | Filter convergence | every declared operator and boolean composition converges with the neutral oracle |
 | Metric normalization | Cosine, Euclidean, and DotProduct are finite, monotonic, and higher-is-closer |
 | SearchEngine retirement | no production, solution, claim, or current package-inventory owner remains |
 | Strict packet | deferred because the shared versioned packet generator is absent |
 
-Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, DAC-55, and
-DAC-56 remain `in-progress` in the certification ledger until the shared control plane can emit the required artifact.
+Behavior is proven, but no local substitute for the strict packet is accepted. DAC-51, DAC-52, DAC-53, DAC-55,
+DAC-56, and DAC-57 remain `in-progress` in the certification ledger until the shared control plane can emit the
+required artifact.
 
 ## Next action
 
-Execute DAC-57 as an empty-root Weaviate rebuild. First perform a systematic primer/provider exploration pass and
-replace the old audit-only card with an implementation-authorized brief. Harvest the existing adapter only for
-provider facts and failure cases. Do not copy Qdrant, Elasticsearch, OpenSearch, or the existing Weaviate control flow.
-Share code only if the final implementation demonstrates a smaller provider-neutral owner already required by the
-framework.
+Execute DAC-58 as an empty-root Milvus rebuild. Begin with the primer and official provider surface, replace the old
+audit card with an implementation-authorized brief, and harvest the existing adapter only for provider facts and
+failure cases. Do not carry forward collection/schema options, Newtonsoft DTO layers, or capability claims without a
+current V-01–V-24 proof. Share code only if the final implementation demonstrates a smaller provider-neutral owner
+already required by the framework.
 
 ## Guardrails
 

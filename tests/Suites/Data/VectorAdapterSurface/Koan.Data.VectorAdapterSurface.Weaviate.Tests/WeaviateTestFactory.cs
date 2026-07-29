@@ -1,181 +1,136 @@
-using System.Net.Http;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Vector;
-using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Connector.Weaviate;
-using Koan.Data.VectorAdapterSurface.TestKit;
+using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Weaviate.Tests;
 
-/// <summary>
-/// Weaviate cell of the vector matrix. Container image and env match
-/// <see cref="WeaviateVectorAdapterFactory"/>'s KoanService attribute, with hybrid search
-/// (Alpha + SearchText) advertised since Weaviate is the only adapter that supports it.
-/// </summary>
-public sealed class WeaviateTestFactory : IVectorAdapterTestFactory
+/// <summary>One pinned live Weaviate runtime shared by the executable DAC-57 ledger.</summary>
+public sealed class WeaviateTestFactory : IAsyncLifetime
 {
     private IContainer? _container;
-    private ServiceProvider? _sp;
-    private string? _endpoint;
-    private HttpClient? _adminHttp;
-    private bool _initialized;
+    private HttpClient? _http;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
-    public IServiceProvider Services => _sp ?? throw new InvalidOperationException("Factory not initialized.");
-    public int EmbeddingDimension => 8;
-
-    public bool SupportsGetEmbedding         => true;
-    public bool SupportsBulkOperations       => true;
-    public bool SupportsFlush                => true;
-    public bool SupportsExportAll            => true;
-    public bool SupportsHybridSearch         => true;  // Weaviate is the only one
-    // AI-0036 §9: metadata properties created explicitly with tokenization=field + class-level
-    // indexNullState=true, so exact Equal/NotEqual and null-inclusive negation (Ne/Not via De Morgan
-    // + Or IsNull) work. Live-verified.
-    public bool SupportsMetadataFilters      => true;
-    public bool SupportsContinuationToken    => true;  // native cursor
-    public bool SupportsPartitionIsolation   => true;
-    public bool SupportsDynamicCollections   => true;
-    public bool SupportsScoreNormalization   => true;  // cosine
+    public string Endpoint { get; private set; } = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
-        if (_initialized) return;
-        _initialized = true;
-
-        var envEndpoint = Environment.GetEnvironmentVariable("Koan_TESTS_WEAVIATE")
-                          ?? Environment.GetEnvironmentVariable("WEAVIATE_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(envEndpoint) && await Ping(envEndpoint))
-        {
-            _endpoint = envEndpoint;
-            BuildSp();
-            IsAvailable = true;
-            return;
-        }
-
         try
         {
-            // Testcontainers deprecated the parameterless ContainerBuilder ctor; the generic-container
-            // pattern (WithImage) still functions — suppress the deprecation (warnings-as-errors).
-#pragma warning disable CS0618
-            _container = new ContainerBuilder()
-                .WithImage("cr.weaviate.io/semitechnologies/weaviate:1.37.6")
-                .WithEnvironment("QUERY_DEFAULTS_LIMIT", "25")
+            var port = GrabFreePort();
+            _container = new ContainerBuilder("cr.weaviate.io/semitechnologies/weaviate:1.37.6")
                 .WithEnvironment("AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED", "true")
-                .WithEnvironment("AUTOSCHEMA_ENABLED", "true") // auto-create metadata properties on insert (filterable)
-                .WithEnvironment("PERSISTENCE_DATA_PATH", "/var/lib/weaviate")
+                .WithEnvironment("AUTOSCHEMA_ENABLED", "false")
+                .WithEnvironment("ASYNC_INDEXING", "false")
                 .WithEnvironment("DEFAULT_VECTORIZER_MODULE", "none")
+                .WithEnvironment("PERSISTENCE_DATA_PATH", "/var/lib/weaviate")
                 .WithEnvironment("CLUSTER_HOSTNAME", "node1")
                 .WithEnvironment("RAFT_BOOTSTRAP_EXPECT", "1")
-                .WithPortBinding(8080, true)
-                .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(req => req.ForPath("/v1/.well-known/ready").ForPort(8080)))
+                .WithPortBinding(port, 8080)
+                .WithWaitStrategy(Wait.ForUnixContainer()
+                    .UntilHttpRequestIsSucceeded(request => request.ForPort(8080).ForPath("/v1/.well-known/ready")))
                 .Build();
-#pragma warning restore CS0618
-
-            await _container.StartAsync();
-            var port = _container.GetMappedPublicPort(8080);
-            _endpoint = $"http://localhost:{port}";
-
-            for (var attempt = 0; attempt < 30; attempt++)
-            {
-                if (await Ping(_endpoint)) { BuildSp(); IsAvailable = true; return; }
-                await Task.Delay(500);
-            }
-            UnavailableReason = "Weaviate container did not respond after 15s.";
+            await _container.StartAsync().ConfigureAwait(false);
+            Endpoint = $"http://localhost:{_container.GetMappedPublicPort(8080)}";
+            _http = Client(Endpoint);
+            IsAvailable = true;
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            UnavailableReason = $"Failed to start weaviate container: {ex.GetType().Name}: {ex.Message}";
+            UnavailableReason = $"Weaviate/Docker unavailable: {error.GetType().Name}: {error.Message}";
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _adminHttp?.Dispose();
-        if (_sp is not null) await _sp.DisposeAsync();
+        _http?.Dispose();
         if (_container is not null)
         {
-            try { await _container.DisposeAsync(); } catch { }
+            try { await _container.DisposeAsync().ConfigureAwait(false); }
+            catch { }
         }
     }
 
-    public async Task ResetAsync(CancellationToken ct = default)
+    public async Task Reset(CancellationToken ct = default)
     {
-        if (_adminHttp is null || _endpoint is null) return;
-
-        // Drop every existing class in Weaviate's schema for a clean slate. Weaviate creates
-        // classes on demand via VectorEnsureCreated, so deleting them is the equivalent of
-        // TRUNCATE-by-table for relational adapters.
-        try
+        if (!IsAvailable || _http is null) return;
+        using var listed = await _http.GetAsync("/v1/schema", ct).ConfigureAwait(false);
+        listed.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await listed.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+        if (!document.RootElement.TryGetProperty("classes", out var classes)) return;
+        foreach (var item in classes.EnumerateArray())
         {
-            using var resp = await _adminHttp.GetAsync("/v1/schema", ct);
-            if (resp.IsSuccessStatusCode)
+            var name = item.GetProperty("class").GetString()!;
+            using var removed = await _http.DeleteAsync($"/v1/schema/{Uri.EscapeDataString(name)}", ct)
+                .ConfigureAwait(false);
+            removed.EnsureSuccessStatusCode();
+        }
+    }
+
+    public async Task PutCollection(string name, string description, CancellationToken ct = default)
+    {
+        if (_http is null) throw new InvalidOperationException(UnavailableReason);
+        var body = JsonSerializer.Serialize(new
+        {
+            @class = name,
+            description,
+            vectorizer = "none",
+            vectorIndexType = "hnsw",
+            vectorIndexConfig = new { distance = "cosine" },
+            properties = new object[]
             {
-                var json = await resp.Content.ReadAsStringAsync(ct);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("classes", out var classes))
-                {
-                    foreach (var cls in classes.EnumerateArray())
-                    {
-                        if (cls.TryGetProperty("class", out var classNameNode) && classNameNode.GetString() is { } className)
-                        {
-                            using var _ = await _adminHttp.DeleteAsync($"/v1/schema/{Uri.EscapeDataString(className)}", ct);
-                        }
-                    }
-                }
+                new { name = "koanId", dataType = new[] { "text" }, tokenization = "field" },
+                new { name = "koanMetadata", dataType = new[] { "blob" } },
+                new { name = "koanTerms", dataType = new[] { "text[]" }, tokenization = "field" }
             }
-        }
-        catch { /* best-effort */ }
-
-        // Rebuild the SP — WeaviateVectorRepository caches `_schemaEnsured` per-instance, and
-        // VectorService caches the repo per-(Type, Type). After we just dropped every class,
-        // that cache is stale and EnsureCreated would early-return without recreating anything.
-        // A fresh SP gives us a fresh VectorService → fresh repo → fresh cache.
-        if (_sp is not null) await _sp.DisposeAsync();
-        BuildSp();
-        Koan.Core.Hosting.App.AppHost.Current = _sp;
-    }
-
-    private void BuildSp()
-    {
-        if (_endpoint is null) throw new InvalidOperationException("Endpoint not resolved.");
-        _adminHttp = new HttpClient { BaseAddress = new Uri(_endpoint, UriKind.Absolute) };
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddHttpClient();
-        services.AddVectorAdapterTestRuntime();
-
-        services.AddOptions<WeaviateOptions>().Configure(o =>
-        {
-            o.ConnectionString = _endpoint;
-            o.Endpoint = _endpoint;
-            o.Metric = "cosine";
         });
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IVectorAdapterFactory, WeaviateVectorAdapterFactory>();
-
-        _sp = services.BuildServiceProvider();
+        using var response = await _http.PostAsync(
+            "/v1/schema", new StringContent(body, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
     }
 
-    private static async Task<bool> Ping(string endpoint)
+    public async Task Restart(CancellationToken ct = default)
     {
-        try
+        if (_container is null) throw new InvalidOperationException(UnavailableReason);
+        await _container.StopAsync(ct).ConfigureAwait(false);
+        await _container.StartAsync(ct).ConfigureAwait(false);
+        var restarted = $"http://localhost:{_container.GetMappedPublicPort(8080)}";
+        if (!string.Equals(Endpoint, restarted, StringComparison.Ordinal))
+            throw new InvalidOperationException($"Weaviate restart changed endpoint from '{Endpoint}' to '{restarted}'.");
+        _http?.Dispose();
+        _http = Client(Endpoint);
+        using var readiness = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        readiness.CancelAfter(TimeSpan.FromSeconds(30));
+        for (var attempt = 0; attempt < 60; attempt++)
         {
-            using var http = new HttpClient { BaseAddress = new Uri(endpoint, UriKind.Absolute), Timeout = TimeSpan.FromSeconds(2) };
-            using var resp = await http.GetAsync("/v1/.well-known/ready");
-            return resp.IsSuccessStatusCode;
+            try
+            {
+                using var response = await _http.GetAsync("/v1/.well-known/ready", readiness.Token)
+                    .ConfigureAwait(false);
+                if (response.IsSuccessStatusCode) return;
+            }
+            catch when (!readiness.IsCancellationRequested) { }
+            await Task.Delay(250, readiness.Token).ConfigureAwait(false);
         }
-        catch
-        {
-            return false;
-        }
+        throw new TimeoutException("Weaviate did not become ready after restart.");
+    }
+
+    private static HttpClient Client(string endpoint) => new()
+    {
+        BaseAddress = new Uri(endpoint),
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+
+    private static int GrabFreePort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try { return ((IPEndPoint)listener.LocalEndpoint).Port; }
+        finally { listener.Stop(); }
     }
 }
