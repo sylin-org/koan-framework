@@ -32,33 +32,33 @@ only the orchestrator edits this ledger; workers publish scoped handoffs under `
 | DAC-06 | passed | DAC-05 | source-only integration; neutral inspection/records; immutable registered reads; shared ordinal projection; 21 focused cases and clean solution build | complete; provider-native proofs remain on child cards |
 | DAC-07 | passed | DAC-06 | one immutable mapping plan; compact four-shape grammar; complete relational command/schema substrate; 16/16 oracle; clean solution build | complete; provider-native projection/index/TTL proofs remain on child cards |
 | DAC-08 | passed | DAC-07 | pure Describe/Explain, active non-mutating Doctor, one executable claim set, restricted evidence, bounded host ownership, eight scenarios, complete benchmark grammar, and canonical responsibility map | complete; provider LIVE proofs remain on child cards |
-| DAC-09 | deferred | DAC-08 | R01-R04 corrected observable semantics; the remaining framework-first gate is intentionally paused | both gold adapters identify the minimum shared seams worth certifying |
-| DAC-10 | absorbed | DAC-11 | bounded public/provider lessons only; no separate harvest ceremony | SQLite rewrite consumes an implementation-neutral acceptance brief |
-| DAC-20 | pending | DAC-09 | — | independent framework gate passes |
-| DAC-15 | pending | DAC-10, DAC-20 | — | both sanitized harvest packets and retirement inventories frozen |
-| DAC-11 | in-progress | DAC-09R-04 | empty-root SQLite rebuild; 47/47 provider, 16/16 Relational, 471/471 Core; greenfield replacement gate passes | rebuild Web surface when packages are available; strict packet and stable performance runner remain explicit defers |
+| DAC-09 | ready | DAC-08 | R01-R04 corrected observable semantics; the remaining framework-first gate is intentionally paused | both gold adapters identify the minimum shared seams worth certifying |
+| DAC-10 | passed | DAC-09 | bounded public/provider lessons were consumed by the SQLite clean-room acceptance brief without a separate reuse phase | complete |
+| DAC-20 | passed | DAC-09 | MongoDB provider facts, black-box failures, and retirement boundary were consumed by the clean-room replacement without a separate reuse phase | complete |
+| DAC-15 | passed | DAC-10, DAC-20 | SQLite and MongoDB common bases, source manifests, moving parts, and retirement inventories are sealed | complete |
+| DAC-11 | ready | DAC-15 | empty-root SQLite rebuild; 47/47 provider, 16/16 Relational, 471/471 Core; greenfield replacement gate passes | rebuild Web surface when packages are available; strict packet and stable performance runner remain explicit defers |
 | DAC-13 | pending | DAC-11 | — | complete SQLite replacement manifest and tests ready for independent review |
-| DAC-21 | pending | DAC-15 and linked shared contract cards | — | MongoDB implementation root is empty and contract/retirement inventories are frozen |
+| DAC-21 | in-progress | DAC-15 | clean-room MongoDB replacement; 34/34 live recovery run; greenfield gate `source=23 parts=9 retired=11`; source hashes pass | fresh build/shared regressions, strict packet emission, topology/performance evidence, and independent review |
 | DAC-24 | pending | DAC-21 | — | complete MongoDB replacement manifest and tests ready for independent review |
 | DAC-23 | pending | DAC-13, DAC-24 | — | both reviewed atomic replacement bundles sealed from the common base |
 | DAC-12 | pending | DAC-23 | — | integrated gold checkpoint sealed |
 | DAC-22 | pending | DAC-23 | — | integrated gold checkpoint sealed |
 | DAC-30 | pending | DAC-12, DAC-22 | — | both independent gold certifications pass |
-| DAC-40 | in-progress | DAC-30 | empty-root InMemory Entity rebuild; 56/56 behavior, detached root-aware snapshots, finite host state, shared family regressions and solution gates green | strict versioned packet generation is available from the conformance control plane |
-| DAC-41 | in-progress | DAC-40 | empty-root JSON rebuild; 34/34 real-file behavior, canonical host state, detached persist-then-publish, exact bounds, and truthful bulk/decline claims | strict versioned packet generation is available from the conformance control plane |
-| DAC-42 | pending | DAC-30 | — | gold contract and stable shared runner proven |
-| DAC-43 | pending | DAC-30 | — | gold contract and stable shared runner proven |
-| DAC-44 | pending | DAC-42 | — | PostgreSQL/Npgsql evidence green |
-| DAC-45 | pending | DAC-30 | — | gold contract and stable shared runner proven |
-| DAC-46 | pending | DAC-40 | — | InMemory/KeyValue family oracle green |
-| DAC-51 | in-progress | DAC-30 | empty-root InMemory rebuild; 50/50 surface tests, V-01–V-24 and G-09 Forge behavior green; solution build clean | strict versioned packet generation is available from the conformance control plane |
-| DAC-52 | in-progress | DAC-51 | empty-root native rebuild; 58 suite passes, 28/28 Forge cells, source policy/isolation/restart/metric proofs, and clean solution build | strict packet is explicitly deferred; linux-x64/linux-arm64 execution remains external-runner evidence |
-| DAC-53 | in-progress | DAC-51 | empty-root Qdrant v1.18.3 rebuild; 28/28 live V/G cells with zero skips; all declared filters and three metrics proven; solution build clean | strict packet generation remains deferred with DAC-51/DAC-52 |
-| DAC-54 | passed | DAC-53 | current shared runtime rejected as a semantic family seam; provider-owned empty-root briefs frozen | complete |
-| DAC-55 | in-progress | DAC-54 | empty-root Elasticsearch 9.4.3 rebuild; 28/28 live V/G cells with zero skips; all declared filters and three metrics proven; regressions green | strict packet generation remains deferred with DAC-51–DAC-53 |
-| DAC-56 | in-progress | DAC-54 | empty-root OpenSearch 3.7.0 rebuild; 28/28 live V/G cells with zero skips; SearchEngine runtime retired | strict packet generation remains deferred with DAC-51–DAC-55 |
-| DAC-57 | in-progress | DAC-53 | empty-root Weaviate 1.37.6 rebuild; 28/28 live V/G cells with zero skips; fixed schema, native token filters, three metrics, and regressions green | strict packet generation remains deferred with DAC-51–DAC-56 |
-| DAC-58 | in-progress | DAC-53 | empty-root Milvus 2.6.20 rebuild; three 28/28 live V/G passes with zero skips; fixed schema/index/load lifecycle, native JSON filters, three metrics, and regressions green | strict packet generation remains deferred with DAC-51–DAC-57 |
+| DAC-40 | ready | DAC-30 | empty-root InMemory Entity rebuild; 56/56 behavior, detached root-aware snapshots, finite host state, shared family regressions and solution gates green | strict versioned packet generation is available from the conformance control plane |
+| DAC-41 | ready | DAC-40 | empty-root JSON rebuild; 34/34 real-file behavior, canonical host state, detached persist-then-publish, exact bounds, and truthful bulk/decline claims | strict versioned packet generation is available from the conformance control plane |
+| DAC-42 | ready | DAC-30 | greenfield PostgreSQL implementation; 26/26 live and Relational 16/16 | strict packet and remaining fault/security/restart/performance evidence |
+| DAC-43 | ready | DAC-30 | greenfield SQL Server implementation; 33/33 live and Relational 16/16 | strict packet and remaining fault/security/restart/performance evidence |
+| DAC-44 | ready | DAC-42 | greenfield CockroachDB provider delta; 17/17 live, Npgsql 16/16, PostgreSQL 26/26 regression | strict packet and remaining operational evidence |
+| DAC-45 | ready | DAC-30 | greenfield Couchbase implementation; 25/25 live and Source Integration 24/24 | strict packet and broad-Core environment reconciliation |
+| DAC-46 | ready | DAC-40 | greenfield Redis implementation; 17/17 live, Source Integration 24/24, Cache 6/6 | strict packet and declared Web transfer-skip reconciliation |
+| DAC-51 | ready | DAC-30 | empty-root InMemory rebuild; 50/50 surface tests, V-01–V-24 and G-09 Forge behavior green; solution build clean | strict versioned packet generation is available from the conformance control plane |
+| DAC-52 | ready | DAC-51 | empty-root native rebuild; 58 suite passes, 28/28 Forge cells, source policy/isolation/restart/metric proofs, and clean solution build | strict packet is explicitly deferred; linux-x64/linux-arm64 execution remains external-runner evidence |
+| DAC-53 | ready | DAC-51, DAC-52 | empty-root Qdrant v1.18.3 rebuild; 28/28 live V/G cells with zero skips; all declared filters and three metrics proven; solution build clean | strict packet generation remains deferred with DAC-51/DAC-52 |
+| DAC-54 | passed | DAC-51, DAC-52, DAC-53 | current shared runtime rejected as a semantic family seam; provider-owned empty-root briefs frozen | complete |
+| DAC-55 | ready | DAC-54 | empty-root Elasticsearch 9.4.3 rebuild; 28/28 live V/G cells with zero skips; all declared filters and three metrics proven; regressions green | strict packet generation remains deferred with DAC-51–DAC-53 |
+| DAC-56 | ready | DAC-54, DAC-55 | empty-root OpenSearch 3.7.0 rebuild; 28/28 live V/G cells with zero skips; SearchEngine runtime retired | strict packet generation remains deferred with DAC-51–DAC-55 |
+| DAC-57 | ready | DAC-53 | empty-root Weaviate 1.37.6 rebuild; 28/28 live V/G cells with zero skips; fixed schema, native token filters, three metrics, and regressions green | strict packet generation remains deferred with DAC-51–DAC-56 |
+| DAC-58 | ready | DAC-53 | empty-root Milvus 2.6.20 rebuild; three 28/28 live V/G passes with zero skips; fixed schema/index/load lifecycle, native JSON filters, three metrics, and regressions green | strict packet generation remains deferred with DAC-51–DAC-57 |
 | DAC-90 | pending | all discovered adapter cards | — | every adapter packet green or declined |
 | DAC-99 | pending | DAC-90 | — | public truth reconciled |
 
@@ -81,13 +81,15 @@ Only the orchestrator adds or closes leases. Two active leases cannot share a se
 
 | Lease | Card | Worker | Allowed evidence/handoff paths | Semantic owners | State |
 |---|---|---|---|---|---|
-| sqlite-dac11 | DAC-11 | orchestrator | `evidence/sqlite/**`, SQLite connector/tests/docs, and proven shared-seam fixes | Adapter(SQLite) | active |
+| mongodb-dac21 | DAC-21 | orchestrator | `evidence/mongodb/**`, MongoDB connector/tests/docs, and proven shared-seam fixes | Adapter(MongoDB) | active |
 
 ## Divergence and risk log
 
 | Date | Card | Observation | Consequence / owner |
 |---|---|---|---|
 | 2026-07-28 | course correction | Four semantic Framework remediations are complete but no gold adapter has been rewritten; continuing R05-R07 first would optimize certification machinery without implementation feedback. | Freeze R01-R04, defer R05-R07/DAC-09, and use empty-root SQLite then MongoDB as vertical design proofs. Shared code changes now require a failing gold case. |
+| 2026-07-29 | ledger reconciliation | All 16 discovered adapters have replacement implementations, but the gold/fleet card states and generated packet summaries remained pending. The stale handoff incorrectly instructed another MongoDB rewrite. | Restore the pushed MongoDB implementation, seal its greenfield lineage, update implementation states, and finish evidence/certification rather than rebuilding adapters again. |
+| 2026-07-29 | strict packet gap | `DataConformancePacket` can compile and validate packets and strict Forge consumes them, but no command emits adapter evidence as `conformance.json`. | Add only the bounded emission seam required by gold evidence; keep every strict verdict DEFERRED until real packets exist. |
 | 2026-07-27 | bootstrap | The primer defines major Source Integration, RecordSet, named-operation, policy, and mapping contracts absent from current Data source. | Framework-first implementation is mandatory; adapters cannot close these gaps locally. |
 | 2026-07-27 | bootstrap | Existing Forge/AODB coverage is materially smaller than the primer's 81-cell catalog. | DAC-03 evolves it as the sole executable projection. |
 | 2026-07-27 | bootstrap | Vector adapters use a distinct `Vector<TEntity>` surface not exhaustively specified by the primer. | DAC-49 obtains human approval for a Vector annex inside the primer before DAC-50 changes conformance tooling. |

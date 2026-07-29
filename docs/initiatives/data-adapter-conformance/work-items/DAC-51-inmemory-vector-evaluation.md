@@ -17,7 +17,7 @@ validation:
 | Field | Value |
 |---|---|
 | Phase / kind | vector / whole-adapter greenfield rebuild |
-| Depends on | DAC-30, DAC-49, DAC-50 |
+| Depends on | DAC-30 |
 | Primer scope | Source Core, Vector Core, Vector Filters, Vector Bulk, Managed Vector Lifecycle, Vector Isolation |
 | Production writes | InMemory Vector connector, the minimum shared Vector contract/runtime projection, focused Vector TestKit cases, docs, and DAC-51 evidence |
 | Owner | Framework(Vector plan and semantic boundary); Adapter(InMemory Vector mechanics) |

@@ -3,13 +3,13 @@ type: SPEC
 domain: data
 title: "DAC-21 Build the MongoDB Gold Adapter from an Empty Implementation"
 audience: [architects, maintainers, developers, ai-agents]
-status: draft
-last_updated: 2026-07-28
+status: in-progress
+last_updated: 2026-07-29
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-28
-  status: reviewed
-  scope: MongoDB ground-up whole-adapter replacement
+  status: behavior-pass-strict-defer
+  scope: MongoDB clean-room replacement, greenfield integrity, and live 34-case recovery verification
 ---
 
 # DAC-21 — Build the MongoDB gold adapter from an empty implementation
@@ -17,7 +17,7 @@ validation:
 | Field | Value |
 |---|---|
 | Phase / kind | gold / ground-up replacement |
-| Depends on | DAC-15 and linked shared contract cards |
+| Depends on | DAC-15 |
 | Unlocks | DAC-24 |
 | Primer scope | complete ratified MongoDB manifest |
 | Production writes | MongoDB connector, newly designated MongoDB tests/docs, and `evidence/mongodb/**` |
@@ -132,12 +132,28 @@ bounds; native BSON serialization must reject reserved Koan-field collisions wit
 - `Test-GreenfieldReplacement.ps1` passes only with `startedEmpty: true`, complete retirement, one execution path, no
   shadow path, and justified moving parts.
 
+## Implementation result
+
+The clean-room implementation landed atomically in `5cf55ab3ab04847d61d6ee1e089c084a76df8f61` from common base
+`86c18819cf03160c20a001d91f3bd2f257fd1a0d`. It removed 2,592 lines from the former connector and added 2,032 lines
+across the replacement, including one repository/native execution path. Eleven former implementation owners are
+absent; no compatibility or shadow repository remains.
+
+Recovery verification on 2026-07-29 restored all MongoDB source byte-identically to the pushed commit and ran the
+existing exact-source test binary against a fresh MongoDB 8.3.4 container. The 34-case provider suite exited zero with
+zero provider skips. The greenfield gate reports `source=23 parts=9 retired=11`, and every source-export hash matches.
+A fresh build remains unclaimed because permission to restore packages from NuGet was denied.
+
+Strict packet emission, topology expansion, stable performance evidence, broad shared/Web regressions, and independent
+certification remain deferred. The existing packet compiler and validator do not yet provide an adapter-evidence
+emission command; no local certificate was synthesized.
+
 ## Definition of done
 
 - [ ] Every ratified MongoDB row passes and every decline fails closed for each selected topology.
-- [ ] The connector contains only MongoDB-native responsibilities behind certified shared contracts.
-- [ ] One activation, registration, repository/native execution, claim, and adapter-test authority remains.
-- [ ] Every moving part has a necessary contract/shared-mechanics/hot-path reason.
+- [x] The connector contains only MongoDB-native responsibilities behind certified shared contracts.
+- [x] One activation, registration, repository/native execution, claim, and adapter-test authority remains.
+- [x] Every moving part has a necessary contract/shared-mechanics/hot-path reason.
 - [ ] Setup, topology truth, limits, diagnostics, resource behavior, and performance are exemplary and reproducible.
 
 ## Stop conditions

@@ -17,7 +17,7 @@ validation:
 | Field | Value |
 |---|---|
 | Phase / kind | gold / ground-up replacement |
-| Depends on | DAC-09R-04; later shared changes require a failing SQLite case |
+| Depends on | DAC-15 |
 | Unlocks | DAC-13 |
 | Primer scope | complete ratified SQLite manifest |
 | Production writes | SQLite connector, newly designated SQLite tests/docs, and `evidence/sqlite/**` |

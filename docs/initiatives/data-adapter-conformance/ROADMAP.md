@@ -77,9 +77,9 @@ DAC-49/DAC-50 run during Foundation so every verdict consumes one stable runner;
 | DAC-10 | harvest SQLite provider/public facts, black-box scenarios, negative lessons, and retirement inventory | DAC-09 |
 | DAC-20 | harvest MongoDB provider/public facts, black-box scenarios, negative lessons, and retirement inventory | DAC-09 |
 | DAC-15 | ratify both gold contracts, freeze rewrite inputs, and require empty implementation roots | DAC-10, DAC-20 |
-| DAC-11 | author a complete SQLite candidate from empty roots | DAC-15 and linked shared contract cards |
+| DAC-11 | author a complete SQLite candidate from empty roots | DAC-15 |
 | DAC-13 | independently package, archaeologically review, and prove absence/lineage for SQLite | DAC-11 |
-| DAC-21 | author a complete MongoDB candidate from empty roots | DAC-15 and linked shared contract cards |
+| DAC-21 | author a complete MongoDB candidate from empty roots | DAC-15 |
 | DAC-24 | independently package, archaeologically review, and prove absence/lineage for MongoDB | DAC-21 |
 | DAC-23 | atomically integrate both reviewed replacement bundles and seal one source checkpoint | DAC-13, DAC-24 |
 | DAC-12 | independently certify SQLite on the integrated checkpoint | DAC-23 |
@@ -94,10 +94,10 @@ DAC-49/DAC-50 run during Foundation so every verdict consumes one stable runner;
 | DAC-46 | evaluate/certify Redis after the KeyValue family oracle | DAC-40 |
 | DAC-51 | evaluate/certify InMemory Vector | DAC-30 |
 | DAC-52 | evaluate/certify SqliteVec | DAC-51 |
-| DAC-53 | evaluate/certify Qdrant | DAC-51 |
-| DAC-54 | audit and independently certify the shared SearchEngine family seam | DAC-30 |
+| DAC-53 | evaluate/certify Qdrant | DAC-51, DAC-52 |
+| DAC-54 | audit and independently certify the shared SearchEngine family seam | DAC-51, DAC-52, DAC-53 |
 | DAC-55 | evaluate/certify Elasticsearch | DAC-54 |
-| DAC-56 | evaluate/certify OpenSearch | DAC-54 |
+| DAC-56 | evaluate/certify OpenSearch | DAC-54, DAC-55 |
 | DAC-57 | evaluate/certify Weaviate | DAC-53 |
 | DAC-58 | evaluate/certify Milvus in the heavy-provider lane | DAC-53 |
 | DAC-90 | reconcile public truth and freeze the final author workflow and CI topology | all discovered adapter cards |
