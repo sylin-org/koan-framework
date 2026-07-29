@@ -116,43 +116,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         ArgumentNullException.ThrowIfNull(models);
         var values = models as IReadOnlyList<TEntity> ?? models.ToArray();
         if (values.Count == 0) return 0;
-        DemandBatch(values.Count);
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "bulk upsert");
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
-        var generated = new bool[values.Count];
-        var statements = new string[values.Count];
-        for (var index = 0; index < values.Count; index++)
+        var writeRoots = plan.Mapping.Bindings
+            .Select(static binding => binding.PhysicalPath.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        var parametersPerItem = Math.Max(1, writeRoots + (ManagedFieldWriteScope.Current?.Count ?? 0));
+        var dispatchSize = Math.Max(1, Math.Min(
+            Infrastructure.Constants.MaximumBatchItems,
+            Infrastructure.Constants.MaximumParameters / parametersPerItem));
+        for (var offset = 0; offset < values.Count; offset += dispatchSize)
         {
-            var model = values[index];
-            generated[index] = plan.Mapping.Identity.IsGenerated &&
-                               EqualityComparer<TKey>.Default.Equals(model.Id, default!);
-            var write = generated[index] ? plan.Commands.Insert(model) : plan.Commands.Update(model);
-            await using var statement = PrepareInsert(
-                connection, transaction, plan, write, includeConflict: !generated[index], $"bulk_{index}_");
-            statements[index] = statement.CommandText +
-                                $" RETURNING {SqliteDialect.Quote(plan.IdentityRoots[0])}";
-            foreach (SqliteParameter parameter in statement.Parameters)
-                command.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
-        }
-        if (command.Parameters.Count > Infrastructure.Constants.MaximumParameters)
-            throw new ArgumentOutOfRangeException(nameof(models), command.Parameters.Count,
-                $"SQLite accepts at most {Infrastructure.Constants.MaximumParameters} parameters per native bulk dispatch.");
-        command.CommandText = string.Join("; ", statements);
-        await using (var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false))
-        {
-            for (var index = 0; index < values.Count; index++)
-            {
-                var applied = await reader.ReadAsync(ct).ConfigureAwait(false);
-                if (generated[index] && applied) plan.AssignGenerated(values[index], reader.GetValue(0));
-                if (!applied && ManagedFieldWriteScope.Current is { Count: > 0 })
-                    throw new InvalidOperationException("The write was rejected as a cross-scope write.");
-                if (index + 1 < values.Count) await reader.NextResultAsync(ct).ConfigureAwait(false);
-            }
+            var count = Math.Min(dispatchSize, values.Count - offset);
+            await UpsertDispatch(connection, transaction, plan, values, offset, count, ct).ConfigureAwait(false);
         }
         await transaction.CommitAsync(ct).ConfigureAwait(false);
         return values.Count;
@@ -163,12 +143,25 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         ArgumentNullException.ThrowIfNull(ids);
         var values = ids as IReadOnlyList<TKey> ?? ids.ToArray();
         if (values.Count == 0) return 0;
-        DemandBatch(values.Count);
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await Delete(connection, null, plan, values, ct).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var width = Math.Max(1, plan.IdentityRoots.Count);
+        var dispatchSize = Math.Max(1, Math.Min(
+            Infrastructure.Constants.MaximumBatchItems,
+            Infrastructure.Constants.MaximumParameters / width));
+        var deleted = 0;
+        for (var offset = 0; offset < values.Count; offset += dispatchSize)
+            deleted += await Delete(
+                connection,
+                transaction,
+                plan,
+                values.Skip(offset).Take(dispatchSize).ToArray(),
+                ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return deleted;
     }
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
@@ -455,6 +448,86 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var affected = await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         if (affected == 0 && ManagedFieldWriteScope.Current is { Count: > 0 })
             throw new InvalidOperationException("The write was rejected as a cross-scope write.");
+    }
+
+    private static async Task UpsertDispatch(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SqliteEntityPlan<TEntity, TKey> plan,
+        IReadOnlyList<TEntity> models,
+        int offset,
+        int count,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        var generated = new bool[count];
+        var statements = new string[count];
+        var requiresOutcomes = ManagedFieldWriteScope.Current is { Count: > 0 };
+        for (var local = 0; local < count; local++)
+        {
+            var model = models[offset + local];
+            generated[local] = plan.Mapping.Identity.IsGenerated &&
+                               EqualityComparer<TKey>.Default.Equals(model.Id, default!);
+            requiresOutcomes |= generated[local];
+            var write = generated[local] ? plan.Commands.Insert(model) : plan.Commands.Update(model);
+            await using var statement = PrepareInsert(
+                connection,
+                transaction,
+                plan,
+                write,
+                includeConflict: !generated[local],
+                $"bulk_{offset + local}_");
+            statements[local] = statement.CommandText;
+            foreach (SqliteParameter parameter in statement.Parameters)
+                command.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
+        }
+        if (command.Parameters.Count > Infrastructure.Constants.MaximumParameters)
+            throw new InvalidOperationException(
+                $"The SQLite bulk dispatcher produced {command.Parameters.Count} parameters; its calculated native bound is invalid.");
+        if (!requiresOutcomes)
+        {
+            command.CommandText = MultiRowUpsert(statements);
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return;
+        }
+
+        command.CommandText = string.Join(
+            "; ",
+            statements.Select(statement => statement +
+                $" RETURNING {SqliteDialect.Quote(plan.IdentityRoots[0])}"));
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        for (var local = 0; local < count; local++)
+        {
+            var applied = await reader.ReadAsync(ct).ConfigureAwait(false);
+            if (generated[local] && applied) plan.AssignGenerated(models[offset + local], reader.GetValue(0));
+            if (!applied && ManagedFieldWriteScope.Current is { Count: > 0 })
+                throw new InvalidOperationException("The write was rejected as a cross-scope write.");
+            if (local + 1 < count) await reader.NextResultAsync(ct).ConfigureAwait(false);
+        }
+    }
+
+    private static string MultiRowUpsert(IReadOnlyList<string> statements)
+    {
+        if (statements.Count == 0) throw new ArgumentException("A native SQLite dispatch cannot be empty.", nameof(statements));
+        const string valuesToken = " VALUES ";
+        const string conflictToken = " ON CONFLICT ";
+        var firstValues = statements[0].IndexOf(valuesToken, StringComparison.Ordinal);
+        if (firstValues < 0) throw new InvalidOperationException("The SQLite upsert plan is missing its VALUES clause.");
+        var firstConflict = statements[0].IndexOf(conflictToken, firstValues + valuesToken.Length, StringComparison.Ordinal);
+        var prefix = statements[0][..(firstValues + valuesToken.Length)];
+        var suffix = firstConflict < 0 ? string.Empty : statements[0][firstConflict..];
+        var rows = new string[statements.Count];
+        for (var index = 0; index < statements.Count; index++)
+        {
+            var values = statements[index].IndexOf(valuesToken, StringComparison.Ordinal);
+            var conflict = statements[index].IndexOf(conflictToken, values + valuesToken.Length, StringComparison.Ordinal);
+            if (values < 0 || (firstConflict < 0) != (conflict < 0) ||
+                conflict >= 0 && !string.Equals(statements[index][conflict..], suffix, StringComparison.Ordinal))
+                throw new InvalidOperationException("A SQLite native bulk dispatch requires one consistent write shape.");
+            rows[index] = statements[index][(values + valuesToken.Length)..(conflict < 0 ? statements[index].Length : conflict)];
+        }
+        return prefix + string.Join(", ", rows) + suffix;
     }
 
     private static SqliteCommand PrepareInsert(

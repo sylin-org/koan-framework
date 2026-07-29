@@ -28,6 +28,7 @@ internal static class SqliteSchema
         await using var command = connection.CreateCommand();
         command.CommandText = CreateTable(plan);
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        await ProvisionIndexes(connection, plan, ct).ConfigureAwait(false);
     }
 
     internal static async Task Validate<TEntity, TKey>(
@@ -110,6 +111,66 @@ internal static class SqliteSchema
         if (!singleGenerated)
             definitions.Add("PRIMARY KEY (" + string.Join(", ", plan.IdentityRoots.Select(SqliteDialect.Quote)) + ")");
         return $"CREATE TABLE IF NOT EXISTS {plan.QualifiedTable} ({string.Join(", ", definitions)})";
+    }
+
+    private static async Task ProvisionIndexes<TEntity, TKey>(
+        SqliteConnection connection,
+        SqliteEntityPlan<TEntity, TKey> plan,
+        CancellationToken ct)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        foreach (var index in plan.Mapping.Indexes.Where(static index => !index.Primary && !index.Ttl))
+        {
+            var expressions = index.Bindings.Select(binding => plan.Dialect
+                    .Read(binding.PhysicalPath, binding.Shape, binding.PhysicalType)
+                    .Replace("koan_row.", string.Empty, StringComparison.Ordinal))
+                .ToArray();
+            var expected = $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX " +
+                           $"{SqliteDialect.Quote(index.Name)} ON {plan.QualifiedTable} " +
+                           $"({string.Join(", ", expressions)})";
+            await using var inspect = connection.CreateCommand();
+            inspect.Transaction = transaction;
+            inspect.CommandText = "SELECT tbl_name, sql FROM sqlite_master WHERE type = 'index' AND name = @name";
+            inspect.Parameters.AddWithValue("@name", index.Name);
+            string? owner = null;
+            string? actual = null;
+            await using (var reader = await inspect.ExecuteReaderAsync(ct).ConfigureAwait(false))
+            {
+                if (await reader.ReadAsync(ct).ConfigureAwait(false))
+                {
+                    owner = reader.GetString(0);
+                    actual = reader.IsDBNull(1) ? null : reader.GetString(1);
+                }
+            }
+
+            if (owner is not null && !string.Equals(owner, plan.Table, StringComparison.OrdinalIgnoreCase))
+                throw new SchemaMismatchException(
+                    typeof(TEntity).FullName ?? typeof(TEntity).Name,
+                    plan.Table,
+                    "IndexOwnership",
+                    [$"Index '{index.Name}' is already owned by SQLite table '{owner}'. Choose a container-unique index name."],
+                    [],
+                    ddlAllowed: true);
+            if (actual is not null && SqlEquivalent(actual, expected)) continue;
+
+            await using var repair = connection.CreateCommand();
+            repair.Transaction = transaction;
+            repair.CommandText = actual is null
+                ? expected
+                : $"DROP INDEX {SqliteDialect.Quote(index.Name)}; {expected}";
+            await repair.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+    }
+
+    private static bool SqlEquivalent(string left, string right)
+    {
+        static string Normalize(string sql) => string.Concat(sql.Where(static character => !char.IsWhiteSpace(character)))
+            .TrimEnd(';')
+            .ToUpperInvariant();
+        return string.Equals(Normalize(left), Normalize(right), StringComparison.Ordinal);
     }
 
     private static string StoreType(Type value)
