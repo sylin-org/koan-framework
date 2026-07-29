@@ -915,6 +915,10 @@ on listing or sampling support:
 Provider-specific Direct/raw APIs are expert escape hatches governed by their Direct contracts. They remain
 inventoried and source-policy-gated outside the Source Integration capability.
 
+Declare Source Integration support once in the pure `DescribeSource(source)` descriptor. Koan projects its
+registered-read, record-result, and granular inspection flags into the same runtime claim set used by diagnostics and
+certification; do not repeat those profiles in adapter-local claim code.
+
 The Data-owned source plan gates effects before Entity lifecycle callbacks, storage readiness/provisioning, cache,
 transaction creation, or provider I/O.
 The adapter consumes the effective plan. Call-level switches, connection overrides, and instruction payloads cannot

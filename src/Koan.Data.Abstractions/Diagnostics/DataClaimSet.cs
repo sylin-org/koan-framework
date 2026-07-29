@@ -20,9 +20,32 @@ public sealed class DataClaimSet
     public static DataClaimSet Describe(IAdapterFactory factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
+        return DescribeCore(factory, descriptor: null);
+    }
+
+    public static DataClaimSet Describe(IAdapterFactory factory, string source)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(source);
+        var descriptor = factory is IDataSourceIntegrationFactory sourceFactory
+            ? sourceFactory.DescribeSource(source.Trim()) ?? DataSourceIntegrationDescriptor.Empty
+            : null;
+        return DescribeCore(factory, descriptor);
+    }
+
+    public static DataClaimSet Describe(IAdapterFactory factory, DataSourceIntegrationDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        return DescribeCore(factory, descriptor);
+    }
+
+    private static DataClaimSet DescribeCore(IAdapterFactory factory, DataSourceIntegrationDescriptor? descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
         var builder = new Builder(factory.Provider);
         builder.Framework(DataClaimProfiles.SourceCore);
         factory.DescribeClaims(builder);
+        if (descriptor is not null) builder.Source(descriptor);
         return builder.Build();
     }
 
@@ -67,6 +90,33 @@ public sealed class DataClaimSet
 
         internal void Framework(string profile) => Add(profile, "Framework", qualifier: null, capability: null, advertised: false);
 
+        internal void Source(DataSourceIntegrationDescriptor descriptor)
+        {
+            var operations = descriptor.Operations;
+            var inspection = descriptor.Inspection;
+
+            ProfileWhen(
+                operations.HasFlag(SourceIntegrationCapabilities.RegisteredRecords) ||
+                operations.HasFlag(SourceIntegrationCapabilities.RegisteredScalar),
+                DataClaimProfiles.RegisteredReads);
+            ProfileWhen(
+                operations.HasFlag(SourceIntegrationCapabilities.RegisteredRecords) ||
+                inspection.HasFlag(SourceInspectionCapabilities.SampleRecords),
+                DataClaimProfiles.RecordResults);
+            ProfileWhen(
+                inspection.HasFlag(SourceInspectionCapabilities.ListContainers),
+                DataClaimProfiles.ContainerListing);
+            ProfileWhen(
+                inspection.HasFlag(SourceInspectionCapabilities.ResolveAddress),
+                DataClaimProfiles.ContainerAddressResolution);
+            ProfileWhen(
+                inspection.HasFlag(SourceInspectionCapabilities.DescribeContainer),
+                DataClaimProfiles.ContainerDescription);
+            ProfileWhen(
+                inspection.HasFlag(SourceInspectionCapabilities.SampleRecords),
+                DataClaimProfiles.RecordSampling);
+        }
+
         internal DataClaimSet Build()
         {
             EnsureMutable();
@@ -92,6 +142,12 @@ public sealed class DataClaimSet
                 normalizedQualifier,
                 capability,
                 advertised));
+        }
+
+        private void ProfileWhen(bool condition, string profile)
+        {
+            if (condition && !_keys.Contains((profile, null)))
+                Add(profile, "Adapter", qualifier: null, capability: null, advertised: true);
         }
 
         private void EnsureMutable()

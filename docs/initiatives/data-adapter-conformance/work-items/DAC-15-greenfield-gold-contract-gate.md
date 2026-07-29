@@ -58,6 +58,55 @@ Koan decisions and native provider facts rather than inherited adapter architect
 - Shared contracts build and their focused tests pass from the common base.
 - Target/Declined manifests and public continuity decisions carry human approval.
 
+## Source descriptor claim correction
+
+**Task:** Make Source Integration's existing pure descriptor project its own conformance claims, so adapters do not
+restate the same capability in a second declaration.
+
+**Application intent:** An application chooses a source once; inspection and named-read availability are described
+consistently wherever Koan reports or certifies that source.
+
+**Public expression:** No new expression: `Data.Source(...).Inspect()` and registered `Query`/`Scalar` remain unchanged.
+
+**Guarantee/correction:** `DescribeSource(source)` is the single truth for container listing, address resolution,
+description, sampling, record results, and registered reads. Runtime facts and conformance selection cannot silently
+underclaim those surfaces. Invalid descriptor work still fails during pure description, before provider activation.
+
+**Complete intent surface:** None beyond the existing adapter descriptor; adapter authors no longer duplicate these
+claims in `DescribeClaims`.
+
+**Public concepts:** None added. Existing descriptor flags map to existing primer profiles.
+
+**Docs read:** The primer defines the six profiles; architecture principles require one decision owner; this card
+permits bounded shared-contract correction; DAC-03 requires runtime and TestKit claims to share one projection.
+
+**Code read:** `DataClaimSet` currently projects only `DescribeClaims`; `DataSourceIntegrationDescriptor` independently
+carries the exact source capabilities; Data Core calls both for the selected source; Forge currently binds only six
+MongoDB rows and leaves 78 non-vector IDs unbound.
+
+**Reusing:** Existing descriptor enums, profile constants, claim builder, source-aware resolution, and diagnostics.
+
+**Creating new:** No file or public concept is added. Descriptor-to-profile projection lives in `DataClaimSet.cs`;
+selected-source arguments flow through `DataService.cs` and `DataSourceIntegrationService.cs`; regression coverage
+lives in the existing Data Core diagnostics specs.
+
+**Coalescence:** `DataClaimSet` absorbs this projection. Adapter-local repeated profile declarations become unnecessary.
+No emitter, registry, or second capability map is created.
+
+**Ergonomics:** Adapter authors implement one descriptor; facts, diagnostics, and certification discover the same
+semantics automatically.
+
+**Constraints satisfied:** No application or HTTP surface changes; stable profile identifiers are reused; description
+stays pure and off provider hot paths; no unbounded state or new moving part is introduced.
+
+**Risks:** Descriptors may vary by source, so every call passes the selected source or the already-computed descriptor;
+projecting a default descriptor globally would be incorrect.
+
+**Result:** `DataClaimSet` now projects the selected source descriptor without activating the provider and coalesces
+an exact explicit claim. Data Core passes the selected source and reuses an already-resolved descriptor. Focused Core
+coverage passes 30/30, including scalar-only non-overclaim; MongoDB passes 35/35 against the real provider, canonical
+Forge is GREEN, greenfield lineage and all 23 source hashes pass, and the initiative catalog remains consistent.
+
 ## Definition of done
 
 - [ ] Both gold contracts and target manifests are ratified.

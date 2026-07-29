@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "protocolVersion": "data-adapter-conformance/1",
   "primerPath": "docs/architecture/data-adapter-development-primer.md",
-  "primerSha256": "5727df1efb1cf87385f5708f5c7dbf02b91b7fe8da4ce8af25ee4dc68c15befe",
+  "primerSha256": "540e7360b153e9f1a4c14212b63978188b0bea6c8f53de33463a846cc041e556",
   "cells": [
     {
       "id": "A-01",

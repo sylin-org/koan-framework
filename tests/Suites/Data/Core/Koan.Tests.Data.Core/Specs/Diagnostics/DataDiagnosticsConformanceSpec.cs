@@ -121,4 +121,75 @@ public sealed class DataDiagnosticsConformanceSpec
         string.Join('|', facts.Select(static fact => fact.ToString()))
             .Should().NotContain("Legacy").And.NotContain("credential-identity");
     }
+
+    [Fact]
+    public void Pure_source_descriptor_projects_complete_nonduplicated_runtime_claims_for_the_selected_source()
+    {
+        var factory = new DescribedSourceFactory();
+
+        var claims = DataClaimSet.Describe(factory, "Legacy");
+
+        factory.DescribedSource.Should().Be("Legacy");
+        factory.Activations.Should().Be(0);
+        claims.Claims.Select(static claim => claim.Profile).Should().BeEquivalentTo(
+            DataClaimProfiles.SourceCore,
+            DataClaimProfiles.RegisteredReads,
+            DataClaimProfiles.RecordResults,
+            DataClaimProfiles.ContainerListing,
+            DataClaimProfiles.ContainerAddressResolution,
+            DataClaimProfiles.ContainerDescription,
+            DataClaimProfiles.RecordSampling);
+        claims.Claims.Should().ContainSingle(claim => claim.Profile == DataClaimProfiles.RegisteredReads);
+        claims.Claims.Where(static claim => claim.Profile != DataClaimProfiles.SourceCore)
+            .Should().OnlyContain(static claim => claim.Advertised);
+    }
+
+    [Fact]
+    public void Scalar_only_source_descriptor_does_not_overclaim_record_results()
+    {
+        var factory = new DescribedSourceFactory(new DataSourceIntegrationDescriptor(
+            SourceIntegrationCapabilities.RegisteredScalar));
+
+        var claims = DataClaimSet.Describe(factory, "Legacy");
+
+        claims.Claims.Should().Contain(claim => claim.Profile == DataClaimProfiles.RegisteredReads);
+        claims.Claims.Should().NotContain(claim => claim.Profile == DataClaimProfiles.RecordResults);
+    }
+
+    private sealed class DescribedSourceFactory : IDataSourceIntegrationFactory
+    {
+        private readonly DataSourceIntegrationDescriptor _descriptor;
+
+        public DescribedSourceFactory(DataSourceIntegrationDescriptor? descriptor = null)
+        {
+            _descriptor = descriptor ?? new DataSourceIntegrationDescriptor(
+                SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
+                SourceInspectionCapabilities.ListContainers |
+                SourceInspectionCapabilities.ResolveAddress |
+                SourceInspectionCapabilities.DescribeContainer |
+                SourceInspectionCapabilities.SampleRecords,
+                ["template"]);
+        }
+
+        public string Provider => "described-source";
+        public string? DescribedSource { get; private set; }
+        public int Activations { get; private set; }
+
+        public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new();
+
+        public void DescribeClaims(IDataClaims claims) =>
+            claims.Profile(DataClaimProfiles.RegisteredReads);
+
+        public DataSourceIntegrationDescriptor DescribeSource(string source)
+        {
+            DescribedSource = source;
+            return _descriptor;
+        }
+
+        public IDataSourceIntegration CreateSource(IServiceProvider services, string source)
+        {
+            Activations++;
+            throw new InvalidOperationException("Pure claim description must not activate Source Integration.");
+        }
+    }
 }

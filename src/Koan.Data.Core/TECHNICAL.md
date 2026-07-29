@@ -163,7 +163,8 @@ validation:
 - `Koan.Data.SourceIntegration` activities contain only source, stable operation, provider, effect, result kind,
   attempts, duration, and result count. Parameter values and native payload text are excluded.
 - Runtime facts, health, source diagnostics, TestKit applicability, and certification packets consume the exact
-  deterministic references emitted by the adapter's inert `DataClaimSet`; no diagnostic surface re-infers claims.
+  deterministic references emitted by the adapter's inert `DataClaimSet`. The selected source's pure descriptor
+  contributes its registered-read, record-result, and inspection profiles once; no diagnostic surface re-infers them.
 
 ## Mapping compilation ownership
 

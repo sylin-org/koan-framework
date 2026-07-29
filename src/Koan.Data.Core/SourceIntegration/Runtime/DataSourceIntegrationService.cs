@@ -76,7 +76,7 @@ internal sealed class DataSourceIntegrationService : IDisposable, IAsyncDisposab
             try
             {
                 descriptor = factory.DescribeSource(definition.Name) ?? DataSourceIntegrationDescriptor.Empty;
-                claims = DataClaimSet.Describe(factory);
+                claims = DataClaimSet.Describe(factory, descriptor);
             }
             catch (Exception error) when (error is not SourceIntegrationException)
             {

@@ -94,7 +94,7 @@ public sealed class DataService : IDataService
         // application depends on this route, so readiness must report it even when repository
         // construction or the first provider operation cannot connect.
         var diagnostics = _sp.GetService<DataDiagnostics>();
-        diagnostics?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory));
+        diagnostics?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory, source));
         diagnostics?.ObserveParticipation(factory.Provider, source);
 
         // Create repository with source context
@@ -151,7 +151,7 @@ public sealed class DataService : IDataService
         var source = decision.Source;
         var sourcePlan = sourceRegistry.GetPlan(source, decision.Adapter);
         var factory = decision.Factory;
-        _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory));
+        _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory, source));
         var repo = factory.Create<TEntity, TKey>(_sp, source);
         var guards = _sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = _sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();

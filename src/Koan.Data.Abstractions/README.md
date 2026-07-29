@@ -48,8 +48,10 @@ Adapters also consume one provider-neutral source and failure vocabulary:
 - `IDataFailureClassifier` translates native exception types/codes into `DataFailureKind`, `DataCommitOutcome`,
   retry disposition, and replay disposition. Message text is never a classifier. `IDataNativeEvidenceSink` records
   restricted native type/code evidence and returns only an opaque bounded reference to public channels.
-- `IAdapterFactory.DescribeClaims` is the inert single declaration for executable capability/profile claims. The
-  resulting `DataClaimSet` supplies the exact references used by execution diagnostics and conformance tooling.
+- `IAdapterFactory.DescribeClaims` declares adapter capabilities and non-source profiles. For
+  `IDataSourceIntegrationFactory`, the pure `DescribeSource(source)` descriptor automatically contributes the
+  registered-read, record-result, and granular inspection profiles it supports. The resulting `DataClaimSet`
+  supplies the exact references used by execution diagnostics and conformance tooling.
 
 Source-only adapters implement `IDataSourceIntegrationFactory`; they do not manufacture an Entity repository.
 `IDataSourceInspectorAdapter` supplies bounded, source-bound container inspection, while `IDataSourceIntegration`

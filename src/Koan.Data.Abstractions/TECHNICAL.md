@@ -37,8 +37,9 @@ validation:
 - `DataFailure`, `DataFailureContext`, and `IDataFailureClassifier` — stable public failure/outcome contract and
   the adapter-owned native type/code translation seam.
 - `IDataNativeEvidenceSink` — write-only restricted native evidence with an opaque bounded public reference.
-- `DataClaimSet`, `IDataClaims`, and `DataCapabilityProfiles` — one inert executable claim declaration and the exact
-  deterministic references shared by runtime and TestKit.
+- `DataClaimSet`, `IDataClaims`, and `DataCapabilityProfiles` — one inert executable claim projection, including
+  source-specific profiles derived from `DataSourceIntegrationDescriptor`, with exact deterministic references
+  shared by runtime and TestKit.
 - `PatchPayload<TKey>` and `PatchOp` — the provider-neutral patch operation accepted by Data.Core.
 - `IFieldTransform`, `IFieldTransformContributor`, and `IFieldTransformInspector` — neutral contracts for
   host-compiled round-trip storage transforms and cross-pillar inspection.
