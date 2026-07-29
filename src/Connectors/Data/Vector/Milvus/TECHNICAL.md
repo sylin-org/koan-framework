@@ -1,44 +1,40 @@
-# Sylin.Koan.Data.Vector.Connector.Milvus — technical contract
+# Milvus adapter internals
 
-## Activation and routing
+The implementation has four semantic owners:
 
-`MilvusVectorModule` registers the provider, discovery adapter, options, named HTTP client, and participation-aware
-health contributor. The provider identity is `milvus`; `[VectorAdapter("milvus")]` is exact.
+- `MilvusRoute` resolves source placement, database, credential, and immutable policy.
+- `MilvusClient` owns bounded REST v2 transport and safe provider-error handling.
+- `MilvusFilter` translates only exact neutral predicates to native Milvus expressions.
+- `MilvusRepository` owns plan validation, collection/index/load state, complete points, search, isolation, and outcomes.
 
-The repository receives the selected factory/source and uses `VectorAdapterNaming` once to compile its collection
-route. Ambient partition and segmentation contributors therefore affect physical naming without Milvus-specific
-tenant logic. `CollectionName` is an explicit pin and bypasses that derivation.
+## Physical model
 
-## Configuration
+Each framework-resolved vector container becomes one injective Milvus collection name. A nullable, payload-free schema
+field carries a versioned contract hash for dimensions, metric, space, model, and fixed wire fields. Dynamic fields are disabled.
+The schema contains:
 
-The authoritative section is `Koan:Data:Milvus`.
+- `koan_id`: deterministic scoped storage identity and VARCHAR primary key;
+- `koan_logical_id`: reversible Koan identity;
+- `koan_vector`: plan-sized FLOAT_VECTOR with an HNSW index;
+- `koan_metadata`: lossless neutral JSON metadata.
 
-- connection: `Endpoint`, `ConnectionString`, or standard `.NET` `ConnectionStrings:Milvus`;
-- authentication: `Token`, or `Username` and `Password`;
-- schema: `Database`, `Collection`, optional `Dimension`, primary/vector/metadata field names, and `Metric`;
-- behavior: `Consistency`, `AutoCreate`, and `TimeoutSeconds`;
-- discovery: `DisableAutoDetection`.
+The adapter validates the contract field, field roles/types, vector dimensions, and index metric before data I/O. Managed
+read-write sources may create and load a collection. External or read-only sources must already expose the correct,
+loaded shape.
 
-An exact `Endpoint` is authoritative. Otherwise `ConnectionString=auto` uses Koan discovery and falls back to
-`http://localhost:19530`. The adapter uses Milvus REST v2; the server deployment remains responsible for its usual
-etcd and object-storage dependencies.
+## Visibility and ranking
 
-`Dimension` is nullable. The first write creates a missing collection from the supplied embedding length; explicit
-pre-creation fails with a correction until a dimension is configured.
+Milvus separates ingestion from QueryNode visibility. Every adapter read/search uses Strong consistency; collection
+load completion is awaited within a configured deadline. Koan Eventual visibility is declined because the REST adapter
+does not own a durable provider session timestamp.
 
-## Operations and limits
+Milvus reports COSINE and IP with higher values closer, while L2 is squared Euclidean distance with lower values closer.
+The adapter returns `(cosine + 1) / 2`, `logistic(innerProduct)`, and `1 / (1 + sqrt(l2))`, respectively. HNSW execution
+is reported approximate and the provider does not expose candidate count for these requests.
 
-Implemented operations are ensure/create, single and bulk upsert, single and bulk delete, KNN search with supported
-metadata predicates, and collection clear. Embedding retrieval, export, hybrid text search, continuation, and index
-statistics are intentionally unclaimed.
+## Bounded operations
 
-`VectorQueryOptions` owns `TopK=10` and positive-value validation. Milvus receives the exact valid value; it may reject
-a request that exceeds its own deployment limits rather than Koan silently changing intent.
-
-## Health and failures
-
-Discovery and active readiness use the REST `/v2/health` contract (discovery may fall back to connectivity). The health
-contributor probes only after the provider/source participates in a route; reference alone is not a critical readiness
-dependency. Authentication, collection, dimension, consistency, timeout, and REST failures retain their Milvus
-context, and cancellation reaches outbound requests.
-
+Native upsert/delete batches run only after all inputs validate. Existing-point preflight provides ordered per-item
+outcomes; atomicity remains not guaranteed. Clear first queries at most `MaxClearPoints + 1` scoped identities and fails
+without mutation on overflow. Stable cutoff ties expand within `MaxSearchCandidates`; inability to prove a stable cutoff
+fails explicitly.

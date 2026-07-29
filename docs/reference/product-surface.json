@@ -1845,7 +1845,7 @@
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
       "versionIntent": "0.20",
       "shape": "library",
-      "description": "Milvus vector provider for Koan: entity-first KNN search, metadata-filter pushdown, bulk operations, and collection management over REST.",
+      "description": "Milvus vector adapter for Koan: plan-owned spaces, complete points, native filters, and truthful similarity over REST v2.",
       "targetFrameworks": [
         "net10.0"
       ],
