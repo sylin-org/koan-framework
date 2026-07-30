@@ -83,7 +83,11 @@ public sealed class MappingConformanceSpec
 
         var serial = plan.Use(MappingPath.Of(nameof(ComputedIdentity.Serial)), MappingConsumer.Filter)
             .Bindings.Should().ContainSingle().Which;
-        var copy = plan.Hydrate<ComputedIdentity>(record.Values);
+        var copy = plan.Hydrate<ComputedIdentity>(record.Values.Append(new MappedValue(
+            serial.Id,
+            serial.PhysicalPath,
+            serial.Shape,
+            "provider-observation-must-not-assign")));
 
         serial.Descriptor.Authority.Should().Be(MappingAuthority.Derived);
         plan.Read().Bindings.Should().NotContain(serial, "derived paths do not independently hydrate the aggregate");

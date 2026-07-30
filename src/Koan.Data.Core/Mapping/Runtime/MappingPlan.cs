@@ -175,7 +175,9 @@ public sealed class MappingPlan
 
         foreach (var binding in Bindings)
         {
-            if (ReferenceEquals(binding, _rootObject) || Identity.IsComposite && Identity.Parts.Any(part => part.Id == binding.Id))
+            if (binding.Descriptor.Authority != MappingAuthority.Canonical ||
+                ReferenceEquals(binding, _rootObject) ||
+                Identity.IsComposite && Identity.Parts.Any(part => part.Id == binding.Id))
                 continue;
             if (!byPath.TryGetValue(binding.PhysicalPath, out var value)) continue;
             try { binding.Assign(entity, value.Value); }
