@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Connector.ElasticSearch</AssemblyName>
     <RootNamespace>Koan.Data.Connector.ElasticSearch</RootNamespace>
     <Description>Elasticsearch vector provider for Koan: plan-bound complete points, native filtered kNN search, normalized similarity, and session-visible mutations.</Description>

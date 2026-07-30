@@ -7,7 +7,6 @@
     <RootNamespace>Koan.Data.Connector.Cockroach</RootNamespace>
     <Description>CockroachDB provider for Koan Data: a lean concrete connector over the shared Npgsql execution family.</Description>
     <PackageTags>$(CommonPackageTags);data;cockroach;cockroachdb;relational;sql;dapper</PackageTags>
-    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

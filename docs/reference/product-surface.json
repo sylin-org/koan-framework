@@ -1398,7 +1398,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Abstractions",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.",
       "targetFrameworks": [
@@ -1457,7 +1457,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Cockroach",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "CockroachDB provider for Koan Data: a lean concrete connector over the shared Npgsql execution family.",
       "targetFrameworks": [
@@ -1475,7 +1475,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Couchbase",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Couchbase provider for Koan Data with direct KV, SQL\u002B\u002B, CAS, compact mappings, and neutral source integration.",
       "targetFrameworks": [
@@ -1495,7 +1495,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.ElasticSearch",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Elasticsearch vector provider for Koan: plan-bound complete points, native filtered kNN search, normalized similarity, and session-visible mutations.",
       "targetFrameworks": [
@@ -1537,7 +1537,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Json",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Zero-configuration JSON persistence for small Koan applications, tests, and local development.",
       "targetFrameworks": [
@@ -1557,7 +1557,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Mongo",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "MongoDB data provider for Koan: options binding and repository integration for document databases.",
       "targetFrameworks": [
@@ -1578,7 +1578,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "OpenSearch vector provider for Koan: plan-bound complete points, native filtered k-NN search, normalized similarity, and session-visible mutations.",
       "targetFrameworks": [
@@ -1600,7 +1600,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Postgres",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.",
       "targetFrameworks": [
@@ -1622,7 +1622,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Redis",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Redis keyed Entity persistence for Koan with native TTL, bounded managed sets, compact JSON mapping, read-only Functions, and shared connection ownership.",
       "targetFrameworks": [
@@ -1644,7 +1644,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.Sqlite",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Durable embedded SQLite provider for Koan Entity data with zero-config local storage, schema management, queries, and bounded paging.",
       "targetFrameworks": [
@@ -1664,7 +1664,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.SqlServer",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "SQL Server provider for Koan relational data with JSON-projection pushdowns, guardrails, and governance.",
       "targetFrameworks": [
@@ -1684,7 +1684,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Core",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Entity data runtime for Koan: provider election, routing, lifecycle, queries, paging, relationships, and canonical operations.",
       "targetFrameworks": [
@@ -1705,7 +1705,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Relational",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Shared schema governance, SQL translation, and command mechanics for Koan relational Data providers.",
       "targetFrameworks": [
@@ -1725,7 +1725,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Relational.Abstractions",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Inert relational schema, dialect, and DDL contracts for Koan Data providers.",
       "targetFrameworks": [
@@ -1743,7 +1743,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Relational.Npgsql",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Shared Npgsql repository mechanics for PostgreSQL-wire Koan Data providers.",
       "targetFrameworks": [
@@ -1784,7 +1784,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Entity-first Koan vector runtime: provider election, memoized repository resolution, isolation-aware naming, querying, health participation, and facades.",
       "targetFrameworks": [
@@ -1803,7 +1803,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Abstractions",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Provider-neutral Koan vector contracts for search repositories, adapter factories, schemas, queries, matches, capabilities, and export shapes.",
       "targetFrameworks": [
@@ -1821,7 +1821,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.InMemory",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "In-process, in-memory vector adapter for Koan: brute-force cosine k-NN over System.Numerics.Tensors (SIMD). The zero-infrastructure vector floor for single-binary deployments and the cross-adapter convergence oracle. Pure managed, no native dependencies, NativeAOT-friendly.",
       "targetFrameworks": [
@@ -1843,7 +1843,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Milvus",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Milvus vector adapter for Koan: plan-owned spaces, complete points, native filters, and truthful similarity over REST v2.",
       "targetFrameworks": [
@@ -1865,7 +1865,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Qdrant",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Qdrant vector provider for Koan: plan-bound Entity vector search, native payload filtering, and session-visible mutations over REST.",
       "targetFrameworks": [
@@ -1887,7 +1887,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.SqliteVec",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [
@@ -1909,7 +1909,7 @@
     },
     {
       "packageId": "Sylin.Koan.Data.Vector.Connector.Weaviate",
-      "versionIntent": "0.20",
+      "versionIntent": "0.21",
       "shape": "library",
       "description": "Weaviate vector provider for Koan: plan-bound entity vectors, native filtering, complete points, and awaited Session visibility.",
       "targetFrameworks": [

@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Connector.OpenSearch</AssemblyName>
     <RootNamespace>Koan.Data.Connector.OpenSearch</RootNamespace>
     <Description>OpenSearch vector provider for Koan: plan-bound complete points, native filtered k-NN search, normalized similarity, and session-visible mutations.</Description>

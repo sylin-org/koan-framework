@@ -299,7 +299,7 @@ workflow:
 
 - asks NBGV for the affected package version;
 - validates product and package coherence;
-- packs the selected 0.20 identities; and
+- packs the selected supported identities from their declared compatibility lines; and
 - pushes missing immutable package identities with the repository NuGet key.
 
 Commit-message vocabulary does not calculate versions. Git height owns patch; an intentional

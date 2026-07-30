@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.Qdrant</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Qdrant</RootNamespace>
     <Description>Qdrant vector provider for Koan: plan-bound Entity vector search, native payload filtering, and session-visible mutations over REST.</Description>

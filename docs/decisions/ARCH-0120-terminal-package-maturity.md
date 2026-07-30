@@ -44,7 +44,7 @@ or historical version numbers cannot decide whether those adapters belong in Koa
 The original R13 plan converted the snapshot into ten mandatory waves, a terminal-outcome
 certificate, exact claim-cell declarations, candidate applicability planning, and generic result
 coordination. Those mechanisms made the promotion process harder to understand than the product
-decision they protected. The useful invariant was smaller: a supported claim, 0.20 version intent,
+decision they protected. The useful invariant was smaller: a supported claim, a supported version intent,
 and supported public dependency closure must agree.
 
 ## Decision
@@ -114,11 +114,12 @@ universal admission framework above ordinary test projects.
 
 ### 5. Dependencies are a safety constraint, not a value score
 
-The product compiler retains the bidirectional 0.20 invariant:
+The initial promotion established `0.20` as the supported floor. The product compiler retains the
+bidirectional invariant across that and later compatibility lines:
 
-- every supported claim owner has project-local 0.20 intent;
+- every supported claim owner has project-local intent at `0.20` or a later compatibility line;
 - every public Koan dependency of a supported owner is supported;
-- every package with 0.20 intent belongs to a supported claim.
+- every package on a supported line belongs to a supported claim.
 
 This law prevents an adapter from publishing on an unsupported foundation. It does not require any
 other Koan package to depend on that adapter.
@@ -184,7 +185,7 @@ R13 succeeds when:
 1. the maintainer-intended public package families are represented by honest supported claims;
 2. each promoted family passes its proportionate semantic, provider-specific, consumer, package, and
    API evidence;
-3. every promoted package and its public Koan dependency closure agree on the 0.20 support signal;
+3. every promoted package and its public Koan dependency closure agree on the supported version signal;
 4. generated public guidance clearly identifies supported providers and their limits;
 5. the promoted packages are observable from the public feed through clean consumer journeys;
 6. known migrated or retired packages have completed public ownership correction;
@@ -198,7 +199,7 @@ R13 succeeds when:
 - Provider adapters are evaluated as products rather than mistaken for unused leaf nodes.
 - Work delivers public integrations sooner and in independently valuable slices.
 - Evidence remains strong while living at the family that understands the semantics.
-- The 0.20 signal remains compiler-enforced without a second maturity system.
+- The supported version signal remains compiler-enforced without a second maturity system.
 - Maintainers and contributors can explain promotion in one short checklist.
 
 ### Tradeoffs
