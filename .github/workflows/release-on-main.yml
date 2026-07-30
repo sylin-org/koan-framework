@@ -49,23 +49,27 @@ jobs:
           }
 
           $surface = Get-Content artifacts/product-surface.json -Raw | ConvertFrom-Json
-          $releaseIds = @($surface.packages |
-            Where-Object { $_.versionIntent -eq '0.20' } |
-            ForEach-Object { $_.packageId } |
-            Sort-Object)
+          $releaseIds = @($surface.claims |
+            Where-Object { $_.maturity -in @('supported-foundation', 'supported-extension') } |
+            ForEach-Object { $_.packages } |
+            Sort-Object -Unique)
           if ($releaseIds.Count -eq 0) {
-            throw 'Product surface selected no guaranteed 0.20 packages.'
+            throw 'Product surface selected no supported packages.'
           }
 
           $artifacts = @(Get-ChildItem artifacts/packages -Recurse -Filter *.nupkg -File)
           $packages = @(
             foreach ($packageId in $releaseIds) {
-              $prefix = "$packageId.0.20."
+              $owners = @($surface.packages | Where-Object { $_.packageId -eq $packageId })
+              if ($owners.Count -ne 1) {
+                throw "Supported package '$packageId' matched $($owners.Count) product-surface owners; expected exactly one."
+              }
+              $prefix = "$packageId.$($owners[0].versionIntent)."
               $matches = @($artifacts | Where-Object {
                 $_.Name.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)
               })
               if ($matches.Count -ne 1) {
-                throw "Guaranteed package '$packageId' matched $($matches.Count) packed 0.20 artifacts; expected exactly one."
+                throw "Supported package '$packageId' matched $($matches.Count) packed '$($owners[0].versionIntent)' artifacts; expected exactly one."
               }
               $matches[0]
             }

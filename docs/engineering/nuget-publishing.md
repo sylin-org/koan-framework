@@ -4,8 +4,8 @@ domain: framework
 title: "NuGet publishing"
 audience: [maintainers, release-engineers]
 status: current
-last_updated: 2026-07-20
-framework_version: v0.20.0
+last_updated: 2026-07-29
+framework_version: v0.21.0
 ---
 
 # NuGet publishing
@@ -31,9 +31,9 @@ The one job:
 
 1. checks out full Git history from `main` so NBGV can calculate package versions;
 2. compiles the product surface, requiring local `version.json` ownership and exact agreement between
-   supported claims and the 0.20 package closure;
+   supported claims and every package owner's declared compatibility line;
 3. packs the solution and the packable template project with `PublicRelease=true`; and
-4. pushes only the selected 0.20 nupkgs with `--skip-duplicate`.
+4. pushes only the supported packages matching those declared lines, with `--skip-duplicate`.
 
 NuGet package identities are immutable. Rerunning the failed workflow run skips identities already
 present and attempts the remaining packages. A missing key, invalid version owner, pack failure, or

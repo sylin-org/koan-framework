@@ -32,18 +32,24 @@ public sealed class PackageBaselineValidatorTests
 
         Assert.True(guard >= 0, "release-on-main must execute the real api-baselines command");
         Assert.True(pack > guard, "the API-baseline guard must pass before any package is packed");
+        Assert.Contains("supported-foundation", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("versionIntent -eq '0.20'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet test", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("green-ratchet", workflow, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task AcceptsTheEarliestPublic020BaselineAndContentOnlyOwner()
+    public async Task AcceptsTheEarliestPublicDeclaredLineBaselineAndContentOnlyOwner()
     {
-        var assembly = Project("Sylin.Koan.Assembly", baseline: "0.20.2", validationEnabled: true);
+        var assembly = Project(
+            "Sylin.Koan.Assembly",
+            versionIntent: "0.21",
+            baseline: "0.21.2",
+            validationEnabled: true);
         var content = Project("Sylin.Koan.Content", includeBuildOutput: false);
         var validator = Validator(new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            [assembly.PackageId] = ["0.19.4", "0.20.2", "0.20.3", "0.20.4-beta"]
+            [assembly.PackageId] = ["0.20.4", "0.21.2", "0.21.3", "0.21.4-beta"]
         });
 
         var report = await validator.ValidateAsync(
@@ -61,10 +67,10 @@ public sealed class PackageBaselineValidatorTests
     [Fact]
     public async Task AllowsOnlyTheFirstPublicationToHaveNoBaseline()
     {
-        var package = Project("Sylin.Koan.New");
+        var package = Project("Sylin.Koan.New", versionIntent: "0.21");
         var validator = Validator(new Dictionary<string, IReadOnlyList<string>>
         {
-            [package.PackageId] = ["0.19.7"]
+            [package.PackageId] = ["0.20.6"]
         });
 
         var report = await validator.ValidateAsync([package], Surface(package.PackageId), CancellationToken.None);
@@ -74,12 +80,12 @@ public sealed class PackageBaselineValidatorTests
     }
 
     [Fact]
-    public async Task RejectsASecond020PublicationWithoutABaseline()
+    public async Task RejectsASecondPublicationOnTheDeclaredLineWithoutABaseline()
     {
-        var package = Project("Sylin.Koan.Missing");
+        var package = Project("Sylin.Koan.Missing", versionIntent: "0.21");
         var validator = Validator(new Dictionary<string, IReadOnlyList<string>>
         {
-            [package.PackageId] = ["0.20.6"]
+            [package.PackageId] = ["0.20.6", "0.21.0"]
         });
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -93,17 +99,40 @@ public sealed class PackageBaselineValidatorTests
     [Fact]
     public async Task RejectsALaterPatchAsTheBaseline()
     {
-        var package = Project("Sylin.Koan.Late", baseline: "0.20.3", validationEnabled: true);
+        var package = Project(
+            "Sylin.Koan.Late",
+            versionIntent: "0.21",
+            baseline: "0.21.3",
+            validationEnabled: true);
         var validator = Validator(new Dictionary<string, IReadOnlyList<string>>
         {
-            [package.PackageId] = ["0.20.1", "0.20.3"]
+            [package.PackageId] = ["0.20.1", "0.21.1", "0.21.3"]
         });
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             validator.ValidateAsync([package], Surface(package.PackageId), CancellationToken.None));
 
         Assert.Contains("earliest immutable", error.Message, StringComparison.Ordinal);
-        Assert.Contains("0.20.1", error.Message, StringComparison.Ordinal);
+        Assert.Contains("0.21.1", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RejectsABaselineFromAnOlderCompatibilityLine()
+    {
+        var package = Project(
+            "Sylin.Koan.Breaking",
+            versionIntent: "0.21",
+            baseline: "0.20.1",
+            validationEnabled: true);
+        var validator = Validator(new Dictionary<string, IReadOnlyList<string>>
+        {
+            [package.PackageId] = ["0.20.1", "0.21.0"]
+        });
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAsync([package], Surface(package.PackageId), CancellationToken.None));
+
+        Assert.Contains("0.21.patch", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -162,6 +191,7 @@ public sealed class PackageBaselineValidatorTests
     private static PackageProject Project(
         string packageId,
         bool includeBuildOutput = true,
+        string versionIntent = "0.20",
         string? baseline = null,
         bool validationEnabled = false) =>
         new(
@@ -181,7 +211,7 @@ public sealed class PackageBaselineValidatorTests
             "Description",
             "koan;test",
             [],
-            VersionIntent: "0.20",
+            VersionIntent: versionIntent,
             PackageValidationBaselineVersion: baseline,
             EnablePackageValidation: validationEnabled);
 

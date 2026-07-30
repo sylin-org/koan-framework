@@ -4,7 +4,6 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Vector.Connector.Milvus</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Milvus</RootNamespace>
     <Description>Milvus vector adapter for Koan: plan-owned spaces, complete points, native filters, and truthful similarity over REST v2.</Description>

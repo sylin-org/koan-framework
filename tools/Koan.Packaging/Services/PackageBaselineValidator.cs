@@ -36,23 +36,26 @@ internal sealed class PackageBaselineValidator(
                 continue;
             }
 
-            var versions = StablePreviewVersions(await publicVersions(packageId, cancellationToken));
+            var compatibilityLine = ParseCompatibilityLine(project.VersionIntent, packageId);
+            var versions = StableVersions(
+                await publicVersions(packageId, cancellationToken),
+                compatibilityLine);
             var baseline = project.PackageValidationBaselineVersion;
             if (string.IsNullOrWhiteSpace(baseline))
             {
                 if (versions.Count > 0)
                 {
                     throw new InvalidOperationException(
-                        $"Supported package '{packageId}' already has public 0.20 artifact '{versions[0]}' but its " +
+                        $"Supported package '{packageId}' already has public {compatibilityLine} artifact '{versions[0]}' but its " +
                         $"owning project '{project.ProjectPath}' has no PackageValidationBaselineVersion. Record " +
-                        "the earliest immutable 0.20 artifact before publishing another patch.");
+                        $"the earliest immutable {compatibilityLine} artifact before publishing another patch.");
                 }
 
                 pending++;
                 continue;
             }
 
-            var canonicalBaseline = ParseStablePreviewVersion(baseline, packageId);
+            var canonicalBaseline = ParseStableVersion(baseline, compatibilityLine, packageId);
             if (!project.EnablePackageValidation)
             {
                 throw new InvalidOperationException(
@@ -63,13 +66,13 @@ internal sealed class PackageBaselineValidator(
             {
                 throw new InvalidOperationException(
                     $"Supported package '{packageId}' records baseline '{baseline}', but NuGet exposes no stable " +
-                    "0.20 artifact. Correct the project-local baseline or the public package identity.");
+                    $"{compatibilityLine} artifact. Correct the project-local baseline or the public package identity.");
             }
             if (versions[0] != canonicalBaseline)
             {
                 throw new InvalidOperationException(
                     $"Supported package '{packageId}' records baseline '{baseline}', but its earliest immutable " +
-                    $"public 0.20 artifact is '{versions[0]}'. Use the first artifact; later patches are not the compatibility floor.");
+                    $"public {compatibilityLine} artifact is '{versions[0]}'. Use the first artifact; later patches are not the compatibility floor.");
             }
 
             configured++;
@@ -97,11 +100,13 @@ internal sealed class PackageBaselineValidator(
             .ToArray();
     }
 
-    private static IReadOnlyList<Version> StablePreviewVersions(IEnumerable<string> versions) =>
+    private static IReadOnlyList<Version> StableVersions(
+        IEnumerable<string> versions,
+        Version compatibilityLine) =>
         versions
             .Select(version => Version.TryParse(version, out var parsed) &&
                                parsed.Build >= 0 && parsed.Revision < 0 &&
-                               parsed.Major == 0 && parsed.Minor == 20 &&
+                               parsed.Major == compatibilityLine.Major && parsed.Minor == compatibilityLine.Minor &&
                                string.Equals(parsed.ToString(3), version, StringComparison.Ordinal)
                 ? parsed
                 : null)
@@ -111,15 +116,27 @@ internal sealed class PackageBaselineValidator(
             .Order()
             .ToArray();
 
-    private static Version ParseStablePreviewVersion(string value, string owner)
+    private static Version ParseStableVersion(string value, Version compatibilityLine, string owner)
     {
         if (!Version.TryParse(value, out var parsed) || parsed.Build < 0 || parsed.Revision >= 0 ||
-            parsed.Major != 0 || parsed.Minor != 20 ||
+            parsed.Major != compatibilityLine.Major || parsed.Minor != compatibilityLine.Minor ||
             !string.Equals(parsed.ToString(3), value, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Package validation baseline '{value}' for '{owner}' is invalid. " +
-                "Use the exact stable version format 0.20.patch.");
+                $"Use the exact stable version format {compatibilityLine}.patch.");
+        }
+
+        return parsed;
+    }
+
+    private static Version ParseCompatibilityLine(string? value, string owner)
+    {
+        if (!Version.TryParse(value, out var parsed) || parsed.Build >= 0 || parsed.Revision >= 0)
+        {
+            throw new InvalidOperationException(
+                $"Supported package '{owner}' has invalid compatibility intent '{value ?? "<missing>"}'. " +
+                "Use an exact major.minor version intent.");
         }
 
         return parsed;

@@ -99,10 +99,10 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         markdown.AppendLine("title: \"Koan Product Surface\"");
         markdown.AppendLine("audience: [developers, support-engineers, architects, ai-agents]");
         markdown.AppendLine("status: current");
-        markdown.AppendLine("last_updated: 2026-07-19");
+        markdown.AppendLine("last_updated: 2026-07-29");
         markdown.Append("framework_version: ").AppendLine(PackagingConstants.PreviewFrameworkVersion);
         markdown.AppendLine("validation:");
-        markdown.AppendLine("  date_last_tested: 2026-07-19");
+        markdown.AppendLine("  date_last_tested: 2026-07-29");
         markdown.AppendLine("  status: passed");
         markdown.AppendLine("  scope: deterministic product claims and evaluated package graph");
         markdown.AppendLine("---");
@@ -115,7 +115,7 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         markdown.AppendLine();
         markdown.AppendLine("## Maturity vocabulary");
         markdown.AppendLine();
-        markdown.AppendLine("These labels are evidence and support dispositions, not one linear ranking. Only the two supported labels admit package owners to the 0.20 compatibility signal.");
+        markdown.AppendLine("These labels are evidence and support dispositions, not one linear ranking. Only the two supported labels admit package owners to a supported compatibility line.");
         markdown.AppendLine();
         markdown.AppendLine("| Label | Meaning | Support / compatibility implication |");
         markdown.AppendLine("|---|---|---|");
@@ -210,11 +210,11 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
         foreach (var packageId in supportedPackages.Order(StringComparer.OrdinalIgnoreCase))
         {
             var project = graph.Project(packageId);
-            if (!string.Equals(project.VersionIntent, "0.20", StringComparison.Ordinal))
+            if (!IsSupportedVersionIntent(project.VersionIntent))
             {
                 throw new InvalidOperationException(
                     $"Supported package '{packageId}' declares version intent '{project.VersionIntent ?? "<missing>"}'. " +
-                    "Set its project-local version.json intent to '0.20'; supported claims and the 0.20 signal must agree.");
+                    "Set its project-local version.json intent to '0.20' or a later compatibility line; supported claims and version intent must agree.");
             }
 
             foreach (var dependency in graph.PackageDependenciesOf(packageId))
@@ -230,15 +230,19 @@ internal sealed class ProductSurfaceCompiler(string repositoryRoot)
 
         foreach (var project in graph.Projects.OrderBy(project => project.PackageId, StringComparer.OrdinalIgnoreCase))
         {
-            if (string.Equals(project.VersionIntent, "0.20", StringComparison.Ordinal) &&
+            if (IsSupportedVersionIntent(project.VersionIntent) &&
                 !supportedPackages.Contains(project.PackageId))
             {
                 throw new InvalidOperationException(
-                    $"Package '{project.PackageId}' declares 0.20 version intent but belongs to no supported claim. " +
+                    $"Package '{project.PackageId}' declares supported version intent '{project.VersionIntent}' but belongs to no supported claim. " +
                     "Add an accepted guarantee or keep the package on its current lower maturity line.");
             }
         }
     }
+
+    private static bool IsSupportedVersionIntent(string? value) =>
+        Version.TryParse(value, out var version) &&
+        (version.Major > 0 || version.Major == 0 && version.Minor >= 20);
 
     private IReadOnlyList<string> RequirePaths(IEnumerable<string> paths, string field)
     {
