@@ -30,9 +30,10 @@ Chapter 2 keeps the same four-line host, garden entities, controllers, automatio
 contract. It adds three references—local ONNX embeddings, SQLite vector storage, and Entity embedding
 integration—plus the business-aligned `Produce` entity and one scored-search endpoint.
 
-`[Embedding]` on `Produce` makes its normal `Save()` create the local vector index. Application code does
-not select providers or orchestrate their startup. `GardenCoopModule` still owns application composition;
-its only new startup responsibility is ensuring five starter produce listings after AI composition is ready.
+`[Embedding]` on `Produce` makes its normal `Save()` create the local vector index. `GardenCoopModule.Compose`
+declares the source-owned `garden-produce` vector shape once—name, 384 dimensions, and embedding model—while
+referenced providers supply the mechanics. Application code does not select providers or orchestrate their startup.
+The module's startup responsibility remains ensuring five starter produce listings after AI composition is ready.
 
 The supported deployment shape is a self-contained folder. This chapter does not claim NativeAOT, a literal
 single-file artifact, or untested operating-system portability.

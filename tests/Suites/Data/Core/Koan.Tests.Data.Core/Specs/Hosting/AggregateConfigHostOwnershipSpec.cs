@@ -1,5 +1,6 @@
 using Koan.Core;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Core;
 using Koan.Testing.Integration;
 using Koan.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,6 +87,41 @@ public sealed class AggregateConfigHostOwnershipSpec
     }
 
     [Fact]
+    public async Task Concurrent_first_use_publishes_one_repository_and_failed_creation_is_retryable()
+    {
+        var factory = new RecordingAdapterFactory { Delay = TimeSpan.FromMilliseconds(40) };
+        await using var host = await StartHost(factory);
+        var data = host.Services.GetRequiredService<IDataService>();
+
+        var repositories = await Task.WhenAll(Enumerable.Range(0, 24).Select(_ => Task.Run(() =>
+            data.GetRepository<AggregateOwnershipEntity, string>())));
+
+        foreach (var repository in repositories) repository.Should().BeSameAs(repositories[0]);
+        factory.CreateCalls.Should().Be(1);
+
+        var retryFactory = new RecordingAdapterFactory { FailNextCreate = true };
+        await using var retryHost = await StartHost(retryFactory);
+        var retryData = retryHost.Services.GetRequiredService<IDataService>();
+        FluentActions.Invoking(() => retryData.GetRepository<AggregateOwnershipEntity, string>())
+            .Should().Throw<InvalidOperationException>().WithMessage("*injected creation failure*");
+        retryData.GetRepository<AggregateOwnershipEntity, string>().Should().NotBeNull();
+        retryFactory.CreateCalls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Repository_capacity_rejects_before_constructing_an_unadmitted_provider_resource()
+    {
+        var factory = new RecordingAdapterFactory();
+        await using var host = await StartHost(factory, repositoryEntries: 1);
+        var data = host.Services.GetRequiredService<IDataService>();
+
+        data.GetRepository<AggregateOwnershipEntity, string>().Should().NotBeNull();
+        FluentActions.Invoking(() => data.GetRepository<SecondAggregateOwnershipEntity, string>())
+            .Should().Throw<InvalidOperationException>().WithMessage("*repository cache*limit of 1*");
+        factory.CreateCalls.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Diagnostics_report_the_configs_observed_by_the_current_host()
     {
         var factory = new RecordingAdapterFactory();
@@ -112,17 +148,25 @@ public sealed class AggregateConfigHostOwnershipSpec
             && info.Source == "Default");
     }
 
-    private static Task<IntegrationHost> StartHost(RecordingAdapterFactory factory)
+    private static Task<IntegrationHost> StartHost(
+        RecordingAdapterFactory factory,
+        int? repositoryEntries = null)
         => KoanIntegrationHost.Configure()
             .ConfigureServices(services =>
             {
                 services.AddKoan();
                 services.AddSingleton<IDataAdapterFactory>(factory);
+                if (repositoryEntries is not null)
+                    services.Configure<DataRuntimeOptions>(options =>
+                        options.RepositoryEntries = repositoryEntries.Value);
             })
             .StartAsync();
 
     [DataAdapter(RecordingAdapterFactory.ProviderId)]
     private sealed class AggregateOwnershipEntity : Koan.Data.Core.Model.Entity<AggregateOwnershipEntity>;
+
+    [DataAdapter(RecordingAdapterFactory.ProviderId)]
+    private sealed class SecondAggregateOwnershipEntity : Koan.Data.Core.Model.Entity<SecondAggregateOwnershipEntity>;
 
     private sealed class RecordingAdapterFactory : IDataAdapterFactory
     {
@@ -138,12 +182,22 @@ public sealed class AggregateConfigHostOwnershipSpec
 
         public IServiceProvider? LastServices => Volatile.Read(ref _lastServices);
 
+        public TimeSpan Delay { get; init; }
+
+        public bool FailNextCreate { get; set; }
+
         public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
             where TEntity : class, IEntity<TKey>
             where TKey : notnull
         {
             Volatile.Write(ref _lastServices, sp);
             Interlocked.Increment(ref _createCalls);
+            if (Delay > TimeSpan.Zero) Thread.Sleep(Delay);
+            if (FailNextCreate)
+            {
+                FailNextCreate = false;
+                throw new InvalidOperationException("injected creation failure");
+            }
             return _inner.Create<TEntity, TKey>(sp, source);
         }
 

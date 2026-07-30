@@ -12,11 +12,6 @@ public class InMemoryVectorPartitionSpecs : VectorPartitionSpecsBase<InMemoryVec
     public InMemoryVectorPartitionSpecs(InMemoryVectorTestFactory factory) : base(factory) { }
 }
 
-public class InMemoryVectorSemanticSpecs : VectorSemanticSpecsBase<InMemoryVectorTestFactory>
-{
-    public InMemoryVectorSemanticSpecs(InMemoryVectorTestFactory factory) : base(factory) { }
-}
-
 public class InMemoryVectorFilterConvergenceSpecs : VectorFilterConvergenceSpecsBase<InMemoryVectorTestFactory>
 {
     public InMemoryVectorFilterConvergenceSpecs(InMemoryVectorTestFactory factory) : base(factory) { }

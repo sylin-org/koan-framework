@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Json.Tests.Specs.Capabilities;
@@ -7,7 +8,7 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
     : KoanDataSpec<JsonFixture>(fixture, output)
 {
     [Fact]
-    public async Task Repository_reports_linq_capability_and_no_native_bulk_writes()
+    public async Task Repository_reports_linq_and_single_replacement_bulk_writes()
     {
         RequireBackingStore();
         await using var host = await BootAsync();
@@ -16,14 +17,27 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
         var repository = data.GetRepository<CapabilityProbe, string>();
         repository.Should().BeAssignableTo<IQueryRepository<CapabilityProbe, string>>();
 
-        // ARCH-0084: negotiate via the unified CapabilitySet. JSON advertises no native bulk writes.
+        // A JSON bulk mutation produces one physical file replacement, not one replacement per row.
         var caps = DataCaps.Describe(repository, repository.GetType().Name);
         caps.Has(DataCaps.Query.Linq).Should().BeTrue();
         caps.Has(DataCaps.Query.String).Should().BeFalse();
-        caps.Has(DataCaps.Write.BulkUpsert).Should().BeFalse();
-        caps.Has(DataCaps.Write.BulkDelete).Should().BeFalse();
+        caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
+        caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
         caps.Has(DataCaps.Write.FastRemove).Should().BeFalse();
+
+        var published = new ClaimCapture();
+        new JsonAdapterFactory().DescribeClaims(published);
+        published.Capabilities.Should().Contain([
+            DataCaps.Query.Linq,
+            DataCaps.Query.Filter,
+            DataCaps.Write.BulkUpsert,
+            DataCaps.Write.BulkDelete,
+            DataCaps.Isolation.RowScoped,
+            DataCaps.Isolation.ContainerScoped,
+            DataCaps.Isolation.DatabaseScoped
+        ]);
+        published.Capabilities.Should().NotContain(DataCaps.Write.AtomicBatch);
 
         var partition = NewPartition("capabilities");
         using var lease = Lease(partition);
@@ -36,5 +50,16 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
         public string Name { get; set; } = "";
+    }
+
+    private sealed class ClaimCapture : IDataClaims
+    {
+        public HashSet<Capability> Capabilities { get; } = [];
+        public IDataClaims Profile(string profile, string? qualifier = null, bool advertised = true) => this;
+        public IDataClaims Capability(Capability capability, bool advertised = true)
+        {
+            if (advertised) Capabilities.Add(capability);
+            return this;
+        }
     }
 }

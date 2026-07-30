@@ -18,7 +18,7 @@ using Xunit;
 namespace Koan.Data.AdapterSurface.TestKit;
 
 /// <summary>
-/// The one reusable AODB conformance ledger (ARCH-0103 §6 / P5). A per-adapter cell subclasses this with the adapter's
+/// The reusable AODB conformance suite (ARCH-0103 §6 / P5). Each adapter subclasses this with the adapter's
 /// container fixture and the per-source placement settings; the base proves, through a real <c>AddKoan()</c> boot, that
 /// the adapter realizes ALL THREE AODB isolation modes — and that it <b>declares</b> the matching capability tokens.
 /// <para>
@@ -86,7 +86,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== The co-definition: declare the required tokens ====================
 
-    [Fact(DisplayName = "AODB ledger: the adapter declares all three isolation modes (RowScoped + ContainerScoped + DatabaseScoped)")]
+    [Fact(DisplayName = "G-09/declarations/Adapter: announced isolation modes are mandatory and executable")]
     public async Task Declares_all_three_isolation_modes()
     {
         RequireBackingStore();
@@ -97,7 +97,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Provider-bounded Entity streams ====================
 
-    [Fact(DisplayName = "Streaming: announced provider-bounded paging realizes; unannounced adapters reject before yielding")]
+    [Fact(DisplayName = "B-09/provider-bounded-page/Adapter: bounded streaming realizes or fails closed")]
     public async Task Provider_bounded_streaming_realizes_or_fails_closed()
     {
         RequireBackingStore();
@@ -188,7 +188,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Polymorphic entity roots (DATA-0109) ====================
 
-    [Fact(DisplayName = "DATA-0109: variants share one root set and preserve their leaf payloads")]
+    [Fact(DisplayName = "B-01/polymorphic-root/Adapter: variants share one root set and preserve leaf payloads")]
     public async Task Polymorphic_variants_share_the_root_set_and_round_trip_leaf_payloads()
     {
         RequireBackingStore();
@@ -303,11 +303,11 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Shared (FieldFilter → managed-record persistence) ====================
 
-    [Fact(DisplayName = "AODB Shared: the framework-managed discriminator isolates reads/writes/deletes (no leak)")]
+    [Fact(DisplayName = "G-09/row/Adapter: the managed discriminator isolates reads writes and deletes")]
     public async Task Shared_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(ManagedFieldNoLeak.Declare);
         await CapabilityConformanceGate.RunCell(ResolveCaps(host.Services), Modules,
             DataCaps.Isolation.RowScoped,
             realize: () => ManagedFieldNoLeak.AssertNoLeakAsync());
@@ -315,7 +315,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Container (Particle → distinct physical container per partition) ====================
 
-    [Fact(DisplayName = "AODB Container: each ambient partition resolves to a distinct physical container (isolation + concurrent no-leak)")]
+    [Fact(DisplayName = "G-09/container/Adapter: each ambient partition resolves to an isolated container")]
     public async Task Container_isolation_holds()
     {
         RequireBackingStore();
@@ -367,7 +367,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Database (Moniker → per-source physical routing) ====================
 
-    [Fact(DisplayName = "AODB Database: a Database-mode axis auto-routes by ambient shard to distinct physical sources, fail-closed on unconfigured")]
+    [Fact(DisplayName = "G-09/database/Adapter: each ambient shard resolves to an isolated source")]
     public async Task Database_isolation_holds()
     {
         RequireBackingStore();

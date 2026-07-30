@@ -4,7 +4,7 @@ using Koan.Data.AdapterSurface.TestKit;
 namespace Koan.Data.Connector.InMemory.Tests.Specs;
 
 /// <summary>
-/// InMemory's AODB conformance ledger cell (ARCH-0103 §6 / P5) — the byte-faithful convergence oracle. Proves the
+/// InMemory's AODB conformance suite (ARCH-0103 §6 / P5) is the byte-faithful convergence oracle. It proves the
 /// KeyValueStore family base realizes all three AODB modes on InMemory AND declares the tokens. The two routed
 /// conformance sources isolate purely by source key (the in-memory store keys by source/type/partition).
 /// </summary>

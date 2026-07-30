@@ -17,13 +17,12 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
-    <!-- ARCH-0103 P5: the conformance ledger base (AodbConformanceSpecsBase) boots real engine fixtures. -->
+    <!-- ARCH-0103 P5: the shared conformance suite boots real engine fixtures. -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Containers\Koan.Testing.Containers.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ARCH-0094 Phase 1: the capability-driven Conformance Gate, LINK-compiled (not project-referenced) so the
-         two planes share its source, not an assembly — this testkit's discoverable conformance axis stays unshared. -->
+    <!-- One test-only dispatcher source serves both AODB planes without adding a runtime package edge to adapters. -->
     <Compile Include="..\..\..\_shared\CapabilityConformanceGate.cs" Link="Support\CapabilityConformanceGate.cs" />
   </ItemGroup>
 

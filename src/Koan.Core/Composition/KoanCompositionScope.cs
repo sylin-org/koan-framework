@@ -32,7 +32,18 @@ public static class KoanCompositionScope
             "Place the declaration inside builder.Services.AddKoan(() => { ... }) or a Koan module registration method.");
     }
 
-    internal static IDisposable Enter(IServiceCollection services)
+    /// <summary>Returns the exact service collection currently being composed, when one exists.</summary>
+    public static bool TryGetServices(out IServiceCollection services)
+    {
+        services = Current.Value!;
+        return services is not null;
+    }
+
+    /// <summary>
+    /// Enters an explicit composition owner. Framework expanders use this when they receive a service collection
+    /// directly; ordinary applications enter through <c>AddKoan</c>.
+    /// </summary>
+    public static IDisposable Enter(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         var previous = Current.Value;

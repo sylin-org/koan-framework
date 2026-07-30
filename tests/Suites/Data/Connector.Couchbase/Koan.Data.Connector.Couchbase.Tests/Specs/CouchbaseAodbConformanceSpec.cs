@@ -5,9 +5,8 @@ using Koan.Data.AdapterSurface.TestKit;
 namespace Koan.Data.Connector.Couchbase.Tests.Specs;
 
 /// <summary>
-/// Couchbase's AODB conformance ledger cell (ARCH-0103 §6 / P4) — the last document-family adapter to fold onto
-/// <c>DocumentStore</c>. Proves, through a real <c>AddKoan()</c> boot over one Couchbase container, that the folded
-/// <c>CouchbaseDocumentStore</c> realizes all three AODB isolation modes AND declares the matching tokens. Couchbase's
+/// Couchbase's AODB conformance suite proves through a real <c>AddKoan()</c> boot that the greenfield connector
+/// realizes all three declared isolation modes. Couchbase's
 /// 3-level keyspace maps each mode to a distinct native level: Shared (the framework-managed discriminator injected into
 /// the document JSON + a CAS conflict guard), Container (a distinct native <b>scope</b> per ambient partition), Database
 /// (a distinct native <b>bucket</b> per routed source). The two routed conformance sources point to freshly-provisioned

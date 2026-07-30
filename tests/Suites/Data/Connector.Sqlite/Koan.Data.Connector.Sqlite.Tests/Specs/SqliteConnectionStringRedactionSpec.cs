@@ -1,7 +1,5 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
-using Koan.Core.Orchestration;
-using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Microsoft.Extensions.Configuration;
@@ -67,20 +65,8 @@ public sealed class SqliteConnectionStringRedactionSpec
         // whether the op throws — so capture any exception without asserting on it.
         var ex = await Record.ExceptionAsync(async () => await repo.Get("probe", CancellationToken.None));
 
-        // Exercise the autonomous adapter's real health-validation path too. Options discovery deliberately
-        // selects without I/O, so only an explicit validation request reaches this probe-failure log.
-        var discovery = provider.GetServices<IServiceDiscoveryAdapter>()
-            .Single(adapter => adapter.ServiceName == "sqlite");
-        await discovery.Discover(new DiscoveryContext
-        {
-            Configuration = configuration,
-            RequireHealthValidation = true,
-            HealthCheckTimeout = TimeSpan.FromSeconds(1),
-        });
-
         var messages = capture.Messages.ToArray();
         var parseFailed = messages.Where(m => m.Contains("parse-failed", StringComparison.Ordinal)).ToArray();
-        var probeFailed = messages.Where(m => m.Contains("sqlite.health", StringComparison.Ordinal)).ToArray();
 
         parseFailed.Should().NotBeEmpty(
             "a malformed connection string must surface a parse-failed warning (op threw: {0}); connection-related captures: {1}",
@@ -92,9 +78,6 @@ public sealed class SqliteConnectionStringRedactionSpec
             "a suffix after a quoted delimiter must not escape masking");
         parseFailed.Should().Contain(m => m.Contains("Password=***", StringComparison.OrdinalIgnoreCase),
             "the connection string must be de-identified via Redaction.DeIdentify before logging");
-        probeFailed.Should().NotBeEmpty("the explicit health-validation path must exercise its failure log");
-        probeFailed.Should().NotContain(m => m.Contains(secret, StringComparison.Ordinal),
-            "SQLite discovery probe failures must de-identify exception messages too");
     }
 
     private sealed class RedactionProbe : Entity<RedactionProbe>

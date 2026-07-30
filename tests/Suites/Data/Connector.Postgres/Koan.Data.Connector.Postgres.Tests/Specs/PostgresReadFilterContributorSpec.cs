@@ -81,8 +81,9 @@ public sealed class PostgresReadFilterContributorSpec(PostgresFixture fixture, I
     public async Task Non_equality_predicate_scopes_query_and_count()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;
@@ -100,8 +101,9 @@ public sealed class PostgresReadFilterContributorSpec(PostgresFixture fixture, I
     public async Task Non_equality_predicate_protects_key_operations()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;
@@ -121,8 +123,9 @@ public sealed class PostgresReadFilterContributorSpec(PostgresFixture fixture, I
     public async Task Non_equality_predicate_scopes_mass_deletes()
     {
         RequireBackingStore();
-        RegisterAxis();
-        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        await using var host = await BootAsync(
+            RegisterAxis,
+            s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
         using var _ = Lease(NewPartition());
 
         Doc visible, hidden;

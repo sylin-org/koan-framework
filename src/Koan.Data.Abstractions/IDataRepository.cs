@@ -13,9 +13,9 @@ namespace Koan.Data.Abstractions;
 public interface IDataRepository<TEntity, TKey> where TEntity : IEntity<TKey>
 {
     /// <summary>
-    /// Idempotent. Ensures the backing store is provisioned and reachable. Called by the
-    /// repository facade before any data operation; adapters cache their own readiness state.
-    /// Default implementation is a no-op.
+    /// Legacy provisioning-ready seam. The facade invokes it only for an unrestricted
+    /// Managed + ReadWrite source; constrained sources require separately proven non-creating
+    /// reachability and declared-shape validation. Default implementation is a no-op.
     /// </summary>
     Task EnsureReady(CancellationToken ct = default) => Task.CompletedTask;
 

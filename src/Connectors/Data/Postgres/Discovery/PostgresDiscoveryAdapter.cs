@@ -1,116 +1,78 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Npgsql;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Connector.Postgres.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Koan.Data.Connector.Postgres.Discovery;
 
-/// <summary>
-/// PostgreSQL autonomous discovery adapter.
-/// Contains ALL PostgreSQL-specific knowledge - core orchestration knows nothing about PostgreSQL.
-/// Reads own KoanServiceAttribute and handles PostgreSQL-specific health checks.
-/// </summary>
-internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
+internal sealed class PostgresDiscoveryAdapter(
+    IConfiguration configuration,
+    ILogger<PostgresDiscoveryAdapter> logger) : ServiceDiscoveryAdapterBase(configuration, logger)
 {
-    public override string ServiceName => "postgres";
-    public override string[] Aliases => new[] { "postgresql", "npgsql" };
+    public override string ServiceName => Constants.Provider;
+    public override string[] Aliases => ["postgresql", "npgsql"];
 
-    public PostgresDiscoveryAdapter(IConfiguration configuration, ILogger<PostgresDiscoveryAdapter> logger)
-        : base(configuration, logger) { }
-
-    /// <summary>PostgreSQL adapter knows which factory contains its KoanServiceAttribute</summary>
     protected override Type GetFactoryType() => typeof(PostgresAdapterFactory);
 
-    /// <summary>PostgreSQL-specific health validation using connection test</summary>
-    protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
-    {
-        // The shared base owns timeout/failure/success narration and redaction.
-        var connectionString = BuildPostgresConnectionString(serviceUrl, context.Parameters);
+    protected override string? ReadExplicitConfiguration() =>
+        _configuration[Constants.Configuration.ConnectionString] ??
+        _configuration.GetConnectionString("Postgres") ??
+        _configuration.GetConnectionString(Constants.DefaultSource);
 
-        using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        using var command = new NpgsqlCommand("SELECT 1", connection);
-        await command.ExecuteScalarAsync(cancellationToken);
-
-        return true;
-    }
-
-    /// <summary>PostgreSQL adapter reads its own configuration sections</summary>
-    protected override string? ReadExplicitConfiguration()
-    {
-        // Check PostgreSQL-specific configuration paths
-        return _configuration.GetConnectionString("PostgreSQL") ??
-               _configuration.GetConnectionString("Postgres") ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
-    }
-
-    /// <summary>PostgreSQL-specific environment variable handling</summary>
-    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
-    {
-        var postgresUrls = Environment.GetEnvironmentVariable("POSTGRES_URLS") ??
-                          Environment.GetEnvironmentVariable("POSTGRESQL_URLS");
-
-        if (string.IsNullOrWhiteSpace(postgresUrls))
-            return Enumerable.Empty<DiscoveryCandidate>();
-
-        return postgresUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-postgres-urls", DiscoveryCandidatePriority.Environment));
-    }
-
-    /// <summary>PostgreSQL-specific connection string construction</summary>
     protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
-    {
-        return BuildPostgresConnectionString(baseUrl, parameters);
-    }
-
-    /// <summary>Build PostgreSQL connection string from URL and optional parameters</summary>
-    private string BuildPostgresConnectionString(string baseUrl, IDictionary<string, object>? parameters = null)
     {
         try
         {
-            // Handle postgres:// URL format
-            if (baseUrl.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase))
-            {
-                var uri = new Uri(baseUrl);
-                var host = uri.Host;
-                var port = uri.Port == -1 ? 5432 : uri.Port;
-                var database = string.IsNullOrEmpty(uri.PathAndQuery.Trim('/')) ? "Koan" : uri.PathAndQuery.Trim('/');
-                var username = "postgres";
-                var password = "postgres";
-
-                // Apply parameters if provided
-                if (parameters != null)
-                {
-                    if (parameters.TryGetValue("database", out var db))
-                        database = db.ToString() ?? database;
-                    if (parameters.TryGetValue("username", out var user))
-                        username = user.ToString() ?? username;
-                    if (parameters.TryGetValue("password", out var pass))
-                        password = pass.ToString() ?? password;
-                }
-
-                return $"Host={host};Port={port};Database={database};Username={username};Password={password}";
-            }
-
-            // If it's already a connection string format, return as-is
+            var builder = Build(baseUrl);
+            builder.Database = Value(parameters, "database") ??
+                               _configuration[Constants.Configuration.Database] ??
+                               EmptyAs(builder.Database, "Koan");
+            builder.Username = Value(parameters, "username") ??
+                               _configuration[Constants.Configuration.Username] ??
+                               EmptyAs(builder.Username, "postgres");
+            builder.Password = Value(parameters, "password") ??
+                               _configuration[Constants.Configuration.Password] ??
+                               EmptyAs(builder.Password, "postgres");
+            return builder.ConnectionString;
+        }
+        catch (Exception error)
+        {
+            ReportNormalizationFailure(baseUrl, error);
             return baseUrl;
         }
-        catch (Exception ex)
-        {
-            ReportNormalizationFailure(baseUrl, ex);
-            return baseUrl; // Return original URL if parsing fails
-        }
     }
 
-    /// <summary>PostgreSQL adapter handles Aspire service discovery for PostgreSQL</summary>
-    protected override string? ReadAspireServiceDiscovery()
+    protected override async Task<bool> ValidateServiceHealth(
+        string serviceUrl,
+        DiscoveryContext context,
+        CancellationToken cancellationToken)
     {
-        // Check Aspire-specific PostgreSQL service discovery
-        return _configuration["services:postgresql:default:0"] ??
-               _configuration["services:postgres:default:0"];
+        await using var connection = new NpgsqlConnection(serviceUrl);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
+
+    private static NpgsqlConnectionStringBuilder Build(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("postgres" or "postgresql"))
+            return new NpgsqlConnectionStringBuilder(value);
+
+        var builder = new NpgsqlConnectionStringBuilder { Host = uri.Host, Port = uri.Port > 0 ? uri.Port : 5432 };
+        var user = uri.UserInfo.Split(':', 2);
+        if (user.Length > 0 && user[0].Length > 0) builder.Username = Uri.UnescapeDataString(user[0]);
+        if (user.Length > 1) builder.Password = Uri.UnescapeDataString(user[1]);
+        if (uri.AbsolutePath.Length > 1) builder.Database = Uri.UnescapeDataString(uri.AbsolutePath[1..]);
+        return builder;
+    }
+
+    private static string? Value(IDictionary<string, object> parameters, string key) =>
+        parameters.TryGetValue(key, out var value) ? Convert.ToString(value) : null;
+
+    private static string EmptyAs(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
 }

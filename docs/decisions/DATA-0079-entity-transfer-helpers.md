@@ -8,6 +8,11 @@ date: 2025-10-02
 
 # DATA-0079: Entity Move/Copy/Mirror Helpers for Context Transfers
 
+> **Current surface:** `Entity<T>` and `Data<T,TKey>` expose the same bounded `Copy`, `Move`, and `Mirror`
+> builders. The execution contract is `.Batch(int)` plus provider-bounded paging, exact mutation receipts,
+> no replay, deferred bounded move deletion, and `MirrorConflict` for bidirectional overlap. Query-shaped
+> delegates, delete-timing strategies, and the parallel partition-move builder are not part of the runtime surface.
+
 Date: 2025-10-02
 
 Status: Accepted

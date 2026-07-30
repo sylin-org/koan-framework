@@ -49,6 +49,13 @@ public class EmbeddingWorkerOptions
     public TimeSpan MaxRetryDelay { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
+    /// Duration of a processing claim before another worker may recover it. Active workers renew the lease while
+    /// the embedding provider is running. The same duration is the recovery grace for legacy Processing rows that
+    /// predate durable ownership metadata.
+    /// </summary>
+    public TimeSpan ProcessingLeaseDuration { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>
     /// Enable automatic cleanup of completed jobs (default: true)
     /// </summary>
     public bool AutoCleanupCompleted { get; set; } = true;

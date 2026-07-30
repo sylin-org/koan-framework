@@ -4,7 +4,7 @@ title: Koan.Data.Core - Technical Reference
 description: Contracts, options, design and operations for the Koan data core.
 packages: [Sylin.Koan.Data.Core]
 source: src/Koan.Data.Core/
-last_updated: 2026-07-17
+last_updated: 2026-07-27
 validation:
   date_last_tested: 2026-07-15
   status: reviewed
@@ -58,8 +58,11 @@ validation:
   transforms, or storage guards.
 - Registering an equal delegate instance repeatedly is idempotent. Distinct handlers retain FIFO
   order. A plan freezes on first inspection or execution and rejects late mutation correctively.
-- `UpsertMany` preflights before-handlers before the first write. With Lifecycle configured it lowers
-  to truthful point writes; without handlers the adapter's native bulk path remains available.
+- `UpsertMany` preflights every before-handler before the first write, applies the same compiled write plan as a
+  single save, then dispatches the prepared set through one native bulk call. Completion callbacks run only after
+  the exact affected-count receipt succeeds.
+- Query candidates cross an internal two-stage boundary: Data completes residual filter, fallback sort, total,
+  page, and projection first; load Lifecycle observes only the final application-visible Entity rows.
 - Remove Lifecycle is preserved by `Safe` and `Optimized`; explicit `Fast` is a deliberate bypass.
 - `IDataDiagnostics.GetLifecyclePlansSnapshot()` and `koan.data.lifecycle.selected` facts expose the
   composed handler inventory without retaining runtime entities or service scopes.
@@ -74,6 +77,12 @@ validation:
   or receipt; they do not independently rank DI registrations.
 - Context/source/Entity/default precedence remains Data-owned. A named choice is required and fails closed;
   only record-to-vector correlation is preferred and may continue through Vector's own automatic policy.
+- `DataSourceRegistry` compiles the elected adapter, typed `StorageLifecycle`, typed `Access`, a redacted
+  connection identity, adapter settings, and route identity into one immutable host-owned `DataSourcePlan`.
+  Runtime arguments may narrow that plan but cannot elevate it; the ordinary default is `Managed + ReadWrite`.
+- `RepositoryFacade` applies the plan's typed operation-effect gate before cancellation observation,
+  segmentation/guard callbacks, readiness, Entity lifecycle, or provider dispatch. Constrained sources do not
+  enter the legacy provisioning-ready seam.
 - Known build provenance admits directly referenced connectors plus the deliberate JSON floor. A transitive
   factory cannot become persistence accidentally. Low-level hosts without a generated manifest use a
   deterministic priority fallback explicitly reported as `unknown-provenance-priority`.
@@ -83,8 +92,8 @@ validation:
   adapter factories, guards, read contributors, configurations, or repositories.
 - Per-provider caches use weak provider keys, so the cache does not extend a host's lifetime. Values
   may safely close over their owning provider because the entire entry releases with that provider.
-- `AggregateConfigs.GetRegisteredTypes()` exposes process-wide entity/key discovery facts only. It
-  never exposes or retains a provider, repository, configuration snapshot, or service instance.
+- `AggregateConfigs.GetRegisteredTypes()` exposes entity/key facts observed by the active host only. It never exposes
+  another host or retains a provider beyond that host's weak-keyed catalog.
 - `IDataDiagnostics.GetEntityConfigsSnapshot()` is host-owned and contains only configurations
   observed by that host. Aggregate resolution records into it directly; diagnostics do not reflect
   over private cache implementation details.
@@ -97,8 +106,9 @@ validation:
 ## Data-adapter health participation
 
 - Generic readiness state, initialization order, and monitoring ship in `Sylin.Koan.Core` under the
-  `Koan.Core.Adapters` namespace. Data Core adds only Data semantics: provider option binding,
-  default paging, and bounded schema recovery through `DataAdapterReadinessExtensions`.
+  `Koan.Core.Adapters` namespace. Data Core adds source semantics: provider option binding, default paging,
+  and distinct host-owned single-flight stages for non-creating reachability, declared-shape validation,
+  and explicitly authorized provisioning.
 - `AdapterOptionsConfigurator<TOptions>` and `IAdapterOptions` live in
   `Koan.Data.Adapters.Configuration`; AI and other concerns do not implement a Data paging contract.
 - `AdapterBootReporting` lives in `Koan.Data.Adapters.Reporting` and reports Data settings through
@@ -111,8 +121,8 @@ validation:
 - An available but inactive provider returns `Unknown`, remains non-critical, and must not open a
   connection or mutate backing infrastructure.
 - An active provider probes every participating source and is critical. Provider implementations
-  retain ownership of the physical probe and may provision only what their normal repository
-  contract already provisions.
+  retain ownership of the physical probe. A probe must be non-creating; provisioning is a separate
+  `Managed + ReadWrite` action and is never inferred from a business-operation failure.
 - Selection uses `AdapterResolver`, `DataSourceRegistry`, and `IDataDiagnostics`; connector health
   implementations must not introduce a parallel configuration hierarchy or fallback election.
 
@@ -123,12 +133,75 @@ validation:
 - `WithConnectionString(...)` is the explicit escape hatch: its value is used literally and never
   reinterpreted as a source or replaced by a configured default. Blank values and `auto` reject before
   provider I/O; use source or adapter routing when Koan should resolve intent.
+- A literal connection override retains the named/default source ceiling. Query and scalar carry proven `Read`;
+  opaque execute and transaction creation carry `Unknown` and therefore reject on every constrained source.
+  Data never infers safety from a SQL prefix or result shape.
+
+## Source Integration ownership
+
+- `Data.Source(name)` resolves one immutable host-owned handle for an explicitly configured source and a matching
+  `IDataSourceIntegrationFactory`. This catalog is separate from Entity repositories and has no automatic provider
+  fallback for named external sources.
+- `Describe()` and `Explain(operation)` are pure projections of the same frozen source, mapping, operation, descriptor,
+  and claim plans used by execution. They never construct a provider integration or perform I/O.
+- `Doctor(ct)` activates only a descriptor that explicitly supports Doctor, applies a Framework timeout distinct from
+  caller cancellation, and accepts only documented non-mutating checks. Source integrations activate lazily and are
+  disposed with their owning host.
+- `Inspect()` applies the source read gate, capability checks, source/reference validation, bounded pages, signed
+  host-scoped continuation envelopes, descriptor-shape validation, and access-policy projection before native work
+  escapes.
+- Registered `Query`/`Scalar<T>` plans are declared during `AddKoan(koan => ...)`, reject duplicate source/operation
+  declarations, and freeze binding kind, parameter types, lane name, bounds, timeout, effect, result, and delivery.
+- Runtime validation resolves the lane against the immutable source plan once per handle operation. An opaque binding
+  requires `EnforcesReadLane`; an effective-read provider binding may execute without one. Active segmentation rejects
+  because this application surface has no host/control-plane override.
+- `RecordSetMaterializer` owns the one buffered pass, `MaterializedValueV1` accounting, first-limit completion,
+  cancellation, provider partial truth, and reader disposal. Inspection samples, registered reads, and typed Direct
+  ADO queries converge here.
+- DTO projection is result-lifetime bounded and compiled by ordinal. The warm row path performs no member discovery,
+  dictionary creation, JSON serialization, or provider-type conversion.
+- `Koan.Data.SourceIntegration` activities contain only source, stable operation, provider, effect, result kind,
+  attempts, duration, and result count. Parameter values and native payload text are excluded.
+- Runtime facts, health, source diagnostics, TestKit applicability, and certification packets consume the exact
+  deterministic references emitted by the adapter's inert `DataClaimSet`. The selected source's pure descriptor
+  contributes its registered-read, record-result, and inspection profiles once; no diagnostic surface re-infers them.
+
+## Mapping compilation ownership
+
+- `DataSourceBuilder.Map<TEntity>` records one source/entity declaration in the active Koan composition. Duplicate
+  declarations reject before host construction.
+- `IDataMappingPlans` is host-owned and bounded by `Koan:Data:Mapping:PlanEntries`. It compiles reflection, conflict,
+  constructor, member-access, structured-value, identity, codec, and index decisions once, then returns the same
+  immutable `MappingPlan` on the warm path.
+- Whole-object bindings compile read-only virtual sub-bindings for logical leaves. The root remains the sole write
+  authority; filters/projections/indexes resolve exact structured physical paths without a second resolver.
+- `MappingPlan.Use` warm-reuses one binding/use receipt per logical path and consumer. `Write`, `WriteIdentity`,
+  `Hydrate`, selective `Read`, filter/order/patch/conditional/index use all reference those same bindings.
+- `MappingConvention` supplies an explicit managed-store Id+Object default when no application map exists. Explicit
+  source maps always win.
+- Recursive object graphs reject with a correction; relationships and units of work do not leak into aggregate
+  mapping. Mark relationship properties out of storage or map an intentional value subtree through a codec.
 
 ## Configuration
 
 - Prefer typed Options for tunables; avoid magic values
 - Centralize constants per project (see ARCH-0040)
 - Structured query planning follows DATA-0096; bounded Entity streaming follows DATA-0107
+
+## Query and mutation receipt ownership
+
+- `FilterPushdownCoordinator` owns the final semantic order. `QueryReceiptValidator` rejects false or impossible
+  filter, sort, pagination, projection, total, and count facts before Lifecycle or public return.
+- Sparse Entity projection is the final Data-owned query stage and uses bounded, compiled member plans. Nested sparse
+  object projection rejects correctively; neutral `RecordSet` projection is the intended complex-shape surface.
+- `GetMany` normalizes one ordered nullable slot per requested identity and rejects unrequested identities.
+- Exact mutation outcomes require `DataCaps.Write.MutationOutcomes` plus the native outcome seam. A returned receipt
+  must carry the same key, a valid outcome, and a committed result.
+- A batch is one-shot. Atomicity is prequalified through both the adapter capability and the created native batch;
+  successful results must report committed execution and matching realized atomicity. Complete item results are
+  validated in native positions, then remapped to logical builder order.
+- The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
+  operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 
 ## Synchronous console-host ownership
 
@@ -170,8 +243,8 @@ validation:
 - A repository must advertise `DataCaps.Query.ProviderBoundedPaging`, enforce the requested page and
   complete total order, and report both honestly. Otherwise enumeration throws a corrective
   `QueryStreamRejectedException` before yielding instead of materializing the complete source.
-- Qualified adapters are SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, and Couchbase.
-  InMemory, JSON, and Redis currently reject.
+- Qualification is determined from the selected adapter's executable capability and receipts, never from its name
+  or storage family.
 - `batchSize` bounds the Koan-visible candidate page, not opaque driver buffers. Consumer pace controls
   later page requests; cancellation and early disposal stop later work.
 - Every user stream sort component must be a single-member, top-level, non-nullable `bool`, `byte`,

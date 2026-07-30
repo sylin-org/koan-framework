@@ -8,10 +8,14 @@ internal static class Constants
         internal const string Alias = "mongodb";
         internal const string ConfigurationName = "Mongo";
         internal const int Priority = 20;
+        internal const int MaximumRoutes = 128;
+        internal const int MaximumCollectionsPerRepository = 1024;
     }
 
     internal static class Configuration
     {
+        internal const string Auto = "auto";
+        internal const string ZenGardenPrefix = "zen-garden://";
         internal const string Section = "Koan:Data:Mongo";
         internal const string ConnectionString = Section + ":ConnectionString";
         internal const string Database = Section + ":Database";
@@ -30,8 +34,16 @@ internal static class Constants
     {
         internal const string ServiceName = "mongo";
         internal const string WellKnownServiceName = "mongodb";
+        internal const string DatabaseParameter = "database";
+        internal const string LocalConnectionString = "mongodb://localhost:27017";
         internal const string MongoUrls = "MONGO_URLS";
         internal const string MongoDbUrls = "MONGODB_URLS";
         internal const int DefaultPort = 27017;
+    }
+
+    internal static class Storage
+    {
+        internal const string Identity = "_id";
+        internal const string ManagedDocument = "__koan_document";
     }
 }

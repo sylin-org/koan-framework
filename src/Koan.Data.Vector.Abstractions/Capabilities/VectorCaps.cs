@@ -31,6 +31,8 @@ public static class VectorCaps
     public static readonly Capability ScoreNormalization = new("vector.scoreNormalization");
     /// <summary>Runtime collection/class creation for partition isolation.</summary>
     public static readonly Capability DynamicCollections = new("vector.dynamicCollections");
+    /// <summary>Native enforcement of a compiled hard-segmentation identity without general metadata filters.</summary>
+    public static readonly Capability ScopeIsolation = new("vector.scopeIsolation");
 
     /// <summary>
     /// Resolves the vector capabilities of <paramref name="source"/> from its

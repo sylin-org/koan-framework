@@ -50,8 +50,8 @@ public sealed class StorageNameParticleNoLeakSpec(SqliteFixture fixture, ITestOu
     public async Task Separate_container_axis_isolates_by_physical_container()
     {
         RequireBackingStore();
-        StorageNameParticleRegistry.Register(new TenantNameParticle());
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(
+            () => StorageNameParticleRegistry.Register(new TenantNameParticle()));
         using var _ = Lease(NewPartition());
 
         Doc a, b;

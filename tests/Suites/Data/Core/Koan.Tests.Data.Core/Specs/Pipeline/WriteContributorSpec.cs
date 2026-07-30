@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Pipeline;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
 
@@ -14,14 +16,15 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// <see cref="WriteStampContributor"/>s composed into <see cref="StorageWritePlan"/> in stable priority order, with
 /// the byte-identical off-gate intact. Validated with a generic (non-classification) contributor so the seam is
 /// proven independent of any axis. Pins: contributor joins + runs, per-type applicability (Build → null),
-/// priority ordering (stable sort, not registration order), the batch `AppliesInBatch` switch, idempotent
+/// priority ordering (stable sort, not registration order), identical batch semantics, idempotent
 /// registration, and plan-memo invalidation on registration.
 /// </summary>
-[Collection("storage-write-plan")]   // serialize: StorageWritePlan memo + the registry are process-global static state
 public sealed class WriteContributorSpec : IDisposable
 {
-    public WriteContributorSpec() => StorageWriteContributorRegistry.Reset();
-    public void Dispose() => StorageWriteContributorRegistry.Reset();
+    private readonly IDisposable _composition;
+
+    public WriteContributorSpec() => _composition = KoanCompositionScope.Enter(new ServiceCollection());
+    public void Dispose() => _composition.Dispose();
 
     private sealed class Doc : Entity<Doc, string>
     {
@@ -41,10 +44,9 @@ public sealed class WriteContributorSpec : IDisposable
     }
 
     /// <summary>Appends "|tag" to a <see cref="Doc"/>'s body, so its run is observable.</summary>
-    private sealed class TagStamp(int priority, bool batch) : IWriteStamp
+    private sealed class TagStamp(int priority) : IWriteStamp
     {
         public int Priority => priority;
-        public bool AppliesInBatch => batch;
         public void Apply(object entity) { if (entity is Doc d) d.Body += "|tag"; }
     }
 
@@ -52,7 +54,6 @@ public sealed class WriteContributorSpec : IDisposable
     private sealed class RecordStamp(int priority) : IWriteStamp
     {
         public int Priority => priority;
-        public bool AppliesInBatch => true;
         public void Apply(object entity) { if (entity is Seq s) s.Order.Add(priority); }
     }
 
@@ -72,7 +73,7 @@ public sealed class WriteContributorSpec : IDisposable
     [Fact]
     public void Registered_contributor_joins_the_plan_and_runs()
     {
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));
+        RegisterFor<Doc>("tag", () => new TagStamp(200));
         StorageWriteContributorRegistry.IsEmpty.Should().BeFalse();
 
         var doc = new Doc();
@@ -84,7 +85,7 @@ public sealed class WriteContributorSpec : IDisposable
     [Fact]
     public void Contributor_that_returns_null_does_not_apply_to_that_type()
     {
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));   // applies only to Doc
+        RegisterFor<Doc>("tag", () => new TagStamp(200));   // applies only to Doc
 
         var other = new Other();
         StorageWritePlan.For(typeof(Other)).ApplyAll(other);   // Build(Other) → null
@@ -104,44 +105,34 @@ public sealed class WriteContributorSpec : IDisposable
     }
 
     [Fact]
-    public void Batch_path_honours_the_contributor_AppliesInBatch_switch()
+    public void Batch_path_runs_the_same_contributor_plan()
     {
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: false));   // not batch-eligible
+        RegisterFor<Doc>("tag", () => new TagStamp(200));
 
         var doc = new Doc();
         StorageWritePlan.For(typeof(Doc)).ApplyBatch(doc);
-        doc.Id.Should().NotBeNullOrWhiteSpace();   // identity is batch-eligible
-        doc.Body.Should().BeEmpty();               // the contributor is excluded from the batch subset
-    }
-
-    [Fact]
-    public void Batch_path_runs_a_batch_eligible_contributor()
-    {
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));
-
-        var doc = new Doc();
-        StorageWritePlan.For(typeof(Doc)).ApplyBatch(doc);
+        doc.Id.Should().NotBeNullOrWhiteSpace();
         doc.Body.Should().Be("|tag");
     }
 
     [Fact]
     public void Registration_is_idempotent_by_id()
     {
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));   // duplicate id → no-op
+        RegisterFor<Doc>("tag", () => new TagStamp(200));
+        RegisterFor<Doc>("tag", () => new TagStamp(200));   // duplicate id → no-op
         StorageWriteContributorRegistry.All.Count(c => c.Id == "tag").Should().Be(1);
     }
 
     [Fact]
-    public void Registration_invalidates_the_plan_memo()
+    public void Composition_changes_are_visible_before_the_host_plan_is_frozen()
     {
-        // Build + memoize the contributor-free plan first.
+        // Hostless composition deliberately performs no runtime memoization.
         var before = new Doc();
         StorageWritePlan.For(typeof(Doc)).ApplyAll(before);
         before.Body.Should().BeEmpty();
 
-        // A later registration must invalidate the memo so the next build includes the contributor.
-        RegisterFor<Doc>("tag", () => new TagStamp(200, batch: true));
+        // A declaration made before host freeze is therefore visible to the compiled runtime plan.
+        RegisterFor<Doc>("tag", () => new TagStamp(200));
         var after = new Doc();
         StorageWritePlan.For(typeof(Doc)).ApplyAll(after);
         after.Body.Should().Be("|tag");

@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Core.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Postgres.Tests.Specs.Capabilities;
@@ -26,6 +27,21 @@ public sealed class PostgresCapabilitiesSpec(PostgresFixture fixture, ITestOutpu
         caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
         caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
 
+        var factory = new PostgresAdapterFactory();
+        factory.ReferenceIdentities.Should().Contain("Koan.Data.Connector.Postgres");
+        var published = new ClaimCapture();
+        factory.DescribeClaims(published);
+        published.Capabilities.Should().Contain([
+            DataCaps.Query.Linq,
+            DataCaps.Query.String,
+            DataCaps.Query.Filter,
+            DataCaps.Write.AtomicBatch,
+            DataCaps.Write.ConditionalReplace,
+            DataCaps.Isolation.RowScoped,
+            DataCaps.Isolation.ContainerScoped,
+            DataCaps.Isolation.DatabaseScoped
+        ]);
+
         var partition = NewPartition();
         using var lease = Lease(partition);
 
@@ -40,5 +56,16 @@ public sealed class PostgresCapabilitiesSpec(PostgresFixture fixture, ITestOutpu
     private sealed class CapabilityProbe : Entity<CapabilityProbe>
     {
         public string Name { get; set; } = "";
+    }
+
+    private sealed class ClaimCapture : IDataClaims
+    {
+        public HashSet<Capability> Capabilities { get; } = [];
+        public IDataClaims Profile(string profile, string? qualifier = null, bool advertised = true) => this;
+        public IDataClaims Capability(Capability capability, bool advertised = true)
+        {
+            if (advertised) Capabilities.Add(capability);
+            return this;
+        }
     }
 }

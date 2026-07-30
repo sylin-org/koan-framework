@@ -1,6 +1,8 @@
 using System.Net;
 using Koan.Data.Vector.Connector.Qdrant;
 using Koan.Data.Vector.Abstractions;
+using Koan.Data.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -12,9 +14,20 @@ public sealed class QdrantHealthContributorCancellationSpec
     public async Task Host_cancellation_is_not_converted_to_an_unhealthy_report()
     {
         var handler = new BlockingHandler();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Koan:Data:Qdrant:Endpoint"] = "http://qdrant.test"
+            })
+            .Build();
+        var sources = new DataSourceRegistry();
+        sources.DiscoverFromConfiguration(configuration);
+        var options = Options.Create(new QdrantOptions { Endpoint = "http://qdrant.test" });
+        var factory = new QdrantVectorAdapterFactory(configuration, sources, options);
         var contributor = new QdrantHealthContributor(
             new StubHttpClientFactory(handler),
-            Options.Create(new QdrantOptions()),
+            options,
+            factory,
             new ActiveParticipation(),
             NullLogger<QdrantHealthContributor>.Instance);
         using var stopping = new CancellationTokenSource();

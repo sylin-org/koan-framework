@@ -119,5 +119,6 @@ public sealed class RelationalOwnershipSpec
         public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted) => Mutations++;
         public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable) => Mutations++;
         public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique) => Mutations++;
+        public void CreateJsonExpressionIndex(string schema, string table, string indexName, IReadOnlyList<RelationalJsonIndexPart> parts, bool unique) => Mutations++;
     }
 }

@@ -1,28 +1,34 @@
-using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Options;
-using Koan.Core;
 using Koan.Core.Observability.Health;
+using Koan.Data.Core;
+using Koan.Data.Core.Diagnostics;
+using Koan.Data.Core.Routing;
+using Microsoft.Data.SqlClient;
 
 namespace Koan.Data.Connector.SqlServer;
 
-internal sealed class SqlServerHealthContributor(IOptions<SqlServerOptions> options) : IHealthContributor
+internal sealed class SqlServerHealthContributor : DataAdapterHealthContributorBase
 {
-    public string Name => "data:sqlserver";
-    public bool IsCritical => true;
-    public async Task<HealthReport> Check(CancellationToken ct = default)
+    private readonly IServiceProvider _services;
+    private readonly SqlServerAdapterFactory _factory;
+
+    public SqlServerHealthContributor(
+        IServiceProvider services,
+        IDataDiagnostics diagnostics,
+        DataProviderCatalog providers,
+        DataDefaultProviderPlan defaultProvider)
+        : base(Infrastructure.Constants.Provider, services, diagnostics, defaultProvider)
     {
-        try
-        {
-            await using var conn = new SqlConnection(options.Value.ConnectionString);
-            await conn.OpenAsync(ct);
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1";
-            _ = await cmd.ExecuteScalarAsync(ct);
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Healthy, null, null, null);
-        }
-        catch (Exception ex)
-        {
-            return new HealthReport(Name, Koan.Core.Observability.Health.HealthState.Unhealthy, ex.Message, null, null);
-        }
+        _services = services;
+        _factory = providers.Find(Infrastructure.Constants.Provider) as SqlServerAdapterFactory
+            ?? throw new InvalidOperationException("The SQL Server adapter is absent from the data catalog.");
+    }
+
+    protected override async Task ProbeSource(string source, CancellationToken ct)
+    {
+        var route = _factory.ResolveRoute(_services, source);
+        await using var connection = new SqlConnection(route.ConnectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new SqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
     }
 }

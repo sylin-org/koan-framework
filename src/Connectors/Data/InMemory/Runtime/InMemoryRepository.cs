@@ -1,0 +1,90 @@
+using System.Collections.Concurrent;
+using Koan.Core.Capabilities;
+using Koan.Data.Abstractions;
+using Koan.Data.Core.KeyValue;
+using Koan.Data.Core.Polymorphism;
+
+namespace Koan.Data.Connector.InMemory.Runtime;
+
+/// <summary>Translates the KeyValue family primitives to detached host-memory snapshots.</summary>
+internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, string source)
+    : KeyValueStore<TEntity, TKey>
+    where TEntity : class, IEntity<TKey>
+    where TKey : notnull
+{
+    private static readonly Type RootType = EntityRootDescriptor.For(typeof(TEntity)).RootType;
+
+    protected override Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(Current().TryGetValue(id, out var record)
+            ? (KvRecord<TEntity>?)Materialize(record)
+            : null);
+    }
+
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)Current()
+            .Select(static pair => Materialize(pair.Value))
+            .ToArray());
+    }
+
+    protected override Task<IReadOnlyList<KvRecord<TEntity>>> ScanBoundedAsync(
+        int maxCandidates,
+        CancellationToken ct)
+    {
+        if (maxCandidates <= 0) throw new ArgumentOutOfRangeException(nameof(maxCandidates));
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult((IReadOnlyList<KvRecord<TEntity>>)Current()
+            .Take(maxCandidates)
+            .Select(static pair => Materialize(pair.Value))
+            .ToArray());
+    }
+
+    protected override Task WriteAsync(TKey id, KvRecord<TEntity> record, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var snapshot = new InMemoryState.Record(
+            EntityJsonSerialization.SerializeDocument(record.Entity),
+            CopyManaged(record.Managed));
+        Current()[id] = snapshot;
+        return Task.CompletedTask;
+    }
+
+    protected override Task<bool> RemoveAsync(TKey id, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(Current().TryRemove(id, out _));
+    }
+
+    protected override Task<int> ClearAsync(CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var store = Current();
+        var count = store.Count;
+        store.Clear();
+        return Task.FromResult(count);
+    }
+
+    protected override void DescribeBackend(ICapabilities capabilities) =>
+        InMemoryFeatures.DescribeBackend(capabilities);
+
+    private ConcurrentDictionary<TKey, InMemoryState.Record> Current() => state.Store<TKey>(
+        source,
+        RootType,
+        Koan.Data.Core.EntityContext.Current?.Partition ?? Infrastructure.Constants.Storage.DefaultPartition);
+
+    private static KvRecord<TEntity> Materialize(InMemoryState.Record record)
+    {
+        var entity = EntityJsonSerialization.DeserializeDocument(record.EntityJson, typeof(TEntity)) as TEntity
+            ?? throw new InvalidDataException(
+                $"InMemory snapshot could not materialize '{typeof(TEntity).FullName}'.");
+        return new KvRecord<TEntity>(entity, CopyManaged(record.Managed));
+    }
+
+    private static IReadOnlyDictionary<string, object?>? CopyManaged(
+        IReadOnlyDictionary<string, object?>? values) => values is null
+        ? null
+        : new Dictionary<string, object?>(values, StringComparer.Ordinal);
+}

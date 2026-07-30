@@ -1,35 +1,21 @@
-
-using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
 using Koan.Data.Adapters.Configuration;
 
 namespace Koan.Data.Vector.Connector.Milvus;
 
+/// <summary>Milvus placement, authentication, and bounded-work options.</summary>
 public sealed class MilvusOptions : IAdapterOptions
 {
-    [Required]
-    public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
-
-    public string Endpoint { get; set; } = Infrastructure.Constants.DefaultEndpoint;
-    public string DatabaseName { get; set; } = "default";
-    public string? CollectionName { get; set; } = null;
-    public string PrimaryFieldName { get; set; } = "id";
-    public string VectorFieldName { get; set; } = "embedding";
-    public string MetadataFieldName { get; set; } = "metadata";
-    public string Metric { get; set; } = "COSINE";
-    public int DefaultTimeoutSeconds { get; set; } = 100;
-
-    /// <summary>
-    /// Optional embedding dimension for explicit collection pre-creation. Ordinary writes derive it from the
-    /// first embedding instead of guessing a model.
-    /// </summary>
-    public int? Dimension { get; set; }
-    public bool AutoCreateCollection { get; set; } = true;
-    public string ConsistencyLevel { get; set; } = "Bounded";
-    public string? Token { get; set; } = null;
-    public string? Username { get; set; } = null;
-    public string? Password { get; set; } = null;
-
+    public const string Section = Infrastructure.Constants.Configuration.Section;
+    public string Endpoint { get; set; } = Infrastructure.Constants.Defaults.Endpoint;
+    public string Database { get; set; } = Infrastructure.Constants.Defaults.Database;
+    public string? Token { get; set; }
+    public int TimeoutSeconds { get; set; } = Infrastructure.Constants.Defaults.TimeoutSeconds;
+    public int VisibilityTimeoutSeconds { get; set; } = Infrastructure.Constants.Defaults.VisibilityTimeoutSeconds;
+    public int MaxMetadataBytesPerPoint { get; set; } = Infrastructure.Constants.Defaults.MaxMetadataBytesPerPoint;
+    public int MaxBatchPoints { get; set; } = Infrastructure.Constants.Defaults.MaxBatchPoints;
+    public int MaxClearPoints { get; set; } = Infrastructure.Constants.Defaults.MaxClearPoints;
+    public int MaxSearchCandidates { get; set; } = Infrastructure.Constants.Defaults.MaxSearchCandidates;
+    public int MaxResponseBytes { get; set; } = Infrastructure.Constants.Defaults.MaxResponseBytes;
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }
-

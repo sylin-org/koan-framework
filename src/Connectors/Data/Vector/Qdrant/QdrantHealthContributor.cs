@@ -1,31 +1,23 @@
-using System;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Koan.Core.Logging;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Vector.Connector.Qdrant;
 
 public sealed class QdrantHealthContributor(
-    IHttpClientFactory httpFactory,
+    IHttpClientFactory http,
     IOptions<QdrantOptions> options,
+    QdrantVectorAdapterFactory factory,
     IVectorAdapterParticipation participation,
     ILogger<QdrantHealthContributor>? logger = null)
-    : VectorAdapterHealthContributorBase("qdrant", participation)
+    : VectorAdapterHealthContributorBase(Infrastructure.Constants.Provider.Name, participation)
 {
     protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        var http = httpFactory.CreateClient(Infrastructure.Constants.HttpClientName);
-        http.BaseAddress = new Uri(options.Value.Endpoint);
-        var response = await http.GetAsync("/readyz", ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new HttpRequestException($"HTTP {(int)response.StatusCode}: {body}");
-        }
-
-        KoanLog.HealthDebug(logger, Infrastructure.Constants.Logging.Health, "healthy",
-            ("status", (int)response.StatusCode));
+        using var client = new QdrantClient(http, factory.ResolveRoute(source), options.Value);
+        await client.Probe(ct).ConfigureAwait(false);
+        KoanLog.HealthDebug(logger, Infrastructure.Constants.HealthLog, "healthy", ("source", source));
     }
 }

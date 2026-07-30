@@ -1,35 +1,19 @@
 <#
 .SYNOPSIS
-  forge-verify.ps1 — the ARCH-0094 Adapter Forge Conformance Gate runner (Phase 2).
+  Runs the ordinary AODB provider suites selected by adapter name or environment.
 
 .DESCRIPTION
-  Runs the AODB Conformance Gate — the real-store xUnit conformance kit (AodbConformanceSpecsBase /
-  VectorAodbConformanceSpecsBase, capability-driven via CapabilityConformanceGate, ARCH-0094 Phase 1) — for one
-  adapter (or all), against real instances, and emits a MACHINE-PARSEABLE Gate VERDICT. This is the orchestrable
-  step the Forge's agent loop consumes (Phase 4: agent -> blueprint -> gate -> retry), plus a human-readable table.
+  Discovers each *AodbConformanceSpec beside its test project, runs that project through dotnet test,
+  and reports test outcomes from TRX. Forge is only a selector and reporter; conformance behavior
+  remains in the shared TestKits and provider tests.
 
-  It does NOT re-implement the harness. It discovers each adapter's `*AodbConformanceSpec` test project, runs the
-  exact `FullyQualifiedName~Aodb` selection through ordinary `dotnet test`, and interprets the resulting TRX without
-  accepting a failed process or incomplete result set. It maps each returned cell to its AODB mode (Declares /
-  Streaming / Shared / Container / Database for record adapters;
-  Declares / Shared / Container / Database for vector adapters), and aggregates a per-adapter verdict:
+  Exit code: 0 = all passed; 1 = a test failed; 2 = one or more tests skipped; 3 = runner error.
 
-    GREEN    — every cell passed (the adapter realizes every mode it declares; shippable)
-    RED      — a cell FAILED (an isolation lie: declared-but-not-realized, or a leak)
-    SKIPPED  — every expected mode ran but a cell was skipped (e.g. Docker unavailable, or a capability-driven Skip)
-               and none failed; inconclusive
-    ERROR    — a structural problem: no .csproj, no TRX produced, or an expected mode (cell) never ran / was
-               undiscovered. NEVER green — the gate could not be assessed.
-
-  The gate-level verdict aggregates these as GREEN / RED / INCONCLUSIVE. General over ANY project carrying a
-  `*AodbConformanceSpec` under tests/Suites/Data (the `<Adapter>[Vector]AodbConformanceSpec` naming + a sibling
-  .csproj), so a future agent-authored adapter plugs in identically.
-
-  Exit code: 0 = all GREEN  ·  1 = any RED (fix the adapter)  ·  3 = any ERROR (fix the project/structure)  ·
-             2 = no RED/ERROR but some SKIPPED (fix the environment, e.g. start Docker).
+.PARAMETER NoBuild
+  Trusts existing test outputs. The caller owns their freshness and configuration.
 
 .EXAMPLE
-  pwsh scripts/forge-verify.ps1 -Adapter Mongo
+  pwsh scripts/forge-verify.ps1 -Adapter Mongo -Plane record
   pwsh scripts/forge-verify.ps1 -DockerFree
   pwsh scripts/forge-verify.ps1 -All -Output json
 #>
@@ -45,192 +29,189 @@ param(
     [switch]$NoBuild
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $resultsRoot = $null
 Push-Location (Resolve-Path "$PSScriptRoot/..")
 try {
     $repoRoot = (Get-Location).ProviderPath
+    $dockerFreeTargets = @(
+        'record/InMemory',
+        'record/Json',
+        'record/Sqlite',
+        'vector/InMemory',
+        'vector/SqliteVec'
+    )
 
-    # The Docker-free conformance surfaces (in-process / file) — fast local + agent-iteration runs without containers.
-    $dockerFreeSet = @('record/InMemory', 'record/Json', 'record/Sqlite', 'vector/InMemory', 'vector/SqliteVec')
-    $modeOrder = @('Declares', 'Streaming', 'Shared', 'Container', 'Database')
-
-    function Get-Mode([string]$methodName) {
-        switch -regex ($methodName) {
-            'Declares'  { return 'Declares' }
-            'Streaming' { return 'Streaming' }
-            'Shared'    { return 'Shared' }
-            'Container' { return 'Container' }
-            'Database'  { return 'Database' }
-            default     { return $methodName }
+    function Find-Project([IO.FileInfo]$Spec) {
+        $directory = $Spec.Directory
+        while ($directory) {
+            $project = Get-ChildItem -LiteralPath $directory.FullName -Filter '*.csproj' -File |
+                Select-Object -First 1
+            if ($project) { return $project.FullName }
+            $directory = $directory.Parent
         }
+        $null
     }
 
-    # ---- discover the conformance projects (exactly one *AodbConformanceSpec per adapter/plane) ----
-    $specs = Get-ChildItem -Path (Join-Path $repoRoot 'tests/Suites/Data') -Recurse -Filter '*AodbConformanceSpec.cs' |
-        Sort-Object FullName
-    $targets = New-Object System.Collections.Generic.List[object]
-    foreach ($s in $specs) {
-        $isVector = $s.Name -match 'VectorAodbConformanceSpec\.cs$'
-        $tPlane = if ($isVector) { 'vector' } else { 'record' }
-        $name = $s.Name -replace 'VectorAodbConformanceSpec\.cs$', '' -replace 'AodbConformanceSpec\.cs$', ''
-        # nearest .csproj walking up from the spec's directory
-        $dir = $s.Directory
-        while ($dir -and -not (Get-ChildItem -Path $dir.FullName -Filter '*.csproj' -File)) { $dir = $dir.Parent }
-        $proj = if ($dir) { (Get-ChildItem -Path $dir.FullName -Filter '*.csproj' -File | Select-Object -First 1).FullName } else { $null }
-        $targets.Add([PSCustomObject]@{ Adapter = $name; Plane = $tPlane; Key = "$tPlane/$name"; Project = $proj }) | Out-Null
-    }
-
-    # ---- select ----
-    $selected = $targets
-    if ($DockerFree) { $selected = $selected | Where-Object { $dockerFreeSet -contains $_.Key } }
-    elseif ($Adapter) { $selected = $selected | Where-Object { $_.Adapter -ieq $Adapter -and ($Plane -eq '' -or $_.Plane -eq $Plane) } }
-    elseif (-not $All) {
-        Write-Host "forge-verify: specify -Adapter <name> [-Plane record|vector], -DockerFree, or -All." -ForegroundColor Yellow
-        exit 2
-    }
-    $selected = @($selected)
-    if ($selected.Count -eq 0) { Write-Host "forge-verify: no conformance projects matched the selection." -ForegroundColor Yellow; exit 2 }
-
-    # ---- run + parse each ----
-    $resultsRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("forge-verify-" + [guid]::NewGuid().ToString('n'))
-    New-Item -ItemType Directory -Path $resultsRoot -Force | Out-Null
-
-    $adapterReports = New-Object System.Collections.Generic.List[object]
-    foreach ($t in $selected) {
-        $expectedModes = if ($t.Plane -eq 'record') { @($modeOrder) } else { @('Declares', 'Shared', 'Container', 'Database') }
-        if (-not $t.Project) {
-            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $null; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = 'no .csproj found next to the spec' }) | Out-Null
-            continue
-        }
-        $trxName = "$($t.Plane)-$($t.Adapter).trx"
-        $trxPath = Join-Path $resultsRoot $trxName
-        $dotnetArgs = @(
-            'test', $t.Project, '--configuration', $Configuration,
-            '--filter', 'FullyQualifiedName~Aodb',
-            '--logger', "trx;LogFileName=$trxName", '--results-directory', $resultsRoot,
-            '--blame-hang-timeout', "$($DeadlineSeconds)s", '--blame-hang-dump-type', 'none'
-        )
-        if ($NoBuild) { $dotnetArgs += '--no-build' }
-        Write-Host ("forge-verify: running {0}/{1} ..." -f $t.Plane, $t.Adapter) -ForegroundColor DarkGray
-        $out = & dotnet @dotnetArgs 2>&1
-        $code = $LASTEXITCODE
-
-        if (-not (Test-Path $trxPath)) {
-            $tail = ($out | Select-Object -Last 14) -join "`n"
-            $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = 'ERROR'; Project = $t.Project; Cells = @(); ExpectedModes = $expectedModes; MissingModes = $expectedModes; Reason = "dotnet test produced no TRX (exit $code):`n$tail" }) | Out-Null
-            continue
-        }
-
-        [xml]$xml = Get-Content -LiteralPath $trxPath -Raw
-        $idToMethod = @{}
-        foreach ($definition in $xml.TestRun.TestDefinitions.UnitTest) {
-            $idToMethod[[string]$definition.id] = [string]$definition.TestMethod.name
-        }
-        $cells = New-Object System.Collections.Generic.List[object]
-        foreach ($result in $xml.TestRun.Results.UnitTestResult) {
-            $method = $idToMethod[[string]$result.testId]
-            if (-not $method) { $method = '[unknown]' }
-            $mode = Get-Mode $method
-            $outcome = switch ([string]$result.outcome) {
-                'Passed' { 'Passed' }
-                'Failed' { 'Failed' }
-                { $_ -in @('NotExecuted', 'Skipped') } { 'Skipped' }
-                default { [string]$result.outcome }
-            }
-            $detail = ''
-            if ($result.Output -and $result.Output.ErrorInfo -and $result.Output.ErrorInfo.Message) {
-                $detail = ([string]$result.Output.ErrorInfo.Message).Trim()
-            }
-            elseif ($result.Output -and $result.Output.StdOut) {
-                $detail = ([string]$result.Output.StdOut).Trim()
-            }
-            $cells.Add([PSCustomObject]@{ Mode = $mode; Method = $method; Outcome = $outcome; Reason = $detail }) | Out-Null
-        }
-        $cellArr = @($cells | Sort-Object { [array]::IndexOf($modeOrder, $_.Mode) })
-        $failed = @($cellArr | Where-Object { $_.Outcome -eq 'Failed' }).Count
-        $skipped = @($cellArr | Where-Object { $_.Outcome -eq 'Skipped' }).Count
-        $passed = @($cellArr | Where-Object { $_.Outcome -eq 'Passed' }).Count
-        $presentModes = @($cellArr | ForEach-Object { $_.Mode } | Select-Object -Unique)
-        $missingModes = @($expectedModes | Where-Object { $presentModes -notcontains $_ })
-        $unexpectedModes = @($presentModes | Where-Object { $expectedModes -notcontains $_ })
-        $duplicateModes = @($cellArr | Group-Object Mode | Where-Object Count -ne 1 | ForEach-Object Name)
-        $unknownOutcomes = @($cellArr | Where-Object { $_.Outcome -notin @('Passed', 'Failed', 'Skipped') }).Count
-        $verdict = if ($failed -gt 0) { 'RED' }
-            elseif ($missingModes.Count -gt 0 -or $unexpectedModes.Count -gt 0 -or $duplicateModes.Count -gt 0 -or
-                $unknownOutcomes -gt 0 -or $code -ne 0) { 'ERROR' }
-            elseif ($skipped -gt 0) { 'SKIPPED' }
-            else { 'GREEN' }
-        $structuralReasons = New-Object System.Collections.Generic.List[string]
-        if ($code -ne 0) { $structuralReasons.Add("dotnet test exited with code $code") }
-        if ($missingModes.Count -gt 0) { $structuralReasons.Add("expected mode(s) not run: $($missingModes -join ', ')") }
-        if ($unexpectedModes.Count -gt 0) { $structuralReasons.Add("unexpected mode(s): $($unexpectedModes -join ', ')") }
-        if ($duplicateModes.Count -gt 0) { $structuralReasons.Add("mode(s) did not run exactly once: $($duplicateModes -join ', ')") }
-        if ($unknownOutcomes -gt 0) { $structuralReasons.Add("unknown test outcome(s): $unknownOutcomes") }
-        $reason = $structuralReasons -join '; '
-        $adapterReports.Add([PSCustomObject]@{ Adapter = $t.Adapter; Plane = $t.Plane; Verdict = $verdict; Project = $t.Project; Cells = $cellArr; ExpectedModes = $expectedModes; Passed = $passed; Failed = $failed; Skipped = $skipped; MissingModes = $missingModes; Reason = $reason }) | Out-Null
-    }
-
-    # ---- aggregate the gate verdict ----
-    $green = @($adapterReports | Where-Object { $_.Verdict -eq 'GREEN' }).Count
-    $red = @($adapterReports | Where-Object { $_.Verdict -eq 'RED' }).Count
-    $errored = @($adapterReports | Where-Object { $_.Verdict -eq 'ERROR' }).Count
-    $skippedAdapters = @($adapterReports | Where-Object { $_.Verdict -eq 'SKIPPED' }).Count
-    $inconclusive = $errored + $skippedAdapters
-    $gateVerdict = if ($red -gt 0) { 'RED' }
-        elseif ($adapterReports.Count -gt 0 -and $green -eq $adapterReports.Count) { 'GREEN' }
-        else { 'INCONCLUSIVE' }
-
-    if ($Output -eq 'json') {
-        $report = [PSCustomObject]@{
-            timestamp = (Get-Date).ToUniversalTime().ToString('o')
-            gate      = 'aodb-conformance'
-            verdict   = $gateVerdict
-            summary   = [PSCustomObject]@{ adapters = $adapterReports.Count; green = $green; red = $red; errored = $errored; skipped = $skippedAdapters }
-            adapters  = @($adapterReports | ForEach-Object {
-                    [PSCustomObject]@{
-                        adapter       = $_.Adapter; plane = $_.Plane; verdict = $_.Verdict; project = $_.Project
-                        expectedCells = @($_.ExpectedModes).Count
-                        actualCells   = @($_.Cells).Count
-                        missingModes  = @($_.MissingModes)
-                        cells         = @($_.Cells | ForEach-Object { [PSCustomObject]@{ mode = $_.Mode; outcome = $_.Outcome; reason = $_.Reason } })
-                        reason        = $_.Reason
-                    }
-                })
-        }
-        $report | ConvertTo-Json -Depth 8
-    }
-    else {
-        $flat = foreach ($a in $adapterReports) {
-            if ($a.Cells.Count -eq 0) {
-                [PSCustomObject]@{ Adapter = $a.Adapter; Plane = $a.Plane; Mode = '-'; Outcome = $a.Verdict; Reason = (($a.Reason -split "`n")[0]) }
-            }
-            else {
-                foreach ($c in $a.Cells) {
-                    $rf = if ($c.Reason) { ($c.Reason -split "`n")[0] } else { '' }
-                    if ($rf.Length -gt 70) { $rf = $rf.Substring(0, 67) + '...' }
-                    [PSCustomObject]@{ Adapter = $a.Adapter; Plane = $a.Plane; Mode = $c.Mode; Outcome = $c.Outcome; Reason = $rf }
+    $targets = @(
+        Get-ChildItem -LiteralPath (Join-Path $repoRoot 'tests/Suites/Data') -Recurse -Filter '*AodbConformanceSpec.cs' -File |
+            Sort-Object FullName |
+            ForEach-Object {
+                $isVector = $_.Name.EndsWith('VectorAodbConformanceSpec.cs', [StringComparison]::Ordinal)
+                $targetPlane = if ($isVector) { 'vector' } else { 'record' }
+                $suffix = if ($isVector) { 'VectorAodbConformanceSpec.cs' } else { 'AodbConformanceSpec.cs' }
+                $name = $_.Name.Substring(0, $_.Name.Length - $suffix.Length)
+                [pscustomobject]@{
+                    Adapter = $name
+                    Plane = $targetPlane
+                    Key = "$targetPlane/$name"
+                    Project = Find-Project $_
                 }
             }
-        }
-        $flat | Format-Table -AutoSize | Out-String | Write-Host
-        foreach ($a in ($adapterReports | Sort-Object Plane, Adapter)) {
-            $color = switch ($a.Verdict) { 'GREEN' { 'Green' } 'RED' { 'Red' } default { 'Yellow' } }
-            $note = if ($a.Reason) { '  — ' + (($a.Reason -split "`n")[0]) } else { '' }
-            Write-Host ("  {0,-7} {1}/{2}{3}" -f $a.Verdict, $a.Plane, $a.Adapter, $note) -ForegroundColor $color
-        }
-        $gateColor = switch ($gateVerdict) { 'GREEN' { 'Green' } 'RED' { 'Red' } default { 'Yellow' } }
-        Write-Host ""
-        Write-Host ("GATE aodb-conformance: {0}  ({1} adapters · {2} green · {3} red · {4} error · {5} skipped)" -f $gateVerdict, $adapterReports.Count, $green, $red, $errored, $skippedAdapters) -ForegroundColor $gateColor
+    )
+
+    $selected = @($targets)
+    if ($DockerFree) {
+        $selected = @($selected | Where-Object { $_.Key -in $dockerFreeTargets })
+    }
+    elseif ($Adapter) {
+        $selected = @($selected | Where-Object {
+                $_.Adapter -ieq $Adapter -and ($Plane -eq '' -or $_.Plane -eq $Plane)
+            })
+    }
+    elseif (-not $All) {
+        Write-Error 'Specify -Adapter <name> [-Plane record|vector], -DockerFree, or -All.'
+        exit 3
     }
 
-    # Exit: RED (a real failure) dominates, then ERROR (structural), then SKIPPED (environment), then GREEN.
+    if ($selected.Count -eq 0) {
+        Write-Error 'No adapter conformance project matched the selection.'
+        exit 3
+    }
+
+    $resultsRoot = Join-Path ([IO.Path]::GetTempPath()) ('forge-verify-' + [guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Path $resultsRoot -Force | Out-Null
+    $reports = New-Object System.Collections.Generic.List[object]
+
+    foreach ($target in $selected) {
+        if (-not $target.Project) {
+            $reports.Add([pscustomobject]@{
+                    Adapter = $target.Adapter
+                    Plane = $target.Plane
+                    Verdict = 'ERROR'
+                    Passed = 0
+                    Failed = 0
+                    Skipped = 0
+                    Reason = 'No project found beside the conformance spec.'
+                }) | Out-Null
+            continue
+        }
+
+        $trxName = "$($target.Plane)-$($target.Adapter).trx"
+        $trxPath = Join-Path $resultsRoot $trxName
+        $arguments = @(
+            'test',
+            $target.Project,
+            '--configuration', $Configuration,
+            '--filter', 'FullyQualifiedName~Aodb',
+            '--logger', "trx;LogFileName=$trxName",
+            '--results-directory', $resultsRoot,
+            '--blame-hang-timeout', "$($DeadlineSeconds)s",
+            '--blame-hang-dump-type', 'none'
+        )
+        if ($NoBuild) { $arguments += '--no-build' }
+
+        Write-Host "forge: $($target.Key)" -ForegroundColor DarkGray
+        $console = & dotnet @arguments 2>&1
+        $exitCode = $LASTEXITCODE
+        if (-not (Test-Path -LiteralPath $trxPath)) {
+            $tail = (($console | Select-Object -Last 3) -join ' ').Trim()
+            if (-not $tail) {
+                $tail = if ($NoBuild) { 'No current test output was found; build this project first.' }
+                    else { 'The test host produced no console diagnostics.' }
+            }
+            $reports.Add([pscustomobject]@{
+                    Adapter = $target.Adapter
+                    Plane = $target.Plane
+                    Verdict = 'ERROR'
+                    Passed = 0
+                    Failed = 0
+                    Skipped = 0
+                    Reason = "dotnet test exited $exitCode without a TRX: $tail"
+                }) | Out-Null
+            continue
+        }
+
+        [xml]$trx = Get-Content -LiteralPath $trxPath -Raw
+        $outcomes = @($trx.TestRun.Results.UnitTestResult | ForEach-Object { [string]$_.outcome })
+        $passed = @($outcomes | Where-Object { $_ -eq 'Passed' }).Count
+        $failed = @($outcomes | Where-Object { $_ -eq 'Failed' }).Count
+        $skipped = @($outcomes | Where-Object { $_ -in @('NotExecuted', 'Skipped') }).Count
+        $unknown = @($outcomes | Where-Object { $_ -notin @('Passed', 'Failed', 'NotExecuted', 'Skipped') }).Count
+
+        $verdict = if ($failed -gt 0) { 'RED' }
+            elseif ($exitCode -ne 0 -or $outcomes.Count -eq 0 -or $unknown -gt 0) { 'ERROR' }
+            elseif ($skipped -gt 0) { 'INCONCLUSIVE' }
+            else { 'GREEN' }
+        $firstFailure = @($trx.TestRun.Results.UnitTestResult |
+                Where-Object { [string]$_.outcome -eq 'Failed' } |
+                ForEach-Object { [string]$_.Output.ErrorInfo.Message } |
+                Where-Object { $_ }) | Select-Object -First 1
+        $reason = if ($failed -gt 0 -and $firstFailure) { ($firstFailure -split '\r?\n')[0] }
+            elseif ($failed -gt 0) { "$failed tests failed; inspect the project test output." }
+            elseif ($exitCode -ne 0) { "dotnet test exited $exitCode" }
+            elseif ($outcomes.Count -eq 0) { 'No tests were discovered.' }
+            elseif ($unknown -gt 0) { "$unknown test outcomes were unrecognized." }
+            else { '' }
+
+        $reports.Add([pscustomobject]@{
+                Adapter = $target.Adapter
+                Plane = $target.Plane
+                Verdict = $verdict
+                Passed = $passed
+                Failed = $failed
+                Skipped = $skipped
+                Reason = $reason
+            }) | Out-Null
+    }
+
+    $red = @($reports | Where-Object Verdict -eq 'RED').Count
+    $errors = @($reports | Where-Object Verdict -eq 'ERROR').Count
+    $inconclusive = @($reports | Where-Object Verdict -eq 'INCONCLUSIVE').Count
+    $green = @($reports | Where-Object Verdict -eq 'GREEN').Count
+    $verdict = if ($red -gt 0) { 'RED' }
+        elseif ($errors -gt 0) { 'ERROR' }
+        elseif ($inconclusive -gt 0) { 'INCONCLUSIVE' }
+        else { 'GREEN' }
+
+    if ($Output -eq 'json') {
+        [pscustomobject]@{
+            gate = 'aodb-conformance'
+            verdict = $verdict
+            summary = [pscustomobject]@{
+                adapters = $reports.Count
+                green = $green
+                red = $red
+                inconclusive = $inconclusive
+                errors = $errors
+            }
+            adapters = $reports.ToArray()
+        } | ConvertTo-Json -Depth 5
+    }
+    else {
+        $reports | Sort-Object Plane, Adapter | Format-Table Adapter, Plane, Passed, Failed, Skipped, Verdict, Reason -AutoSize
+        Write-Host "FORGE $verdict adapters=$($reports.Count) green=$green red=$red inconclusive=$inconclusive errors=$errors"
+    }
+
     if ($red -gt 0) { exit 1 }
-    if ($errored -gt 0) { exit 3 }
-    if ($gateVerdict -ne 'GREEN') { exit 2 }
+    if ($errors -gt 0) { exit 3 }
+    if ($inconclusive -gt 0) { exit 2 }
     exit 0
 }
 finally {
     Pop-Location
-    if ($resultsRoot -and (Test-Path $resultsRoot)) { Remove-Item -Recurse -Force $resultsRoot -ErrorAction SilentlyContinue }
+    if ($resultsRoot -and (Test-Path -LiteralPath $resultsRoot)) {
+        Remove-Item -LiteralPath $resultsRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }

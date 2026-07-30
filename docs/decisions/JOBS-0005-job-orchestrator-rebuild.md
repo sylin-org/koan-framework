@@ -31,6 +31,13 @@
 > `IKoanJobHandler<T>` branch was never implemented and is not part of the public promise; handlers use
 > the one static `Execute` plus the execution scope's standard `IServiceProvider`.
 
+> **Implementation update (2026-07-27):** dispatch now treats a durable row whose `WorkType` is no longer
+> registered as a deterministic terminal condition. The orchestrator—the single lifecycle writer—claims the row,
+> clears its lease, records `UnregisteredWorkType`, dead-letters it, and continues claiming until it finds bound work
+> or the queue is empty. Submission remains strict, and ledgers remain ignorant of CLR registration. Warnings are
+> emitted once per retired work type per process so a large stale backlog is observable without flooding logs. The
+> behavior is part of the shared ledger contract suite rather than an in-memory-only exception.
+
 ---
 
 ## 1. Context

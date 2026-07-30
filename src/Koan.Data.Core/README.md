@@ -10,7 +10,11 @@ Data access core for Koan: common primitives, options, and helpers used by relat
 - Entity contracts and helpers for aggregate storage
 - Options and conventions shared across data adapters
 - Data-owned adapter option binding for readiness and default paging
-- Schema recovery composed around Core's generic readiness gate
+- Immutable named-source lifecycle/access policy enforced before readiness or provider work
+- Separate host-owned reachability, declared-shape validation, and authorized provisioning stages
+- Source-only inspection and registered reads without an Entity repository shim
+- Bounded provider-neutral `RecordSet` materialization and compiled ordinal DTO projection
+- Compact provider-neutral aggregate mapping with host-scoped compiled plans and shared physical encodings
 - Selection-aware health semantics for data connectors
 - Support for paging, streaming, and batching semantics (see references)
 
@@ -27,10 +31,10 @@ dotnet add package Sylin.Koan.Data.Core
   - `Item.Query(predicate, ct)`
   - `Item.FirstPage(size, ct)` and `Item.Page(pageNumber, pageSize, ct)`
   - `Item.QueryStream(predicate, ct)`
-- `AllStream`/`QueryStream` lazily compose provider-bounded numbered pages on SQLite, PostgreSQL,
-  SQL Server, CockroachDB, MongoDB, and Couchbase. InMemory, JSON, and Redis reject correctively
-  before query/yield; there is no materializing fallback. `batchSize` bounds Koan-visible candidates,
-  not opaque driver buffers. No public cursor or resume-token API exists.
+- `AllStream`/`QueryStream` lazily compose numbered pages only when the selected adapter proves provider-bounded
+  paging and complete ordering. Otherwise they reject correctively before query/yield; there is no materializing
+  fallback. `batchSize` bounds Koan-visible candidates, not opaque driver buffers. No public cursor or resume-token
+  API exists.
 - If a first-class static isn’t available, you can fall back to the generic facade (second-class): `Data<TEntity, TKey>.Query(...)`.
 
 Host-owned persistence policy composes beside the normal zero-configuration bootstrap:
@@ -46,6 +50,62 @@ services.AddKoan(() =>
 The same Lifecycle boundary governs Entity/Data calls and generated REST/MCP entity operations. See
 `/docs/reference/data/entity-lifecycle.md` for phases, bulk/transaction semantics, and deliberate
 bypasses.
+
+Use a named source when the application needs to inspect or query an external system without adopting Entity
+persistence. The connector supplies the final native binding leaf; the application declares the business name,
+parameters, lane, and bounds once:
+
+```csharp
+services.AddKoan(koan =>
+{
+    koan.Data.Source("LegacyErp")
+        .Query("orders.recent", query => query
+            .Lane("Reports")
+            .Sql("select ... where CREATED_UTC >= @since")
+            .Parameter<DateTimeOffset>("since")
+            .MaxRecords(500));
+});
+
+var source = Data.Source("LegacyErp");
+var description = source.Describe();
+var explanation = source.Explain("orders.recent");
+var diagnosis = await source.Doctor(ct);
+var recent = await source.Query("orders.recent", new { since }, ct);
+var orders = recent.Project<RecentOrder>();
+var containers = await source.Inspect().Containers(50, ct: ct);
+```
+
+The runtime call cannot change the provider payload, source, or read lane. Opaque bindings require a
+provider-enforced read lane. Inspection uses neutral containers rather than schemas/tables, and `RecordSet` preserves
+duplicate fields, missing/null, nested values, explicit bounds, and honest completion. `Describe` and `Explain` are
+pure and never activate a client; `Doctor` is explicit, bounded, non-mutating, and returns stable corrective findings.
+
+Map an Entity to an external record shape in the same source declaration:
+
+```csharp
+services.AddKoan(koan =>
+{
+    koan.Data.Source("LegacyErp").Map<Customer>(map => map
+        .Container("dbo", "CUSTOMER")
+        .Key(customer => customer.Id).Name("CUSTOMER_NO")
+        .Property(customer => customer.Name.Full).Name("DISPLAY_NM")
+        .Property(customer => customer.Profile).Object("PROFILE_JSON"));
+});
+```
+
+`Name` is a scalar physical value, `Object` keeps one logical subtree together, and `Path("NAME_DATA", "full")`
+places a flat logical value inside a structured physical value. `Key(...).Parts(...)`, `Generated`, `ReadOnly`, and
+`Codec` remain explicit only when needed.
+
+When insert/update distinction matters, ask for it explicitly; ordinary `Save` stays the low-ceremony default:
+
+```csharp
+var result = await item.SaveWithOutcome(ct);
+// result.Outcome is Inserted or Updated; result.CommitOutcome is Committed.
+```
+
+This stronger path is available only when the selected adapter proves exact native mutation outcomes. Bulk writes
+prepare the complete Entity set, dispatch once, and reject an inexact affected-count receipt without replay.
 
 Child relationships are strict by default. Native and in-memory providers execute directly; a
 scan-backed provider fails with a corrective `RelationshipQueryRejectedException` unless the call
@@ -84,6 +144,31 @@ transaction routing. It stores that state in Core's logical-flow `KoanContext`, 
 generic API for tenancy, subjects, or other module-owned axes. Those modules own their business-facing
 facades and register durable carriage independently through `Koan.Core.Context`.
 
+Named sources default to `Managed + ReadWrite`. Integrate an existing system without granting Koan
+shape or data mutation authority by declaring the two independent ceilings once:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Sources": {
+        "LegacyErp": {
+          "Adapter": "sqlserver",
+          "ConnectionString": "<provider-enforced read-only route>",
+          "StorageLifecycle": "External",
+          "Access": "ReadOnly"
+        }
+      }
+    }
+  }
+}
+```
+
+Entity, batch, instruction, and Direct paths consume the same immutable source plan. `ReadOnly`
+blocks data writes; `External` independently blocks create/alter/drop/repair. Forbidden and opaque
+effects reject before lifecycle callbacks, readiness, resource creation, or provider I/O. Provider
+credentials remain the security boundary.
+
 For a synchronous console process, `new ServiceCollection().StartKoan()` starts a standard .NET
 Generic Host and returns its active provider facade. The caller owns it; use
 `using var app = (IDisposable)services.StartKoan()` so disposal stops hosted capabilities and releases
@@ -97,6 +182,10 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 - Its dependency on Cache Abstractions is inert contract vocabulary. Referencing Data Core does not activate caching.
 - Stream-shaped Entity APIs run only when the elected provider proves bounded paging. Unsupported providers reject
   before yielding instead of hiding whole-source materialization.
+- Query lifecycle callbacks observe only the final visible rows after residual filtering, sort/page completion, and
+  projection; discarded provider candidates never escape through Lifecycle.
+- Atomic batches and exact per-item outcomes are negotiated execution seams. `RequireAtomic` rejects before deferred
+  mutation loads or callbacks when the selected adapter cannot prove it.
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
 - `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
@@ -105,6 +194,11 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   the operation reaches Data.
 - Required Entity operations without a live composed host throw `KoanHostContextException` with the missing
   operation/service correction.
+- A business operation is never treated as a missing-shape probe, provisioned from exception text, and replayed.
+  Adapters translate native types/codes through the Data failure-classification seam.
+- Registered reads are uncached and never replayed. Unknown effects, missing/unenforced lanes, parameter drift,
+  scalar cardinality drift, extra result channels, and active segmentation reject before unsafe exposure.
+- Direct typed ADO queries share `RecordSet`'s compiled ordinal projection; they do not serialize dictionaries to JSON.
 
 ## Customization
 

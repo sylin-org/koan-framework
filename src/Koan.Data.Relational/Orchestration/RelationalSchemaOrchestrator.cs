@@ -1,212 +1,271 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
-using Koan.Data.Core.Optimization;
-using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Relational.Orchestration;
 
-internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrator
+internal sealed class RelationalSchemaOrchestrator :
+    IRelationalSchemaOrchestrator,
+    IRelationalMappingSchemaOrchestrator
 {
-    private readonly IServiceProvider _sp;
-    private readonly ILogger<RelationalSchemaOrchestrator>? _logger;
+    private readonly IServiceProvider _services;
 
-    public RelationalSchemaOrchestrator(
-        IServiceProvider sp,
-        ILogger<RelationalSchemaOrchestrator>? logger = null)
+    public RelationalSchemaOrchestrator(IServiceProvider services) => _services = services;
+
+    public RelationalSchemaPlan Plan(
+        MappingPlan mapping,
+        IRelationalStoreFeatures features,
+        RelationalSchemaPolicy policy)
     {
-        _sp = sp;
-        _logger = logger;
+        ArgumentNullException.ThrowIfNull(mapping);
+        ArgumentNullException.ThrowIfNull(features);
+        ArgumentNullException.ThrowIfNull(policy);
+
+        var identityIds = mapping.Identity.Parts
+            .Select(static part => part.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        var indexRoots = mapping.Indexes
+            .SelectMany(static index => index.Bindings)
+            .Select(static binding => binding.PhysicalPath.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        var columns = mapping.Bindings
+            .GroupBy(static binding => binding.PhysicalPath.Name, StringComparer.Ordinal)
+            .Select(group => CompileColumn(group, identityIds, indexRoots, features, policy))
+            .ToArray();
+
+        var unproved = new List<string>();
+        var indexes = mapping.Indexes.Select(index =>
+        {
+            var nested = index.Bindings.Any(static binding => binding.PhysicalPath.IsNested);
+            var derived = index.Bindings.Any(static binding =>
+                binding.Descriptor.Authority == MappingAuthority.Derived);
+            var rewriteFree = !derived || features.SupportsRewriteFreeExpressionIndexes;
+            if (!index.Primary && !features.SupportsMappedIndexes)
+                unproved.Add($"Index:{index.Name}");
+            if (derived && !rewriteFree)
+                unproved.Add($"RewriteFree:{index.Name}");
+            if (nested && !features.SupportsRewriteFreeExpressionIndexes)
+                unproved.Add($"ExpressionIndex:{index.Name}");
+            if (index.Ttl && !features.SupportsNativeTtl)
+                unproved.Add($"TTL:{index.Name}");
+            return new RelationalIndexDefinition(
+                index.Name,
+                index.Bindings.Select(static binding => binding.PhysicalPath),
+                index.Bindings.Select(EncodingId),
+                index.Unique,
+                index.Primary,
+                index.Ttl,
+                rewriteFree);
+        }).ToArray();
+
+        var schema = mapping.Container.Namespace.Count == 0
+            ? ResolveSchema(policy)
+            : string.Join('.', mapping.Container.Namespace);
+        var plan = new RelationalSchemaPlan(
+            mapping,
+            schema,
+            mapping.Container.Name,
+            columns,
+            indexes,
+            unproved);
+        RelationalPlanGuard.Validate(mapping, plan);
+        return plan;
     }
 
-    public Task<IReadOnlyDictionary<string, object?>> ValidateAsync<TEntity, TKey>(
+    public Task<RelationalSchemaValidation> ValidateAsync(
+        MappingPlan mapping,
         IRelationalDdlExecutor ddl,
         IRelationalStoreFeatures features,
-        string table,
         RelationalSchemaPolicy policy,
         CancellationToken ct = default)
-        where TEntity : class, Abstractions.IEntity<TKey>
-        where TKey : notnull
     {
         ct.ThrowIfCancellationRequested();
-        var entity = typeof(TEntity);
-        var schema = ResolveSchema(policy);
-        var required = GetRequiredColumns(entity, policy);
-        var missing = required.Where(c => !ddl.ColumnExists(schema, table, c)).ToArray();
-        var tableExists = ddl.TableExists(schema, table);
-        var state = ComputeState(tableExists, missing.Length == 0, policy);
-        IReadOnlyDictionary<string, object?> report = new Dictionary<string, object?>
+        var plan = Plan(mapping, features, policy);
+        var exists = ddl.TableExists(plan.Schema, plan.Table);
+        var missing = new List<string>();
+        var incompatible = new List<string>();
+        var unverified = new List<string>();
+        if (!exists)
         {
-            ["Provider"] = features.ProviderName,
-            ["Schema"] = schema,
-            ["Table"] = table,
-            ["TableExists"] = tableExists,
-            ["ProjectedColumns"] = required,
-            ["MissingColumns"] = missing,
-            ["Policy"] = policy.Projections.ToString(),
-            ["DdlAllowed"] = IsDdlAllowed(policy),
-            ["MatchingMode"] = policy.Matching.ToString(),
-            ["State"] = state
-        };
-        return Task.FromResult(report);
-    }
-
-    private Task EnsureCreatedJsonAsync<TEntity, TKey>(
-        IRelationalDdlExecutor ddl,
-        IRelationalStoreFeatures features,
-        string table,
-        RelationalSchemaPolicy policy,
-        CancellationToken ct)
-        where TEntity : class, Abstractions.IEntity<TKey>
-        where TKey : notnull
-    {
-        ct.ThrowIfCancellationRequested();
-        var schema = ResolveSchema(policy);
-        if (!ddl.TableExists(schema, table))
-        {
-            EnsureDdlAllowed(policy, features, schema, table);
-            ddl.CreateTableIdJson(schema, table);
+            missing.AddRange(plan.Columns.Select(static column => column.Name));
+            return Task.FromResult(new RelationalSchemaValidation(
+                plan,
+                tableExists: false,
+                missing,
+                incompatible,
+                unverified));
         }
-        return Task.CompletedTask;
+
+        foreach (var expected in plan.Columns)
+        {
+            var actual = ddl.DescribeColumn(plan.Schema, plan.Table, expected.Name);
+            if (actual is null)
+            {
+                missing.Add(expected.Name);
+                continue;
+            }
+            if (!features.SupportsDefinitionValidation)
+            {
+                unverified.Add($"ColumnDefinition:{expected.Name}");
+                continue;
+            }
+            if (!DefinitionEquals(expected, actual))
+                incompatible.Add($"{expected.Name}: expected {Describe(expected)}; found {Describe(actual)}");
+        }
+        return Task.FromResult(new RelationalSchemaValidation(
+            plan,
+            tableExists: true,
+            missing,
+            incompatible,
+            unverified));
     }
 
-    public Task EnsureCreatedAsync<TEntity, TKey>(
+    public async Task<RelationalSchemaValidation> EnsureCreatedAsync(
+        MappingPlan mapping,
         IRelationalDdlExecutor ddl,
         IRelationalStoreFeatures features,
-        string table,
         RelationalSchemaPolicy policy,
         CancellationToken ct = default)
-        where TEntity : class, Abstractions.IEntity<TKey>
-        where TKey : notnull
-        => policy.Projections == RelationalProjectionMode.None
-            ? EnsureCreatedJsonAsync<TEntity, TKey>(ddl, features, table, policy, ct)
-            : EnsureCreatedMaterializedAsync<TEntity, TKey>(ddl, features, table, policy, ct);
-
-    private Task EnsureCreatedMaterializedAsync<TEntity, TKey>(
-        IRelationalDdlExecutor ddl,
-        IRelationalStoreFeatures features,
-        string table,
-        RelationalSchemaPolicy policy,
-        CancellationToken ct)
-        where TEntity : class, Abstractions.IEntity<TKey>
-        where TKey : notnull
     {
-        ct.ThrowIfCancellationRequested();
-        var entity = typeof(TEntity);
-        var schema = ResolveSchema(policy);
-        var projections = ProjectionResolver.Get(entity);
-        var allColumns = new List<RelationalColumnDefinition>();
-
-        // Always add Id and Json columns - use optimized storage type for Id
-        var optimizationInfo = _sp.GetStorageOptimization<TEntity, TKey>();
-        var idStorageType = GetIdStorageType<TKey>(optimizationInfo, features.ProviderName);
-
-        allColumns.Add(new("Id", idStorageType, false));
-        allColumns.Add(new("Json", typeof(string), false));
-        foreach (var p in projections)
+        var validation = await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
+        if (!validation.IsCompatible)
         {
-            var clr = p.Property.PropertyType;
-            var underlying = Nullable.GetUnderlyingType(clr) ?? clr;
-            var nullable = Nullable.GetUnderlyingType(clr) is not null;
-            if (features.SupportsJsonFunctions)
+            EnsureDdlAllowed(policy, features, validation.Plan.Schema, validation.Plan.Table);
+            if (validation.Incompatible.Count != 0)
             {
-                // Computed/generated from JSON; underlying nullability doesn't matter here
-                allColumns.Add(new(p.ColumnName, typeof(string), true, true, "$." + p.Property.Name, p.IsIndexed));
+                throw new SchemaMismatchException(
+                    mapping.EntityType.FullName ?? mapping.EntityType.Name,
+                    validation.Plan.Table,
+                    policy.Matching.ToString(),
+                    validation.Missing.Concat(validation.Incompatible).ToArray(),
+                    [],
+                    IsDdlAllowed(policy));
+            }
+
+            if (!validation.TableExists)
+            {
+                ddl.CreateTableWithColumns(
+                    validation.Plan.Schema,
+                    validation.Plan.Table,
+                    validation.Plan.Columns);
             }
             else
             {
-                // No JSON computed columns (e.g., SQLite): create physical columns but keep them nullable
-                // so inserts that only write Json don’t violate NOT NULL constraints.
-                allColumns.Add(new(p.ColumnName, underlying, true, false, null, p.IsIndexed));
-            }
-        }
-        bool created = false;
-        if (!ddl.TableExists(schema, table))
-        {
-            EnsureDdlAllowed(policy, features, schema, table);
-            // Use the strongly-typed API on the executor. Executors that don't implement CreateTableWithColumns
-            // should implement CreateTableIdJson instead; the interface now includes CreateTableWithColumns so
-            // the MsSql executor implements it.
-            ddl.CreateTableWithColumns(schema, table, allColumns);
-            created = true;
-        }
-        // Only add missing columns if table already existed
-        if (!created)
-        {
-            foreach (var col in allColumns.Skip(2)) // skip Id, Json (already created)
-            {
-                var exists = ddl.ColumnExists(schema, table, col.Name);
-                if (!exists)
+                foreach (var column in validation.Plan.Columns.Where(column =>
+                             validation.Missing.Contains(column.Name, StringComparer.Ordinal)))
                 {
-                    EnsureDdlAllowed(policy, features, schema, table);
-                    if (col.IsComputed && features.SupportsJsonFunctions)
+                    if (column.IsComputed && column.JsonPath is not null)
                     {
-                        // JsonPath is defined when IsComputed=true; assert non-null to satisfy nullable analysis
-                        ddl.AddComputedColumnFromJson(schema, table, col.Name, col.JsonPath!, features.SupportsPersistedComputedColumns);
+                        ddl.AddComputedColumnFromJson(
+                            validation.Plan.Schema,
+                            validation.Plan.Table,
+                            column.Name,
+                            column.JsonPath,
+                            features.SupportsPersistedComputedColumns);
                     }
                     else
                     {
-                        ddl.AddPhysicalColumn(schema, table, col.Name, col.ClrType, col.Nullable);
+                        ddl.AddMappedColumn(validation.Plan.Schema, validation.Plan.Table, column);
                     }
                 }
             }
         }
 
-        // JOBS-0008: create the declared indexes (per-column AND composite [Index] groups) for both freshly-created and
-        // pre-existing tables. Previously per-column indexes were created only when ALTERing an existing table, so a
-        // freshly-created table had NO secondary indexes — every filtered/ordered query full-scanned. This is what made
-        // the per-lane claim seek slow on relational (no composite (Lane,Status,VisibleAt,FirstSubmittedAt) index).
-        // CREATE INDEX IF NOT EXISTS makes it idempotent; each is best-effort so a non-indexable column degrades to a
-        // scan, never a failure.
-        if (IsDdlAllowed(policy))
-            EnsureIndexes(ddl, features, schema, table, entity);
-        return Task.CompletedTask;
-    }
-
-    private void EnsureIndexes(IRelationalDdlExecutor ddl, IRelationalStoreFeatures features, string schema, string table, Type entity)
-    {
-        if (!features.SupportsIndexesOnComputedColumns) return;
-        foreach (var idx in IndexMetadata.GetIndexes(entity))
+        if (features.SupportsMappedIndexes && IsDdlAllowed(policy))
         {
-            if (idx.IsPrimaryKey || idx.Ttl || idx.Properties.Count == 0) continue;   // PK is implicit; TTL is Mongo-only
-            var cols = idx.Properties
-                .Select(Koan.Data.Core.ProjectionResolver.ColumnNameOf)   // single converged column-name resolver (DATA-0105 §3a)
-                .ToArray();
-            var name = !string.IsNullOrWhiteSpace(idx.Name) ? idx.Name! : $"IX_{table}_{string.Join("_", cols)}";
-            try { ddl.CreateIndex(schema, table, name, cols, unique: idx.Unique); }
-            catch (Exception error)
+            foreach (var index in validation.Plan.Indexes.Where(static index => !index.Primary))
             {
-                _logger?.LogWarning(
-                    error,
-                    "Relational index {Index} could not be created for {Provider}/{Schema}/{Table}; queries may scan.",
-                    name,
-                    features.ProviderName,
-                    schema,
-                    table);
+                if (index.Ttl && !features.SupportsNativeTtl) continue;
+                if (!index.RewriteFree && index.Parts.Any(static part => part.IsNested)) continue;
+                ddl.CreateMappedIndex(validation.Plan.Schema, validation.Plan.Table, index);
             }
         }
+
+        return await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
     }
 
-    private static string ResolveSchema(RelationalSchemaPolicy policy)
-        => string.IsNullOrWhiteSpace(policy.DefaultSchema) ? "dbo" : policy.DefaultSchema;
-
-
-    private static string[] GetRequiredColumns(Type entity, RelationalSchemaPolicy policy)
+    public async Task<IReadOnlyDictionary<string, object?>> ValidateAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
     {
-        var cols = new List<string> { "Id", "Json" };
-        if (policy.Projections is RelationalProjectionMode.ComputedProjections or RelationalProjectionMode.PhysicalColumns)
+        var mapping = RelationalCompatibilityMapping.Compile<TEntity, TKey>(_services, table, policy);
+        var compatibleFeatures = RelationalCompatibilityMapping.Features(features, policy.Projections);
+        var validation = await ValidateAsync(mapping, ddl, compatibleFeatures, policy, ct).ConfigureAwait(false);
+        var state = validation.IsCompatible
+            ? validation.Unverified.Count == 0 ? "Healthy" : "Degraded"
+            : policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
+        return new Dictionary<string, object?>
         {
-            var projections = ProjectionResolver.Get(entity);
-            cols.AddRange(projections.Select(p => p.ColumnName));
-        }
-        return cols.Distinct(StringComparer.Ordinal).ToArray();
+            ["Provider"] = features.ProviderName,
+            ["Schema"] = validation.Plan.Schema,
+            ["Table"] = validation.Plan.Table,
+            ["TableExists"] = validation.TableExists,
+            ["ProjectedColumns"] = validation.Plan.Columns.Select(static column => column.Name).ToArray(),
+            ["MissingColumns"] = validation.Missing.ToArray(),
+            ["Policy"] = policy.Projections.ToString(),
+            ["DdlAllowed"] = IsDdlAllowed(policy),
+            ["MatchingMode"] = policy.Matching.ToString(),
+            ["State"] = state
+        };
     }
 
-
-    private static string ComputeState(bool tableExists, bool matches, RelationalSchemaPolicy policy)
+    public async Task EnsureCreatedAsync<TEntity, TKey>(
+        IRelationalDdlExecutor ddl,
+        IRelationalStoreFeatures features,
+        string table,
+        RelationalSchemaPolicy policy,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
     {
-        if (!tableExists) return policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        if (!matches) return policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        return "Healthy";
+        var mapping = RelationalCompatibilityMapping.Compile<TEntity, TKey>(_services, table, policy);
+        var compatibleFeatures = RelationalCompatibilityMapping.Features(features, policy.Projections);
+        await EnsureCreatedAsync(mapping, ddl, compatibleFeatures, policy, ct).ConfigureAwait(false);
     }
+
+    private static RelationalColumnDefinition CompileColumn(
+        IGrouping<string, MappingBindingPlan> group,
+        IReadOnlySet<string> identityIds,
+        IReadOnlySet<string> indexRoots,
+        IRelationalStoreFeatures features,
+        RelationalSchemaPolicy policy)
+    {
+        var bindings = group.ToArray();
+        var identity = bindings.All(binding => identityIds.Contains(binding.Id));
+        var generated = bindings.All(static binding =>
+            binding.Descriptor.Generation == MappingGeneration.Provider);
+        var computed = policy.Projections == RelationalProjectionMode.ComputedProjections &&
+                       features.SupportsJsonFunctions &&
+                       bindings.Length == 1 &&
+                       bindings[0].Descriptor.Authority == MappingAuthority.Derived &&
+                       !bindings[0].LogicalPath.IsRoot;
+        var structured = !computed && bindings.Any(static binding =>
+            binding.Shape == MappingValueShape.Object || binding.PhysicalPath.IsNested);
+        var nullable = !identity && (computed || bindings.All(binding => IsNullable(binding.LogicalType)));
+        var jsonPath = computed
+            ? "$." + string.Join('.', bindings[0].LogicalPath.Segments)
+            : null;
+        return new RelationalColumnDefinition(
+            group.Key,
+            computed ? typeof(string) : structured ? typeof(DataObject) : bindings[0].PhysicalType,
+            nullable,
+            IsComputed: computed,
+            JsonPath: jsonPath,
+            IsIndexed: indexRoots.Contains(group.Key),
+            Shape: structured ? RelationalStorageShape.Structured : RelationalStorageShape.Scalar,
+            IsIdentity: identity,
+            IsGenerated: generated);
+    }
+
+    private static string EncodingId(MappingBindingPlan binding) =>
+        binding.Descriptor.Codec?.Id ?? $"clr:{binding.PhysicalType.AssemblyQualifiedName}";
+
+    private static string ResolveSchema(RelationalSchemaPolicy policy) =>
+        string.IsNullOrWhiteSpace(policy.DefaultSchema) ? "dbo" : policy.DefaultSchema;
 
     private static void EnsureDdlAllowed(
         RelationalSchemaPolicy policy,
@@ -214,37 +273,35 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         string schema,
         string table)
     {
-        if (!IsDdlAllowed(policy))
-        {
-            var reason = policy.Ddl != RelationalDdlPolicy.AutoCreate
+        if (IsDdlAllowed(policy)) return;
+        var reason = policy.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.External
+            ? "StorageLifecycle=External forbids shape mutation."
+            : policy.Ddl != RelationalDdlPolicy.AutoCreate
                 ? $"DDL is disabled by policy '{policy.Ddl}'."
                 : "DDL is not allowed in production.";
-            throw new InvalidOperationException(
-                $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason} " +
-                "Set the selected provider's DdlPolicy to AutoCreate and explicitly allow production DDL only when intended.");
-        }
+        throw new InvalidOperationException(
+            $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason} " +
+            "Set the selected provider's DdlPolicy to AutoCreate and explicitly allow production DDL only when intended.");
     }
 
-    private static bool IsDdlAllowed(RelationalSchemaPolicy policy)
-        => policy.Ddl == RelationalDdlPolicy.AutoCreate && (!Koan.Core.KoanEnv.IsProduction || policy.AllowProductionDdl);
+    private static bool IsDdlAllowed(RelationalSchemaPolicy policy) =>
+        policy.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.Managed &&
+        policy.Ddl == RelationalDdlPolicy.AutoCreate &&
+        (!Koan.Core.KoanEnv.IsProduction || policy.AllowProductionDdl);
 
-    private static Type GetIdStorageType<TKey>(StorageOptimizationInfo optimizationInfo, string providerName)
-        where TKey : notnull
-    {
-        // For non-string keys, use the key type directly (no optimization needed)
-        if (typeof(TKey) != typeof(string))
-            return typeof(TKey);
+    private static bool DefinitionEquals(RelationalColumnDefinition expected, RelationalColumnDefinition actual) =>
+        expected.ClrType == actual.ClrType &&
+        expected.Nullable == actual.Nullable &&
+        expected.IsComputed == actual.IsComputed &&
+        string.Equals(expected.JsonPath, actual.JsonPath, StringComparison.Ordinal) &&
+        expected.Shape == actual.Shape &&
+        expected.IsIdentity == actual.IsIdentity &&
+        expected.IsGenerated == actual.IsGenerated;
 
-        // For string keys, check if optimization is enabled
-        if (!optimizationInfo.IsOptimized)
-            return typeof(string);
+    private static string Describe(RelationalColumnDefinition column) =>
+        $"{column.Shape}/{column.ClrType.Name}/nullable={column.Nullable}/computed={column.IsComputed}/" +
+        $"path={column.JsonPath ?? "<none>"}/identity={column.IsIdentity}/generated={column.IsGenerated}";
 
-        // Apply optimization based on type
-        return optimizationInfo.OptimizationType switch
-        {
-            StorageOptimizationType.Guid => typeof(Guid),
-            _ => typeof(string)
-        };
-    }
-
+    private static bool IsNullable(Type type) =>
+        !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
 }

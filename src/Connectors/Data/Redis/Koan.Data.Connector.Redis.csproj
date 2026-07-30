@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Description>Redis-backed key/value Entity persistence for Koan with explicit caller paging, source routing, shared connection pooling, and participation-aware health.</Description>
+    <Description>Redis keyed Entity persistence for Koan with native TTL, bounded managed sets, compact JSON mapping, read-only Functions, and shared connection ownership.</Description>
     <PackageTags>$(CommonPackageTags);data;redis;keyvalue;repository</PackageTags>
   </PropertyGroup>
   <ItemGroup>

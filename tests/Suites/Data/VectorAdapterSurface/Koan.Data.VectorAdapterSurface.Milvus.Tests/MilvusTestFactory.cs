@@ -1,238 +1,180 @@
-using System.Net.Http;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using DotNet.Testcontainers.Networks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Vector;
-using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Connector.Milvus;
-using Koan.Data.VectorAdapterSurface.TestKit;
-
-// Testcontainers deprecated the parameterless ContainerBuilder ctor (used 3x for the etcd+minio+milvus
-// stack); the generic-container pattern still functions — suppress the deprecation (warnings-as-errors).
-#pragma warning disable CS0618
+using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Milvus.Tests;
 
-/// <summary>
-/// Milvus cell of the vector matrix. Milvus 2.4 standalone wants three real services on a
-/// shared network — etcd + minio + milvus — exactly like its official docker-compose.
-///
-/// <para>
-/// The previous "embedded etcd via ETCD_USE_EMBED" pattern doesn't exist in Milvus 2.4; that
-/// env var is a leftover from older Milvus versions. The 2.4 binary always dials its configured
-/// etcd endpoint (default <c>localhost:2379</c>) and SIGABRT-exits at startup when it can't
-/// reach one. The three-service stack matches what Milvus actually ships as production-shape.
-/// </para>
-///
-/// <para>
-/// <see cref="MilvusOptions.Dimension"/> is only needed when a test pre-creates a collection;
-/// otherwise the adapter derives it from the first embedding.
-/// </para>
-/// </summary>
-public sealed class MilvusTestFactory : IVectorAdapterTestFactory
+/// <summary>One pinned live Milvus topology shared by the provider suite.</summary>
+public sealed class MilvusTestFactory : IAsyncLifetime
 {
     private INetwork? _network;
     private IContainer? _etcd;
     private IContainer? _minio;
     private IContainer? _milvus;
-    private ServiceProvider? _sp;
-    private string? _endpoint;
-    private HttpClient? _adminHttp;
-    private bool _initialized;
+    private HttpClient? _http;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
-    public IServiceProvider Services => _sp ?? throw new InvalidOperationException("Factory not initialized.");
-    public int EmbeddingDimension => 8;
-
-    public bool SupportsGetEmbedding         => false; // not implemented in MilvusVectorRepository
-    public bool SupportsBulkOperations       => true;
-    public bool SupportsFlush                => true;  // adapter overrides: drops the collection
-    public bool SupportsExportAll            => false;
-    public bool SupportsIndexStats           => false; // not implemented in MilvusVectorRepository
-    public bool SupportsHybridSearch         => false;
-    public bool SupportsMetadataFilters      => true;  // metadata["key"] JSON-field access via MilvusFilterTranslator (live-verified)
-    public bool SupportsContinuationToken    => false;
-    public bool SupportsPartitionIsolation   => true;
-    public bool SupportsDynamicCollections   => true;
-    // Milvus 2.4 REST has no flush/compact endpoint; KNN search runs against growing segments
-    // where filter-based deletes don't land until segments seal naturally. Point-lookup Query
-    // sees deletes immediately, KNN Search does not. Verified across 2.4.0 and 2.4.13.
-    public bool SupportsDeleteImmediatelyVisibleToSearch => false;
-    public bool SupportsScoreNormalization   => true;  // cosine
+    public string Endpoint { get; private set; } = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
-        if (_initialized) return;
-        _initialized = true;
-
-        var envEndpoint = Environment.GetEnvironmentVariable("Koan_TESTS_MILVUS")
-                          ?? Environment.GetEnvironmentVariable("MILVUS_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(envEndpoint) && await Ping(envEndpoint))
-        {
-            _endpoint = envEndpoint;
-            BuildSp();
-            IsAvailable = true;
-            return;
-        }
-
         try
         {
             _network = new NetworkBuilder().Build();
-            await _network.CreateAsync();
+            await _network.CreateAsync().ConfigureAwait(false);
 
-            _etcd = new ContainerBuilder()
-                .WithImage("quay.io/coreos/etcd:v3.5.25")
+            _etcd = new ContainerBuilder("quay.io/coreos/etcd:v3.5.25")
                 .WithNetwork(_network)
                 .WithNetworkAliases("etcd")
                 .WithEnvironment("ETCD_AUTO_COMPACTION_MODE", "revision")
                 .WithEnvironment("ETCD_AUTO_COMPACTION_RETENTION", "1000")
                 .WithEnvironment("ETCD_QUOTA_BACKEND_BYTES", "4294967296")
                 .WithEnvironment("ETCD_SNAPSHOT_COUNT", "50000")
-                .WithCommand(
-                    "etcd",
+                .WithCommand("etcd",
                     "-advertise-client-urls=http://etcd:2379",
                     "-listen-client-urls=http://0.0.0.0:2379",
                     "--data-dir=/etcd")
-                // Wait for etcd's "ready to serve client requests" log line. The earlier
-                // `etcdctl endpoint health` strategy hangs on Windows hosts (Testcontainers tries
-                // to run the command in the wrong context); log-message matching is portable.
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("ready to serve client requests"))
                 .Build();
-            await _etcd.StartAsync();
+            await _etcd.StartAsync().ConfigureAwait(false);
 
-            _minio = new ContainerBuilder()
-                .WithImage("minio/minio:RELEASE.2024-12-18T13-15-44Z")
+            _minio = new ContainerBuilder("minio/minio:RELEASE.2024-12-18T13-15-44Z")
                 .WithNetwork(_network)
                 .WithNetworkAliases("minio")
                 .WithEnvironment("MINIO_ACCESS_KEY", "minioadmin")
                 .WithEnvironment("MINIO_SECRET_KEY", "minioadmin")
                 .WithCommand("minio", "server", "/minio_data")
-                // Wait strategy uses logs, not HTTP — minio's port isn't exposed to the host
-                // (only milvus needs to reach it via the internal Docker network), so the
-                // Testcontainers HTTP poller can't connect from the host side.
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("API:"))
                 .Build();
-            await _minio.StartAsync();
+            await _minio.StartAsync().ConfigureAwait(false);
 
-            _milvus = new ContainerBuilder()
-                // 2.4.13 is the latest 2.4.x stable; 2.4.0 has REST API quirks (notably
-                // single-id delete-by-filter being silently dropped on growing segments)
-                // that were fixed in later patch releases.
-                .WithImage("milvusdb/milvus:v2.6.20")
+            var hostPort = GrabFreePort();
+            _milvus = new ContainerBuilder("milvusdb/milvus:v2.6.20")
                 .WithNetwork(_network)
                 .WithNetworkAliases("milvus")
                 .WithEnvironment("ETCD_ENDPOINTS", "etcd:2379")
                 .WithEnvironment("MINIO_ADDRESS", "minio:9000")
                 .WithCommand("milvus", "run", "standalone")
-                .WithPortBinding(19530, true)
-                .WithPortBinding(9091, true)
-                // "Proxy successfully started" is the last bootstrap line milvus emits when the
-                // gRPC frontend at 19530 is accepting client connections. Log-based wait
-                // sidesteps Windows Docker Desktop quirks where the HTTP-from-host poller
-                // doesn't resolve the mapped public port reliably.
+                .WithPortBinding(hostPort, 19530)
                 .WithWaitStrategy(Wait.ForUnixContainer().UntilMessageIsLogged("Proxy successfully started"))
                 .Build();
-            await _milvus.StartAsync();
-            // The wait strategy ("Proxy successfully started" log line) is already authoritative
-            // — once it satisfies, milvus is accepting client connections on 19530. Skipping a
-            // follow-up HTTP ping loop because Milvus doesn't expose REST /healthz on 19530
-            // anyway (that path lives on the management port 9091).
-            var port = _milvus.GetMappedPublicPort(19530);
-            _endpoint = $"http://localhost:{port}";
-            BuildSp();
+            await _milvus.StartAsync().ConfigureAwait(false);
+            Endpoint = $"http://localhost:{hostPort}";
+            _http = Client(Endpoint);
+            await AwaitReady().ConfigureAwait(false);
             IsAvailable = true;
-            return;
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            UnavailableReason = $"Failed to start Milvus stack: {ex.GetType().Name}: {ex.Message}";
+            UnavailableReason = $"Milvus/Docker unavailable: {error.GetType().Name}: {error.Message}";
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _adminHttp?.Dispose();
-        if (_sp is not null) await _sp.DisposeAsync();
-        if (_milvus is not null) { try { await _milvus.DisposeAsync(); } catch { } }
-        if (_minio is not null) { try { await _minio.DisposeAsync(); } catch { } }
-        if (_etcd is not null) { try { await _etcd.DisposeAsync(); } catch { } }
-        if (_network is not null) { try { await _network.DisposeAsync(); } catch { } }
+        _http?.Dispose();
+        if (_milvus is not null) { try { await _milvus.DisposeAsync().ConfigureAwait(false); } catch { } }
+        if (_minio is not null) { try { await _minio.DisposeAsync().ConfigureAwait(false); } catch { } }
+        if (_etcd is not null) { try { await _etcd.DisposeAsync().ConfigureAwait(false); } catch { } }
+        if (_network is not null) { try { await _network.DisposeAsync().ConfigureAwait(false); } catch { } }
     }
 
-    public async Task ResetAsync(CancellationToken ct = default)
+    public async Task Reset(CancellationToken ct = default)
     {
-        if (_adminHttp is not null && _endpoint is not null)
+        if (!IsAvailable || _http is null) return;
+        using var listed = await Post("/v2/vectordb/collections/list", new { dbName = "default" }, ct)
+            .ConfigureAwait(false);
+        if (!listed.RootElement.TryGetProperty("data", out var collections) ||
+            collections.ValueKind != JsonValueKind.Array) return;
+        foreach (var item in collections.EnumerateArray())
+        {
+            var name = item.GetString();
+            if (name is null) continue;
+            using var dropped = await Post("/v2/vectordb/collections/drop",
+                new { dbName = "default", collectionName = name }, ct).ConfigureAwait(false);
+        }
+    }
+
+    public async Task PutCollection(string name, CancellationToken ct = default)
+    {
+        using var created = await Post("/v2/vectordb/collections/create", new
+        {
+            dbName = "default",
+            collectionName = name,
+            dimension = 8,
+            metricType = "COSINE"
+        }, ct).ConfigureAwait(false);
+    }
+
+    public async Task Restart(CancellationToken ct = default)
+    {
+        if (_milvus is null) throw new InvalidOperationException(UnavailableReason);
+        await _milvus.StopAsync(ct).ConfigureAwait(false);
+        await _milvus.StartAsync(ct).ConfigureAwait(false);
+        _http?.Dispose();
+        _http = Client(Endpoint);
+        await AwaitReady(ct).ConfigureAwait(false);
+    }
+
+    private async Task<JsonDocument> Post(string path, object body, CancellationToken ct)
+    {
+        if (_http is null) throw new InvalidOperationException(UnavailableReason);
+        using var response = await _http.PostAsync(path,
+            new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json"), ct)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+        if (document.RootElement.TryGetProperty("code", out var code) && code.GetInt64() is not 0 and not 200)
+        {
+            document.Dispose();
+            throw new InvalidOperationException("Milvus fixture request was rejected.");
+        }
+        return document;
+    }
+
+    private async Task AwaitReady(CancellationToken ct = default)
+    {
+        if (_http is null) throw new InvalidOperationException(UnavailableReason);
+        using var readiness = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        readiness.CancelAfter(TimeSpan.FromSeconds(60));
+        for (var attempt = 0; attempt < 120; attempt++)
         {
             try
             {
-                // Drop every existing collection. Milvus v2 REST: POST /v2/vectordb/collections/list,
-                // then POST /v2/vectordb/collections/drop for each.
-                using var listResp = await _adminHttp.PostAsync("/v2/vectordb/collections/list",
-                    new StringContent("{}", System.Text.Encoding.UTF8, "application/json"), ct);
-                if (listResp.IsSuccessStatusCode)
+                using var response = await _http.PostAsync(
+                    "/v2/vectordb/collections/list",
+                    new StringContent("{\"dbName\":\"default\"}", Encoding.UTF8, "application/json"),
+                    readiness.Token).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
                 {
-                    var json = await listResp.Content.ReadAsStringAsync(ct);
-                    using var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("data", out var data))
-                    {
-                        foreach (var col in data.EnumerateArray())
-                        {
-                            if (col.GetString() is { } name)
-                            {
-                                using var _ = await _adminHttp.PostAsync("/v2/vectordb/collections/drop",
-                                    new StringContent($"{{\"collectionName\":\"{name}\"}}", System.Text.Encoding.UTF8, "application/json"), ct);
-                            }
-                        }
-                    }
+                    using var document = JsonDocument.Parse(
+                        await response.Content.ReadAsStringAsync(readiness.Token).ConfigureAwait(false));
+                    if (document.RootElement.TryGetProperty("code", out var code) && code.GetInt64() is 0 or 200) return;
                 }
             }
-            catch { /* best-effort */ }
+            catch when (!readiness.IsCancellationRequested) { }
+            await Task.Delay(250, readiness.Token).ConfigureAwait(false);
         }
-
-        if (_sp is not null) await _sp.DisposeAsync();
-        BuildSp();
-        Koan.Core.Hosting.App.AppHost.Current = _sp;
+        throw new TimeoutException("Milvus did not become ready.");
     }
 
-    private void BuildSp()
+    private static HttpClient Client(string endpoint) => new()
     {
-        if (_endpoint is null) throw new InvalidOperationException("Endpoint not resolved.");
-        _adminHttp = new HttpClient { BaseAddress = new Uri(_endpoint, UriKind.Absolute) };
+        BaseAddress = new Uri(endpoint),
+        Timeout = TimeSpan.FromSeconds(30)
+    };
 
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddHttpClient("milvus", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddVectorAdapterTestRuntime();
-
-        services.AddOptions<MilvusOptions>().Configure(o =>
-        {
-            o.ConnectionString = _endpoint;
-            o.Endpoint = _endpoint;
-            o.Dimension = EmbeddingDimension;
-            o.AutoCreateCollection = true;
-            o.Metric = "COSINE";
-            o.ConsistencyLevel = "Strong"; // deterministic reads-after-writes for tests
-        });
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IVectorAdapterFactory, MilvusVectorAdapterFactory>();
-
-        _sp = services.BuildServiceProvider();
-    }
-
-    private static async Task<bool> Ping(string endpoint)
+    private static int GrabFreePort()
     {
-        try
-        {
-            using var http = new HttpClient { BaseAddress = new Uri(endpoint, UriKind.Absolute), Timeout = TimeSpan.FromSeconds(2) };
-            using var resp = await http.GetAsync("/v2/health");
-            return resp.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try { return ((IPEndPoint)listener.LocalEndpoint).Port; }
+        finally { listener.Stop(); }
     }
 }

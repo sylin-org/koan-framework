@@ -2,10 +2,12 @@ using System;
 using System.Threading;
 using AwesomeAssertions;
 using Koan.Core.Capabilities;
+using Koan.Core.Composition;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
@@ -17,11 +19,12 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// store (<c>CombineWriteStamped</c>); an operation-sourced predicate (soft-delete) is excluded there but kept by the
 /// primary-store <c>CombineAll</c>. This is the ONE composer the facade, the diagnostic, and the vector path share.
 /// </summary>
-[Collection("managed-field-registry")]   // serialize: the registry is process-global static state
 public sealed class AodbComposeSpec : IDisposable
 {
-    public AodbComposeSpec() => ManagedFieldRegistry.Reset();
-    public void Dispose() { _t.Value = null; ManagedFieldRegistry.Reset(); }
+    private readonly IDisposable _composition;
+
+    public AodbComposeSpec() => _composition = KoanCompositionScope.Enter(new ServiceCollection());
+    public void Dispose() { _t.Value = null; _composition.Dispose(); }
 
     private static readonly AsyncLocal<string?> _t = new();
     private sealed class Doc { }

@@ -60,34 +60,6 @@ internal sealed class MongoDiscoveryAdapter : ServiceDiscoveryAdapterBase
                        .Select(url => new DiscoveryCandidate(url.Trim(), "environment-mongo-urls", DiscoveryCandidatePriority.Environment));
     }
 
-    /// <summary>MongoDB-specific connection string parameter application — delegates to the shared
-    /// <see cref="MongoConnectionString.ApplyParameters"/> (replica-set-safe string manipulation),
-    /// preserving the dictionary-presence semantics: auth is applied only when BOTH username and password
-    /// keys are present; the database is applied when its key is present.</summary>
-    protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
-    {
-        try
-        {
-            string? username = null;
-            string? password = null;
-            if (parameters.TryGetValue("username", out var u) &&
-                parameters.TryGetValue("password", out var p))
-            {
-                username = u?.ToString();
-                password = p?.ToString();
-            }
-
-            var database = parameters.TryGetValue("database", out var db) ? db?.ToString() : null;
-
-            return MongoConnectionString.ApplyParameters(baseUrl, database, username, password);
-        }
-        catch (Exception ex)
-        {
-            ReportNormalizationFailure(baseUrl, ex);
-            return baseUrl;
-        }
-    }
-
     /// <summary>MongoDB adapter handles Aspire service discovery for MongoDB</summary>
     protected override string? ReadAspireServiceDiscovery()
     {

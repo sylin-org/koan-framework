@@ -995,8 +995,8 @@ Moving data between partitions, sources, or adapters is common: archiving old re
 
 Koan's transfer DSL provides declarative copy, move, and mirror operations:
 - **Copy:** Duplicate entities to another context
-- **Move:** Copy then delete from origin (strategies: AfterCopy, Batched, Synced)
-- **Mirror:** Propagate records one-way or reconcile both sides; `[Timestamp]` resolves bidirectional conflicts
+- **Move:** Copy bounded pages, then delete only identities whose destination batch returned an exact receipt
+- **Mirror:** Make one side authoritative, or reconcile both sides with an explicit conflict policy
 
 **Recipe**
 
@@ -1011,6 +1011,7 @@ Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use
 // Copy completed todos to archive partition
 await Todo.Copy(t => t.Completed)
     .To(partition: "archive")
+    .Batch(500)
     .Audit(batch => logger.LogInformation("Archived {Count} todos", batch.BatchCount))
     .Run(ct);
 ```
@@ -1020,9 +1021,9 @@ await Todo.Copy(t => t.Completed)
 ```csharp
 // Move old todos from hot storage to cold
 await Todo.Move()
-    .WithDeleteStrategy(DeleteStrategy.Synced)  // Delete immediately after each copy
     .From(partition: "hot")
     .To(adapter: "postgres", partition: "cold")
+    .Batch(500)
     .Run(ct);
 ```
 
@@ -1032,6 +1033,8 @@ await Todo.Move()
 // Keep transactional and reporting databases in sync
 await Todo.Mirror(mode: MirrorMode.Bidirectional)
     .To(source: "Analytics")
+    .Conflict(MirrorConflict.Latest)
+    .Batch(500)
     .Run(ct);
 
 // Push production records to analytics
@@ -1040,12 +1043,13 @@ await Todo.Mirror(mode: MirrorMode.Push)
     .Run(ct);
 ```
 
-**Query-shaped transfer:**
+**Filtered transfer:**
 
 ```csharp
-// Copy only todos with specific tag
-await Todo.Copy(query => query.Where(t => t.Tags.Contains("important")))
+// Copy only important todos
+await Todo.Copy(todo => todo.Important)
     .To(partition: "priority")
+    .Batch(500)
     .Run(ct);
 ```
 
@@ -1085,10 +1089,14 @@ if (result.HasConflicts)
 - **Analytics:** Mirror transactional data to reporting databases
 - **Migrations:** Transfer data between adapters during provider changes
 
-Current transfer builders materialize the selected source before writing the destination in batches.
-`BatchSize(...)` and `.Audit(...)` describe destination write batches; they do not bound source
-materialization or provide checkpoints. If the selection can be large, use a qualified Entity stream
-and an application-owned idempotency/checkpoint design instead.
+`Batch(...)` is one portable bound: it limits each provider candidate page, each destination mutation,
+and each deferred identity-delete batch. An adapter must prove provider-side paging and ordering before
+the first source query. A returned destination or delete count must exactly match its admitted batch;
+an ambiguous exception is surfaced and never replayed.
+
+Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
+dataset in application memory or mutate an offset-paged source while reading it. Use Jobs and an
+application-owned checkpoint when work must survive process failure or resume across runs.
 
 **Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
 not a checkpoint or resume token.

@@ -1,5 +1,6 @@
 using Koan.Core.Context;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
 using Koan.Data.AI.Telemetry;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +34,7 @@ public class EmbeddingWorker(
     // Rate limiting: track embeddings generated per minute
     private readonly ConcurrentQueue<DateTimeOffset> _recentEmbeddings = new();
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
+    private readonly string _owner = Guid.CreateVersion7().ToString("N");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -41,6 +43,8 @@ public class EmbeddingWorker(
             logger.LogInformation("EmbeddingWorker disabled via configuration");
             return;
         }
+        if (options.Value.ProcessingLeaseDuration <= TimeSpan.Zero)
+            throw new InvalidOperationException("EmbeddingWorker ProcessingLeaseDuration must be positive.");
 
         logger.LogInformation("EmbeddingWorker started (BatchSize={BatchSize}, RateLimit={RateLimit}/min)",
             options.Value.BatchSize, options.Value.GlobalRateLimitPerMinute);
@@ -134,51 +138,69 @@ public class EmbeddingWorker(
     {
         var batchStopwatch = Stopwatch.StartNew();
 
-        // Query for pending jobs in durable FIFO order.
-        var pendingJobs = (await EmbedJob<TEntity>.Query(
-            j => j.Status == EmbedJobStatus.Pending,
+        // Query pending work plus abandoned claims in durable FIFO order. A legacy Processing row without lease
+        // metadata becomes recoverable only after the configured grace window, so a mixed-version deployment does
+        // not immediately steal work from an older worker.
+        var now = DateTimeOffset.UtcNow;
+        var legacyCutoff = now - options.Value.ProcessingLeaseDuration;
+        var candidates = (await EmbedJob<TEntity>.Query(
+            j => j.Status == EmbedJobStatus.Pending ||
+                 (j.Status == EmbedJobStatus.Processing &&
+                  ((j.LeaseUntil != null && j.LeaseUntil <= now) ||
+                   (j.LeaseUntil == null && j.StartedAt != null && j.StartedAt <= legacyCutoff))),
             ct))
             .OrderBy(j => j.CreatedAt)
             .Take(options.Value.BatchSize)
             .ToList();
 
-        if (!pendingJobs.Any())
+        if (candidates.Count == 0)
             return 0;
 
-        logger.LogDebug("Processing {Count} pending jobs for {EntityType}",
-            pendingJobs.Count, typeof(TEntity).Name);
+        logger.LogDebug("Processing {Count} claimable embedding jobs for {EntityType}",
+            candidates.Count, typeof(TEntity).Name);
 
         var processedCount = 0;
-        foreach (var job in pendingJobs)
+        foreach (var candidate in candidates)
         {
+            // Do not consume a durable claim while waiting for local rate capacity.
+            await WaitForRateLimit(ct);
+            var job = await TryClaim<TEntity>(candidate.Id!, ct);
+            if (job is null) continue;
+
+            using var execution = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var heartbeat = MaintainLease<TEntity>(job.Id!, execution);
             try
             {
-                // Check rate limit before processing
-                await WaitForRateLimit(ct);
-
-                // Mark job as processing
-                job.Status = EmbedJobStatus.Processing;
-                job.StartedAt = DateTimeOffset.UtcNow;
-                await job.Save(ct);
-
-                // Process the job
-                await ProcessJobAsync(job, ct);
-
-                // Mark job as completed
-                job.Status = EmbedJobStatus.Completed;
-                job.CompletedAt = DateTimeOffset.UtcNow;
-                await job.Save(ct);
-
-                processedCount++;
-                logger.LogDebug("Completed embedding job {JobId} for entity {EntityId}",
-                    job.Id, job.EntityId);
+                await ProcessJobAsync(job, execution.Token);
+                if (await CompleteClaim(job, execution.Token))
+                {
+                    processedCount++;
+                    logger.LogDebug("Completed embedding job {JobId} for entity {EntityId}",
+                        job.Id, job.EntityId);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogWarning(
+                    "Embedding job {JobId} stopped because its processing lease could not be maintained",
+                    job.Id);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to process embedding job {JobId}: {Error}",
                     job.Id, ex.Message);
 
-                await HandleJobFailureAsync(job, ex.Message, ct);
+                await HandleJobFailureAsync(job, ex.Message, execution.Token);
+            }
+            finally
+            {
+                execution.Cancel();
+                try { await heartbeat; }
+                catch (OperationCanceledException) { }
             }
         }
 
@@ -209,6 +231,140 @@ public class EmbeddingWorker(
 
         return processedCount;
     }
+
+    private async Task<EmbedJob<TEntity>?> TryClaim<TEntity>(string jobId, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        var job = await EmbedJob<TEntity>.Get(jobId, ct);
+        var now = DateTimeOffset.UtcNow;
+        if (job is null || !IsClaimable(job, now)) return null;
+
+        var priorStatus = job.Status;
+        var priorOwner = job.Owner;
+        var priorLeaseUntil = job.LeaseUntil;
+        var priorStartedAt = job.StartedAt;
+        job.Status = EmbedJobStatus.Processing;
+        job.Owner = _owner;
+        job.StartedAt = now;
+        job.LeaseUntil = now + options.Value.ProcessingLeaseDuration;
+        job.CompletedAt = null;
+
+        var cas = ConditionalRepository<TEntity>();
+        if (cas is not null)
+        {
+            var claimed = priorStatus == EmbedJobStatus.Pending
+                ? await cas.ConditionalReplaceAsync(job, value => value.Status == EmbedJobStatus.Pending, ct)
+                : await cas.ConditionalReplaceAsync(
+                    job,
+                    value => value.Status == EmbedJobStatus.Processing &&
+                             value.Owner == priorOwner &&
+                             value.LeaseUntil == priorLeaseUntil &&
+                             value.StartedAt == priorStartedAt,
+                    ct);
+            return claimed ? job : null;
+        }
+
+        // Providers without conditional replacement retain an honest at-least-once claim: write the unique owner,
+        // then reconcile before doing external work. A racing writer may cause duplicate work, never silent loss.
+        await job.Save(ct);
+        var verified = await EmbedJob<TEntity>.Get(job.Id!, ct);
+        return verified is { Status: EmbedJobStatus.Processing } && verified.Owner == _owner
+            ? verified
+            : null;
+    }
+
+    private bool IsClaimable<TEntity>(EmbedJob<TEntity> job, DateTimeOffset now)
+        where TEntity : class, IEntity<string>
+    {
+        if (job.Status == EmbedJobStatus.Pending) return true;
+        if (job.Status != EmbedJobStatus.Processing) return false;
+        if (job.LeaseUntil is { } leaseUntil) return leaseUntil <= now;
+        return job.StartedAt is { } startedAt &&
+               startedAt <= now - options.Value.ProcessingLeaseDuration;
+    }
+
+    private async Task MaintainLease<TEntity>(
+        string jobId,
+        CancellationTokenSource execution)
+        where TEntity : class, IEntity<string>
+    {
+        var duration = options.Value.ProcessingLeaseDuration;
+        var interval = TimeSpan.FromTicks(Math.Max(TimeSpan.FromMilliseconds(100).Ticks, duration.Ticks / 3));
+        using var timer = new PeriodicTimer(interval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(execution.Token))
+            {
+                if (await RenewLease<TEntity>(jobId, execution.Token)) continue;
+                logger.LogWarning("Embedding worker lost the processing lease for job {JobId}", jobId);
+                execution.Cancel();
+                return;
+            }
+        }
+        catch (OperationCanceledException) when (execution.IsCancellationRequested)
+        {
+        }
+        catch (Exception error)
+        {
+            logger.LogError(error, "Embedding worker could not renew the processing lease for job {JobId}", jobId);
+            execution.Cancel();
+        }
+    }
+
+    private async Task<bool> RenewLease<TEntity>(string jobId, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        var job = await EmbedJob<TEntity>.Get(jobId, ct);
+        if (job is not { Status: EmbedJobStatus.Processing } || job.Owner != _owner) return false;
+        var leaseUntil = DateTimeOffset.UtcNow + options.Value.ProcessingLeaseDuration;
+        job.LeaseUntil = leaseUntil;
+
+        var cas = ConditionalRepository<TEntity>();
+        if (cas is not null)
+            return await cas.ConditionalReplaceAsync(
+                job,
+                value => value.Status == EmbedJobStatus.Processing && value.Owner == _owner,
+                ct);
+
+        await job.Save(ct);
+        var verified = await EmbedJob<TEntity>.Get(jobId, ct);
+        return verified is { Status: EmbedJobStatus.Processing } &&
+               verified.Owner == _owner &&
+               verified.LeaseUntil == leaseUntil;
+    }
+
+    private async Task<bool> CompleteClaim<TEntity>(EmbedJob<TEntity> job, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        job.Status = EmbedJobStatus.Completed;
+        job.Error = null;
+        job.CompletedAt = DateTimeOffset.UtcNow;
+        job.Owner = null;
+        job.LeaseUntil = null;
+        return await ReplaceOwned(job, ct);
+    }
+
+    private async Task<bool> ReplaceOwned<TEntity>(EmbedJob<TEntity> replacement, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        var cas = ConditionalRepository<TEntity>();
+        if (cas is not null)
+            return await cas.ConditionalReplaceAsync(
+                replacement,
+                value => value.Status == EmbedJobStatus.Processing && value.Owner == _owner,
+                ct);
+
+        var current = await EmbedJob<TEntity>.Get(replacement.Id!, ct);
+        if (current is not { Status: EmbedJobStatus.Processing } || current.Owner != _owner) return false;
+        await replacement.Save(ct);
+        return true;
+    }
+
+    private static IConditionalWriteRepository<EmbedJob<TEntity>, string>? ConditionalRepository<TEntity>()
+        where TEntity : class, IEntity<string>
+        => Data<EmbedJob<TEntity>, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<EmbedJob<TEntity>, string>.As<IConditionalWriteRepository<EmbedJob<TEntity>, string>>()
+            : null;
 
     /// <summary>
     /// Processes a single embedding job.
@@ -339,9 +495,13 @@ public class EmbeddingWorker(
             await Task.Delay(delay, ct);
             job.Status = EmbedJobStatus.Pending;
             job.StartedAt = null;
+            job.CompletedAt = null;
         }
 
-        await job.Save(ct);
+        job.Owner = null;
+        job.LeaseUntil = null;
+        if (!await ReplaceOwned(job, ct))
+            logger.LogWarning("Embedding failure outcome for job {JobId} was not written because its lease was lost", job.Id);
     }
 
     /// <summary>

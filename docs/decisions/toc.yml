@@ -300,6 +300,8 @@
       href: DATA-0108-integrity-first-entity-backup.md
     - name: DATA-0109 Adapter-neutral polymorphic Entity roots
       href: DATA-0109-polymorphic-entity-roots.md
+    - name: DATA-0110 Compact provider-neutral Data adapter language
+      href: DATA-0110-compact-data-adapter-language.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

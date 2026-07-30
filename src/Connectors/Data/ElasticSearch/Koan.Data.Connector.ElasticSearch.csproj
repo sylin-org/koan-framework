@@ -7,12 +7,15 @@
     <PackageValidationBaselineVersion>0.20.0</PackageValidationBaselineVersion>
     <AssemblyName>Koan.Data.Connector.ElasticSearch</AssemblyName>
     <RootNamespace>Koan.Data.Connector.ElasticSearch</RootNamespace>
-    <Description>Elasticsearch vector adapter for Koan: index provisioning, kNN search, metadata filtering and health checks via the Elasticsearch REST API.</Description>
+    <Description>Elasticsearch vector provider for Koan: plan-bound complete points, native filtered kNN search, normalized similarity, and session-visible mutations.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;elasticsearch;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\Koan.Data.SearchEngine\Koan.Data.SearchEngine.csproj" />
-    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 </Project>

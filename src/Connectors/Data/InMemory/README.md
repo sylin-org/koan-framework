@@ -38,8 +38,9 @@ var saved = await new Todo { Title = "Prove the rule" }.Save();
 var same = await Todo.Get(saved.Id);
 ```
 
-The saved value is available to every repository in the same Koan host and disappears when that host exits. No files,
-container, or remote service are created.
+The saved value is available to every repository in the same Koan host and disappears when that host exits. InMemory
+stores a serialized snapshot, so mutating the original or a loaded value does not silently mutate persistence; call
+`Save()` again to publish a change. No files, container, or remote service are created.
 
 ## Selection
 
@@ -62,10 +63,11 @@ when application durability must not change as references grow:
 
 ## Current capability boundary
 
-- process-local concurrent storage keyed by source, Entity type, and partition;
+- process-local concurrent storage keyed by source, Entity root, and partition;
+- detached, polymorphism-safe Entity snapshots on every read and write;
 - in-memory filter execution;
 - bulk upsert and bulk delete;
-- atomic batch behavior within the in-memory store; and
+- ordered, non-atomic batch behavior with atomic requirements rejected before mutation; and
 - shared/container/database isolation modes through the common key-value family.
 
 The connector does not advertise `DataCaps.Query.ProviderBoundedPaging`. `AllStream` and
@@ -75,8 +77,9 @@ an already resident full-source dictionary is not a provider-bounded stream.
 Use `All`/`Query` for deliberately small test sets, or `FirstPage`/`Page` when a bounded result returned
 to test code is sufficient. Numbered pages do not create an unbounded-data performance guarantee.
 
-These are connector-specific claims, not a promise that remote providers behave identically. The
-current connector suite passes 56/56.
+Physical compatibility maps and `StorageLifecycle: External` reject correctively: an object-graph store has no legacy
+physical names or pre-existing provider-owned storage to open. These are connector-specific claims, not a promise that
+remote providers behave identically. The current connector suite passes 56/56.
 
 For application conformance, prefer `Sylin.Koan.Testing`; it owns host isolation, partitions, and the
 capability-aware battery. See [`TECHNICAL.md`](TECHNICAL.md) for the exact storage and negotiation

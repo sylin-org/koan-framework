@@ -3,6 +3,7 @@ using Koan.Data.Abstractions;
 using Koan.Core;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using Koan.Core.Hosting.App;
 
 namespace Koan.Data.Core;
 
@@ -11,7 +12,6 @@ public static class AggregateConfigs
     private static ConditionalWeakTable<
         IServiceProvider,
         ConcurrentDictionary<(Type EntityType, Type KeyType), object>> _configsByProvider = new();
-    private static readonly ConcurrentDictionary<(Type EntityType, Type KeyType), byte> RegisteredTypes = new();
 
     public static AggregateConfig<TEntity, TKey> Get<TEntity, TKey>(IServiceProvider sp)
         where TEntity : class, IEntity<TKey>
@@ -20,7 +20,6 @@ public static class AggregateConfigs
         ArgumentNullException.ThrowIfNull(sp);
 
         var key = (typeof(TEntity), typeof(TKey));
-        RegisteredTypes.TryAdd(key, 0);
         var cache = Volatile.Read(ref _configsByProvider).GetValue(
             sp,
             static _ => new ConcurrentDictionary<(Type EntityType, Type KeyType), object>());
@@ -54,11 +53,16 @@ public static class AggregateConfigs
     /// Gets the provider-free entity and key types observed by aggregate configuration.
     /// </summary>
     /// <remarks>
-    /// This process-wide discovery surface retains type facts only. Provider selection, repositories,
-    /// and services remain isolated to the provider supplied to <see cref="Get{TEntity,TKey}"/>.
+    /// The current host's catalog retains type facts only. Provider selection, repositories, and services
+    /// remain isolated to the provider supplied to <see cref="Get{TEntity,TKey}"/>.
     /// </remarks>
     public static IReadOnlyCollection<(Type EntityType, Type KeyType)> GetRegisteredTypes()
-        => RegisteredTypes.Keys.ToArray();
+    {
+        var provider = AppHost.Current;
+        return provider is not null && Volatile.Read(ref _configsByProvider).TryGetValue(provider, out var configs)
+            ? configs.Keys.ToArray()
+            : [];
+    }
 
     /// <summary>
     /// Clears aggregate configuration and discovery state used by test matrices.
@@ -74,7 +78,6 @@ public static class AggregateConfigs
             new ConditionalWeakTable<
                 IServiceProvider,
                 ConcurrentDictionary<(Type EntityType, Type KeyType), object>>());
-        RegisteredTypes.Clear();
     }
 
     private static string? ResolveProvider(Type aggregateType)

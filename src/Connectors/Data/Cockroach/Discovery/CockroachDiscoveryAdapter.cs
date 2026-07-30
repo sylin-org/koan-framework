@@ -1,117 +1,83 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Npgsql;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Connector.Cockroach.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Koan.Data.Connector.Cockroach.Discovery;
 
-/// <summary>
-/// CockroachDB autonomous discovery adapter.
-/// Contains ALL CockroachDB-specific knowledge - core orchestration knows nothing about CockroachDB.
-/// Reads own KoanServiceAttribute and handles CockroachDB-specific health checks.
-/// </summary>
-internal sealed class CockroachDiscoveryAdapter : ServiceDiscoveryAdapterBase
+internal sealed class CockroachDiscoveryAdapter(
+    IConfiguration configuration,
+    ILogger<CockroachDiscoveryAdapter> logger) : ServiceDiscoveryAdapterBase(configuration, logger)
 {
-    public override string ServiceName => "cockroach";
-    // Only cockroach/cockroachdb — the `npgsql` alias stays with the Postgres discovery adapter so an app that
-    // references both connectors disambiguates each engine.
-    public override string[] Aliases => new[] { "cockroachdb" };
+    public override string ServiceName => Constants.Provider;
+    public override string[] Aliases => [Constants.Alias];
 
-    public CockroachDiscoveryAdapter(IConfiguration configuration, ILogger<CockroachDiscoveryAdapter> logger)
-        : base(configuration, logger) { }
-
-    /// <summary>CockroachDB adapter knows which factory contains its KoanServiceAttribute</summary>
     protected override Type GetFactoryType() => typeof(CockroachAdapterFactory);
 
-    /// <summary>CockroachDB-specific health validation using connection test</summary>
-    protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
-    {
-        var connectionString = BuildCockroachConnectionString(serviceUrl, context.Parameters);
+    protected override string? ReadExplicitConfiguration() =>
+        _configuration[Constants.Configuration.ConnectionString] ??
+        _configuration.GetConnectionString("Cockroach") ??
+        _configuration.GetConnectionString("CockroachDB") ??
+        _configuration.GetConnectionString(Constants.DefaultSource);
 
-        using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        using var command = new NpgsqlCommand("SELECT 1", connection);
-        await command.ExecuteScalarAsync(cancellationToken);
-
-        return true;
-    }
-
-    /// <summary>CockroachDB adapter reads its own configuration sections</summary>
-    protected override string? ReadExplicitConfiguration()
-    {
-        // Check CockroachDB-specific configuration paths
-        return _configuration.GetConnectionString("CockroachDB") ??
-               _configuration.GetConnectionString("Cockroach") ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
-    }
-
-    /// <summary>CockroachDB-specific environment variable handling</summary>
-    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
-    {
-        var cockroachUrls = Environment.GetEnvironmentVariable("POSTGRES_URLS") ??
-                          Environment.GetEnvironmentVariable("POSTGRESQL_URLS");
-
-        if (string.IsNullOrWhiteSpace(cockroachUrls))
-            return Enumerable.Empty<DiscoveryCandidate>();
-
-        return cockroachUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(url => new DiscoveryCandidate(url.Trim(), "environment-cockroach-urls", DiscoveryCandidatePriority.Environment));
-    }
-
-    /// <summary>CockroachDB-specific connection string construction</summary>
     protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
-    {
-        return BuildCockroachConnectionString(baseUrl, parameters);
-    }
-
-    /// <summary>Build CockroachDB connection string from URL and optional parameters</summary>
-    private string BuildCockroachConnectionString(string baseUrl, IDictionary<string, object>? parameters = null)
     {
         try
         {
-            // Handle cockroach:// URL format
-            if (baseUrl.StartsWith("cockroach://", StringComparison.OrdinalIgnoreCase))
-            {
-                var uri = new Uri(baseUrl);
-                var host = uri.Host;
-                var port = uri.Port == -1 ? 26257 : uri.Port;
-                var database = string.IsNullOrEmpty(uri.PathAndQuery.Trim('/')) ? "Koan" : uri.PathAndQuery.Trim('/');
-                var username = "root";   // CockroachDB --insecure default user (no password)
-                var password = "";
-
-                // Apply parameters if provided
-                if (parameters != null)
-                {
-                    if (parameters.TryGetValue("database", out var db))
-                        database = db.ToString() ?? database;
-                    if (parameters.TryGetValue("username", out var user))
-                        username = user.ToString() ?? username;
-                    if (parameters.TryGetValue("password", out var pass))
-                        password = pass.ToString() ?? password;
-                }
-
-                return $"Host={host};Port={port};Database={database};Username={username};Password={password}";
-            }
-
-            // If it's already a connection string format, return as-is
+            var builder = Build(baseUrl);
+            builder.Database = Value(parameters, "database") ??
+                               _configuration[Constants.Configuration.Database] ??
+                               EmptyAs(builder.Database, "Koan");
+            builder.Username = Value(parameters, "username") ??
+                               _configuration[Constants.Configuration.Username] ??
+                               EmptyAs(builder.Username, "root");
+            var password = Value(parameters, "password") ?? _configuration[Constants.Configuration.Password];
+            if (password is not null) builder.Password = password;
+            return builder.ConnectionString;
+        }
+        catch (Exception error)
+        {
+            ReportNormalizationFailure(baseUrl, error);
             return baseUrl;
         }
-        catch (Exception ex)
-        {
-            ReportNormalizationFailure(baseUrl, ex);
-            return baseUrl; // Return original URL if parsing fails
-        }
     }
 
-    /// <summary>CockroachDB adapter handles Aspire service discovery for CockroachDB</summary>
-    protected override string? ReadAspireServiceDiscovery()
+    protected override async Task<bool> ValidateServiceHealth(
+        string serviceUrl,
+        DiscoveryContext context,
+        CancellationToken cancellationToken)
     {
-        // Check Aspire-specific CockroachDB service discovery
-        return _configuration["services:cockroachdb:default:0"] ??
-               _configuration["services:cockroach:default:0"];
+        await using var connection = new NpgsqlConnection(serviceUrl);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
+
+    private static NpgsqlConnectionStringBuilder Build(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("cockroach" or "postgres" or "postgresql"))
+            return new NpgsqlConnectionStringBuilder(value);
+
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 26257,
+            SslMode = SslMode.Disable
+        };
+        var user = uri.UserInfo.Split(':', 2);
+        if (user.Length > 0 && user[0].Length > 0) builder.Username = Uri.UnescapeDataString(user[0]);
+        if (user.Length > 1) builder.Password = Uri.UnescapeDataString(user[1]);
+        if (uri.AbsolutePath.Length > 1) builder.Database = Uri.UnescapeDataString(uri.AbsolutePath[1..]);
+        return builder;
+    }
+
+    private static string? Value(IDictionary<string, object> parameters, string key) =>
+        parameters.TryGetValue(key, out var value) ? Convert.ToString(value) : null;
+
+    private static string EmptyAs(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
 }

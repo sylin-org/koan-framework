@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Core.Naming;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Axes.Tests.Support;
@@ -21,21 +22,23 @@ namespace Koan.Data.Axes.Tests;
 public sealed class ContainerModeSpec : IDisposable
 {
     private static readonly AsyncLocal<string?> _tenant = new();
+    private readonly ServiceCollection _services = new();
+    private readonly IDisposable _composition;
 
-    public ContainerModeSpec() => AxisRegistries.ResetAll();
-    public void Dispose() { _tenant.Value = null; AxisRegistries.ResetAll(); }
+    public ContainerModeSpec() => _composition = KoanCompositionScope.Enter(_services);
+    public void Dispose() { _tenant.Value = null; _composition.Dispose(); }
 
     private sealed class NamedDoc { }
     private sealed class OtherDoc { }
 
-    private static void RegisterTenantContainerAxis()
+    private void RegisterTenantContainerAxis()
         => DataAxisExpander.ExpandAxes(new[]
         {
             new Axis()
                 .Named("tenant").Mode(AxisMode.Container)
                 .AppliesTo(t => t == typeof(NamedDoc))
                 .Field("__tenant", () => _tenant.Value),
-        }, new ServiceCollection());
+        }, _services);
 
     private static IDisposable Tenant(string id)
     {
@@ -76,7 +79,7 @@ public sealed class ContainerModeSpec : IDisposable
     public void The_axis_value_is_in_the_name_cache_key_so_two_tenants_get_distinct_names()
     {
         RegisterTenantContainerAxis();
-        const string provider = "container-mode-spec";   // unique provider isolates the static cache
+        const string provider = "container-mode-spec";   // stable provider identity within this host cache
 
         string n1, n2, host;
         using (Tenant("T1")) n1 = StorageNameGenerator.Resolve(provider, typeof(NamedDoc), "alpha", Cap);
@@ -107,7 +110,7 @@ public sealed class ContainerModeSpec : IDisposable
         DataAxisExpander.ExpandAxes(new[]
         {
             new Axis().Named("tenant").Mode(AxisMode.Container).AppliesTo(t => t == typeof(NamedDoc)).Field("__t", () => 42),
-        }, new ServiceCollection());
+        }, _services);
 
         FluentActions.Invoking(() => StorageNameGenerator.Generate(typeof(NamedDoc), "alpha", Cap()))
             .Should().Throw<InvalidOperationException>().WithMessage("*must be a string*");

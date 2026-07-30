@@ -1,114 +1,75 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Data.SqlClient;
-using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Connector.SqlServer.Infrastructure;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.SqlServer.Discovery;
 
-/// <summary>
-/// SQL Server autonomous discovery adapter.
-/// Contains ALL SQL Server-specific knowledge - core orchestration knows nothing about SQL Server.
-/// Reads own KoanServiceAttribute and handles SQL Server-specific health checks.
-/// </summary>
-internal sealed class SqlServerDiscoveryAdapter : ServiceDiscoveryAdapterBase
+internal sealed class SqlServerDiscoveryAdapter(
+    IConfiguration configuration,
+    ILogger<SqlServerDiscoveryAdapter> logger) : ServiceDiscoveryAdapterBase(configuration, logger)
 {
-    public override string ServiceName => "mssql";
-    public override string[] Aliases => new[] { "sqlserver", "microsoft.sqlserver" };
-
-    public SqlServerDiscoveryAdapter(IConfiguration configuration, ILogger<SqlServerDiscoveryAdapter> logger)
-        : base(configuration, logger) { }
-
-    /// <summary>SQL Server adapter knows which factory contains its KoanServiceAttribute</summary>
+    public override string ServiceName => Constants.Service;
+    public override string[] Aliases => [Constants.Provider, "microsoft.sqlserver"];
     protected override Type GetFactoryType() => typeof(SqlServerAdapterFactory);
 
-    /// <summary>SQL Server-specific health validation using connection test</summary>
-    protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
-    {
-        var connectionString = BuildSqlServerConnectionString(serviceUrl, context.Parameters);
+    protected override string? ReadExplicitConfiguration() =>
+        _configuration[Constants.Configuration.ConnectionString] ??
+        _configuration.GetConnectionString("SqlServer") ??
+        _configuration.GetConnectionString("MSSQL") ??
+        _configuration.GetConnectionString(Constants.DefaultSource);
 
-        using var connection = new SqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        using var command = new SqlCommand("SELECT 1", connection);
-        await command.ExecuteScalarAsync(cancellationToken);
-
-        return true;
-    }
-
-    /// <summary>SQL Server adapter reads its own configuration sections</summary>
-    protected override string? ReadExplicitConfiguration()
-    {
-        // Check SQL Server-specific configuration paths
-        return _configuration.GetConnectionString("SqlServer") ??
-               _configuration.GetConnectionString("MSSQL") ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.DataFallback.ConnectionString];
-    }
-
-    /// <summary>SQL Server-specific environment variable handling</summary>
-    protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
-    {
-        var sqlServerUrls = Environment.GetEnvironmentVariable("SQLSERVER_URLS") ??
-                           Environment.GetEnvironmentVariable("MSSQL_URLS");
-
-        if (string.IsNullOrWhiteSpace(sqlServerUrls))
-            return Enumerable.Empty<DiscoveryCandidate>();
-
-        return sqlServerUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-sqlserver-urls", DiscoveryCandidatePriority.Environment));
-    }
-
-    /// <summary>SQL Server-specific connection string parameter application</summary>
     protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
-    {
-        return BuildSqlServerConnectionString(baseUrl, parameters);
-    }
-
-    /// <summary>SQL Server-specific connection string construction</summary>
-    private string BuildSqlServerConnectionString(string baseUrl, IDictionary<string, object>? parameters = null)
     {
         try
         {
-            // Handle mssql:// URL format
-            if (baseUrl.StartsWith("mssql://", StringComparison.OrdinalIgnoreCase))
-            {
-                var uri = new Uri(baseUrl);
-                var server = $"{uri.Host},{(uri.Port == -1 ? 1433 : uri.Port)}";
-                var database = "Koan";
-                var userId = "sa";
-                var password = "Your_password123";
-
-                // Apply parameters if provided
-                if (parameters != null)
-                {
-                    if (parameters.TryGetValue("database", out var db))
-                        database = db.ToString() ?? database;
-                    if (parameters.TryGetValue("userId", out var user))
-                        userId = user.ToString() ?? userId;
-                    if (parameters.TryGetValue("password", out var pass))
-                        password = pass.ToString() ?? password;
-                }
-
-                return $"Server={server};Database={database};User Id={userId};Password={password};TrustServerCertificate=True";
-            }
-
-            // If it's already a connection string format, return as-is
+            var builder = Build(baseUrl);
+            builder.InitialCatalog = Value(parameters, "database") ??
+                                     _configuration[Constants.Configuration.Database] ??
+                                     EmptyAs(builder.InitialCatalog, "Koan");
+            builder.UserID = Value(parameters, "userId") ??
+                             _configuration[Constants.Configuration.UserId] ??
+                             EmptyAs(builder.UserID, "sa");
+            builder.Password = Value(parameters, "password") ??
+                               _configuration[Constants.Configuration.Password] ??
+                               EmptyAs(builder.Password, "Your_password123");
+            builder.TrustServerCertificate = true;
+            return builder.ConnectionString;
+        }
+        catch (Exception error)
+        {
+            ReportNormalizationFailure(baseUrl, error);
             return baseUrl;
         }
-        catch (Exception ex)
-        {
-            ReportNormalizationFailure(baseUrl, ex);
-            return baseUrl; // Return original URL if parsing fails
-        }
     }
 
-    /// <summary>SQL Server adapter handles Aspire service discovery for SQL Server</summary>
-    protected override string? ReadAspireServiceDiscovery()
+    protected override async Task<bool> ValidateServiceHealth(
+        string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        // Check Aspire-specific SQL Server service discovery
-        return _configuration["services:mssql:default:0"] ??
-               _configuration["services:sqlserver:default:0"];
+        await using var connection = new SqlConnection(serviceUrl);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = new SqlCommand("SELECT 1", connection);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
     }
+
+    private static SqlConnectionStringBuilder Build(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != "mssql")
+            return new SqlConnectionStringBuilder(value);
+        var builder = new SqlConnectionStringBuilder
+        {
+            DataSource = $"{uri.Host},{(uri.Port > 0 ? uri.Port : 1433)}"
+        };
+        var user = uri.UserInfo.Split(':', 2);
+        if (user.Length > 0 && user[0].Length > 0) builder.UserID = Uri.UnescapeDataString(user[0]);
+        if (user.Length > 1) builder.Password = Uri.UnescapeDataString(user[1]);
+        if (uri.AbsolutePath.Length > 1) builder.InitialCatalog = Uri.UnescapeDataString(uri.AbsolutePath[1..]);
+        return builder;
+    }
+
+    private static string? Value(IDictionary<string, object> parameters, string key) =>
+        parameters.TryGetValue(key, out var value) ? Convert.ToString(value) : null;
+    private static string EmptyAs(string? value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value;
 }

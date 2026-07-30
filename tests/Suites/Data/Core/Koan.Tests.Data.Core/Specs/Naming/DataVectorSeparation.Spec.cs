@@ -59,6 +59,7 @@ public class DataVectorSeparationSpec
     public void VectorNaming_UsesVectorAdapterFactory()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddKoanDataCore();
         services.AddKoanDataVector();
         var sp = services.BuildServiceProvider();
@@ -79,6 +80,7 @@ public class DataVectorSeparationSpec
     public void SameEntity_DifferentNamesInDataVsVector()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddKoanDataCore();
         services.AddKoanDataVector();
         var sp = services.BuildServiceProvider();
@@ -109,6 +111,7 @@ public class DataVectorSeparationSpec
     public void DataNaming_WithPartition_AppliesAdapterFormatting()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddKoanDataCore();
         var sp = services.BuildServiceProvider();
 
@@ -134,6 +137,7 @@ public class DataVectorSeparationSpec
     public void VectorNaming_WithPartition_AppliesAdapterFormatting()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
         services.AddKoanDataCore();
         services.AddKoanDataVector();
         var sp = services.BuildServiceProvider();

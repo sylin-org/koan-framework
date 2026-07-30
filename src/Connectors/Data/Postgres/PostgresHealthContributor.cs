@@ -1,14 +1,13 @@
-using Npgsql;
 using Koan.Core.Observability.Health;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Routing;
+using Npgsql;
 
 namespace Koan.Data.Connector.Postgres;
 
 internal sealed class PostgresHealthContributor : DataAdapterHealthContributorBase
 {
-    private const string ProviderName = "postgres";
     private readonly IServiceProvider _services;
     private readonly PostgresAdapterFactory _factory;
 
@@ -17,17 +16,17 @@ internal sealed class PostgresHealthContributor : DataAdapterHealthContributorBa
         IDataDiagnostics diagnostics,
         DataProviderCatalog providers,
         DataDefaultProviderPlan defaultProvider)
-        : base(ProviderName, services, diagnostics, defaultProvider)
+        : base(Infrastructure.Constants.Provider, services, diagnostics, defaultProvider)
     {
         _services = services;
-        _factory = providers.Find(ProviderName) as PostgresAdapterFactory
-            ?? throw new InvalidOperationException("The PostgreSQL provider is absent from the host Data catalog.");
+        _factory = providers.Find(Infrastructure.Constants.Provider) as PostgresAdapterFactory
+            ?? throw new InvalidOperationException("The PostgreSQL adapter is absent from the data catalog.");
     }
 
     protected override async Task ProbeSource(string source, CancellationToken ct)
     {
-        var options = _factory.ResolveOptions(_services, source);
-        await using var connection = new NpgsqlConnection(options.ConnectionString);
+        var route = _factory.ResolveRoute(_services, source);
+        await using var connection = new NpgsqlConnection(route.ConnectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var command = new NpgsqlCommand("SELECT 1", connection);
         _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);

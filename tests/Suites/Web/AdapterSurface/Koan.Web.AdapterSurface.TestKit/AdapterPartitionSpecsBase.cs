@@ -65,7 +65,7 @@ public abstract class AdapterPartitionSpecsBase<TFactory> : IClassFixture<TFacto
         // default set; partition data persists across spec methods otherwise.
         foreach (var partition in KnownPartitions)
         {
-            try { await Koan.Data.Core.Data<Widget, string>.ClearPartition(partition); } catch { }
+            try { await Koan.Data.Core.Data<Widget, string>.DeleteAll(partition); } catch { }
         }
     }
 

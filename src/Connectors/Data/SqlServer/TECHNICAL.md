@@ -11,23 +11,31 @@ source: src/Connectors/Data/SqlServer/
 - The adapter declares `DataCaps.Query.ProviderBoundedPaging` and applies numbered pages in SQL Server
   before candidate rows are materialized into application memory.
 - Relational translation and schema helpers remain in Koan.Data.Relational.
+- One `SqlServerRepository<TEntity,TKey>` and compiled `SqlServerEntityPlan<TEntity,TKey>` serve managed Id+object
+  storage and explicit flat/object/nested/composite/generated maps.
+- External lifecycle performs no DDL; read-only source policy rejects Entity mutation before provider I/O.
+- `Inspect()` provides neutral table/view discovery, description, and bounded sampling. Registered SQL reads/scalars
+  require a source-owned read lane and execute inside a rollback-only transaction; database grants remain the security
+  boundary.
 
 ## Configuration
 
-- Connection string, schema governance, JSON materialization, naming, discovery, and readiness use
+- Connection string, schema governance, naming, discovery, and readiness use
   the existing `SqlServerOptions` and adapter-readiness contracts.
 
 ### Options (typical keys)
 
-- ConnectionStrings:Default (first-win)
-- ConnectionStrings:SqlServer
-- Koan:Data:Sources:Default:sqlserver:ConnectionString
-- Koan:Data:SqlServer:ConnectionString
-- Koan:Data:SqlServer:DdlPolicy
-- Koan:Data:SqlServer:SchemaMatchingMode
-- Koan:Data:SqlServer:JsonCaseInsensitive
-- Koan:Data:SqlServer:JsonWriteIndented
-- Koan:Data:SqlServer:JsonIgnoreNullValues
+- `ConnectionStrings:Default` (first-win)
+- `ConnectionStrings:SqlServer`
+- `Koan:Data:Sources:<name>:ConnectionString`
+- `Koan:Data:Sources:<name>:ReadLanes:<lane>:ConnectionString`
+- `Koan:Data:SqlServer:ConnectionString`
+- `Koan:Data:SqlServer:Schema`
+- `Koan:Data:SqlServer:NamingStyle` and `Separator`
+- `Koan:Data:SqlServer:DdlPolicy`
+- `Koan:Data:SqlServer:SchemaMatchingMode`
+- `Koan:Data:SqlServer:AllowProductionDdl`
+- standard readiness options under `Koan:Data:SqlServer:Readiness`
 
 `ConnectionString=auto` attempts orchestration discovery before using the localhost development
 fallback. The connector does not currently expose provider-specific retry or command-timeout options.
@@ -62,8 +70,13 @@ fallback. The connector does not currently expose provider-specific retry or com
 ## Operations
 
 - Health: connection open/round-trip.
-- Tracing: connector operations use the `Koan.Data.Connector.SqlServer` activity source.
 - Configuration/discovery logs avoid introducing a second provider-selection path.
+
+## Verification
+
+- Connector suite: 33/33 against the pinned SQL Server 2025 container on 2026-07-28.
+- Coverage includes CRUD/query/count/paging/batch, managed fields, compact external mappings, nested JSON preservation,
+  composite/generated identities, policy enforcement, named SQL, neutral inspection, and bounded sampling.
 
 ## References
 

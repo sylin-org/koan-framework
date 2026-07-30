@@ -20,7 +20,7 @@ public sealed class InMemoryManagedFieldNoLeakSpec(InMemoryFixture fixture, ITes
     public async Task InMemory_realizes_shared_mode()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(ManagedFieldNoLeak.Declare);
 
         // The generic, tenancy-independent managed-field oracle: registers __scope, runs the full no-leak matrix against
         // whatever adapter the ambient host resolves (here InMemory), and resets the registry on exit.

@@ -123,7 +123,7 @@ public sealed class SqliteHealthContributorSpec
     }
 
     [Fact]
-    public async Task Elected_sqlite_health_probes_the_authoritative_default_source()
+    public async Task Elected_sqlite_health_is_non_creating_and_then_probes_the_provisioned_default_source()
     {
         var databasePath = TempDatabase("active");
         var fallbackPath = TempDatabase("unused-fallback");
@@ -138,16 +138,18 @@ public sealed class SqliteHealthContributorSpec
                              .StartAsync())
             {
                 var contributor = SqliteHealth(host.Services);
-                var report = await contributor.Check();
+                var absent = await contributor.Check();
 
                 contributor.IsCritical.Should().BeTrue();
-                report.State.Should().Be(HealthState.Healthy);
-                File.Exists(databasePath).Should().BeTrue();
+                absent.State.Should().Be(HealthState.Unhealthy);
+                File.Exists(databasePath).Should().BeFalse("health is an observation, not a provisioning path");
                 File.Exists(fallbackPath).Should().BeFalse(
                     "health must inspect the same configured Default source used by repositories");
 
                 var saved = await new HealthRecord { Value = "same-target" }.Save();
                 (await HealthRecord.Get(saved.Id))!.Value.Should().Be("same-target");
+                (await contributor.Check()).State.Should().Be(HealthState.Healthy);
+                File.Exists(databasePath).Should().BeTrue();
                 File.Exists(fallbackPath).Should().BeFalse(
                     "repository operations and readiness must agree on the authoritative Default source");
 
@@ -231,8 +233,7 @@ public sealed class SqliteHealthContributorSpec
 
             contributor.IsCritical.Should().BeTrue();
             report.State.Should().Be(HealthState.Unhealthy);
-            report.Description.Should().Be("Data source 'Default' is unavailable");
-            report.Data.Should().ContainKey("failedSource").WhoseValue.Should().Be("Default");
+            report.Description.Should().Be("An active Data source is unavailable");
         }
         finally
         {
@@ -266,10 +267,13 @@ public sealed class SqliteHealthContributorSpec
                     .GetRepository<HealthRecord, string>();
             }
 
+            await new HealthRecord { Value = "healthy-default" }.Save();
+
             var report = await SqliteHealth(host.Services).Check();
 
             report.State.Should().Be(HealthState.Unhealthy);
-            report.Data.Should().ContainKey("failedSource").WhoseValue.Should().Be("ZArchive");
+            report.Data.Should().NotContainKey("failedSource", "public health output identifies the redacted route decision instead");
+            report.Data.Should().ContainKey("failedDecision").WhoseValue.Should().NotBeNull();
             File.Exists(healthyPath).Should().BeTrue(
                 "the healthy source sorts first and must be probed before the later failing source");
         }

@@ -1,3 +1,4 @@
+using GardenCoop.Initialization;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Microsoft.AspNetCore.Builder;
@@ -9,7 +10,7 @@ using Microsoft.AspNetCore.Builder;
 )]
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
+builder.Services.AddKoan(GardenCoopModule.Compose);
 var app = builder.Build();
 await app.RunAsync();
 

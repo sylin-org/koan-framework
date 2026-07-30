@@ -45,6 +45,19 @@ public static class ServiceCollectionExtensions
         return Compose(services, configure);
     }
 
+    /// <summary>
+    /// Adds Koan and declares typed pillar behavior through one neutral application builder.
+    /// </summary>
+    public static IServiceCollection AddKoan(
+        this IServiceCollection services,
+        Action<KoanApplicationBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configure);
+
+        return Compose(services, () => configure(new KoanApplicationBuilder()));
+    }
+
     private static IServiceCollection Compose(IServiceCollection services, Action? configure)
     {
         var session = SemanticCompositionSession.GetOrCreate(services);

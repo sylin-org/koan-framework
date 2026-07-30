@@ -6,16 +6,13 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Options" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <PackageValidationBaselineVersion>0.20.3</PackageValidationBaselineVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Description>In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.</Description>
+    <Description>Host-ephemeral Koan Entity adapter with detached snapshots, exact isolation, and bounded in-process state.</Description>
     <PackageTags>$(CommonPackageTags);data;inmemory;testing;repository</PackageTags>
   </PropertyGroup>
 </Project>

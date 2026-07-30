@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Relationships;
 
@@ -20,11 +20,11 @@ namespace Koan.Data.Core.Optimization;
 /// </summary>
 public static class IdentityEncoding
 {
-    private static readonly ConcurrentDictionary<Type, IReadOnlySet<string>> Cache = new();
+    private static readonly ConditionalWeakTable<Type, EncodedMembers> Cache = new();
 
     /// <summary>The property names on <paramref name="entityType"/> that carry GUID-encoded identity values.</summary>
     public static IReadOnlySet<string> GuidEncodedMembers(Type entityType)
-        => Cache.GetOrAdd(entityType, Compute);
+        => Cache.GetValue(entityType, static type => new EncodedMembers(Compute(type))).Members;
 
     /// <summary>True when <paramref name="propertyName"/> on <paramref name="entityType"/> is a GUID-encoded id/reference.</summary>
     public static bool IsGuidEncoded(Type entityType, string propertyName)
@@ -83,4 +83,6 @@ public static class IdentityEncoding
 
         return null;
     }
+
+    private sealed record EncodedMembers(IReadOnlySet<string> Members);
 }

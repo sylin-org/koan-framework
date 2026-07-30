@@ -18,7 +18,7 @@ namespace Koan.Data.Core.Axes;
 /// the built-in equality contributor); discovery is already populated by then (the manifest loader
 /// runs in the assembly-closure walk, before the initializer/Register loop).
 ///
-/// <para>The static registries (<see cref="ManagedFieldRegistry"/>, <see cref="StorageNameParticleRegistry"/>,
+/// <para>The host-owned registry facades (<see cref="ManagedFieldRegistry"/>, <see cref="StorageNameParticleRegistry"/>,
 /// <see cref="OperationOverrideRegistry"/>) dedup by key, so re-entrant / cross-host expansion is idempotent. The
 /// DI-enumerable read-filter seams are per-ServiceCollection — the expander runs once per collection (the IDataService
 /// guard), so NO static guard is needed for them.</para>
@@ -27,21 +27,14 @@ namespace Koan.Data.Core.Axes;
 /// <b>cross-source</b> field collision — a <c>[DataAxis]</c> reusing a managed-field name a hand-written module
 /// (e.g. <c>Koan.Data.SoftDelete</c>'s <c>__deleted</c>) already registered
 /// — would otherwise be silently first-wins-dropped by the registry's idempotent dedup (a nondeterministic, boot-order
-/// dependent half-axis / isolation hole). The expander owns a per-field ledger (<see cref="_fieldOwners"/>) so it can
-/// tell <i>its own re-entrant re-expansion</i> (same axis, another host) from a genuine cross-source clash, and throws
+/// dependent half-axis / isolation hole). The expander owns a per-host field ledger so it can
+/// tell <i>its own re-entrant re-expansion</i> from a genuine cross-source clash, and throws
 /// loudly on the latter. The override plane rides the field (its <c>OnDelete</c> name must equal a declared
 /// <c>.Field</c>), and the name-particle plane's axis id is the within-batch dedup key (only the expander registers
 /// particles), so both are covered.</para>
 /// </summary>
 public static class DataAxisExpander
 {
-    // Cross-host field-ownership ledger: managed-field StorageName → the axis id that first claimed it via this expander.
-    // Lets a re-entrant re-expansion (same axis, a second host in one process) be recognized as self (idempotent) while a
-    // field present in ManagedFieldRegistry but ABSENT from this ledger is owned by another source (a hand-written
-    // registrar) ⇒ a cross-source collision ⇒ fail loud. Static so it persists across hosts; reset in tests.
-    private static readonly object _ledgerGate = new();
-    private static readonly Dictionary<string, string> _fieldOwners = new(StringComparer.Ordinal);
-
     /// <summary>Discover every <see cref="IDataAxis"/> implementor and expand it. The production entry point.</summary>
     public static void ExpandDiscovered(IServiceCollection services)
         => Expand(KoanRegistry.GetDiscoveredImplementors(typeof(IDataAxis)), services);
@@ -77,11 +70,12 @@ public static class DataAxisExpander
         ArgumentNullException.ThrowIfNull(axes);
         ArgumentNullException.ThrowIfNull(services);
         if (axes.Count == 0) return;   // off = structurally absent
+        using var composition = Koan.Core.Composition.KoanCompositionScope.Enter(services);
 
-        // Pass 1 — validate each axis, then detect WITHIN-BATCH collisions and NAME the offending axes (the static
-        // registries silently dedup by key, which is correct for re-entrant Reference=Intent but the WRONG diagnostic
+        // Pass 1 — validate each axis, then detect WITHIN-BATCH collisions and NAME the offending axes (the host
+        // catalogs silently dedup by key, which is correct for re-entrant Reference=Intent but the WRONG diagnostic
         // for two DISTINCT axes claiming the same key — surface it loudly here instead). Cross-SOURCE collisions (vs a
-        // hand-written registrar already in the static registries) are caught in Pass 2 via the field-ownership ledger.
+        // hand-written registrar already in the host catalogs) are caught in Pass 2 via the field-ownership ledger.
         var seenIds = new Dictionary<string, int>(StringComparer.Ordinal);          // axis id → index
         var seenFields = new Dictionary<string, string>(StringComparer.Ordinal);    // managed field name → axis id
         for (var i = 0; i < axes.Count; i++)
@@ -121,7 +115,7 @@ public static class DataAxisExpander
                     // Fail loud on a CROSS-SOURCE field clash (a reserved name a hand-written module already owns) before
                     // the registry silently first-wins-drops it (ARCH-0101 §8). Re-entrant self (same axis, another host)
                     // is recognized via the ledger and proceeds idempotently.
-                    ClaimField(fieldName, id);
+                    ClaimField(fieldName, id, services);
 
                     // Smart defaults (ARCH-0101 §7/§8): RowScoped fail-closed, indexed, auto-equality unless a .Reads
                     // predicate replaces it. Cache-key partitioning is automatic (the cache reads ManagedFieldRegistry).
@@ -172,33 +166,58 @@ public static class DataAxisExpander
     // Claim a managed-field name for an axis. Throws on a cross-source clash: the name is already in ManagedFieldRegistry
     // but this expander never claimed it for THIS axis ⇒ a hand-written module (or, defensively, a different axis across
     // hosts) owns it. A re-entrant claim by the same axis is a no-op.
-    private static void ClaimField(string fieldName, string axisId)
+    private static void ClaimField(string fieldName, string axisId, IServiceCollection services)
     {
-        lock (_ledgerGate)
+        var ledger = services.Where(static descriptor => descriptor.ServiceType == typeof(DataAxisOwnershipCatalog))
+            .Select(static descriptor => descriptor.ImplementationInstance)
+            .OfType<DataAxisOwnershipCatalog>().LastOrDefault();
+        if (ledger is null)
         {
-            if (_fieldOwners.TryGetValue(fieldName, out var owner))
-            {
-                if (!string.Equals(owner, axisId, StringComparison.Ordinal))
-                    throw new InvalidOperationException(
-                        $"Data axis '{axisId}' declares the managed field '{fieldName}', already claimed by axis '{owner}'. " +
-                        "A managed field name must be owned by exactly one axis.");
-                return;   // re-entrant self ⇒ idempotent
-            }
-
-            if (ManagedFieldRegistry.All.Any(d => string.Equals(d.StorageName, fieldName, StringComparison.Ordinal)))
-                throw new InvalidOperationException(
-                    $"Data axis '{axisId}' declares the managed field '{fieldName}', already registered by another source " +
-                    "(a framework module's registrar, e.g. Koan.Data.SoftDelete '__deleted'). " +
-                    "Choose a distinct field name — a managed field must be owned by exactly one source.");
-
-            _fieldOwners[fieldName] = axisId;
+            ledger = new DataAxisOwnershipCatalog();
+            services.AddSingleton(ledger);
         }
+        ledger.Claim(fieldName, axisId);
     }
 
     /// <summary>Test-support: clear the cross-host field-ownership ledger (pair with the registries' Reset so a unit
     /// spec sees a clean slate). Production never calls this.</summary>
     public static void ResetForTesting()
     {
-        lock (_ledgerGate) _fieldOwners.Clear();
+        if (!Koan.Core.Composition.KoanCompositionScope.TryGetServices(out var services)) return;
+        services.Where(static descriptor => descriptor.ServiceType == typeof(DataAxisOwnershipCatalog))
+            .Select(static descriptor => descriptor.ImplementationInstance)
+            .OfType<DataAxisOwnershipCatalog>().LastOrDefault()?.Reset();
+    }
+
+    private sealed class DataAxisOwnershipCatalog
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, string> _fieldOwners = new(StringComparer.Ordinal);
+
+        public void Claim(string fieldName, string axisId)
+        {
+            lock (_gate)
+            {
+                if (_fieldOwners.TryGetValue(fieldName, out var owner))
+                {
+                    if (!string.Equals(owner, axisId, StringComparison.Ordinal))
+                        throw new InvalidOperationException(
+                            $"Data axis '{axisId}' declares the managed field '{fieldName}', already claimed by axis '{owner}'. " +
+                            "A managed field name must be owned by exactly one axis.");
+                    return;
+                }
+                if (ManagedFieldRegistry.All.Any(descriptor =>
+                        string.Equals(descriptor.StorageName, fieldName, StringComparison.Ordinal)))
+                    throw new InvalidOperationException(
+                        $"Data axis '{axisId}' declares the managed field '{fieldName}', already registered by another source. " +
+                        "Choose a distinct field name; a managed field has one owner per host.");
+                _fieldOwners[fieldName] = axisId;
+            }
+        }
+
+        public void Reset()
+        {
+            lock (_gate) _fieldOwners.Clear();
+        }
     }
 }

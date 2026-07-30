@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
@@ -12,7 +12,7 @@ namespace Koan.Data.Core.Polymorphism;
 [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
 public sealed class EntityRootDescriptor
 {
-    private static readonly ConcurrentDictionary<Type, EntityRootDescriptor> Cache = new();
+    private static readonly ConditionalWeakTable<Type, EntityRootDescriptor> Cache = new();
 
     private EntityRootDescriptor(
         Type declaredType,
@@ -36,7 +36,7 @@ public sealed class EntityRootDescriptor
     public static EntityRootDescriptor For(Type entityType)
     {
         ArgumentNullException.ThrowIfNull(entityType);
-        return Cache.GetOrAdd(entityType, Create);
+        return Cache.GetValue(entityType, Create);
     }
 
     public static bool TryFor(Type entityType, out EntityRootDescriptor descriptor)

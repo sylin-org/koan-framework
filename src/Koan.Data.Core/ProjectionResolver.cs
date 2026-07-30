@@ -1,6 +1,6 @@
-using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions.Annotations;
 
 namespace Koan.Data.Core;
@@ -41,10 +41,10 @@ public static class ProjectionResolver
 
     // Type-plane memoization (DATA-0105 §3). The projection is a pure function of the entity type; it is read
     // on every relational schema-ensure and several adapter write paths, so it is computed once per type.
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<ProjectedProperty>> Cache = new();
+    private static readonly ConditionalWeakTable<Type, Projection> Cache = new();
 
     public static IReadOnlyList<ProjectedProperty> Get(Type aggregateType)
-        => Cache.GetOrAdd(aggregateType, static t => Compute(t));
+        => Cache.GetValue(aggregateType, static type => new Projection(Compute(type))).Items;
 
     private static IReadOnlyList<ProjectedProperty> Compute(Type aggregateType)
     {
@@ -74,4 +74,6 @@ public static class ProjectionResolver
         }
         return list.ToArray();
     }
+
+    private sealed record Projection(IReadOnlyList<ProjectedProperty> Items);
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -54,10 +55,16 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
                     options.PollInterval = TimeSpan.FromMilliseconds(10);
                     options.IdlePollInterval = TimeSpan.FromMilliseconds(10);
                     options.GlobalRateLimitPerMinute = 0;
+                    options.ProcessingLeaseDuration = TimeSpan.FromMilliseconds(250);
                 });
                 s.AddSingleton<IAiAdapterRegistry>(_adapters);
-                s.AddKoan(() =>
-                    AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts)));
+                s.AddKoan(koan =>
+                {
+                    var source = koan.Data.Source("Default");
+                    source.Vector<ReentrancyDoc>(space => Space(space, "reentrancy"));
+                    source.Vector<AsyncEmbeddingDoc>(space => Space(space, "async-embedding"));
+                    AsyncEmbeddingDoc.Lifecycle.AfterUpsert(_ => Interlocked.Increment(ref _asyncDomainUpserts));
+                });
             })
             .StartAsync();
 
@@ -82,6 +89,13 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
             Origin = "in-process",
         });
     }
+
+    private static void Space<TEntity>(VectorSpaceBuilder<TEntity> space, string name)
+        where TEntity : class, Koan.Data.Abstractions.IEntity<string> => space
+        .Name(name)
+        .Dimensions(3)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session);
 
     private sealed class MutableTestAdapterRegistry : IAiAdapterRegistry
     {
@@ -116,8 +130,8 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         await new ReentrancyDoc { Id = "d1", Text = "ripe red tomatoes on the vine" }.Save();
 
         // And the hook actually stored exactly one vector (vector-only path still works).
-        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 5);
-        hit.Matches.Should().ContainSingle(m => (string)(object)m.Id == "d1",
+        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(5));
+        hit.Items.Should().ContainSingle(m => (string)(object)m.Id == "d1",
             "the AfterUpsert hook must store the embedding once via the vector-only path");
     }
 
@@ -142,8 +156,8 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         (_embedder.RequestedInputs - before).Should().Be(2,
             "the finite-set operation must not discover or re-embed unrelated entities");
 
-        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 10);
-        hit.Matches.Select(match => (string)(object)match.Id)
+        var hit = await Vector<ReentrancyDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(10));
+        hit.Items.Select(match => (string)(object)match.Id)
             .Should().Contain(new[] { "subset-1", "subset-2" });
     }
 
@@ -184,8 +198,77 @@ public sealed class EmbeddingHookReentrancySpec : IAsyncLifetime
         Volatile.Read(ref _asyncDomainUpserts).Should().Be(1,
             "the worker owns a vector write, not a second persistence operation over the domain Entity");
 
-        var hit = await Vector<AsyncEmbeddingDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, topK: 5);
-        hit.Matches.Should().ContainSingle(match => (string)(object)match.Id == id);
+        var hit = await Vector<AsyncEmbeddingDoc>.Search(new[] { 0.1f, 0.2f, 0.3f }, query => query.Top(5));
+        hit.Items.Should().ContainSingle(match => (string)(object)match.Id == id);
+    }
+
+    [Fact]
+    public async Task Async_embedding_worker_recovers_an_abandoned_legacy_processing_job()
+    {
+        const string id = "async-crash-recovery";
+        const string text = "recover this interrupted embedding";
+        await new AsyncEmbeddingDoc { Id = id, Text = text }.Save();
+        var jobId = EmbedJob<AsyncEmbeddingDoc>.MakeId(id);
+        var job = await WaitForJob(jobId, value => value.Status == EmbedJobStatus.Completed);
+        var before = _embedder.RequestsFor(text);
+
+        job.Status = EmbedJobStatus.Processing;
+        job.Owner = null;
+        job.LeaseUntil = null;
+        job.StartedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
+        job.CompletedAt = null;
+        await job.Save();
+
+        var recovered = await WaitForJob(
+            jobId,
+            value => value.Status == EmbedJobStatus.Completed && _embedder.RequestsFor(text) > before);
+        recovered.Owner.Should().BeNull();
+        recovered.LeaseUntil.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Async_embedding_worker_does_not_steal_an_active_processing_lease()
+    {
+        const string id = "async-active-lease";
+        const string text = "leave this active claim alone";
+        await new AsyncEmbeddingDoc { Id = id, Text = text }.Save();
+        var jobId = EmbedJob<AsyncEmbeddingDoc>.MakeId(id);
+        var job = await WaitForJob(jobId, value => value.Status == EmbedJobStatus.Completed);
+        var before = _embedder.RequestsFor(text);
+
+        job.Status = EmbedJobStatus.Processing;
+        job.Owner = "another-live-worker";
+        job.LeaseUntil = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
+        job.StartedAt = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
+        job.CompletedAt = null;
+        await job.Save();
+
+        await Task.Delay(750);
+        var untouched = await EmbedJob<AsyncEmbeddingDoc>.Get(jobId);
+        untouched.Should().NotBeNull();
+        untouched!.Status.Should().Be(EmbedJobStatus.Processing);
+        untouched.Owner.Should().Be("another-live-worker");
+        _embedder.RequestsFor(text).Should().Be(before);
+
+        untouched.Status = EmbedJobStatus.Completed;
+        untouched.Owner = null;
+        untouched.LeaseUntil = null;
+        untouched.CompletedAt = DateTimeOffset.UtcNow;
+        await untouched.Save();
+    }
+
+    private static async Task<EmbedJob<AsyncEmbeddingDoc>> WaitForJob(
+        string jobId,
+        Func<EmbedJob<AsyncEmbeddingDoc>, bool> predicate)
+    {
+        for (var attempt = 0; attempt < 200; attempt++)
+        {
+            var job = await EmbedJob<AsyncEmbeddingDoc>.Get(jobId);
+            if (job is not null && predicate(job)) return job;
+            await Task.Delay(25);
+        }
+
+        throw new TimeoutException($"Embedding job '{jobId}' did not reach the expected state.");
     }
 }
 
@@ -207,8 +290,10 @@ public sealed class AsyncEmbeddingDoc : Entity<AsyncEmbeddingDoc>
 internal sealed class FakeEmbedAdapter : IEmbedAdapter
 {
     private int _requestedInputs;
+    private readonly ConcurrentDictionary<string, int> _requestedByInput = new(StringComparer.Ordinal);
 
     public int RequestedInputs => Volatile.Read(ref _requestedInputs);
+    public int RequestsFor(string input) => _requestedByInput.GetValueOrDefault(input);
     public string Id => "fake";
     public string Name => "fake";
     public string Type => "fake";
@@ -224,6 +309,7 @@ internal sealed class FakeEmbedAdapter : IEmbedAdapter
     public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {
         Interlocked.Add(ref _requestedInputs, request.Input.Count);
+        foreach (var input in request.Input) _requestedByInput.AddOrUpdate(input, 1, (_, count) => count + 1);
         return Task.FromResult(new AiEmbeddingsResponse
         {
             Vectors = request.Input.Select(_ => new[] { 0.1f, 0.2f, 0.3f }).ToList(),

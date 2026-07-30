@@ -1,87 +1,97 @@
 ---
 uid: reference.modules.Koan.data.mongo
 title: Koan.Data.Connector.Mongo - Technical Reference
-description: MongoDB adapter for Koan Entity data.
+description: MongoDB gold-reference adapter for Koan Data.
 packages: [Sylin.Koan.Data.Connector.Mongo]
 source: src/Connectors/Data/Mongo/
-last_updated: 2026-07-17
+last_updated: 2026-07-29
 ---
 
 ## Contract
 
-- Referencing the connector makes provider `mongo` (alias `mongodb`, priority 20) eligible for Data
-  election. `AddKoan()` performs all registration.
-- The selected factory owns source routing, Mongo client pooling, and collection naming. Repository
-  operations never re-enter provider election.
-- `All()` is unpaged. Mongo applies `Skip`/`Limit` only when the caller supplies explicit pagination.
-- The adapter declares `DataCaps.Query.ProviderBoundedPaging` for qualified Entity streams.
+- Provider `mongo` (alias `mongodb`, priority 20) is registered by `AddKoan()`.
+- `MongoAdapterFactory` is the sole route and repository authority. It also supplies source inspection and registered
+  pipeline execution without manufacturing an Entity repository.
+- `MongoClientManager` owns one bounded, reusable `MongoClient` per configured connection/database route and resolves
+  discovery intent once before publishing that route's database handle.
+- One `MongoRepository<TEntity,TKey>` implements managed and explicit-mapping behavior through one compiled
+  `MongoEntityPlan`; there is no compatibility repository or alternate execution stack.
 
-## Configuration
+## Storage representation
 
-Default-source configuration is resolved from the first applicable provider-specific declaration:
+Managed entities are serialized by an adapter-owned Json.NET configuration, converted recursively to native BSON, and
+stored with `_id` as the physical identity. Camel-case member names and Koan's polymorphic discriminator are stable
+adapter decisions. `DateTime` and `DateTimeOffset` are normalized to UTC BSON dates; `TimeSpan`, `DateOnly`, and
+`TimeOnly` use comparable deterministic encodings.
 
-1. `Koan:Data:Mongo:ConnectionString`
-2. `ConnectionStrings:Mongo`
-3. `Koan:Data:Sources:Default:mongo:ConnectionString`
-4. the `MongoOptions.ConnectionString` default (`auto`)
+An explicit `MappingPlan` replaces naming conventions with compiled physical bindings. Reads hydrate through those
+bindings. Writes use `$set` for each declared path and `$setOnInsert` for a mapped `_id`, preserving unbound fields and
+unbound siblings inside a structured document. Managed documents use the cheaper whole-document replace path.
 
-Database and optional credentials use `Koan:Data:Mongo:{Database,Username,Password}` or their
-provider-specific Default-source equivalents. Named sources use
-`Koan:Data:Sources:{name}:{Adapter,ConnectionString}` and provider settings under that source.
-Generic cross-provider connection aliases are not consumed.
+Mapped collections cannot also accept an ambient container partition. Explicit maps reject framework-managed row
+fields because that combination cannot preserve both external ownership and hidden scope values without another
+declared physical binding.
 
-A concrete connection is authoritative. `auto` delegates to the shared health-checked discovery
-coordinator. The package describes a `mongo` → `mongodb` Zen Garden binding, but that contract remains
-inactive unless the functional `Koan.ZenGarden` engine is referenced and enabled. An active Zen Garden
-endpoint is one health-checked candidate, not a short circuit.
+## Query and mutation execution
 
-## Storage and routing
+`MongoQueryCompiler` lowers the declared filter floor, nested canonical paths, exact sort prefixes, explicit pages,
+and counts to driver definitions over physical BSON names. Unsupported CLR residuals do not enter the repository.
+Identity batches are bounded; bulk writes are ordered and require acknowledged driver receipts.
 
-- The Default source reuses the DI-managed `MongoClientProvider`.
-- Named sources with the same resolved connection/database reuse that provider; distinct physical
-  placements receive one factory-owned client per `(connection, database)`.
-- Collection names are resolved through the already selected `INamingProvider` for the current Entity
-  and ambient partition, then cached per resolved collection.
-- Schema/index ensure is memoized per physical collection for the host lifetime.
+Guarded upserts include Koan's managed-field write scope. A duplicate `_id` produced by an attempted cross-scope upsert
+is surfaced as a corrective cross-scope failure. Conditional writes combine identity, caller predicate, and managed
+scope in one native operation.
 
-## Query and write behavior
+Mongo batches use one ordered `BulkWrite`. They intentionally advertise no atomic execution capability; atomic or
+idempotency requirements reject before mutation. The connector does not infer topology support or replay an ambiguous
+commit.
 
-- Supported filters lower to native MongoDB definitions; unsupported residual work is coordinated by
-  Data Core.
-- Explicit pages use MongoDB `Skip`/`Limit`; no adapter page default or cap exists.
-- Bulk upsert/delete, transactional batches, conditional replace, TTL indexes, and fast remove are
-  advertised through Data capabilities and implemented with native driver operations.
-- BSON conventions and serializers are connector implementation details. Driver registration is
-  once-guarded and does not capture an application host or silently change failed document
-  serialization into a string payload.
+## Collection and index realization
 
-## Readiness and observability
+`MongoSchema` is a retryable, host-bounded gate per physical collection. `Managed` creates a missing collection and
+realizes declared indexes. `External` verifies existence and performs no DDL. Managed conventions and explicit mapping
+plans both lower their index paths through the same physical decisions used by reads and writes. TTL declarations use
+MongoDB's native zero-second expiry index.
 
-Availability is not participation. A referenced but unelected connector reports non-critical
-`Unknown` health and does not connect. Mongo becomes critical when it wins default election or a
-runtime repository/direct-source request selects it. Active sources are probed through the same
-factory route and client pool used by Entity operations.
+## Inspection and registered operations
 
-Activities use the `Koan.Data.Connector.Mongo` source and include Entity, selected source, and ambient
-partition. Discovery and health output de-identify connection strings; raw credentials/endpoints are
-not emitted as runtime facts.
+Inspection exposes database-relative `StorageAddress` values, collection/view traits, effective read/write operations,
+bounded pagination, and bounded samples. MongoDB collections have no promised fixed shape, so `Describe` reports no
+synthetic schema. A sample builds a neutral union of observed top-level fields; each record preserves missing separately
+from null, retains duplicate-name occurrences by ordinal, and converts binary, temporal, and nested BSON to the neutral
+value algebra. Inspection reads raw BSON so the driver's ordinary document deserializer cannot discard or reject legal
+duplicate elements; raw buffers are disposed immediately after the bounded neutral copy is complete.
 
-## Provider-bounded streaming
+`MongoPipelineBinding` stores validated JSON stages and the target collection. It rejects `$out` and `$merge` during
+composition and therefore carries `ValidatedRead` proof. Execution parses immutable stages, structurally substitutes
+declared `{{parameter}}` values as BSON, appends a provider bound, and returns neutral records or an exact one-record,
+one-field scalar receipt.
 
-`AllStream` and `QueryStream` are coordinated as lazy numbered pages by Data Core. `batchSize` bounds
-the Koan-visible candidate page, not opaque driver buffers. DATA-0107's exact user-sort floor applies;
-other sorts reject before provider I/O. Offset traversal is not snapshot isolation, resumable, or
-mutation-safe.
+## Discovery, readiness, and resources
 
-## Evidence boundary
+Options materialization normalizes configuration without provider I/O. On first use, default `auto` connection
+resolution asynchronously uses `IServiceDiscoveryCoordinator`; explicit `zen-garden://` intent is required and
+fail-closed. Concurrent callers share one resolution, while cancellation abandons only the caller's wait. Concrete
+native endpoints bypass discovery. Health probes use the same route and client owner as data operations. Referencing
+the package alone does not create a MongoDB client or start discovery.
 
-The current focused connector suite passes 68/68 against MongoDB, including CRUD, routing,
-partitioning, filtering, managed-field isolation, field transforms, batching, and stream behavior.
-This is connector evidence, not a universal MongoDB production/SLO, migration, or compatibility
-certification.
+Route clients and per-repository collection gates are bounded. Driver clients are reused for the host lifetime and
+disposed with the host. Collection enumeration, identity batches, pipeline results, and inspection samples all have
+explicit bounds.
 
-## References
+## Capability truth
 
-- [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
-- [ARCH-0114 layered capability activation](../../../../docs/decisions/ARCH-0114-layered-capability-activation.md)
+The adapter declares native LINQ/filter execution, provider-bounded paging, bulk upsert/delete, conditional replace,
+TTL indexes, and row/container/database isolation. It does not declare `AtomicBatch` or `FastRemove`. Query receipts
+report only work completed by MongoDB.
+
+## Verification
+
+The connector project and test project build with zero warnings. The real MongoDB 8.3 suite passes 40/40, covering
+managed CRUD, filtering convergence, comparable values, identity types, partitions, routing, discovery, health,
+instructions, batching, capability truth, managed-field isolation, explicit legacy mapping, read-only/external policy,
+lossless bounded inspection, registered pipelines, pure options, single-flight first use, and cancellation-safe
+discovery. Canonical Forge also executes 11 exact MongoDB rows, including provider-specific D-01 through D-05.
+
+- [Data adapter development primer](../../../../docs/architecture/data-adapter-development-primer.md)
+- [Adapter responsibility map](../../../../docs/architecture/data-adapter-responsibility-map.md)

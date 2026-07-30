@@ -4,11 +4,9 @@ namespace Koan.Data.Connector.Couchbase.Tests.Specs.Filtering;
 
 /// <summary>
 /// Couchbase derivation of the shared filter-convergence oracle (<see cref="FilterConvergence"/>,
-/// ARCH-0079). Couchbase is the only remaining data connector that PUSHES filters down — it translates
-/// the <c>Filter</c> AST to N1QL (<c>CouchbaseN1qlFilterTranslator</c>) and runs it server-side — so it is
-/// the one place a translation bug can hide (enum encoding, null semantics, array containment). The Json /
-/// Redis / InMemory connectors filter client-side through the same in-memory evaluator the oracle uses, so
-/// a convergence test there would be tautological.
+/// ARCH-0079). The greenfield adapter compiles the <c>Filter</c> AST to parameterized SQL++ and returns an
+/// exact native-execution receipt, so this is where enum encoding, null semantics, nested paths, and array
+/// containment must converge with the framework oracle.
 ///
 /// Runs every filter in the corpus through the real Couchbase cluster and the in-memory floor and asserts
 /// identical id-sets. Skips when no Docker/Couchbase is reachable.

@@ -13,6 +13,9 @@ normalization for an in-process embedding model. It contributes provider id `onn
 - `VocabPath` defaults to `vocab.txt` beside the model and must exist.
 - The DI container owns and disposes the adapter and its `InferenceSession`.
 - A successful activation publishes one healthy `inproc://onnx` member with Embedding capability.
+- The adapter implements `IAiSourceInspector` and reports the loaded session and model directly. The generic AI
+  health monitor therefore uses provider-owned inspection and never applies its HTTP compatibility probe to the
+  in-process member. Candidates outside the canonical `onnx` / `inproc://onnx` identity report unavailable.
 
 Relative paths resolve from `AppContext.BaseDirectory`. `ModelName` is the routing/reporting name;
 `Dimension` is a fallback when output metadata cannot determine vector width. `MaxTokens`, `LowercaseInput`, and

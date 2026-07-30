@@ -2,45 +2,34 @@ namespace Koan.Data.Connector.Sqlite.Infrastructure;
 
 public static class Constants
 {
+    public const string Provider = "sqlite";
+    public const string DefaultSource = "Default";
+    public const string DefaultConnection = "Data Source=.koan/data/Koan.sqlite";
+    public const int MaximumMemorySources = 256;
+    public const int MaximumPlans = 512;
+    public const int MaximumBatchItems = 4_096;
+    public const int MaximumParameters = 30_000;
+
     public static class Configuration
     {
+        public const string Section = "Koan:Data:Sqlite";
+        public const string DefaultSourceSection = "Koan:Data:Sources:Default:sqlite";
+
         public static class Keys
         {
-            public const string Section = "Koan:Data:Sqlite";
-            public const string AltSection = "Koan:Data:Sources:Default:sqlite";
-
-            public const string DefaultSourceConnectionString = "Koan:Data:Sources:Default:ConnectionString";
             public const string ConnectionString = Section + ":ConnectionString";
-            public const string AltConnectionString = AltSection + ":ConnectionString";
+            public const string DefaultSourceConnectionString = "Koan:Data:Sources:Default:ConnectionString";
+            public const string ProviderSourceConnectionString = DefaultSourceSection + ":ConnectionString";
             public const string ConnectionStringsSqlite = "ConnectionStrings:Sqlite";
             public const string ConnectionStringsDefault = "ConnectionStrings:Default";
-
-            // Naming and connection metadata
             public const string NamingStyle = Section + ":NamingStyle";
-            public const string AltNamingStyle = AltSection + ":NamingStyle";
+            public const string ProviderNamingStyle = DefaultSourceSection + ":NamingStyle";
             public const string Separator = Section + ":Separator";
-            public const string AltSeparator = AltSection + ":Separator";
-            public const string EnsureCreatedSupported = Section + ":EnsureCreatedSupported";
-
-            // Schema governance
-            public const string DdlPolicy = Section + ":DdlPolicy"; // AutoCreate | Validate | NoDdl
-            public const string AltDdlPolicy = AltSection + ":DdlPolicy";
-            public const string SchemaMatchingMode = Section + ":SchemaMatchingMode"; // Relaxed | Strict
-            public const string AltSchemaMatchingMode = AltSection + ":SchemaMatchingMode";
-
-            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
+            public const string ProviderSeparator = DefaultSourceSection + ":Separator";
+            public const string DdlPolicy = Section + ":DdlPolicy";
+            public const string ProviderDdlPolicy = DefaultSourceSection + ":DdlPolicy";
+            public const string SchemaMatching = Section + ":SchemaMatchingMode";
+            public const string ProviderSchemaMatching = DefaultSourceSection + ":SchemaMatchingMode";
         }
-
-        public static class DataFallback
-        {
-            public const string ConnectionString = "Koan:Data:ConnectionString";
-            public const string DefaultSource = ".koan/data/Koan.sqlite";
-        }
-    }
-
-    public static class Bootstrap
-    {
-        public const string EnsureCreatedSupported = "EnsureCreatedSupported";
     }
 }
-

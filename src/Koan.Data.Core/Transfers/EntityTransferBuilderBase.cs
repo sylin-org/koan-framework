@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Linq.Expressions;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Failures;
 
 namespace Koan.Data.Core.Transfers;
 
@@ -16,30 +13,17 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 {
     private const int DefaultBatchSize = 500;
 
-    protected Expression<Func<TEntity, bool>>? Predicate { get; }
-    protected Func<IQueryable<TEntity>, IQueryable<TEntity>>? QueryShaper { get; }
+    private Action<TransferAuditBatch>? _audit;
+    private readonly List<string> _warnings = [];
 
+    protected EntityTransferBuilderBase(Expression<Func<TEntity, bool>>? predicate)
+        => Predicate = predicate;
+
+    protected Expression<Func<TEntity, bool>>? Predicate { get; }
     protected TransferContextOptions? FromContext { get; private set; }
     protected TransferContextOptions? ToContext { get; private set; }
-
-    private Action<TransferAuditBatch>? _audit;
-    protected Action<TransferAuditBatch>? AuditCallback => _audit;
-
-    protected int BatchSizeValue { get; private set; } = DefaultBatchSize;
-
-    private readonly List<string> _warnings = new();
-
+    protected int BatchSize { get; private set; } = DefaultBatchSize;
     protected IReadOnlyList<string> Warnings => _warnings;
-
-    protected EntityTransferBuilderBase(Expression<Func<TEntity, bool>>? predicate, Func<IQueryable<TEntity>, IQueryable<TEntity>>? queryShaper)
-    {
-        if (predicate != null && queryShaper != null)
-            throw new ArgumentException("Specify either a predicate or a query-shaped delegate, not both.");
-
-        Predicate = predicate;
-        QueryShaper = queryShaper;
-    }
-
     protected TBuilder Self => (TBuilder)this;
 
     public TBuilder From(string? source = null, string? adapter = null, string? partition = null)
@@ -54,137 +38,159 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return Self;
     }
 
-    public TBuilder Audit(Action<TransferAuditBatch> callback)
-    {
-        _audit += callback;
-        return Self;
-    }
-
-    public TBuilder BatchSize(int size)
+    public TBuilder Batch(int size)
     {
         if (size <= 0)
             throw new ArgumentOutOfRangeException(nameof(size), "Batch size must be greater than zero.");
-        BatchSizeValue = size;
+        BatchSize = size;
+        return Self;
+    }
+
+    public TBuilder Audit(Action<TransferAuditBatch> callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        _audit += callback;
         return Self;
     }
 
     protected void AddWarning(string message)
     {
         if (!string.IsNullOrWhiteSpace(message) && !_warnings.Contains(message, StringComparer.Ordinal))
-        {
             _warnings.Add(message);
-        }
     }
 
-    protected async Task<List<TEntity>> FetchEntities(TransferContextOptions? context, CancellationToken cancellationToken)
+    protected void DemandDestination()
+    {
+        if (ToContext is null)
+            throw new InvalidOperationException("Destination context must be specified via To().");
+    }
+
+    protected bool HasSameContext()
+        => SnapshotFor(FromContext) == SnapshotFor(ToContext);
+
+    protected async IAsyncEnumerable<IReadOnlyList<TEntity>> ReadBatches(
+        TransferContextOptions? context,
+        [EnumeratorCancellation] CancellationToken ct)
     {
         using var scope = context?.Apply();
+        var stream = Predicate is null
+            ? Data<TEntity, TKey>.AllStream(BatchSize, ct)
+            : Data<TEntity, TKey>.QueryStream(Predicate, BatchSize, ct);
 
-        IReadOnlyList<TEntity> materialized;
-        if (Predicate != null)
+        var batch = new List<TEntity>(BatchSize);
+        await foreach (var entity in stream.WithCancellation(ct).ConfigureAwait(false))
         {
-            try
-            {
-                materialized = await Data<TEntity, TKey>.Query(Predicate, cancellationToken);
-            }
-            catch (NotSupportedException)
-            {
-                var all = await Data<TEntity, TKey>.All(cancellationToken);
-                materialized = all.AsQueryable().Where(Predicate).ToList();
-                AddWarning("Repository does not support LINQ queries natively; predicate evaluated client-side.");
-            }
-        }
-        else
-        {
-            materialized = await Data<TEntity, TKey>.All(cancellationToken);
+            batch.Add(entity);
+            if (batch.Count != BatchSize) continue;
+            yield return batch;
+            batch = new List<TEntity>(BatchSize);
         }
 
-        var list = materialized.ToList();
-
-        if (Predicate != null)
-        {
-            var compiled = Predicate.Compile();
-            list = list.Where(compiled).ToList();
-        }
-
-        if (QueryShaper != null)
-        {
-            var shaped = QueryShaper(list.AsQueryable());
-            list = shaped.ToList();
-        }
-
-        return list;
+        if (batch.Count != 0) yield return batch;
     }
 
-    protected async Task<(int Copied, int BatchCounter, int TotalProcessed)> UpsertBatches(
-        IList<TEntity> items,
+    protected static async Task<IReadOnlyList<TEntity?>> ReadMany(
+        IReadOnlyList<TKey> ids,
+        TransferContextOptions? context,
+        CancellationToken ct)
+    {
+        using var scope = context?.Apply();
+        return await Data<TEntity, TKey>.GetMany(ids, ct).ConfigureAwait(false);
+    }
+
+    protected async Task<int> WriteBatch(
+        IReadOnlyList<TEntity> entities,
         TransferContextOptions? origin,
         TransferContextOptions? destination,
         TransferKind kind,
-        Stopwatch stopwatch,
-        List<TransferAuditBatch> auditBatches,
-        CancellationToken cancellationToken,
-        int batchCounter,
-        int totalProcessed)
+        TransferProgress progress,
+        CancellationToken ct)
     {
-        if (items.Count == 0)
-        {
-            return (0, batchCounter, totalProcessed);
-        }
+        if (entities.Count == 0) return 0;
+        if (entities.Count > BatchSize)
+            throw new InvalidOperationException(
+                $"Transfer execution attempted a destination batch of {entities.Count}, above the declared bound of {BatchSize}.");
 
-        var copied = 0;
+        ct.ThrowIfCancellationRequested();
+        int written;
+        using (destination?.Apply())
+            written = await Data<TEntity, TKey>.UpsertMany(entities, ct).ConfigureAwait(false);
 
-        foreach (var chunk in items.Chunk(Math.Max(1, BatchSizeValue)))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var materialized = chunk.ToList();
-            using var scope = destination?.Apply();
-            await Data<TEntity, TKey>.UpsertMany(materialized, cancellationToken);
-
-            copied += materialized.Count;
-            totalProcessed += materialized.Count;
-            batchCounter++;
-
-            var batch = new TransferAuditBatch(
-                kind,
-                batchCounter,
-                materialized.Count,
-                totalProcessed,
-                SnapshotFor(origin),
-                SnapshotFor(destination),
-                stopwatch.Elapsed,
-                false);
-
-            auditBatches.Add(batch);
-            _audit?.Invoke(batch);
-        }
-
-        return (copied, batchCounter, totalProcessed);
+        progress.BatchNumber++;
+        progress.TotalProcessed = checked(progress.TotalProcessed + written);
+        var audit = new TransferAuditBatch(
+            kind,
+            progress.BatchNumber,
+            written,
+            progress.TotalProcessed,
+            SnapshotFor(origin),
+            SnapshotFor(destination),
+            progress.Stopwatch.Elapsed,
+            false);
+        _audit?.Invoke(audit);
+        return written;
     }
 
-    protected static TransferContextSnapshot SnapshotFor(TransferContextOptions? ctx)
-        => ctx?.Snapshot() ?? TransferContextSnapshot.Empty;
+    private protected async Task<int> DeleteJournal(
+        TransferJournal<TKey> journal,
+        TransferContextOptions? context,
+        CancellationToken ct)
+    {
+        var deleted = 0;
+        await foreach (var ids in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
+        {
+            using var scope = context?.Apply();
+            var affected = await Data<TEntity, TKey>.DeleteMany(ids, ct).ConfigureAwait(false);
+            if (affected != ids.Count)
+                throw new BulkMutationReceiptRejectedException(
+                    typeof(TEntity).FullName ?? typeof(TEntity).Name,
+                    ids.Count,
+                    affected,
+                    DataCommitOutcome.Unknown);
+            deleted = checked(deleted + affected);
+        }
+        return deleted;
+    }
 
-    protected void EmitSummary(
+    protected TransferResult<TKey> Complete(
         TransferKind kind,
-        int totalProcessed,
-        Stopwatch stopwatch,
-        List<TransferAuditBatch> auditBatches)
+        int read,
+        int copied,
+        int deleted,
+        TransferProgress progress,
+        IReadOnlyList<TransferConflict<TKey>>? conflicts = null)
     {
         var summary = new TransferAuditBatch(
             kind,
             0,
             0,
-            totalProcessed,
+            progress.TotalProcessed,
             SnapshotFor(FromContext),
             SnapshotFor(ToContext),
-            stopwatch.Elapsed,
+            progress.Stopwatch.Elapsed,
             true);
-
-        auditBatches.Add(summary);
         _audit?.Invoke(summary);
+        progress.Stopwatch.Stop();
+
+        return new TransferResult<TKey>
+        {
+            Kind = kind,
+            ReadCount = read,
+            CopiedCount = copied,
+            DeletedCount = deleted,
+            Duration = progress.Stopwatch.Elapsed,
+            Conflicts = conflicts?.ToArray() ?? [],
+            Warnings = Warnings.ToArray()
+        };
     }
 
-    protected static List<T> CloneList<T>(IEnumerable<T> source)
-        => source is List<T> list ? new List<T>(list) : source.ToList();
+    protected static TransferContextSnapshot SnapshotFor(TransferContextOptions? context)
+        => context?.Snapshot() ?? TransferContextSnapshot.Empty;
+
+    protected sealed class TransferProgress
+    {
+        public Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
+        public int BatchNumber { get; set; }
+        public int TotalProcessed { get; set; }
+    }
 }

@@ -90,6 +90,7 @@ public class Phase3_AsyncQueueTests
         options.IdlePollInterval.Should().Be(TimeSpan.FromSeconds(5));
         options.GlobalRateLimitPerMinute.Should().Be(60);
         options.MaxRetries.Should().Be(3);
+        options.ProcessingLeaseDuration.Should().Be(TimeSpan.FromMinutes(1));
         options.Enabled.Should().BeTrue();
         options.AutoCleanupCompleted.Should().BeTrue();
         options.CompletedJobRetention.Should().Be(TimeSpan.FromHours(24));

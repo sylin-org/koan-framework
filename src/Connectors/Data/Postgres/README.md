@@ -1,6 +1,6 @@
 # Sylin.Koan.Data.Connector.Postgres
 
-PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
+PostgreSQL provider for Koan managed entities and existing relational data.
 
 - Target framework: net10.0
 - License: Apache-2.0
@@ -11,6 +11,10 @@ PostgreSQL provider for Koan relational data with safe defaults and pushdowns.
 - JSON projection, filter, and paging pushdowns where supported
 - Schema helpers (create table/index) via Koan.Data.Relational
 - Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
+- Compact flat, structured, nested-path, composite-key, and generated-key maps
+- Read-only fail-fast safety and non-creating `StorageLifecycle.External`
+- Provider-neutral container inspection and bounded record sampling
+- Registered parameterized SQL reads and scalars through provider-enforced read lanes
 
 ## Install
 
@@ -36,6 +40,42 @@ public sealed class Order : Entity<Order>;
 var saved = await new Order().Save();
 var same = await Order.Get(saved.Id);
 ```
+
+Connect an existing table without introducing a parallel data API:
+
+```csharp
+builder.Services.AddKoan(koan => koan.Data
+    .Source("Legacy")
+    .Map<Customer>(map => map
+        .Container("CUSTOMER")
+        .Key(customer => customer.Id).Name("CUSTOMER_NO")
+        .Property(customer => customer.DisplayName).Name("DISPLAY_NM")
+        .Property(customer => customer.Profile).Object("PROFILE_JSON")));
+
+using (EntityContext.Source("Legacy"))
+{
+    var customer = await Customer.Get(7);
+}
+```
+
+Set `StorageLifecycle=External` when Koan must validate but never create or repair the table. Set `Access=ReadOnly`
+when writes must reject before provider mutation. Nested `.Path("NAME_DATA", "full")` updates preserve unbound values
+inside the same `jsonb` object.
+
+Explore or name a useful read without adding a second data API:
+
+```csharp
+koan.Data.Source("Legacy").Query("customers.active", query => query
+    .Lane("Reports")
+    .Sql("select id as Id, name as Name from customers where active = @active")
+    .Parameter<bool>("active"));
+
+var legacy = Data.Source("Legacy");
+var active = await legacy.Query("customers.active", new { active = true });
+var containers = await legacy.Inspect().Containers(100, null, ct);
+```
+
+Opaque SQL requires a configured read lane. PostgreSQL executes it in a native read-only transaction.
 
 ## Usage - safe snippets
 

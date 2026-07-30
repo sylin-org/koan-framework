@@ -5,6 +5,11 @@
 **Supersedes:** AI-0014, AI-SOURCE-ROUTING-FIX, AI-SOURCE-MEMBER-IMPLEMENTATION-PLAN
 **Implementation Started:** 2025-10-01
 
+> **Implementation update (2026-07-27):** health probing is provider-owned when an adapter implements
+> `IAiSourceInspector`; HTTP `HEAD` remains only the compatibility floor for older network providers. The ONNX
+> connector now inspects its loaded in-process session directly, so the routing identity `inproc://onnx` is never
+> mistaken for a network endpoint and cannot oscillate into an artificial unhealthy circuit.
+
 ---
 
 ## 🔄 IMPLEMENTATION STATUS

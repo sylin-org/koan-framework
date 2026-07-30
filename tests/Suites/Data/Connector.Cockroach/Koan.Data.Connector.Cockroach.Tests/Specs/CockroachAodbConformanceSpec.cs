@@ -6,11 +6,9 @@ using Npgsql;
 namespace Koan.Data.Connector.Cockroach.Tests.Specs;
 
 /// <summary>
-/// CockroachDB's AODB conformance ledger cell (ARCH-0094 Forge dogfood / ARCH-0103 §6). Proves the relational
-/// realization of all three AODB modes on CockroachDB AND declares the tokens — reusing the shipped Postgres
-/// connector's repository/dialect/DDL unchanged (CockroachDB ≈ Postgres over pg-wire). For the Database cell the two
-/// routed conformance sources point to freshly-created physical databases on the fixture's node (Database mode = a
-/// distinct physical database per source).
+/// CockroachDB's AODB conformance suite proves the relational realization of all three AODB modes through
+/// CockroachDB's lean Npgsql-family connector. For the Database cell the two routed conformance sources point to
+/// freshly-created physical databases on the fixture's node.
 /// </summary>
 public sealed class CockroachAodbConformanceSpec(CockroachFixture fixture, ITestOutputHelper output)
     : AodbConformanceSpecsBase<CockroachFixture>(fixture, output)

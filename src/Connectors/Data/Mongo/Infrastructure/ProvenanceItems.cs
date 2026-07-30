@@ -24,14 +24,14 @@ internal static class MongoProvenanceItems
     private static readonly IReadOnlyCollection<string> ConnectionConsumers = new[]
     {
         "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
-        "Koan.Data.Connector.Mongo.MongoClientProvider",
+        "Koan.Data.Connector.Mongo.Runtime.MongoClientManager",
         "Koan.Data.Connector.Mongo.MongoAdapterFactory"
     };
 
     private static readonly IReadOnlyCollection<string> DatabaseConsumers = new[]
     {
         "Koan.Data.Connector.Mongo.MongoOptionsConfigurator",
-        "Koan.Data.Connector.Mongo.MongoClientProvider"
+        "Koan.Data.Connector.Mongo.Runtime.MongoClientManager"
     };
 
     private static readonly IReadOnlyCollection<string> PagingConsumers = new[]
