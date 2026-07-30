@@ -20,39 +20,39 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Mongo",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Postgres",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Redis",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational.Npgsql",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Jobs",

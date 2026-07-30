@@ -3,7 +3,7 @@ namespace Koan.Packaging.Infrastructure;
 internal static class PackagingConstants
 {
     public const string PackagePrefix = "Sylin.Koan";
-    public const string PreviewFrameworkVersion = "v0.21.0";
+    public const string PreviewFrameworkVersion = "v0.20.0";
     public const string CorePackageId = "Sylin.Koan.Core";
     public const string MsBuildDisableNodeReuseEnvironmentVariable = "MSBUILDDISABLENODEREUSE";
     public const string MsBuildDisableNodeReuseEnvironmentValue = "1";

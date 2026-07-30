@@ -5,7 +5,7 @@ title: "NuGet publishing"
 audience: [maintainers, release-engineers]
 status: current
 last_updated: 2026-07-29
-framework_version: v0.21.0
+framework_version: v0.20.0
 ---
 
 # NuGet publishing
