@@ -30,6 +30,7 @@ public sealed class PackageBaselineValidatorTests
         var guard = workflow.IndexOf("dotnet run --project tools/Koan.Packaging -- api-baselines", StringComparison.Ordinal);
         var pack = workflow.IndexOf("- name: Pack", StringComparison.Ordinal);
 
+        Assert.Contains("branches: [main]", workflow, StringComparison.Ordinal);
         Assert.True(guard >= 0, "release-on-main must execute the real api-baselines command");
         Assert.True(pack > guard, "the API-baseline guard must pass before any package is packed");
         Assert.Contains("supported-foundation", workflow, StringComparison.Ordinal);
