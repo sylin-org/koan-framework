@@ -4,14 +4,15 @@ domain: framework
 title: "NuGet publishing"
 audience: [maintainers, release-engineers]
 status: current
-last_updated: 2026-07-29
+last_updated: 2026-08-06
 framework_version: v0.20.0
 ---
 
 # NuGet publishing
 
-Koan publishes through one GitHub Actions workflow after source reaches `main`. Development commits
-and open pull requests do not publish packages.
+Koan integrates development through `dev` and publishes through one GitHub Actions workflow after the
+validated `dev` tree is promoted to `main`. Development commits and open pull requests do not publish
+packages.
 
 ## Prerequisite
 
@@ -21,11 +22,13 @@ state store is required.
 
 ## Publish
 
-1. Open a pull request targeting `main`. The cheap PR coherence job checks product/API truth, one
+1. Open a focused pull request targeting `dev`. The cheap PR coherence job checks product/API truth, one
    Release build, lockfiles, and structural documentation/tooling drift; affected behavior tests
    remain part of developing and reviewing the change.
-2. Merge the pull request. A deliberate direct commit to `main` has the same release effect.
-3. Observe **Release packages** on the resulting `main` commit.
+2. Merge the pull request into `dev`. Topic branches coalesce nowhere else.
+3. When the integrated tree is ready to publish, promote that exact `dev` tree to `main` as one release
+   change. A deliberate direct commit to `main` has the same publication effect.
+4. Observe **Release packages** on the resulting `main` commit.
 
 The one job:
 
