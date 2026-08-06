@@ -4,12 +4,12 @@ domain: framework
 title: "R09-03 - Compile One Optional Capability Layer"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-08-06
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-08-06
   status: passed
-  scope: generic typed contribution lifecycle, compiled service-discovery plan, and ZenGarden optional-layer proof
+  scope: generic typed contribution lifecycle, compiled service-discovery plan, ZenGarden optional-layer proof, and Weaviate required-intent regression repair
 ---
 
 # R09-03 — Compile one optional capability layer
@@ -442,3 +442,28 @@ fall back. No scaffolding or framework-maintenance concept appears in the applic
   mutation, or private downstream inspection occurred.
 - Next outcome: assess shared deterministic Data/Communication selection mechanics from their current
   typed policy owners before creating R09-04's implementation card.
+
+## 2026-08-06 Weaviate regression repair
+
+- Application intent: configuring `Koan:Data:Weaviate:ConnectionString` as
+  `zen-garden://weaviate` remains a hard choice that either resolves the requested offering or rejects
+  before connector I/O; it never becomes a native endpoint or autonomous fallback.
+- Complete expression: reference the Weaviate connector and `Sylin.Koan.ZenGarden`, call the existing
+  `AddKoan()`, and provide the deliberate connection intent. No code, decoration, context, or new
+  application concept is added.
+- Guarantee and correction: a ready matching offering produces its endpoint; an absent coordinator or
+  unresolved offering throws the established corrective error naming Weaviate, Zen Garden, and the
+  safe `auto` or native-endpoint alternatives.
+- Regression boundary: the Data adapter rebuild in `0bd5a0a90` removed Weaviate's inert
+  `Koan.ZenGarden.Contracts` dependency and required-intent branch while leaving this accepted contract
+  and its executable packaging probe intact.
+- Coalescence: restore parsing through the existing `ZenGardenConnectionIntent` contract and resolution
+  through `IServiceDiscoveryCoordinator` in `WeaviateOptionsConfigurator`; keep automatic discovery,
+  health qualification, and native endpoint precedence unchanged. Core and the Zen Garden runtime gain
+  no new owner or mechanism.
+- Ergonomics: the repair preserves the single configuration expression, adds no IntelliSense surface,
+  and keeps the three choices—native endpoint, `auto`, or required Zen Garden intent—mutually explicit.
+- Evidence result: the executable probe returned `WEAVIATE-EXPLICIT-REJECTED`; the complete packaging
+  suite passed 61/61, the host-backed Weaviate matrix passed 28/28, the Weaviate package and full
+  Release solution built with zero warnings/errors, and generated product/package truth plus public
+  documentation passed their current-state gates.

@@ -1920,7 +1920,8 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions",
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "ownsReadme": true,

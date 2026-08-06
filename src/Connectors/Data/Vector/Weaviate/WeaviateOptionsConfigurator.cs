@@ -3,6 +3,7 @@ using Koan.Core.Adapters;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Adapters.Configuration;
+using Koan.ZenGarden;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,7 +30,7 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
         options.Endpoint = !string.IsNullOrWhiteSpace(explicitEndpoint)
             ? explicitEndpoint
             : !string.IsNullOrWhiteSpace(legacyConnection) && !IsAutomatic(legacyConnection)
-                ? legacyConnection
+                ? ResolveConfiguredConnection(legacyConnection)
                 : Discover();
         options.ApiKey = EmptyToNull(ReadProviderConfiguration(
             options.ApiKey ?? string.Empty, Infrastructure.Constants.Configuration.Keys.ApiKey));
@@ -56,11 +57,11 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             return Infrastructure.Constants.Defaults.Endpoint;
         try
         {
-            var result = _discovery.DiscoverService(Infrastructure.Constants.Provider.Name, new DiscoveryContext
-            {
-                OrchestrationMode = KoanEnv.OrchestrationMode,
-                HealthCheckTimeout = TimeSpan.FromMilliseconds(500)
-            }).GetAwaiter().GetResult();
+            var result = _discovery.DiscoverService(
+                    Infrastructure.Constants.Provider.Name,
+                    DiscoveryContext())
+                .GetAwaiter()
+                .GetResult();
             return result.IsSuccessful && !string.IsNullOrWhiteSpace(result.ServiceUrl)
                 ? result.ServiceUrl
                 : Infrastructure.Constants.Defaults.Endpoint;
@@ -71,6 +72,38 @@ internal sealed class WeaviateOptionsConfigurator : AdapterOptionsConfigurator<W
             return Infrastructure.Constants.Defaults.Endpoint;
         }
     }
+
+    private string ResolveConfiguredConnection(string connection)
+    {
+        if (!ZenGardenConnectionIntent.TryParse(connection, out var intent)) return connection;
+        if (_discovery is null)
+            throw ExplicitIntentFailure(intent!, "Koan's service-discovery coordinator is unavailable.");
+
+        var result = _discovery.ResolveServiceIntent(
+                Infrastructure.Constants.Provider.Name,
+                connection,
+                DiscoveryContext())
+            .GetAwaiter()
+            .GetResult();
+        if (!result.IsSuccessful || string.IsNullOrWhiteSpace(result.ServiceUrl))
+            throw ExplicitIntentFailure(intent!, result.ErrorMessage);
+
+        return result.ServiceUrl;
+    }
+
+    private static DiscoveryContext DiscoveryContext() => new()
+    {
+        OrchestrationMode = KoanEnv.OrchestrationMode,
+        HealthCheckTimeout = TimeSpan.FromMilliseconds(500)
+    };
+
+    private static InvalidOperationException ExplicitIntentFailure(
+        ZenGardenConnectionIntent intent,
+        string? reason) => new(
+        $"Weaviate explicit Zen Garden intent for '{intent.ToOfferingSelector()}' could not be satisfied. " +
+        $"{reason ?? "No ready Weaviate offering was found."} " +
+        "Reference and enable Koan.ZenGarden with a ready 'weaviate' offering, choose 'auto', " +
+        "or provide a native Weaviate endpoint.");
 
     private static bool IsAutomatic(string value) =>
         string.Equals(value.Trim(), Infrastructure.Constants.Configuration.Automatic, StringComparison.OrdinalIgnoreCase);
