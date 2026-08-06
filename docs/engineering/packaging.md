@@ -4,7 +4,7 @@ domain: engineering
 title: "NuGet packaging policy"
 audience: [developers, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-29
+last_updated: 2026-08-06
 framework_version: v0.20.0
 ---
 
@@ -40,7 +40,8 @@ These commands inspect product/package shape. They do not stage or publish anyth
 
 ## Publish
 
-Merge the intended source into `main`. The resulting `main` commit runs **Release packages**, which
+Coalesce focused pull requests into `dev`, then promote the validated integrated tree to `main` as one
+release change. The resulting `main` commit runs **Release packages**, which
 packs the solution and the packable template project with `PublicRelease=true`, then pushes each
 supported product-surface package from its validated compatibility line, using the repository's
 `NUGET_API_KEY`. Lower-maturity package artifacts are not published. Existing immutable identities
