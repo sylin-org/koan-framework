@@ -33,7 +33,7 @@ public sealed class GeneratedOutputVerifierTests : IDisposable
     }
 
     [Fact]
-    public void MainPullRequestGateChecksProductTruthThenCheapRepositoryCoherence()
+    public void DevPullRequestGateChecksProductTruthThenCheapRepositoryCoherence()
     {
         var workflow = File.ReadAllText(Path.Combine(FindKoanRoot(), ".github", "workflows", "pr-gate.yml"));
         var surface = workflow.IndexOf(
@@ -44,7 +44,8 @@ public sealed class GeneratedOutputVerifierTests : IDisposable
             StringComparison.Ordinal);
         var repositoryCheck = workflow.IndexOf("./scripts/green-ratchet.ps1", StringComparison.Ordinal);
 
-        Assert.True(surface >= 0, "the main PR gate must execute the real product-surface compiler");
+        Assert.Contains("branches: [dev]", workflow, StringComparison.Ordinal);
+        Assert.True(surface >= 0, "the dev PR gate must execute the real product-surface compiler");
         Assert.True(baselines > surface, "the supported API-baseline guard must follow valid product truth");
         Assert.True(repositoryCheck > baselines, "both product guards must pass before repository coherence");
         Assert.Contains("-SkipTests", workflow, StringComparison.Ordinal);

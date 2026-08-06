@@ -2,7 +2,7 @@
 
 **Status**: Accepted
 **Date**: 2026-07-14
-**Amended**: 2026-07-29 — release selection follows each supported package's declared compatibility line
+**Amended**: 2026-08-06 — dev is the sole development coalescence point; main remains the publication boundary
 **Deciders**: Framework maintainer
 **Scope**: Package versioning and NuGet publication
 
@@ -14,18 +14,20 @@ manifests, release-wave escrow, GitHub Release state, recovery coordination, six
 full-repository certification. Replacing it with a manual one-job workflow removed that machinery but
 mistakenly kept `dev` as the publication source.
 
-Development work is not a release event. A pull request to `main` is the review and validation
-boundary; its resulting `main` commit is the publication boundary. Standard GitHub Actions, MSBuild,
-NBGV, and NuGet already express the complete lifecycle.
+Development work is not a release event. Focused pull requests coalesce through `dev`, where the
+repository-coherence gate validates the integrated change. Promotion of that validated tree to `main`
+is the publication boundary. Standard GitHub Actions, MSBuild, NBGV, and NuGet already express the
+complete lifecycle.
 
 ## Decision checkpoint
 
-**Application intent:** A maintainer merges a pull request into `main` or commits directly to `main`;
-the resulting `main` commit publishes the repository's independently versioned packages.
+**Application intent:** A maintainer merges focused development pull requests into `dev`, then promotes
+the validated integrated tree to `main`; the resulting `main` commit publishes the repository's
+independently versioned packages.
 
-**Public expression:** GitHub Actions validates `pull_request` events targeting `main` and runs the
-single package release job on `push` to `main`. Commits and pull requests targeting `dev` trigger
-neither path.
+**Public expression:** GitHub Actions validates `pull_request` events targeting `dev` and runs the
+single package release job on `push` to `main`. A `dev` commit cannot publish, and a `main` push does
+not re-run the development gate.
 
 **Guarantee/correction:** Only source present on `main` can receive the NuGet credential and reach
 publication. Product-surface compilation selects exactly the supported package closure and each owner's declared
@@ -34,17 +36,17 @@ maturity packages cannot be pushed by the job. A rejected credential, invalid ve
 release-scope/artifact mismatch, pack error, or registry failure stops the job; after correcting the
 cause, rerun the same `main` workflow run.
 
-**Complete intent surface:** Open and merge a pull request to `main`, or deliberately commit to
-`main`. No manual release dispatch, branch selector, release branch, tag, GitHub Release, package
-manifest, or Koan-specific coordinator participates.
+**Complete intent surface:** Open and merge focused pull requests to `dev`; when the aggregate is ready,
+promote that exact tree to `main`. No manual release dispatch, branch selector, release branch, tag,
+GitHub Release, package manifest, or Koan-specific coordinator participates.
 
 **Public concepts:** GitHub's ordinary pull-request and push events, standard .NET pack/NuGet push,
 and project-local NBGV `version.json` files. Each exists because it owns validation, publication, or
 package identity respectively; no additional public release concept is required.
 
-**Coalescence and ergonomics:** GitHub Actions owns the single integration chokepoint. The PR gate
-validates before merge and the `main` push publishes afterward. The earlier `release-on-dev` path is
-deleted. The human expression is one familiar action—merge to `main`—and the workflow name, branch,
+**Coalescence and ergonomics:** `dev` is the single development integration chokepoint. Its PR gate
+validates each focused change before merge; promotion carries the validated aggregate to `main`, whose
+push publishes afterward. The parallel `release-on-dev` path is deleted. The workflow names, branches,
 logs, and rerun mechanics remain ordinary GitHub UI concepts.
 
 ## Independent version ownership
@@ -83,9 +85,9 @@ stops the job and is corrected at its ordinary owner before rerunning.
 
 ## Consequences
 
-- A `dev` commit causes no validation or publication workflow activity.
-- A pull request targeting `main` validates but cannot publish.
-- The resulting `main` commit automatically invokes the one publication job.
+- A pull request targeting `dev` validates but cannot publish.
+- A `dev` commit cannot receive the NuGet credential.
+- Promotion of the validated `dev` tree to `main` automatically invokes the one publication job.
 - Packing may produce lower-maturity artifacts for build completeness, but publication selects only
   the product-surface package IDs validated at 0.20.
 - Version ownership remains local, explicit, independently inspectable, and free to advance one
@@ -96,7 +98,7 @@ stops the job and is corrected at its ordinary owner before rerunning.
 
 ## Removed paths
 
-- publication or validation triggered from `dev`;
+- publication triggered from `dev` or development integration performed directly on `main`;
 - manual branch-selected publication;
 - `automation/package-lineage-dev` and synthetic lineage commits;
 - release manifests, closure markers, and shared-input release maps;
@@ -104,5 +106,5 @@ stops the job and is corrected at its ordinary owner before rerunning.
 - prior-wave reconciliation and six-job permission choreography; and
 - release workflow contract tests that restated YAML implementation details.
 
-Historical detail remains available in Git history. Current guidance teaches only the `main`
-integration path in [NuGet publishing](../engineering/nuget-publishing.md).
+Historical detail remains available in Git history. Current guidance teaches the `dev` integration
+path and `main` publication boundary in [NuGet publishing](../engineering/nuget-publishing.md).

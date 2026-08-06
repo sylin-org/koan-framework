@@ -1,19 +1,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # PR gate — cheap repository-coherence validation on pull requests.
 #
-# A main PR proves that the repository compiles and its product/API/docs/tooling projections agree.
+# A dev PR proves that the repository compiles and its product/API/docs/tooling projections agree.
 # Behavioral evidence belongs to the affected project or capability family while the change is
 # developed. Whole-repository certification is an explicit milestone activity, not a merge or
 # publication prerequisite.
 #
-# Package publication remains owned by release-on-main.yml after merge and runs no tests.
+# Package publication remains owned by release-on-main.yml after the validated dev tree is promoted
+# to main; the publisher runs no tests.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: PR gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev]
 
 # One gate run per PR; a newer push cancels the older in-flight run.
 concurrency:

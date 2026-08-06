@@ -12,7 +12,7 @@ should make that promise smaller, clearer, or more dependable.
 3. Build the smallest affected project and run its focused tests or documentation gate.
 4. Update the canonical owner and any package, sample, template, or agent guidance that would
    otherwise teach a different result.
-5. Open a focused pull request to `main`, explain the user-visible promise, and sign the commit.
+5. Open a focused pull request to `dev`, explain the user-visible promise, and sign the commit.
 
 ## Before changing code
 
