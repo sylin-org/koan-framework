@@ -714,7 +714,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.",
+      "description": "Host-ephemeral Koan Entity adapter with detached snapshots, exact isolation, and bounded in-process state.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1127,7 +1127,8 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions",
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Weaviate/TECHNICAL.md",
