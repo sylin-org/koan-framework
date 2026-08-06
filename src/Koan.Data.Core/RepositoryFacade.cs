@@ -14,6 +14,7 @@ using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Querying;
+using Koan.Data.Core.Routing;
 using Koan.Data.Core.Semantics;
 using Koan.Data.Core.Sorting;
 
@@ -46,6 +47,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IInstructionExecutor<TEntity>,
     IAxisScopeDiagnostics,
     IDataOperationGate,
+    IDataRouteBoundRepository,
     IDataMutationOutcomes<TEntity, TKey>,
     IDataQueryBoundary<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
@@ -68,6 +70,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
     private readonly DataSegmentationPlan.DataSegmentationScope _segmentation;
     private readonly DataSourcePlan _sourcePlan;
+    private readonly DataOperationHorizon? _operationHorizon;
+    private readonly DataRouteBinding? _routeBinding;
 
     public RepositoryFacade(
         IDataRepository<TEntity, TKey> inner,
@@ -76,7 +80,9 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         EntityLifecyclePlan<TEntity, TKey>? lifecycle = null,
         DataSegmentationPlan.DataSegmentationScope? segmentation = null,
         StorageFieldTransformPlan? fieldTransforms = null,
-        DataSourcePlan? sourcePlan = null)
+        DataSourcePlan? sourcePlan = null,
+        DataOperationHorizon? operationHorizon = null,
+        DataRouteBinding? routeBinding = null)
     {
         _inner = inner;
         _guards = guards ?? Array.Empty<IStorageGuard>();
@@ -88,6 +94,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         _managed = ManagedFieldRegistry.ForType(typeof(TEntity));
         _segmentation = segmentation ?? DataSegmentationPlan.DataSegmentationScope.Empty;
         _sourcePlan = sourcePlan ?? DataSourcePlan.Default;
+        _operationHorizon = operationHorizon;
+        _routeBinding = routeBinding;
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
         // The adapter is inspected once iff this entity could ever be scoped: it has a managed descriptor (write-stamp
         // + equality read) OR a NON-default read-filter contributor (a predicate axis). The built-in equality
@@ -402,34 +410,107 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     public void Describe(ICapabilities caps)
         => DataCaps.Describe(_inner, _inner.GetType().Name).CopyInto(caps);
 
-    public Task EnsureReady(CancellationToken ct = default)
+    public async Task EnsureReady(CancellationToken ct = default)
     {
-        _sourcePlan.Demand(DataOperationEffect.SchemaOrAdmin, "entity ensure ready");
-        return _inner.EnsureReady(ct);
+        await using var operation = await Guard(
+            DataOperationEffect.SchemaOrAdmin,
+            "entity ensure ready",
+            ct,
+            ensureReadiness: false);
+        await _inner.EnsureReady(ct);
     }
 
     void IDataOperationGate.Demand(DataOperationEffect effect, string operation)
         => _sourcePlan.Demand(effect, operation);
 
-    private async Task<DataSegmentationBinding> Guard(
+    string IDataRouteBoundRepository.RouteNamespace =>
+        _routeBinding?.Namespace ?? $"data-route:{_sourcePlan.RouteIdentity}:0";
+
+    internal DataRouteBinding? RouteBinding => _routeBinding;
+
+    private GuardedOperationAwaitable Guard(
         DataOperationEffect effect,
         string operation,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool ensureReadiness = true)
+        => new(GuardAsync(effect, operation, ct, ensureReadiness));
+
+    private async Task<GuardedOperation> GuardAsync(
+        DataOperationEffect effect,
+        string operation,
+        CancellationToken ct,
+        bool ensureReadiness)
     {
         // Source policy is the first semantic action. It runs before cancellation observation,
         // segmentation callbacks, cross-cutting guards, readiness, lifecycle, or provider work.
         _sourcePlan.Demand(effect, operation);
         ct.ThrowIfCancellationRequested();
-        var segmentation = _segmentation.Bind(operation);
-        // Generic fail-closed pre-op checks at the chokepoint, BEFORE touching the store (DATA-0105 §0).
-        // Cross-cutting modules register guards (Koan.Tenancy registers the tenant gate, ARCH-0095 P1); the
-        // data core never names them. No registered guard ⇒ empty loop ⇒ no-op.
-        for (var i = 0; i < _guards.Length; i++) _guards[i].Guard(typeof(TEntity));
-        // The legacy EnsureReady contract can provision. Only the unrestricted source cell may enter it;
-        // constrained sources rely on adapter-earned non-creating reachability and shape validation.
-        if (_sourcePlan.UsesLegacyProvisioningReadiness)
-            await _inner.EnsureReady(ct);
-        return segmentation;
+        DataOperationLease? lease = null;
+        try
+        {
+            if (_operationHorizon is not null && _routeBinding is not null)
+                lease = await _operationHorizon.Enter(_routeBinding, effect, operation, ct);
+            var segmentation = _segmentation.Bind(operation);
+            // Generic fail-closed pre-op checks at the chokepoint, BEFORE touching the store (DATA-0105 §0).
+            // Cross-cutting modules register guards (Koan.Tenancy registers the tenant gate, ARCH-0095 P1); the
+            // data core never names them. No registered guard ⇒ empty loop ⇒ no-op.
+            for (var i = 0; i < _guards.Length; i++) _guards[i].Guard(typeof(TEntity));
+            // The legacy EnsureReady contract can provision. Only the unrestricted source cell may enter it;
+            // constrained sources rely on adapter-earned non-creating reachability and shape validation.
+            if (ensureReadiness && _sourcePlan.UsesLegacyProvisioningReadiness)
+                await _inner.EnsureReady(ct);
+            return new GuardedOperation(segmentation, lease);
+        }
+        catch
+        {
+            if (lease is not null) await lease.DisposeAsync();
+            throw;
+        }
+    }
+
+    private sealed class GuardedOperation(
+        DataSegmentationBinding segmentation,
+        DataOperationLease? lease) : IAsyncDisposable
+    {
+        public DataSegmentationBinding Segmentation { get; } = segmentation;
+
+        internal GuardedOperation Activate()
+        {
+            lease?.Activate();
+            return this;
+        }
+
+        public ValueTask DisposeAsync() => lease?.DisposeAsync() ?? ValueTask.CompletedTask;
+    }
+
+    private readonly struct GuardedOperationAwaitable(Task<GuardedOperation> operation)
+    {
+        public Awaiter GetAwaiter() => new(operation.GetAwaiter());
+
+        internal readonly struct Awaiter(
+            System.Runtime.CompilerServices.TaskAwaiter<GuardedOperation> inner) :
+            System.Runtime.CompilerServices.ICriticalNotifyCompletion
+        {
+            public bool IsCompleted => inner.IsCompleted;
+
+            public GuardedOperation GetResult()
+            {
+                var operation = inner.GetResult();
+                try
+                {
+                    return operation.Activate();
+                }
+                catch
+                {
+                    operation.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    throw;
+                }
+            }
+
+            public void OnCompleted(Action continuation) => inner.OnCompleted(continuation);
+
+            public void UnsafeOnCompleted(Action continuation) => inner.UnsafeOnCompleted(continuation);
+        }
     }
 
     // Raw facade reads used by lifecycle Prior/remove preparation. They retain every Data-owned
@@ -510,7 +591,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<TEntity?> Get(TKey id, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity get", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity get", ct);
+        var segmentation = operationScope.Segmentation;
         var entity = await ReadOne(id, segmentation, ct);
         if (entity is not null && _lifecycle is { HasLoad: true })
             await _lifecycle.ApplyLoad(entity, ct);
@@ -519,7 +601,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity get many", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity get many", ct);
+        var segmentation = operationScope.Segmentation;
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         var entities = await ReadMany(idList, segmentation, ct);
         if (_lifecycle is { HasLoad: true })
@@ -541,7 +624,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         QueryDefinition query,
         CancellationToken ct)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity query", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity query", ct);
+        var segmentation = operationScope.Segmentation;
         var managed = ReadScopeFilter(segmentation);
         return Reverse(await RequireQuery().Query(managed is null ? query : ApplyManaged(query, managed), ct));
     }
@@ -569,7 +653,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity count", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity count", ct);
+        var segmentation = operationScope.Segmentation;
         var managed = ReadScopeFilter(segmentation);
         return await RequireQuery().Count(managed is null ? query : ApplyManaged(query, managed), ct);
     }
@@ -589,7 +674,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         int maxCandidates,
         CancellationToken ct)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity bounded query", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity bounded query", ct);
+        var segmentation = operationScope.Segmentation;
         var managed = ReadScopeFilter(segmentation);
         var bounded = _inner as IBoundedQueryRepository<TEntity, TKey>
             ?? throw new NotSupportedException(
@@ -624,7 +710,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<RepositoryQueryResult<TEntity>> QueryRaw(string query, object? parameters, QueryDefinition shaping, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity raw query", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity raw query", ct);
+        var segmentation = operationScope.Segmentation;
         GuardRawAgainstActiveScope(segmentation);
         if (_inner is not IRawQueryRepository<TEntity, TKey> raw)
             throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support raw queries.");
@@ -635,7 +722,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Read, "entity raw count", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity raw count", ct);
+        var segmentation = operationScope.Segmentation;
         GuardRawAgainstActiveScope(segmentation);
         return _inner is IRawQueryRepository<TEntity, TKey> raw
             ? await raw.CountRaw(query, parameters, ct)
@@ -713,7 +801,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity upsert", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity upsert", ct);
+        var segmentation = operationScope.Segmentation;
         if (_lifecycle is not { HasUpsert: true })
             return await PersistPreparedUpsert(model, segmentation, ct);
 
@@ -727,7 +816,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         TEntity model,
         CancellationToken ct)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity upsert with outcome", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity upsert with outcome", ct);
+        var segmentation = operationScope.Segmentation;
         var capabilities = DataCaps.Describe(_inner, _inner.GetType().Name);
         if (!capabilities.Has(DataCaps.Write.MutationOutcomes) ||
             _inner is not IMutationOutcomeRepository<TEntity, TKey> outcomes)
@@ -769,7 +859,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         TKey id,
         CancellationToken ct)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity delete with outcome", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity delete with outcome", ct);
+        var segmentation = operationScope.Segmentation;
         var entity = await ReadOne(id, segmentation, ct);
         if (entity is null)
             return new MutationResult<TEntity, TKey>(
@@ -790,7 +881,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity batch upsert", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity batch upsert", ct);
+        var segmentation = operationScope.Segmentation;
         var list = models as IList<TEntity> ?? models.ToList();
         if (_lifecycle is { HasUpsert: true })
         {
@@ -814,7 +906,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity delete", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity delete", ct);
+        var segmentation = operationScope.Segmentation;
         if (_lifecycle is not { HasRemove: true })
             return await DeleteWithoutLifecycle(id, segmentation, ct);
 
@@ -852,7 +945,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity batch delete", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity batch delete", ct);
+        var segmentation = operationScope.Segmentation;
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         if (_lifecycle is { HasRemove: true })
             return await DeleteManyWithLifecycle(idList, segmentation, ct);
@@ -962,7 +1056,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity delete all", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity delete all", ct);
+        var segmentation = operationScope.Segmentation;
         var managed = ReadScopeFilter(segmentation);
         if (_lifecycle is { HasRemove: true } || _deleteOverride is not null || managed is not null ||
             _sourcePlan.StorageLifecycle == StorageLifecycle.External)
@@ -975,7 +1070,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
         var effect = strategy == RemoveStrategy.Fast
             ? DataOperationEffect.SchemaOrAdmin
             : DataOperationEffect.Write;
-        var segmentation = await Guard(effect, "entity remove all", ct);
+        await using var operationScope = await Guard(effect, "entity remove all", ct);
+        var segmentation = operationScope.Segmentation;
         if (_sourcePlan.StorageLifecycle == StorageLifecycle.External && strategy == RemoveStrategy.Optimized)
             strategy = RemoveStrategy.Safe;
         var managed = ReadScopeFilter(segmentation);
@@ -996,7 +1092,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     // another scope. The trigger rides the contributor union (a pure predicate axis has no managed field). Use Upsert.
     public async Task<bool> ConditionalReplaceAsync(TEntity model, Expression<Func<TEntity, bool>> guard, CancellationToken ct = default)
     {
-        var segmentation = await Guard(DataOperationEffect.Write, "entity conditional replace", ct);
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity conditional replace", ct);
+        var segmentation = operationScope.Segmentation;
         if (IsReadScoped(segmentation) || (HasManaged && CurrentManagedValues(segmentation) is not null))
             throw new NotSupportedException(
                 $"ConditionalReplaceAsync is not supported for scoped entity '{typeof(TEntity).Name}' under an " +
@@ -1035,7 +1132,7 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                 $"entity '{typeof(TEntity).Name}'. Use the Entity query/write surface, or model a genuine " +
                 "control-plane entity as host-scoped.");
         }
-        await Guard(effect, "entity instruction", ct);
+        await using var operationScope = await Guard(effect, "entity instruction", ct);
         if (_inner is IInstructionExecutor<TEntity> exec)
             return await exec.ExecuteAsync<TResult>(instruction, ct);
         throw new NotSupportedException($"Repository for {typeof(TEntity).Name} does not support instruction '{instruction.Name}'.");
@@ -1093,7 +1190,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
 
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
-            var segmentation = await _outer.Guard(DataOperationEffect.Write, "entity batch", ct);
+            await using var operationScope = await _outer.Guard(DataOperationEffect.Write, "entity batch", ct);
+            var segmentation = operationScope.Segmentation;
             if (_savingOrSaved)
                 throw new InvalidOperationException("A batch can be saved once. Create a new Entity batch for later work.");
             _savingOrSaved = true;

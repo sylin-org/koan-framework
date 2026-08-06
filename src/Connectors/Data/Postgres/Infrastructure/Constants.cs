@@ -15,4 +15,11 @@ public static class Constants
         public const string Password = Section + ":Password";
         public const string SearchPath = Section + ":SearchPath";
     }
+
+    internal static class StorageStatus
+    {
+        internal const string Ready = "ready";
+        internal const string Timeout = "postgres-timeout";
+        internal const string Unavailable = "postgres-unavailable";
+    }
 }

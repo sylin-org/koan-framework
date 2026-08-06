@@ -16,7 +16,7 @@ namespace Koan.Cache.Decorators;
 /// observe the read. ARCH-0076 (M10) documents the canonical priority bands.
 /// </summary>
 [ProviderPriority(100)]
-internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
+internal sealed class CacheRepositoryDecorator : IDataRouteAwareRepositoryDecorator
 {
     private readonly EntityCachePlan _plans;
     private readonly ILogger<CacheRepositoryDecorator> _logger;
@@ -28,6 +28,19 @@ internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
     }
 
     public object? TryDecorate(Type entityType, Type keyType, object repository, IServiceProvider services)
+        => TryDecorate(
+            entityType,
+            keyType,
+            repository,
+            DataRepositoryDecorationContext.Unbound,
+            services);
+
+    public object? TryDecorate(
+        Type entityType,
+        Type keyType,
+        object repository,
+        DataRepositoryDecorationContext context,
+        IServiceProvider services)
     {
         if (repository is null)
         {
@@ -56,7 +69,13 @@ internal sealed class CacheRepositoryDecorator : IDataRepositoryDecorator
         }
 
         var decoratorType = typeof(CachedRepository<,>).MakeGenericType(entityType, keyType);
-        var decorated = ActivatorUtilities.CreateInstance(services, decoratorType, repository, cacheClient, plan);
+        var decorated = ActivatorUtilities.CreateInstance(
+            services,
+            decoratorType,
+            repository,
+            cacheClient,
+            plan,
+            context);
         _logger.LogDebug(
             "Cache decorator applied to repository for {EntityType} using strategy {Strategy}.",
             entityType.Name,

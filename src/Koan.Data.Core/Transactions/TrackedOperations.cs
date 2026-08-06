@@ -2,6 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Data.Abstractions;
+using Koan.Data.Core.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Transactions;
 
@@ -19,6 +21,8 @@ internal interface ITrackedOperation
     /// Get the adapter hint for this operation (for grouping).
     /// </summary>
     string GetAdapterHint();
+
+    DataRouteBinding? ResolveDataBinding(IServiceProvider services);
 }
 
 /// <summary>
@@ -55,6 +59,18 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
     {
         return _context.Adapter ?? _context.Source ?? "Default";
     }
+
+    public DataRouteBinding? ResolveDataBinding(IServiceProvider services)
+    {
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: _partition ?? _context.Partition,
+            preserveTransaction: false);
+        return AdapterResolver.ResolveDecisionForEntity<TEntity>(
+            services,
+            services.GetRequiredService<DataSourceRegistry>()).Binding;
+    }
 }
 
 /// <summary>
@@ -90,6 +106,18 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
     public string GetAdapterHint()
     {
         return _context.Adapter ?? _context.Source ?? "Default";
+    }
+
+    public DataRouteBinding? ResolveDataBinding(IServiceProvider services)
+    {
+        using var _ = EntityContext.With(
+            source: string.IsNullOrWhiteSpace(_context.Source) ? null : _context.Source,
+            adapter: string.IsNullOrWhiteSpace(_context.Adapter) ? null : _context.Adapter,
+            partition: _partition ?? _context.Partition,
+            preserveTransaction: false);
+        return AdapterResolver.ResolveDecisionForEntity<TEntity>(
+            services,
+            services.GetRequiredService<DataSourceRegistry>()).Binding;
     }
 }
 
@@ -165,6 +193,8 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
     {
         return $"vector:{_context.Adapter ?? _context.Source ?? "Default"}";
     }
+
+    public DataRouteBinding? ResolveDataBinding(IServiceProvider services) => null;
 }
 
 /// <summary>
@@ -226,4 +256,6 @@ internal sealed class VectorDeleteOperation<TEntity, TKey> : ITrackedOperation
     {
         return $"vector:{_context.Adapter ?? _context.Source ?? "Default"}";
     }
+
+    public DataRouteBinding? ResolveDataBinding(IServiceProvider services) => null;
 }

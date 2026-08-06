@@ -23,6 +23,8 @@ mapping-use decisions are compiled outside warm operations; mapped member access
 The adapter exposes registered SQL record/scalar operations and provider-neutral inspection of tables and views.
 Container continuations are bounded, opaque after Data wraps them, and resumable. Sampling reads at most `take + 1`
 native rows so it reports `Complete` versus `ProviderLimit` truthfully.
+Repository plans derive container names from the constructing SQLite factory, including when SQLite is an inactive
+cutover target behind a different active provider.
 
 `SqlOperationBinding` is opaque. A registered SQL operation therefore selects a configured read lane. SQLite opens
 that lane's connection and enables native `query_only` before executing the command; an effective write fails at

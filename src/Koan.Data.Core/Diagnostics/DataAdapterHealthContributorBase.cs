@@ -23,6 +23,8 @@ public abstract class DataAdapterHealthContributorBase(
     private const string DefaultSource = "Default";
     private readonly IDataDiagnostics _runtimeDiagnostics =
         services.GetService(typeof(DataDiagnostics)) as IDataDiagnostics ?? diagnostics;
+    private readonly DefaultDataRouteAuthority? _routeAuthority =
+        services.GetService(typeof(DefaultDataRouteAuthority)) as DefaultDataRouteAuthority;
 
     /// <summary>The adapter identifier used by routing and source configuration.</summary>
     protected string Provider { get; } = provider;
@@ -116,13 +118,20 @@ public abstract class DataAdapterHealthContributorBase(
     {
         var sources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        if (Matches(defaultProvider.ProviderId))
+        var active = _routeAuthority?.Current;
+        if (active is not null && Matches(active.Plan.Adapter))
+        {
+            sources.Add(active.Plan.Source);
+        }
+        else if (active is null && Matches(defaultProvider.ProviderId))
         {
             sources.Add(DefaultSource);
         }
 
         foreach (var participation in _runtimeDiagnostics.GetAdapterParticipationsSnapshot()
-                     .Where(participation => Matches(participation.Provider)))
+                     .Where(participation =>
+                         participation.Role == DataAdapterParticipationRole.Explicit &&
+                         Matches(participation.Provider)))
         {
             sources.Add(participation.Source);
         }

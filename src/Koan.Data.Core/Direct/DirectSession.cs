@@ -74,9 +74,19 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         ct.ThrowIfCancellationRequested();
         var route = Resolve();
         var plan = DemandResolvedRoute(route, ceiling, _effect, "direct transaction begin");
-        var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
+        var binding = Bind(plan);
+        var lease = _sp.GetRequiredService<DataOperationHorizon>()
+            .Enter(binding, _effect, "direct transaction", ct)
+            .AsTask().GetAwaiter().GetResult();
+        DbConnection? conn = null;
         try
         {
+            conn = CreateConnection(
+                _sp,
+                route.Provider,
+                route.ConnectionString,
+                route.Source,
+                IsUnqualifiedDefault());
             conn.Open();
             var tx = conn.BeginTransaction();
             return new DirectTransaction(
@@ -86,11 +96,13 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 _maxRows,
                 plan,
                 _effect,
-                _sp.GetRequiredService<RecordSetMaterializer>());
+                _sp.GetRequiredService<RecordSetMaterializer>(),
+                lease);
         }
         catch
         {
-            conn.Dispose();
+            conn?.Dispose();
+            lease.DisposeAsync().AsTask().GetAwaiter().GetResult();
             throw;
         }
     }
@@ -261,16 +273,26 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         CancellationToken ct)
     {
         var route = Resolve();
-        _ = DemandResolvedRoute(route, ceiling, effect, operation);
-        var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
+        var plan = DemandResolvedRoute(route, ceiling, effect, operation);
+        var binding = Bind(plan);
+        var lease = await _sp.GetRequiredService<DataOperationHorizon>()
+            .Enter(binding, effect, operation, ct).ConfigureAwait(false);
+        DbConnection? conn = null;
         try
         {
+            conn = CreateConnection(
+                _sp,
+                route.Provider,
+                route.ConnectionString,
+                route.Source,
+                IsUnqualifiedDefault());
             await conn.OpenAsync(ct).ConfigureAwait(false);
-            return new ConnCtx(conn);
+            return new ConnCtx(conn, lease);
         }
         catch
         {
-            await conn.DisposeAsync().ConfigureAwait(false);
+            if (conn is not null) await conn.DisposeAsync().ConfigureAwait(false);
+            await lease.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
@@ -281,6 +303,12 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         if (_connectionString is null && TryGetEntityType(out _)) return null;
 
         var registry = _sp.GetService<DataSourceRegistry>();
+        if (_connectionString is null && string.IsNullOrWhiteSpace(_source) && string.IsNullOrWhiteSpace(_adapter))
+        {
+            var active = _sp.GetRequiredService<DefaultDataRouteAuthority>().Current.Plan;
+            active.Demand(effect, operation);
+            return active;
+        }
         if (_ceilingPlan is not null)
         {
             _ceilingPlan.Demand(effect, operation);
@@ -402,23 +430,18 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         }
 
         // Priority 4: No routing specified - use default source
-        if (sourceRegistry?.TryGetSource("Default", out var defSource) == true)
+        var active = _sp.GetRequiredService<DefaultDataRouteAuthority>().Current.Plan;
+        if (sourceRegistry?.TryGetSource(active.Source, out var defSource) == true)
         {
-            if (string.IsNullOrWhiteSpace(defSource.Adapter))
-            {
-                throw new InvalidOperationException(
-                    "The Default source does not specify an adapter. Add Koan:Data:Sources:Default:Adapter.");
-            }
-
             return ResolveProviderSource(
-                defSource.Adapter,
-                "Default",
+                active.Adapter,
+                active.Source,
                 defSource.ConnectionString,
                 resolver);
         }
 
         throw new InvalidOperationException(
-            "No source or adapter specified, and no 'Default' source configured. Specify Direct(source: ...) or Direct(adapter: ...) or configure Koan:Data:Sources:Default.");
+            $"The active default source '{active.Source}' is not configured. Restore the source declaration that matches the durable route record.");
     }
 
     private ConnectionRoute ResolveProviderSource(
@@ -460,7 +483,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         IServiceProvider sp,
         string provider,
         string connectionString,
-        string source)
+        string source,
+        bool defaultDerived)
     {
         var factories = sp.GetServices<IDataProviderConnectionFactory>()
                         ?? Enumerable.Empty<IDataProviderConnectionFactory>();
@@ -472,7 +496,12 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         var canonicalProvider = sp.GetService<DataProviderCatalog>()
             ?.Find(provider)
             ?.Provider ?? provider;
-        sp.GetService<DataDiagnostics>()?.ObserveParticipation(canonicalProvider, source);
+        sp.GetService<DataDiagnostics>()?.ObserveParticipation(
+            canonicalProvider,
+            source,
+            defaultDerived
+                ? DataAdapterParticipationRole.DefaultDerived
+                : DataAdapterParticipationRole.Explicit);
         return factory.Create(connectionString, source);
     }
 
@@ -560,12 +589,30 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return list;
     }
 
-    private sealed record ConnCtx(DbConnection Connection) : IAsyncDisposable
+    private DataRouteBinding Bind(DataSourcePlan plan)
+    {
+        var origin = IsUnqualifiedDefault()
+            ? DataRouteOrigin.Default
+            : DataRouteOrigin.ExplicitSource;
+        return _sp.GetRequiredService<DefaultDataRouteAuthority>().Bind(plan, origin);
+    }
+
+    private bool IsUnqualifiedDefault() =>
+        _connectionString is null && string.IsNullOrWhiteSpace(_source) && string.IsNullOrWhiteSpace(_adapter);
+
+    private sealed record ConnCtx(DbConnection Connection, DataOperationLease Lease) : IAsyncDisposable
     {
         public DbTransaction? Transaction { get; init; }
         public async ValueTask DisposeAsync()
         {
-            await Connection.DisposeAsync();
+            try
+            {
+                await Connection.DisposeAsync();
+            }
+            finally
+            {
+                await Lease.DisposeAsync();
+            }
         }
     }
 

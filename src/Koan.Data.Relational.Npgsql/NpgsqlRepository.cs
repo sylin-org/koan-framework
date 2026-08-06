@@ -42,6 +42,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private readonly IServiceProvider _services;
     private readonly MappingPlan? _declaredMapping;
     private readonly DataSegmentationPlan _segmentation;
+    private readonly INamingProvider? _namingProvider;
     private readonly object _plansGate = new();
     private readonly Dictionary<string, NpgsqlEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
     private readonly int _planLimit;
@@ -50,6 +51,15 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private NpgsqlEntityPlan<TEntity, TKey> _plan => ResolvePlan();
 
     public NpgsqlRepository(IServiceProvider services, NpgsqlRepositoryOptions options, IStorageNameResolver resolver)
+        : this(services, options, resolver, null)
+    {
+    }
+
+    public NpgsqlRepository(
+        IServiceProvider services,
+        NpgsqlRepositoryOptions options,
+        IStorageNameResolver resolver,
+        INamingProvider? namingProvider)
     {
         _services = services;
         _options = options;
@@ -58,13 +68,13 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(options.Source);
+        _namingProvider = namingProvider;
         _ = resolver;
     }
 
     private NpgsqlEntityPlan<TEntity, TKey> ResolvePlan()
     {
-        var table = _declaredMapping?.Container.Name ??
-                    Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+        var table = _declaredMapping?.Container.Name ?? ResolveStorageName();
         var key = _declaredMapping?.Id ?? $"{_options.SearchPath}/{table}";
         lock (_plansGate)
         {
@@ -80,6 +90,10 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             return created;
         }
     }
+
+    private string ResolveStorageName() => _namingProvider is null
+        ? Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_services)
+        : _namingProvider.ResolveStorage(typeof(TEntity), EntityContext.Current?.Partition, _services);
 
     public StorageOptimizationInfo OptimizationInfo { get; }
 

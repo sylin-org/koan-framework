@@ -4,10 +4,10 @@ domain: framework
 title: "Task guides"
 audience: [developers, operators, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-08-06
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-22
+  date_last_tested: 2026-08-06
   status: verified
   scope: distinct public tasks subordinate to capability-pillar contracts
 ---
@@ -21,6 +21,7 @@ capability.
 | Task | Owning pillar | Guide |
 |---|---|---|
 | Process a large Entity set without unbounded materialization | Data | [Entity access and streaming](data/entity-access-and-streaming.md) |
+| Move the active default Entity database to an empty graduated provider | Data | [Verified default-route cutover](data/default-route-cutover.md) |
 | Configure external sign-in and application authorization | Identity and isolation | [Authentication setup](authentication-setup.md) |
 | Apply fail-closed tenant isolation | Identity and isolation | [Tenancy](tenancy-howto.md) |
 | Add retries, schedules, chains, or durable background execution | Work and communication | [Background jobs](jobs-howto.md) |

@@ -6,6 +6,7 @@ using Koan.Data.Abstractions;
 using Koan.Core;
 using Koan.Data.Core.Infrastructure;
 using Koan.Data.Core.Routing;
+using Koan.Core.Hosting.Registry;
 
 namespace Koan.Data.Core.Composition;
 
@@ -19,8 +20,9 @@ internal static class DataCompositionFacts
     public static void Project(KoanCompositionBuilder builder, IServiceProvider services, string source)
     {
         ContributeElections(builder, services, source);
-        ContributeEntities(builder, services);
+        ContributeEntities(builder);
         ContributeSourcePlans(builder, services, source);
+        ContributeDefaultRoute(builder, services, source);
         ContributeLifecycle(builder, services, source);
     }
 
@@ -72,19 +74,43 @@ internal static class DataCompositionFacts
         }
     }
 
-    // Best-effort: IDataDiagnostics reflects AggregateConfigs.Cache, populated lazily on first
-    // Data<T,K> access — so at boot this is typically the entities the app touched during startup.
-    private static void ContributeEntities(KoanCompositionBuilder builder, IServiceProvider services)
+    private static void ContributeEntities(KoanCompositionBuilder builder)
     {
-        var diagnostics = services.GetService<IDataDiagnostics>();
-        if (diagnostics is null) return;
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IEntity))
+                     .Where(static type => type.IsClass && !type.IsAbstract && !type.ContainsGenericParameters)
+                     .OrderBy(static type => type.FullName ?? type.Name, StringComparer.Ordinal))
+            builder.AddEntity(ShortTypeName(type.FullName ?? type.Name));
+    }
 
-        foreach (var entity in diagnostics.GetEntityConfigsSnapshot())
+    private static void ContributeDefaultRoute(
+        KoanCompositionBuilder builder,
+        IServiceProvider services,
+        string source)
+    {
+        var authority = services.GetService<DefaultDataRouteAuthority>();
+        if (authority is null) return;
+
+        var current = authority.Current;
+        var subject = "data:route:default";
+        var tokens = new List<string>
         {
-            var type = entity.EntityType;
-            var shortName = ShortTypeName(type);
-            builder.AddEntity(shortName);
-        }
+            $"adapter:{current.Plan.Adapter}",
+            $"source:{current.Plan.Source}",
+            $"authority-revision:{current.AuthorityRevision}",
+            $"content-generation:{current.ContentGeneration}"
+        };
+        tokens.AddRange(current.QuarantinedRouteIdentities
+            .Order(StringComparer.Ordinal)
+            .Select(static route => $"quarantined:{route}"));
+        builder.AddCapability(subject, tokens);
+        builder.AddObservation(
+            Constants.Diagnostics.Codes.DefaultRouteSelected,
+            subject,
+            $"Koan's active default Data route is source '{current.Plan.Source}' through provider " +
+            $"'{current.Plan.Adapter}' at authority revision {current.AuthorityRevision} and content generation " +
+            $"{current.ContentGeneration}.",
+            "durable-route-authority",
+            source);
     }
 
     private static void ContributeLifecycle(KoanCompositionBuilder builder, IServiceProvider services, string source)

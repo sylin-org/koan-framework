@@ -2,6 +2,7 @@ using Koan.Cache.Abstractions.Stores;
 using Koan.Core.Context;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Routing;
 using Koan.Cache.Stores;
 using Koan.Cache.Identity;
 
@@ -11,7 +12,8 @@ namespace Koan.Cache.Entity;
 internal sealed class EntityCacheEvictionCoordinator(
     ICacheSubjectClient writer,
     EntityCachePlan plans,
-    KoanContextCarrierRegistry contextCarriers)
+    KoanContextCarrierRegistry contextCarriers,
+    IDataService? data = null)
 {
     public async Task<EntityCacheEviction> Evict<TEntity, TKey>(
         IAsyncEnumerable<Entity<TEntity, TKey>> entities,
@@ -25,6 +27,9 @@ internal sealed class EntityCacheEvictionCoordinator(
         var plan = plans.Require(typeof(TEntity));
         var capturedDataContext = EntityContext.Current;
         var capturedCarriers = contextCarriers.Capture();
+        string? routeNamespace;
+        using (EnterContext(capturedDataContext, capturedCarriers))
+            routeNamespace = (data?.GetRepository<TEntity, TKey>() as IDataRouteBoundRepository)?.RouteNamespace;
         var enumerated = 0L;
         var removed = 0L;
         var absent = 0L;
@@ -55,7 +60,7 @@ internal sealed class EntityCacheEvictionCoordinator(
                     continue;
                 }
 
-                if (!plan.TryBuildKey(entity, id, out var key))
+                if (!plan.TryBuildKey(entity, id, out var key, routeNamespace))
                 {
                     throw new InvalidOperationException(
                         $"Cache policy for '{typeof(TEntity).Name}' could not resolve key template " +
