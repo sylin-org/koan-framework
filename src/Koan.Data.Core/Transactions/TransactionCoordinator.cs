@@ -8,6 +8,7 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Failures;
 using Microsoft.Extensions.Logging;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core.Transactions;
 
@@ -22,6 +23,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private readonly Activity? _activity;
     private bool _isCompleted;
     private readonly object _lock = new();
+    private readonly IServiceProvider _services;
+    private readonly DataOperationHorizon _operationHorizon;
 
     public string Name { get; }
     public bool IsCompleted => _isCompleted;
@@ -29,12 +32,16 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     public TransactionCoordinator(
         string name,
         IDataService dataService,
+        IServiceProvider services,
+        DataOperationHorizon operationHorizon,
         ILogger<TransactionCoordinator> logger,
         TransactionOptions options)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _services = services ?? throw new ArgumentNullException(nameof(services));
+        _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
 
         // Start telemetry span
         if (_options.EnableTelemetry)
@@ -164,7 +171,16 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 _operationsByAdapter.Values.Sum(list => list.Count),
                 _operationsByAdapter.Count);
 
-            // Execute operations per adapter (best-effort atomicity)
+            var bindings = _operationsByAdapter.Values
+                .SelectMany(static operations => operations)
+                .Select(operation => operation.ResolveDataBinding(_services))
+                .OfType<DataRouteBinding>()
+                .ToArray();
+            await using var operationHorizon = await _operationHorizon
+                .EnterMany(bindings, $"deferred transaction '{Name}'", ct)
+                .ConfigureAwait(false);
+
+            // Execute operations per adapter (best-effort atomicity) inside one declared route horizon.
             await ExecuteOperations(ct);
 
             _isCompleted = true;

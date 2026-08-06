@@ -47,9 +47,12 @@ internal static class AdapterResolver
             }
 
             return Required(
+                services,
+                sourceRegistry,
                 providers,
                 source.Adapter,
                 routed.Source!,
+                DataRouteOrigin.ExplicitSource,
                 Constants.Diagnostics.Reasons.ContextSource,
                 $"Correct Koan:Data:Sources:{routed.Source}:Adapter or reference the requested connector.");
         }
@@ -74,9 +77,12 @@ internal static class AdapterResolver
             }
 
             return Required(
+                services,
+                sourceRegistry,
                 providers,
                 source.Adapter,
                 routedKey,
+                DataRouteOrigin.DatabaseAxis,
                 Constants.Diagnostics.Reasons.DatabaseAxis,
                 $"Correct Koan:Data:Sources:{routedKey}:Adapter or reference the requested connector.");
         }
@@ -84,9 +90,12 @@ internal static class AdapterResolver
         if (!string.IsNullOrWhiteSpace(context?.Adapter))
         {
             return Required(
+                services,
+                sourceRegistry,
                 providers,
                 context.Adapter,
                 "Default",
+                DataRouteOrigin.AmbientAdapter,
                 Constants.Diagnostics.Reasons.ContextAdapter,
                 "Correct EntityContext.Adapter or reference the requested connector.");
         }
@@ -95,9 +104,12 @@ internal static class AdapterResolver
         if (entityAdapter is not null)
         {
             return Required(
+                services,
+                sourceRegistry,
                 providers,
                 entityAdapter,
                 "Default",
+                DataRouteOrigin.EntityAttribute,
                 Constants.Diagnostics.Reasons.EntityAttribute,
                 $"Correct the provider decoration on '{typeof(TEntity).Name}' or reference the requested connector.");
         }
@@ -106,12 +118,15 @@ internal static class AdapterResolver
     }
 
     internal static AdapterResolutionDecision ResolveDefault(IServiceProvider services)
-        => services.GetRequiredService<DataDefaultProviderPlan>().Decision;
+        => services.GetRequiredService<DefaultDataRouteAuthority>().ResolveDefault();
 
     private static AdapterResolutionDecision Required(
+        IServiceProvider services,
+        DataSourceRegistry sources,
         DataProviderCatalog providers,
         string requested,
         string source,
+        DataRouteOrigin origin,
         string via,
         string correction)
     {
@@ -122,7 +137,9 @@ internal static class AdapterResolver
                 : "data:source",
             via,
             correction);
-        return new AdapterResolutionDecision(selected.Factory, source, selected.Receipt);
+        var plan = sources.GetPlan(source, selected.Receipt.ProviderId);
+        var binding = services.GetRequiredService<DefaultDataRouteAuthority>().Bind(plan, origin);
+        return new AdapterResolutionDecision(selected.Factory, source, selected.Receipt, binding);
     }
 
     private static string? ResolveFromAttribute<TEntity>() where TEntity : class

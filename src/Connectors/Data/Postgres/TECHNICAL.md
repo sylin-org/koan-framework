@@ -16,6 +16,8 @@ source: src/Connectors/Data/Postgres/
 - `StorageLifecycle.External` disables DDL below the facade. `Access=ReadOnly` is enforced by the compiled source plan
   before mapped or managed writes.
 - `Inspect()` lists, resolves, describes, and samples tables/views through neutral storage descriptors.
+- The inspector exposes non-creating storage status through an open plus `SELECT 1`, returning redacted status codes for
+  capability-qualified cutover planning.
 - Registered `.Sql(...)` records/scalars require a declared read lane and execute in a PostgreSQL read-only transaction.
 
 ## Configuration

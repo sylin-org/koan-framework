@@ -30,6 +30,7 @@ await app.RunAsync();
 | [koan-bootstrap](koan-bootstrap/SKILL.md) | Understand `AddKoan()`, Reference = Intent, and `KoanModule`. |
 | [koan-debugging](koan-debugging/SKILL.md) | Read startup, health, facts, lock drift, and corrective failures. |
 | [koan-data-modeling](koan-data-modeling/SKILL.md) | Model keys, aggregates, relationships, lifecycle, and value objects. |
+| [koan-data-cutover](koan-data-cutover/SKILL.md) | Promote the active default Entity database through verified single-host cutover. |
 | [koan-caching](koan-caching/SKILL.md) | Apply Entity cache semantics and inspect topology limits. |
 | [koan-jobs](koan-jobs/SKILL.md) | Express durable Entity-owned work, retry, progress, and schedules. |
 | [koan-web](koan-web/SKILL.md) | Project Entities and business actions through ASP.NET Core. |
@@ -73,4 +74,4 @@ product surface.
 Run `pwsh scripts/skills-lint.ps1 -Strict` and `pwsh scripts/validate-code-examples.ps1` after changing
 skills. The public-document gate also treats every tracked skill asset as public narrative.
 
-Aligned with the Koan 0.20 preview on 2026-07-19.
+Aligned with the Koan 0.20 preview on 2026-08-06.

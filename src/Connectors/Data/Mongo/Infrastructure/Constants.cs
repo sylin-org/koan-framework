@@ -46,4 +46,11 @@ internal static class Constants
         internal const string Identity = "_id";
         internal const string ManagedDocument = "__koan_document";
     }
+
+    internal static class StorageStatus
+    {
+        internal const string Ready = "ready";
+        internal const string Timeout = "mongo-timeout";
+        internal const string Unavailable = "mongo-unavailable";
+    }
 }

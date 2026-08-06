@@ -3,6 +3,9 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Failures;
+using Koan.Data.Core.Routing;
+using Koan.Core.Hosting.App;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Transfers;
 
@@ -186,6 +189,22 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     protected static TransferContextSnapshot SnapshotFor(TransferContextOptions? context)
         => context?.Snapshot() ?? TransferContextSnapshot.Empty;
+
+    private protected ValueTask<DataMultiOperationLease> EnterOperationHorizon(CancellationToken ct)
+    {
+        var services = AppHost.Current
+            ?? throw new InvalidOperationException("A running Koan host is required for Entity transfer.");
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var bindings = new List<DataRouteBinding>(2);
+        foreach (var context in new[] { FromContext, ToContext })
+        {
+            using var scope = context?.Apply();
+            var binding = AdapterResolver.ResolveDecisionForEntity<TEntity>(services, registry).Binding;
+            if (binding is not null) bindings.Add(binding);
+        }
+        return services.GetRequiredService<DataOperationHorizon>()
+            .EnterMany(bindings, $"Entity transfer for '{typeof(TEntity).FullName}'", ct);
+    }
 
     protected sealed class TransferProgress
     {

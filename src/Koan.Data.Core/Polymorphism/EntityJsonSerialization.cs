@@ -60,6 +60,21 @@ public static class EntityJsonSerialization
         return JsonConvert.SerializeObject(entity, entity.GetType(), DocumentSettings);
     }
 
+    /// <summary>
+    /// Serializes an Entity into a typed token tree without a JSON text round-trip, preserving date and binary token
+    /// kinds for canonical framework evidence.
+    /// </summary>
+    public static JToken SerializeDocumentToken(object entity)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        var serializer = JsonSerializer.Create(DocumentSettings);
+        var writer = new JTokenWriter();
+        serializer.Serialize(writer, entity, entity.GetType());
+        return writer.Token
+            ?? throw new InvalidDataException(
+                $"Entity token serialization produced no document for '{entity.GetType().FullName}'.");
+    }
+
     /// <summary>Materializes a framework Entity document through the same safe family catalog as adapters.</summary>
     public static object DeserializeDocument(string json, Type nominalType)
     {

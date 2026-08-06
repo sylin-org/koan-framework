@@ -62,6 +62,10 @@ from null, retains duplicate-name occurrences by ordinal, and converts binary, t
 value algebra. Inspection reads raw BSON so the driver's ordinary document deserializer cannot discard or reject legal
 duplicate elements; raw buffers are disposed immediately after the bounded neutral copy is complete.
 
+The native status facet issues a non-creating `ping` through the route-owned client and returns only stable, redacted
+readiness codes. Cutover combines that proof with complete collection inventory; a provider-limited inventory is never
+treated as complete.
+
 `MongoPipelineBinding` stores validated JSON stages and the target collection. It rejects `$out` and `$merge` during
 composition and therefore carries `ValidatedRead` proof. Execution parses immutable stages, structurally substitutes
 declared `{{parameter}}` values as BSON, appends a provider bound, and returns neutral records or an exact one-record,

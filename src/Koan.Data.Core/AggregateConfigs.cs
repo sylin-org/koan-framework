@@ -26,18 +26,8 @@ public static class AggregateConfigs
 
         var config = (AggregateConfig<TEntity, TKey>)cache.GetOrAdd(key, _ =>
         {
-            var providers = sp.GetRequiredService<Routing.DataProviderCatalog>();
-            var requested = ResolveProvider(typeof(TEntity));
-            var provider = requested is null
-                ? sp.GetRequiredService<Routing.DataDefaultProviderPlan>().ProviderId
-                : providers.Require(
-                    requested,
-                    "data:entity",
-                    Infrastructure.Constants.Diagnostics.Reasons.EntityAttribute,
-                    $"Correct the provider decoration on '{typeof(TEntity).Name}' or reference the requested connector.")
-                    .ProviderId;
             var idSpec = AggregateMetadata.GetIdSpec(typeof(TEntity));
-            return new AggregateConfig<TEntity, TKey>(provider, idSpec, sp);
+            return new AggregateConfig<TEntity, TKey>(idSpec, sp);
         });
 
         sp.GetService<DataDiagnostics>()?.Observe(new EntityConfigInfo(
@@ -78,15 +68,6 @@ public static class AggregateConfigs
             new ConditionalWeakTable<
                 IServiceProvider,
                 ConcurrentDictionary<(Type EntityType, Type KeyType), object>>());
-    }
-
-    private static string? ResolveProvider(Type aggregateType)
-    {
-        // Prefer explicit SourceAdapter if present, then fall back to legacy DataAdapter
-        var src = (SourceAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(SourceAdapterAttribute));
-        if (src is not null && !string.IsNullOrWhiteSpace(src.Provider)) return src.Provider;
-        var data = (DataAdapterAttribute?)Attribute.GetCustomAttribute(aggregateType, typeof(DataAdapterAttribute));
-        return data?.Provider;
     }
 }
 
