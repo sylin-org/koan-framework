@@ -13,18 +13,19 @@ provider alias. It does not declare itself an automatic floor. Selection follows
 attribute, configured source, direct-reference, automatic-floor, and priority rules; the connector adds no separate
 registration API.
 
-`InMemoryRepository<TEntity,TKey>` is a thin backend over the shared key-value store contract. Its
-host-owned singleton store partitions physical dictionaries by routed source, Entity type, and ambient partition.
-The store is internal implementation state; process exit discards every dictionary.
+`Runtime/InMemoryRepository<TEntity,TKey>` is a thin backend over the shared key-value store contract.
+`Runtime/InMemoryState` owns one finite host-local registry, partitioned by routed source, Entity root, and ambient
+partition. Values are serialized with Data Core's root-aware Entity codec and materialized anew on every read. The
+store is internal implementation state; process exit discards every dictionary.
 
 ## Capabilities
 
 The repository declares:
 
-- `FilterExecutionProfile(InMemory, fullyEvaluated: true)`;
+- `FilterExecutionProfile(InMemory, SupportsBoundedCandidates: true)`;
 - bulk upsert;
 - bulk delete; and
-- atomic batch within the process-local store.
+- ordered batch execution without an atomic guarantee.
 
 It does not declare `DataCaps.Query.ProviderBoundedPaging`. Its query path starts from the resident
 full-source dictionary, so slicing a numbered page is not evidence of provider-bounded traversal.
@@ -32,6 +33,10 @@ full-source dictionary, so slicing a numbered page is not evidence of provider-b
 The common key-value family supplies managed-field guards, isolation modes, instructions, and the
 provider-neutral Entity repository contract. This connector does not infer remote durability,
 distributed atomicity, or production recovery from those shared semantics.
+
+The factory publishes the same executable claims and rejects two inapplicable source decisions rather than silently
+weakening them: physical `Map<T>` declarations and `StorageLifecycle.External`. `RequireAtomic=true` rejects before
+dispatch because the KeyValue batch has no single all-or-nothing native boundary.
 
 ## Streaming boundary
 
@@ -44,8 +49,11 @@ distributed atomicity, or production recovery from those shared semantics.
 
 ## Concurrency and isolation
 
-Each physical store is a `ConcurrentDictionary`. Individual key operations and the connector's
-declared batch contract are process-local. There is no cross-process coordination, durable journal,
+Each physical store is a `ConcurrentDictionary`. Warm lookup is lock-free; only creation misses enter the reservation
+gate. The host owns at most 4096 source/root/partition stores; exceeding the bound rejects before another store is
+published. Writes serialize detached snapshots and reads deserialize fresh values, so POCO references are never the
+persistence boundary. Individual key operations and the connector's batch contract are process-local. There is no
+cross-process coordination, durable journal,
 replication, backup, or restart recovery.
 
 `EntityContext.Partition` changes the physical store. Routed data sources also remain distinct. Test
@@ -56,7 +64,8 @@ every inherited Entity battery.
 
 `Koan.Data.Connector.InMemory.Tests` covers CRUD, filtering/capabilities, sorting, batch behavior,
 instructions, isolation modes, partitions, host ownership, and managed-field no-leak behavior. The
-current suite passes 56/56.
+current suite passes 56/56, including detached nested-object/collection mutation, root/variant round trips, and the
+finite host-state boundary.
 
 ## Unsupported
 

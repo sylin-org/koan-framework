@@ -39,6 +39,7 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     /// <summary>
     /// Job status: Pending, Processing, Completed, Failed
     /// </summary>
+    [Index(Group = "ix_embed_jobs_claim", Order = 0)]
     public required EmbedJobStatus Status { get; set; }
 
     /// <summary>
@@ -54,12 +55,24 @@ public class EmbedJob<TEntity> : Entity<EmbedJob<TEntity>>, IAmbientExempt
     /// <summary>
     /// When job was created/queued
     /// </summary>
+    [Index(Group = "ix_embed_jobs_claim", Order = 2)]
     public DateTimeOffset CreatedAt { get; set; }
 
     /// <summary>
     /// When job started processing (null if not yet started)
     /// </summary>
     public DateTimeOffset? StartedAt { get; set; }
+
+    /// <summary>
+    /// Process-unique owner of the current processing claim. Null outside <see cref="EmbedJobStatus.Processing"/>.
+    /// </summary>
+    public string? Owner { get; set; }
+
+    /// <summary>
+    /// Durable processing lease. An expired lease makes an interrupted job eligible for another worker to reclaim.
+    /// </summary>
+    [Index(Group = "ix_embed_jobs_claim", Order = 1)]
+    public DateTimeOffset? LeaseUntil { get; set; }
 
     /// <summary>
     /// When job completed or failed (null if not finished)

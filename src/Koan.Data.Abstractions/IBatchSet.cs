@@ -7,14 +7,18 @@ namespace Koan.Data.Abstractions;
 /// <typeparam name="TEntity">The entity type managed by this batch set.</typeparam>
 /// <typeparam name="TKey">The entity identifier type.</typeparam>
 /// <remarks>
-/// Atomicity guarantees depend on the underlying provider. Relational providers (Postgres, SQL Server)
-/// wrap the batch in a transaction. Document providers (MongoDB) execute operations sequentially
-/// without a distributed transaction unless the provider explicitly supports multi-document sessions.
-/// Batch size is not limited by the interface, but very large batches (&gt;1 000 items) should be
-/// split to stay within provider limits and avoid memory pressure.
+/// Atomicity and complete per-item outcomes are earned execution guarantees, not provider-family assumptions.
+/// Callers request atomicity explicitly; the created native batch must qualify the seam before work and return a
+/// matching receipt after dispatch. Use <see cref="BatchOptions.MaxItems"/> to state a finite application bound.
 /// </remarks>
 public interface IBatchSet<TEntity, TKey>
 {
+    /// <summary>
+    /// Guarantees this created native batch can promise before execution. The default is deliberately
+    /// conservative so an old or sequential batch can never satisfy <see cref="BatchOptions.RequireAtomic"/>.
+    /// </summary>
+    BatchExecutionCapabilities ExecutionCapabilities => BatchExecutionCapabilities.None;
+
     /// <summary>Queues an insert for <paramref name="entity"/>.</summary>
     IBatchSet<TEntity, TKey> Add(TEntity entity);
 
@@ -38,6 +42,6 @@ public interface IBatchSet<TEntity, TKey>
     /// </summary>
     /// <param name="options">Optional batch execution options (timeout, conflict strategy, etc.).</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>A <see cref="BatchResult"/> summarising the operations performed.</returns>
+    /// <returns>A <see cref="BatchResult"/> describing the operations and execution guarantee actually realized.</returns>
     Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default);
 }

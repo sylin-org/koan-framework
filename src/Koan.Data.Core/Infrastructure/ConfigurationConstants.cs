@@ -7,6 +7,11 @@ internal static class ConfigurationConstants
     public static class Sources
     {
         public const string Section = ConfigurationConstants.Section + ":Sources";
+        public const string Adapter = "Adapter";
+        public const string Connection = "ConnectionString";
+        public const string StorageLifecycle = "StorageLifecycle";
+        public const string Access = "Access";
+        public const string ReadLanes = "ReadLanes";
 
         /// <summary>
         /// Builds "Koan:Data:Sources:{sourceName}".

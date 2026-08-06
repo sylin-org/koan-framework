@@ -1,48 +1,67 @@
-using System.Collections.Concurrent;
-using Koan.Data.Abstractions;
 using Koan.Core;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Vector.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Vector.Connector.InMemory;
 
-/// <summary>
-/// In-process, in-memory <see cref="IVectorAdapterFactory"/> — the zero-infrastructure vector floor.
-/// Issues per-(entity, partition, source) <see cref="InMemoryVectorRepository{TEntity, TKey}"/> stores keyed by
-/// Vector's selected-provider naming output, so physical isolation works
-/// with no external infrastructure. Reference = Intent: referencing this package makes a single managed
-/// binary capable of semantic search (k-NN over <see cref="System.Numerics.Tensors.TensorPrimitives"/>).
-/// </summary>
-/// <remarks>
-/// Priority −100 mirrors the in-memory data adapter: it is the fallback that activates only when no
-/// other vector provider is configured (a real server, or sqlite-vec for the durable in-proc tier).
-/// This is also the cross-adapter convergence oracle — every native provider's pushdown is validated
-/// against the result this adapter produces in managed code.
-/// </remarks>
-[ProviderPriority(-100)]
-public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory
+/// <summary>Host-owned factory for the infrastructure-free exact Vector adapter.</summary>
+[ProviderPriority(Infrastructure.Constants.Provider.Priority)]
+public sealed class InMemoryVectorAdapterFactory : IVectorAdapterFactory, IDisposable
 {
-    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, (float[] Embedding, object? Metadata)>> _stores
-        = new(StringComparer.Ordinal);
+    private readonly InMemoryVectorOptions _options;
+    private readonly InMemoryVectorStoreCatalog _stores;
 
-    public string Provider => "inmemory";
-    public IReadOnlyCollection<string> Aliases => ["memory", "inproc"];
+    public InMemoryVectorAdapterFactory(IOptions<InMemoryVectorOptions> options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        _options = Validate(options.Value);
+        _stores = new InMemoryVectorStoreCatalog(_options.MaxSpaces);
+    }
+
+    public string Provider => Infrastructure.Constants.Provider.Name;
+    public IReadOnlyCollection<string> Aliases => Infrastructure.Constants.Provider.Aliases;
     public bool IsAutomaticFloor => true;
 
-    public StorageNamingCapability GetNamingCapability(IServiceProvider services)
-        => new()
-        {
-            Style = StorageNamingStyle.EntityType,
-            Casing = NameCasing.AsIs,
-            PartitionSeparator = '#',
-            Partition = PartitionTokenPolicy.Default,
-        };
+    public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
+    {
+        Style = StorageNamingStyle.EntityType,
+        Casing = NameCasing.AsIs,
+        PartitionSeparator = '#',
+        Partition = PartitionTokenPolicy.Default
+    };
 
-    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider sp, string source = "Default")
+    public IVectorSearchRepository<TEntity, TKey> Create<TEntity, TKey>(
+        IServiceProvider services,
+        VectorSpacePlan plan)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
-        // ARCH-0103 P1 (Moniker): the routed source prefixes the store key, so a Database-mode axis lands each ambient's
-        // embeddings in a distinct in-memory store (native-or-emulated: the emulation is a source-keyed dictionary).
-        => new InMemoryVectorRepository<TEntity, TKey>(this, sp, _stores, source);
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(plan);
+        if (plan.Dimensions > _options.MaxDimensions)
+            throw new InvalidOperationException(
+                $"Vector space '{plan.Name}' declares {plan.Dimensions} dimensions; InMemory is bounded to {_options.MaxDimensions}. " +
+                "Reduce Dimensions or increase Koan:Data:Vector:InMemory:MaxDimensions.");
+        if (plan.Visibility != VectorVisibility.Session)
+            throw new NotSupportedException(
+                "InMemory Vector is immediately session-visible and does not simulate Eventual visibility. Use Visibility(Session).");
+        return new InMemoryVectorRepository<TEntity, TKey>(services, this, plan, _stores, _options);
+    }
 
+    public void Dispose() => _stores.Dispose();
+
+    private static InMemoryVectorOptions Validate(InMemoryVectorOptions value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (value.MaxSpaces <= 0) throw Invalid(nameof(value.MaxSpaces));
+        if (value.MaxPointsPerSpace <= 0) throw Invalid(nameof(value.MaxPointsPerSpace));
+        if (value.MaxDimensions <= 0) throw Invalid(nameof(value.MaxDimensions));
+        if (value.MaxMetadataBytesPerPoint <= 0) throw Invalid(nameof(value.MaxMetadataBytesPerPoint));
+        return value;
+    }
+
+    private static InvalidOperationException Invalid(string name) =>
+        new($"InMemoryVectorOptions.{name} must be greater than zero.");
 }

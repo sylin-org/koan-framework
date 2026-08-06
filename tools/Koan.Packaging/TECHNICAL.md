@@ -22,7 +22,7 @@ version index. Family test projects and workflows—not this inventory tool—ow
 - `api-baselines`
 
 `product-surface --check` compiles the current claims and evaluated package graph, then compares both
-canonical generated outputs without writing them. Supported claims require 0.20 version intent and a
+canonical generated outputs without writing them. Supported claims require a supported compatibility-line intent and a
 supported public dependency closure. `api-baselines` independently requires package validation for
 supported assembly owners once a public baseline exists; never-published packages remain explicit
 first-publication cases.

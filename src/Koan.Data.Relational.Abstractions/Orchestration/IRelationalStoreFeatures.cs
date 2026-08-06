@@ -7,4 +7,8 @@ public interface IRelationalStoreFeatures
     bool SupportsPersistedComputedColumns { get; }
     bool SupportsIndexesOnComputedColumns { get; }
     string ProviderName { get; }
+    bool SupportsDefinitionValidation => false;
+    bool SupportsMappedIndexes => false;
+    bool SupportsRewriteFreeExpressionIndexes => false;
+    bool SupportsNativeTtl => false;
 }

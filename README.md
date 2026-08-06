@@ -1,51 +1,8 @@
-# Koan Framework
+# Koan
 
-Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications: the “Ruby on
-Rails for agentic .NET.” It is designed to move from V0 to V1 in meaningful small steps—application
-code states business intent while the framework owns composition, backend negotiation, lifecycle,
-and explanation.
+## Write with intent. Koan makes it real.
 
-> **Status:** Koan 0.20 is the preview line. Its supported foundation and extensions are explicit;
-> other available packages remain verified, demonstrated, experimental, specified, or unassessed. The supported
-> 0.20 package set is live on NuGet; use the [generated product surface](docs/reference/product-surface.md) as the
-> maturity authority.
-
-## Reach a meaningful result
-
-Install the template from NuGet and create a persisted web API:
-
-```powershell
-dotnet new install Sylin.Koan.Templates
-dotnet new koan-web -o TodoApi
-cd TodoApi
-dotnet run
-```
-
-In another shell, create and read a Todo and inspect what composed it:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
-  -ContentType application/json -Body '{"title":"buy milk"}'
-Invoke-RestMethod http://localhost:5000/api/todos
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
-```
-
-Use the URL printed by the application if it differs. The complete result is in
-[the template guide](templates/README.md); repository contributors can inspect the richer executable contract in
-[`samples/FirstUse`](samples/FirstUse/README.md).
-
-## The application grammar
-
-The normal web host is four lines:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
-var app = builder.Build();
-await app.RunAsync();
-```
-
-A model and its HTTP surface remain business-shaped:
+Declare what your application knows. Declare how the world reaches it.
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -58,75 +15,66 @@ public sealed class Todo : Entity<Todo>
 public sealed class TodosController : EntityController<Todo>;
 ```
 
-That expression gains Entity persistence, query, paging, controller conventions, health, structured
-startup reporting, and runtime facts from referenced capabilities. There is no application repository,
-`DbContext`, schema bootstrap, controller CRUD plumbing, or framework service-registration list.
+**Entity. Controller. Done.**
 
-```csharp
-var todo = await new Todo { Title = "Ship the meaningful step" }.Save();
-var same = await Todo.Get(todo.Id);
-var open = await Todo.Query(item => !item.Done);
-await todo.Remove();
+Run it and `/api/todos` is a persisted, queryable HTTP API.
+
+No `DbContext`. No repository. No schema script. No CRUD service. No endpoint mapping.
+
+## Make one
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run -- --urls http://localhost:5000
 ```
 
-## Grow by intent
+Create a Todo. Read it back. It survives the restart.
 
-References make capabilities available. `AddKoan()` compiles their modules once; the relevant pillar
-elects providers and reports the result. Adding a capability should add business vocabulary, not
-infrastructure ceremony.
-
-Examples:
-
-- `[Cacheable]` adds Entity cache semantics.
-- `IKoanJob<T>` makes an Entity durable work with progress and schedules.
-- `[Embedding]` adds semantic indexing and search when AI/vector providers are present.
-- `[McpEntity]` projects a governed Entity surface to agents.
-- Entity Events and Transport are local-first; adding an eligible connector can transparently extend
-  Transport reach without changing the application terminal. Events remain local to the process.
-
-```csharp
-await order.Events.Raise<OrderApproved>(ct); // something happened to this order
-await order.Transport.Send(ct);              // distribute an isolated copy of its current state
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
+  -ContentType application/json -Body '{"title":"buy milk"}'
+Invoke-RestMethod http://localhost:5000/api/todos
 ```
 
-The same terminals lift pointwise over Entity collections and lazy streams. Backend differences are
-negotiated, not hidden: configured intent either resolves to an eligible provider or fails with a
-corrective explanation.
+## Agent, meet Todo.
 
-## Inspect what happened
+Add Koan's MCP package and one declaration:
 
-When Koan is working well, the same resolved composition is visible through:
+```powershell
+dotnet add package Sylin.Koan.Mcp
+```
 
-- the startup report;
-- `/health/live` and `/health/ready`;
-- `/.well-known/Koan/facts` for operators and reviewers;
-- `koan://facts`, `koan://entities`, and `koan://self` for MCP clients; and
-- `koan.lock.json` for referenced-module drift.
+```diff
++using Koan.Mcp;
++
++[McpEntity(Name = "Todo", Description = "Work the team intends to finish")]
+ public sealed class Todo : Entity<Todo>
+```
 
-These are projections of runtime decisions, not separate configuration authorities.
+Now an MCP client can discover and work with the same `Todo`, through the same model and access
+rules as the rest of your application.
 
-## Choose Koan when
+No second domain model. No mirrored service. No handwritten tool handlers.
 
-Choose Koan when the application is naturally Entity-centric, you value conventions over repeated
-plumbing, and you want data, jobs, communication, web, and agent surfaces to compose through one
-inspectable runtime.
+## Let the idea grow
 
-Do not choose it when you need a stable 1.0 compatibility promise today, require a publicly certified
-package-only install, need an unsupported provider guarantee, or want direct control of every ORM,
-transport, and hosting mechanism. Koan rejects false backend parity; package existence is not a support
-claim.
+Today it is a local SQLite API. Tomorrow it can use Postgres, run durable work, publish events,
+search semantically, serve media, or collaborate with an agent.
 
-## Read next
+Add only what the application needs. **The code keeps saying `Todo`.**
 
-- [Quickstart](docs/getting-started/quickstart.md)
-- [Golden path](docs/getting-started/overview.md)
-- [Graduated samples](samples/README.md)
-- [Product constitution](docs/architecture/product-constitution.md)
-- [Entity semantics contract](docs/architecture/entity-semantics-contract.md)
-- [Current capability and package surface](docs/reference/product-surface.md)
-- [Current package-quality assessment](docs/reference/package-quality.md)
-- [Troubleshooting](docs/support/troubleshooting.md)
-- [Agent-readable product map](llms.txt)
+Underneath, it's still ASP.NET Core. Reach for a normal controller or service whenever you want
+one. Want to look behind the magic? Koan tells you what it chose and why.
 
-Architecture decision records are retained as dated decisions. For current product behavior, prefer
-the pages above, executable samples, generated product surface, and source/tests.
+## Go further
+
+- [Build your first Koan application](docs/getting-started/quickstart.md)
+- [Bring Koan into an existing ASP.NET Core application](docs/getting-started/adopt-existing-app.md)
+- [Run complete applications](samples/README.md)
+- [Build for agents](docs/reference/agents/index.md)
+- [Understand the architecture](docs/architecture/index.md)
+- [See what works today](docs/reference/what-works.md)
+
+> Koan 0.20 is a .NET 10 preview.

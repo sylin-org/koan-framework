@@ -23,5 +23,10 @@ public interface INamingProvider
     /// capability — adapters should not override this.
     /// </summary>
     string ResolveStorage(System.Type entityType, string? partition, System.IServiceProvider services)
-        => StorageNameGenerator.Resolve(Provider, entityType, partition, () => GetNamingCapability(services));
+        => StorageNameGenerator.Resolve(
+            Provider,
+            entityType,
+            partition,
+            () => GetNamingCapability(services),
+            services);
 }

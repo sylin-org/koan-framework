@@ -2,53 +2,19 @@
 type: GUIDE
 domain: framework
 title: "Koan documentation"
-audience: [developers, architects, ai-agents]
+audience: [developers, operators, architects, ai-agents]
 status: current
-last_updated: 2026-07-21
+last_updated: 2026-07-23
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-21
-  status: passed
-  scope: public template install, generation, clean restore/build, SQLite Entity result, and runtime facts
+  date_last_tested: 2026-07-23
+  status: reviewed
+  scope: public documentation home and reader paths
 ---
 
-# Koan documentation
+# Bring an idea
 
-Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Its job is to
-turn business intent into readable code while centralizing composition, backend negotiation,
-lifecycle, and explanation.
-
-## Start with a result
-
-Install the public template and create a persisted web API:
-
-```powershell
-dotnet new install Sylin.Koan.Templates
-dotnet new koan-web -o TodoApi
-cd TodoApi
-dotnet run
-```
-
-Then create and inspect one Todo:
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
-  -ContentType application/json -Body '{"title":"buy milk"}'
-Invoke-RestMethod http://localhost:5000/api/todos
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
-```
-
-Use the URL printed by the application if it differs. The [quickstart](getting-started/quickstart.md)
-explains the result; [FirstUse](../samples/FirstUse/README.md) is the richer repository-owned executable contract.
-
-## Read business, not plumbing
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
-var app = builder.Build();
-await app.RunAsync();
-```
+Koan starts with the thing your application is about.
 
 ```csharp
 public sealed class Todo : Entity<Todo>
@@ -60,33 +26,36 @@ public sealed class Todo : Entity<Todo>
 public sealed class TodosController : EntityController<Todo>;
 ```
 
-References make capabilities available. `AddKoan()` compiles the referenced module set. Entity and
-pillar semantics express application intent; elected providers own mechanics. Startup, health,
-runtime facts, and agent resources explain the same resolved composition.
+That is enough for a persisted, queryable API in the Koan web starter. From there, the same `Todo`
+can gain durable work, events, identity, semantic search, media, or a governed agent surface without
+turning into a different application at every layer.
 
-## The current learning path
+## Start where you are
 
-1. [Quickstart](getting-started/quickstart.md) — run one meaningful approval workflow.
-2. [Golden path](getting-started/overview.md) — learn the minimal application grammar and grow it deliberately.
-3. [Graduated samples](../samples/README.md) — use only examples with focused executable evidence.
-4. [Developer guides](guides/README.md) — add a capability when the business needs it.
-5. [Product surface](reference/product-surface.md) — check maturity, package shape, and evidence before relying on a claim.
-6. [Architecture](architecture/product-constitution.md) — understand the laws behind the conventions.
+- **[Make your first Koan application](getting-started/quickstart.md)** — Go from a template to
+  stored data and a working API.
+- **[Bring Koan into an application you already have](getting-started/adopt-existing-app.md)** — Add
+  one Entity boundary while your controllers, services, EF models, and deployment stay put.
+- **[Run an application with a story](../samples/README.md)** — Tend a garden, organize a photo
+  vault, reconcile customers, or follow the complete first journey.
+- **[Let an agent meet your application](reference/agents/index.md)** — Expose the same model and
+  access rules through MCP—without building a second agent API.
 
-## Current support boundary
+## Let the idea grow
 
-Koan 0.20 is a preview, not a 1.0 compatibility promise. Package patches remain independently owned,
-and package presence does not imply support, production certification, or backend parity. The generated
-[product surface](reference/product-surface.md) names the supported foundation, supported extensions,
-demonstrations, experiments, specifications, and unassessed packages.
+- [Store and query it](reference/data/index.md), then [give it an HTTP surface](reference/web/index.md).
+- [Know who is acting](reference/identity/index.md) and keep tenant boundaries intact.
+- [Run durable work and communicate](reference/work/index.md) without inventing a parallel work model.
+- [Add AI and semantic search](reference/ai/index.md), or [work with files and media](reference/state-content/index.md).
+- [Turn imperfect arrivals into trusted records](reference/canon/index.md).
 
-Use canonical `/health/live` and `/health/ready` probes. Use `/.well-known/Koan/facts` or
-`koan://facts` to understand runtime decisions. Unsupported configured intent should reject with a
-correction instead of silently choosing weaker behavior.
+Add what the application asks for. The domain code should remain the easiest part to recognize.
 
-## Documentation boundary
+## Look behind the magic
 
-This navigation is the current public product curriculum. Initiative ledgers, assessments, plans,
-proposals, and archived material remain in the repository as engineering evidence; they are not
-alternate usage guidance. Architecture decision records are preserved as dated decisions and may
-describe the system at the time they were written.
+- [Decide whether Koan fits](architecture/index.md).
+- [See what works today](reference/what-works.md).
+- [Troubleshoot a running application](support/troubleshooting.md).
+- [Orient a coding agent](../llms.txt).
+
+> Koan 0.20 is a .NET 10 preview.

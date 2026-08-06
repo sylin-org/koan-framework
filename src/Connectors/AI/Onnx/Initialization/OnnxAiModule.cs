@@ -23,7 +23,7 @@ public sealed class OnnxAiModule : KoanModule, IContributeTo<AiProviderContribut
     }
 
     public void Contribute(AiProviderContributionTarget target) =>
-        target.Add<OnnxAdapterContributor>("onnx");
+        target.Add<OnnxAdapterContributor>(Infrastructure.Constants.Adapter.Type);
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {

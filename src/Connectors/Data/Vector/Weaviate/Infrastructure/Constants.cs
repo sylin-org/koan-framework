@@ -2,51 +2,61 @@ namespace Koan.Data.Vector.Connector.Weaviate.Infrastructure;
 
 internal static class Constants
 {
-    public static class Configuration
+    internal static class Provider
     {
-        public const string Section = "Koan:Data:Weaviate";
-
-        public static class Keys
-        {
-            public const string ConnectionString = Section + ":ConnectionString";
-            public const string Endpoint = Section + ":Endpoint";
-            public const string ApiKey = Section + ":ApiKey";
-            public const string Metric = Section + ":Metric";
-            public const string TimeoutSeconds = Section + ":TimeoutSeconds";
-        }
-
-        public static class Flags
-        {
-            public const string DisableAutoDetection = Section + ":DisableAutoDetection";
-        }
-
-        public static class ZenGarden
-        {
-            public const string Section = Configuration.Section + ":ZenGarden";
-            public const string Offering = Section + ":Offering";
-            public const string Instance = Section + ":Instance";
-            public const string Capabilities = Section + ":Capabilities";
-            public const string Capability = Section + ":Capability";
-        }
-
+        internal const string Name = "weaviate";
+        internal const int Priority = 25;
+        internal static readonly string[] Aliases = ["weaviate-db", "weaviate-vector"];
     }
 
-    public static class Discovery
+    internal static class Configuration
     {
-        public const string EnvList = "Koan_DATA_WEAVIATE_URLS"; // comma/semicolon-separated
+        internal const string Section = "Koan:Data:Weaviate";
+        internal const string Automatic = "auto";
 
-        public const int DefaultPort = 8080;
-        public const string WellKnownServiceName = "weaviate";
-        public const string HostDocker = "host.docker.internal";
-        public const string Localhost = "localhost";
+        internal static class Keys
+        {
+            internal const string Endpoint = Section + ":Endpoint";
+            internal const string ApiKey = Section + ":ApiKey";
+            internal const string TimeoutSeconds = Section + ":TimeoutSeconds";
+            internal const string MaxMetadataBytesPerPoint = Section + ":MaxMetadataBytesPerPoint";
+            internal const string MaxBatchPoints = Section + ":MaxBatchPoints";
+            internal const string MaxClearPoints = Section + ":MaxClearPoints";
+            internal const string MaxSearchCandidates = Section + ":MaxSearchCandidates";
+            internal const string MaxResponseBytes = Section + ":MaxResponseBytes";
+            internal const string VisibilityTimeoutSeconds = Section + ":VisibilityTimeoutSeconds";
+            internal const string DisableAutoDetection = Section + ":DisableAutoDetection";
+            internal const string LegacyConnectionString = Section + ":ConnectionString";
+        }
     }
 
-    internal static class Logging
+    internal static class Defaults
     {
-        public const string Health = "data.weaviate.health";
+        internal const string Endpoint = "http://localhost:8080";
+        internal const int Port = 8080;
+        internal const int TimeoutSeconds = 30;
+        internal const int VisibilityTimeoutSeconds = 30;
+        internal const int MaxMetadataBytesPerPoint = 1 * 1024 * 1024;
+        internal const int MaxBatchPoints = 1_024;
+        // One extra result is reserved for the mutation-free overflow proof under Weaviate's 10,000 query ceiling.
+        internal const int MaxClearPoints = 9_999;
+        internal const int MaxSearchCandidates = 10_000;
+        internal const int MaxResponseBytes = 64 * 1024 * 1024;
+        internal const int MaxAttempts = 3;
+        internal const int RetryDelayMilliseconds = 50;
+        internal const int VisibilityPollMilliseconds = 25;
+    }
+
+    internal static class Wire
+    {
+        internal const string Id = "koanId";
+        internal const string Metadata = "koanMetadata";
+        internal const string Terms = "koanTerms";
+        internal const string ContractPrefix = "koan-vector-v1:";
     }
 
     internal const string HttpClientName = "weaviate";
-    internal const string DefaultEndpoint = "http://localhost:8080";
+    internal const string ReadyPath = "/v1/.well-known/ready";
+    internal const string HealthLog = "data.weaviate.health";
+    internal static readonly Guid PointNamespace = new("67591f20-4d57-54ec-b218-7cf6c75c0f4a");
 }
-

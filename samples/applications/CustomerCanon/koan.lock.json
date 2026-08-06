@@ -24,15 +24,15 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Json",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Web",

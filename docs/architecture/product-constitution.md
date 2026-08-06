@@ -20,9 +20,8 @@ the generated [product surface](../reference/product-surface.md).
 
 ## Promise
 
-Koan is an opinionated meta-framework for agentic .NET applications: the Rails move for an era in
-which humans and coding agents build together. It helps an application grow from V0 to V1 through
-meaningful, small steps.
+Koan is an opinionated meta-framework for agentic, data-driven .NET applications. It helps humans and
+coding agents grow an application from V0 to V1 through meaningful, small steps.
 
 Application code should read as the business. Koan takes responsibility for recurring infrastructure
 composition, conventions, and integration complexity, then explains the decisions it made. It does not

@@ -19,7 +19,7 @@ namespace Koan.Tests.Data.Core.Specs.Naming;
 /// - Null / whitespace / empty partition all produce the same un-suffixed name
 /// - GUID partitions get adapter-specific normalization (Sqlite "N" format)
 /// - Named partitions go through adapter sanitization
-/// - The per-instance cache returns the same instance on repeated calls
+/// - The supplied host cache returns the same instance on repeated calls
 /// - Distinct (Type, partition) keys produce distinct entries
 /// </summary>
 public class AdapterResolveStorageSpec
@@ -109,9 +109,9 @@ public class AdapterResolveStorageSpec
         var first = factory.ResolveStorage(typeof(Widget), "alpha", sp);
         var second = factory.ResolveStorage(typeof(Widget), "alpha", sp);
 
-        // ConcurrentDictionary returns the cached instance — string equality plus reference identity.
+        // The exact supplied host returns the cached instance — string equality plus reference identity.
         ReferenceEquals(first, second).Should().BeTrue(
-            "the per-factory cache should not recompose the name on repeated calls");
+            "the supplied host cache should not recompose the name on repeated calls");
     }
 
     [Fact]
@@ -161,13 +161,16 @@ public class AdapterResolveStorageSpec
 
     private static IServiceProvider BuildEmptySp()
     {
-        return new ServiceCollection().BuildServiceProvider();
+        return new ServiceCollection()
+            .AddSingleton(new StorageNameCache(32))
+            .BuildServiceProvider();
     }
 
     private static IServiceProvider BuildSpWithOptions(Action<IServiceCollection> configure)
     {
         var services = new ServiceCollection();
         services.AddOptions();
+        services.AddSingleton(new StorageNameCache(32));
         configure(services);
         return services.BuildServiceProvider();
     }
@@ -176,6 +179,7 @@ public class AdapterResolveStorageSpec
     {
         var services = new ServiceCollection();
         services.AddOptions();
+        services.AddSingleton(new StorageNameCache(32));
         services.Configure<SqliteOptions>(_ => { });
         return services.BuildServiceProvider();
     }

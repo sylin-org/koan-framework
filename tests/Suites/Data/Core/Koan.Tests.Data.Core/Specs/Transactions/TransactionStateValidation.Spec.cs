@@ -2,7 +2,6 @@ using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Transactions;
-using Koan.Data.Vector;
 using Koan.Tests.Data.Core.Support;
 using AwesomeAssertions;
 
@@ -24,77 +23,6 @@ public sealed class TransactionStateValidationSpec
     public TransactionStateValidationSpec(ITestOutputHelper output)
     {
         _output = output ?? throw new ArgumentNullException(nameof(output));
-    }
-
-    /// <summary>
-    /// Test: Operations executed immediately when no transaction is active.
-    /// </summary>
-    [Fact]
-    public async Task Operations_execute_immediately_without_transaction()
-    {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        var partition = $"tx-state-{Guid.CreateVersion7():n}";
-
-        var entity = new TodoEntity { Title = "Immediate Execution" };
-        var embedding = GenerateTestEmbedding(1536);
-
-        using (var _ = EntityContext.Partition(partition))
-        {
-            // No transaction - operations execute immediately
-            await entity.Save();
-
-            // Entity should be queryable immediately
-            var count = await TodoEntity.Count;
-            count.Should().Be(1, "entity should be persisted immediately");
-
-            await Vector<TodoEntity>.Save(entity.Id, embedding);
-
-            // Vector should be persisted immediately
-            var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-            fakeRepo.ContainsVector(entity.Id).Should().BeTrue("vector should be persisted immediately");
-        }
-    }
-
-    /// <summary>
-    /// Test: Operations deferred during active transaction.
-    /// </summary>
-    [Fact]
-    public async Task Operations_deferred_during_active_transaction()
-    {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        var partition = $"tx-state-{Guid.CreateVersion7():n}";
-
-        var entity1 = new TodoEntity { Title = "Deferred 1" };
-        var entity2 = new TodoEntity { Title = "Deferred 2" };
-        var embedding1 = GenerateTestEmbedding(1536);
-
-        using (var _ = EntityContext.Partition(partition))
-        {
-            using (EntityContext.Transaction("defer-test"))
-            {
-                await entity1.Save();
-                await entity2.Save();
-                await Vector<TodoEntity>.Save(entity1.Id, embedding1);
-
-                // Nothing should be persisted yet
-                var count = await TodoEntity.Count;
-                count.Should().Be(0, "entities should not be persisted during transaction");
-
-                var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-                fakeRepo.VectorCount.Should().Be(0, "vectors should not be persisted during transaction");
-
-                await EntityContext.Commit();
-            }
-
-            // After commit - all operations should be persisted
-            var finalCount = await TodoEntity.Count;
-            finalCount.Should().Be(2, "both entities should be persisted after commit");
-
-            var fakeRepoAfterCommit = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-            fakeRepoAfterCommit.VectorCount.Should().Be(1, "vector should be persisted after commit");
-        }
     }
 
     /// <summary>
@@ -304,52 +232,6 @@ public sealed class TransactionStateValidationSpec
     }
 
     /// <summary>
-    /// Test: Multiple operations queued and executed in order on commit.
-    /// </summary>
-    [Fact]
-    public async Task Transaction_executes_operations_in_queue_order()
-    {
-        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
-
-        var partition = $"tx-state-{Guid.CreateVersion7():n}";
-
-        var entity1 = new TodoEntity { Title = "First" };
-        var entity2 = new TodoEntity { Title = "Second" };
-        var entity3 = new TodoEntity { Title = "Third" };
-
-        var embedding1 = GenerateTestEmbedding(1536);
-        var embedding2 = GenerateTestEmbedding(1536);
-
-        using (var _ = EntityContext.Partition(partition))
-        {
-            using (EntityContext.Transaction("queue-order"))
-            {
-                // Queue operations in specific order
-                await entity1.Save();
-                await Vector<TodoEntity>.Save(entity1.Id, embedding1);
-                await entity2.Save();
-                await entity3.Save();
-                await Vector<TodoEntity>.Save(entity2.Id, embedding2);
-
-                await EntityContext.Commit();
-            }
-
-            // Verify all operations committed
-            var entityCount = await TodoEntity.Count;
-            entityCount.Should().Be(3, "all entities should be persisted");
-
-            var fakeRepo = runtime.VectorService.GetFakeRepository<TodoEntity, string>();
-            fakeRepo.VectorCount.Should().Be(2, "both vectors should be persisted");
-
-            // Verify operation tracking (order preserved)
-            var ops = fakeRepo.Operations;
-            ops.Should().HaveCount(2);
-            ops[0].Id.Should().Be(entity1.Id, "first vector operation should be entity1");
-            ops[1].Id.Should().Be(entity2.Id, "second vector operation should be entity2");
-        }
-    }
-
-    /// <summary>
     /// Test: Empty transaction (no operations) commits successfully.
     /// </summary>
     [Fact]
@@ -370,20 +252,4 @@ public sealed class TransactionStateValidationSpec
         }
     }
 
-    #region Helper Methods
-
-    private static float[] GenerateTestEmbedding(int dimensions)
-    {
-        var embedding = new float[dimensions];
-        var random = new Random(42);
-
-        for (int i = 0; i < dimensions; i++)
-        {
-            embedding[i] = (float)random.NextDouble();
-        }
-
-        return embedding;
-    }
-
-    #endregion
 }

@@ -1,4 +1,5 @@
 using Koan.Data.Core.Direct;
+using Koan.Data.Abstractions.Sources;
 using Koan.Tests.Data.Core.Support;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -29,19 +30,27 @@ public sealed class DirectDataAccessSpec
         runtime.Services.GetService<IDirectDataService>().Should().NotBeNull();
 
         var data = runtime.Services.GetRequiredService<IDataService>();
-        var session = data.Direct(adapter: "sqlite")
-            .WithConnectionString($"Data Source={runtime.SqlitePath}");
+        var connection = $"Data Source={runtime.SqlitePath}";
 
-        await session.Execute("CREATE TABLE IF NOT EXISTS direct_probe (id INTEGER PRIMARY KEY, name TEXT)");
-        var inserted = await session.Execute(
+        await data.Direct(adapter: "sqlite")
+            .WithConnectionString(connection)
+            .Effect(DataOperationEffect.SchemaOrAdmin)
+            .Execute("CREATE TABLE IF NOT EXISTS direct_probe (id INTEGER PRIMARY KEY, name TEXT)");
+        var inserted = await data.Direct(adapter: "sqlite")
+            .WithConnectionString(connection)
+            .Effect(DataOperationEffect.Write)
+            .Execute(
             "INSERT INTO direct_probe (name) VALUES (@name)",
             new { name = "folded" });
         inserted.Should().Be(1);
 
-        var count = await session.Scalar<long>("SELECT COUNT(*) FROM direct_probe");
+        var reads = data.Direct(adapter: "sqlite")
+            .WithConnectionString(connection)
+            .Effect(DataOperationEffect.Read);
+        var count = await reads.Scalar<long>("SELECT COUNT(*) FROM direct_probe");
         count.Should().Be(1);
 
-        var rows = await session.Query<ProbeRow>("SELECT id, name FROM direct_probe");
+        var rows = await reads.Query<ProbeRow>("SELECT id, name FROM direct_probe");
         rows.Should().ContainSingle();
         rows[0].Name.Should().Be("folded");
     }
@@ -54,27 +63,38 @@ public sealed class DirectDataAccessSpec
         var data = runtime.Services.GetRequiredService<IDataService>();
         var connectionString = $"Data Source={runtime.SqlitePath}";
 
-        var setup = data.Direct(adapter: "sqlite").WithConnectionString(connectionString);
+        var setup = data.Direct(adapter: "sqlite")
+            .WithConnectionString(connectionString)
+            .Effect(DataOperationEffect.SchemaOrAdmin);
         await setup.Execute("CREATE TABLE IF NOT EXISTS direct_tx (id INTEGER PRIMARY KEY, name TEXT)");
 
         // Committed work is durable.
-        await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
+        await using (var tx = data.Direct(adapter: "sqlite")
+                         .WithConnectionString(connectionString)
+                         .Effect(DataOperationEffect.Write)
+                         .Begin())
         {
             await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "committed" });
             await tx.Commit();
         }
 
         // Rolled-back work is discarded.
-        await using (var tx = data.Direct(adapter: "sqlite").WithConnectionString(connectionString).Begin())
+        await using (var tx = data.Direct(adapter: "sqlite")
+                         .WithConnectionString(connectionString)
+                         .Effect(DataOperationEffect.Write)
+                         .Begin())
         {
             await tx.Execute("INSERT INTO direct_tx (name) VALUES (@name)", new { name = "discarded" });
             await tx.Rollback();
         }
 
-        var count = await setup.Scalar<long>("SELECT COUNT(*) FROM direct_tx");
+        var reads = data.Direct(adapter: "sqlite")
+            .WithConnectionString(connectionString)
+            .Effect(DataOperationEffect.Read);
+        var count = await reads.Scalar<long>("SELECT COUNT(*) FROM direct_tx");
         count.Should().Be(1);
 
-        var rows = await setup.Query<ProbeRow>("SELECT id, name FROM direct_tx");
+        var rows = await reads.Query<ProbeRow>("SELECT id, name FROM direct_tx");
         rows.Should().ContainSingle();
         rows[0].Name.Should().Be("committed");
     }

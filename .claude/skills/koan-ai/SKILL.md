@@ -2,7 +2,7 @@
 name: koan-ai
 description: Entity-aware AI over Entity<T> — EntityAi.Embed/Chat/Ocr convention inference, [Embedding] auto-embed-on-save, [MediaAnalysis] vision/OCR, the static Koan.AI.Client chat/embed facade, and the conversation builder
 pillar: ai
-card: docs/reference/cards/ai-data.md
+card: docs/reference/ai/index.md
 status: current
 last_validated: 2026-07-16
 ---
@@ -126,7 +126,7 @@ When you need a testable seam, inject `IAiPipeline` and call `Prompt(AiChatReque
 
 ## See also
 
-- [Reference card: ai-data.md](../../../docs/reference/cards/ai-data.md) — one-screen pillar map
+- [AI capability](../../../docs/reference/ai/index.md) — model operations, providers, failures, and vector links
 - [AI reference](../../../docs/reference/ai/index.md) · [AI vector how-to](../../../docs/guides/ai-vector-howto.md)
 - [SnapVault](../../../samples/applications/SnapVault/README.md) — media analysis + `[Embedding]` with optional AI/vector enrichment
 - [GardenCoop Local Discovery](../../../samples/journeys/GardenCoop/02-LocalDiscovery/README.md) — local embeddings and semantic produce discovery

@@ -133,6 +133,10 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         var removed = await chain.VerifyAsync();
         removed.Intact.Should().BeFalse("removing a chained event breaks the sequence");
         removed.Detail.Should().Contain("sequence gap", "the chain detects a deletion, not just an alteration");
+
+        // Restore the shared fixture's chain so this destructive proof cannot contaminate later acceptance facts.
+        await events[1].Save();
+        (await chain.VerifyAsync()).Intact.Should().BeTrue("restoring the removed event repairs the test fixture");
     }
 
     [Fact]

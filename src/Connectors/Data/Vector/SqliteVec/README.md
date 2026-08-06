@@ -1,73 +1,62 @@
 # Sylin.Koan.Data.Vector.Connector.SqliteVec
 
-Durable, in-process vector search for Koan through the sqlite-vec `vec0` extension—no vector server required.
+Durable, exact vector search in one local SQLite file, with no vector server or provider ceremony.
 
 - Target framework: net10.0
+- Native engine: sqlite-vec v0.1.9
 - License: Apache-2.0
-
-## Install
-
-```powershell
-dotnet add package Sylin.Koan.Data.Vector.Connector.SqliteVec
-```
-
-The connector brings the Vector runtime it implements. Keep `AddKoan()` and the same Entity vector code used by other
-providers.
 
 ## Smallest meaningful result
 
 ```csharp
-using Koan.Data.Core.Model;
-using Koan.Data.Vector;
+builder.Services.AddKoan(koan =>
+    koan.Data.Source("Semantic").Vector<Article>(space => space
+        .Name("articles")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session)));
 
-public sealed class Article : Entity<Article> { }
+await Vector<Article>.Save(article.Id, embedding, new { article.Category }, ct);
 
-await Vector<Article>.Save("koan", [1f, 0f, 0f]);
-var nearest = await Vector<Article>.Search([0.9f, 0.1f, 0f], topK: 5);
+var nearest = await Vector<Article>.Search(
+    embedding,
+    query => query.Top(12).AtLeast(.82),
+    ct);
 ```
 
-With no sqlite-vec placement of its own, the provider pairs with SQLite's configured local connection. If neither is
-configured, both local providers converge on `Data Source=.koan/data/Koan.sqlite`. Override only when vectors should
-live elsewhere:
+The package discovers itself through `AddKoan`. By default it pairs with the selected SQLite record source; configure
+`Koan:Data:Sources:<name>:SqliteVec:ConnectionString` when vectors belong in a separate file.
 
-```json
-{
-  "ConnectionStrings": {
-    "SqliteVec": "Data Source=.koan/vectors.db"
-  },
-  "Koan": {
-    "Data": {
-      "SqliteVec": {
-        "DistanceMetric": "cosine"
-      }
-    }
-  }
-}
-```
+## Guarantees
 
-Supported metrics are `cosine`, `l2`, and `l1`; an unknown value fails correctively.
+- exact native cosine or Euclidean kNN with finite `[0,1]` similarity and stable identity ties;
+- atomic complete-point upsert and atomic ordered batches;
+- immediate Session visibility and file-backed restart durability;
+- positional get-many, truthful delete outcomes, and lossless neutral metadata;
+- source, partition, and Koan hard-scope isolation;
+- ReadOnly and External policy enforcement before file or shape mutation;
+- pinned native RID payloads verified by SHA-256 and `vec_version()` before use.
 
-## Readiness and inspection
+SqliteVec deliberately declines dot product, arbitrary metadata `Where(...)`, hybrid search, Eventual visibility,
+continuations, streaming export, and multiple vectors per Entity. Unsupported intent fails with a corrective exception;
+the adapter never substitutes a managed scan or a weaker result.
 
-Package presence makes sqlite-vec available but does not open or create a database. Before selection, its health is
-non-critical `Unknown`. Once an Entity selects it, the exact routed source becomes critical; readiness opens that
-database, loads the embedded native extension, and reports failure without substituting another provider. Startup
-facts show the effective de-identified store and whether it was explicit, paired from SQLite, or the local fallback.
+## Supported native platforms
 
-## Boundaries
+- Windows x64
+- Linux x64
+- Linux arm64
 
-- Native binaries are bundled for `win-x64`, `linux-x64`, and `linux-arm64`. Other platforms fail with the supported
-  RID list.
-- The first use extracts and hash-validates vec0 v0.1.9 in a versioned temporary directory.
-- Each entity/source repository holds one SQLite connection and serializes access. This is a durable embedded floor,
-  not a distributed or high-concurrency vector service.
-- sqlite-vec stores metadata but this adapter does not implement metadata-filter pushdown. Tenant/Shared searches fail
-  closed; they never silently search across tenants. Partition and routed-source isolation remain supported.
-- The first vector fixes a collection's dimension. Mixing dimensions is invalid.
-- Hybrid search, continuation, export, and multiple vectors per entity are unsupported.
+An unsupported RID fails before a database operation. Native library paths and extension-loading controls are not
+application configuration.
+
+## Bounded options
+
+`Koan:Data:SqliteVec:MaxMetadataBytesPerPoint` and `MaxSearchCandidates` bound per-point metadata and stable-tie
+expansion. Dimensions, metric, visibility, placement policy, and space name remain shared Koan decisions.
 
 ## References
 
 - [Technical reference](./TECHNICAL.md)
-- [Vector runtime](../../../../Koan.Data.Vector/README.md)
-
+- [Vector reference](../../../../../docs/reference/ai/vector.md)
+- [Data adapter development primer](../../../../../docs/architecture/data-adapter-development-primer.md)

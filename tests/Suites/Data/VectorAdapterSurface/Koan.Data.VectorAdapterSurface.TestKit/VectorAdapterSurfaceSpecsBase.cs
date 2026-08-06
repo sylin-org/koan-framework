@@ -59,7 +59,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         var embed = Embed("alpha", 1);
         await Vector<TodoVector>.Save("v1", embed);
 
-        var result = await Vector<TodoVector>.Search(embed, topK: 1);
+        var result = await Vector<TodoVector>.SearchLegacy(embed, topK: 1);
         result.Matches.Should().HaveCount(1);
         result.Matches[0].Id.Should().Be("v1");
     }
@@ -76,7 +76,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
 
         // Searching with the new (beta) vector should hit v1 with a much higher score than the
         // original (alpha) vector would yield.
-        var hitsBeta = await Vector<TodoVector>.Search(Embed("beta", 99), topK: 5);
+        var hitsBeta = await Vector<TodoVector>.SearchLegacy(Embed("beta", 99), topK: 5);
         hitsBeta.Matches.Should().Contain(m => m.Id.Equals("v1"));
     }
 
@@ -94,7 +94,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         inserted.Should().BeGreaterThanOrEqualTo(5);
 
         // All five should be retrievable via search seeded by the same category.
-        var found = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 10);
+        var found = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 10);
         found.Matches.Select(m => m.Id).Should().Contain(new[] { "v1", "v2", "v3", "v4", "v5" });
     }
 
@@ -127,7 +127,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         var deleted = await Vector<TodoVector>.Delete("v1");
         deleted.Should().BeTrue();
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 10);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 10);
         hits.Matches.Select(m => m.Id).Should().NotContain("v1");
         hits.Matches.Select(m => m.Id).Should().Contain("v2");
     }
@@ -153,7 +153,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         var removed = await Vector<TodoVector>.Delete(new[] { "v1", "v2", "v3" });
         removed.Should().BeGreaterThanOrEqualTo(3);
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 10);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 10);
         hits.Matches.Select(m => m.Id).Should().NotContain(new[] { "v1", "v2", "v3" });
     }
 
@@ -215,7 +215,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("alpha-3", Embed("alpha", 3));
         await Vector<TodoVector>.Save("beta-1", Embed("beta", 1));
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 4);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 4);
         hits.Matches.Should().HaveCount(4);
 
         var topThreeIds = hits.Matches.Take(3).Select(m => (string)(object)m.Id).ToList();
@@ -230,7 +230,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
         foreach (var i in Enumerable.Range(1, 10))
             await Vector<TodoVector>.Save($"v{i}", Embed("alpha", i));
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 3);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 3);
         hits.Matches.Should().HaveCount(3);
     }
 
@@ -239,7 +239,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
     {
         SkipIfUnavailable();
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 5);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 5);
         hits.Matches.Should().BeEmpty();
     }
 
@@ -258,7 +258,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
 
         await Vector<TodoVector>.Flush();
 
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 5);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 5);
         hits.Matches.Should().BeEmpty();
     }
 
@@ -277,7 +277,7 @@ public abstract class VectorAdapterSurfaceSpecsBase<TFactory> : IAsyncLifetime
 
         // Subsequent operations should still work.
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
-        var hits = await Vector<TodoVector>.Search(Embed("alpha", 0), topK: 1);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("alpha", 0), topK: 1);
         hits.Matches.Should().NotBeEmpty();
     }
 }

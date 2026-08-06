@@ -1,15 +1,45 @@
+using Koan.Data.Abstractions.Sources;
+
 namespace Koan.Data.Abstractions.Instructions;
 
 public static class InstructionSql
 {
     public static Instruction NonQuery(string sql, object? parameters = null)
-    => new(RelationalInstructions.SqlNonQuery, new { Sql = sql }, ToDictionary(parameters));
+        => NonQuery(sql, DataOperationEffect.Unknown, parameters);
+
+    public static Instruction NonQuery(
+        string sql,
+        DataOperationEffect effect,
+        object? parameters = null)
+        => Create(RelationalInstructions.SqlNonQuery, sql, effect, parameters);
 
     public static Instruction Scalar(string sql, object? parameters = null)
-    => new(RelationalInstructions.SqlScalar, new { Sql = sql }, ToDictionary(parameters));
+        => Scalar(sql, DataOperationEffect.Unknown, parameters);
+
+    public static Instruction Scalar(
+        string sql,
+        DataOperationEffect effect,
+        object? parameters = null)
+        => Create(RelationalInstructions.SqlScalar, sql, effect, parameters);
 
     public static Instruction Query(string sql, object? parameters = null)
-    => new(RelationalInstructions.SqlQuery, new { Sql = sql }, ToDictionary(parameters));
+        => Query(sql, DataOperationEffect.Unknown, parameters);
+
+    public static Instruction Query(
+        string sql,
+        DataOperationEffect effect,
+        object? parameters = null)
+        => Create(RelationalInstructions.SqlQuery, sql, effect, parameters);
+
+    private static Instruction Create(
+        string name,
+        string sql,
+        DataOperationEffect effect,
+        object? parameters)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sql);
+        return new Instruction(name, new { Sql = sql }, ToDictionary(parameters), Effect: effect);
+    }
 
     internal static IReadOnlyDictionary<string, object?>? ToDictionary(object? parameters)
     {

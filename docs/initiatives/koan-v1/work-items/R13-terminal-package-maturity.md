@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R13 - Promote the Meaningful Public Surface to 0.20"
 audience: [architects, maintainers, developers, ai-agents]
-status: current
+status: resolved
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
-  status: in-progress
-  scope: PostgreSQL through Redis public and observed; CockroachDB focused evidence active
+  status: passed
+  scope: Intended public provider families observed; accepted migrations dispositioned without unsafe retirement
 ---
 
 # R13 — Promote the meaningful public surface to 0.20
 
 - Tranche: `T8 — public provider promotion`
-- Status: `in-progress — promote CockroachDB as the remaining networked Entity provider`
+- Status: `passed — intended 0.20 families public; migrations dispositioned; S3 and Backup shelved`
 - Depends on: passed R11, completed R12-06, and accepted
   [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) with validation corrected by
   [ARCH-0121](../../../decisions/ARCH-0121-claim-scoped-validation.md)
@@ -74,7 +74,7 @@ when no real prerequisite connects them.
 | 1 | Entity data providers | PostgreSQL, SQL Server, MongoDB, Couchbase, Redis, and CockroachDB are supported extensions with shared Entity semantics and real provider proof |
 | 2 | Vector and search | establish the local vector floor, then promote Qdrant, Milvus, Weaviate, Elasticsearch, and OpenSearch through shared semantics plus native deltas |
 | 3 | AI runtime and providers | promote the mainline runtime, Ollama, LM Studio, and ONNX with lifecycle, routing, protocol/runtime, and consumer proof |
-| 4 | Storage, backup, and media | promote the local/S3 storage path, integrity-first backup/restore, and media behavior through their real user journeys |
+| 4 | Storage and media | promote the local storage path and media behavior; S3 and Backup are shelved until separately prioritized |
 | 5 | External authentication | promote Google, Microsoft, and Discord through deterministic authorization-code protocol tests without requiring live credentials |
 | 6 | Accepted migrations | complete only the already-decided Agyo and Zen Garden ownership moves with public destination evidence |
 
@@ -113,10 +113,44 @@ immutable API floor in R13-11.
 `29900614297`, public indexing of all three exact `0.20.0` artifacts, and a clean NuGet.org-only Redis
 8.8 consumer. Their immutable API floors are recorded in R13-12. Cache Redis remains unassessed.
 
-[R13-12](r13/R13-12-cockroach-provider-promotion.md) is active. CockroachDB's health now follows the
-existing participation-owned Data law, and its complete focused real-provider project passes 7/7
-with zero skips against 26.2.3. Its corrected one-owner pack, zero-warning staged-package consumer,
-product/API checks, and cheap coherence are green; publication and public observation remain.
+[R13-12](r13/R13-12-cockroach-provider-promotion.md) passed through PR `#102`, main commit
+`3ff7f1950931addd12a16e194299468bd442dcdf`, release run `29903009583`, public indexing of exact
+`0.20.0`, and a fresh NuGet.org-only CockroachDB 26.2.3 consumer. Its immutable API floor is recorded
+in R13-13.
+
+[R13-13](r13/R13-13-local-vector-floor-promotion.md) passed through PR `#103`, main commit
+`e96a4dbe8fd83dd99f8d5a438f1765f31c420ec5`, release run `29905812375`, public indexing of the
+runtime/abstractions at `0.20.0` and both local providers at `0.20.1`, and the unchanged NuGet.org-only
+restart consumer. Their immutable API floors are recorded in R13-14.
+
+[R13-14](r13/R13-14-external-vector-search-promotion.md) passed through PR `#104`, main commit
+`663b947f783ff0d9a445cce6c45b0330684e59d3`, release run `29908506818`, public indexing of all six
+exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Their immutable API floors
+are recorded in R13-15.
+
+[R13-15](r13/R13-15-ai-runtime-provider-promotion.md) passed through PR `#105`, main commit
+`98c937b90b74e51d2a7b321214c7667e9743d6ce`, release run `29918889215`, public indexing of the four
+exact `0.20.0` artifacts plus ONNX `0.20.1`, and the unchanged fresh NuGet.org-only consumer. Their
+immutable API floors are recorded in R13-16.
+
+[R13-16](r13/R13-16-storage-backup-media-promotion.md) passed through PR `#106`, main commit
+`4f3eabe949bbb1b02b77cdb4f4afff85cb7a5917`, release run `29923873005` attempt 2, public indexing
+of all six exact `0.20.0` artifacts, and the fresh NuGet.org-only consumer. Their immutable API floors
+are recorded centrally in R13-17, so baseline capture does not mint behaviorless package patches. S3
+and Backup remain shelved.
+
+[R13-17](r13/R13-17-external-auth-promotion.md) passed through PR `#107`, main commit
+`a12b2154907d9f75f8bdef77cf4470ecefa1aad8`, release run `29926734114`, public indexing of all
+three exact `0.20.0` artifacts, and the unchanged fresh NuGet.org-only consumer. Its immutable API floors
+were recorded centrally through PR `#108`, main commit
+`138388e86eacad2c9c9b238e97548a465396f2a4`, and release run `29928202945`. The guard reported
+`76/76` floors, every packed identity already existed, and no new package or symbol package was created.
+
+[R13-18](r13/R13-18-accepted-migration-disposition.md) passed by applying ARCH-0089's existing
+transition gate to current public evidence. Agyo has no public destination packages or migrated
+Agents/Orchestration/Eval/Review owners; Zen Garden has no newer public tip or complete
+Models/HuggingFace lifecycle proof. The six departing Koan owners remain unclaimed at `0.17`; no
+unsafe deletion, promotion, forwarding package, or sibling mutation occurred.
 
 ## Execution
 
@@ -143,7 +177,7 @@ Status: complete. The seven owners are public and the clean external consumer pa
 
 ### R13-C onward — Promote provider families
 
-Status: active through R13-12 CockroachDB promotion.
+Status: complete through R13-18 accepted migration disposition; S3 and Backup shelved.
 
 Open one short family card only when implementation begins. Each card freezes its guarantee and
 limits, names the existing conformance owner, identifies the real provider boundary, and ends with a

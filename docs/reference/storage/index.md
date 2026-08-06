@@ -1,7 +1,7 @@
 ---
 type: REFERENCE
 domain: storage
-title: "Storage reference"
+title: "Store Entity-owned bytes"
 audience: [developers, architects, ai-agents]
 last_updated: 2026-07-17
 framework_version: v0.20.0
@@ -9,10 +9,10 @@ status: current
 validation:
   date_last_tested: 2026-07-17
   status: verified
-  scope: Storage runtime, contracts, Local/S3 providers, routing tests, and tenant-isolation proof
+  scope: Storage runtime, contracts, Local provider, routing tests, and tenant-isolation proof
 ---
 
-# Storage reference
+# Store Entity-owned bytes
 
 Use Storage when an Entity owns or describes bytes that must live behind a logical profile rather than a vendor API.
 The common path is model-first; `IStorageService` remains the deliberate infrastructure escape hatch.
@@ -88,7 +88,7 @@ Each profile accepts:
 |---|---|
 | `Container` | Required logical backend container/bucket. |
 | `Provider` | Optional exact provider identity. Exact means required. |
-| `Mode` | Optional `Local`, `Remote`, or `Replicated` topology requirement. |
+| `Mode` | Optional topology requirement. The supported 0.20 greenfield path is `Local`; remote and replicated modes require an admitted remote provider. |
 | `LocalCache` | Cache quota/watermark settings for a replicated route. |
 
 At the Storage root, `DefaultProfile` selects the implicit route when several profiles exist. A sole profile becomes
@@ -111,34 +111,11 @@ Storage compiles one route per profile during host composition:
 This decision does not run again for every blob operation. Startup facts and the lockfile project the resulting
 election and unified `StorageCaps` tokens.
 
-## Use S3
+## S3 boundary
 
-```powershell
-dotnet add package Sylin.Koan.Storage.Connector.S3
-```
-
-```json
-{
-  "Koan": {
-    "Storage": {
-      "Profiles": {
-        "archive": { "Provider": "s3", "Container": "documents" }
-      },
-      "Providers": {
-        "S3": {
-          "Endpoint": "http://localhost:9000",
-          "Region": "us-east-1"
-        }
-      }
-    }
-  }
-}
-```
-
-If the functional Zen Garden module is active and bound, S3 can discover a storage replica when `Endpoint` is absent.
-The contracts dependency alone is inert. Presigning specifically requires a Moss endpoint; it is not generic
-client-side S3 signing. Supply credentials with `Koan__Storage__Providers__S3__AccessKey` and
-`Koan__Storage__Providers__S3__SecretKey` or another .NET configuration provider.
+S3 is shelved and is not a supported 0.20 Storage choice. Do not select it for a greenfield application
+from this reference. The [product surface](../product-surface.md) remains the authority if that
+disposition changes; local Storage is the current supported path.
 
 ## Use the service boundary
 
@@ -160,12 +137,9 @@ require the provider's compiled capability; unsupported intent throws the standa
 - Segmentation is applied at `IStorageService`, covering Entity, Media, raw service, listing, presign, and transfer
   paths. Tenant values never appear in general composition facts.
 - Cross-provider copy streams through the process. Same-provider copy uses the backend only when declared.
-- Whole-object text/byte helpers buffer. Local range reads buffer the requested range; current S3 full/range reads
-  materialize their response in memory.
-- Local is single-node filesystem storage. S3 inherits service-side durability, consistency, encryption, lifecycle,
-  and availability behavior.
-- Replication is asynchronous local-cache/durable-remote behavior, not a distributed transaction. Required replication
-  refuses to start without both placements.
+- Whole-object text/byte helpers buffer. Local range reads buffer the requested range.
+- Local is single-node filesystem storage. Shared, remote, presigned, and replicated behavior is not
+  a supported 0.20 greenfield promise.
 - Configuration is a host-composition input; live profile/provider reload is not a supported implicit contract.
 
 For provider-author contracts, reference `Sylin.Koan.Storage.Abstractions` and implement `IStorageProvider`, placement,

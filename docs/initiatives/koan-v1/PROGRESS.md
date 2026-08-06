@@ -3,13 +3,13 @@ type: ARCHITECTURE
 domain: framework
 title: "Koan V1 Reorganization Progress"
 audience: [architects, maintainers, ai-agents]
-status: current
+status: passed
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-22
-  status: in-progress
-  scope: PostgreSQL through Redis public and observed; CockroachDB focused evidence active
+  status: passed
+  scope: R14 public documentation product surface
 ---
 
 # Koan V1 Reorganization Progress
@@ -19,19 +19,18 @@ or completes a work item. The roadmap describes order; it does not report progre
 
 ## Initiative state
 
-- Overall: `active`
-- Current tranche: `T8 — public provider promotion`
-- Active work item: [R13 — Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md)
-- Active child: [R13-12 — CockroachDB provider promotion](work-items/r13/R13-12-cockroach-provider-promotion.md)
-- Most recently completed R13 child: [R13-11 — Redis provider promotion](work-items/r13/R13-11-redis-provider-promotion.md)
-- Most recently completed child: [R12-06 — Publish the first 0.20 package wave](work-items/r12/R12-06-publish-and-observe-first-wave.md)
-- Pending release boundary: focused CockroachDB provider promotion; native/health, one-owner pack,
-  external-consumer, product/API, and cheap-coherence evidence is green, with publication pending
-- Preview readiness: `technical GO`; R12-07's public upgrade, mixed-state publisher convergence, and
-  feedback triage are complete; explicit maintainer go/no-go acceptance remains
-- Deliberate overlap: R12 remains `in-progress` only for
-  [R12-07](work-items/r12/R12-07-preview-evolution.md); R13 owns current implementation, and its first
-  dependency-closed publication wave will supply R12-07's evidence
+- Overall: `passed`
+- Current tranche: `T9 — public product language (passed)`
+- Active work item: none
+- Active child: none
+- Most recently completed work item: [R14 — Public documentation product surface](work-items/R14-public-documentation-product-surface.md)
+- Most recently completed R13 child: [R13-18 — Accepted migration disposition](work-items/r13/R13-18-accepted-migration-disposition.md)
+- Most recently completed child: [R12-07 — Preview evolution](work-items/r12/R12-07-preview-evolution.md)
+- Pending release boundary: none. R12 and R13 are complete; S3 and Backup are shelved.
+- Preview readiness: `GO accepted on 2026-07-22`; public upgrade, mixed-state publisher convergence,
+  feedback triage, and maintainer acceptance are complete
+- Deliberate boundary: this closes 0.20 preview maturity without declaring V1 GA, setting a V1 support
+  date, or widening the generated supported package surface
 
 ## Work items
 
@@ -49,8 +48,9 @@ or completes a work item. The roadmap describes order; it does not report progre
 | R09 | [Compile the Semantic Composition Kernel](work-items/R09-semantic-composition-kernel.md) | T7A | passed | R07; protects R08-01 | Codex · 2026-07-17 | R09-01 through R09-09 passed. One retained module lifecycle, compiled semantic constitution, typed contribution/election mechanics, hard capability overlays, canonical evidence, contract isolation, and legacy-kernel deletion are proved. ARCH-0115 and ARCH-0116 record the result. |
 | R10 | [Graduate the golden sample portfolio](work-items/R10-golden-samples.md) | T7B | passed | R09; R08-04 | Codex · 2026-07-17 | All eleven children pass. Ten public applications build strictly; eight sample suites pass 45 with 2 intentional skips. Canon is automatic, CustomerCanon is graduated, and the portfolio no longer blocks package polish. |
 | R11 | [Graduate the NuGet product surface](work-items/R11-package-product-quality.md) | T7B | passed | R09; R10; guards R08-05 | Architect + Codex · 2026-07-19 | R11-01 through R11-07 pass. All 93 active packages have terminal topology, package-owned presentation, and zero objective findings; the complete public-release ratchet passed 4,648 tests with 30 intentional skips and no failures. |
-| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | in-progress | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-06 are complete. R12-07 now has public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence; its technical recommendation is GO and awaits explicit maintainer acceptance. |
-| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | in-progress | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | PostgreSQL through Redis are public, indexed, consumer-green, and baseline-captured at their first 0.20 versions. R13-12 CockroachDB is native/health, staged-package-consumer, product/API, and cheap-coherence green. |
+| R12 | [Road to the 0.20 Preview](work-items/R12-road-to-020-preview.md) | T7C | passed | R08 local evidence; R09; R10; R11 | Maintainer + Codex · 2026-07-22 | R12-01 through R12-07 pass. The maintainer explicitly accepted the technical GO after public before/after upgrade, mixed immutable-set publication convergence, and feedback triage evidence. |
+| R13 | [Promote the meaningful public surface to 0.20](work-items/R13-terminal-package-maturity.md) | T8 | passed | R11; R12-06; ARCH-0120 | Maintainer + Codex · 2026-07-22 | Entity through external Auth are public, indexed, consumer-green, and baseline-captured. R13-18 keeps unready cross-repository migrations truthful at 0.17 without blocking closure; S3 and Backup are shelved. |
+| R14 | [Make public documentation one greenfield product surface](work-items/R14-public-documentation-product-surface.md) | T9 | passed | R12; R13; public-doc truth gate | Maintainer + Codex · 2026-07-22 | All 40 promoted claims have one canonical capability home; all current documents are reachable; duplicate cards and maturity prose defer to their owners; public-doc, strict skill, generated-surface, privacy, and whitespace checks pass. |
 
 Allowed status values are `pending`, `in-progress`, `blocked`, `passed`, and `stopped`. Only one work
 item should normally be `in-progress`.
@@ -71,13 +71,17 @@ item should normally be `in-progress`.
 | R09 | passed | All nine children pass. Functional assemblies use one module lifecycle, contracts are isolated without activation metadata, the duplicate bootstrap kernel is deleted, and focused source/package journeys remain meaningful. |
 | R10 | passed | All eleven children pass. Ten public applications, their index/solution membership, current docs, and eight executable sample suites agree. |
 | R11 | passed | R11-01 through R11-07 pass. The 93-package graph, 26 claims, package-owned prose, objective zero-finding quality report, clean packs, focused family evidence, and complete public-release ratchet agree. |
-| R12 | in-progress | Technical evidence is complete: the public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, and feedback was triaged. Maintainer GO acceptance remains. |
-| R13 | in-progress | The first lean slice and PostgreSQL through Redis are public and observed. R13-12 CockroachDB is focused-green through health correction, pack, staged consumer, and cheap coherence; publish and observe it, then capture its immutable API floor. |
+| R12 | passed | The public app upgraded from exact 0.20.4 packages to current 0.20.* packages with the same result, mixed-state publication converged, feedback was triaged, and the maintainer accepted GO on 2026-07-22. |
+| R13 | passed | Entity, Vector/Search, AI runtime/providers, Local Storage/Media, and external Auth are public, indexed, public-consumer green, and API-baseline complete. R13-18 found no public destination evidence for the accepted Agyo/Zen Garden moves, so six unclaimed owners remain truthfully at 0.17 under ARCH-0089 rather than being deleted or promoted. S3 and Backup are shelved. |
+| R14 | passed | The public curriculum has one greenfield capability path, 40/40 promoted claims have one current owner, zero current documents are orphaned, and the scoped public-documentation gates pass. |
 
 ## Divergence and risk log
 
 | Date | Item | Observation | Disposition |
 |---|---|---|---|
+| 2026-07-22 | R14 public documentation consolidation | Public guidance had competing document types, duplicated capability cards, package-local maturity language, and navigation organized partly by repository shape. | Consolidate the current non-ADR surface around canonical capability owners; retain package-specific deltas and concise superseded pointers; make generated product truth the only maturity owner. The final graph has zero current-document orphans, and all 40 promoted claims resolve to one capability home. |
+| 2026-07-22 | R12 preview acceptance | The technical GO recommendation was backed by public upgrade, publication convergence, and bounded feedback evidence; the only remaining gate was explicit maintainer acceptance. | The maintainer accepted GO. R12 and the 0.20 preview maturity cycle pass. This decision does not declare V1 GA, set a V1 support date, or widen the supported package surface. |
+| 2026-07-22 | R13 accepted migration disposition | Agyo's public tip contains substantial RAG but no migrated Agents/Orchestration loop, standalone Eval/Review projects, or public NuGet package IDs. Zen Garden's public tip has not advanced since April and does not prove the complete Models/HuggingFace lifecycle destination. | Apply ARCH-0089's transition gate: keep the six departing Koan owners unclaimed at 0.17; perform no deletion, promotion, forwarding package, or sibling mutation. Move the cross-repository work out of the completed 0.20 promotion epic and resume only from public destination/consumer evidence. |
 | 2026-07-22 | Practical merge and publication flow | Per-package NBGV versioning and main publication had become coupled to a 107-project certification ratchet, a permanent PR-native job, a duplicate surface workflow, and repeated consumer proof. This delayed framework work while proving unrelated providers and confused portfolio certification with package identity. | ARCH-0121 keeps one cheap main-PR coherence job and one test-free main publisher. Affected behavior/native tests run during development; clean consumers apply only to first publication or changed artifact shape; the complete ratchet is an explicit whole-framework milestone. The exact replacement flow passed in 86.6 seconds versus about 16 minutes 22 seconds for the preceding connected gate. |
 | 2026-07-21 | R13 first-slice merge ratchet | The first simplified PR ratchet passed build, docs, product truth, API posture, and direct native proof, but its deterministic test leg exposed three real evidence seams: failed-start cleanup masked corrective exceptions, the shared Mongo Web bridge changed the database without preserving authentication source, and the clean consumer omitted locally newer package dependencies. | Keep the lean path and repair each direct owner. Dispose incomplete hosts without an invalid stop sequence; preserve an authenticated Mongo URL's original auth database; derive and pack the promoted owners' complete public project-reference closure through the existing repository inspector. Focused host/Communication/Data and real Mongo evidence pass; rerun the final PR ratchet. |
 | 2026-07-21 | ARCH-0120 value-led correction | The fixed 55-owner program confused repository accounting with product value. Provider adapters are legitimate public leaf packages whose consumers are applications; reverse dependencies cannot decide whether they belong. The ten-wave plan, terminal certificate, central exact-cell metadata, and generic admission/native-candidate coordination added more process than the 0.20 promotion decision required. | Amend ARCH-0120 and R13 around cohesive provider families. Product intent decides inclusion; shared semantics, provider-specific real-boundary proof, a clean consumer, and package/API integrity decide promotion. Preserve the claim/version/dependency invariant, API baselines, generated truth, and existing family tests. Keep PR #95 draft until superseded machinery is removed and the smaller slice is revalidated. |

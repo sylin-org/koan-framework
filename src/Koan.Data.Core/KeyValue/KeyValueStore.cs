@@ -178,8 +178,10 @@ public abstract class KeyValueStore<TEntity, TKey> :
         return new RepositoryQueryResult<TEntity>
         {
             Items = list,
+            FilterHandled = query.Filter is not null,
             TotalCount = totalCount,
             IsEstimate = false,
+            CountExecution = totalCount is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = sortHandled,
             PaginationHandled = paginationHandled,
         };

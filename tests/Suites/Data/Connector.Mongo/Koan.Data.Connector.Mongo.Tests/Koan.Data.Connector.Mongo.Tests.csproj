@@ -20,7 +20,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <!-- Wire-shape specs (FilterWireShape) build BsonDocument/FilterDefinition directly against the driver. -->
     <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
 

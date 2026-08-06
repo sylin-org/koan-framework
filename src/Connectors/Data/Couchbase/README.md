@@ -1,25 +1,18 @@
 # Sylin.Koan.Data.Connector.Couchbase
 
-Couchbase persistence for Koan Entities. Reference the package, keep the application's normal
-`AddKoan()` bootstrap, and use Entity verbs; the connector owns discovery, cluster/bucket access,
-scope and collection routing, schema ensure, and readiness participation.
+Couchbase persistence for Koan entities, compact external mappings, neutral source inspection, and
+registered SQL++ reads. Add the package, keep the normal `AddKoan()` bootstrap, and use Entity verbs.
 
 - Target framework: net10.0
 - License: Apache-2.0
 
 ## Install
 
-> **Supported 0.20 extension:** Koan supports this connector within the capability and operational
-> boundaries below. Couchbase availability is not eager activation; the selected or explicitly routed
-> provider owns connection and readiness.
-
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Couchbase
 ```
 
-## Meaningful result
-
-With Couchbase reachable, no provider registration or repository scaffold is required:
+## Managed entities
 
 ```csharp
 builder.Services.AddKoan();
@@ -30,28 +23,61 @@ public sealed class Product : Entity<Product>
     public decimal Price { get; set; }
 }
 
-var saved = await new Product { Name = "Garden sensor", Price = 24.50m }.Save();
-var affordable = await Product.Query(product => product.Price < 50m);
+var product = await new Product { Name = "Garden sensor", Price = 24.50m }.Save();
+var affordable = await Product.Query(item => item.Price < 50m);
 ```
 
-When Couchbase is the only server-backed Data connector, it wins automatic provider election over
-the local JSON floor. Pin business-critical placement with `[DataAdapter("couchbase")]` or the
-Default-source adapter setting when adding another connector must not move existing data.
+Known-key reads and writes use Couchbase KV. Set queries, counts, sorting, and explicit pages use
+parameterized SQL++. Managed sources create missing scopes, collections, and query indexes on demand.
+
+## Existing collections
+
+`Namespace` maps to a Couchbase scope and `Container` maps to a collection:
+
+```csharp
+koan.Data.Source("Legacy").Map<Customer>(map => map
+    .Container(StorageAddress.From("erp", "customers"))
+    .Key(customer => customer.Id).Name("CUSTOMER_NO")
+    .Property(customer => customer.Name).Name("DISPLAY_NM")
+    .Property(customer => customer.Profile).Object("PROFILE"));
+```
+
+Mapped updates use CAS and change only declared paths, preserving fields owned by the external
+system. Nested `.Path(...)` and composite `.Parts(...)` keys are supported. Couchbase document keys
+are application-assigned; `.Generated()` is rejected with a corrective error.
+
+Use `StorageLifecycle.External` when Koan must never create scopes, collections, or indexes. Use
+`DataSourceAccess.ReadOnly` when every mutation must fail before provider I/O. The two policies are
+independent and default to Managed/ReadWrite.
+
+## Inspect and run named reads
+
+```csharp
+koan.Data.Source("Legacy").Query("customers.active", query => query
+    .Lane("Reports")
+    .Sql("SELECT META(c).id AS Id, c.name AS Name FROM `erp`.`crm`.`customers` AS c WHERE c.active = $active")
+    .Parameter<bool>("active"));
+
+var source = Koan.Data.Core.Data.Source("Legacy");
+var active = await source.Query("customers.active", new { active = true });
+var containers = await source.Inspect().Containers(take: 25);
+```
+
+Registered SQL++ requires a configured read lane and is executed with Couchbase's read-only query
+option. Inspection returns Koan Source/Namespace/Container descriptors and neutral records, not SDK
+bucket-manager types.
 
 ## Configuration
 
-`auto` is the default and uses Koan's discovery path, then the local Couchbase fallback.
-Use exact provider configuration only when placement or native guarantees require it:
-
 ```json
 {
-  "ConnectionStrings": {
-    "Couchbase": "couchbase://localhost"
-  },
+  "ConnectionStrings": { "Couchbase": "couchbase://localhost" },
   "Koan": {
     "Data": {
       "Couchbase": {
         "Bucket": "Products",
+        "Username": "${secret}",
+        "Password": "${secret}",
         "Durability": "Majority"
       }
     }
@@ -59,39 +85,20 @@ Use exact provider configuration only when placement or native guarantees requir
 }
 ```
 
-Supply `Username` and `Password` through the platform's secret provider; do not commit credentials.
-`Scope`, `Collection`, `QueryTimeoutSeconds`, `ManagementUrl`, and named-source placement are
-optional, explicit native choices—not common-path requirements.
+`Durability` accepts `None`, `Majority`, `MajorityAndPersistToActive`, or `PersistToMajority` and is
+applied to every KV mutation. Invalid values fail during route construction. `Scope`, `Collection`,
+`QueryTimeout`, `BootstrapTimeout`, and `BootstrapPollInterval` are optional provider settings.
 
-## Capabilities
+## Guarantee boundary
 
-- supported LINQ/filter translation to parameterized N1QL
-- bulk upsert/delete, transactional batches, conditional replace, and raw N1QL string queries
-- Row-, container-, and database-scoped Data isolation composition using bucket/scope/collection
-- provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
-- factory-owned connection pooling, lazy selected use, and selection-aware readiness
+- LINQ/filter translation is native, parameterized, and receipt-backed.
+- Conditional replace uses opaque Couchbase CAS.
+- Bulk operations are bounded; batches are non-atomic unless and until Koan has a replay-safe
+  transaction callback contract. `RequireAtomic` and idempotency-key claims reject.
+- Entity streaming uses explicit provider-bounded pages. It is not snapshot-consistent, resumable,
+  or mutation-safe.
+- One host-owned cluster is shared per connection and credential identity; bucket handles are shared
+  within it. Repositories never own SDK clients.
+- External queries require externally managed indexes. Koan does not create them as a side effect.
 
-`Product.All()` requests the complete visible set. Couchbase does not invent pagination defaults or
-caps; use `Product.Page(page, size)` or `Product.AllStream(batchSize: ...)` when the set can grow.
-
-## Streaming boundary
-
-`AllStream` and `QueryStream` request one numbered N1QL page at a time. `batchSize` caps the
-Koan-visible candidate page; it does not claim a bound for opaque Couchbase SDK buffers. Unsupported
-sorts reject before provider I/O.
-
-These streams use offset pages. They do not provide snapshot consistency, mutation-safe traversal,
-resumability, or a public cursor; concurrent writes can cause skips or duplicates.
-
-## Operations boundary
-
-A referenced but unelected Couchbase connector is available, not a readiness dependency and not an
-eager host initializer. Its shared cluster provider connects lazily when Couchbase wins election or a
-runtime Entity/source operation selects it. First selected use against a fresh local cluster may be
-expensive while Couchbase initializes services, bucket, and indexes.
-
-## References
-
-- [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/Couchbase/TECHNICAL.md)
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+See [TECHNICAL.md](TECHNICAL.md) for the complete implementation contract and evidence.

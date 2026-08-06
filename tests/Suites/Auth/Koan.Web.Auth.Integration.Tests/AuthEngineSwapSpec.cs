@@ -45,11 +45,15 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
     [Fact]
     public async Task OIDC_challenge_callback_round_trip_validates_id_token_and_authenticates()
     {
-        using var client = _fx.NewClient();
+        using var client = _fx.NewSplitHostClient();
 
         // The whole OIDC machinery runs here: metadata discovery, JWKS fetch, PKCE, nonce, and signed
         // id_token validation. If any of it failed the handler would NOT sign in → authenticated=false.
-        await DriveLogin(client, "/auth/test-oidc/challenge?return=/e2e/whoami", injectRole: "admin");
+        await DriveLogin(
+            client,
+            "/auth/test-oidc/challenge?return=/e2e/whoami",
+            injectRole: "admin",
+            browserBaseUrl: _fx.PublicBaseUrl);
 
         var who = await ReadWhoAmI(client);
         who.GetProperty("authenticated").GetBoolean().Should().BeTrue();
@@ -117,9 +121,9 @@ public sealed class AuthEngineSwapSpec : IClassFixture<AuthSwapFixture>
     /// auto-redirect; cookies — correlation, nonce, auth — flow via the CookieContainer). On the dev Test
     /// authorize hop it appends a <c>roles</c> hint (test-only; in real OAuth custom params aren't forwarded).
     /// </summary>
-    private async Task DriveLogin(HttpClient client, string challenge, string injectRole)
+    private async Task DriveLogin(HttpClient client, string challenge, string injectRole, string? browserBaseUrl = null)
     {
-        var url = new Uri(_fx.BaseUrl + challenge);
+        var url = new Uri((browserBaseUrl ?? _fx.BaseUrl) + challenge);
         var chain = new System.Collections.Generic.List<string>();
         for (var hop = 0; hop < 12; hop++)
         {

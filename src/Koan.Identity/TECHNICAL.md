@@ -6,7 +6,7 @@ Identity owns the durable person, explicit provider links, cookie-session twin, 
 contribution/explanation, identity-domain audit, lifecycle operations, and impersonation primitives. It does not own
 external authentication protocols, OAuth client-token issuance, tenant membership, or HTTP projection.
 
-`SecIdentityModule` registers typed options and host-owned services, discovers access contributors,
+`SecIdentityModule` registers typed options and host-owned services, discovers access and erasure contributors,
 installs lifecycle audit hooks, replaces inert auth-store defaults with Entity-backed implementations, and applies the
 startup posture. Package reference is activation intent; application code retains the ordinary `AddKoan()`.
 
@@ -34,6 +34,7 @@ their durable implementations without activating functional Web Auth.
 - `Session`: cookie-session/device twin and revocation state;
 - `IdentityRole`: deterministic global person-to-standard-role binding;
 - `AuditEvent`: best-effort identity mutation evidence, optionally hash chained;
+- `IdentityErasureReceipt`: non-identifying, content-hashed owner outcomes for one erasure attempt;
 - `ImpersonationGrant`: pending/approved/revoked, dual-control, time-boxed acting-as record.
 
 These records are host/global-plane entities and deliberately exempt from tenant segmentation. Identity Tenancy owns
@@ -57,14 +58,15 @@ Caller authorization remains the projection's responsibility.
 ## Lifecycle and audit
 
 `SessionService` records, lists, and revokes cookie sessions. `IdentityLifecycleService` suspends/reactivates in
-partial-failure-tolerant batches and deletes core-owned emails, sessions, external links, global roles, and
-actor/target impersonation grants before deleting the person. Audit evidence is retained. Optional capability
-dependents require their owning deprovisioning path.
+partial-failure-tolerant batches. `PreviewErasureAsync` folds every discovered `IIdentityErasureContributor` without
+mutation. `EraseAsync` closes core access first, executes all owners even after an owner-local failure, sanitizes
+retained audit last, and persists a non-identifying receipt. `DeleteWithDependentsAsync` is a compatibility projection
+over this one path. Duplicate semantic owner names block correctively rather than making coverage ambiguous.
 
-Entity lifecycle hooks emit before/after snapshots for the owned domain entities. Raw provider claim blobs are
-redacted. Emission is deliberately best-effort after the mutation; failures do not report the committed business
-operation as failed. `HashChainAudit` serializes chain writes and allows `AuditChain.VerifyAsync` to detect content or
-sequence changes, but it is not storage immutability.
+Entity lifecycle hooks emit bounded before/after metadata under the default `PrivacySafe` posture. `Full` is explicit,
+and raw provider claim blobs remain redacted. Erasure severs the subject and identifying snapshots while retaining
+action/time evidence. A valid hash chain is re-hashed after an authorized rewrite; a pre-existing invalid chain is
+refused. Emission remains best-effort after ordinary mutations, and chaining is not storage immutability.
 
 ## Configuration and reporting
 
@@ -73,6 +75,7 @@ sequence changes, but it is not storage immutability.
 - `Posture`: nullable `IdentityPosture`; environment-derived when absent;
 - `SeedDevUsers` / `DevUser`: Development + Open local-person seeding;
 - `HashChainAudit`: opt-in tamper-evident audit chain.
+- `AuditSnapshotMode`: `PrivacySafe` (default) or explicit `Full`.
 
 Open outside Development fails startup. Module reporting exposes effective posture, source, durable reconciliation,
 and the absence of a per-active-user licensing axis without exposing identity data.
@@ -82,7 +85,8 @@ and the absence of a per-active-user licensing axis without exposing identity da
 - bearer-token epoch revocation and personal access tokens;
 - automatic email-based account merging;
 - group-to-role/access semantics;
-- transactional deletion across independent providers or optional modules;
+- automatic restart orchestration or transactional deletion across independent providers/owners;
+- claims about external IdPs, token issuers, SIEMs, or backups that did not contribute an erasure owner;
 - append-only storage enforcement, guaranteed audit delivery, or SIEM export;
 - general UI, external IdP protocol handling, and OAuth authorization-server behavior;
 - a framework-neutral authorization-floor extraction from the current Web package.

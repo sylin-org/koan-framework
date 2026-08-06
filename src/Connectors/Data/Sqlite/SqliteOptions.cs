@@ -1,23 +1,19 @@
+using System.ComponentModel.DataAnnotations;
 using Koan.Core.Adapters;
 using Koan.Data.Adapters.Configuration;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Relational.Orchestration;
-using System.ComponentModel.DataAnnotations;
 
 namespace Koan.Data.Connector.Sqlite;
 
 public sealed class SqliteOptions : IAdapterOptions
 {
     [Required]
-    public string ConnectionString { get; set; } = "auto"; // DX-first: auto-detect by default
+    public string ConnectionString { get; set; } = "auto";
     public StorageNamingStyle NamingStyle { get; set; } = StorageNamingStyle.FullNamespace;
     public string Separator { get; set; } = ".";
-    // Schema policy
     public RelationalDdlPolicy DdlPolicy { get; set; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; set; } = RelationalSchemaMatchingMode.Relaxed;
-    // Effective production permission. AutoCreate implies permission for this embedded application-owned store;
-    // Validate/NoDdl remain the opt-in choices for externally provisioned schema.
-    public bool AllowProductionDdl { get; set; } = false;
-
+    public bool AllowProductionDdl { get; set; }
     public IAdapterReadinessConfiguration Readiness { get; set; } = new AdapterReadinessConfiguration();
 }

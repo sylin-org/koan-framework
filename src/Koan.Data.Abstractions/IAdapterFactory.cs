@@ -30,4 +30,10 @@ public interface IAdapterFactory : INamingProvider
     /// packages are direct-only; a foundation bundle may nominate one deliberately safe floor.
     /// </summary>
     bool IsAutomaticFloor => false;
+
+    /// <summary>
+    /// Declares the executable Data claims published by this provider. Absence is meaningful: the Framework never
+    /// infers an adapter claim merely because an optional interface or implementation type exists.
+    /// </summary>
+    void DescribeClaims(IDataClaims claims) { }
 }

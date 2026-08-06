@@ -1,146 +1,69 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Couchbase;
-using Couchbase.Core.Configuration.Server;
 using Couchbase.Core.IO.Authentication.Authenticators;
-using Couchbase.KeyValue;
 using Koan.Core;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
+using Koan.Data.Connector.Couchbase.Infrastructure;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.Couchbase.Discovery;
 
-/// <summary>
-/// Couchbase autonomous discovery adapter.
-/// Contains ALL Couchbase-specific knowledge - core orchestration knows nothing about Couchbase.
-/// Reads own KoanServiceAttribute and handles Couchbase-specific health checks.
-/// </summary>
-internal sealed class CouchbaseDiscoveryAdapter : ServiceDiscoveryAdapterBase
+internal sealed class CouchbaseDiscoveryAdapter(
+    IConfiguration configuration,
+    ILogger<CouchbaseDiscoveryAdapter> logger) : ServiceDiscoveryAdapterBase(configuration, logger)
 {
-    public override string ServiceName => "couchbase";
-    public override string[] Aliases => new[] { "cb", "nosql" };
+    public override string ServiceName => Constants.Discovery.ServiceName;
+    public override string[] Aliases => [Constants.Alias];
 
-    public CouchbaseDiscoveryAdapter(IConfiguration configuration, ILogger<CouchbaseDiscoveryAdapter> logger)
-        : base(configuration, logger) { }
-
-    /// <summary>Couchbase adapter knows which factory contains its KoanServiceAttribute</summary>
     protected override Type GetFactoryType() => typeof(CouchbaseAdapterFactory);
 
-    /// <summary>Couchbase-specific health validation using cluster test</summary>
-    protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
-    {
-        var connectionString = NormalizeCouchbaseConnectionString(serviceUrl);
+    protected override string? ReadExplicitConfiguration() =>
+        _configuration[Constants.Configuration.ConnectionString] ??
+        _configuration.GetConnectionString("Couchbase") ??
+        _configuration.GetConnectionString(Constants.DefaultSource);
 
-        var options = new ClusterOptions
-        {
-            ConnectionString = connectionString
-        };
-
-        var username = "Administrator";
-        var password = "password";
-        if (context.Parameters != null)
-        {
-            if (context.Parameters.TryGetValue("username", out var configuredUsername) &&
-                context.Parameters.TryGetValue("password", out var configuredPassword))
-            {
-                username = configuredUsername.ToString() ?? username;
-                password = configuredPassword.ToString() ?? password;
-            }
-        }
-
-        options.WithAuthenticator(new PasswordAuthenticator(
-            username,
-            password,
-            connectionString.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)));
-
-        using var cluster = await Cluster.ConnectAsync(options);
-
-        var bucketName = context.Parameters?.TryGetValue("bucket", out var bucket) == true
-            ? bucket.ToString() ?? "Koan"
-            : "Koan";
-
-        try
-        {
-            var testBucket = await cluster.BucketAsync(bucketName);
-            await testBucket.WaitUntilReadyAsync(TimeSpan.FromSeconds(5));
-            return true;
-        }
-        catch
-        {
-            // A missing bucket does not make the connected cluster unavailable.
-            await cluster.Buckets.GetAllBucketsAsync();
-            return true;
-        }
-    }
-
-    /// <summary>Couchbase adapter reads its own configuration sections</summary>
-    protected override string? ReadExplicitConfiguration()
-    {
-        // Check Couchbase-specific configuration paths
-        return _configuration.GetConnectionString("Couchbase") ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.ConnectionString] ??
-               _configuration[Infrastructure.Constants.Configuration.Keys.DefaultSourceConnectionString];
-    }
-
-    /// <summary>Couchbase-specific environment variable handling</summary>
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()
     {
-        var couchbaseUrls = Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseUrls) ??
-                           Environment.GetEnvironmentVariable(Infrastructure.Constants.Discovery.CouchbaseAliasUrls);
-
-        if (string.IsNullOrWhiteSpace(couchbaseUrls))
-            return Enumerable.Empty<DiscoveryCandidate>();
-
-        return couchbaseUrls.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
-                           .Select(url => new DiscoveryCandidate(url.Trim(), "environment-couchbase-urls", DiscoveryCandidatePriority.Environment));
+        var values = Environment.GetEnvironmentVariable(Constants.Discovery.CouchbaseUrls) ??
+                     Environment.GetEnvironmentVariable(Constants.Discovery.CouchbaseAliasUrls);
+        return string.IsNullOrWhiteSpace(values)
+            ? []
+            : values.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static value => new DiscoveryCandidate(
+                    Normalize(value),
+                    "environment-couchbase-urls",
+                    DiscoveryCandidatePriority.Environment));
     }
 
-    /// <summary>Couchbase-specific connection string normalization</summary>
-    protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters)
+    protected override string ApplyConnectionParameters(string baseUrl, IDictionary<string, object> parameters) =>
+        Normalize(baseUrl);
+
+    protected override async Task<bool> ValidateServiceHealth(
+        string serviceUrl,
+        DiscoveryContext context,
+        CancellationToken cancellationToken)
     {
-        return NormalizeCouchbaseConnectionString(baseUrl);
+        var username = Value(context.Parameters, "username") ?? "Administrator";
+        var password = Value(context.Parameters, "password") ?? "password";
+        var options = new ClusterOptions { ConnectionString = Normalize(serviceUrl) };
+        options.WithAuthenticator(new PasswordAuthenticator(username, password));
+        using var cluster = await Cluster.ConnectAsync(options).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        _ = await cluster.PingAsync().ConfigureAwait(false);
+        return true;
     }
 
-    /// <summary>Couchbase-specific connection string normalization</summary>
-    private string NormalizeCouchbaseConnectionString(string value)
+    private static string Normalize(string value)
     {
-        try
-        {
-            var trimmed = value?.Trim() ?? "";
-            if (string.IsNullOrEmpty(trimmed)) return "couchbase://localhost";
-
-            // If already properly formatted, return as-is
-            if (trimmed.StartsWith("couchbase://", StringComparison.OrdinalIgnoreCase) ||
-                trimmed.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase))
-            {
-                return trimmed;
-            }
-
-            // Handle HTTP URLs - convert to couchbase protocol
-            if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-            {
-                return trimmed.Replace("http://", "couchbase://", StringComparison.OrdinalIgnoreCase);
-            }
-            if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                return trimmed.Replace("https://", "couchbases://", StringComparison.OrdinalIgnoreCase);
-            }
-
-            // If it's just a hostname or IP, add the couchbase protocol
-            return $"couchbase://{trimmed}";
-        }
-        catch (Exception ex)
-        {
-            ReportNormalizationFailure(value, ex);
-            return value; // Return original value if normalization fails
-        }
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("couchbase://", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)) return trimmed;
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return "couchbase://" + trimmed[7..];
+        if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return "couchbases://" + trimmed[8..];
+        return "couchbase://" + trimmed;
     }
 
-    /// <summary>Couchbase adapter handles Aspire service discovery for Couchbase</summary>
-    protected override string? ReadAspireServiceDiscovery()
-    {
-        // Check Aspire-specific Couchbase service discovery
-        return _configuration["services:couchbase:default:0"] ??
-               _configuration["services:cb:default:0"];
-    }
+    private static string? Value(IDictionary<string, object>? values, string key) =>
+        values?.TryGetValue(key, out var value) == true ? Convert.ToString(value) : null;
 }

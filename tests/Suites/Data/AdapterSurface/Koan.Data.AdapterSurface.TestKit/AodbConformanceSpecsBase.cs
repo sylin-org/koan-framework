@@ -18,7 +18,7 @@ using Xunit;
 namespace Koan.Data.AdapterSurface.TestKit;
 
 /// <summary>
-/// The one reusable AODB conformance ledger (ARCH-0103 §6 / P5). A per-adapter cell subclasses this with the adapter's
+/// The reusable AODB conformance suite (ARCH-0103 §6 / P5). Each adapter subclasses this with the adapter's
 /// container fixture and the per-source placement settings; the base proves, through a real <c>AddKoan()</c> boot, that
 /// the adapter realizes ALL THREE AODB isolation modes — and that it <b>declares</b> the matching capability tokens.
 /// <para>
@@ -86,7 +86,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== The co-definition: declare the required tokens ====================
 
-    [Fact(DisplayName = "AODB ledger: the adapter declares all three isolation modes (RowScoped + ContainerScoped + DatabaseScoped)")]
+    [Fact(DisplayName = "G-09/declarations/Adapter: announced isolation modes are mandatory and executable")]
     public async Task Declares_all_three_isolation_modes()
     {
         RequireBackingStore();
@@ -97,7 +97,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Provider-bounded Entity streams ====================
 
-    [Fact(DisplayName = "Streaming: announced provider-bounded paging realizes; unannounced adapters reject before yielding")]
+    [Fact(DisplayName = "B-09/provider-bounded-page/Adapter: bounded streaming realizes or fails closed")]
     public async Task Provider_bounded_streaming_realizes_or_fails_closed()
     {
         RequireBackingStore();
@@ -186,13 +186,128 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
             });
     }
 
+    // ==================== Polymorphic entity roots (DATA-0109) ====================
+
+    [Fact(DisplayName = "B-01/polymorphic-root/Adapter: variants share one root set and preserve leaf payloads")]
+    public async Task Polymorphic_variants_share_the_root_set_and_round_trip_leaf_payloads()
+    {
+        RequireBackingStore();
+        var ct = TestContext.Current.CancellationToken;
+        var partition = NewPartition("polymorphic-root");
+        var familyTag = Guid.NewGuid().ToString("N");
+        string animeId;
+
+        await using (var host = await BootAsync())
+        using (Lease(partition))
+        {
+            var root = await new PolyMedia
+            {
+                Id = $"{familyTag}-01",
+                FamilyTag = familyTag,
+                Kind = "Media",
+                Title = "Root title",
+                SortOrder = 1
+            }.Save(ct);
+            PolyAnime anime = await new PolyAnime
+            {
+                Id = $"{familyTag}-02",
+                FamilyTag = familyTag,
+                Kind = "Anime",
+                Title = "Anime title",
+                SortOrder = 2,
+                Episodes = 24
+            }.Save(ct);
+            PolyManga manga = await new PolyManga
+            {
+                Id = $"{familyTag}-03",
+                FamilyTag = familyTag,
+                Kind = "Manga",
+                Title = "Manga title",
+                SortOrder = 3,
+                Volumes = 12,
+                Chapters = 108
+            }.Save(ct);
+            animeId = anime.Id;
+
+            var animeFromRoot = await PolyMedia.Get(anime.Id, ct);
+            var hydratedAnime = animeFromRoot.Should().BeOfType<PolyAnime>().Which;
+            hydratedAnime.Episodes.Should().Be(24);
+
+            PolyAnime? animeFromLeaf = await PolyAnime.Get(anime.Id, ct);
+            animeFromLeaf.Should().NotBeNull();
+            animeFromLeaf!.Episodes.Should().Be(24);
+            animeFromLeaf.Title.Should().Be("Anime title");
+
+            var family = await PolyMedia.Query(media => media.FamilyTag == familyTag, ct);
+            family.Should().HaveCount(3);
+        family.Select(static media => media.GetType()).Should().BeEquivalentTo(
+            new[] { typeof(PolyMedia), typeof(PolyAnime), typeof(PolyManga) });
+            var queriedManga = family.Single(media => media.Id == manga.Id)
+                .Should().BeOfType<PolyManga>().Which;
+            queriedManga.Volumes.Should().Be(12);
+            queriedManga.Chapters.Should().Be(108);
+            (await PolyMedia.Count.Where(
+                media => media.FamilyTag == familyTag,
+                CountStrategy.Exact,
+                ct)).Should().Be(3);
+            (await PolyMedia.Count.Exact(ct)).Should().Be(
+                3,
+                "the unique partition must contain only this family before unfiltered paging");
+
+            var firstPage = await PolyMedia.Page(
+                1,
+                2,
+                sort => sort.OrderBy(media => media.SortOrder),
+                ct);
+            var secondPage = await PolyMedia.Page(
+                2,
+                2,
+                sort => sort.OrderBy(media => media.SortOrder),
+                ct);
+            firstPage.Select(static media => media.Id).Should().Equal(root.Id, anime.Id);
+            secondPage.Select(static media => media.Id).Should().Equal(manga.Id);
+            firstPage[1].Should().BeOfType<PolyAnime>();
+            secondPage[0].Should().BeOfType<PolyManga>();
+
+            PolyMedia? rootTypedAnime = await PolyMedia.Get(anime.Id, ct);
+            rootTypedAnime.Should().NotBeNull();
+            rootTypedAnime!.Title = "Anime title after root save";
+            PolyMedia resaved = await rootTypedAnime.Save(ct);
+            resaved.Should().BeOfType<PolyAnime>();
+
+            PolyAnime? animeAfterRootSave = await PolyAnime.Get(anime.Id, ct);
+            animeAfterRootSave.Should().NotBeNull();
+            animeAfterRootSave!.Episodes.Should().Be(24);
+            animeAfterRootSave.Title.Should().Be("Anime title after root save");
+        }
+
+        // InMemory is intentionally host-owned, while JsonFixture intentionally provisions a fresh directory per
+        // boot. Shared-store fixtures can additionally prove hydration after DataService and its repository cache die.
+        if (Fixture is InMemoryFixture || Fixture is JsonFixture)
+        {
+            return;
+        }
+
+        await using var coldHost = await BootAsync();
+        using var coldLease = Lease(partition);
+        var coldRootRead = await PolyMedia.Get(animeId, ct);
+        var coldAnime = coldRootRead.Should().BeOfType<PolyAnime>().Which;
+        coldAnime.Episodes.Should().Be(24);
+        coldAnime.Title.Should().Be("Anime title after root save");
+
+        PolyAnime? coldTypedRead = await PolyAnime.Get(animeId, ct);
+        coldTypedRead.Should().NotBeNull();
+        coldTypedRead!.Episodes.Should().Be(24);
+        coldTypedRead.Title.Should().Be("Anime title after root save");
+    }
+
     // ==================== Shared (FieldFilter → managed-record persistence) ====================
 
-    [Fact(DisplayName = "AODB Shared: the framework-managed discriminator isolates reads/writes/deletes (no leak)")]
+    [Fact(DisplayName = "G-09/row/Adapter: the managed discriminator isolates reads writes and deletes")]
     public async Task Shared_isolation_holds()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(ManagedFieldNoLeak.Declare);
         await CapabilityConformanceGate.RunCell(ResolveCaps(host.Services), Modules,
             DataCaps.Isolation.RowScoped,
             realize: () => ManagedFieldNoLeak.AssertNoLeakAsync());
@@ -200,7 +315,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Container (Particle → distinct physical container per partition) ====================
 
-    [Fact(DisplayName = "AODB Container: each ambient partition resolves to a distinct physical container (isolation + concurrent no-leak)")]
+    [Fact(DisplayName = "G-09/container/Adapter: each ambient partition resolves to an isolated container")]
     public async Task Container_isolation_holds()
     {
         RequireBackingStore();
@@ -252,7 +367,7 @@ public abstract class AodbConformanceSpecsBase<TFixture> : KoanDataSpec<TFixture
 
     // ==================== Database (Moniker → per-source physical routing) ====================
 
-    [Fact(DisplayName = "AODB Database: a Database-mode axis auto-routes by ambient shard to distinct physical sources, fail-closed on unconfigured")]
+    [Fact(DisplayName = "G-09/database/Adapter: each ambient shard resolves to an isolated source")]
     public async Task Database_isolation_holds()
     {
         RequireBackingStore();

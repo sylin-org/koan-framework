@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Koan.Data.Connector.Cockroach</AssemblyName>
     <RootNamespace>Koan.Data.Connector.Cockroach</RootNamespace>
-    <Description>CockroachDB provider for Koan relational data: a thin pg-wire delta over the Postgres connector (Npgsql + Dapper) with guardrails and governance.</Description>
+    <Description>CockroachDB provider for Koan Data: a lean concrete connector over the shared Npgsql execution family.</Description>
     <PackageTags>$(CommonPackageTags);data;cockroach;cockroachdb;relational;sql;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>

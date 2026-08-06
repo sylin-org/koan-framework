@@ -24,16 +24,19 @@ public sealed class ProduceSearchController : ControllerBase
             return BadRequest("Query parameter 'q' is required.");
 
         var queryVector = await Client.Embed(q, ct);
-        var result = await Vector<Produce>.Search(queryVector, topK: Math.Clamp(k, 1, 20), ct: ct);
-        var listings = await Produce.Get(result.Matches.Select(match => match.Id), ct);
+        var result = await Vector<Produce>.Search(
+            queryVector,
+            query => query.Top(Math.Clamp(k, 1, 20)),
+            ct);
+        var listings = await Produce.Get(result.Items.Select(match => match.Id), ct);
 
-        var hits = result.Matches.Zip(listings)
+        var hits = result.Items.Zip(listings)
             .Where(pair => pair.Second is not null)
             .Select(pair => new Hit(
                 pair.First.Id,
                 pair.Second!.Name,
                 pair.Second.Category,
-                pair.First.Score));
+                pair.First.Similarity));
         return Ok(hits);
     }
 }

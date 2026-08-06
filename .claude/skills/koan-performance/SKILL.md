@@ -2,7 +2,7 @@
 name: koan-performance
 description: Capability-qualified Entity<T> streaming, explicit paging/count strategies, and batch-shaped reads/writes without overclaiming provider commands or guarantees
 pillar: data
-card: docs/reference/cards/data.md
+card: docs/reference/data/index.md
 status: current
 last_validated: 2026-07-15
 ---
@@ -137,7 +137,7 @@ snapshot-consistent, mutation-safe, resumable, or cursor-based ([DATA-0107](../.
 
 ## See also
 
-- [Reference card: data](../../../docs/reference/cards/data.md)
+- [Data capability](../../../docs/reference/data/index.md)
 - [Performance guide](../../../docs/guides/performance.md)
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md)
 - [Entity data reference](../../../docs/reference/data/index.md)

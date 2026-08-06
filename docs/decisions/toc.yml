@@ -186,6 +186,8 @@
       href: ARCH-0120-terminal-package-maturity.md
     - name: ARCH-0121 Claim-scoped validation and a cheap main boundary
       href: ARCH-0121-claim-scoped-validation.md
+    - name: ARCH-0122 Dogfood-derived runtime control and deterministic test seams
+      href: ARCH-0122-dogfood-runtime-and-test-seams.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
@@ -296,6 +298,10 @@
       href: DATA-0107-provider-bounded-entity-streams.md
     - name: DATA-0108 Integrity-first Entity backup and recovery
       href: DATA-0108-integrity-first-entity-backup.md
+    - name: DATA-0109 Adapter-neutral polymorphic Entity roots
+      href: DATA-0109-polymorphic-entity-roots.md
+    - name: DATA-0110 Compact provider-neutral Data adapter language
+      href: DATA-0110-compact-data-adapter-language.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -462,3 +468,5 @@
   items:
     - name: DEC-0053 Service-to-service authentication
       href: DEC-0053-service-to-service-authentication.md
+    - name: SEC-0009 Privacy-safe identity erasure with honest receipts
+      href: SEC-0009-privacy-safe-identity-erasure.md

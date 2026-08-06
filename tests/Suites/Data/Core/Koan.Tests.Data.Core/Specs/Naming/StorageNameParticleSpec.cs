@@ -1,10 +1,12 @@
 using System;
 using System.Threading;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Core.Naming;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core.Model;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Specs.Naming;
 
@@ -16,13 +18,13 @@ namespace Koan.Tests.Data.Core.Specs.Naming;
 /// DISTINCT names — a per-container name can never cache and serve across tenants. A non-applicable type stays
 /// byte-identical even with the contributor registered.
 /// </summary>
-[Collection("storage-name-particle-registry")]   // serialize: the registry is process-global static state
 public sealed class StorageNameParticleSpec : IDisposable
 {
     private static readonly AsyncLocal<string?> _tenant = new();
+    private readonly IDisposable _composition;
 
-    public StorageNameParticleSpec() => StorageNameParticleRegistry.Reset();
-    public void Dispose() { _tenant.Value = null; StorageNameParticleRegistry.Reset(); }
+    public StorageNameParticleSpec() => _composition = KoanCompositionScope.Enter(new ServiceCollection());
+    public void Dispose() { _tenant.Value = null; _composition.Dispose(); }
 
     private static IDisposable Tenant(string id)
     {
@@ -89,7 +91,7 @@ public sealed class StorageNameParticleSpec : IDisposable
     {
         // The decisive security pin: a per-container name (T1-base) must NEVER cache and serve to another tenant.
         StorageNameParticleRegistry.Register(new TenantNameParticle());
-        const string provider = "name-particle-spec"; // unique provider isolates the static cache
+        const string provider = "name-particle-spec"; // stable provider identity within this composition
 
         string n1, n2, host;
         using (Tenant("T1")) n1 = StorageNameGenerator.Resolve(provider, typeof(NamedDoc), "alpha", Cap());

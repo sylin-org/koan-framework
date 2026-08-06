@@ -14,6 +14,9 @@ namespace Koan.AI.Contracts.Sources;
 /// </summary>
 public sealed record AiSourceDefinition
 {
+    /// <summary>Whether routing and health monitoring may use this source.</summary>
+    public bool IsEnabled { get; init; } = true;
+
     /// <summary>
     /// Source name (unique identifier).
     /// Examples: "ollama", "enterprise", "production"

@@ -7,6 +7,7 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Pipeline;
+using Koan.Core.Hosting.App;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Axes;
@@ -26,12 +27,13 @@ public static partial class DataAxis
         => Explain(services, typeof(TEntity));
 
     /// <summary>Explain the axis composition + read-scope of <paramref name="entityType"/> in the current ambient. The
-    /// planes come from the static registries; the active fold + adapter satisfaction from the facade diagnostic (best
-    /// effort — if the adapter cannot be resolved, the registry-level story is still returned).</summary>
+    /// planes come from the supplied host's declaration catalogs; the active fold + adapter satisfaction from the
+    /// facade diagnostic (best effort — if the adapter cannot be resolved, the catalog-level story is still returned).</summary>
     public static AxisExplanation Explain(IServiceProvider services, Type entityType)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(entityType);
+        using var host = AppHost.PushScope(services);
 
         var planes = new List<AxisPlane>();
 

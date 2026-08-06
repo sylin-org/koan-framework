@@ -1,88 +1,113 @@
 - name: Home
   href: index.md
-- name: Get started
+- name: Start
   href: getting-started/quickstart.md
   items:
-    - name: Quickstart
+    - name: Make your first application
       href: getting-started/quickstart.md
-    - name: Golden path
-      href: getting-started/overview.md
-- name: Developer guides
+    - name: Bring Koan into an existing app
+      href: getting-started/adopt-existing-app.md
+- name: Build
+  href: reference/what-works.md
+  items:
+    - name: How Koan starts
+      href: reference/core/index.md
+    - name: Data
+      href: reference/data/index.md
+    - name: HTTP APIs
+      href: reference/web/index.md
+    - name: Identity and tenancy
+      href: reference/identity/index.md
+    - name: Jobs, events, and messages
+      href: reference/work/index.md
+      items:
+        - name: Background jobs
+          href: reference/jobs/index.md
+        - name: Events and transport
+          href: reference/communication/index.md
+    - name: Cache, files, and media
+      href: reference/state-content/index.md
+      items:
+        - name: Cache
+          href: reference/data/cache.md
+        - name: Files and storage
+          href: reference/storage/index.md
+        - name: Media
+          href: reference/media/index.md
+    - name: AI and semantic search
+      href: reference/ai/index.md
+      items:
+        - name: Vector search
+          href: reference/ai/vector.md
+    - name: Agents and MCP
+      href: reference/agents/index.md
+    - name: Trusted records with Canon
+      href: reference/canon/index.md
+    - name: Test and understand the app
+      href: reference/operations/index.md
+      items:
+        - name: OpenTelemetry
+          href: reference/operations/observability.md
+        - name: External services
+          href: reference/operations/external-topology.md
+        - name: NativeAOT
+          href: reference/operations/native-aot.md
+- name: How to…
   href: guides/README.md
   items:
-    - name: Build an API
-      href: reference/web/index.md
-    - name: Model data
-      href: reference/data/index.md
-    - name: Entity access and streaming
+    - name: Read and stream Entities
       href: guides/data/entity-access-and-streaming.md
-    - name: Cache Entity state
-      href: reference/data/cache.md
-    - name: Build a canonical Entity
+    - name: Add sign-in
+      href: guides/authentication-setup.md
+    - name: Issue OAuth tokens
+      href: guides/oauth-server-howto.md
+    - name: Isolate tenants
+      href: guides/tenancy-howto.md
+    - name: Run background work
+      href: guides/jobs-howto.md
+    - name: Build trusted records with Canon
       href: guides/canon-capabilities-howto.md
-    - name: Store Entity-backed files
-      href: reference/storage/index.md
-    - name: Add AI capabilities
-      href: reference/ai/index.md
-    - name: Run durable jobs
-      href: reference/cards/jobs.md
-    - name: Use Entity Events and Transport
-      href: reference/communication/index.md
-    - name: Expose agent capabilities
+    - name: Let an agent use the app
       href: guides/mcp-agent-native-howto.md
-    - name: Configure MCP over HTTP
+    - name: Reach MCP over HTTP
       href: guides/mcp-http-sse-howto.md
-    - name: Add authentication
-      href: reference/cards/auth.md
-    - name: Add tenancy
-      href: reference/cards/tenancy.md
     - name: Test an application
       href: guides/testing-your-app.md
-    - name: Evaluate experimental NativeAOT
-      href: reference/cards/nativeaot.md
-    - name: Understand the composition lockfile
+    - name: Engineer an app with an agent
+      href: guides/agent-application-engineering.md
+    - name: Review what changed
       href: guides/composition-lockfile.md
 - name: Reference
-  href: reference/product-surface.md
+  href: reference/what-works.md
   items:
-    - name: Product and package surface
+    - name: What works today
+      href: reference/what-works.md
+    - name: Exact package and support status
       href: reference/product-surface.md
     - name: Package quality
       href: reference/package-quality.md
-    - name: Core and composition
-      href: reference/core/index.md
-    - name: Entity data
-      href: reference/data/index.md
-    - name: Canon
-      href: reference/canon/index.md
-    - name: Web and HTTP
-      href: reference/web/index.md
     - name: HTTP API
       href: reference/web/http-api.md
-    - name: PATCH normalization
+    - name: .NET API
+      href: api/index.md
+    - name: PATCH behavior
       href: api/patch-normalization.md
-    - name: Jobs
-      href: reference/cards/jobs.md
-    - name: Communication
-      href: reference/communication/index.md
-    - name: AI
-      href: reference/ai/index.md
-    - name: MCP
-      href: reference/cards/mcp.md
-- name: Architecture
-  href: architecture/product-constitution.md
-  items:
-    - name: Product constitution
-      href: architecture/product-constitution.md
-    - name: Entity semantics contract
-      href: architecture/entity-semantics-contract.md
-    - name: Framework principles
-      href: architecture/principles.md
-- name: Samples
+    - name: Glossary
+      href: reference/glossary.md
+- name: Stories you can run
   href: ../samples/README.md
-- name: Troubleshooting
+- name: Help when something breaks
   href: support/troubleshooting.md
-- name: Decision record
-  href: decisions/index.md
+- name: Architecture
+  href: architecture/index.md
+  items:
+    - name: The big picture
+      href: architecture/index.md
+    - name: The product promises
+      href: architecture/product-constitution.md
+    - name: How Entities grow
+      href: architecture/entity-semantics-contract.md
+    - name: Design principles
+      href: architecture/principles.md
 - name: Contributing
   href: ../CONTRIBUTING.md

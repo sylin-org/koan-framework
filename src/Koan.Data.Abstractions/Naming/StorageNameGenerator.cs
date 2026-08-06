@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Text;
+using Koan.Core.Hosting.App;
 using Koan.Core.Naming;
 
 namespace Koan.Data.Abstractions.Naming;
@@ -21,36 +21,54 @@ public static class StorageNameGenerator
     // container-level cross-scope leak). The source component is the Database-mode routed source (ARCH-0103, vector
     // plane only — null on the record path): a per-source name (sourceA_Todo) must not cache and serve across sources.
     // Empty axis signature + null source ⇒ byte-identical key and name to the pre-ARCH-0101/0103 path.
-    private static readonly ConcurrentDictionary<(string Provider, Type Entity, string? Partition, string Axis, string? Source), string> Cache = new();
-
-    // The base anchor (DATA-0104 grammar / NameOverride result) is stable per (provider, entity) and
-    // INDEPENDENT of partition. Caching it here (ARCH-0096 §3, the deepest stable plane) means resolving a new
-    // partition no longer re-runs the grammar — only the partition token + clamp are per-(provider,entity,partition).
-    private static readonly ConcurrentDictionary<(string Provider, Type Entity), string> AnchorCache = new();
-
     /// <summary>Cached entry point used by the <see cref="INamingProvider"/> default implementation (record plane —
     /// no Database-mode source folded into the name; the record plane routes a source to a distinct physical store via
     /// the factory, not the identifier). Byte-identical to the pre-ARCH-0103 path.</summary>
-    public static string Resolve(string provider, Type entityType, string? partition, Func<StorageNamingCapability> capabilityFactory)
-        => Resolve(provider, entityType, partition, source: null, capabilityFactory);
+    public static string Resolve(
+        string provider,
+        Type entityType,
+        string? partition,
+        Func<StorageNamingCapability> capabilityFactory,
+        IServiceProvider? services = null)
+        => Resolve(provider, entityType, partition, source: null, capabilityFactory, services);
 
     /// <summary>Source-aware entry point (ARCH-0103, vector plane): folds the Database-mode routed
     /// <paramref name="source"/> into the name as a leading particle so each source resolves to a distinct physical
     /// container on the same store (the name-mangling Database floor, composing with the Container partition particle).
     /// A null / empty / <c>"Default"</c> source contributes nothing ⇒ byte-identical to the record path.</summary>
-    public static string Resolve(string provider, Type entityType, string? partition, string? source, Func<StorageNamingCapability> capabilityFactory)
+    public static string Resolve(
+        string provider,
+        Type entityType,
+        string? partition,
+        string? source,
+        Func<StorageNamingCapability> capabilityFactory,
+        IServiceProvider? services = null)
     {
         // Gather the ambient container-name particles (e.g. a separate-container tenant) BEFORE the cache lookup — they
         // determine the name AND must be in the cache key. Empty fast path when no axis is registered (IsEmpty).
         var extras = StorageNameParticleRegistry.Gather(entityType);
         var src = NormalizeSource(source);
-        var key = (provider, entityType, string.IsNullOrWhiteSpace(partition) ? null : partition.Trim(), AxisKey(extras), src);
-        return Cache.GetOrAdd(key, static (k, ctx) =>
+        var key = new StorageNameCache.NameKey(
+            provider,
+            entityType,
+            string.IsNullOrWhiteSpace(partition) ? null : partition.Trim(),
+            AxisKey(extras),
+            src);
+        var cache = services?.GetService(typeof(StorageNameCache)) as StorageNameCache
+            ?? AppHost.Current?.GetService(typeof(StorageNameCache)) as StorageNameCache;
+        if (cache is null)
         {
-            var cap = ctx.factory();
-            var baseName = AnchorCache.GetOrAdd((k.Provider, k.Entity), static (ak, c) => ResolveAnchor(ak.Entity, c), cap);
-            return Compose(baseName, k.Partition, k.Source, cap, ctx.extras);
-        }, (factory: capabilityFactory, extras));
+            var capability = capabilityFactory();
+            return Compose(ResolveAnchor(entityType, capability), key.Partition, key.Source, capability, extras);
+        }
+        return cache.Resolve(key, () =>
+        {
+            var capability = capabilityFactory();
+            var anchor = cache.Anchor(
+                new StorageNameCache.AnchorKey(provider, entityType),
+                () => ResolveAnchor(entityType, capability));
+            return Compose(anchor, key.Partition, key.Source, capability, extras);
+        });
     }
 
     /// <summary>Pure generation (no cache) — exposed for testing and direct use.</summary>

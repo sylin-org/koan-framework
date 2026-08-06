@@ -69,7 +69,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
 
         using (Vector<TodoVector>.WithPartition("beta"))
         {
-            var hits = await Vector<TodoVector>.Search(Embed("anchor", 1), topK: 10);
+            var hits = await Vector<TodoVector>.SearchLegacy(Embed("anchor", 1), topK: 10);
             hits.Matches.Select(m => m.Id).Should().NotContain("only-in-alpha");
         }
     }
@@ -92,7 +92,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
 
         using (Vector<TodoVector>.WithPartition("alpha"))
         {
-            var hits = await Vector<TodoVector>.Search(Embed("anchor", 0), topK: 10);
+            var hits = await Vector<TodoVector>.SearchLegacy(Embed("anchor", 0), topK: 10);
             hits.Matches.Select(m => m.Id).Should().OnlyContain(id => ((string)(object)id).StartsWith("alpha-"));
         }
     }
@@ -118,7 +118,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
 
         using (Vector<TodoVector>.WithPartition("beta"))
         {
-            var hits = await Vector<TodoVector>.Search(Embed("anchor", 0), topK: 5);
+            var hits = await Vector<TodoVector>.SearchLegacy(Embed("anchor", 0), topK: 5);
             hits.Matches.Select(m => m.Id).Should().Contain("shared-id");
         }
     }
@@ -145,13 +145,13 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
 
         using (Vector<TodoVector>.WithPartition("beta"))
         {
-            var hits = await Vector<TodoVector>.Search(Embed("anchor", 0), topK: 5);
+            var hits = await Vector<TodoVector>.SearchLegacy(Embed("anchor", 0), topK: 5);
             hits.Matches.Select(m => m.Id).Should().Contain("beta-1");
         }
 
         using (Vector<TodoVector>.WithPartition("alpha"))
         {
-            var hits = await Vector<TodoVector>.Search(Embed("anchor", 0), topK: 5);
+            var hits = await Vector<TodoVector>.SearchLegacy(Embed("anchor", 0), topK: 5);
             hits.Matches.Should().BeEmpty();
         }
     }
@@ -190,7 +190,7 @@ public abstract class VectorPartitionSpecsBase<TFactory> : IAsyncLifetime
         {
             using (Vector<TodoVector>.WithPartition(p))
             {
-                var hits = await Vector<TodoVector>.Search(Embed(p, 0), topK: 50);
+                var hits = await Vector<TodoVector>.SearchLegacy(Embed(p, 0), topK: 50);
                 var ids = hits.Matches.Select(m => (string)(object)m.Id).ToList();
                 diagnostics.Add($"{p}: [{string.Join(", ", ids)}]");
                 ids.Should().HaveCountGreaterThanOrEqualTo(4, $"partition '{p}' should hold its 4 writes. Diagnostics: {string.Join(" | ", diagnostics)}");

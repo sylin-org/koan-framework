@@ -209,36 +209,35 @@ namespace Koan.Data.Core.Model
         public static IBatchSet<TEntity, TKey> Batch() => Data<TEntity, TKey>.Batch();
 
         public static CopyTransferBuilder<TEntity, TKey> Copy()
-            => new(null, null);
+            => Data<TEntity, TKey>.Copy();
 
         public static CopyTransferBuilder<TEntity, TKey> Copy(Expression<Func<TEntity, bool>> predicate)
-            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
-
-        public static CopyTransferBuilder<TEntity, TKey> Copy(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
-            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+            => Data<TEntity, TKey>.Copy(predicate);
 
         public static MoveTransferBuilder<TEntity, TKey> Move()
-            => new(null, null);
+            => Data<TEntity, TKey>.Move();
 
         public static MoveTransferBuilder<TEntity, TKey> Move(Expression<Func<TEntity, bool>> predicate)
-            => new(predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
-
-        public static MoveTransferBuilder<TEntity, TKey> Move(Func<IQueryable<TEntity>, IQueryable<TEntity>> query)
-            => new(null, query ?? throw new ArgumentNullException(nameof(query)));
+            => Data<TEntity, TKey>.Move(predicate);
 
         public static MirrorTransferBuilder<TEntity, TKey> Mirror(MirrorMode mode = MirrorMode.Push)
-            => new(mode, null, null);
+            => Data<TEntity, TKey>.Mirror(mode);
 
         public static MirrorTransferBuilder<TEntity, TKey> Mirror(Expression<Func<TEntity, bool>> predicate, MirrorMode mode = MirrorMode.Push)
-            => new(mode, predicate ?? throw new ArgumentNullException(nameof(predicate)), null);
-
-        public static MirrorTransferBuilder<TEntity, TKey> Mirror(Func<IQueryable<TEntity>, IQueryable<TEntity>> query, MirrorMode mode = MirrorMode.Push)
-            => new(mode, null, query ?? throw new ArgumentNullException(nameof(query)));
+            => Data<TEntity, TKey>.Mirror(predicate, mode);
 
         public static Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         {
             if (model is null) throw new ArgumentNullException(nameof(model));
             return Data<TEntity, TKey>.Upsert(model, ct);
+        }
+
+        public static Task<MutationResult<TEntity, TKey>> UpsertWithOutcome(
+            TEntity model,
+            CancellationToken ct = default)
+        {
+            if (model is null) throw new ArgumentNullException(nameof(model));
+            return Data<TEntity, TKey>.UpsertWithOutcome(model, ct);
         }
 
         public static Task<TEntity> Upsert(TEntity model, string partition, CancellationToken ct = default)
@@ -292,6 +291,11 @@ namespace Koan.Data.Core.Model
         // Removal helpers
         public static Task<bool> Remove(TKey id, CancellationToken ct = default)
             => Data<TEntity, TKey>.Delete(id, ct);
+
+        public static Task<MutationResult<TEntity, TKey>> RemoveWithOutcome(
+            TKey id,
+            CancellationToken ct = default)
+            => Data<TEntity, TKey>.DeleteWithOutcome(id, ct);
 
         public static Task<bool> Remove(TKey id, QueryDefinition? options, CancellationToken ct = default)
         {

@@ -1,23 +1,51 @@
 # Sylin.Koan.Data.Vector.Connector.Qdrant
 
-Use Qdrant behind Koan's entity-first vector API. Referencing this package is the activation step; `AddKoan()`
-discovers it, elects it when appropriate, and reports the effective route at startup.
+Use Qdrant through Koan's Entity-first vector API. The application declares a vector space once; the adapter realizes
+its shape, source policy, isolation, visibility, filtering, and similarity semantics over Qdrant.
 
-## Install and use
+## Declare the space
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Vector.Connector.Qdrant
 ```
 
 ```csharp
-public sealed class Article : Entity<Article> { }
+public sealed class Article : Entity<Article>;
 
-await Vector<Article>.Save(article.Id, embedding, new { category = "support" });
-var matches = await Vector<Article>.Search(embedding, topK: 12);
+services.AddKoan(koan => koan.Data
+    .Source("Search")
+    .Vector<Article>(space => space
+        .Name("content")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session)));
 ```
 
-No Qdrant-specific registration is required. With Qdrant reachable at `http://localhost:6333`, no configuration is
-required either. Set an endpoint only when the deployment differs:
+`Name`, `Dimensions`, `Metric`, and `Visibility` are application decisions. They are not repeated in Qdrant options.
+Referencing the package activates the adapter; no provider client or collection bootstrap belongs in application code.
+
+## Save and search
+
+```csharp
+await Vector<Article>.Save(article.Id, embedding, new
+{
+    article.Category,
+    article.Language
+});
+
+var matches = await Vector<Article>.Search(embedding, query => query
+    .Top(12)
+    .Where(Filter.All(
+        Filter.Eq("Category", "support"),
+        Filter.In("Language", ["en", "fr"]))));
+```
+
+Awaited saves and deletes are visible to subsequent operations in `Session` mode. Search results expose a normalized
+`Similarity` in `[0,1]`, where larger always means closer, for cosine, Euclidean, and dot-product spaces.
+
+## Configure placement
+
+Qdrant at `http://localhost:6333` needs no configuration. Set placement or authentication only when they differ:
 
 ```json
 {
@@ -32,20 +60,25 @@ required either. Set an endpoint only when the deployment differs:
 }
 ```
 
-The first write establishes vector dimension. Set `Koan:Data:Qdrant:Dimension` only when the application must create
-an empty collection before any write. Koan defaults `topK` to 10; an explicit positive value is sent unchanged.
+Use `Koan:Data:Sources:{name}` for source-specific endpoints and standard `Access` or `StorageLifecycle` policy. A
+read-only source rejects mutations before provider I/O. An external source validates existing storage and never creates
+or repairs it.
 
-## Honest capability boundary
+## Guarantees and limits
 
-Qdrant supports KNN search, metadata filters, bulk writes/deletes, embedding reads, collection clear, export through
-scroll, dynamic collection naming, and normalized cosine scores. This adapter does not claim hybrid text search,
-search continuation tokens, or index statistics.
+- Managed writes create a missing collection from the immutable vector-space plan; every existing collection is
+  validated for the declared named-vector dimensions and metric.
+- Arbitrary Entity IDs round-trip without exposing Qdrant's UUID/u64 restriction. Source, partition, and row scopes
+  participate in physical isolation.
+- Neutral metadata round-trips losslessly. A separate provider-native projection supports declared payload filters.
+- Batch outcomes preserve input order and report `BatchAtomicity.NotGuaranteed`.
+- Clear removes only points in the active scope; it does not drop the collection.
+- Dense search is reported as approximate. Candidate expansion is bounded and fails when a stable cutoff cannot be
+  proven within the configured limit.
+- Eventual visibility, hybrid text search, search continuations, streaming export, and atomic batches are declined
+  explicitly. Unsupported filter operators fail closed.
 
-Writes wait for visibility by default. Set `WaitForResult` to `false` only when ingestion throughput is more important
-than immediate read-after-write behavior. The default scalar-quantized, on-disk profile favors lower memory use; tune
-`Quantization` and `OnDisk` when recall and memory requirements differ.
+Operator budgets are available through `QdrantOptions`: request timeout, per-point metadata bytes, batch points,
+search candidates, and response bytes. They bound work; they do not redefine vector semantics.
 
-Avoid pinning `CollectionName` in partitioned or tenant-isolated applications unless one shared collection is truly
-intended. A fixed name bypasses Koan's physical-name folds, and the runtime reports that correction.
-
-See [TECHNICAL.md](./TECHNICAL.md) for configuration, naming, health, and failure behavior.
+See [TECHNICAL.md](./TECHNICAL.md) for the provider realization and failure contract.

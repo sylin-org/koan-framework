@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Polymorphism;
 using Koan.Web.Contracts;
 using Koan.Web.Infrastructure;
 using System.Text.Json;
@@ -50,10 +51,10 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         TEntity? baseModel = await Data<TEntity, TKey>.Get(id!, ct);
         if (body?.Snapshot != null)
         {
-            baseModel ??= Activator.CreateInstance<TEntity>();
             var json = System.Text.Json.JsonSerializer.Serialize(body.Snapshot);
-            var updated = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json);
-            if (updated is not null) baseModel = updated;
+            baseModel = (TEntity)EntityJsonSerialization.DeserializeDocument(
+                json,
+                baseModel?.GetType() ?? typeof(TEntity));
         }
         baseModel ??= Activator.CreateInstance<TEntity>();
         typeof(TEntity).GetProperty("Id")?.SetValue(baseModel, id);
@@ -87,7 +88,7 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (body?.Snapshot != null)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(body.Snapshot);
-            var updated = System.Text.Json.JsonSerializer.Deserialize<TEntity>(json);
+            var updated = (TEntity)EntityJsonSerialization.DeserializeDocument(json, draft.GetType());
             if (updated is not null)
             {
                 typeof(TEntity).GetProperty("Id")?.SetValue(updated, id);
@@ -146,7 +147,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeSubmit(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(DraftSet, SubmittedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: DraftSet).To(partition: SubmittedSet).Batch(500).Run(ct);
         await flow.AfterSubmitted(ctx, ct);
         return NoContent();
     }
@@ -177,7 +179,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeWithdraw(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DraftSet).Batch(500).Run(ct);
         await flow.AfterWithdrawn(ctx, ct);
         return NoContent();
     }
@@ -256,7 +259,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         {
             await Data<TEntity, TKey>.Upsert(ctx.SubmittedSnapshot!, ct);
         }
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, ApprovedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: ApprovedSet).Batch(500).Run(ct);
         await flow.AfterApproved(ctx, ct);
         return NoContent();
     }
@@ -265,12 +269,11 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
     {
         try
         {
-            var srcNode = JsonNode.Parse(JsonSerializer.Serialize(source)) as JsonObject ?? new JsonObject();
+            var srcNode = JsonNode.Parse(EntityJsonSerialization.SerializeDocument(source)) as JsonObject ?? new JsonObject();
             var patchNode = JsonNode.Parse(JsonSerializer.Serialize(transform)) as JsonObject;
             if (patchNode is null) return source;
             MergeJson(srcNode, patchNode);
-            var merged = JsonSerializer.Deserialize<TEntity>(srcNode.ToJsonString());
-            return merged ?? source;
+            return (TEntity)EntityJsonSerialization.DeserializeDocument(srcNode.ToJsonString(), source.GetType());
         }
         catch
         {
@@ -330,7 +333,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeReject(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DeniedSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DeniedSet).Batch(500).Run(ct);
         await flow.AfterRejected(ctx, ct);
         return NoContent();
     }
@@ -363,7 +367,8 @@ public abstract class EntityModerationController<TEntity, TKey, TFlow> : Control
         if (!v.Ok) return Problem(detail: v.Message, statusCode: v.Status, title: v.Code);
         var b = await flow.BeforeReturn(ctx, ct);
         if (!b.Ok) return Problem(detail: b.Message, statusCode: b.Status, title: b.Code);
-        _ = await Data<TEntity, TKey>.MovePartition(SubmittedSet, DraftSet, e => Equals(e.Id, id), null, 500, ct);
+        _ = await Data<TEntity, TKey>.Move(e => Equals(e.Id, id))
+            .From(partition: SubmittedSet).To(partition: DraftSet).Batch(500).Run(ct);
         await flow.AfterReturned(ctx, ct);
         return NoContent();
     }

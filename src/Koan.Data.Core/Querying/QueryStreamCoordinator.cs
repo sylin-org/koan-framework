@@ -88,7 +88,9 @@ internal static class QueryStreamCoordinator
                 .WithCountStrategy(null);
             RepositoryQueryResult<TEntity> result;
             using (enterContext())
-                result = await queryRepository.Query(adapterPage, ct).ConfigureAwait(false);
+                result = await DataQueryExecution<TEntity, TKey>
+                    .QueryCandidates(repository, queryRepository, adapterPage, ct)
+                    .ConfigureAwait(false);
 
             // Validate the complete candidate page before yielding from it. A provider cannot emit a
             // trustworthy prefix and then reveal that it ignored the requested bound or total order.
@@ -105,6 +107,17 @@ internal static class QueryStreamCoordinator
                 throw Reject<TEntity>(facts, provider,
                     Infrastructure.Constants.Diagnostics.Reasons.StreamSortNotHandled,
                     "Use a provider-handled portable top-level order, or materialize the query explicitly.", batchSize);
+            try
+            {
+                QueryReceiptValidator.Validate(adapterPage, result);
+            }
+            catch (QueryReceiptRejectedException receipt)
+            {
+                throw Reject<TEntity>(facts, provider,
+                    Infrastructure.Constants.Diagnostics.Reasons.InvalidStreamReceipt,
+                    receipt.Correction,
+                    batchSize);
+            }
 
             if (!selectedRecorded)
             {
@@ -119,7 +132,13 @@ internal static class QueryStreamCoordinator
             {
                 ct.ThrowIfCancellationRequested();
                 if (residualPredicate is null || residualPredicate(item))
+                {
+                    using (enterContext())
+                        await DataQueryExecution<TEntity, TKey>
+                            .MaterializeVisible(repository, item, ct)
+                            .ConfigureAwait(false);
                     yield return item;
+                }
             }
 
             if (candidateCount < batchSize) yield break;

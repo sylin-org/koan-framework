@@ -1,9 +1,11 @@
 using System;
 using AwesomeAssertions;
+using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Pipeline;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
@@ -14,7 +16,6 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// Upsert/UpsertMany and the batch subset runs on the batch path — preserving the shipped invariant that batch
 /// writes are NOT timestamp-stamped.
 /// </summary>
-[Collection("storage-write-plan")]   // serialize with WriteContributorSpec: shared plan memo + global registry state
 public class StorageWritePlanSpec
 {
     private sealed class Stamped : Entity<Stamped, string>
@@ -80,20 +81,24 @@ public class StorageWritePlanSpec
     }
 
     [Fact]
-    public void ApplyBatch_generates_the_id_but_does_not_stamp_timestamps()
+    public void ApplyBatch_uses_the_same_identity_and_timestamp_plan()
     {
-        // The shipped BatchFacade invariant: batch writes get an id but no [Timestamp] stamping.
         var e = new Stamped();
         StorageWritePlan.For(typeof(Stamped)).ApplyBatch(e);
 
         e.Id.Should().NotBeNullOrWhiteSpace();
-        e.CreatedAt.Should().Be(default);
-        e.UpdatedAt.Should().Be(default);
+        e.CreatedAt.Should().NotBe(default);
+        e.UpdatedAt.Should().NotBe(default);
     }
 
     [Fact]
     public void Plan_is_memoized_per_type()
     {
+        using var provider = new ServiceCollection()
+            .AddSingleton<StorageWritePlanCache>()
+            .BuildServiceProvider();
+        using var host = AppHost.PushScope(provider);
+
         StorageWritePlan.For(typeof(Stamped)).Should().BeSameAs(StorageWritePlan.For(typeof(Stamped)));
     }
 }

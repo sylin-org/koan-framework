@@ -70,7 +70,7 @@ public sealed class ConvergenceSpecs
             // The real framework path: split against caps, push the pushable part, finish the residual.
             var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, caps, typeof(Widget));
             var adapterResult = await repo.Query(adapterQuery);
-            var finalized = FilterPushdownCoordinator.Finalize(query, residual, adapterResult);
+            var finalized = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, adapterResult);
 
             var got = finalized.Page.Select(w => w.Id).OrderBy(x => x).ToArray();
 
@@ -96,7 +96,7 @@ public sealed class ConvergenceSpecs
             var repo = new CapabilityProfiledRepository(Corpus, caps);
             var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, caps, typeof(Widget));
             var adapterResult = await repo.Query(adapterQuery);
-            var finalized = FilterPushdownCoordinator.Finalize(query, residual, adapterResult);
+            var finalized = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, adapterResult);
 
             finalized.TotalCount.Should().Be(3, $"profile '{profileName}' must count the filtered set");
             finalized.Page.Count.Should().Be(2, $"profile '{profileName}' must return one page of the filtered set");

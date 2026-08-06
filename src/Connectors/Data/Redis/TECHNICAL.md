@@ -1,61 +1,63 @@
 ---
 uid: reference.modules.Koan.data.redis
 title: Koan.Data.Connector.Redis - Technical Reference
-description: Redis adapter for Koan data.
+description: Redis keyed Entity persistence with bounded managed sets and read-only Functions.
 packages: [Sylin.Koan.Data.Connector.Redis]
-source: src/Koan.Data.Connector.Redis/
+source: src/Connectors/Data/Redis/
 ---
 
-## Contract
+## Executable profile
 
-- Supported keyed, ephemeral, and modest-cardinality Entity persistence with native TTL, fast keyed removal,
-  source/logical-database routing, limited query semantics, and caller-visible numbered paging.
-- The adapter does not declare `DataCaps.Query.ProviderBoundedPaging`; its current scan path cannot
-  prove that a requested page is applied before the keyspace is traversed.
+- Direct Redis string commands for keyed reads and writes; ordered `MGET` preserves positional get-many results.
+- Native per-key TTL from a single `[Index(Ttl = true)]` `DateTime`/`DateTimeOffset` property.
+- Optimistic conditional replacement through Redis transaction conditions (`WATCH` semantics).
+- Bulk upsert/delete with a configured maximum; Entity batches do not claim atomicity or idempotency.
+- Row, container, and database isolation. Managed fields live in JSON; partitions compile into distinct logical sets;
+  routed sources may select distinct Redis logical databases.
+- Full Entity filter correctness over a bounded Koan-owned membership set, reported as `FilterExecutionKind.Scan` with
+  bounded candidates. This is not native filtering and does not earn provider-bounded paging.
 
-## Streaming boundary
+## Key and registry layout
 
-- `AllStream` and `QueryStream` fail correctively with `QueryStreamRejectedException` before yielding;
-  there is no complete-result materializing fallback.
-- Use `All`/`Query` only for known-small sets. Use `FirstPage`/`Page` to limit the result returned to
-  application code, without inferring a provider-side scan bound.
-- A later incremental Redis implementation must earn a separate capability claim through shared
-  conformance before these Entity streams become available.
-- Numbered pages bound only the result returned to application code. They do not make traversal snapshot-based,
-  resumable, mutation-safe, or bounded at the Redis keyspace.
+```text
+koan:{route-hash}:record:{identity}
+koan:{route-hash}:members
+```
+
+Safe short identities remain readable; other identities use URL-safe base64. Record and registry keys share a Redis
+Cluster hash slot. Managed writes transact the record and membership together. Expiration can leave stale membership;
+bounded reads ignore missing records and remove stale members only on ReadWrite sources. Exceeding `MaxQueryEntries`
+rejects before member materialization. External sources never create or consult `members`.
 
 ## Configuration
 
-- The transitive `Sylin.Koan.Redis` backend owns endpoints, SSL, timeouts, discovery, orchestration, and host-lifetime
-  connection pooling. `ConnectionStrings:Redis` configures the common endpoint.
-- A named Data source may select its own endpoint and logical database. The shared backend reuses one connection
-  multiplexer per distinct endpoint; the default DI multiplexer is also consumed by Cache Redis when present.
-- Referencing this Data adapter activates the Redis backend. Referencing Cache Redis alone does not activate Data.
+| Setting | Default | Meaning |
+|---|---:|---|
+| `Koan:Data:Redis:Database` | `0` | Redis logical database |
+| `Koan:Data:Redis:MaxQueryEntries` | `10000` | Maximum owned-set cardinality accepted by query/count/clear |
+| `Koan:Data:Redis:MaxBulkEntries` | `1000` | Maximum entries accepted by get-many/bulk/batch |
+| `Koan:Data:Redis:NamingStyle` | `EntityType` | Unmapped container naming style |
+| `Koan:Data:Redis:Separator` | `_` | Unmapped naming separator |
 
-## Key conventions
+Settings may be overridden under `Koan:Data:Sources:{source}:redis:*`. The host owns at most 128 distinct endpoint
+multiplexers and rejects further routes rather than growing an unbounded process-lifetime pool.
 
-- Keys should be prefixed by area and entity type (e.g., `app:{tenant}:Cart:{id}`) when multi-tenant.
-- Keep separators consistent; include a version segment when value formats evolve.
+## Source Integration
 
-## Serialization
+Redis declares registered record/scalar Functions and no portable inspection capability. Functions require a read
+lane, dispatch with `FCALL_RO`, pass explicit keys through `KEYS`, pass parameters through `ARGV`, and apply
+`RecordSetLimits`. Infrastructure owns `FUNCTION LOAD`, upgrades, and removal.
 
-- Default JSON with a version field for evolution; consider compression for large payloads.
-- Backward compatibility: support older versions during rolling upgrades; add non-breaking fields.
+## Operational boundaries
 
-## TTL and eviction
-
-- Configure per-entity TTLs when appropriate; avoid global expirations for critical data.
-- Monitor eviction via metrics; ensure memory headroom under expected load.
-
-## Operations
-
-- Health: an available Redis package stays non-critical until it wins default election or a runtime operation selects
-  one of its sources. Active sources receive a `PING` round-trip through the same pooled endpoint used by Entity work.
-- Metrics: connection pool size, operation latency, error rates.
-- Logs: key patterns only (no raw values); redact sensitive data.
+- Redis transactions serialize queued commands but do not roll back runtime command errors; Koan does not advertise
+  atomic Entity batches.
+- Redis Cluster does not support logical database selection beyond database zero.
+- Eviction and persistence are deployment policies, not adapter durability claims.
+- `AllStream` and `QueryStream` reject because owned-set materialization is not provider-bounded paging.
+- Health performs `PING` only for participating sources through their resolved shared connection.
 
 ## References
 
 - [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
-
+- [DATA-0110 compact data adapter language](../../../../docs/decisions/DATA-0110-compact-data-adapter-language.md)

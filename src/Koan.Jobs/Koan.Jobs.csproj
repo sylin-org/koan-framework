@@ -25,6 +25,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Koan.Jobs.Tests" />
     <InternalsVisibleTo Include="Koan.Jobs.TestKit" />
+    <InternalsVisibleTo Include="Koan.Jobs.Testing" />
     <InternalsVisibleTo Include="Koan.Jobs.Adapter.Sqlite.Tests" />
     <InternalsVisibleTo Include="Koan.Tests.Integration.Bootstrap.Pillars" />
     <InternalsVisibleTo Include="Koan.Samples.SnapVault.Tests" />

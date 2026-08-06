@@ -1,87 +1,84 @@
 # Sylin.Koan.Data.Connector.Sqlite
 
-SQLite provider for Koan relational data—suited to local development, tests, and single-node applications.
-
-- Target framework: net10.0
-- License: Apache-2.0
-
-## Capabilities
-
-- Zero-config file database at `.koan/data/Koan.sqlite`
-- Basic LINQ predicate pushdown via Koan.Data.Relational translator
-- Schema helpers (create table/index) via Koan.Data.Relational
-- Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
+SQLite is Koan's embedded relational reference adapter. It supports the ordinary Entity experience for a managed
+store and the same compact source experience for external or legacy files.
 
 ## Install
-
-> **0.20 preview:** SQLite belongs to the guaranteed 0.20 foundation and is published through standard NuGet release
-> flow.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ```
 
-## Minimal setup
-
-Reference the package and keep the application's normal `services.AddKoan()` bootstrap. No provider registration,
-schema scaffold, environment label, or configuration is required. The default `AutoCreate` policy creates the
-embedded store on first use even under the .NET Generic Host's standard `Production` environment. Choose
-`Validate` or `NoDdl` when schema is provisioned externally. Configure a source only when the default target is not
-appropriate:
-
-```json
-{
-  "Koan": {
-    "Data": {
-      "Sources": {
-        "Default": {
-          "Adapter": "sqlite",
-          "ConnectionString": "Data Source=./data/app.db"
-        }
-      }
-    }
-  }
-}
-```
-
-Use a `Data Source=...` connection string for a durable file. `Data Source=:memory:` and explicit
-`Mode=Memory` targets create private, source-isolated databases that survive per-operation connections for one
-Koan host and disappear when that host is disposed.
-
-## Usage - safe snippets
-
-- Prefer first-class model statics:
-  - `Todo.FirstPage(100, ct)` then `Todo.Page(2, 100, ct)`
-  - `await foreach (var t in Todo.QueryStream(x => x.Done == false, ct)) { ... }`
+For an application-owned store, reference the package and use the normal bootstrap:
 
 ```csharp
-// Materialize a small filtered set
-var open = await Todo.Query(x => !x.Done, ct);
+builder.Services.AddKoan();
 
-// Stream when the set may be large
-await foreach (var t in Todo.QueryStream(x => !x.Done, ct))
+var todo = await new Todo { Title = "Ship" }.Save();
+var open = await Todo.Query(item => !item.Done, ct);
+```
+
+The zero-configuration target is `.koan/data/Koan.sqlite`. SQLite creates it on first elected use; merely loading
+the connector does not touch disk. File, private-memory, and named shared-memory connection strings are supported.
+
+## Inspect and name useful reads
+
+Use provider-neutral storage vocabulary to see what a source contains:
+
+```csharp
+var source = Data.Source("Legacy");
+var page = await source.Inspect().Containers(100, ct: ct);
+var customer = await source.Inspect().Resolve(StorageAddress.From("CUSTOMER"), ct);
+var shape = await source.Inspect().Describe(customer, ct);
+var sample = await source.Inspect().Sample(customer, 20, ct);
+```
+
+Give reusable SQL a business name in the one application composition call. Opaque SQL requires a configured read
+lane; SQLite enforces it with `PRAGMA query_only = ON` on the selected lane connection.
+
+```csharp
+builder.Services.AddKoan(koan =>
 {
-    // process
+    koan.Data.Source("Legacy").Query("customers.active", query => query
+        .Lane("Reports")
+        .Sql("select CUSTOMER_NO as Id, DISPLAY_NM as Name from CUSTOMER where ACTIVE = @active")
+        .Parameter<bool>("active"));
+
+    koan.Data.Source("Legacy").Scalar<long>("customers.count", query => query
+        .Lane("Reports")
+        .Sql("select count(*) from CUSTOMER"));
+});
+
+var active = await Data.Source("Legacy").Query("customers.active", new { active = true }, ct);
+var count = await Data.Source("Legacy").Scalar<long>("customers.count", ct);
+```
+
+## Map a legacy shape
+
+One compiled map drives hydration, writes, identity predicates, filters, sorts, batches, and schema validation:
+
+```csharp
+builder.Services.AddKoan(koan =>
+    koan.Data.Source("Legacy").Map<Customer>(map => map
+        .Container("CUSTOMER")
+        .Key(customer => customer.Id).Name("CUSTOMER_NO")
+        .Property(customer => customer.Name.Full).Name("DISPLAY_NM")
+        .Property(customer => customer.Profile).Object("PROFILE_JSON")));
+
+using (EntityContext.Source("Legacy"))
+{
+    var customer = await Customer.Get(7, ct);
+    customer!.Name.Full = "Updated";
+    await customer.Save(ct);
 }
 ```
 
-## Streaming boundary
+Supported shapes are identity plus whole object, flat physical names, mixed scalar/object values, and logical
+properties backed by nested structured paths. Composite and provider-generated identities are supported. Nested
+path updates preserve unrelated JSON properties.
 
-`AllStream` and `QueryStream` request one numbered SQLite page at a time. `batchSize` caps the
-Koan-visible candidate page; it does not claim a bound for opaque provider-driver buffers. Streaming
-accepts only DATA-0107's first proved user-sort floor: top-level, non-nullable `bool`, `byte`, `sbyte`,
-`short`, `ushort`, or `int`. Other user sorts reject before provider I/O. Data.Core separately appends
-the usual string Entity identifier as an opaque provider-stable tie-break, not a cross-provider
-collation promise.
+Set `StorageLifecycle: External` to prohibit physical shape mutation. Set `Access: ReadOnly` to reject every Entity
+write before provider I/O. An explicit map pins its declared container, so combining it with an ambient partition
+rejects rather than silently sharing that container.
 
-These streams do not provide snapshot consistency, mutation-safe traversal, resumability, or a public
-cursor. Concurrent writes can therefore cause skips or duplicates during offset-based traversal.
-
-See the [technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/Sqlite/TECHNICAL.md)
-for options and dialect notes.
-
-## References
-
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
-
+See [TECHNICAL.md](TECHNICAL.md) for guarantees and limits.

@@ -15,7 +15,7 @@ public sealed class DevTokenStore
         public Dictionary<string, List<string>> Claims { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
 
-    private readonly ConcurrentDictionary<string, (DateTimeOffset Exp, UserProfile Profile, string? CodeChallenge, string? Nonce, bool IsOpenId, ClaimEnvelope Env)> _codes = new();
+    private readonly ConcurrentDictionary<string, (DateTimeOffset Exp, UserProfile Profile, string? CodeChallenge, string? Nonce, bool IsOpenId, string? Issuer, ClaimEnvelope Env)> _codes = new();
     private readonly ConcurrentDictionary<string, (DateTimeOffset Exp, UserProfile Profile, ClaimEnvelope Env)> _tokens = new();
     private readonly IOptions<TestProviderOptions> _options;
     private readonly JwtTokenService _jwtService;
@@ -30,7 +30,12 @@ public sealed class DevTokenStore
 
     public string IssueCode(UserProfile profile, TimeSpan ttl, string? codeChallenge,
         ISet<string>? roles = null, ISet<string>? permissions = null, IDictionary<string, string[]>? claims = null,
-        string? nonce = null, bool isOpenId = false)
+        string? nonce = null, bool isOpenId = false) =>
+        IssueCode(profile, ttl, codeChallenge, roles, permissions, claims, nonce, isOpenId, issuer: null);
+
+    public string IssueCode(UserProfile profile, TimeSpan ttl, string? codeChallenge,
+        ISet<string>? roles, ISet<string>? permissions, IDictionary<string, string[]>? claims,
+        string? nonce, bool isOpenId, string? issuer)
     {
         var env = new ClaimEnvelope();
         if (roles != null) foreach (var r in roles) if (!string.IsNullOrWhiteSpace(r)) env.Roles.Add(r);
@@ -50,17 +55,24 @@ public sealed class DevTokenStore
         }
 
         var code = Guid.CreateVersion7().ToString("n");
-        _codes[code] = (DateTimeOffset.UtcNow.Add(ttl), profile, codeChallenge, nonce, isOpenId, env);
+        _codes[code] = (DateTimeOffset.UtcNow.Add(ttl), profile, codeChallenge, nonce, isOpenId, issuer, env);
         return code;
     }
 
     public bool TryRedeemCode(string code, out UserProfile profile, out string? challenge, out ClaimEnvelope env,
         out string? nonce, out bool isOpenId)
     {
-        profile = default!; challenge = null; env = new ClaimEnvelope(); nonce = null; isOpenId = false;
+        var redeemed = TryRedeemCode(code, out profile, out challenge, out env, out nonce, out isOpenId, out _);
+        return redeemed;
+    }
+
+    public bool TryRedeemCode(string code, out UserProfile profile, out string? challenge, out ClaimEnvelope env,
+        out string? nonce, out bool isOpenId, out string? issuer)
+    {
+        profile = default!; challenge = null; env = new ClaimEnvelope(); nonce = null; isOpenId = false; issuer = null;
         if (!_codes.TryRemove(code, out var entry)) return false;
         if (entry.Exp < DateTimeOffset.UtcNow) return false;
-        profile = entry.Profile; challenge = entry.CodeChallenge; env = entry.Env; nonce = entry.Nonce; isOpenId = entry.IsOpenId;
+        profile = entry.Profile; challenge = entry.CodeChallenge; env = entry.Env; nonce = entry.Nonce; isOpenId = entry.IsOpenId; issuer = entry.Issuer;
         return true;
     }
 

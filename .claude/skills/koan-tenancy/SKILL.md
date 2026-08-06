@@ -2,7 +2,7 @@
 name: koan-tenancy
 description: Automatic, fail-closed multi-tenant isolation — reference Koan.Tenancy and every non-[HostScoped] Entity<T> is isolated by the ambient tenant across data reads/writes, blob storage, and cache; Tenant.Use/None/Current scoping, [HostScoped]/IAmbientExempt exemption, dev-open/prod-closed posture, and the DataAxis.AssertNoLeak proof
 pillar: tenancy
-card: docs/reference/cards/tenancy.md
+card: docs/reference/identity/index.md
 status: current
 last_validated: 2026-06-24
 ---
@@ -125,7 +125,7 @@ Posture is environment-derived (Development → `Open`, else → `Closed`); over
 
 ## See also
 
-- [Reference card: tenancy.md](../../../docs/reference/cards/tenancy.md) — one-screen pillar map
+- [Identity and isolation](../../../docs/reference/identity/index.md) — tenant scope, posture, and cross-pillar boundary
 - [Multi-Tenancy How-To](../../../docs/guides/tenancy-howto.md) — Concept → Recipe → Sample for each surface + the roadmap
 - [ARCH-0095 — tenancy](../../../docs/decisions/ARCH-0095-tenancy.md) · [ARCH-0099 — tenancy realignment](../../../docs/decisions/ARCH-0099-tenancy-realignment.md)
 - [ARCH-0101 — the data-axis model](../../../docs/decisions/ARCH-0101-data-axis-model.md) (how isolation is a registered contributor)

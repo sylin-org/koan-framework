@@ -101,6 +101,192 @@ public sealed class AiRoutingEngineSpec
     }
 
     [Fact]
+    public void ResolveChat_with_explicit_source_and_model_preserves_both()
+    {
+        var router = CreateRouterWithSources(
+            CreateSource(
+                "alpha",
+                "alpha",
+                50,
+                new Dictionary<string, AiCapabilityConfig>
+                {
+                    ["Chat"] = new() { Model = "alpha-default" }
+                }),
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig>
+                {
+                    ["Chat"] = new() { Model = "beta-default" }
+                }));
+
+        var resolution = router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model",
+            Route = new AiRouteHints { Source = "alpha" }
+        });
+
+        resolution.Source.Name.Should().Be("alpha");
+        resolution.EffectiveModel.Should().Be("explicit-model");
+    }
+
+    [Fact]
+    public void ResolveChat_with_explicit_member_and_model_preserves_both()
+    {
+        var alphaMembers = new[]
+        {
+            CreateMember(
+                "alpha",
+                "primary",
+                0,
+                MemberHealthState.Healthy,
+                new Dictionary<string, AiCapabilityConfig>
+                {
+                    ["Chat"] = new() { Model = "primary-default" }
+                }),
+            CreateMember(
+                "alpha",
+                "secondary",
+                1,
+                MemberHealthState.Healthy,
+                new Dictionary<string, AiCapabilityConfig>
+                {
+                    ["Chat"] = new() { Model = "secondary-default" }
+                })
+        };
+        var router = CreateRouterWithSources(
+            CreateSource("alpha", "alpha", 50, null, alphaMembers),
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig>
+                {
+                    ["Chat"] = new() { Model = "beta-default" }
+                }));
+
+        var resolution = router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model",
+            Route = new AiRouteHints { Source = "alpha::secondary" }
+        });
+
+        resolution.Source.Name.Should().Be("alpha");
+        resolution.Member.Name.Should().Be("alpha::secondary");
+        resolution.EffectiveModel.Should().Be("explicit-model");
+    }
+
+    [Fact]
+    public void ResolveChat_with_missing_explicit_source_and_model_lists_usable_sources()
+    {
+        var router = CreateRouterWithSources(
+            CreateSource(
+                "alpha",
+                "alpha",
+                50,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "alpha-default" } }),
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "beta-default" } }));
+
+        var act = () => router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model",
+            Route = new AiRouteHints { Source = "missing" }
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Source 'missing' not found*Usable sources for capability 'Chat': beta, alpha");
+    }
+
+    [Fact]
+    public void ResolveChat_with_disabled_explicit_source_and_model_lists_usable_sources()
+    {
+        var disabled = CreateSource(
+            "alpha",
+            "alpha",
+            100,
+            new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "alpha-default" } }) with
+        {
+            IsEnabled = false
+        };
+        var router = CreateRouterWithSources(
+            disabled,
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "beta-default" } }));
+
+        var act = () => router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model",
+            Route = new AiRouteHints { Source = "alpha" }
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("AI source 'alpha' is disabled*Usable sources for capability 'Chat': beta");
+    }
+
+    [Fact]
+    public void ResolveChat_with_incompatible_explicit_source_and_model_lists_usable_sources()
+    {
+        var router = CreateRouterWithSources(
+            CreateSource(
+                "alpha",
+                "alpha",
+                100,
+                new Dictionary<string, AiCapabilityConfig> { ["Embedding"] = new() { Model = "alpha-embedding" } }),
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "beta-default" } }));
+
+        var act = () => router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model",
+            Route = new AiRouteHints { Source = "alpha" }
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Source 'alpha' does not support capability 'Chat'. Usable sources: beta");
+    }
+
+    [Fact]
+    public void ResolveChat_with_model_and_no_source_retains_priority_election()
+    {
+        var router = CreateRouterWithSources(
+            CreateSource(
+                "alpha",
+                "alpha",
+                50,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "alpha-default" } }),
+            CreateSource(
+                "beta",
+                "beta",
+                90,
+                new Dictionary<string, AiCapabilityConfig> { ["Chat"] = new() { Model = "beta-default" } }));
+
+        var resolution = router.ResolveChat(new AiChatRequest
+        {
+            Messages = [new("user", "hi")],
+            Model = "explicit-model"
+        });
+
+        resolution.Source.Name.Should().Be("beta");
+        resolution.EffectiveModel.Should().Be("explicit-model");
+    }
+
+    [Fact]
     public void ResolveChat_skips_unhealthy_member_when_first_in_order()
     {
         var adapters = new InMemoryAdapterRegistry();
@@ -269,6 +455,19 @@ public sealed class AiRoutingEngineSpec
         };
     }
 
+    private static AiCategoryRouter CreateRouterWithSources(params AiSourceDefinition[] sources)
+    {
+        var adapters = new InMemoryAdapterRegistry();
+        var registry = new FakeSourceRegistry();
+        foreach (var source in sources)
+        {
+            adapters.Add(new TestAdapter(source.Provider));
+            registry.RegisterSource(source);
+        }
+
+        return CreateRouter(adapters, registry);
+    }
+
     private static AiMemberDefinition CreateMember(
         string source,
         string memberKey,
@@ -316,7 +515,7 @@ public sealed class AiRoutingEngineSpec
 
         public IReadOnlyCollection<AiSourceDefinition> GetSourcesWithCapability(string capabilityName)
             => _sources.Values
-                .Where(source => HasCapability(source, capabilityName))
+                .Where(source => source.IsEnabled && HasCapability(source, capabilityName))
                 .OrderByDescending(static s => s.Priority)
                 .ThenBy(static s => s.Name, StringComparer.OrdinalIgnoreCase)
                 .ToArray();

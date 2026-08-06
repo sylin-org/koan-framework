@@ -3,19 +3,19 @@ type: SPEC
 domain: framework
 title: "R12 - Road to the 0.20 Preview"
 audience: [architects, maintainers, developers, ai-agents]
-status: current
-last_updated: 2026-07-21
+status: resolved
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-21
-  status: in-progress
-  scope: epic charter and dependency-ordered preview maturity plan
+  date_last_tested: 2026-07-22
+  status: passed
+  scope: R12-01 through R12-07 passed; maintainer accepted the 0.20 preview GO
 ---
 
 # R12 — Road to the 0.20 preview
 
 - Tranche: `T7C — 0.20 public-preview maturity`
-- Status: `in-progress`
+- Status: `passed — 0.20 preview GO accepted on 2026-07-22`
 - Depends on: passed R09, R10, and R11; completed local R08-01 through R08-05 evidence
 - Supersedes: the unexecuted public-observation and upgrade tail of R08
 - Unlocks: a coherent public 0.20 package line that external developers can install, evaluate, and
@@ -88,12 +88,13 @@ Communication, MCP, security, and optional AI/vector capability.
 | [R12-04](r12/R12-04-coherent-public-narrative.md) | every public-facing surface tells one greenfield, present-tense product story and an anti-drift gate preserves it | passed |
 | [R12-05](r12/R12-05-public-consumer-journey.md) | the public template installs from NuGet, generates both starters, restores cleanly, and proves the SQLite-backed consumer result | passed |
 | [R12-06](r12/R12-06-publish-and-observe-first-wave.md) | one `main`-boundary job publishes and observes the exact supported package set without a second release system | passed |
-| [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves mixed-state idempotent publication, establishes the feedback baseline, and produces the final R12 go/no-go record | in-progress |
+| [R12-07](r12/R12-07-preview-evolution.md) | the first new dependency-closed R13 wave upgrades a public-created application, proves mixed-state idempotent publication, establishes the feedback baseline, and produces the final R12 go/no-go record | passed |
 
-R12-01 through R12-06 are complete. R12-07 remains one bounded preview-evolution proof and will close
-through the first newly promoted R13 family slice. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md)
-and [R13](R13-terminal-package-maturity.md) own value-led promotion of the meaningful public provider
-surface, so R12 completion does not wait on unrelated families or cross-repository handoffs.
+R12-01 through R12-07 are complete. The maintainer accepted R12-07's evidence-backed GO on
+2026-07-22. [ARCH-0120](../../../decisions/ARCH-0120-terminal-package-maturity.md) and
+[R13](R13-terminal-package-maturity.md) separately own value-led promotion of the meaningful public
+provider surface; R13 is also complete without treating unrelated cross-repository handoffs as R12
+blockers.
 
 ## Scope
 
@@ -142,6 +143,10 @@ R12 passes only when:
 7. a later preview wave proves upgrade and mixed-state idempotent publication recovery;
 8. external feedback is recorded as bounded evidence, not used to reopen architecture by anecdote;
 9. the maintainer receives a concise go/no-go record for the next maturity band.
+
+**Acceptance result:** PASS on 2026-07-22. The maintainer explicitly accepted GO for the coherent
+0.20 preview maturity contract. This closes R12 without declaring V1 GA, setting a V1 support date,
+or promoting packages outside the generated supported surface.
 
 ## Stop conditions
 

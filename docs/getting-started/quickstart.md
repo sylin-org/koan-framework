@@ -1,50 +1,62 @@
 ---
 type: GUIDE
 domain: core
-title: "Koan quickstart"
+title: "Build your first Koan application"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-07-21
+last_updated: 2026-07-23
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-21
   status: passed
-  scope: public 0.20 template install, clean restore/build, SQLite-backed REST create/read, and runtime facts
+  scope: public template install, SQLite-backed REST create/read, and runtime facts
 ---
 
-# Koan quickstart
+# Build your first Koan application
 
-Install the public template and create the application:
+Five minutes. One Entity. One Controller. A real API that keeps its data.
+
+This is the application you are about to run:
+
+```csharp
+public sealed class Todo : Entity<Todo>
+{
+    public string Title { get; set; } = "";
+    public bool Done { get; set; }
+}
+
+[Route("api/todos")]
+public sealed class TodosController : EntityController<Todo>;
+```
+
+That is the intent. Koan brings the persisted, queryable HTTP API.
+
+## Make it real
+
+You need the .NET 10 SDK.
 
 ```powershell
 dotnet new install Sylin.Koan.Templates
 dotnet new koan-web -o TodoApi
 cd TodoApi
-dotnet run
+dotnet run -- --urls http://localhost:5000
 ```
 
-In another shell:
+In another shell, create a Todo and read it back:
 
 ```powershell
 Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
   -ContentType application/json -Body '{"title":"buy milk"}'
 Invoke-RestMethod http://localhost:5000/api/todos
-Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 ```
 
-The URL printed by ASP.NET Core is authoritative if it differs. The POST persists a Todo; the read proves
-ordinary Entity access; the facts response explains the modules and SQLite election that produced the result.
-The [template guide](../../templates/README.md) contains the exact generated shape.
+Stop the app, start it again, and repeat the GET. Your Todo is still there.
 
-## Read the whole application
+**Entity. Controller. Done.**
 
-Repository contributors can read [`samples/FirstUse`](../../samples/FirstUse/README.md) in this order:
+## Where did the plumbing go?
 
-1. `Domain/Approval.cs` — business state and access policy.
-2. `Web/ApprovalsController.cs` — the governed HTTP surface.
-3. `Program.cs` — the complete host.
-
-The host is exactly:
+The generated host is ordinary ASP.NET Core with one Koan call:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -53,22 +65,42 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-Storage, schema readiness, controller mechanics, health, startup reporting, runtime facts, and MCP
-hosting come from referenced capabilities. The application contains no repository, `DbContext`,
-database registration, schema script, MCP tool handler, or health plumbing.
+The template references Koan's SQLite provider. From that reference and your declarations, Koan
+sets up persistence, prepares the schema, maps the controller, and reports whether the app is ready.
 
-## Know what is proved
+There is no repository, `DbContext`, schema script, provider registration, CRUD service, or endpoint
+mapping to maintain.
 
-FirstUse is exercised through its real host. Focused evidence covers REST, SQLite persistence,
-filtered query, readiness, composition facts, MCP discovery, access policy, dry-run, and an agent
-write observed through REST. Its checked-in `koan.lock.json` records referenced composition.
+Want to look behind the magic?
 
-The public-feed journey has been observed independently: template installation, generation, clean restore/build,
-SQLite-backed REST create/read, and runtime facts all pass without repository package sources.
+```powershell
+Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
+```
 
-## Continue
+The response shows what Koan found, what it selected, and why. For quick operational checks, use
+`/health/live` and `/health/ready`.
 
-Run [`samples/GoldenJourney`](../../samples/GoldenJourney/README.md) next. It grows the same small host
-with a business rule, durable assessment job, bounded agent recommendation, and explained
-configuration failure. Then use the [golden path](overview.md) and only the
-[graduated sample portfolio](../../samples/README.md).
+## Let the idea grow
+
+Keep the Entity. Add only what the application needs:
+
+- [Change or expand its data](../reference/data/index.md).
+- [Give it identity and tenant boundaries](../reference/identity/index.md).
+- [Add jobs, events, or messaging](../reference/work/index.md).
+- [Add AI and semantic search](../reference/ai/index.md).
+- [Let an agent discover and work with it](../reference/agents/index.md).
+
+Or open a complete, runnable story in the [sample portfolio](../../samples/README.md). The
+[FirstUse application](../../samples/FirstUse/README.md) is the smallest complete example.
+
+Already have an ASP.NET Core application? [Bring Koan into one boundary](adopt-existing-app.md)
+without replacing what already works.
+
+## Start small. Know the edges.
+
+Koan 0.20 is a .NET 10 preview. The template uses compatible `0.20.*` packages and durable embedded
+SQLite storage, which is a great fit for local and single-node applications—not a promise of
+remote-database or multi-node-write behavior.
+
+When you choose another provider, Koan will not quietly fall back to a different one. If its package
+or configuration is missing, startup tells you what to add or change.

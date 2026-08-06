@@ -16,8 +16,8 @@ validation:
 
 Koan is moving toward a stable product reality:
 
-> **Ruby on Rails for agentic .NET:** an opinionated meta-framework that takes applications from
-> V0 to V1 in meaningful, small steps. Application code expresses the business; Koan contains and
+> **An opinionated meta-framework for agentic, data-driven .NET:** Koan takes applications from V0
+> to V1 in meaningful, small steps. Application code expresses the business; Koan contains and
 > explains the infrastructure complexity.
 
 This initiative turns that direction into a gated execution program. It does not declare Koan 1.0

@@ -54,6 +54,34 @@ public sealed class SseStreamTests
     }
 
     [Fact]
+    public void Formatter_emits_the_exact_comment_only_control_frame()
+    {
+        var formatted = SseFormatter.ToWireFormat(
+            new SseEnvelope(null, "", Comment: "hb"));
+
+        formatted.Should().Be(": hb\n\n");
+    }
+
+    [Fact]
+    public void Formatter_emits_the_exact_retry_only_control_frame()
+    {
+        var formatted = SseFormatter.ToWireFormat(
+            new SseEnvelope(null, "", Retry: TimeSpan.FromSeconds(2)));
+
+        formatted.Should().Be("retry: 2000\n\n");
+    }
+
+    [Fact]
+    public void Formatter_rejects_null_data()
+    {
+        var envelope = new SseEnvelope(null, null!);
+
+        var act = () => SseFormatter.ToWireFormat(envelope);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
     public async Task The_same_result_executes_through_mvc()
     {
         var context = CreateHttpContext();
@@ -66,7 +94,7 @@ public sealed class SseStreamTests
     }
 
     [Fact]
-    public async Task Envelope_stream_preserves_explicit_events_and_fills_missing_names()
+    public async Task Envelope_stream_preserves_explicit_and_unnamed_frames()
     {
         var context = CreateHttpContext(options => options.DefaultEvent = "heartbeat");
 
@@ -74,8 +102,70 @@ public sealed class SseStreamTests
         await result.ExecuteAsync(context);
 
         var payload = await ReadBody(context);
-        payload.Should().Contain("event: heartbeat");
+        payload.Should().Contain("data: noop");
+        payload.Should().NotContain("event: heartbeat");
         payload.Should().Contain("event: custom");
+    }
+
+    [Fact]
+    public async Task Envelope_stream_applies_a_fallback_only_when_the_caller_requests_one()
+    {
+        var context = CreateHttpContext(options => options.DefaultEvent = "configured");
+
+        await Sse.Stream(GetMixedEnvelopes(), eventName: "requested").ExecuteAsync(context);
+
+        var payload = await ReadBody(context);
+        payload.Should().Contain("event: requested").And.Contain("event: custom");
+        payload.Should().NotContain("event: configured");
+    }
+
+    [Fact]
+    public async Task Minimal_result_preserves_exact_control_frames_even_with_a_requested_fallback()
+    {
+        var context = CreateHttpContext();
+
+        await Sse.Stream(GetControlFrames(), eventName: "fallback").ExecuteAsync(context);
+
+        (await ReadBody(context)).Should().Be(": hb\n\nretry: 1500\n\n: warm\nretry: 3000\n\n");
+    }
+
+    [Fact]
+    public async Task Mvc_result_preserves_exact_control_frames()
+    {
+        var context = CreateHttpContext();
+        IActionResult result = Sse.Stream(GetControlFrames());
+
+        await result.ExecuteResultAsync(new ActionContext(context, new RouteData(), new ActionDescriptor()));
+
+        (await ReadBody(context)).Should().Be(": hb\n\nretry: 1500\n\n: warm\nretry: 3000\n\n");
+    }
+
+    [Fact]
+    public async Task Result_preserves_stronger_cache_and_application_owned_transport_directives()
+    {
+        var context = CreateHttpContext();
+        context.Response.Headers.CacheControl = "private, no-store";
+        context.Response.Headers.Pragma = "application-owned";
+        context.Response.Headers.Connection = "close";
+        context.Response.Headers["X-Accel-Buffering"] = "yes";
+
+        await Sse.Stream(GetStrings()).ExecuteAsync(context);
+
+        context.Response.Headers.CacheControl.ToString().Should().Be("private, no-store");
+        context.Response.Headers.Pragma.ToString().Should().Be("application-owned");
+        context.Response.Headers.Connection.ToString().Should().Be("close");
+        context.Response.Headers["X-Accel-Buffering"].ToString().Should().Be("yes");
+    }
+
+    [Fact]
+    public async Task Result_adds_no_cache_without_discarding_existing_cache_directives()
+    {
+        var context = CreateHttpContext();
+        context.Response.Headers.CacheControl = "private";
+
+        await Sse.Stream(GetStrings()).ExecuteAsync(context);
+
+        context.Response.Headers.CacheControl.ToString().Should().Be("private, no-cache");
     }
 
     private static DefaultHttpContext CreateHttpContext(Action<KoanSseOptions>? configure = null)
@@ -117,6 +207,18 @@ public sealed class SseStreamTests
         yield return new SseEnvelope(null, "noop");
         await Task.Yield();
         yield return new SseEnvelope("custom", "data");
+    }
+
+    private static async IAsyncEnumerable<SseEnvelope> GetControlFrames()
+    {
+        yield return new SseEnvelope(null, "", Comment: "hb");
+        await Task.Yield();
+        yield return new SseEnvelope(null, "", Retry: TimeSpan.FromMilliseconds(1500));
+        yield return new SseEnvelope(
+            "ignored-for-control",
+            "",
+            Retry: TimeSpan.FromSeconds(3),
+            Comment: "warm");
     }
 
     private sealed class TestMessage

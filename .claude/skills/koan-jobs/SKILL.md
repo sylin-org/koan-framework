@@ -179,6 +179,6 @@ o.QueueAgeWarning = TimeSpan.FromMinutes(5);          // oldest-queued-age tripw
 ## See also
 
 - [Background Jobs how-to](../../../docs/guides/jobs-howto.md) — the authoritative walkthrough (durability tiers, testing, full `JobContext`)
-- [Reference card: jobs.md](../../../docs/reference/cards/jobs.md) — one-screen pillar map
+- [Jobs capability](../../../docs/reference/jobs/index.md) — greenfield path, guarantees, and corrections
 - [JOBS-0005 — job orchestrator rebuild](../../../docs/decisions/JOBS-0005-job-orchestrator-rebuild.md) — the ledger model + capability ladder
 - [JOBS-0008 — lane-fair dispatch](../../../docs/decisions/JOBS-0008-lane-fair-dispatch.md) — fairness across lanes

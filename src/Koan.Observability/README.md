@@ -82,4 +82,4 @@ package owns only the optional OpenTelemetry SDK pipeline.
 - Individual instrument owners remain responsible for safe values and bounded metric dimensions.
 
 See [TECHNICAL.md](TECHNICAL.md) for the composition and failure contract and the
-[Observability reference](../../docs/reference/cards/observability.md) for the compact operator map.
+[Observability reference](../../docs/reference/operations/observability.md) for the operator map.

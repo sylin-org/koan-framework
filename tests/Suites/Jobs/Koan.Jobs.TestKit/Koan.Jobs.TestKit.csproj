@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\src\Koan.Jobs\Koan.Jobs.csproj" />
+    <ProjectReference Include="..\..\..\..\src\Koan.Jobs.Testing\Koan.Jobs.Testing.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <!-- P2.1: the Koan.Testing shim was retired; reference the xUnit-free host directly. KoanIntegrationHost

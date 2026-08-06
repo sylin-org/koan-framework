@@ -1,61 +1,56 @@
-# Koan samples
+# Pick an idea. Make it run.
 
-Samples are Koan's public curriculum. Names describe the business result; numbers appear only where
-order has meaning inside a cumulative journey.
+Choose the result that sounds fun. Every sample starts as an ordinary .NET application, runs locally,
+and keeps the interesting code about the thing being built.
 
-These applications teach the Koan 0.20 preview. A sample proves behavior, not package maturity; check
-the [generated product surface](../docs/reference/product-surface.md) before treating a capability as
-supported.
+## Feel the magic
 
-On Windows, every listed sample also starts through the `start.bat` in its own root. The launcher uses
-the same standard `dotnet run` path, works from any caller directory, and forwards optional application
-arguments. The tables retain the portable cross-platform command as the execution contract.
+### Entity. Controller. Agent.
 
-## Start here
+[FirstUse](FirstUse/README.md) turns one `Approval` model—with a one-line controller and one agent
+declaration—into persisted data, an HTTP API, and a governed tool. Start here for the smallest
+complete expression of Koan.
 
-| Sample | Meaningful result | Start |
-|---|---|---|
-| [FirstUse](FirstUse/README.md) | Persist and approve one request; inspect the resulting API, facts, and governed agent tool | `dotnet run --project samples/FirstUse` |
-| [GoldenJourney](GoldenJourney/README.md) | Grow that same application through a rule, durable job, and agent recommendation | `dotnet run --project samples/GoldenJourney` |
+```powershell
+dotnet run --project samples/FirstUse
+```
 
-## Fundamentals
+### Let a simple idea grow
 
-Use these when you want one concern in isolation.
+[GoldenJourney](GoldenJourney/README.md) begins with a review request, then adds a business rule,
+durable background work, and a bounded agent recommendation. The domain stays recognizable at every
+step.
 
-| Sample | Meaningful result | Concepts | Start |
-|---|---|---|---|
-| [LocalChecklist](fundamentals/LocalChecklist/README.md) | Save a checklist, complete one item, and reload open work | console host, Entity statics, JSON | `dotnet run --project samples/fundamentals/LocalChecklist` |
-| [TaskGraph](fundamentals/TaskGraph/README.md) | Resolve one task graph over scalar, set, and stream cardinalities | EntityController, Parent, Relatives, Cache | `dotnet run --project samples/fundamentals/TaskGraph` |
+```powershell
+dotnet run --project samples/GoldenJourney
+```
 
-## Capability journeys
+## Choose your story
 
-[GardenCoop](journeys/GardenCoop/README.md) is one application that grows in meaningful small steps:
+| I want to… | Run this |
+|---|---|
+| Turn dry garden readings into watering reminders | [Garden Journal](journeys/GardenCoop/01-GardenJournal/README.md) |
+| Search local produce with ordinary words—without Docker, an API key, or a vector server | [GardenCoop: Local Discovery](journeys/GardenCoop/02-LocalDiscovery/README.md) |
+| Upload a photo and watch a durable workflow organize it into a private gallery | [SnapVault](applications/SnapVault/README.md) |
+| Turn messy customer arrivals into one trusted customer—or reject them with reasons | [CustomerCanon](applications/CustomerCanon/README.md) |
+| Approve articles and publish them to another named data source | [DevPortal](applications/DevPortal/README.md) |
+| Run a batch, verify every order, clean it up, and keep an honest receipt | [OrderIntake](applications/OrderIntake/README.md) |
 
-1. [Garden Journal](journeys/GardenCoop/01-GardenJournal/README.md) turns dry readings into watering reminders.
-2. [Local Discovery](journeys/GardenCoop/02-LocalDiscovery/README.md) keeps that complete application and adds local semantic produce search.
+[Explore the complete GardenCoop journey](journeys/GardenCoop/README.md) to watch one useful
+application learn something new without losing what already worked.
 
-Each chapter is independently runnable. Every later chapter must preserve the earlier business result,
-then add one visible capability.
+## Take one small bite
 
-## Complete applications
+- [LocalChecklist](fundamentals/LocalChecklist/README.md) saves a checklist, completes an item, and
+  reloads the work in a tiny console application.
+- [TaskGraph](fundamentals/TaskGraph/README.md) makes relationships readable across one Entity, a
+  set, and a stream.
 
-| Sample | Meaningful result | Concepts | Start |
-|---|---|---|---|
-| [DevPortal](applications/DevPortal/README.md) | Approve local articles, publish them through named provider channels, and render entity-backed share cards | named sources, Entity transfer, OpenGraph | `dotnet run --project samples/applications/DevPortal` |
-| [OrderIntake](applications/OrderIntake/README.md) | Run bounded order intake through one named source and keep a verified durable receipt | named sources, Entity batch work, Jobs, readiness | `dotnet run --project samples/applications/OrderIntake` |
-| [SnapVault](applications/SnapVault/README.md) | Upload a photo into a local studio, durably organize and serve it, then share its event without exposing the vault | Entity media, Jobs, tenancy, access, optional AI/vector | `dotnet run --project samples/applications/SnapVault` |
-| [CustomerCanon](applications/CustomerCanon/README.md) | Turn messy customer arrivals into one durable trusted customer, or reject them with reasons | CanonEntity, discovered contributors, generated Canon API, JSON | `dotnet run --project samples/applications/CustomerCanon` |
+Run any sample from the repository root with the command on its page. On Windows, its `start.bat`
+does the same thing from any directory and forwards any application arguments.
 
-Other application directories are active graduation work, not current curriculum. Presence in the tree
-is not a support claim.
+These applications target the Koan 0.20 preview. See [what works today](../docs/reference/what-works.md)
+when deciding what to add to your own application.
 
-The recommendation experience graduated into the standalone
-[Usagi Picks](https://github.com/lbotinelly/usagipicks) product repository. It remains useful Koan application
-evidence, but is no longer bundled sample source or part of this solution.
-
-## Graduation contract
-
-A public sample must have one business sentence, a standard .NET command to a meaningful result, focused
-executable evidence, and documentation that agrees with its source, provider requirements, facts, and
-deployment shape. Business intent must dominate the application code; mechanics belong at framework
-chokepoints. Private dogfood identities and unsupported performance or deployment claims do not belong here.
+Want to see Koan inside a standalone product? Explore
+[Usagi Picks](https://github.com/lbotinelly/usagipicks), an agent-guided recommendation experience.

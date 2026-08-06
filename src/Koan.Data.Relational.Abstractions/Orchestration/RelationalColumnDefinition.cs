@@ -7,4 +7,7 @@ public sealed record RelationalColumnDefinition(
     bool Nullable,
     bool IsComputed = false,
     string? JsonPath = null,
-    bool IsIndexed = false);
+    bool IsIndexed = false,
+    RelationalStorageShape Shape = RelationalStorageShape.Scalar,
+    bool IsIdentity = false,
+    bool IsGenerated = false);

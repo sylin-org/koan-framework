@@ -19,6 +19,9 @@ public enum DeadReason
     /// <summary>The Core context carrier bag captured at submit could not be restored at execute (for example, an
     /// unregistered axis or unsupported format) — deterministic, so dead-lettered rather than run fail-open.</summary>
     CarrierRestoreFailed = 2,
+    /// <summary>The durable record names a work type that is no longer registered by the running application.
+    /// This is deterministic and cannot succeed on retry, so it is retired once instead of poisoning the worker loop.</summary>
+    UnregisteredWorkType = 3,
 }
 
 /// <summary>The control signal a handler raised via <see cref="JobContext"/> verbs, read by the orchestrator post-execute.

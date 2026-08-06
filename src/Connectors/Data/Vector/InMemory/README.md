@@ -1,55 +1,51 @@
 # Sylin.Koan.Data.Vector.Connector.InMemory
 
-The zero-infrastructure vector floor for Koan: managed, process-local similarity search behind the ordinary Entity
-vector ring.
+The bounded, zero-infrastructure exact Vector floor for Koan.
 
 - Target framework: net10.0
 - License: Apache-2.0
 
-## Install
-
-```powershell
-dotnet add package Sylin.Koan.Data.Vector.Connector.InMemory
-```
-
-This package brings the Vector runtime it implements. Keep the normal `AddKoan()` bootstrap; there is no provider
-registration or configuration.
-
 ## Smallest meaningful result
 
 ```csharp
-using Koan.Data.Core.Model;
-using Koan.Data.Vector;
-
-public sealed class Article : Entity<Article> { }
+builder.Services.AddKoan(koan =>
+{
+    koan.Data.Source("Semantic").Vector<Article>(space => space
+        .Name("articles")
+        .Dimensions(3)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session));
+});
 
 await Vector<Article>.Save("koan", [1f, 0f, 0f]);
-var nearest = await Vector<Article>.Search([0.9f, 0.1f, 0f], topK: 5);
+
+var nearest = await Vector<Article>.Search(
+    [0.9f, 0.1f, 0f],
+    query => query.Top(5));
 ```
 
-In-memory is Koan's lowest-priority automatic vector provider. A directly referenced durable provider supersedes it;
-an explicit provider request remains exact and never silently falls back.
+Reference the package and keep the ordinary `AddKoan(...)` bootstrap. There is no provider registration, client,
+connection string, or index ceremony.
 
-## What it supports
+## What it proves
 
-- cosine kNN over `System.Numerics.Tensors`;
-- metadata filters through Koan's unified filter model;
-- vector/keyword hybrid scoring;
-- bulk upsert/delete, embedding retrieval, flush, export, and offset continuation;
-- partition, routed-source, and tenant isolation through the same Vector naming and scope pipeline as other providers.
+- exact cosine, Euclidean, or dot-product ranking with normalized finite similarity;
+- stable identity tie ordering and truthful exact execution receipts;
+- complete point save/get/delete and positional get-many;
+- full Koan metadata filters before ranking;
+- ordered bulk outcomes without an atomic-batch claim;
+- Session visibility and source, partition, and row-scope isolation;
+- bounded spaces, points, dimensions, metadata size, and host-owned caches.
 
-## Operational contract
+It does not pretend to provide durability, Eventual visibility, approximate indexing, hybrid text search, continuation,
+multiple vectors per point, streaming export, or atomic batches. Those clauses reject correctively.
 
-Data lives only in the current process and disappears when that process stops. The provider has no external readiness
-dependency and performs no filesystem or network I/O. Startup facts identify it as the ephemeral fallback floor.
-
-## Boundaries
-
-Use it for a first meaningful semantic result, tests, local workflows, and bounded single-process datasets. Do not use
-it when restart durability, multi-process sharing, distributed indexing, approximate-nearest-neighbour scale, or a
-backend-specific consistency guarantee is required.
+Data belongs to one application host and disappears when that host is disposed. Use this adapter for local workflows,
+tests, and bounded single-process datasets. Select another connector when persistence, sharing, or provider-native
+capabilities are application requirements.
 
 ## References
 
 - [Technical reference](./TECHNICAL.md)
-- [Vector runtime](../../../../Koan.Data.Vector/README.md)
+- [Vector reference](../../../../../docs/reference/ai/vector.md)
+- [Data adapter development primer](../../../../../docs/architecture/data-adapter-development-primer.md)

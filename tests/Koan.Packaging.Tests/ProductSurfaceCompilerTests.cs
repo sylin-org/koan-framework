@@ -94,7 +94,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
     }
 
     [Fact]
-    public void RejectsSupportPromotionWithout020VersionIntent()
+    public void RejectsSupportPromotionBelowTheSupportedVersionFloor()
     {
         SeedPath("docs/capability.md");
         SeedPath("tests/evidence.txt");
@@ -105,7 +105,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             Compiler().Compile([package], Claims(claim)));
 
         Assert.Contains("version intent '0.19'", error.Message, StringComparison.Ordinal);
-        Assert.Contains("0.20", error.Message, StringComparison.Ordinal);
+        Assert.Contains("later compatibility line", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         var error = Assert.Throws<InvalidOperationException>(() =>
             Compiler().Compile([package], Claims(Claim(package.PackageId))));
 
-        Assert.Contains("0.20 version intent", error.Message, StringComparison.Ordinal);
+        Assert.Contains("supported version intent '0.20'", error.Message, StringComparison.Ordinal);
         Assert.Contains("no supported claim", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -143,7 +143,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
     }
 
     [Fact]
-    public void AcceptsCompleteSupported020DependencyClosure()
+    public void AcceptsCompleteSupportedDependencyClosureAcrossCompatibilityLines()
     {
         SeedPath("docs/capability.md");
         SeedPath("tests/evidence.txt");
@@ -151,7 +151,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         var application = Project(
             "Sylin.Koan.App",
             references: [Reference(dependency)],
-            versionIntent: "0.20");
+            versionIntent: "0.21");
         var claim = Claim(application.PackageId) with
         {
             Maturity = "supported-foundation",
@@ -160,7 +160,8 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
 
         var surface = Compiler().Compile([application, dependency], Claims(claim));
 
-        Assert.All(surface.Packages, package => Assert.Equal("0.20", package.VersionIntent));
+        Assert.Equal("0.20", surface.Packages.Single(package => package.PackageId == dependency.PackageId).VersionIntent);
+        Assert.Equal("0.21", surface.Packages.Single(package => package.PackageId == application.PackageId).VersionIntent);
     }
 
     [Fact]

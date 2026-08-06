@@ -72,6 +72,11 @@ the person deactivated first, revokes all Koan cookie sessions, then removes eve
 These operations are ordered, idempotent Entity writes—not a cross-provider transaction. A receipt is emitted only
 after the requested workflow completes and attests only to its own recorded fields.
 
+The bridge also contributes automatically to `IdentityLifecycleService.EraseAsync`. Whole-person erasure removes
+memberships and tenant-scoped `AgentGrant` rows for registered tenants, then de-identifies matching deprovisioning
+receipts and tenancy audit summaries. The final identity-erasure receipt reports this package as
+`Koan.Identity.Tenancy`; no extra registration is required.
+
 ## Boundaries
 
 - The bridge scopes inbound ASP.NET Core requests. Background work must establish its tenant through the normal

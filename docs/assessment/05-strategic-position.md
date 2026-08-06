@@ -6,17 +6,16 @@ working strategy the consolidation tracks should serve.
 
 ## §1 The reframed mission
 
-Koan is **not** a commercial product. It is the equivalent of Ruby on Rails for **agentic,
-data-driven .NET web applications**: solid architectural foundations, plus enough automation that
-a small senior team (and its coding agents) ships sophisticated systems without burning time on
+Koan is **not** a commercial product. It is an opinionated meta-framework for **agentic,
+data-driven .NET web applications**: solid architectural foundations, plus enough automation that a
+small senior team and its coding agents can ship sophisticated systems without burning time on
 scaffolding. Every keep/cut/invest decision below is evaluated against that mission — not against
 market positioning, enterprise sales, or feature parity with anything.
 
 ## §2 What the assessment says the real strengths are
 
-1. **Entity-as-universal-grammar — the Rails move, stretched further than ActiveRecord ever
-   went.** Rails' center of gravity was AR; everything hung off it. Koan's `Entity<T>` is the
-   same center of gravity, but the *same grammar* already covers CRUD, vector search, jobs
+1. **Entity as universal grammar.** Koan's `Entity<T>` is the center of gravity, and the *same
+   grammar* already covers CRUD, vector search, jobs
    (`IKoanJob` — jobs are entities), caching (`[Cacheable]`), embeddings (`[Embedding]`), media,
    and agent tools (`[McpEntity]`). One mental model radiating across pillars is the rarest
    property a framework can have, and it is the thing Stages 1–3 found genuinely settled. **This

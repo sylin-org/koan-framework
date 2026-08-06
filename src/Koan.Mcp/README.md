@@ -13,8 +13,8 @@
 
 ## Install and shortest supported path
 
-MCP belongs to the supported 0.20 extension surface. Public-feed publication follows the final
-package-only proof; until then, use the source checkout or the exact staged candidate feed.
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity and
+publication truth for this package.
 
 ```powershell
 dotnet add package Sylin.Koan.Mcp

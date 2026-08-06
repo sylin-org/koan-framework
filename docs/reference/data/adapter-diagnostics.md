@@ -112,6 +112,7 @@ execution contract.
 ## Related
 
 - [Entity data foundation](index.md)
+- [Schema provisioning and readiness](../../guides/deep-dive/auto-provisioning-system.md)
 - [Entity access and streaming](../../guides/data/entity-access-and-streaming.md)
 - [Runtime facts](../../engineering/runtime-facts.md)
 - [DATA-0107 provider-bounded Entity streams](../../decisions/DATA-0107-provider-bounded-entity-streams.md)

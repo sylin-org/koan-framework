@@ -6,9 +6,7 @@ using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Axes.Tests.Support;
 
-/// <summary>Reset the process-global static registries the expander / diagnostics read, plus the expander's cross-host
-/// field-ownership ledger — used in spec ctor/dispose so each unit spec sees a clean slate (mirrors the data-core
-/// pipeline specs).</summary>
+/// <summary>Reset the current composition's host-owned declaration catalogs and field-ownership ledger.</summary>
 internal static class AxisRegistries
 {
     public static void ResetAll()

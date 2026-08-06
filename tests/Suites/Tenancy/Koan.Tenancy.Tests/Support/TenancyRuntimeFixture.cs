@@ -2,6 +2,8 @@ using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
+using Koan.Data.Vector;
+using Koan.Data.Vector.Abstractions;
 using Koan.Testing.Integration;
 using Koan.Tests.Shared;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,7 +33,8 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
         string adapter = "sqlite",
         string environment = "Test",
         Action<IServiceCollection>? configureServices = null,
-        bool withLocalStorage = false)
+        bool withLocalStorage = false,
+        Action? configureDeclarations = null)
     {
         var root = Path.Combine(Path.GetTempPath(), "Koan-Tenancy", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
@@ -86,7 +89,14 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
             .WithSettings(settings)
             .ConfigureServices(s =>
             {
-                s.AddKoan();
+                s.AddKoan(koan =>
+                {
+                    var source = koan.Data.Source("Default");
+                    source.Vector<VectorTenantIsolationSpec.VecDoc>(space => Space(space, "tenant-vector"));
+                    source.Vector<VectorTenantIsolationSpec.ModDoc>(space => Space(space, "moderation-vector"));
+                    source.Vector<VectorTenantIsolationSpec.ArchDoc>(space => Space(space, "archive-vector"));
+                    configureDeclarations?.Invoke();
+                });
                 // The deliberately non-isolating fake (inert unless a source names "fake-noniso") — the fail-closed
                 // safety-net counter-example now that every real KV adapter announces isolation (ARCH-0103).
                 s.AddSingleton<IDataAdapterFactory, NonIsolatingFakeAdapterFactory>();
@@ -100,6 +110,13 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
 
         return new TenancyRuntimeFixture(host, root);
     }
+
+    private static void Space<TEntity>(VectorSpaceBuilder<TEntity> space, string name)
+        where TEntity : class, IEntity<string> => space
+        .Name(name)
+        .Dimensions(3)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session);
 
     /// <summary>Bind the host and reset the per-type data-config caches so each fixture boot is clean.</summary>
     public void ResetEntityCaches()

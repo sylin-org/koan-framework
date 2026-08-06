@@ -31,7 +31,9 @@ does not add a second authentication flow: it consumes Web Auth's sign-in lifecy
 - Effective-access contributors explain global roles and active grants; optional modules such as Identity Tenancy add
   their own facts through the same resolver.
 - Identity-domain Entity mutations produce best-effort `AuditEvent` records. Optional hash chaining detects later
-  alteration, deletion, or reordering.
+  alteration, deletion, or reordering. Snapshots contain bounded, privacy-safe state by default.
+- `IdentityLifecycleService` previews and executes one erasure across every registered semantic owner, returning a
+  non-identifying, integrity-checked receipt with explicit partial-failure and retry information.
 - Dual-control, time-boxed impersonation preserves the real actor in a separate claim and rechecks the grant.
 
 All records use Koan's selected Data provider. There is no Identity-specific repository or storage adapter.
@@ -45,7 +47,8 @@ All records use Koan's selected Data provider. There is no Identity-specific rep
       "Posture": "Closed",
       "SeedDevUsers": false,
       "DevUser": "local-operator",
-      "HashChainAudit": true
+      "HashChainAudit": true,
+      "AuditSnapshotMode": "PrivacySafe"
     }
   }
 }
@@ -53,7 +56,29 @@ All records use Koan's selected Data provider. There is no Identity-specific rep
 
 `Posture` is a nullable `IdentityPosture` enum. Without an override, Development is `Open` and other environments are
 `Closed`. Open posture may seed local people when `SeedDevUsers` is enabled; forcing Open outside Development refuses
-startup. Invalid enum values fail standard .NET options binding.
+startup. `AuditSnapshotMode` defaults to `PrivacySafe`; `Full` is an explicit forensic compatibility choice and raw
+provider claims remain redacted. Invalid enum values fail standard .NET options binding.
+
+## Erase a person
+
+Resolve `IdentityLifecycleService` from DI. Preview is read-only; erase runs the same preview internally and then
+executes all discovered owners in deterministic order:
+
+```csharp
+var plan = await lifecycle.PreviewErasureAsync(identityId, ct);
+var receipt = await lifecycle.EraseAsync(identityId, ct);
+
+if (!receipt.Complete)
+    logger.LogWarning("Retry identity erasure using receipt {ReceiptId}", receipt.Id);
+```
+
+`receipt` intentionally contains no identity ID. Keep its opaque ID if an operator must retrieve it later, and use
+`receipt.HasValidHash()` to detect field changes. A retry creates a new receipt and safely converges completed owners.
+
+Applications with identity-bearing domain data implement and register `IIdentityErasureContributor`. One contributor
+should represent one stable semantic owner; its preview, counts, summaries, and corrections must not contain personal
+data. Referencing `Sylin.Koan.Identity.Tenancy` automatically adds its memberships, tenant grants, and retained-evidence
+owner.
 
 ## Add management HTTP APIs
 
@@ -72,8 +97,10 @@ are intended.
   return only with an effective-access consumer.
 - Audit emission is best-effort after the domain mutation. Hash chaining detects tampering but does not make the
   underlying store append-only or deliver records to a SIEM.
-- Core lifecycle deletion removes core-owned dependents and retains audit evidence; it is not a cross-provider
-  transaction. Identity Tenancy owns tenant-seat deprovisioning.
+- An erasure receipt proves only the registered owners it lists. External IdPs, bearer-token issuers, SIEMs, backups,
+  and application stores need their own owner or explicit operational handling.
+- Erasure is an ordered, idempotent multi-write workflow, not a cross-provider transaction. Access closes first;
+  failures are explicit and the same request can be retried.
 
 See [TECHNICAL.md](TECHNICAL.md) and the public
 [authentication guide](../../docs/guides/authentication-setup.md).

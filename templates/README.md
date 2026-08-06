@@ -9,8 +9,8 @@ generated application contains business code and ordinary .NET structure, not fr
 dotnet new install Sylin.Koan.Templates
 ```
 
-This is the canonical Koan 0.20 preview entry. The template package and its guaranteed dependencies are live on
-NuGet.
+This is the canonical Koan 0.20 preview entry. The generated
+[product surface](../docs/reference/product-surface.md) owns package maturity and publication truth.
 
 ## First result
 

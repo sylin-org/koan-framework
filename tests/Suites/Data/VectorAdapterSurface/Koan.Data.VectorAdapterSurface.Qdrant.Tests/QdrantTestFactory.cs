@@ -1,225 +1,116 @@
-using System.Net.Http;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Text.Json;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Koan.Data.Abstractions.Naming;
-using Koan.Data.Vector;
-using Koan.Data.Vector.Abstractions;
-using Koan.Data.Vector.Connector.Qdrant;
-using Koan.Data.VectorAdapterSurface.TestKit;
+using Xunit;
 
 namespace Koan.Data.VectorAdapterSurface.Qdrant.Tests;
 
-/// <summary>
-/// Qdrant cell of the vector matrix. Single-binary deployment — no etcd/minio sidecars like
-/// Milvus — which makes the Testcontainers setup trivial. <c>/readyz</c> flips to 200 once
-/// the node is accepting queries, and HTTP-from-host works reliably across Docker Desktop on
-/// Windows because Qdrant doesn't do any inter-container chatter that gets in the way of port
-/// mapping.
-///
-/// <para>
-/// <see cref="QdrantOptions.Dimension"/> is only needed when a test pre-creates a collection;
-/// otherwise the adapter derives it from the first embedding. <see cref="QdrantOptions.WaitForResult"/> is true, which
-/// means writes block until visible to subsequent reads — that's what gives this adapter its
-/// <see cref="SupportsDeleteImmediatelyVisibleToSearch"/> = true claim.
-/// </para>
-/// </summary>
-public sealed class QdrantTestFactory : IVectorAdapterTestFactory
+/// <summary>One pinned live Qdrant runtime shared by the provider suite.</summary>
+public sealed class QdrantTestFactory : IAsyncLifetime
 {
-    private IContainer? _qdrant;
-    private ServiceProvider? _sp;
-    private string? _endpoint;
-    private HttpClient? _adminHttp;
-    private bool _initialized;
+    private IContainer? _container;
+    private HttpClient? _http;
 
     public bool IsAvailable { get; private set; }
     public string? UnavailableReason { get; private set; }
-    public IServiceProvider Services => _sp ?? throw new InvalidOperationException("Factory not initialized.");
-    public int EmbeddingDimension => 8;
-
-    // Implemented natively — Qdrant exposes /points/{id}?with_vector for single fetch and
-    // /points (POST) with ids[] + with_vector for batch fetch.
-    public bool SupportsGetEmbedding         => true;
-    public bool SupportsBulkOperations       => true;
-    public bool SupportsFlush                => true;  // adapter overrides: drops the collection
-    public bool SupportsExportAll            => true;  // /points/scroll pagination
-    public bool SupportsIndexStats           => false; // QdrantVectorRepository exposes no count instruction
-    public bool SupportsHybridSearch         => false;
-    public bool SupportsMetadataFilters      => true;  // must/should/must_not via QdrantFilterTranslator
-    public bool SupportsContinuationToken    => false; // search doesn't paginate (scroll is a separate endpoint)
-    public bool SupportsPartitionIsolation   => true;
-    public bool SupportsDynamicCollections   => true;
-    // Qdrant's wait=true write semantics make this trivially true — unlike Milvus.
-    public bool SupportsDeleteImmediatelyVisibleToSearch => true;
-    public bool SupportsScoreNormalization   => true;  // cosine
+    public string Endpoint { get; private set; } = string.Empty;
 
     public async ValueTask InitializeAsync()
     {
-        if (_initialized) return;
-        _initialized = true;
-
-        var envEndpoint = Environment.GetEnvironmentVariable("Koan_TESTS_QDRANT")
-                          ?? Environment.GetEnvironmentVariable("QDRANT_ENDPOINT")
-                          ?? Environment.GetEnvironmentVariable("QDRANT_URL");
-        if (!string.IsNullOrWhiteSpace(envEndpoint) && await Ping(envEndpoint))
-        {
-            _endpoint = envEndpoint;
-            BuildSp();
-            IsAvailable = true;
-            return;
-        }
-
         try
         {
-            // v1.10.x is the latest 1.x stable line; 1.11+ are also fine but pinning gives
-            // deterministic CI behavior. Qdrant follows semver rigorously so REST surface is
-            // stable across 1.x. Using the image-constructor overload (the parameterless
-            // ContainerBuilder() is now CS0618-obsolete in Testcontainers 4.11+).
-            _qdrant = new ContainerBuilder("qdrant/qdrant:v1.18.3")
-                .WithPortBinding(6333, true)
+            var restPort = GrabFreePort();
+            _container = new ContainerBuilder("qdrant/qdrant:v1.18.3")
+                .WithPortBinding(restPort, 6333)
                 .WithPortBinding(6334, true)
-                // /readyz returns 200 once the node has loaded collections and is accepting
-                // queries — that's the right "ready" signal. HTTP-from-host works reliably
-                // because Qdrant is a single process with direct port binding.
                 .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilHttpRequestIsSucceeded(req => req.ForPort(6333).ForPath("/readyz")))
+                    .UntilHttpRequestIsSucceeded(request => request.ForPort(6333).ForPath("/readyz")))
                 .Build();
-            await _qdrant.StartAsync();
-
-            var port = _qdrant.GetMappedPublicPort(6333);
-            _endpoint = $"http://localhost:{port}";
-            BuildSp();
+            await _container.StartAsync().ConfigureAwait(false);
+            Endpoint = $"http://localhost:{_container.GetMappedPublicPort(6333)}";
+            _http = CreateClient(Endpoint);
             IsAvailable = true;
-            return;
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            UnavailableReason = $"Failed to start Qdrant: {ex.GetType().Name}: {ex.Message}";
+            UnavailableReason = $"Qdrant/Docker unavailable: {error.GetType().Name}: {error.Message}";
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _adminHttp?.Dispose();
-        if (_sp is not null) await _sp.DisposeAsync();
-        if (_qdrant is not null) { try { await _qdrant.DisposeAsync(); } catch { } }
+        _http?.Dispose();
+        if (_container is not null)
+        {
+            try { await _container.DisposeAsync().ConfigureAwait(false); }
+            catch { }
+        }
     }
 
-    public async Task ResetAsync(CancellationToken ct = default)
+    public async Task Reset(CancellationToken ct = default)
     {
-        if (_adminHttp is not null && _endpoint is not null)
+        if (!IsAvailable || _http is null) return;
+        using var listed = await _http.GetAsync("/collections", ct).ConfigureAwait(false);
+        listed.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await listed.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+        foreach (var collection in document.RootElement.GetProperty("result").GetProperty("collections").EnumerateArray())
+        {
+            var name = collection.GetProperty("name").GetString()!;
+            using var removed = await _http.DeleteAsync($"/collections/{Uri.EscapeDataString(name)}", ct)
+                .ConfigureAwait(false);
+            removed.EnsureSuccessStatusCode();
+        }
+    }
+
+    public async Task PutCollection(string name, string json, CancellationToken ct = default)
+    {
+        if (_http is null) throw new InvalidOperationException(UnavailableReason);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+        using var response = await _http.PutAsync($"/collections/{Uri.EscapeDataString(name)}", content, ct)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task Restart(CancellationToken ct = default)
+    {
+        if (_container is null) throw new InvalidOperationException(UnavailableReason);
+        await _container.StopAsync(ct).ConfigureAwait(false);
+        await _container.StartAsync(ct).ConfigureAwait(false);
+        var restartedEndpoint = $"http://localhost:{_container.GetMappedPublicPort(6333)}";
+        if (!string.Equals(Endpoint, restartedEndpoint, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Qdrant restart changed its mapped endpoint from '{Endpoint}' to '{restartedEndpoint}'.");
+        _http?.Dispose();
+        _http = CreateClient(Endpoint);
+        using var readiness = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        readiness.CancelAfter(TimeSpan.FromSeconds(15));
+        for (var attempt = 0; attempt < 30; attempt++)
         {
             try
             {
-                // Drop every existing collection. /collections returns the full list, then
-                // DELETE /collections/{name} for each. Best-effort — failures during reset
-                // shouldn't crash subsequent specs.
-                using var listResp = await _adminHttp.GetAsync("/collections", ct);
-                if (listResp.IsSuccessStatusCode)
-                {
-                    var json = await listResp.Content.ReadAsStringAsync(ct);
-                    using var doc = System.Text.Json.JsonDocument.Parse(json);
-                    if (doc.RootElement.TryGetProperty("result", out var result) &&
-                        result.TryGetProperty("collections", out var collections))
-                    {
-                        foreach (var col in collections.EnumerateArray())
-                        {
-                            if (col.TryGetProperty("name", out var nameElem) &&
-                                nameElem.GetString() is { } name)
-                            {
-                                using var _ = await _adminHttp.DeleteAsync($"/collections/{Uri.EscapeDataString(name)}", ct);
-                            }
-                        }
-                    }
-                }
+                using var response = await _http.GetAsync("/readyz", readiness.Token).ConfigureAwait(false);
+                if (response.IsSuccessStatusCode) return;
             }
-            catch { /* best-effort */ }
+            catch when (!readiness.IsCancellationRequested) { }
+            await Task.Delay(100, readiness.Token).ConfigureAwait(false);
         }
-
-        if (_sp is not null) await _sp.DisposeAsync();
-        BuildSp();
-        Koan.Core.Hosting.App.AppHost.Current = _sp;
+        throw new TimeoutException("Qdrant did not become ready after restart.");
     }
 
-    /// <summary>
-    /// Endpoint URL of the running Qdrant instance, useful for tests that need to inspect
-    /// collection state via the admin HTTP API (e.g. verifying quantization config landed).
-    /// Null until <see cref="InitializeAsync"/> has resolved a backing instance.
-    /// </summary>
-    public string? Endpoint => _endpoint;
-
-    /// <summary>
-    /// Builds an isolated <see cref="IServiceProvider"/> against the same Qdrant instance with
-    /// custom options. Used by adapter-specific specs (e.g. quantization mode coverage) that
-    /// need to vary configuration per test. Caller is responsible for disposing the returned SP.
-    /// </summary>
-    public ServiceProvider BuildServiceProviderWith(Action<QdrantOptions> configure)
+    private static HttpClient CreateClient(string endpoint) => new()
     {
-        if (_endpoint is null) throw new InvalidOperationException("Factory not initialized.");
+        BaseAddress = new Uri(endpoint),
+        Timeout = TimeSpan.FromSeconds(3)
+    };
 
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddVectorAdapterTestRuntime();
-
-        services.AddOptions<QdrantOptions>().Configure(o =>
-        {
-            // Start from the same baseline the matrix uses, then let the spec override.
-            ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension);
-            configure(o);
-        });
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IVectorAdapterFactory, QdrantVectorAdapterFactory>();
-
-        return services.BuildServiceProvider();
-    }
-
-    private void BuildSp()
+    private static int GrabFreePort()
     {
-        if (_endpoint is null) throw new InvalidOperationException("Endpoint not resolved.");
-        _adminHttp = new HttpClient { BaseAddress = new Uri(_endpoint, UriKind.Absolute) };
-
-        var services = new ServiceCollection();
-        services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-        services.AddLogging();
-        services.AddHttpClient("qdrant", c => c.BaseAddress = new Uri(_endpoint));
-        services.AddVectorAdapterTestRuntime();
-
-        services.AddOptions<QdrantOptions>().Configure(o => ApplyMatrixDefaults(o, _endpoint, EmbeddingDimension));
-        services.AddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
-        services.AddSingleton<IVectorAdapterFactory, QdrantVectorAdapterFactory>();
-
-        _sp = services.BuildServiceProvider();
-    }
-
-    /// <summary>
-    /// Matrix baseline: lean defaults (scalar quantization on, on-disk originals) — the same
-    /// profile production users get out of the box. Spec-specific factories layer overrides on
-    /// top via <see cref="BuildServiceProviderWith"/>.
-    /// </summary>
-    private static void ApplyMatrixDefaults(QdrantOptions o, string endpoint, int embeddingDimension)
-    {
-        o.ConnectionString = endpoint;
-        o.Endpoint = endpoint;
-        o.Dimension = embeddingDimension;
-        o.AutoCreateCollection = true;
-        o.Distance = "Cosine";
-        o.WaitForResult = true; // synchronous writes for deterministic test behavior
-        // o.OnDisk and o.Quantization keep their adapter-level defaults (true / Scalar) — that's
-        // the lean profile we want the matrix to exercise so prod and test stay in sync.
-    }
-
-    private static async Task<bool> Ping(string endpoint)
-    {
-        try
-        {
-            using var http = new HttpClient { BaseAddress = new Uri(endpoint, UriKind.Absolute), Timeout = TimeSpan.FromSeconds(2) };
-            using var resp = await http.GetAsync("/readyz");
-            return resp.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try { return ((IPEndPoint)listener.LocalEndpoint).Port; }
+        finally { listener.Stop(); }
     }
 }

@@ -27,7 +27,7 @@ public sealed class OrdersController : ControllerBase
 
 - typed values become compact Newtonsoft JSON;
 - strings remain unquoted text; and
-- `SseEnvelope` values preserve explicit event name, id, and retry fields.
+- `SseEnvelope` values preserve explicit event name, id, retry, comment, and unnamed control frames.
 
 The returned `SseResult` implements both MVC `IActionResult` and ASP.NET `IResult`, so Koan transports and application
 controllers use the same wire engine without two helper vocabularies.
@@ -48,9 +48,13 @@ Configure only the fallback event name when needed:
 
 ## Guarantees and boundaries
 
-- Responses use `text/event-stream`, disable ordinary proxy buffering/caching headers, flush every frame, and stop on
-  request cancellation.
-- A missing envelope event name receives the explicit `Sse.Stream(..., eventName)` value or configured default.
+- Responses use `text/event-stream`, add ordinary proxy buffering/caching guidance when absent, flush every frame,
+  and stop on request cancellation. Existing stronger cache or application-owned transport directives survive.
+- Typed and text values receive the explicit `Sse.Stream(..., eventName)` value or configured default. An explicit
+  envelope remains unnamed unless the caller supplies `eventName`.
+- An envelope with empty data plus a comment, retry, or id is a control frame. It emits only those control fields,
+  even when the stream has a fallback event name; comment-only heartbeats are exactly `: text` plus the blank frame
+  terminator.
 - Empty text chunks are skipped; multiline data is emitted as valid repeated `data:` lines.
 - The package does not promise delivery, replay, resume storage, heartbeat generation, backpressure persistence,
   authentication, or proxy-specific buffering behavior. Compose those concerns at their owning transport or host.

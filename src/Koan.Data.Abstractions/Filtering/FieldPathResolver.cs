@@ -1,7 +1,7 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions.Pipeline;
 
 namespace Koan.Data.Abstractions.Filtering;
@@ -25,7 +25,8 @@ public static class FieldPathResolver
     // FieldPath itself is not value-equal (its Segments list compares by reference), so the key is the
     // joined path string — allocation-free for the common single-segment case. Only successful resolutions
     // are cached; an unresolvable path keeps throwing (the strict contract callers depend on).
-    private static readonly ConcurrentDictionary<(Type Root, string Path, Type? Managed), ResolvedField> _cache = new();
+    private const int PathsPerType = 256;
+    private static readonly ConditionalWeakTable<Type, TypePathCache> Cache = new();
 
     public static ResolvedField Resolve(Type rootType, FieldPath path)
     {
@@ -34,14 +35,26 @@ public static class FieldPathResolver
             throw new InvalidFilterFieldException(path?.ToString() ?? string.Empty, rootType!, string.Empty, "Field path is empty.");
 
         var key = (
-            rootType,
             path.Segments.Count == 1 ? path.Segments[0] : string.Join('.', path.Segments),
             path.ManagedClrType);
-        if (_cache.TryGetValue(key, out var cached)) return cached;
 
-        var resolved = ResolveCore(rootType, path);
-        _cache[key] = resolved;
-        return resolved;
+        if (path.ManagedClrType is null && path.Segments.Count == 1 && !ManagedFieldRegistry.IsEmpty)
+        {
+            var storageName = path.Segments[0];
+            var managed = ManagedFieldRegistry.ForType(rootType)
+                .FirstOrDefault(descriptor => string.Equals(descriptor.StorageName, storageName, StringComparison.Ordinal));
+            if (managed is not null)
+            {
+                var comparable = Nullable.GetUnderlyingType(managed.ClrType) ?? managed.ClrType;
+                return new ResolvedField(rootType, [], managed.ClrType, comparable,
+                    TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName,
+                    CanonicalPath: FieldPath.Managed(managed.StorageName, managed.ClrType));
+            }
+        }
+
+        return Cache.GetValue(rootType, static _ => new TypePathCache()).GetOrAdd(
+            key,
+            () => ResolveCore(rootType, path));
     }
 
     private static ResolvedField ResolveCore(Type rootType, FieldPath path)
@@ -60,25 +73,6 @@ public static class FieldPathResolver
                 IsManaged: true,
                 StorageName: storageName,
                 CanonicalPath: FieldPath.Managed(storageName, declaredManagedType));
-        }
-
-        // Managed-field resolution (DATA-0105 §3b, Seam 3) — a single segment that matches a registered managed
-        // field for this entity type resolves to a managed ResolvedField (no CLR member). Gated on registry
-        // non-emptiness so the throw-path and success-only memoization below are byte-identical when no module
-        // registers. Because the relational translator AND the pushability splitter both funnel through this one
-        // resolver, this single change makes both managed-aware consistently.
-        if (!ManagedFieldRegistry.IsEmpty && path.Segments.Count == 1)
-        {
-            var seg = path.Segments[0];
-            var managed = ManagedFieldRegistry.ForType(rootType)
-                .FirstOrDefault(d => string.Equals(d.StorageName, seg, StringComparison.Ordinal));
-            if (managed is not null)
-            {
-                var managedComparable = Nullable.GetUnderlyingType(managed.ClrType) ?? managed.ClrType;
-                return new ResolvedField(rootType, Array.Empty<MemberInfo>(), managed.ClrType, managedComparable,
-                    TargetsCollection: false, ElementType: null, IsManaged: true, StorageName: managed.StorageName,
-                    CanonicalPath: FieldPath.Managed(managed.StorageName, managed.ClrType));
-            }
         }
 
         var members = new MemberInfo[path.Segments.Count];
@@ -152,5 +146,24 @@ public static class FieldPathResolver
             return typeof(object);
 
         return null;
+    }
+
+    private sealed class TypePathCache
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<(string Path, Type? Managed), ResolvedField> _fields = new();
+
+        public ResolvedField GetOrAdd(
+            (string Path, Type? Managed) key,
+            Func<ResolvedField> create)
+        {
+            lock (_gate)
+            {
+                if (_fields.TryGetValue(key, out var existing)) return existing;
+                var created = create();
+                if (_fields.Count < PathsPerType) _fields.Add(key, created);
+                return created;
+            }
+        }
     }
 }

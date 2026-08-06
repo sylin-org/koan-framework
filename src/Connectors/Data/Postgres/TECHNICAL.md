@@ -11,6 +11,12 @@ source: src/Connectors/Data/Postgres/
 - The adapter declares `DataCaps.Query.ProviderBoundedPaging` and applies numbered pages in PostgreSQL
   before candidate rows are materialized into application memory.
 - JSON pushdown and projection behavior remain capability-dependent.
+- Managed aggregates use the native two-column `Id` + `jsonb` path. Explicit `Map<T>` declarations use their physical
+  schema/table, scalar names, object roots, and nested JSON paths without routing through the managed table convention.
+- `StorageLifecycle.External` disables DDL below the facade. `Access=ReadOnly` is enforced by the compiled source plan
+  before mapped or managed writes.
+- `Inspect()` lists, resolves, describes, and samples tables/views through neutral storage descriptors.
+- Registered `.Sql(...)` records/scalars require a declared read lane and execute in a PostgreSQL read-only transaction.
 
 ## Configuration
 
@@ -64,6 +70,13 @@ Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets 
   it and execute `SELECT 1`.
 - Metrics: command duration and failures; track server version when diagnosing feature behavior.
 - Logs: SQL with parameter redaction; note when in-memory filtering occurs.
+
+## Verification
+
+- Connector suite: 26/26 against pinned `postgres:18.4-alpine` on 2026-07-28.
+- The suite covers native query receipts, atomic batch behavior, managed-field isolation, compact legacy mapping,
+  composite/generated identities, nested `jsonb` preservation, read-only safety, non-creating External lifecycle,
+  named SQL, inspection, and bounded sampling.
 
 ## References
 

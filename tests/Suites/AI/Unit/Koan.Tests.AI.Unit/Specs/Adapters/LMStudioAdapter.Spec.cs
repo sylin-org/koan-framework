@@ -11,6 +11,7 @@ using AwesomeAssertions;
 using Koan.AI.Connector.LMStudio;
 using Koan.AI.Connector.LMStudio.Options;
 using Koan.AI.Contracts.Models;
+using Koan.AI.Contracts.Sources;
 using Koan.Core.Adapters;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
@@ -213,6 +214,27 @@ public class LMStudioAdapterSpec
 
         adapter.ReadinessState.Should().Be(AdapterReadinessState.Degraded);
         adapter.IsReady.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Inspection_uses_the_candidate_openai_models_protocol()
+    {
+        var handler = new RecordingHandler((request, _) =>
+        {
+            request.RequestUri!.AbsolutePath.Should().Be("/v1/models");
+            return JsonResponse("""{"data":[{"id":"local-model","owned_by":"local"}]}""");
+        });
+        using var adapter = CreateAdapter(handler);
+
+        var result = await adapter.InspectAsync(new AiSourceCandidate
+        {
+            Provider = "lmstudio",
+            Endpoint = "http://localhost:1234"
+        });
+
+        result.Available.Should().BeTrue();
+        result.Models.Should().Equal("local-model");
+        result.Capabilities.Should().Contain("Chat");
     }
 
     private static LMStudioAdapter CreateAdapter(RecordingHandler handler, LMStudioOptions? options = null)

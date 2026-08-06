@@ -50,13 +50,20 @@ override reject host startup with that correction.
 ## Routes
 
 - `GET /media/{id}` — original bytes;
+- `HEAD /media/{id}` — original validators, content type, and length without a body;
 - `GET /media/{id}/{recipe}` — named recipe or supported format shortcut;
+- `HEAD /media/{id}/{recipe}` — recipe-result metadata without a body;
 - `GET /media/{id}/{recipe}?w=...&q=...` — allowlisted overrides;
 - `GET /media/recipes` — materialized catalog and shortcuts; and
 - `GET /media/recipes/{name}?as=appsettings` — canonical recipe configuration.
 
 `MediaEntitySource<TEntity>` resolves the source through the Entity data path before consulting a derivative,
 so active tenancy and access axes gate both cold and warm requests.
+
+Originals and recipe results backed by seekable streams support standard byte ranges, including `206`,
+`Content-Range`, `Accept-Ranges: bytes`, and length-bearing `416` responses. A non-seekable custom source remains
+valid for complete GET/HEAD delivery, advertises `Accept-Ranges: none`, and rejects a requested range correctively
+rather than silently returning the full body.
 
 ## Current limits
 

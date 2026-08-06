@@ -15,7 +15,7 @@ nav: false
 
 # Entity Pattern Scaling (Moved)
 
-This catalog has merged into the [Data modeling guide](../guides/data-modeling.md) as part of the DX-0041 consolidation. Update bookmarks to that document for:
+This catalog has merged into the [Data capability](../reference/data/index.md). Update bookmarks to that document for:
 
 - Stage-by-stage CRUD, messaging, and AI integration recipes.
 - Cross-pillar checklists linking Data, Web, Flow, and AI guidance.

@@ -30,7 +30,7 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         if (string.IsNullOrWhiteSpace(req.code) || string.IsNullOrWhiteSpace(req.redirect_uri) || string.IsNullOrWhiteSpace(req.client_id)) return BadRequest(new { error = "invalid_request" });
         if (!string.Equals(req.client_id, o.ClientId, StringComparison.Ordinal) || !string.Equals(req.client_secret ?? "", o.ClientSecret, StringComparison.Ordinal)) return Unauthorized();
 
-        if (!store.TryRedeemCode(req.code, out var profile, out var challenge, out var envx, out var nonce, out var isOpenId)) { logger.LogDebug("TestProvider token: invalid_grant for code {Code}", req.code); return BadRequest(new { error = "invalid_grant" }); }
+        if (!store.TryRedeemCode(req.code, out var profile, out var challenge, out var envx, out var nonce, out var isOpenId, out var issuer)) { logger.LogDebug("TestProvider token: invalid_grant for code {Code}", req.code); return BadRequest(new { error = "invalid_grant" }); }
         // Enforce PKCE S256 when a challenge is present
         if (!string.IsNullOrWhiteSpace(challenge))
         {
@@ -48,8 +48,13 @@ public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, 
         logger.LogDebug("TestProvider token: issued access token for {Email}", profile.Email);
         if (isOpenId)
         {
-            // OIDC: also mint a signed id_token (iss derived from the request so it matches the discovery issuer).
-            var issuer = $"{Request.Scheme}://{Request.Host}{Constants.Routes.Base}";
+            // OIDC: mint with the public issuer captured at the browser-facing authorization request. The token
+            // exchange may intentionally arrive over the app's internal address in a container.
+            if (string.IsNullOrWhiteSpace(issuer))
+            {
+                logger.LogWarning("TestProvider token: authorization code has no public issuer");
+                return BadRequest(new { error = "invalid_grant" });
+            }
             var idToken = jwt.CreateIdToken(profile, issuer, req.client_id, nonce, TimeSpan.FromHours(1));
             return Ok(new { access_token = token, token_type = "Bearer", expires_in = 3600, id_token = idToken });
         }

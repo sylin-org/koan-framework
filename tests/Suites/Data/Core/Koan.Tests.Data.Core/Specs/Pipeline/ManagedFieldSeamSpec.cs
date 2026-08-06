@@ -1,9 +1,12 @@
 using System;
 using System.Linq;
 using AwesomeAssertions;
+using Koan.Core.Composition;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Xunit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Specs.Pipeline;
 
@@ -13,11 +16,12 @@ namespace Koan.Tests.Data.Core.Specs.Pipeline;
 /// axis. Pins: storage-name validation (the camel-case-stable invariant), per-type applicability, the
 /// off = byte-identical gate, the managed ResolvedField shape, and the fail-loud in-memory guard.
 /// </summary>
-[Collection("managed-field-registry")]   // serialize: the registry is process-global static state
 public sealed class ManagedFieldSeamSpec : IDisposable
 {
-    public ManagedFieldSeamSpec() => ManagedFieldRegistry.Reset();
-    public void Dispose() => ManagedFieldRegistry.Reset();
+    private readonly IDisposable _composition;
+
+    public ManagedFieldSeamSpec() => _composition = KoanCompositionScope.Enter(new ServiceCollection());
+    public void Dispose() => _composition.Dispose();
 
     private sealed class Scoped { public string Id { get; set; } = ""; }
     private sealed class Exempt { public string Id { get; set; } = ""; }
@@ -50,6 +54,17 @@ public sealed class ManagedFieldSeamSpec : IDisposable
     {
         var act = () => ManagedFieldRegistry.Register(Field(name, _ => true));
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Theory]
+    [InlineData(EntityFamilyStorage.TypeField)]
+    [InlineData("__KOAN_TYPE")]
+    public void Register_rejects_the_reserved_entity_family_field(string name)
+    {
+        var act = () => ManagedFieldRegistry.Register(Field(name, _ => true));
+
+        act.Should().Throw<ArgumentException>()
+            .WithMessage($"*reserved*{EntityFamilyStorage.TypeField}*");
     }
 
     [Fact]

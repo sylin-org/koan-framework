@@ -1,6 +1,6 @@
 using Koan.Data.Abstractions.Annotations;
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 namespace Koan.Data.Core;
 
@@ -8,10 +8,10 @@ public static class IndexMetadata
 {
     // Type-plane memoization (DATA-0105 §3). The index set is a pure function of the entity type; it is read
     // on every relational schema-ensure and on several adapter write paths, so it is computed once per type.
-    private static readonly ConcurrentDictionary<Type, IReadOnlyList<IndexSpec>> Cache = new();
+    private static readonly ConditionalWeakTable<Type, Indexes> Cache = new();
 
     public static IReadOnlyList<IndexSpec> GetIndexes(Type aggregateType)
-        => Cache.GetOrAdd(aggregateType, static t => Compute(t));
+        => Cache.GetValue(aggregateType, static type => new Indexes(Compute(type))).Items;
 
     private static IReadOnlyList<IndexSpec> Compute(Type aggregateType)
     {
@@ -89,4 +89,6 @@ public static class IndexMetadata
 
         return results.ToArray();
     }
+
+    private sealed record Indexes(IReadOnlyList<IndexSpec> Items);
 }

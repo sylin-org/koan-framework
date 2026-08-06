@@ -2,17 +2,26 @@ using System.Collections.Generic;
 using System.Linq;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Core.Hosting.App;
 
 namespace Koan.Data.Core.Axes;
 
 /// <summary>
 /// The boot-report self-projection of the active data-axis planes (ARCH-0101 §9) — the same self-reporting machinery
-/// as the boot report, listing what data-segmentation is composed app-wide. DI-free (reads only the static registries),
-/// so it runs in <c>KoanModule.Report</c> where no <c>IServiceProvider</c> is available. Per-entity detail (the active
-/// fold + adapter satisfaction) lives in <see cref="DataAxis.Explain"/>.
+/// as the boot report, listing what data-segmentation is composed app-wide. The explicit overload reads exactly one
+/// host; the parameterless facade reads the active composition/host. Per-entity detail (the active fold + adapter
+/// satisfaction) lives in <see cref="DataAxis.Explain"/>.
 /// </summary>
 public static class DataAxisReport
 {
+    /// <summary>Summarizes the registry owned by an explicit host.</summary>
+    public static string? Summarize(IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        using var host = AppHost.PushScope(services);
+        return Summarize();
+    }
+
     /// <summary>A one-line summary of the registered axis planes, or <c>null</c> when none is registered (the boot
     /// report omits the line entirely — off = structurally absent).</summary>
     public static string? Summarize()

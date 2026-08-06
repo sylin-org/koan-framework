@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Koan.Data.Core;
+using Koan.Identity.Infrastructure;
 
 namespace Koan.Identity.Audit;
 
@@ -53,7 +54,83 @@ public sealed class AuditChain
     /// <summary>Recompute the chain from the store and report the first break (if any).</summary>
     public async Task<AuditChainVerification> VerifyAsync(CancellationToken ct = default)
     {
-        var chained = await LoadChainAsync(ct).ConfigureAwait(false);
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var chained = await LoadChainAsync(ct).ConfigureAwait(false);
+            return Verify(chained);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Authorize a bounded rewrite of chained audit content, but only when the pre-existing chain verifies. The
+    /// chain is re-hashed from the first changed event while the append lock is held. Used by privacy erasure; it
+    /// refuses to bless unexplained prior tampering.
+    /// </summary>
+    internal async Task<(int Changed, int Rehashed)> RewriteAsync(
+        Func<AuditEvent, bool> rewrite,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(rewrite);
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var chained = await LoadChainAsync(ct).ConfigureAwait(false);
+            var before = Verify(chained);
+            if (!before.Intact)
+                throw new InvalidOperationException(
+                    $"Identity audit erasure refused: the existing hash chain is invalid at sequence " +
+                    $"{before.EventsOrBrokenAt} ({before.Detail}). Investigate or restore the chain before retrying.");
+
+            var previous = Genesis;
+            var changed = 0;
+            var rehashed = 0;
+            var rewriteTail = false;
+            foreach (var auditEvent in chained)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (rewrite(auditEvent))
+                {
+                    changed++;
+                    rewriteTail = true;
+                }
+
+                if (rewriteTail)
+                {
+                    auditEvent.PrevHash = previous;
+                    auditEvent.Hash = Compute(auditEvent.Sequence, previous, auditEvent);
+                    await auditEvent.Save(ct).ConfigureAwait(false);
+                    rehashed++;
+                }
+
+                previous = auditEvent.Hash!;
+            }
+
+            if (chained.Count > 0)
+            {
+                _lastSequence = chained[^1].Sequence;
+                _lastHash = chained[^1].Hash!;
+            }
+            else
+            {
+                _lastSequence = -1;
+                _lastHash = Genesis;
+            }
+            _seeded = true;
+            return (changed, rehashed);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    private static AuditChainVerification Verify(IReadOnlyList<AuditEvent> chained)
+    {
         var prev = Genesis;
         long expected = 0;
         foreach (var e in chained)
@@ -92,8 +169,18 @@ public sealed class AuditChain
 
     private static async Task<List<AuditEvent>> LoadChainAsync(CancellationToken ct)
     {
-        var all = await AuditEvent.All(ct).ConfigureAwait(false);
-        return all.Where(a => a.Hash is not null).OrderBy(a => a.Sequence).ToList();
+        var chained = new List<AuditEvent>();
+        for (var page = 1; ; page++)
+        {
+            var batch = await AuditEvent.Page(
+                page,
+                IdentityErasureConstants.PageSize,
+                sort => sort.OrderBy(audit => audit.Sequence).ThenBy(audit => audit.Id),
+                ct).ConfigureAwait(false);
+            chained.AddRange(batch.Where(static audit => audit.Hash is not null));
+            if (batch.Count < IdentityErasureConstants.PageSize) break;
+        }
+        return chained.OrderBy(static audit => audit.Sequence).ToList();
     }
 
     private static string Compute(long sequence, string prevHash, AuditEvent e)

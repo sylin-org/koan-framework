@@ -2,7 +2,7 @@
 name: koan-vector
 description: Semantic / KNN search over entity embeddings — [Embedding] class attribute, Vector<T>.Search(float[]) over Weaviate/Qdrant/Milvus, precompute query vectors with Koan.AI.Client.Embed, and zero-AI-cost provider migration via IVectorSearchRepository.ExportAll/Upsert
 pillar: vector
-card: docs/reference/cards/vector.md
+card: docs/reference/ai/vector.md
 status: current
 last_validated: 2026-07-16
 ---
@@ -128,7 +128,7 @@ public sealed class SemanticSearch
 
 ## See also
 
-- [Reference card: vector.md](../../../docs/reference/cards/vector.md) — one-screen pillar map
+- [Vector capability](../../../docs/reference/ai/vector.md) — Entity embeddings, provider choice, and inspection
 - [AI & vector how-to](../../../docs/guides/ai-vector-howto.md) — embeddings, search, migration walkthrough
 - [GardenCoop Local Discovery](../../../samples/journeys/GardenCoop/02-LocalDiscovery/README.md) — `[Embedding]` plus `Vector<Produce>.Search` for local semantic discovery
 - [DATA-0078 — vector export capabilities](../../../docs/decisions/DATA-0078-vector-export-capabilities.md)

@@ -43,8 +43,10 @@ internal sealed class CapabilityProfiledRepository : IQueryRepository<Widget, st
         return Task.FromResult(new RepositoryQueryResult<Widget>
         {
             Items = list,
-            TotalCount = list.Count,
+            FilterHandled = query.Filter is not null,
+            TotalCount = query.CountStrategy is null ? null : list.Count,
             IsEstimate = false,
+            CountExecution = query.CountStrategy is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = RepositoryQueryResult<Widget>.NoSortHandled,
             PaginationHandled = false,
         });

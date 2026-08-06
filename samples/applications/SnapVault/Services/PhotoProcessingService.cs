@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Koan.AI;
 using Koan.Core;
 using Koan.AI.Contracts.Options;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Vector;
 using Koan.Media.Core.Extensions;
@@ -201,21 +202,19 @@ public sealed class PhotoProcessingService
             // that can't push the filter throws, and the outer catch falls back to keyword search (which also
             // honors eventId), so the push-down never widens results. (Production-only: the unit harness has no
             // embedding provider, so this branch falls through to the keyword path.)
-            object? filter = string.IsNullOrEmpty(eventId)
-                ? null
-                : new Dictionary<string, object> { ["EventId"] = eventId };
-
             // Hybrid vector search with user-controlled alpha (0.0 = keyword, 1.0 = semantic).
             var vectorResults = await Vector<PhotoAsset>.Search(
-                vector: queryVector,
-                text: query,
-                alpha: alpha,
-                topK: topK,
-                filter: filter,
-                ct: ct);
+                queryVector,
+                vectorQuery =>
+                {
+                    vectorQuery.Top(topK).Text(query).SemanticWeight(alpha);
+                    if (!string.IsNullOrEmpty(eventId))
+                        vectorQuery.Where(Filter.Eq("EventId", eventId));
+                },
+                ct);
 
             var photos = new List<PhotoAsset>();
-            foreach (var match in vectorResults.Matches)
+            foreach (var match in vectorResults.Items)
             {
                 var photo = await PhotoAsset.Get(match.Id, ct);
                 if (photo != null) photos.Add(photo);

@@ -55,8 +55,7 @@ public sealed class ManagedFieldNoLeakSpec(SqliteFixture fixture, ITestOutputHel
     public async Task Managed_scope_isolates_reads_and_deletes()
     {
         RequireBackingStore();
-        EnsureRegistered();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(EnsureRegistered);
         using var _ = Lease(NewPartition());
 
         Doc a, b;
@@ -84,8 +83,7 @@ public sealed class ManagedFieldNoLeakSpec(SqliteFixture fixture, ITestOutputHel
     public async Task Cross_scope_upsert_takeover_is_rejected()
     {
         RequireBackingStore();
-        EnsureRegistered();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(EnsureRegistered);
         using var _ = Lease(NewPartition());
 
         Doc b;

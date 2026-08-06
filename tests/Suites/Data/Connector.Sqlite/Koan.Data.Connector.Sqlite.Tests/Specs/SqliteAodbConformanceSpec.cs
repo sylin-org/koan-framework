@@ -6,7 +6,7 @@ using Koan.Data.AdapterSurface.TestKit;
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 
 /// <summary>
-/// SQLite's AODB conformance ledger cell (ARCH-0103 §6 / P5) — the relational reference (P0, already conformant; its
+/// SQLite's AODB conformance suite (ARCH-0103 §6 / P5) is the relational reference (P0, already conformant; its
 /// specs seed the kit). Proves the relational realization of all three AODB modes AND declares the tokens. The two
 /// routed conformance sources resolve to distinct on-disk database files (per-source connection string).
 /// </summary>

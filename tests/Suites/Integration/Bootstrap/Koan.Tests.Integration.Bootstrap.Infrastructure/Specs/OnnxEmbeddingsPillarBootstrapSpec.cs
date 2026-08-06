@@ -44,6 +44,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
 
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", modelPath!)
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
@@ -52,6 +56,13 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
         var onnx = registry.All.OfType<IEmbedAdapter>().FirstOrDefault(a => a.Type == "onnx");
         onnx.Should().NotBeNull("the ONNX connector must register an embed adapter when a model is configured");
         onnx!.Capabilities.Should().Contain(AiCapability.Embed);
+        var inspection = await ((IAiSourceInspector)onnx).InspectAsync(new AiSourceCandidate
+        {
+            Provider = onnx.Type,
+            Endpoint = "inproc://onnx"
+        });
+        inspection.Available.Should().BeTrue();
+        inspection.Models.Should().Contain("all-MiniLM-L6-v2");
 
         var resp = await onnx.Embed(new AiEmbeddingsRequest
         {
@@ -76,6 +87,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
 
         await using var host = await KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", modelPath!)
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
@@ -114,6 +129,10 @@ public sealed class OnnxEmbeddingsPillarBootstrapSpec
         // the provider the application asked Koan to activate.
         var builder = KoanIntegrationHost.Configure()
             .WithSetting("Koan:Environment", "Test")
+            .WithSetting("Koan:Communication:TransportProvider", "in-process")
+            .WithSetting("Koan:Communication:EventsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkSignalsProvider", "in-process")
+            .WithSetting("Koan:Communication:FrameworkBroadcastsProvider", "in-process")
             .WithSetting("Koan:Ai:Onnx:ModelPath", "does-not-exist.onnx")
             .ConfigureServices(services => services.AddKoan());
 

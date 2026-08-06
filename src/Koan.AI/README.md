@@ -3,6 +3,9 @@
 The AI capability ring for Koan: one business-facing client, capability-aware routing, provider composition, source
 health, and startup inspection.
 
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity. This
+page owns AI runtime setup, routing behavior, and limits.
+
 ## Smallest meaningful use
 
 Install this runtime and one provider, for example:
@@ -15,13 +18,14 @@ dotnet add package Sylin.Koan.AI.Connector.Ollama
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/summary", async () => await Client.Chat("Summarize today's orders."));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("Summarize today's orders."));
 ```
 
 `AddKoan()` is the complete application bootstrap. Referenced provider modules describe their capabilities; Koan
@@ -58,6 +62,50 @@ Category configuration can constrain source or model without leaking provider me
 sources under `Koan:Ai:Sources` are the advanced routing surface; ordinary applications normally need only a provider
 reference and, when conventions cannot locate it, that provider's exact endpoint configuration.
 
+When one request must select both, the choices compose:
+
+```csharp
+var response = await Client.Conversation()
+    .WithUser("Summarize the deployment.")
+    .WithSource("local-gpu") // or "local-gpu::secondary" to pin one member
+    .WithModel("qwen3:8b")
+    .Send();
+```
+
+An explicit source or member is authoritative. Koan preserves it with the explicit model or rejects a
+missing, disabled, or capability-incompatible choice with usable alternatives; it never silently elects
+another source. Without `WithSource`, normal capability and priority election remains unchanged.
+
+Applications that operate a changing endpoint catalog can request `IAiSourceControl`. Inspect an endpoint through
+its provider protocol before applying it, then enable, disable, or remove the logical source without rebuilding the
+host:
+
+```csharp
+var inspection = await sourceControl.InspectAsync(new AiSourceCandidate
+{
+    Provider = "ollama",
+    Endpoint = "http://model-host:11434"
+});
+
+if (inspection.Available)
+{
+    Console.WriteLine(inspection.Version ?? "version unavailable");
+    Console.WriteLine($"Installed: {string.Join(", ", inspection.Models)}");
+    Console.WriteLine(inspection.ResidentModelsAvailable
+        ? $"Resident: {string.Join(", ", inspection.ResidentModels)}"
+        : "Residency unavailable");
+}
+
+sourceControl.Disable("maintenance-pool");
+sourceControl.Remove("retired-pool", expectedOrigin: "runtime");
+```
+
+`Available` means at least one provider-owned inspection facet answered. `VersionAvailable`,
+`ModelsAvailable`, and `ResidentModelsAvailable` distinguish unavailable facts from successful empty values;
+`Models` is the installed-model catalog. Ollama inspection owns its version, tags, and process APIs. LM Studio
+inspection owns its OpenAI-compatible models API and reports only the facets that protocol can inspect. Inspection
+does not register the endpoint. Disabled and removed sources leave routing and health probing immediately.
+
 ## Host and failure contract
 
 - `Client.IsAvailable` and `Client.TryResolve()` are optional probes. They return absence for a missing or disposed
@@ -66,6 +114,9 @@ reference and, when conventions cannot locate it, that provider's exact endpoint
 - Referencing the AI runtime without a usable provider is allowed; invoking an unsupported operation is not.
 - Explicit provider configuration is intent and fails startup when invalid. Automatic candidates may be absent
   without making the application unhealthy.
+- AI source health is always present alongside other Koan readiness components once AI is active. It is noncritical
+  by default: an unavailable provider remains visible as `Koan.AI` without taking an otherwise healthy application
+  offline. Members that have not completed a probe report `unknown`; they are never counted as healthy.
 - Provider HTTP/model errors and cancellation remain visible to the caller.
 
 Provider packages document their exact discovery, configuration, and guarantee boundaries. See

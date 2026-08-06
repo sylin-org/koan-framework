@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
 using Koan.Core.Observability.Health;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
@@ -85,6 +86,17 @@ public sealed class DataAdapterParticipationSpec
         using var services = registrations.BuildServiceProvider();
         services.GetRequiredService<DataDiagnostics>()
             .ObserveParticipation("participating-provider", "Archive");
+        var claims = DataClaimSet.For("participating-provider", declaration => declaration
+            .Profile(DataClaimProfiles.RegisteredReads, advertised: true));
+        services.GetRequiredService<DataDiagnostics>().ObserveSourcePlan(
+            new DataSourcePlan(
+                "Archive",
+                "participating-provider",
+                StorageLifecycle.External,
+                DataSourceAccess.ReadOnly,
+                "decision-archive",
+                "credential-identity"),
+            claims);
         var publicDiagnostics = services.GetRequiredService<IDataDiagnostics>();
         publicDiagnostics.Should().BeOfType<EmptyPublicDiagnostics>();
 
@@ -97,6 +109,9 @@ public sealed class DataAdapterParticipationSpec
 
         report.State.Should().Be(HealthState.Healthy);
         health.ActiveSources.Should().Equal("Archive");
+        report.Data!["decisions"].Should().Be("decision-archive");
+        report.Data["claims"].Should().Be(string.Join(",", claims.Claims.Select(static claim => claim.Reference)));
+        string.Join('|', report.Data.Values).Should().NotContain("Archive").And.NotContain("credential-identity");
     }
 
     [Fact]

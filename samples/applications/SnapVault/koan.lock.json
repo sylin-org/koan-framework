@@ -8,11 +8,11 @@
   "modules": [
     {
       "id": "Koan.AI",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.AI.Contracts",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Cache.Abstractions",
@@ -32,31 +32,31 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Vector",
-      "version": "0.18"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Vector.Abstractions",
-      "version": "0.17"
+      "version": "0.21"
     },
     {
       "id": "Koan.Identity",
@@ -72,15 +72,15 @@
     },
     {
       "id": "Koan.Media.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Media.Core",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Media.Web",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Security.Trust",
@@ -88,15 +88,15 @@
     },
     {
       "id": "Koan.Storage",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Storage.Abstractions",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.Storage.Connector.Local",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Tenancy",

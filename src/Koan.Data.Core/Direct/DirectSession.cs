@@ -7,12 +7,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core.Configuration;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Routing;
 using Koan.Core.Semantics.Segmentation;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Core.SourceIntegration.Runtime;
 
 namespace Koan.Data.Core.Direct;
 
@@ -27,6 +28,9 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     private TimeSpan _timeout = TimeSpan.FromSeconds(
         (sp.GetService<Microsoft.Extensions.Options.IOptions<Options.DirectOptions>>()?.Value?.TimeoutSeconds) ?? 30);
     private int _maxRows = sp.GetService<Microsoft.Extensions.Options.IOptions<Options.DirectOptions>>()?.Value?.MaxRows ?? 10_000;
+    private DataSourcePlan? _ceilingPlan;
+    private DataOperationEffect _effect = DataOperationEffect.Unknown;
+    private bool _effectDeclared;
 
     public IDirectSession WithConnectionString(string value)
     {
@@ -39,10 +43,12 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         }
 
         _connectionString = value;
+        _ceilingPlan = null;
         return this;
     }
     public IDirectSession WithTimeout(TimeSpan timeout)
     {
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
         _timeout = timeout; return this;
     }
     public IDirectSession WithMaxRows(int maxRows)
@@ -50,25 +56,56 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         _maxRows = maxRows > 0 ? maxRows : _maxRows; return this;
     }
 
+    public IDirectSession Effect(DataOperationEffect effect)
+    {
+        if (effect == DataOperationEffect.Unknown)
+            throw new ArgumentOutOfRangeException(nameof(effect), "Declare Read, Write, or SchemaOrAdmin.");
+        if (_effectDeclared)
+            throw new InvalidOperationException("A Direct session can declare its operation effect once.");
+        _effect = effect;
+        _effectDeclared = true;
+        return this;
+    }
+
     public IDirectTransaction Begin(CancellationToken ct = default)
     {
+        var ceiling = DemandBeforeRoute(_effect, "direct transaction begin");
         GuardDirect();
+        ct.ThrowIfCancellationRequested();
         var route = Resolve();
+        var plan = DemandResolvedRoute(route, ceiling, _effect, "direct transaction begin");
         var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
-        conn.Open();
-        var tx = conn.BeginTransaction();
-        return new DirectTransaction(conn, tx, _timeout, _maxRows);
+        try
+        {
+            conn.Open();
+            var tx = conn.BeginTransaction();
+            return new DirectTransaction(
+                conn,
+                tx,
+                _timeout,
+                _maxRows,
+                plan,
+                _effect,
+                _sp.GetRequiredService<RecordSetMaterializer>());
+        }
+        catch
+        {
+            conn.Dispose();
+            throw;
+        }
     }
 
     public async Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        var ceiling = DemandBeforeRoute(_effect, "direct execute");
         GuardDirect();
         // Prefer instruction executor path when source points to an entity and no explicit connection override is set
-        if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<int>(entityType!, InstructionSql.NonQuery(sql, parameters), out var execTask))
+        if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<int>(
+                entityType!, InstructionSql.NonQuery(sql, _effect, parameters), ct, out var execTask))
         {
             return await execTask;
         }
-        await using var ctx = await Open(ct);
+        await using var ctx = await Open(_effect, "direct execute", ceiling, ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         return await cmd.ExecuteNonQueryAsync(ct);
@@ -76,12 +113,14 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public async Task<T?> Scalar<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        var ceiling = DemandBeforeRoute(_effect, "direct scalar");
         GuardDirect();
-        if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<T?>(entityType!, InstructionSql.Scalar(sql, parameters), out var execTask))
+        if (_connectionString is null && TryGetEntityType(out var entityType) && TryInvokeExecutor<T?>(
+                entityType!, InstructionSql.Scalar(sql, _effect, parameters), ct, out var execTask))
         {
             return await execTask;
         }
-        await using var ctx = await Open(ct);
+        await using var ctx = await Open(_effect, "direct scalar", ceiling, ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         var res = await cmd.ExecuteScalarAsync(ct);
@@ -91,6 +130,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     public async Task<IReadOnlyList<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
     {
+        var ceiling = DemandBeforeRoute(_effect, "direct query");
         GuardDirect();
         if (_connectionString is null && TryGetEntityType(out var entityType))
         {
@@ -98,7 +138,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             if (data is not null)
             {
                 // Execute instruction-backed query and normalize to List<object>
-                var instruction = InstructionSql.Query(sql, parameters);
+                var instruction = InstructionSql.Query(sql, _effect, parameters);
                 var method = typeof(DataServiceExecuteExtensions).GetMethods().FirstOrDefault(m => m.Name == "Execute" && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2);
                 if (method is not null)
                 {
@@ -118,25 +158,45 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                 }
             }
         }
-        await using var ctx = await Open(ct);
+        await using var ctx = await Open(_effect, "direct query", ceiling, ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
         using var reader = await cmd.ExecuteReaderAsync(ct);
-        return await MaterializeAsJsonObjects(reader, _maxRows, ct);
+        return await MaterializeAsObjects(reader, _maxRows, ct);
     }
 
     public async Task<IReadOnlyList<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
-        var rows = await Query(sql, parameters, ct);
-        var settings = JsonSettings.Default;
-        var list = new List<T>(rows.Count);
-        foreach (var row in rows)
+        var ceiling = DemandBeforeRoute(_effect, "direct typed query");
+        GuardDirect();
+        if (_connectionString is null && TryGetEntityType(out _))
         {
-            var json = row is string s ? s : JsonConvert.SerializeObject(row, settings);
-            var item = JsonConvert.DeserializeObject<T>(json, settings);
-            if (item != null) list.Add(item);
+            var entityRows = await Query(sql, parameters, ct).ConfigureAwait(false);
+            var typed = new T[entityRows.Count];
+            for (var index = 0; index < entityRows.Count; index++)
+            {
+                if (entityRows[index] is not T item)
+                    throw new RecordProjectionException(
+                        typeof(T),
+                        $"Entity-backed Direct returned '{entityRows[index]?.GetType().FullName ?? "null"}', not the requested target. Use the matching Entity type.");
+                typed[index] = item;
+            }
+            return typed;
         }
-        return list;
+
+        await using var ctx = await Open(_effect, "direct typed query", ceiling, ct);
+        await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
+        cmd.CommandTimeout = (int)_timeout.TotalSeconds;
+        var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        var limits = new RecordSetLimits(
+            _maxRows,
+            long.MaxValue,
+            long.MaxValue,
+            _timeout);
+        var records = await _sp.GetRequiredService<RecordSetMaterializer>()
+            .Materialize(new AdoNeutralRecordReader(reader), limits, "direct typed query", ct)
+            .ConfigureAwait(false);
+        return records.Project<T>();
     }
 
     private bool TryGetEntityType(out Type? entityType)
@@ -174,7 +234,11 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             "explicit host scope for a genuine control-plane operation.");
     }
 
-    private bool TryInvokeExecutor<TResult>(Type entityType, Instruction instruction, out Task<TResult> task)
+    private bool TryInvokeExecutor<TResult>(
+        Type entityType,
+        Instruction instruction,
+        CancellationToken ct,
+        out Task<TResult> task)
     {
         task = default!;
         var data = _sp.GetService(typeof(IDataService)) as IDataService;
@@ -182,7 +246,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         var method = typeof(DataServiceExecuteExtensions).GetMethods().FirstOrDefault(m => m.Name == "Execute" && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2);
         if (method is null) return false;
         var gm = method.MakeGenericMethod(entityType, typeof(TResult));
-        var obj = gm.Invoke(null, new object?[] { data, instruction, default(CancellationToken) });
+        var obj = gm.Invoke(null, new object?[] { data, instruction, ct });
         if (obj is Task<TResult> t)
         {
             task = t; return true;
@@ -190,12 +254,70 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return false;
     }
 
-    private async Task<ConnCtx> Open(CancellationToken ct)
+    private async Task<ConnCtx> Open(
+        DataOperationEffect effect,
+        string operation,
+        DataSourcePlan? ceiling,
+        CancellationToken ct)
     {
         var route = Resolve();
+        _ = DemandResolvedRoute(route, ceiling, effect, operation);
         var conn = CreateConnection(_sp, route.Provider, route.ConnectionString, route.Source);
-        await conn.OpenAsync(ct);
-        return new ConnCtx(conn);
+        try
+        {
+            await conn.OpenAsync(ct).ConfigureAwait(false);
+            return new ConnCtx(conn);
+        }
+        catch
+        {
+            await conn.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    private DataSourcePlan? DemandBeforeRoute(DataOperationEffect effect, string operation)
+    {
+        // The entity pseudo-source routes through RepositoryFacade, whose compiled entity source is authoritative.
+        if (_connectionString is null && TryGetEntityType(out _)) return null;
+
+        var registry = _sp.GetService<DataSourceRegistry>();
+        if (_ceilingPlan is not null)
+        {
+            _ceilingPlan.Demand(effect, operation);
+            return _ceilingPlan;
+        }
+        if (registry is null)
+        {
+            DataSourcePlan.Default.Demand(effect, operation);
+            return DataSourcePlan.Default;
+        }
+
+        var sourceName = string.IsNullOrWhiteSpace(_source) ? "Default" : _source!;
+        var configured = registry.GetSource(sourceName);
+        var adapterHint = !string.IsNullOrWhiteSpace(_adapter)
+            ? _adapter!
+            : !string.IsNullOrWhiteSpace(configured?.Adapter)
+                ? configured.Adapter
+                : sourceName;
+        var plan = registry.GetPlan(sourceName, adapterHint, _connectionString);
+        plan.Demand(effect, operation);
+        _ceilingPlan = plan;
+        return _ceilingPlan;
+    }
+
+    private DataSourcePlan DemandResolvedRoute(
+        ConnectionRoute route,
+        DataSourcePlan? ceiling,
+        DataOperationEffect effect,
+        string operation)
+    {
+        var registry = _sp.GetService<DataSourceRegistry>();
+        var resolved = registry?.GetPlan(route.Source, route.Provider, route.ConnectionString)
+            ?? ceiling
+            ?? DataSourcePlan.Default;
+        resolved.Demand(effect, operation);
+        _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(resolved);
+        return resolved;
     }
 
     private static DbCommand CreateCommand(DbConnection connection, string sql, IReadOnlyDictionary<string, object?>? parameters, DbTransaction? tx)
@@ -356,7 +478,70 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private sealed record ConnectionRoute(string Provider, string ConnectionString, string Source);
 
-    internal static async Task<IReadOnlyList<object>> MaterializeAsJsonObjects(DbDataReader reader, int maxRows, CancellationToken ct)
+    internal sealed class AdoNeutralRecordReader : INeutralRecordReader
+    {
+        private readonly DbDataReader _reader;
+        private bool _ended;
+        private bool _additional;
+
+        public AdoNeutralRecordReader(DbDataReader reader)
+        {
+            _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+            var fields = new DataField[reader.FieldCount];
+            for (var ordinal = 0; ordinal < fields.Length; ordinal++)
+            {
+                fields[ordinal] = new DataField(
+                    ordinal,
+                    reader.GetName(ordinal),
+                    SafeFieldType(reader, ordinal),
+                    SafeProviderType(reader, ordinal));
+            }
+            Fields = fields;
+        }
+
+        public IReadOnlyList<DataField> Fields { get; }
+        public NeutralRecordReaderCompletion Completion => NeutralRecordReaderCompletion.Complete;
+        public bool HasAdditionalResultChannels => _additional;
+
+        public async ValueTask<DataRecord?> Read(CancellationToken ct = default)
+        {
+            if (_ended) return null;
+            if (!await _reader.ReadAsync(ct).ConfigureAwait(false))
+            {
+                _ended = true;
+                _additional = await _reader.NextResultAsync(ct).ConfigureAwait(false);
+                return null;
+            }
+
+            var values = new object?[Fields.Count];
+            for (var ordinal = 0; ordinal < values.Length; ordinal++)
+                values[ordinal] = _reader.IsDBNull(ordinal) ? null : Normalize(_reader.GetValue(ordinal));
+            return new DataRecord(Fields, values);
+        }
+
+        public ValueTask DisposeAsync() => _reader.DisposeAsync();
+
+        private static object? Normalize(object? value) => value switch
+        {
+            DBNull => null,
+            char character => character.ToString(),
+            _ => value
+        };
+
+        private static Type? SafeFieldType(DbDataReader reader, int ordinal)
+        {
+            try { return reader.GetFieldType(ordinal); }
+            catch (NotSupportedException) { return null; }
+        }
+
+        private static string? SafeProviderType(DbDataReader reader, int ordinal)
+        {
+            try { return reader.GetDataTypeName(ordinal); }
+            catch (NotSupportedException) { return null; }
+        }
+    }
+
+    internal static async Task<IReadOnlyList<object>> MaterializeAsObjects(DbDataReader reader, int maxRows, CancellationToken ct)
     {
         var list = new List<object>();
         var cols = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray();

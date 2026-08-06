@@ -1,36 +1,60 @@
 # Sylin.Koan.Data.Vector.Connector.Milvus
 
-Use Milvus behind Koan's entity-first vector API. Referencing this package activates the adapter; `AddKoan()` handles
-registration, provider election, naming, health participation, and startup reporting.
+Milvus realizes Koan vector spaces over the REST v2 API. Applications declare the space once; the adapter owns the
+fixed collection schema, HNSW index, load lifecycle, native metadata filters, and score conversion.
 
-## Install and use
+## Install
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Vector.Connector.Milvus
 ```
 
-```csharp
-public sealed class Article : Entity<Article> { }
+## Usage
 
-await Vector<Article>.Save(article.Id, embedding, new { category = "support" });
-var matches = await Vector<Article>.Search(embedding, topK: 12);
+```csharp
+services.AddKoan(koan => koan.Data
+    .Source("Search")
+    .Vector<Article>(space => space
+        .Name("content")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session)));
+
+await Vector<Article>.Save(article.Id, embedding, new { article.Category });
+var matches = await Vector<Article>.Search(embedding, query => query
+    .Top(12)
+    .Where(Filter.Eq("Category", "support")));
 ```
 
-No Milvus-specific registration is required. The zero-configuration endpoint is `http://localhost:19530`. Configure
-another deployment with `Koan:Data:Milvus:Endpoint`; use `Token` or `Username`/`Password` when authentication is
-enabled.
+The local default is `http://localhost:19530`. Configure only placement or authentication when needed:
 
-The first write establishes vector dimension. Set `Koan:Data:Milvus:Dimension` only when an empty collection must be
-created before the first write. Koan defaults `topK` to 10; an explicit positive value is sent unchanged.
+```json
+{
+  "Koan": {
+    "Data": {
+      "Milvus": {
+        "Endpoint": "https://milvus.example.net",
+        "Database": "default",
+        "Token": "use-a-secret-provider"
+      }
+    }
+  }
+}
+```
 
-## Honest capability boundary
+Milvus v2.6.20 is the reference runtime. Standalone deployments require the Milvus service plus its etcd and object
+storage dependencies.
 
-Milvus supports KNN search, native metadata-filter pushdown, bulk writes/deletes, collection clear, dynamic collection
-naming, and normalized cosine scores. The current adapter does not provide embedding reads, export, hybrid text
-search, search continuation tokens, or index statistics. Delete visibility follows the configured Milvus consistency
-posture and is not claimed as immediately observable.
+## Guarantees
 
-Avoid pinning `CollectionName` in partitioned or tenant-isolated applications unless one shared collection is truly
-intended. A fixed name bypasses Koan's physical-name folds, and the runtime reports that correction.
+- Dimensions, metric, model, logical space, source, and visibility come only from `VectorSpacePlan`.
+- Managed storage uses a fixed VARCHAR/FLOAT_VECTOR/JSON schema, disabled dynamic fields, and an explicit HNSW index.
+- Existing collections are validated before use; External and read-only sources cannot create, load, repair, or clear.
+- Awaited mutations use Strong reads to satisfy Koan Session visibility over the stateless REST boundary.
+- Complete points preserve identity, vector, and neutral metadata.
+- COSINE, L2, and IP results become finite `[0,1]` similarities where higher means closer.
+- Supported filters execute as native Milvus prefilters; unsupported operators fail before provider I/O.
+- Search, metadata, batches, clear, response bodies, load waits, and tie expansion are bounded.
 
-See [TECHNICAL.md](./TECHNICAL.md) for configuration, deployment shape, health, and failure behavior.
+The adapter does not claim Eventual visibility, hybrid text semantics, continuation snapshots, streaming export, atomic
+batches, or multiple vector fields per Entity.

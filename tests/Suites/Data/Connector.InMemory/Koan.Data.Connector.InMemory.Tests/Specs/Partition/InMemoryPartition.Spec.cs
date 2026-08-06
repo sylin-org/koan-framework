@@ -51,6 +51,24 @@ public sealed class InMemoryPartitionSpec(InMemoryFixture fixture, ITestOutputHe
         partitionBAfterDelete.Should().HaveCount(1);
     }
 
+    [Fact]
+    public async Task Host_store_registry_rejects_before_exceeding_its_finite_bound()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+
+        for (var index = 0; index < 4096; index++)
+        {
+            using var lease = Lease($"bounded-{index}");
+            (await TenantRecord.Get("missing")).Should().BeNull();
+        }
+
+        using var overflow = Lease("bounded-overflow");
+        await FluentActions.Invoking(() => TenantRecord.Get("missing"))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*host bound of 4096 source/root/partition stores*");
+    }
+
     private sealed class TenantRecord : Entity<TenantRecord>
     {
         public string Name { get; set; } = "";

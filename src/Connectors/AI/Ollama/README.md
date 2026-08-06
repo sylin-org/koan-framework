@@ -2,6 +2,9 @@
 
 Local and remote Ollama provider for Koan AI: chat, streaming, embeddings, vision, tools, and model operations.
 
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity;
+this page owns Ollama setup and limits.
+
 ## Install
 
 ```powershell
@@ -13,13 +16,14 @@ The package reference is the provider declaration. There is no Ollama-specific r
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/ask", async () => await Client.Chat("What makes a good domain model?"));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("What makes a good domain model?"));
 ```
 
 In Development, Koan looks for a healthy Ollama runtime at the conventional local or container address. A ready
@@ -64,6 +68,10 @@ when the functional Zen Garden engine is present and can satisfy the intent.
   may be elected.
 - Requests can select a model explicitly; otherwise `DefaultModel` is used.
 - Cancellation and provider HTTP failures propagate to the caller.
+- Runtime source inspection calls `/api/version`, `/api/tags`, and `/api/ps` inside this adapter. The provider-neutral
+  result reports version, installed models, and resident models without exposing Ollama transport to the application.
+  Each facet has its own availability flag, so an empty installed catalog or no resident models is not confused with
+  an unavailable endpoint.
 
 Koan does not install Ollama or pull the default model merely because this package is referenced. Model pull and
 removal remain explicit operations.

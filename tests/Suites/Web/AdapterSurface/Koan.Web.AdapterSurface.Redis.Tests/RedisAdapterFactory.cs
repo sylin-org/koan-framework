@@ -3,12 +3,13 @@ using Koan.Web.AdapterSurface.TestKit.Containers;
 
 namespace Koan.Web.AdapterSurface.Redis.Tests;
 
-public sealed class RedisAdapterFactory : AdapterTestFactoryBase
+public sealed class RedisAdapterFactory : AdapterTestFactoryBase, IAdapterCapabilities
 {
     private readonly RedisContainerHelper _redis = new();
 
     public override bool IsAvailable => _redis.IsAvailable;
     public override string? UnavailableReason => _redis.UnavailableReason;
+    bool IAdapterCapabilities.SupportsCrossPartitionTransfer => false;
     protected override string HostEnvironment => "Test";
 
     protected override async ValueTask StartBackingStoreAsync() => await _redis.InitializeAsync();

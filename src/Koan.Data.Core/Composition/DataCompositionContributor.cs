@@ -20,6 +20,7 @@ internal static class DataCompositionFacts
     {
         ContributeElections(builder, services, source);
         ContributeEntities(builder, services);
+        ContributeSourcePlans(builder, services, source);
         ContributeLifecycle(builder, services, source);
     }
 
@@ -105,6 +106,25 @@ internal static class DataCompositionFacts
                 Constants.Diagnostics.Codes.LifecycleSelected,
                 subject,
                 $"Koan composed {lifecycle.TotalHandlers} persistence lifecycle handler(s) for '{shortName}'.",
+                "host-composition",
+                source);
+        }
+    }
+
+    private static void ContributeSourcePlans(KoanCompositionBuilder builder, IServiceProvider services, string source)
+    {
+        var diagnostics = services.GetService<IDataDiagnostics>();
+        if (diagnostics is null) return;
+
+        foreach (var plan in diagnostics.GetSourcePlansSnapshot())
+        {
+            var subject = $"data:source:{plan.RouteIdentity}";
+            builder.AddCapability(subject, plan.ClaimReferences);
+            builder.AddObservation(
+                Constants.Diagnostics.Codes.SourcePlanSelected,
+                subject,
+                $"Koan selected provider '{plan.Adapter}' with StorageLifecycle={plan.StorageLifecycle}, " +
+                $"Access={plan.Access}, ReadLanes={plan.ReadLanes.Count}.",
                 "host-composition",
                 source);
         }

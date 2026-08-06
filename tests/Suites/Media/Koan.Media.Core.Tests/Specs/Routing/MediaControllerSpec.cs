@@ -4,7 +4,9 @@ using System.Text.Json;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Tests.Support;
 using Koan.Media.Web.Infrastructure;
+using Koan.Media.Web.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SixLabors.ImageSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Routing;
@@ -80,6 +82,86 @@ public sealed class MediaControllerSpec
             "the stored ContentType must surface verbatim");
         var bytes = await response.Content.ReadAsByteArrayAsync();
         bytes.Should().Equal(fakeMp4, "raw bytes must be byte-identical to the source");
+    }
+
+    [Fact]
+    public async Task GetOriginal_honors_satisfiable_and_unsatisfiable_byte_ranges()
+    {
+        await using var server = await MediaTestServer.StartAsync();
+        var sourceBytes = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
+        await server.Source.AddAsync("range", new MemoryStream(sourceBytes), "application/octet-stream");
+
+        using var rangeRequest = new HttpRequestMessage(HttpMethod.Get, "/media/range");
+        rangeRequest.Headers.TryAddWithoutValidation(HttpHeaderNames.Range, "bytes=4-11");
+        using var partial = await server.Client.SendAsync(rangeRequest);
+
+        partial.StatusCode.Should().Be(HttpStatusCode.PartialContent);
+        partial.Headers.AcceptRanges.Should().ContainSingle("bytes");
+        partial.Content.Headers.ContentRange!.ToString().Should().Be("bytes 4-11/32");
+        (await partial.Content.ReadAsByteArrayAsync()).Should().Equal(sourceBytes[4..12]);
+
+        using var invalidRequest = new HttpRequestMessage(HttpMethod.Get, "/media/range");
+        invalidRequest.Headers.TryAddWithoutValidation(HttpHeaderNames.Range, "bytes=99-120");
+        using var invalid = await server.Client.SendAsync(invalidRequest);
+
+        invalid.StatusCode.Should().Be(HttpStatusCode.RequestedRangeNotSatisfiable);
+        invalid.Content.Headers.ContentRange!.ToString().Should().Be("bytes */32");
+    }
+
+    [Fact]
+    public async Task Head_and_get_agree_for_original_and_recipe_representations()
+    {
+        await using var server = await MediaTestServer.StartAsync();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 320, height: 240));
+
+        foreach (var path in new[] { "/media/photo", "/media/photo/png?w=100" })
+        {
+            using var get = await server.Client.GetAsync(path);
+            using var headRequest = new HttpRequestMessage(HttpMethod.Head, path);
+            using var head = await server.Client.SendAsync(headRequest);
+
+            head.StatusCode.Should().Be(HttpStatusCode.OK);
+            head.Content.Headers.ContentLength.Should().Be(get.Content.Headers.ContentLength);
+            head.Headers.ETag.Should().Be(get.Headers.ETag);
+            head.Content.Headers.ContentType.Should().Be(get.Content.Headers.ContentType);
+            (await head.Content.ReadAsByteArrayAsync()).Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task Recipe_result_honors_byte_ranges_without_changing_render_or_cache_semantics()
+    {
+        await using var server = await MediaTestServer.StartAsync();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 320, height: 240));
+        const string path = "/media/photo/png?w=100";
+
+        using var full = await server.Client.GetAsync(path);
+        var fullBytes = await full.Content.ReadAsByteArrayAsync();
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.TryAddWithoutValidation(HttpHeaderNames.Range, "bytes=0-15");
+        using var partial = await server.Client.SendAsync(request);
+
+        partial.StatusCode.Should().Be(HttpStatusCode.PartialContent);
+        partial.Content.Headers.ContentRange!.Length.Should().Be(fullBytes.Length);
+        (await partial.Content.ReadAsByteArrayAsync()).Should().Equal(fullBytes[..16]);
+        partial.Headers.ETag.Should().Be(full.Headers.ETag);
+    }
+
+    [Fact]
+    public async Task Non_seekable_source_rejects_range_correctively_instead_of_returning_the_full_body()
+    {
+        var source = new StaticMediaSource(Enumerable.Range(0, 32).Select(value => (byte)value).ToArray(), seekable: false);
+        await using var server = await MediaTestServer.StartAsync(services =>
+            services.Replace(ServiceDescriptor.Singleton<IMediaSource>(source)));
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/media/nonseekable");
+        request.Headers.TryAddWithoutValidation(HttpHeaderNames.Range, "bytes=0-3");
+        using var response = await server.Client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestedRangeNotSatisfiable);
+        response.Headers.GetValues(HttpHeaderNames.AcceptRanges).Should().ContainSingle("none");
+        (await response.Content.ReadAsStringAsync()).Should().Contain("does not support byte ranges");
     }
 
     [Fact]
@@ -417,6 +499,54 @@ public sealed class MediaControllerSpec
 
         var response = await server.Client.GetAsync("/media/photo?bg=red");
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    private sealed class StaticMediaSource(byte[] bytes, bool seekable) : IMediaSource
+    {
+        public Task<MediaSourceHandle?> OpenAsync(string id, CancellationToken ct = default)
+        {
+            Stream stream = seekable
+                ? new MemoryStream(bytes, writable: false)
+                : new NonSeekableReadStream(new MemoryStream(bytes, writable: false));
+            return Task.FromResult<MediaSourceHandle?>(new MediaSourceHandle(
+                id,
+                stream,
+                "0123456789abcdef",
+                new DateTimeOffset(2026, 7, 22, 12, 0, 0, TimeSpan.Zero),
+                "application/octet-stream"));
+        }
+    }
+
+    private sealed class NonSeekableReadStream(Stream inner) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            inner.ReadAsync(buffer, cancellationToken);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            await inner.DisposeAsync();
+            GC.SuppressFinalize(this);
+        }
     }
 }
 

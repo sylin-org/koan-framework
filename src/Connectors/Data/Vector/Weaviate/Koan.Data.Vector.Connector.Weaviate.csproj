@@ -6,7 +6,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Koan.Data.Vector.Connector.Weaviate</AssemblyName>
     <RootNamespace>Koan.Data.Vector.Connector.Weaviate</RootNamespace>
-    <Description>Weaviate vector provider for Koan: entity-first KNN and hybrid search, GraphQL filter pushdown, continuation, export, and schema management.</Description>
+    <Description>Weaviate vector provider for Koan: plan-bound entity vectors, native filtering, complete points, and awaited Session visibility.</Description>
     <PackageTags>$(CommonPackageTags);data;vector;weaviate;graphql;knn</PackageTags>
   </PropertyGroup>
   <ItemGroup>
@@ -15,8 +15,6 @@
     <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
-    <ProjectReference Include="..\..\..\..\Koan.ZenGarden.Contracts\Koan.ZenGarden.Contracts.csproj" />
     <PackageReference Include="Microsoft.Extensions.Http" />
-    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 </Project>

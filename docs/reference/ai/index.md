@@ -1,10 +1,10 @@
 ---
 type: REF
 domain: ai
-title: "AI"
+title: "Add model-powered operations"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-19
+last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
   date_last_tested: 2026-07-18
@@ -12,11 +12,15 @@ validation:
   scope: AI runtime, prompt semantics, local provider composition, and HTTP projection
 ---
 
-# AI
+# Add model-powered operations
 
-Koan AI lets application code state an operation—chat, embed, OCR, image generation, speech, reranking, or another
+Use Koan AI when application code needs chat, embedding, OCR, image generation, speech, reranking, or another
 declared capability—while referenced providers own native protocol and model mechanics. `AddKoan()` compiles the
 provider topology and reports which providers and sources became active.
+
+> **Maturity:** The provider-neutral runtime/contracts and the Ollama, LM Studio, and ONNX providers are supported
+> on the 0.20 line within the capability and deployment boundaries below. Prompt persistence and the HTTP projection
+> remain separately demonstrated surfaces.
 
 ## Shortest path
 
@@ -30,13 +34,14 @@ dotnet add package Sylin.Koan.AI.Connector.Ollama
 ```csharp
 using Koan.AI;
 using Koan.Core;
+using Microsoft.Extensions.Hosting;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddKoan();
+using var app = builder.Build();
+await app.StartAsync();
 
-var app = builder.Build();
-app.MapGet("/summary", () => Client.Chat("Summarize today's orders."));
-await app.RunAsync();
+Console.WriteLine(await Client.Chat("Summarize today's orders."));
 ```
 
 With Ollama listening on its conventional endpoint, no provider registration or configuration is required. If the
@@ -74,6 +79,11 @@ Other operations include OCR, image generation/editing, transcription, speech, d
 structured extraction, reranking, translation, moderation, and video rendering. Availability depends on an active
 provider that declares and implements the requested capability. Koan fails an unsupported operation; it does not
 pretend every referenced provider supports every verb.
+
+For Entity-aware embeddings and nearest-neighbor retrieval, continue to
+[Vector search](vector.md). `[Embedding]` adds vector synchronization to ordinary Entity saves;
+`EntityAi.Embed(entity)` remains the explicit one-off transformation. AI inference and vector storage
+are separate provider choices even when one application workflow uses both.
 
 ## Inspectable prompts
 
@@ -127,6 +137,27 @@ using (Client.Scope(chat: "ollama"))
 Explicit source/model/endpoint intent wins. Koan does not promise automatic retry, provider fallback, budget
 enforcement, rate limiting, or cost routing unless a separately documented capability implements it.
 
+### Operate a changing source catalog
+
+Ordinary applications should keep automatic composition. When an application genuinely owns a runtime endpoint
+catalog, resolve `IAiSourceControl` and inspect before applying:
+
+```csharp
+var inspection = await sourceControl.InspectAsync(new AiSourceCandidate
+{
+    Provider = "lmstudio",
+    Endpoint = candidateEndpoint
+});
+
+if (inspection.Available)
+    sourceControl.Apply(candidateSource);
+```
+
+`Enable`, `Disable`, and `Remove` change routing immediately. Applying a same-origin source replaces it and resets
+health; late probes from the previous revision are discarded. Provider packages own inspection grammar. A provider
+that does not implement inspection is rejected with the package/configuration correction rather than a guessed
+generic probe.
+
 ## HTTP projection
 
 To expose the same runtime through HTTP, add the Web projection:
@@ -157,9 +188,9 @@ those through their owning Koan/ASP.NET Core concerns before exposing AI routes 
 ## Related reading
 
 - [Entity data](../data/index.md)
-- [Vector providers](../cards/vector.md)
-- [Usagi Picks standalone recommendation application](https://github.com/lbotinelly/usagipicks)
-- [MCP and agent-facing surfaces](../cards/mcp.md)
+- [Vector search](vector.md)
+- [MCP and agent-facing surfaces](../agents/index.md)
+- [GardenCoop local discovery sample](../../../samples/journeys/GardenCoop/02-LocalDiscovery/)
 - [Ollama package](../../../src/Connectors/AI/Ollama/README.md)
 - [LM Studio package](../../../src/Connectors/AI/LMStudio/README.md)
 - [ONNX package](../../../src/Connectors/AI/Onnx/README.md)

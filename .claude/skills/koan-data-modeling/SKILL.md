@@ -2,7 +2,7 @@
 name: koan-data-modeling
 description: Aggregate boundaries, [Parent] relationships + Relatives navigation, persistence Lifecycle hooks (BeforeUpsert/BeforeRemove/AfterLoad), value objects, timestamps, context routing
 pillar: data
-card: docs/reference/cards/data.md
+card: docs/reference/data/index.md
 status: current
 last_validated: 2026-06-18
 ---
@@ -143,8 +143,8 @@ is owned by that host. Handlers receive `EntityEventContext<T>`:
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen pillar map
-- [Data modeling guide](../../../docs/guides/data-modeling.md) — aggregates, keys, value objects
+- [Data capability](../../../docs/reference/data/index.md) — Entity modeling, providers, relationships, and cost
+- [Entity lifecycle](../../../docs/reference/data/entity-lifecycle.md) — persistence invariants and write policy
 - [TaskGraph](../../../samples/fundamentals/TaskGraph/README.md) — `Entity<Todo>` CRUD + `[Parent]` relationship navigation across scalar, set, and stream cardinalities
 - [DATA-0072 — `[Parent]` relationship attribute](../../../docs/decisions/DATA-0072-parent-relationship-attribute-explicit-type.md)
 - [DATA-0077 — Source/Adapter/Partition routing](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)

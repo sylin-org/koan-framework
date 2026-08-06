@@ -4,7 +4,7 @@ domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-15
+last_updated: 2026-07-24
 framework_version: v0.20.0
 validation:
   status: not-yet-tested
@@ -150,43 +150,101 @@ await product.Save();
 
 **Sharing Shape Across Entities**
 
-Sooner or later you'll have several entities that share fields: a family of catalog records, a set of job types, audited rows that all carry `CreatedBy`. The instinct from classic OOP is to inherit one entity from another. Don't.
+First decide whether the types are one searchable family or merely reuse the same properties. That
+decision controls whether Koan gives them one physical set or separate sets.
+
+**Use one Entity root when every variant belongs in the same table or collection.** Put every field
+that must participate in portable filtering, sorting, counting, paging, indexes, or persistence
+policy on the root. Then close each variant through the generated same-name family companion:
 
 ```csharp
-// Anti-pattern: do NOT inherit one concrete entity from another
-public class Model  : Entity<Model> { public string? Shared { get; set; } }
-public class Model2 : Model { public string? Extra { get; set; } }  // compiles, looks fine, isn't
-```
-
-This compiles and reads naturally, but it silently splits writes from reads:
-
-- `Save` is `Save<TEntity>(this TEntity)`, so `new Model2().Save()` infers `TEntity = Model2` and writes to a dedicated **Model2** collection (full shape, `Extra` included).
-- `Get` is an inherited static fixed at the CRTP root `Entity<Model>`, so both `Model.Get(id)` AND `Model2.Get(id)` read the **Model** collection.
-
-Net result: the `Model2` row persists correctly but is unreadable through either `.Get(id)`. No exception, no warning. (Validated against real MongoDB.) C# does not let an inherited static re-specialize for the deriving type, so `Model2.Get` simply *is* `Model.Get`.
-
-**The fix: make each entity its own `Entity<T>` root, and lift shared shape into a generic base.**
-
-```csharp
-// Shared fields via a generic base; each entity is its own set
-public abstract class CatalogEntity<T> : Entity<T> where T : CatalogEntity<T>, new()
+public class Media : Entity<Media>
 {
-    public string? Shared { get; set; }   // every catalog entity gets this
+    public string Kind { get; set; } = "";
+    public string Title { get; set; } = "";
 }
 
-public class Package : CatalogEntity<Package> { }
-public class Mirror  : CatalogEntity<Mirror>  { public string? Extra { get; set; } }
+public sealed class Anime : Media<Anime>
+{
+    public int? Episodes { get; set; }
+}
 
-await new Package { Shared = "x" }.Save();
-var p = await Package.Get(id);   // bare .Get(id), returns Package, own collection
-var m = await Mirror.Get(id);    // bare .Get(id), returns Mirror, own collection, isolated
+public sealed class Manga : Media<Manga>
+{
+    public int? Volumes { get; set; }
+    public int? Chapters { get; set; }
+}
 ```
 
-`Package` and `Mirror` are now **siblings** that share shape, each with its own collection. Same-id rows in different types never collide. The bare `Foo.Get(id)` ergonomic is preserved with zero ceremony: no source generator, no `partial`, no `Entity<T>.Get(...)` call form.
+You declare only those three application types. Koan's source generator supplies the
+`Media<TVariant>` companion from the `Media : Entity<Media>` root; no persistence attribute,
+converter, or provider option is required.
 
-**What you trade:** siblings are not substitutable. `Mirror` is not a `Package`, so you cannot pass one where the other is expected or query both as one set. That is the only thing class inheritance would have given you, and it is rarely what you actually want for stored entities. If you genuinely need a polymorphic set (query a base type and get mixed concrete rows back), that is single-table inheritance: one shared collection plus a type discriminator, an explicit opt-in, not the default. For the common case (share fields, store separately), sibling CRTP roots are the answer.
+Use the variant for typed point access and writes:
 
-**Rule of thumb:** every concrete entity should read `class Foo : Entity<Foo>` or `class Foo : SomeBase<Foo>`. If you ever see `class Foo : SomeConcreteEntity` (inheriting a type that is itself a set), stop: that is the footgun.
+```csharp
+var saved = await new Anime
+{
+    Kind = "Anime",
+    Title = "Cowboy Bebop",
+    Episodes = 26
+}.Save(ct);
+
+Anime? anime = await Anime.Get(saved.Id, ct);
+```
+
+`Anime.Get` returns `Anime?`, including `Episodes`. Loading the same identifier through
+`Media.Get` returns `Media?`, whose runtime object is still `Anime`.
+
+Use the root for operations over the complete family:
+
+```csharp
+var animeRows = await Media.Query(item => item.Kind == "Anime", ct);
+var firstPage = await Media.Page(1, 25, ct);
+var everything = await Media.All(ct);
+```
+
+Anime, Manga, and plain Media records share the Media repository, table, or collection. Root filters,
+sorts, counts, and pages therefore execute once and retain the selected adapter's normal pushdown
+behavior. Derived-only members such as `Episodes` are persisted payload; move a member to `Media`
+when it needs portable set-wide query or policy semantics. Record-local write stamps and field
+transforms follow the runtime record type, so leaf timestamp/classification members are not skipped.
+
+Close the variant with itself: write `Anime : Media<Anime>`, not `Anime : Media` or
+`Anime : Media<Manga>`. Koan validates the family shape and reports a correction instead of silently
+creating another repository.
+
+Koan stores a reserved `__koan_type` hint for every record in a known family, including a plain root
+record. It never infers a CLR type from `Kind`, a property name, or the presence of `Episodes`. This
+matters when adopting polymorphic roots over existing data:
+
+- A discriminator-free row loaded through `Media` materializes as `Media`.
+- `Anime.Get(id)` can use its explicit target to load a known discriminator-free Anime row when the adapter
+  materializes that row on demand. Eager file stores require a migration/backfill because they hydrate before the
+  point-read target exists.
+- A mixed root query cannot safely classify old discriminator-free derived JSON. Migrate or backfill
+  those rows before relying on variant identity in root reads.
+
+**Use a generic shared base when the types need separate physical sets.**
+
+```csharp
+public abstract class CatalogEntity<T> : Entity<T> where T : CatalogEntity<T>, new()
+{
+    public string? Shared { get; set; }
+}
+
+public sealed class Package : CatalogEntity<Package> { }
+public sealed class Mirror : CatalogEntity<Mirror>
+{
+    public string? Extra { get; set; }
+}
+```
+
+`Package` and `Mirror` are sibling Entity roots. They reuse shape but have independent repositories,
+tables or collections, queries, and identifiers.
+
+**Rule of thumb:** use `Entity<Self>` or a shared generic base for an independent set. Use
+`Root<Self>` when `Self` is a variant in the root's shared set.
 
 Entity property names must also be unique without relying on case. A model with inherited `Id` and a
 second property named `id`, for example, has no portable identity across JSON and providers with
@@ -937,8 +995,8 @@ Moving data between partitions, sources, or adapters is common: archiving old re
 
 Koan's transfer DSL provides declarative copy, move, and mirror operations:
 - **Copy:** Duplicate entities to another context
-- **Move:** Copy then delete from origin (strategies: AfterCopy, Batched, Synced)
-- **Mirror:** Propagate records one-way or reconcile both sides; `[Timestamp]` resolves bidirectional conflicts
+- **Move:** Copy bounded pages, then delete only identities whose destination batch returned an exact receipt
+- **Mirror:** Make one side authoritative, or reconcile both sides with an explicit conflict policy
 
 **Recipe**
 
@@ -953,6 +1011,7 @@ Latest `Koan.Data.Core` (transfer builders in `Koan.Data.Core.Transfers`). Use
 // Copy completed todos to archive partition
 await Todo.Copy(t => t.Completed)
     .To(partition: "archive")
+    .Batch(500)
     .Audit(batch => logger.LogInformation("Archived {Count} todos", batch.BatchCount))
     .Run(ct);
 ```
@@ -962,9 +1021,9 @@ await Todo.Copy(t => t.Completed)
 ```csharp
 // Move old todos from hot storage to cold
 await Todo.Move()
-    .WithDeleteStrategy(DeleteStrategy.Synced)  // Delete immediately after each copy
     .From(partition: "hot")
     .To(adapter: "postgres", partition: "cold")
+    .Batch(500)
     .Run(ct);
 ```
 
@@ -974,6 +1033,8 @@ await Todo.Move()
 // Keep transactional and reporting databases in sync
 await Todo.Mirror(mode: MirrorMode.Bidirectional)
     .To(source: "Analytics")
+    .Conflict(MirrorConflict.Latest)
+    .Batch(500)
     .Run(ct);
 
 // Push production records to analytics
@@ -982,12 +1043,13 @@ await Todo.Mirror(mode: MirrorMode.Push)
     .Run(ct);
 ```
 
-**Query-shaped transfer:**
+**Filtered transfer:**
 
 ```csharp
-// Copy only todos with specific tag
-await Todo.Copy(query => query.Where(t => t.Tags.Contains("important")))
+// Copy only important todos
+await Todo.Copy(todo => todo.Important)
     .To(partition: "priority")
+    .Batch(500)
     .Run(ct);
 ```
 
@@ -1027,10 +1089,14 @@ if (result.HasConflicts)
 - **Analytics:** Mirror transactional data to reporting databases
 - **Migrations:** Transfer data between adapters during provider changes
 
-Current transfer builders materialize the selected source before writing the destination in batches.
-`BatchSize(...)` and `.Audit(...)` describe destination write batches; they do not bound source
-materialization or provide checkpoints. If the selection can be large, use a qualified Entity stream
-and an application-owned idempotency/checkpoint design instead.
+`Batch(...)` is one portable bound: it limits each provider candidate page, each destination mutation,
+and each deferred identity-delete batch. An adapter must prove provider-side paging and ordering before
+the first source query. A returned destination or delete count must exactly match its admitted batch;
+an ambiguous exception is surfaced and never replayed.
+
+Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
+dataset in application memory or mutate an offset-paged source while reading it. Use Jobs and an
+application-owned checkpoint when work must survive process failure or resume across runs.
 
 **Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
 not a checkpoint or resume token.
@@ -1211,11 +1277,23 @@ an unbounded fallback.
 **Solution:** Use middleware or filters to set partition automatically
 **Prevention:** Add integration tests validating partition isolation
 
-### Symptom: Saved an entity but `Get()` returns null
+### Symptom: Koan rejects a polymorphic variant declaration
 
-**Cause:** The entity inherits from another concrete entity (`class Derived : SomeEntity`), so `Save` writes to the `Derived` collection while the inherited `Get` reads the base (`SomeEntity`) collection
-**Solution:** Make each entity its own root and share fields via a generic base: `class Derived : SharedBase<Derived>` where `SharedBase<T> : Entity<T>` (see Section 1, "Sharing Shape Across Entities")
-**Prevention:** Every concrete entity should read `: Entity<Self>` or `: SomeBase<Self>`, never `: AnotherConcreteEntity`
+**Cause:** The variant does not close the generated family companion with itself—for example,
+`class Anime : Media` or `class Anime : Media<Manga>`.
+**Solution:** Declare the root as `Media : Entity<Media>` and the variant as
+`Anime : Media<Anime>` (see Section 1, "Sharing Shape Across Entities").
+**Prevention:** Use `Root<Self>` for a shared polymorphic set. Use `Entity<Self>` or a generic shared
+base only when each type should own a separate set.
+
+### Symptom: A legacy derived row loads as the root type
+
+**Cause:** The stored row predates Koan's `__koan_type` source hint. A mixed root read cannot safely
+infer the CLR variant from a domain field or payload shape.
+**Solution:** Use a typed point read such as `Anime.Get(id)` when the expected variant is known, then
+migrate or backfill legacy rows before depending on variant identity in `Media` queries.
+**Prevention:** Save new records through their typed variant; Koan writes the source hint
+automatically.
 
 ---
 

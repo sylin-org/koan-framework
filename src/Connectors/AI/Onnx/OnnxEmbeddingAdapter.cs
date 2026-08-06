@@ -2,6 +2,7 @@ using FastBertTokenizer;
 using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts;
+using Koan.AI.Contracts.Sources;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
@@ -14,7 +15,7 @@ namespace Koan.AI.Connector.Onnx;
 /// embed-only: it implements <see cref="IEmbedAdapter"/> and declares <see cref="AiCapability.Embed"/> and
 /// nothing else, so chat/vision/etc. fail loud rather than silently mis-serving.
 /// </summary>
-internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IDisposable
+internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IAiSourceInspector, IDisposable
 {
     private readonly OnnxOptions _options;
     private readonly InferenceSession _session;
@@ -40,9 +41,9 @@ internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IDisposable
     // in-process ONNX *provider*, and the embedded model is its default — a usage-time concern surfaced via
     // the source's Embedding capability, not baked into the adapter's identity. The registry dedupes by Id,
     // so one ONNX provider serves the one model the app embeds (the in-process single-model tier).
-    public string Id => "onnx";
-    public string Name => $"ONNX ({_options.ModelName})";
-    public string Type => "onnx";
+    public string Id => Infrastructure.Constants.Adapter.Type;
+    public string Name => $"{Infrastructure.Constants.Adapter.DisplayName} ({_options.ModelName})";
+    public string Type => Infrastructure.Constants.Adapter.Type;
 
     /// <summary>The default (and, for the in-process tier, only) model this provider serves.</summary>
     public string DefaultModel => _options.ModelName;
@@ -62,6 +63,34 @@ internal sealed class OnnxEmbeddingAdapter : IEmbedAdapter, IDisposable
                 AdapterType = Type,
             }
         });
+
+    public Task<AiSourceInspection> InspectAsync(AiSourceCandidate candidate, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+        ct.ThrowIfCancellationRequested();
+        var targetsThisProvider = string.Equals(candidate.Provider, Type, StringComparison.OrdinalIgnoreCase);
+        var targetsThisRuntime = string.Equals(
+            candidate.Endpoint.TrimEnd('/'),
+            Infrastructure.Constants.Source.ConnectionString,
+            StringComparison.OrdinalIgnoreCase);
+        var available = targetsThisProvider && targetsThisRuntime;
+
+        return Task.FromResult(new AiSourceInspection
+        {
+            Provider = Type,
+            Endpoint = candidate.Endpoint,
+            Available = available,
+            Models = available ? [_options.ModelName] : [],
+            ModelsAvailable = available,
+            ResidentModels = available ? [_options.ModelName] : [],
+            ResidentModelsAvailable = available,
+            Capabilities = new HashSet<string>(Capabilities, StringComparer.OrdinalIgnoreCase),
+            Detail = available
+                ? "The in-process ONNX session is loaded and requires no network endpoint."
+                : $"The ONNX provider owns only '{Infrastructure.Constants.Source.ConnectionString}'; " +
+                  $"'{candidate.Provider}' at '{candidate.Endpoint}' is not this runtime."
+        });
+    }
 
     public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default)
     {

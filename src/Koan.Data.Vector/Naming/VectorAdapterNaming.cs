@@ -19,7 +19,7 @@ namespace Koan.Data.Vector.Naming;
 ///
 /// <para>The factory still owns the naming <b>capability</b> (charset / separators / limit) via
 /// <see cref="INamingProvider.GetNamingCapability"/>; this routes through the source-aware
-/// <see cref="StorageNameGenerator.Resolve(string,Type,string?,string?,Func{StorageNamingCapability})"/> overload so the
+/// <see cref="StorageNameGenerator.Resolve(string,Type,string?,string?,Func{StorageNamingCapability},IServiceProvider?)"/> overload so the
 /// source is folded with the SAME identifier-safe rendering as the partition (the record-plane <c>ResolveStorage</c>
 /// stays source-free — the record plane routes a source to a distinct physical store via the factory, not the name).</para>
 /// </summary>
@@ -38,7 +38,8 @@ public static class VectorAdapterNaming
         var source = RoutedSource.Resolve<TEntity>().Source;
         return StorageNameGenerator.Resolve(
             factory.Provider, typeof(TEntity), Koan.Data.Core.EntityContext.Current?.Partition, source,
-            () => factory.GetNamingCapability(sp));
+            () => factory.GetNamingCapability(sp),
+            sp);
     }
 
     /// <summary>
@@ -59,7 +60,8 @@ public static class VectorAdapterNaming
             typeof(TEntity),
             Koan.Data.Core.EntityContext.Current?.Partition,
             routedSource,
-            () => provider.GetNamingCapability(services));
+            () => provider.GetNamingCapability(services),
+            services);
     }
 
     // ARCH-0103 §6 follow-on — the CollectionName/IndexName pin footgun. An adapter option that pins a STATIC
@@ -76,7 +78,7 @@ public static class VectorAdapterNaming
     /// <summary>
     /// True when <paramref name="pinnedName"/> is a non-blank static name AND an isolation discriminator that the pin
     /// bypasses is in scope for <typeparamref name="TEntity"/> — mirroring exactly what
-    /// <see cref="StorageNameGenerator.Resolve(string,Type,string?,string?,Func{StorageNamingCapability})"/> folds into
+    /// <see cref="StorageNameGenerator.Resolve(string,Type,string?,string?,Func{StorageNamingCapability},IServiceProvider?)"/> folds into
     /// the name: an ambient partition (Container), a routed Database source (Database, explicit or axis-derived), or a
     /// Container-mode <c>[DataAxis]</c> container-name particle (<see cref="StorageNameParticleRegistry"/>). Pure (no
     /// state); the basis of <see cref="WarnIfPinnedNameDefeatsIsolation{TEntity}"/>. A blank pin (the "no override"

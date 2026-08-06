@@ -8,8 +8,7 @@ namespace Koan.Data.VectorAdapterSurface.TestKit;
 /// <summary>
 /// Real-world scenario specs adapted from PGVector's <c>SemanticSearch.Spec.cs</c>. These exercise
 /// shape-of-results behavior (similarity ranking, duplicate detection, hybrid blending) rather
-/// than the raw API surface. Adapters that don't support a scenario flag it off via the
-/// capability interface and the spec skips green.
+/// than the raw API surface. Adapters that don't support a scenario must reject it correctively.
 /// </summary>
 public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     where TFactory : class, IVectorAdapterTestFactory
@@ -54,7 +53,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("cooking-2", Embed("cooking", 2));
         await Vector<TodoVector>.Save("cooking-3", Embed("cooking", 3));
 
-        var hits = await Vector<TodoVector>.Search(Embed("tech", 0), topK: 6);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("tech", 0), topK: 6);
         var topThree = hits.Matches.Take(3).Select(m => (string)(object)m.Id);
         topThree.Should().AllSatisfy(id => id.Should().StartWith("tech-"));
     }
@@ -73,7 +72,7 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("books-1", Embed("books", 1));
         await Vector<TodoVector>.Save("books-2", Embed("books", 2));
 
-        var hits = await Vector<TodoVector>.Search(queryVec, topK: 3);
+        var hits = await Vector<TodoVector>.SearchLegacy(queryVec, topK: 3);
         var ids = hits.Matches.Select(m => (string)(object)m.Id).ToList();
         ids.Should().Contain("query-anchor");
         ids.Should().Contain(id => id.StartsWith("electronics-"));
@@ -90,26 +89,36 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         await Vector<TodoVector>.Save("dup-b", Embed("topic", 5));  // same seed → very similar vector
         await Vector<TodoVector>.Save("different", Embed("other-topic", 5));
 
-        var hits = await Vector<TodoVector>.Search(Embed("topic", 5), topK: 3);
+        var hits = await Vector<TodoVector>.SearchLegacy(Embed("topic", 5), topK: 3);
         var topTwo = hits.Matches.Take(2).Select(m => (string)(object)m.Id).ToList();
         topTwo.Should().Contain("dup-a");
         topTwo.Should().Contain("dup-b");
     }
 
     [Fact]
-    public async Task HybridSearch_combinesVectorAndKeyword()
+    public async Task HybridSearch_matches_declared_capability()
     {
-        Assert.SkipWhen(!Factory.SupportsHybridSearch, "Adapter does not support hybrid search (Alpha + SearchText).");
         SkipIfUnavailable();
 
         // Save with embeddings; the adapter must also index 'Title' as text for BM25.
         await Vector<TodoVector>.Save("hybrid-1", Embed("topic", 1));
         await Vector<TodoVector>.Save("hybrid-2", Embed("topic", 2));
 
+        if (!Factory.SupportsHybridSearch)
+        {
+            Func<Task> unsupported = async () =>
+                _ = await Vector<TodoVector>.SearchLegacy(
+                    vector: Embed("topic", 0),
+                    text: "hybrid",
+                    alpha: 0.5);
+            await unsupported.Should().ThrowAsync<NotSupportedException>();
+            return;
+        }
+
         // Pure-keyword leaning search. We can't assert exact ranking across adapters (BM25
         // implementations vary), but we can assert the search runs without throwing and returns
         // results.
-        var hits = await Vector<TodoVector>.Search(
+        var hits = await Vector<TodoVector>.SearchLegacy(
             vector: Embed("topic", 0),
             text: "hybrid",
             alpha: 0.5);
@@ -141,9 +150,8 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     // ============================================================================================
 
     [Fact]
-    public async Task ExportAll_streamsAllStoredVectors()
+    public async Task ExportAll_matches_declared_capability()
     {
-        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
@@ -153,6 +161,16 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
             ?.TryGetRepository<TodoVector, string>();
         repo.Should().NotBeNull("ExportAll is exercised directly against the repository (not on the Vector<T> facade)");
+
+        if (!Factory.SupportsExportAll)
+        {
+            Func<Task> unsupported = async () =>
+            {
+                await foreach (var _ in repo!.ExportAll()) { }
+            };
+            await unsupported.Should().ThrowAsync<NotSupportedException>();
+            return;
+        }
 
         var exported = new List<string>();
         await foreach (var batch in repo!.ExportAll())
@@ -165,9 +183,8 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ExportAll_onMissingIndex_returnsEmpty()
+    public async Task ExportAll_onMissingIndex_matches_declared_capability()
     {
-        Assert.SkipWhen(!Factory.SupportsExportAll, "Adapter does not implement ExportAll.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Flush();
@@ -175,6 +192,16 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
         var repo = (Koan.Core.Hosting.App.AppHost.Current?.GetService(typeof(IVectorService)) as IVectorService)
             ?.TryGetRepository<TodoVector, string>();
         repo.Should().NotBeNull();
+
+        if (!Factory.SupportsExportAll)
+        {
+            Func<Task> unsupported = async () =>
+            {
+                await foreach (var _ in repo!.ExportAll()) { }
+            };
+            await unsupported.Should().ThrowAsync<NotSupportedException>();
+            return;
+        }
 
         var exported = new List<string>();
         await foreach (var batch in repo!.ExportAll())
@@ -184,16 +211,22 @@ public abstract class VectorSemanticSpecsBase<TFactory> : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Stats_returnsStoredVectorCount()
+    public async Task Stats_matches_declared_capability()
     {
         // Stats is the vector.index.stats instruction (count of stored vectors). It is gated on its own
         // capability — ES/OS (shared base), Weaviate, and the in-memory reference implement it; Qdrant and
         // Milvus do not expose it through the instruction surface (distinct from ExportAll, which they can do).
-        Assert.SkipWhen(!Factory.SupportsIndexStats, "Adapter does not implement the IndexStats instruction.");
         SkipIfUnavailable();
 
         await Vector<TodoVector>.Save("v1", Embed("alpha", 1));
         await Vector<TodoVector>.Save("v2", Embed("alpha", 2));
+
+        if (!Factory.SupportsIndexStats)
+        {
+            Func<Task> unsupported = async () => _ = await Vector<TodoVector>.Stats();
+            await unsupported.Should().ThrowAsync<NotSupportedException>();
+            return;
+        }
 
         var count = await Vector<TodoVector>.Stats();
         count.Should().BeGreaterThanOrEqualTo(2);

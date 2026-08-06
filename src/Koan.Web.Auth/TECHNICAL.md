@@ -23,6 +23,11 @@ directly instead of depending on functional Web Auth merely to consume a contrac
 Provider callbacks use `/auth/{id}/callback`. Relative endpoints and authorities are reserved for the self-hosted local
 test provider; deployment providers should use absolute HTTPS endpoints.
 
+The local relative OIDC authority is projected as one logical provider with separate transport addresses: the live
+request supplies its public issuer/authorization origin, while `IServerAddressesFeature` supplies its internal
+back-channel origin. If neither a bound address nor a loopback public origin is available, challenge fails with a
+correction naming the required Kestrel binding instead of attempting an unreachable public hostname.
+
 ## Runtime behavior
 
 `AuthModule.Start` resolves the immutable plan and seeds one ASP.NET scheme per eligible provider. OIDC uses

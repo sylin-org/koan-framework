@@ -11,6 +11,8 @@ public static class Constants
             public const string RelationshipExecution = "koan.data.relationship.execution";
             public const string StreamExecution = "koan.data.stream.execution";
             public const string LifecycleSelected = "koan.data.lifecycle.selected";
+            public const string SourcePlanSelected = "koan.data.source.plan.selected";
+            public const string SourceClaimsSelected = "koan.data.source.claims.selected";
         }
 
         public static class Reasons
@@ -38,12 +40,30 @@ public static class Constants
             public const string PaginationNotHandled = "provider-pagination-not-handled";
             public const string StreamSortNotHandled = "provider-stream-sort-not-handled";
             public const string StreamPageLimitExceeded = "provider-stream-page-limit-exceeded";
+            public const string InvalidStreamReceipt = "provider-stream-receipt-invalid";
+            public const string UnsupportedRegisteredOperation = "registered-operation-unsupported";
         }
     }
 
     public static class Defaults
     {
         public const int RelationshipBatchSize = 100;
+        public const int SourceMaxRecords = 1_000;
+        public const long SourceMaxBytes = 16 * 1024 * 1024;
+        public const long SourceMaxValueBytes = 4 * 1024 * 1024;
+        public const int SourceMaxDurationSeconds = 30;
+        public const int SourceParameterPlanCacheEntries = 1_024;
+        public const int MappingPlanEntries = 256;
+        public const int DiagnosticSourceEntries = 256;
+        public const int NativeEvidenceEntries = 256;
+        public const int StorageNameCacheEntries = 4_096;
+        public const int EntityTypesPerRoot = 1_024;
+        public const int SourceEntries = 256;
+        public const int SourcePlanEntries = 1_024;
+        public const int RepositoryEntries = 1_024;
+        public const int VariantRepositoryEntries = 1_024;
+        public const int DoctorTimeoutSeconds = 10;
+        public const string SourceContinuationPrefix = "koan-source-v1.";
 
         // Default page size used by facade loops when materializing "All"/"QueryAll" across providers.
         // Keep conservative to balance throughput and memory. Adapters no longer clamp to their own
@@ -52,6 +72,9 @@ public static class Constants
     }
     public static class Configuration
     {
+        public const string SourceIntegration = "Koan:Data:SourceIntegration";
+        public const string Mapping = "Koan:Data:Mapping";
+
         public static class Direct
         {
             public const string Section = "Koan:Data:Direct";

@@ -1,24 +1,13 @@
 # Sylin.Koan.Data.Connector.Mongo
 
-MongoDB persistence for Koan Entities. Reference the package, keep the application's normal
-`AddKoan()` bootstrap, and use Entity verbs; the connector owns driver setup, discovery, naming,
-schema/index ensure, source routing, and readiness participation.
-
-- Target framework: net10.0
-- License: Apache-2.0
-
-## Install
-
-MongoDB is a supported 0.20 networked Entity provider. Its transitive Zen Garden contract dependency
-is module-free and activates nothing; applications still reference only this connector for MongoDB.
+Use MongoDB through Koan's ordinary Entity and Source surfaces. The connector owns clients, BSON, collection naming,
+indexes, discovery, mapping, inspection, and native execution.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.Mongo
 ```
 
-## Meaningful result
-
-With MongoDB reachable, no provider registration or repository scaffold is required:
+## Save and query documents
 
 ```csharp
 builder.Services.AddKoan();
@@ -29,65 +18,102 @@ public sealed class Book : Entity<Book>
     public bool Published { get; set; }
 }
 
-var saved = await new Book { Title = "Meaningful steps", Published = true }.Save();
-var published = await Book.Query(book => book.Published);
+var book = await new Book { Title = "Meaningful steps", Published = true }.Save();
+var published = await Book.Query(item => item.Published);
 ```
 
-When Mongo is the only server-backed Data connector, it wins automatic provider election over the
-local JSON floor. Pin business-critical placement with `[DataAdapter("mongo")]` or the Default-source
-adapter setting when adding another connector must not move existing data.
+No MongoDB repository, client, serializer registration, or collection bootstrap appears in application code.
 
-## Configuration
+## Fit a legacy collection without changing the model
 
-`auto` is the default and uses Koan's health-checked discovery pipeline, then the local MongoDB
-fallback. Use exact provider configuration only when placement must be explicit:
+```csharp
+koan.Data.Source("Legacy").Map<Customer>(map => map
+    .Container("CUSTOMER")
+    .Key(customer => customer.Id).Name("CUSTOMER_NO")
+    .Property(customer => customer.Name.Full).Name("DISPLAY_NM")
+    .Property(customer => customer.Profile).Object("PROFILE")
+    .Property(customer => customer.Name.First).Path("NAME_DATA", "first"));
+```
+
+The same Entity verbs now use those physical names. Mapped writes update only declared physical paths, so fields owned
+by the legacy system remain untouched. Composite keys use `.Key(...).Parts(...)`. Mark the source `External` to prevent
+collection creation, and `ReadOnly` to reject every mutation before provider I/O.
 
 ```json
 {
-  "ConnectionStrings": {
-    "Mongo": "mongodb://localhost:27017"
-  },
   "Koan": {
     "Data": {
-      "Mongo": {
-        "Database": "Books"
+      "Sources": {
+        "Legacy": {
+          "Adapter": "mongo",
+          "ConnectionString": "mongodb://legacy-host:27017",
+          "Database": "erp",
+          "StorageLifecycle": "External",
+          "Access": "ReadOnly"
+        }
       }
     }
   }
 }
 ```
 
-Named sources use `Koan:Data:Sources:{name}:{Adapter,ConnectionString}` plus the provider-specific
-`mongo` settings beneath that source. Credentials belong in the platform's secret store.
+## See what a source contains
 
-## Capabilities
+```csharp
+var source = Koan.Data.Core.Data.Source("Legacy");
+var page = await source.Inspect().Containers(take: 25);
+var customer = await source.Inspect().Resolve(StorageAddress.From("CUSTOMER"));
+RecordSet sample = await source.Inspect().Sample(customer, take: 20);
+```
 
-- LINQ/filter translation to native MongoDB filters for the supported expression floor
-- bulk upsert/delete, atomic batches, conditional replace, TTL indexes, and fast remove
-- Row-, container-, and database-scoped Data isolation composition
-- provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
-- source-aware client pooling and selection-aware readiness
+The vocabulary stays provider-neutral: sources contain addressable containers with traits and operations. MongoDB
+returns collections and views through that surface. Samples preserve top-level BSON field order and duplicate names,
+missing values, binary and temporal values, nested objects, arrays, nulls, and explicit result bounds.
 
-`Book.All()` requests the complete visible set. Mongo does not invent pagination defaults or caps;
-use `Book.Page(page, size)` or `Book.AllStream(batchSize: ...)` when the set can grow.
+## Give a native pipeline a business name
 
-## Streaming boundary
+```csharp
+koan.Data.Source("Catalog").Query("products.low-stock", query => query
+    .Pipeline("products",
+        """{ "$match": { "stock": { "$lte": "{{threshold}}" } } }""",
+        """{ "$sort": { "stock": 1 } }""")
+    .Parameter<int>("threshold"));
 
-`AllStream` and `QueryStream` request one numbered MongoDB page at a time. `batchSize` caps the
-Koan-visible candidate page; it does not claim a bound for opaque MongoDB driver buffers. Streaming
-accepts only DATA-0107's proved user-sort floor. Unsupported sorts reject before provider I/O.
+RecordSet result = await Koan.Data.Core.Data
+    .Source("Catalog")
+    .Query("products.low-stock", new { threshold = 5 });
+```
 
-These streams use offset pages. They do not provide snapshot consistency, mutation-safe traversal,
-resumability, or a public cursor; concurrent writes can cause skips or duplicates.
+Parameters replace exact `{{name}}` BSON string values after parsing; they are never interpolated into JSON. `$out`
+and `$merge` are rejected when the operation is declared, so registered pipelines are validated reads.
 
-## Operations boundary
+## Configuration
 
-A referenced but unelected Mongo connector is available, not a readiness dependency. It becomes
-critical when it wins default election or a runtime Entity/source operation selects it. Startup,
-health, and facts report the selected/participating sources with credentials redacted.
+`auto` is the default. Options access remains pure; the first operation on an active MongoDB route asks Koan's
+discovery coordinator for MongoDB and falls back to `mongodb://localhost:27017` when automatic discovery has no result.
+Concurrent first callers share that one resolution. A concrete connection string is authoritative.
 
-## References
+```json
+{
+  "ConnectionStrings": { "Mongo": "mongodb://localhost:27017" },
+  "Koan": { "Data": { "Mongo": { "Database": "Books" } } }
+}
+```
 
-- [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/Mongo/TECHNICAL.md)
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Entity access and streaming](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+Explicit `zen-garden://...` intent must resolve; it never silently falls back. Credentials belong in the platform's
+secret store.
+
+## Honest capability boundary
+
+MongoDB provides native filters, exact counts, explicit paging, bulk upsert/delete, conditional replace, TTL indexes,
+and row/container/database isolation. The connector does not claim fast remove or atomic batch execution. A batch is
+an ordered bulk write; `RequireAtomic=true` rejects before mutation because transaction support depends on topology and
+has not been selected as a connector guarantee.
+
+`All()` means all visible records. Use explicit pages or Koan's bounded stream surface for growing sets. Numbered-page
+streaming is not snapshot-consistent or resumable and concurrent writes can cause skips or duplicates.
+
+- Target framework: net10.0
+- License: Apache-2.0
+- [Technical reference](TECHNICAL.md)
+- [Data adapter development primer](../../../../docs/architecture/data-adapter-development-primer.md)

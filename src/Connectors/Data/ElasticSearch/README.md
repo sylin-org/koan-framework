@@ -1,93 +1,83 @@
 # Sylin.Koan.Data.Connector.ElasticSearch
 
-Elasticsearch vector storage and similarity search for Koan Entities. Reference the package, keep the application's
-normal `AddKoan()` bootstrap, and use `Vector<TEntity>`; the connector owns discovery, index provisioning, native
-kNN requests, filtering, naming, source isolation, and readiness participation.
+Elasticsearch vector storage for Koan Entities. The application declares one vector space; the connector realizes that
+plan through Elasticsearch `dense_vector`, native kNN search, and native metadata pre-filtering.
 
 - Target framework: net10.0
 - License: Apache-2.0
 
 ## Install
 
-> **Maturity:** This provider is available below the supported 0.20 boundary. Package presence is not a support
-> claim; check the [generated product surface](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/product-surface.md).
-
 ```powershell
 dotnet add package Sylin.Koan.Data.Connector.ElasticSearch
 ```
 
-## Meaningful result
-
-With Elasticsearch reachable, no provider registration or repository scaffold is required:
+## Use
 
 ```csharp
-builder.Services.AddKoan();
+builder.Services.AddKoan(koan => koan.Data
+    .Source("Search")
+    .Vector<Article>(space => space
+        .Name("content")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session)));
 
-public sealed class Article : Entity<Article>
-{
-    public string Title { get; set; } = "";
-}
-
-float[] embedding = [0.12f, 0.42f, 0.88f];
 await Vector<Article>.Save("article-1", embedding, new { category = "docs" });
 
 var nearest = await Vector<Article>.Search(
     embedding,
-    topK: 5,
-    filter: Filter.Eq("category", "docs"));
+    query => query.Top(5).Where(Filter.Eq("category", "docs")));
 ```
 
-When Elasticsearch is the intended vector provider, it participates in the shared automatic election policy. If
-more than one durable provider is referenced, pin business-critical placement with `[VectorAdapter("elasticsearch")]`
-or `Koan:Data:VectorDefaults:DefaultProvider`.
+The space declaration owns its name, dimensions, metric, model, source, and visibility. Standard source declarations
+own access and storage lifecycle. Elasticsearch configuration owns only placement, credentials, timeouts, and bounded
+work limits.
 
 ## Configuration
 
-`auto` is the default and uses Koan's health-checked discovery pipeline, then the local endpoint fallback. Use exact
-provider configuration for secured or explicitly placed clusters:
-
 ```json
 {
-  "ConnectionStrings": {
-    "ElasticSearch": "https://search.example.net:9200"
-  },
   "Koan": {
     "Data": {
       "ElasticSearch": {
+        "Endpoint": "https://search.example.net:9200",
         "ApiKey": "use-your-secret-provider",
-        "IndexPrefix": "catalog",
-        "Dimension": 1536
+        "TimeoutSeconds": 30,
+        "MaxSearchCandidates": 10000
       }
     }
   }
 }
 ```
 
-`Koan:Data:ElasticSearch:Endpoint` is the exact endpoint alternative to the connection-string entry. HTTP Basic
-credentials use `Username` and `Password`. Credentials belong in the platform's secret store.
+HTTP Basic authentication uses `Username` and `Password`. `ConnectionStrings:ElasticSearch` remains an endpoint
+alternative. Standard named-source routing can select a different endpoint and credentials without changing Entity
+code. Keep credentials in the platform secret store.
 
-## Capabilities
+## Guarantees
 
-- automatic Elasticsearch `dense_vector` mapping and index provisioning;
-- single and bulk vector upsert/delete, clear, count, scroll export, and index statistics;
-- native Elasticsearch kNN search with caller-owned `topK`;
-- metadata filtering pushed into `knn.filter`, with unsupported operators rejected rather than ignored;
-- source, partition, container, and tenant-aware index naming;
-- selection-aware readiness and redacted startup reporting.
+- complete point reads return logical identity, embedding, and neutral metadata;
+- Cosine, Euclidean, and unrestricted DotProduct spaces have explicit native mappings and normalized higher-is-closer
+  scores;
+- awaited mutations use explicit refresh and are visible to subsequent Session reads;
+- `Eq`, `Ne`, ranges, `In`, `Nin`, `Has`, `HasAny`, `HasAll`, `HasNone`, `Size`, and `Exists` run as native kNN
+  pre-filters; unsupported filters fail closed;
+- single and bulk upsert/delete preserve ordered outcomes; bulk atomicity is reported as not guaranteed;
+- Managed sources may create storage, External sources validate only, and ReadOnly sources reject mutations before I/O;
+- source, partition, container, and row scopes isolate every read and mutation path;
+- requests, responses, metadata, batches, candidates, retries, and tie expansion are bounded.
 
-## Boundaries
+## Deliberate limits
 
-- This connector stores vector representations and metadata; it is not a general Elasticsearch Entity data adapter.
-- Embedding retrieval and hybrid text/vector search are not supported.
-- All named sources share the configured cluster endpoint and isolate through generated index names. Per-source
-  cluster endpoints are not supported.
-- Setting `IndexName` explicitly pins all contexts to one index and may defeat active isolation. Koan reports this
-  conflict but honors the explicit name.
-- Automatic discovery probes without credentials. Configure secured clusters explicitly.
-- Elasticsearch index mappings fix the vector dimension at creation. Changing models normally requires a new index
-  or a controlled reindex.
+- This is a Vector adapter, not a general Elasticsearch Entity adapter.
+- Search accuracy is approximate because Elasticsearch uses indexed approximate kNN.
+- Eventual visibility, hybrid text search, continuation snapshots, streaming export, and atomic batches are not claimed.
+- The adapter generates and validates its write alias and backing index. There is no ordinary index-name, field-name,
+  dimension, metric, refresh, or auto-create option.
+- Existing external mappings must carry the Koan contract marker and match the declared space exactly.
 
-## References
+## Reference
 
 - [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/ElasticSearch/TECHNICAL.md)
 - [Vector runtime](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Vector/README.md)

@@ -1,4 +1,3 @@
 [assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
-// ARCH-0091: one shared factory (container) per engine assembly, injected into spec ctors now that
-// IClassFixture is dropped. Replaces the per-spec-class IClassFixture (4 containers) with one.
+// One pinned Milvus topology serves the provider suite.
 [assembly: Xunit.AssemblyFixture(typeof(Koan.Data.VectorAdapterSurface.Milvus.Tests.MilvusTestFactory))]

@@ -8,7 +8,8 @@ internal static class ChatOptionsMapper
 {
     private const string ProfileKey = "koan:ai:profile";
     private const string ThinkKey = "koan:ai:think";
-    private const string RouteAdapterKey = "koan:ai:route:adapter";
+    private const string RouteSourceKey = "koan:ai:route:source";
+    private const string LegacyRouteAdapterKey = "koan:ai:route:adapter";
     private const string RoutePolicyKey = "koan:ai:route:policy";
     private const string RouteStickyKey = "koan:ai:route:sticky";
     private const string ContextTagsKey = "koan:ai:context:tags";
@@ -142,9 +143,9 @@ internal static class ChatOptionsMapper
 
         options.AdditionalProperties ??= new AdditionalPropertiesDictionary();
 
-        if (!string.IsNullOrWhiteSpace(hints.AdapterId))
+        if (!string.IsNullOrWhiteSpace(hints.Source))
         {
-            options.AdditionalProperties[RouteAdapterKey] = hints.AdapterId;
+            options.AdditionalProperties[RouteSourceKey] = hints.Source;
         }
 
         if (!string.IsNullOrWhiteSpace(hints.Policy))
@@ -199,7 +200,7 @@ internal static class ChatOptionsMapper
             vendor = new Dictionary<string, Newtonsoft.Json.Linq.JToken>();
             foreach (var pair in options.AdditionalProperties)
             {
-                if (pair.Key is ProfileKey or ThinkKey or RouteAdapterKey or RoutePolicyKey or RouteStickyKey or ContextTagsKey or ContextGroundingKey)
+                if (pair.Key is ProfileKey or ThinkKey or RouteSourceKey or LegacyRouteAdapterKey or RoutePolicyKey or RouteStickyKey or ContextTagsKey or ContextGroundingKey)
                 {
                     continue;
                 }
@@ -243,7 +244,8 @@ internal static class ChatOptionsMapper
 
         return new AiRouteHints
         {
-            AdapterId = TryGetAdditional<string>(options, RouteAdapterKey),
+            Source = TryGetAdditional<string>(options, RouteSourceKey)
+                ?? TryGetAdditional<string>(options, LegacyRouteAdapterKey),
             Policy = TryGetAdditional<string>(options, RoutePolicyKey),
             StickyKey = TryGetAdditional<string>(options, RouteStickyKey),
         };

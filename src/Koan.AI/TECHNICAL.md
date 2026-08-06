@@ -34,8 +34,24 @@ The router handles capability and category intent, optional source/model hints, 
 adapter resolution. A capability declaration means the adapter implements that operation; it does not guarantee a
 particular model is installed or healthy.
 
+`AiRouteHints.Source` carries either a source name or a pinned `source::member`; `WithSource` is its fluent
+expression. Explicit source/member and model hints are orthogonal and are preserved together. The router validates
+capability against the exact explicit choice and reports usable alternatives instead of falling back. Source-free
+requests retain automatic election. `AdapterId` and `WithRouteAdapter` remain compatibility aliases only.
+
 Background health observation updates member state without rebuilding provider topology. Startup provenance reports
 configured categories/sources, the live adapter roster, and source/member status.
+
+`IAiSourceControl` coordinates runtime mutation and provider-owned endpoint inspection. `AiSourceInspection`
+separates overall reachability from version, installed-model, and resident-model facet availability. Successful
+empty collections therefore remain distinct from facets the provider could not inspect. Adapters own all transport
+and parsing; source control never becomes a provider client.
+
+`AiSourcesHealthContributor` composes as one element of the standard `IHealthContributor` collection and is
+noncritical by default. Its readiness data reports healthy, unhealthy, unknown, and recovering member counts.
+Unknown or recovering members are not false-green: an entirely unprobed source reports `unknown`, while a source
+with explicit failures and no healthy member reports `unhealthy`. Core's critical-only readiness policy can therefore
+keep the overall application ready while still exposing an unavailable AI subsystem and `critical=false`.
 
 ## Host contract
 

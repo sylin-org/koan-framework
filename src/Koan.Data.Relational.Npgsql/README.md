@@ -18,17 +18,27 @@ dotnet add package Sylin.Koan.Data.Relational.Npgsql
 
 ## Meaningful result
 
-A concrete provider maps its resolved endpoint, identity, schema policy, naming convention, and stable-order clause to
+A concrete provider maps its resolved endpoint, identity, schema policy, and naming convention to
 `NpgsqlRepositoryOptions`, then returns `NpgsqlRepository<TEntity,TKey>` from its normal `IDataAdapterFactory`. The
 repository supplies the shared Entity CRUD, query, paging, batch, isolation, and schema behavior without borrowing or
 activating another provider connector.
+
+Managed Id+object storage and explicit physical maps both compile into `NpgsqlEntityPlan<TEntity,TKey>` and execute
+through the same repository. Scalar names, object roots, nested `jsonb` paths, composite keys, and generated keys are
+plan differences—not alternate repositories. Nested writes preserve values outside the declared map.
 
 ## Guarantees and limits
 
 - This package contains no `KoanModule`, discovery adapter, provider election, health contributor, or startup report.
 - Referencing it alone activates no Data provider and opens no connection.
 - Concrete providers retain ownership of configuration, source routing, identity, discovery, and operations reporting.
+- The immutable repository options carry the compiled `DataSourcePlan`; External DDL and read-only writes therefore
+  remain denied below provider composition as well as at the framework facade.
 - The mechanism assumes compatible Npgsql/PostgreSQL-wire SQL behavior. Provider-specific differences must be explicit
   options or remain in the concrete connector; compatibility is not inferred from protocol alone.
+- `NpgsqlStableOrder` makes the one current ordering delta explicit: PostgreSQL may use its physical tuple identifier,
+  while providers without that system column order by the compiled identity roots.
+- Warm entity plans are compiled once per bounded storage route; query translation and native parameter binding remain
+  on the provider hot path without reflection-driven repository selection.
 
 See [TECHNICAL.md](TECHNICAL.md) for the ownership boundary.

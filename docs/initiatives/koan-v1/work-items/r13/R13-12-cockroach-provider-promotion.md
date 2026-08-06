@@ -7,7 +7,7 @@ status: current
 last_updated: 2026-07-22
 framework_version: v0.20.0
 validation:
-  status: in-progress
+  status: passed
   scope: focused CockroachDB provider, health, pack, consumer, product, and API evidence
 ---
 
@@ -108,4 +108,11 @@ exact first public version becomes the immutable API floor in the following slic
   and three content-only owners;
 - generated-drift check and the no-tests repository coherence gate: passed in 51.1 seconds with zero
   doc errors and 1,402 existing warnings; no sibling provider or whole-framework certification ran;
-- publication, public indexing, and public-package consumer: pending.
+- PR `#102` exact-head gate `29902727400`: passed as the one cheap coherence job with no tests or
+  containers; squash-merged to `main` as `3ff7f1950931addd12a16e194299468bd442dcdf`;
+- main release `29903009583`: passed; NuGet accepted both the package and symbols as new artifacts,
+  and indexed exact `Sylin.Koan.Data.Connector.Cockroach 0.20.0`;
+- NuGet.org-only consumer: restored exact `0.20.0` into a new empty cache, built with zero
+  warnings/errors, and repeated the real 26.2.3 Entity journey with
+  `COCKROACHDB|PACKAGE-CONSUMER|CRUD|QUERY|PAGE|STREAM|PASS`;
+- exact `0.20.0` API floor: recorded in the connector project by R13-13.

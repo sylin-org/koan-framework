@@ -1,73 +1,81 @@
 ---
 uid: reference.modules.Koan.data.connector.elasticsearch
 title: Koan.Data.Connector.ElasticSearch - Technical Reference
-description: Elasticsearch vector provider for Koan with native kNN, shared search-engine mechanics, and selection-aware readiness.
+description: Plan-bound Elasticsearch vector adapter with native kNN, bounded metadata projection, and honest source policy.
 packages: [Sylin.Koan.Data.Connector.ElasticSearch]
 source: src/Connectors/Data/ElasticSearch/
 ---
 
-## Role
+## Ownership
 
-This package makes the `elasticsearch` vector provider available by reference. Its thin provider assembly owns the
-Elasticsearch identity, aliases, orchestration metadata, discovery vocabulary, and native `dense_vector`/top-level
-`knn` dialect. `Sylin.Koan.Data.SearchEngine` owns the common repository, configuration, health, naming, and REST
-mechanics shared with OpenSearch.
+`ElasticSearchVectorAdapterFactory` binds an immutable `VectorSpacePlan` before provider I/O. `DataSourcePlan` supplies
+access and lifecycle policy. `ElasticSearchOptions` contains endpoint, authentication, timeout, and bounded-work
+settings only. The adapter has no production dependency on `Koan.Data.SearchEngine` and no provider-owned schema or
+vector semantics.
 
-No Elasticsearch-specific service registration is required in application code.
+Four runtime parts own distinct failures:
 
-## Election and lifecycle
+- `ElasticSearchRoute` resolves one source-aware endpoint, credential set, and policy;
+- `ElasticSearchClient` owns bounded HTTP, cancellation, safe status errors, and narrow read-only transient retries;
+- `ElasticSearchFilter` compiles the declared neutral Filter subset into native pre-filter queries;
+- `ElasticSearchRepository` owns physical shape, complete points, receipts, score conversion, lifecycle, and disposal.
 
-`ElasticSearchVectorAdapterFactory` is a provider candidate with priority 20 and alias `elastic`. An exact
-`[VectorAdapter("elasticsearch")]` request or `Koan:Data:VectorDefaults:DefaultProvider` pin wins over automatic
-selection and fails if unavailable; Koan does not substitute a different provider.
+## Physical contract
 
-Reference makes the connector available but not critical. Before a runtime Entity/source selects it, health is
-`Unknown`, non-critical, and connection-free. Selection records provider/source participation; subsequent health
-checks probe `/_cluster/health` with the same endpoint and authentication used by repository operations.
+Each logical Entity/source/partition container and named space resolves to a readable, lowercase, hash-suffixed write
+alias with one generated backing index. Writes set `require_alias=true`, so document APIs cannot create an accidental
+index. Managed lifecycle may create the alias and backing index; External validates but never creates; ReadOnly rejects
+mutations before dispatch.
 
-## Configuration precedence
+The mapping stores:
 
-Endpoint resolution uses the first exact value:
+- logical identity and scope as `keyword`;
+- the embedding as `dense_vector` with plan-owned dimensions and metric;
+- lossless neutral metadata as a disabled object;
+- a constant-cardinality nested path/value projection for native filters;
+- contract version, space, model, and metric in mapping metadata.
 
-1. `ConnectionStrings:ElasticSearch`
-2. `Koan:Data:ElasticSearch:ConnectionString`
-3. `Koan:Data:ElasticSearch:Endpoint`
-4. autonomous discovery and then `http://localhost:9200`
+The nested projection hashes logical property paths and stores canonical typed values. This avoids dynamic mapping
+growth while supporting equality, range, set, collection, size, existence, and boolean composition. A filter outside
+the declared subset throws `VectorFilterUnsupportedException` before a query is sent.
 
-There is no generic Data connection-string alias. Other keys under `Koan:Data:ElasticSearch` are `IndexPrefix`,
-`IndexName`, `VectorField`, `MetadataField`, `IdField`, `SimilarityMetric`, `RefreshMode`, `TimeoutSeconds`,
-`Dimension`, `ApiKey`, `Username`, `Password`, `DisableIndexAutoCreate`, and `DisableAutoDetection`.
+## Search and score truth
 
-Startup facts show the effective de-identified endpoint and common vector/index choices. Credentials are never
-projected.
+Search uses Elasticsearch top-level kNN with `filter` as a native pre-filter. `num_candidates`, response size, and
+stable tie expansion are bounded. Results are sorted by normalized similarity and then logical identity.
 
-## Repository behavior
+| Koan metric | Elasticsearch similarity | Koan normalization |
+|---|---|---|
+| Cosine | `cosine` | native `(1 + cosine) / 2` score |
+| Euclidean | `l2_norm` | invert native squared-distance score, then `1 / (1 + distance)` |
+| DotProduct | `max_inner_product` | invert the native piecewise score, then apply Koan logistic normalization |
 
-The shared repository provides automatic index ensure, upsert/bulk upsert, delete/bulk delete, clear, count, scroll
-export, statistics, and kNN search. The Elasticsearch dialect emits a `dense_vector` mapping and Elasticsearch 8.x
-top-level `knn` request. The caller's `topK` is passed through; the adapter does not invent or reduce it.
+Accuracy is reported as `Approximate`. Native per-shard candidate counts are not mislabeled as a truthful global
+candidate count.
 
-The unified `Filter` AST is translated once in `Sylin.Koan.Data.SearchEngine` and placed in `knn.filter`. Supported
-operators are `Eq`, `Ne`, `Gt`, `Gte`, `Lt`, `Lte`, `In`, `Nin`, `StartsWith`, `EndsWith`, `Contains`, `Has`,
-`HasAny`, `HasAll`, `HasNone`, and `Exists`. Unsupported operators fail before a misleading match-all result.
+## Mutations and visibility
 
-## Naming and isolation
+Single and bulk mutations request an explicit refresh, providing awaited Session visibility without waiting for the
+periodic refresh interval. Bulk responses are parsed item by item in request order. HTTP success never becomes
+fabricated item success, and `BatchAtomicity.NotGuaranteed` records Elasticsearch partial-application semantics.
+Mutation requests are not automatically retried because their outcome may be unknown after transport failure.
 
-The factory passes the provider selected by Vector into Koan's central naming chokepoint; the repository does not
-re-elect naming during an operation. Generated index names include active source, partition, container, and tenant
-contributors. All sources use the one configured cluster endpoint.
+Clear uses policy-gated delete-by-query inside the active scope; it does not drop the index. Complete positional
+get-many, source/partition/container/row isolation, cancellation, restart recovery, and disposal are exercised against
+the pinned Elasticsearch 9.4.3 container.
 
-`IndexName` is an explicit physical-name pin. Koan honors it and reports when it defeats active isolation. Per-source
-cluster endpoints, embedding retrieval, hybrid text/vector search, and snapshot-consistent scroll guarantees are not
-part of this provider contract.
+## Configuration
 
-## Validation surface
+Endpoint precedence is exact provider/source configuration, `ConnectionStrings:ElasticSearch`, then the configured
+default endpoint. Supported provider settings are `Endpoint`, `ApiKey`, `Username`, `Password`, `TimeoutSeconds`,
+`MaxMetadataBytesPerPoint`, `MaxBatchPoints`, `MaxRequestBytes`, `MaxSearchCandidates`, `MaxResponseBytes`, readiness,
+and discovery control.
 
-The provider-owned matrix exercises boot/configuration, pre-use readiness, index ensure, CRUD/bulk behavior, search,
-filtering, partition isolation, export, clear, and semantic shapes against Elasticsearch 8.13.4. Capability-gated
-tests record embedding retrieval and hybrid search as unsupported.
+Vector dimensions, metric, model, space name, visibility, storage lifecycle, access, index names, and wire fields are
+not provider settings.
 
-## References
+## Capability boundary
 
-- Shared implementation: `~/reference/modules/Koan/data/searchengine`
-- DATA-0097 Vector Pathway Parity: `~/decisions/DATA-0097-vector-pathway-parity.md`
+The adapter claims native kNN, the listed Filter subset, bulk upsert/delete, score normalization, and dynamic physical
+containers. It explicitly declines Eventual visibility, hybrid search, native continuation, export, atomic batch, and
+multi-vector-per-Entity behavior.

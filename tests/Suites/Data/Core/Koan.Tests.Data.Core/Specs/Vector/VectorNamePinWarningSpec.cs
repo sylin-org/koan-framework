@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using AwesomeAssertions;
+using Koan.Core.Composition;
 using Koan.Core.Logging;
 using Koan.Core.Naming;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Vector.Naming;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Tests.Data.Core.Specs.Vector;
@@ -82,6 +84,7 @@ public sealed class VectorNamePinWarningSpec
     {
         // The name-fold composes THREE discriminators; this is the one the original predicate missed (review HIGH): a
         // Container-mode [DataAxis] realizes isolation as a container-name particle, not via EntityContext.Partition.
+        using var composition = KoanCompositionScope.Enter(new ServiceCollection());
         StorageNameParticleRegistry.Register(new FakeContainerParticleContributor(typeof(ContainerParticleProbe)));
         try
         {

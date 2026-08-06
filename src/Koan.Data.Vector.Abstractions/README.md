@@ -1,5 +1,7 @@
 # Sylin.Koan.Data.Vector.Abstractions
 
+Supported provider-neutral contracts behind Koan's Entity Vector runtime and provider packages.
+
 Provider-neutral contracts for Koan vector search: adapter factories, repositories, capabilities, query and match
 shapes, export batches, schema descriptions, and provider-selection annotations. Referencing this package alone does
 not register a vector runtime or select a backend.

@@ -1,156 +1,50 @@
 ---
 type: HANDOFF
 domain: koan-v1
-status: active
+status: passed
 last_updated: 2026-07-22
 framework_version: v0.20.0
 ---
 
 # Koan v1 — current handoff
 
-## Current objective
+## Current state
 
-Complete the 0.20 maturity cycle by promoting the maintainer-intended provider families through
-small, evidence-backed slices while preserving 0.20 as the supported-contract signal. Historical
-package counts do not define completion. Release automation is infrastructure, not a product
-capability, and must remain proportionate.
+[R14](work-items/R14-public-documentation-product-surface.md) is complete. The current non-ADR public
+documentation is one greenfield, capability-led product surface for developers, coding agents,
+operators, maintainers, and architects.
 
-## Completed baseline: first supported wave and public consumer proof
+- All 40 promoted product claims have exactly one canonical capability home.
+- All current public documents are reachable; there are zero current-document orphans.
+- Fifteen legacy capability cards are concise superseded pointers.
+- Generated product truth is the sole maturity authority; 22 duplicate package statements were
+  removed and a permanent lint rule guards the boundary.
+- S3 and Backup remain explicitly shelved.
+- ADRs were not changed.
+- The branch is `work/public-docs-greenfield`; changes are local and uncommitted.
 
-The maintainer rejected the automatic release compiler after multiple long validation cycles exposed
-failures in release orchestration rather than framework behavior. The later manual-from-`dev`
-replacement also changed the integration boundary without explicit approval. The corrected decision
-is recorded in [R12-06](work-items/r12/R12-06-publish-and-observe-first-wave.md) and ARCH-0110:
+## Validation
 
-- commits and pull requests targeting `dev` trigger no validation or publication workflow;
-- pull requests targeting `main` run the existing validation gate but cannot publish;
-- the resulting `main` commit automatically runs one package publication job;
-- each packable project keeps its local NBGV `version.json`;
-- the workflow compiles the product surface, runs `dotnet pack` with `PublicRelease=true`, and runs
-  `dotnet nuget push --skip-duplicate` only for the compiler-selected guaranteed 0.20 package owners,
-  using the established `NUGET_API_KEY`;
-- no lineage branch, synthetic commits, manifests, escrow, tags, GitHub Releases, recovery ledger,
-  duplicated proof lanes, or full test ratchet participates in publication.
+- `pwsh scripts/public-docs-lint.ps1`
+- `pwsh scripts/skills-lint.ps1 -Strict`
+- `dotnet run --project tools/Koan.Packaging -- product-surface --check`
+- focused docs link/frontmatter lint
+- `git diff --check`
+- changed-diff privacy inspection
 
-The former release subsystem and its implementation-detail tests are removed. Package
-inventory, quality assessment, product-surface compilation, NBGV stamping, bounded internal
-dependency ranges, and package metadata remain.
+These checks cover the requested public project documentation surface. DocFX/API generation,
+dependency restoration, and broad framework builds are deliberately outside this documentation
+epic.
 
-Focused implementation evidence:
+## Next action
 
-- `Koan.Packaging` Release build: clean in 2.3 seconds;
-- trimmed `Koan.Packaging.Tests` compile: clean in 2.1 seconds; tests were not executed;
-- evaluated inventory: 93 independently versioned packages in 10.3 seconds;
-- declared product surface: 18 supported claims map to exactly 38 guaranteed package owners, all
-  with `versionIntent=0.20`;
-- workflow: one `main`-push job, zero test commands, one API-key reference, and no Git mutation or
-  legacy release state;
-- `Sylin.Koan.Templates` is the one packable project outside `Koan.sln` and has one explicit standard
-  pack command in the same job.
-- Public `Sylin.Koan.Templates 0.20.6` now uses standard `0.20.*` patch floats. A fresh NuGet.org
-  install generated both templates; isolated restores completed without warnings, the web project
-  built with zero warnings/errors, and the console passed SQLite Entity save/load/query.
-- SQLite startup explanation now follows adapter-owned fallback selection and no longer emits the
-  misleading correction path for local auto mode. The fix is tracked as complete in `R12-05`.
+There is no active implementation item in this epic. Review the local diff, then commit or publish
+only when explicitly requested.
 
-## Accepted next epic: value-led 0.20 promotion
+## Guardrails
 
-[ARCH-0120](../../decisions/ARCH-0120-terminal-package-maturity.md) keeps the useful 0.20 invariant:
-supported claim owners use 0.20 intent, their public Koan dependency closure is supported, and every
-0.20 owner belongs to a supported claim. It now rejects the larger fixed-owner program that grew
-around that invariant.
-
-Product intent—not reverse dependencies—decides whether a package belongs. Database, vector, search,
-storage, authentication, and AI adapters are first-class public extensions even when applications
-are their only consumers. R13 promotes those capabilities by meaningful family: shared semantics,
-provider-specific real-boundary proof, a clean package consumer, and package/API integrity. The
-historical 38/55 inventory remains discovery, not an execution ledger or completion count.
-
-The lean [R13](work-items/R13-terminal-package-maturity.md) uses the first seven-owner testing and
-operational slice to prove the smaller promotion path. After that publication decision, high-use Data
-providers are next, followed by Vector/Search, AI providers, Storage/Media, external Auth, and only
-already-decided public migrations. Families may progress independently when no real prerequisite
-connects them.
-
-## Exact pause point
-
-The lean process change and first seven-owner slice are merged, published, indexed, and public-consumer
-green. R12-07's ordinary public upgrade proof is also green; its GO recommendation awaits explicit
-maintainer acceptance rather than another technical exercise.
-
-PostgreSQL R13-07 through Redis R13-11 are merged, published, indexed, public-consumer green, and
-baseline-captured at their exact first 0.20 versions. Redis's functional backend and inert contract
-are separately supported while Cache Redis remains unassessed. The active local slice is
-[R13-12](work-items/r13/R13-12-cockroach-provider-promotion.md): promote CockroachDB as the remaining
-intended networked Entity provider. Its health now follows participation rather than package
-availability, and the complete real CockroachDB 26.2.3 suite passes 7/7 with zero skips. Its
-one-owner `PublicRelease` pack, zero-warning staged-package consumer, 40-claim product truth, 51/52
-API posture, and 51.1-second no-tests coherence gate are green. Commit, publication, indexing, and
-public observation remain.
-Untracked `tmp/` is unrelated user-owned material and must remain untouched and unstaged.
-
-## Remote/public state
-
-- PR `#93` merged to `main` as `ad9d739199da809fa44efc9a4ce3db8059348b42`. Main-boundary run
-  `29792486934` succeeded: product-surface selection resolved the exact 38-package guaranteed 0.20
-  closure, packing completed, and NuGet accepted the publication set.
-- PR `#94` merged to `main` as `cfb60f848653686278a1976dcacc71386f4cb19e`. Main-boundary run
-  `29796113330` succeeded and NuGet.org indexed the corrected `Sylin.Koan.Templates 0.20.6`.
-- PR `#95` merged to `main` as `a8a1bb61b53195ce44bef00024d722862deb949d`. Lean gate
-  `29891719299` passed with one job and no tests/containers; release run `29891926990` published the
-  45-package supported closure. NuGet.org indexed all seven newly supported owners and their clean
-  public consumer passed.
-- PR `#96` merged to `main` as `b89cec6266080186db4fdd3fee99aa04b089abbc`. Lean gate
-  `29893297175` passed as one job with no tests/containers; release run `29893491621` published
-  PostgreSQL and Npgsql `0.20.1`. Both are indexed, and the exact public package consumer passed.
-- PR `#97` merged to `main` as `a8d3869adc84d15a330acb52cdf5c7dca916a6ad`. Lean gate
-  `29894628337` passed as one job with no tests/containers; release run `29894829655` published SQL
-  Server `0.20.1`. It is indexed, and the exact public package consumer passed.
-- PR `#98` merged to `main` as `e90e8fecff4efb3d1a4dd2d956b8d8f1bc4b423a`. Lean gate
-  `29895799297` passed as one job with no tests/containers; release run `29896020354` published MongoDB
-  and Zen Garden Contracts `0.20.1`. Both are indexed, and the exact public package consumer passed
-  MongoDB Entity behavior while proving the contract remained inert.
-- PR `#99` merged to `main` as `38d00f841b9dcd0cc22e3540918436e8d2f542d3`. Lean gate
-  `29898149195` passed as one job with no tests/containers; release run `29898380061` published
-  Couchbase `0.20.1`. It is indexed, and the exact public package consumer passed against Community
-  8.0.2.
-- PR `#100` merged to `main` as `b5628a7abad1e275522bed74901e1db9a459de29`. Lean gate
-  `29900348172` passed as one job with no tests/containers; release run `29900614297` published the
-  Redis Data connector, shared backend, and inert abstractions at exact `0.20.0`. All are indexed,
-  and a NuGet.org-only consumer restored into an empty cache and passed against Redis 8.8.
-- The historical `sylin-labs` NuGet organization is retired. Ownership of all 166 indexed historical
-  Sora and Koan package IDs was preserved under `sylin.org`; the authenticated account reports one
-  organization, `sylin.org`, with 240 packages. No packages were deleted or unlisted. Public owner
-  search is eventually consistent and may temporarily report stale `sylin-labs` results.
-- No `automation/package-lineage-dev` branch, `release/dev/*` tag, release-wave escrow, or GitHub
-  Release was created.
-- There is no manual dispatch path. Any future `main` commit is a publication event; work on `dev`
-  triggers nothing.
-
-## Validation posture
-
-- The smaller slice retains API baselines, generated-surface drift detection, host/container lifecycle,
-  reusable family conformance, package-only consumption, and direct provider evidence.
-- Focused repairs pass the host failure oracle, Communication 44/44, the affected Data correction 1/1,
-  and the real Mongo Web owner 52/52. The package consumer builds the complete local dependency closure;
-  its connected clean-network run passed.
-- The main PR now runs only product/API agreement, one Release build, lockfile and structural
-  documentation/tooling checks. Affected behavior and native evidence run at their owning family;
-  complete certification is never inferred from promotion or publication.
-
-## Next actions
-
-1. Commit the focused CockroachDB promotion and Redis baseline capture.
-2. Merge only after the exact lean gate passes; observe the ordinary publisher and public CockroachDB
-   consumer.
-3. Capture CockroachDB's exact first API floor in the next slice, then move to the Vector/Search
-   family.
-
-## Repository boundaries
-
-- Preserve unrelated worktree changes and untracked `tmp/`; never stage `tmp/`.
-- Do not inspect private dogfood applications.
-- Do not publish from a workstation, tag, create a GitHub Release, or mutate unrelated remote
-  configuration.
-- Full release certification belongs only to an explicitly requested whole-framework milestone, not
-  normal development, merge, promotion, version calculation, publication, or release plumbing.
+- Never disclose private downstream identity, artifacts, paths, or distinctive workflows.
+- Keep generated product surface as the sole maturity authority.
+- Do not create a second documentation inventory, human/agent manual pair, or per-page work-card
+  tree.
+- Keep changes local and uncommitted until explicitly requested.

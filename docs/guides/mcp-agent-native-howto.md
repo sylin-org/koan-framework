@@ -19,7 +19,7 @@ related_guides:
 
 # Agent-native MCP — from one attribute to governed access
 
-> A single walkthrough that grows one entity from *"an agent can call it"* to *"an agent calls exactly what it's allowed to, is told what it could unlock, and leaves an audit trail."* Each step shows **what you write**, **what the agent sees**, and **what happens**. Streamable HTTP, authentication, and session details are in [MCP over HTTP](mcp-http-sse-howto.md); the authorization model is in [authorization-howto.md](authorization-howto.md). One-screen maps: [agent-native card](../reference/cards/agent-native.md) · [mcp card](../reference/cards/mcp.md).
+> A single walkthrough that grows one entity from *"an agent can call it"* to *"an agent calls exactly what it's allowed to, is told what it could unlock, and leaves an audit trail."* Each step shows **what you write**, **what the agent sees**, and **what happens**. Streamable HTTP, authentication, and session details are in [MCP over HTTP](mcp-http-sse-howto.md); the authorization model is in [authorization-howto.md](authorization-howto.md). Start with the [Agents capability](../reference/agents/index.md).
 
 ## The one idea
 

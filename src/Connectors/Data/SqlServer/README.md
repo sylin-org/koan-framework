@@ -2,8 +2,9 @@
 
 SQL Server provider for Koan relational data with safe defaults, pushdowns, and schema helpers.
 
-This package is a supported 0.20 networked Entity provider. Referencing it makes SQL Server eligible
-for normal `AddKoan()` provider selection; no provider-specific registration API is required.
+The generated [product surface](../../../../docs/reference/product-surface.md) owns support maturity.
+Referencing this package makes SQL Server eligible for normal `AddKoan()` provider selection; no
+provider-specific registration API is required.
 
 - Target framework: net10.0
 - License: Apache-2.0
@@ -14,6 +15,9 @@ for normal `AddKoan()` provider selection; no provider-specific registration API
 - JSON projection and filter/paging pushdowns where supported
 - Schema helpers via Koan.Data.Relational (add-only create/index)
 - Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
+- Compact flat, object, nested-path, composite-key, and generated-key maps
+- Read-only fail-fast safety and non-creating `StorageLifecycle.External`
+- Provider-neutral inspection plus registered parameterized SQL reads/scalars
 
 ## Install
 
@@ -42,6 +46,20 @@ Configure a connection using first-win resolution:
 With `ConnectionString=auto` (the default), local orchestration discovery is attempted and then the
 documented localhost development fallback is used. Keep explicit credentials in secret stores. A
 reachable SQL Server instance is the only external runtime prerequisite.
+
+Map an existing table with the same Entity surface:
+
+```csharp
+builder.Services.AddKoan(koan => koan.Data.Source("Legacy").Map<Customer>(map => map
+    .Container("CUSTOMER")
+    .Key(customer => customer.Id).Name("CUSTOMER_NO")
+    .Property(customer => customer.DisplayName).Name("DISPLAY_NM")
+    .Property(customer => customer.Profile).Object("PROFILE_JSON")));
+```
+
+Set `StorageLifecycle=External` to prohibit DDL and `Access=ReadOnly` to reject Entity writes. `Inspect()` exposes
+neutral containers and bounded samples. Registered `.Sql(...)` reads require a configured read lane; use database
+grants as the security boundary. Koan also wraps SQL Server named reads in a rollback-only transaction.
 
 ## Usage - safe snippets
 

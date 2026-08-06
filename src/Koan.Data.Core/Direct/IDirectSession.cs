@@ -1,3 +1,5 @@
+using Koan.Data.Abstractions.Sources;
+
 namespace Koan.Data.Core.Direct;
 
 public interface IDirectSession
@@ -12,6 +14,8 @@ public interface IDirectSession
     IDirectSession WithConnectionString(string value);
     IDirectSession WithTimeout(TimeSpan timeout);
     IDirectSession WithMaxRows(int maxRows);
+    /// <summary>Declares the effect of this opaque Direct operation or transaction once.</summary>
+    IDirectSession Effect(DataOperationEffect effect);
     IDirectTransaction Begin(CancellationToken ct = default);
 
     Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default);

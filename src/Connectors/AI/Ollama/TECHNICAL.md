@@ -31,6 +31,9 @@ endpoint election.
 - `AiPromptOptions.Think` is sent as Ollama's top-level `think` value.
 - Standard prompt controls map into Ollama's options object; `VendorOptions` are provider-specific passthrough values.
 - `MaxConcurrentRequests` bounds concurrent calls for this adapter when greater than zero.
+- Endpoint inspection independently calls `/api/version`, `/api/tags`, and `/api/ps`. The adapter maps those
+  responses to provider-neutral version, installed-model, and resident-model facets. Overall reachability succeeds
+  when any facet answers; per-facet availability and detail preserve partial failures.
 
 ## Boundaries
 

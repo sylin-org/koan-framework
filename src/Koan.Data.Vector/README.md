@@ -1,6 +1,6 @@
 # Sylin.Koan.Data.Vector
 
-Entity-first vector persistence and search for Koan. The runtime elects one referenced provider per entity, memoizes
+Supported Entity-first vector persistence and search for Koan. The runtime elects one referenced provider per entity, memoizes
 repository resolution, applies Koan data isolation to vector operations and physical names, and reports which
 providers actually became runtime dependencies.
 

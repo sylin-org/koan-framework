@@ -6,7 +6,7 @@ using Microsoft.Data.SqlClient;
 namespace Koan.Data.Connector.SqlServer.Tests.Specs;
 
 /// <summary>
-/// SQL Server's AODB conformance ledger cell (ARCH-0103 §6 / P5). Proves the relational realization of all three AODB
+/// SQL Server's AODB conformance suite (ARCH-0103 §6 / P5) proves the relational realization of all three AODB
 /// modes on SQL Server AND declares the tokens. For the Database cell the two routed conformance sources point to
 /// freshly-created physical databases on the fixture's server (Database mode = a distinct physical database per source).
 /// </summary>

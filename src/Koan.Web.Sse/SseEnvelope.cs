@@ -14,4 +14,7 @@ public readonly record struct SseEnvelope(
 {
     public bool HasEventName => !string.IsNullOrWhiteSpace(EventName);
     public bool HasComment => !string.IsNullOrWhiteSpace(Comment);
+    internal bool IsControlFrame =>
+        Data is { Length: 0 } &&
+        (HasComment || Retry is not null || !string.IsNullOrEmpty(Id));
 }

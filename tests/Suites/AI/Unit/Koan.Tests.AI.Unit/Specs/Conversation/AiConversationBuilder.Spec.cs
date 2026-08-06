@@ -23,7 +23,7 @@ public sealed class AiConversationBuilderSpec
             .WithContextTag("tenant", "acme")
             .WithGroundingReference("doc-42")
             .WithModel("glm-1")
-            .WithRouteAdapter("ollama:test")
+            .WithSource("ollama::test")
             .WithRoutePolicy("wrw")
             .WithAugmentation("rag", configure: p => p["dataset"] = "kb")
             .WithAugmentation("moderation", enabled: false)
@@ -34,7 +34,8 @@ public sealed class AiConversationBuilderSpec
         request.Messages.Select(m => m.Role).Should().Contain(new[] { "system", "user" });
         request.Model.Should().Be("glm-1");
         request.Route.Should().NotBeNull();
-        request.Route!.AdapterId.Should().Be("ollama:test");
+        request.Route!.Source.Should().Be("ollama::test");
+        request.Route.AdapterId.Should().Be("ollama::test");
         request.Route.Policy.Should().Be("wrw");
         request.Context.Should().NotBeNull();
         request.Context!.Profile.Should().Be("support");
@@ -46,6 +47,17 @@ public sealed class AiConversationBuilderSpec
         request.Options.Should().NotBeNull();
         request.Options!.Temperature.Should().Be(0.2);
         request.Options.Profile.Should().Be("support");
+    }
+
+    [Fact]
+    public void WithRouteAdapter_remains_a_source_compatibility_alias()
+    {
+        var request = new AiConversationBuilder(new FakePipeline())
+            .WithUser("hello")
+            .WithRouteAdapter("legacy-source")
+            .Build();
+
+        request.Route!.Source.Should().Be("legacy-source");
     }
 
     [Fact]

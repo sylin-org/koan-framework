@@ -44,10 +44,9 @@ When it is working well:
 - the remote agent can dry-run or upsert an approval, but cannot discover the local-only delete;
 - a write made through MCP is immediately observable through the REST API.
 
-The release compiler copies this same directory outside the repository and rebuilds it exclusively
-from locally staged `Sylin.Koan.*` packages. `FirstUseContractTests` proves the source lane, including
-the lockfile; the release clean room writes `first-use-package-evidence.json` with the same package-
-transitive assertion. Public package availability is a separate release fact.
+Repository-owned source and clean-package evidence keep this sample aligned with the current public
+grammar. The [product surface](../../docs/reference/product-surface.md) remains the separate support
+and package-availability authority.
 
 This is an executable first-use contract, not a production security template. Koan can supply the
 supported identity, authorization, token, trust, and tenancy primitives selected by package

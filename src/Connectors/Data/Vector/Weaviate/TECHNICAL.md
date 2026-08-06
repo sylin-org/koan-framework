@@ -1,45 +1,61 @@
-# Sylin.Koan.Data.Vector.Connector.Weaviate — technical contract
+# Weaviate adapter technical contract
 
-## Activation and routing
+The adapter has four runtime responsibilities:
 
-`WeaviateVectorModule` registers the provider, discovery adapter, typed options, named HTTP client, and
-participation-aware health contributor. The identity is `weaviate`; `[VectorAdapter("weaviate")]`
-requests it exactly.
+- `WeaviateRoute` resolves one source endpoint, credential, and immutable source policy.
+- `WeaviateClient` owns bounded HTTP/JSON execution and safe status-only provider failures.
+- `WeaviateFilter` projects neutral metadata into a constant `text[]` schema and writes exact GraphQL prefilters.
+- `WeaviateRepository` realizes the immutable `VectorSpacePlan`, point lifecycle, search, visibility, and isolation.
 
-The selected factory/source is passed to the repository. `VectorAdapterNaming` compiles class names from the entity,
-source, partition, and active segmentation contributors; no Weaviate-specific tenancy branch exists.
+## Physical shape
 
-## Configuration and layered discovery
+Every physical collection name is a readable GraphQL-safe prefix plus a SHA-256 suffix over Koan's lossless logical
+name. This preserves source and partition isolation without collision-prone character replacement.
 
-The authoritative section is `Koan:Data:Weaviate`.
+Managed creation writes `vectorizer: none`, HNSW, the declared distance, and three fixed properties:
 
-- connection: `Endpoint`, `ConnectionString`, or standard `.NET` `ConnectionStrings:Weaviate`;
-- authentication: `ApiKey`;
-- index/search: `Metric` and `TimeoutSeconds`;
-- discovery: `DisableAutoDetection`.
+| Property | Purpose |
+|---|---|
+| `koanId` | Stable provider-neutral logical identity. |
+| `koanMetadata` | Base64-encoded lossless neutral metadata JSON. |
+| `koanTerms` | Constant-schema tokens used only for native prefiltering. |
 
-The exact `Endpoint` key expresses user intent even when its value equals the default, and it is never overwritten by
-discovery. Otherwise `ConnectionString=auto` uses the shared discovery pipeline and falls back to
-`http://localhost:8080`.
+The collection description contains a versioned marker for dimensions, metric, logical space, and model because
+Weaviate's schema does not expose self-provided vector dimensions. Existing collections must match the complete marker,
+vectorizer, distance, and fixed properties. External sources are inspected but never provisioned or repaired.
 
-The adapter consumes only `Koan.ZenGarden.Contracts`. If the functional Zen Garden engine is referenced and active,
-it contributes a health-checked Weaviate offering candidate. Without it the contract is inert. Weaviate still owns
-endpoint normalization, health, schema, and operations; Zen Garden contributes but does not elect.
+## Point and query semantics
 
-## Schema, operations, and limits
+Physical object UUIDs are deterministic UUIDv5 values over collection, compiled row-scope identity, and logical ID.
+That makes direct get/delete scope-safe without exposing scope values. Metadata is stored once losslessly; projection
+tokens encode paths and values injectively with type-aware canonical forms. No user metadata property is added to the
+Weaviate schema.
 
-The adapter creates a class on first write, using `vectorizer=none`; supplied embeddings remain application-owned. It
-learns dimension from the first embedding and fails a changed dimension before sending an invalid write.
+Search uses native `nearVector` and GraphQL `where` before ranking. Equal/NotEqual, In/Nin, Has/HasAny/HasAll/HasNone,
+Size, Exists, And, Or, and Not translate to exact `ContainsAny`, `ContainsAll`, and `ContainsNone` operations over the
+fixed token set. Unsupported operators fail through `VectorFilterUnsupportedException`; there is no full scan or
+post-kNN residual filter.
 
-It implements KNN/hybrid search, supported GraphQL filter translation, cursor continuation, single/bulk writes and
-deletes, embedding reads, export, clear, and index statistics. Unsupported filter operators fail at the vector filter
-gate. `VectorQueryOptions` owns `TopK=10` and positive validation; the adapter does not clamp valid caller intent.
+Raw Weaviate distance becomes Koan similarity as follows:
 
-## Health and failures
+| Metric | Weaviate distance | Koan similarity |
+|---|---|---|
+| Cosine | `1 - cosine` | `1 - distance / 2` |
+| Euclidean | squared L2 | `1 / (1 + sqrt(distance))` |
+| Dot product | negative dot | `logistic(-distance)` |
 
-Readiness checks Weaviate only after an entity/source route selects it. Package presence alone is optional capability,
-not a critical dependency. Authentication, schema, dimension, timeout, GraphQL, and REST failures remain explicit and
-cancellation flows through HTTP calls.
+Search reports `Approximate`, an unknown candidate count, no fabricated total, and no continuation. Stable cutoff ties
+expand within `MaxSearchCandidates` or fail correctively.
 
-See [ARCH-0114](../../../../docs/decisions/ARCH-0114-layered-capability-activation.md) for the layered-capability law.
+## Mutation and visibility
 
+Creates use object POST; an identity conflict is replaced through object PUT. Batch inputs are fully validated before
+the first write, preserve input order, report Inserted/Updated/Deleted/Missing per item, and report
+`BatchAtomicity.NotGuaranteed`. Native bulk capability is deliberately not advertised.
+
+Session mutations request consistency `ALL`, then inspect the collection's node/shard vector queue until ready within
+`VisibilityTimeoutSeconds`. Clear first retrieves at most `MaxClearPoints + 1` object IDs; overflow fails before any
+delete. The default bound is 9,999, reserving one result beneath Weaviate's 10,000 query ceiling for overflow proof.
+
+HTTP responses, metadata, batches, clear, search expansion, and visibility waits all have typed bounds. Provider error
+bodies and business values are not included in thrown transport or GraphQL errors.

@@ -2,7 +2,7 @@
 name: koan-caching
 description: Transparent Entity caching, policy and topology negotiation, pointwise cache-entry eviction, request scopes, tags, coherence, health, and startup inspection
 pillar: cache
-card: docs/reference/cards/cache.md
+card: docs/reference/data/cache.md
 status: current
 last_validated: 2026-07-16
 ---
@@ -152,7 +152,7 @@ Best-effort loss is bounded by L1 TTL.
 
 ## See also
 
-- [Reference card](../../../docs/reference/cards/cache.md)
+- [Cache capability](../../../docs/reference/data/cache.md)
 - [Full reference](../../../docs/reference/data/cache.md)
 - [Architecture](../../../docs/architecture/koan-cache-module.md)
 - [Entity identity convergence](../../../docs/architecture/cache-scope-key-convergence.md)

@@ -1,7 +1,7 @@
 ---
 type: REF
 domain: communication
-title: "Communication — Entity Events and Transport"
+title: "Raise occurrences and send Entity snapshots"
 audience: [developers, architects, operators, ai-agents]
 status: current
 last_updated: 2026-07-16
@@ -12,7 +12,7 @@ validation:
   scope: local Events/Transport, startup-declared business channels, internal routes, and directly elected RabbitMQ carriage
 ---
 
-# Communication — Entity Events and Transport
+# Raise occurrences and send Entity snapshots
 
 Communication gives Entity code two distinct intents without exposing a bus:
 

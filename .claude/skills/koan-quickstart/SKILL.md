@@ -142,7 +142,7 @@ operational guarantees.
 
 ## See also
 
-- [Reference card: data.md](../../../docs/reference/cards/data.md) — one-screen Data pillar map
+- [Data capability](../../../docs/reference/data/index.md) — greenfield Entity and provider path
 - [Getting started: quickstart](../../../docs/getting-started/quickstart.md) — the long-form walkthrough
 - [Getting started: overview](../../../docs/getting-started/overview.md) — framework mental model
 - Sample: [LocalChecklist](../../../samples/fundamentals/LocalChecklist) — minimal local data application

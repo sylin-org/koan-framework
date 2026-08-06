@@ -9,6 +9,9 @@ public interface IDataDiagnostics
     // The default preserves compatibility for third-party diagnostic implementations.
     IReadOnlyList<DataAdapterParticipationInfo> GetAdapterParticipationsSnapshot() => [];
 
+    /// <summary>Returns redacted immutable source decisions observed by this host.</summary>
+    IReadOnlyList<DataSourcePlanInfo> GetSourcePlansSnapshot() => [];
+
     /// <summary>Returns lifecycle behavior declared by this host composition.</summary>
     IReadOnlyList<Lifecycle.EntityLifecycleInfo> GetLifecyclePlansSnapshot() => [];
 }

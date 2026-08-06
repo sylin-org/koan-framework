@@ -8,7 +8,7 @@ namespace Koan.Web.AdapterSurface.TestKit;
 
 /// <summary>
 /// Cross-partition transfer specs. Validates Entity&lt;T&gt;.Copy() / Move() / Mirror() and the
-/// direct Data&lt;T,K&gt;.CopyPartition / MovePartition / ReplacePartition / MoveFrom().To() APIs.
+/// the equivalent generic Data&lt;T,K&gt; transfer entry points.
 /// </summary>
 public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactory>, IAsyncLifetime
     where TFactory : class, IAdapterTestFactory
@@ -61,7 +61,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         // Each transfer spec needs both source and destination empty.
         foreach (var partition in KnownPartitions)
         {
-            try { await Data<Widget, string>.ClearPartition(partition); } catch { }
+            try { await Data<Widget, string>.DeleteAll(partition); } catch { }
         }
     }
 
@@ -153,18 +153,21 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     }
 
     // ============================================================================================
-    // Data<T,K>.CopyPartition (direct API)
+    // Data<T,K>.Copy (generic entry point)
     // ============================================================================================
 
     [Fact]
-    public async Task DataCopyPartition_returns_copied_count_and_preserves_source()
+    public async Task DataCopy_returns_copied_count_and_preserves_source()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("src-direct", count: 5);
 
-        var copied = await Data<Widget, string>.CopyPartition("src-direct", "dst-direct");
+        var copied = (await Data<Widget, string>.Copy()
+            .From(partition: "src-direct")
+            .To(partition: "dst-direct")
+            .Run()).CopiedCount;
 
         copied.Should().Be(5);
         (await CountIn("src-direct")).Should().Be(5);
@@ -172,18 +175,21 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     }
 
     // ============================================================================================
-    // Data<T,K>.MovePartition (direct API)
+    // Data<T,K>.Move (generic entry point)
     // ============================================================================================
 
     [Fact]
-    public async Task DataMovePartition_returns_moved_count_and_drains_source()
+    public async Task DataMove_returns_moved_count_and_drains_source()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("src-move", count: 3);
 
-        var moved = await Data<Widget, string>.MovePartition("src-move", "dst-move");
+        var moved = (await Data<Widget, string>.Move()
+            .From(partition: "src-move")
+            .To(partition: "dst-move")
+            .Run()).CopiedCount;
 
         moved.Should().Be(3);
         (await CountIn("src-move")).Should().Be(0);
@@ -191,21 +197,22 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     }
 
     // ============================================================================================
-    // Data<T,K>.MoveFrom(...).To(...) fluent builder
+    // Compact generic builders
     // ============================================================================================
 
     [Fact]
-    public async Task MoveFrom_fluent_builder_copies_with_Copy_flag()
+    public async Task Data_copy_builder_preserves_source()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("fl-src", count: 2);
 
-        var result = await Data<Widget, string>.MoveFrom("fl-src")
-            .Copy()
-            .BatchSize(10)
-            .To("fl-dst");
+        _ = await Data<Widget, string>.Copy()
+            .From(partition: "fl-src")
+            .To(partition: "fl-dst")
+            .Batch(10)
+            .Run();
 
         // Copy() keeps source intact.
         (await CountIn("fl-src")).Should().Be(2);
@@ -213,32 +220,35 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     }
 
     [Fact]
-    public async Task MoveFrom_fluent_builder_move_drains_source()
+    public async Task Data_move_builder_drains_source()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("fl-src-move", count: 2);
 
-        await Data<Widget, string>.MoveFrom("fl-src-move").To("fl-dst-move");
+        _ = await Data<Widget, string>.Move()
+            .From(partition: "fl-src-move")
+            .To(partition: "fl-dst-move")
+            .Run();
 
         (await CountIn("fl-src-move")).Should().Be(0);
         (await CountIn("fl-dst-move")).Should().Be(2);
     }
 
     // ============================================================================================
-    // Data<T,K>.ClearPartition
+    // Existing partition-aware deletion
     // ============================================================================================
 
     [Fact]
-    public async Task ClearPartition_removes_all_partition_rows()
+    public async Task DeleteAll_partition_removes_all_partition_rows()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("to-clear", count: 4);
 
-        var removed = await Data<Widget, string>.ClearPartition("to-clear");
+        var removed = await Data<Widget, string>.DeleteAll("to-clear");
 
         removed.Should().BeGreaterThanOrEqualTo(0); // some adapters report removed count, others 0
         (await CountIn("to-clear")).Should().Be(0);
@@ -249,14 +259,17 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     // ============================================================================================
 
     [Fact]
-    public async Task CopyPartition_same_source_and_target_is_noop()
+    public async Task Copy_same_source_and_target_is_noop()
     {
         SkipIfTransferUnsupported();
         SkipIfUnavailable();
 
         await SeedPartition("same", count: 2);
 
-        var copied = await Data<Widget, string>.CopyPartition("same", "same");
+        var copied = (await Data<Widget, string>.Copy()
+            .From(partition: "same")
+            .To(partition: "same")
+            .Run()).CopiedCount;
         copied.Should().Be(0);
         (await CountIn("same")).Should().Be(2);
     }

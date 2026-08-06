@@ -10,6 +10,7 @@ using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Identity.Infrastructure;
+using Koan.Identity.Erasure;
 using Koan.Identity.Reconciliation;
 using Koan.Web.Auth.Domain;
 
@@ -32,7 +33,7 @@ public sealed class SecIdentityModule : KoanModule
 
         // Layer 1 — management services (offline-capable; the optional Web package exposes them as APIs).
         services.TryAddSingleton<Management.SessionService>();
-        services.TryAddSingleton<Management.IdentityLifecycleService>();
+        services.TryAddScoped<Management.IdentityLifecycleService>();
         services.TryAddSingleton<Management.IdentityLinkService>(); // D5 — explicit account-linking
 
         // Layer 2 — access model: the global role binding + the contributor-pipeline effective-access resolver +
@@ -43,6 +44,11 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddScoped<Access.AccessExplainer>();
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
+
+        // SEC-0009 — semantic owners compose one privacy erasure plan. Scoped registration permits an
+        // application-owned contributor to use its ordinary scoped dependencies without special wiring.
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IIdentityErasureContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IIdentityErasureContributor), type));
 
         // Layer 3 — day-2 power: safe impersonation, JIT/time-boxed grants, tamper-evident audit.
         services.TryAddSingleton<Impersonation.ImpersonationService>();
@@ -116,9 +122,13 @@ public sealed class SecIdentityModule : KoanModule
     {
         module.Describe(Version);
         var configured = cfg.GetValue<IdentityPosture?>($"{IdentityOptions.SectionPath}:Posture");
+        var auditSnapshotMode = cfg.GetValue<Audit.IdentityAuditSnapshotMode?>(
+            $"{IdentityOptions.SectionPath}:{nameof(IdentityOptions.AuditSnapshotMode)}")
+            ?? Audit.IdentityAuditSnapshotMode.PrivacySafe;
         var posture = IdentityPostureResolver.Resolve(env.IsDevelopment(), configured);
         var source = configured is null ? (env.IsDevelopment() ? "dev-open" : "closed") : "override";
         module.SetSetting("Identity", b => b.Value(
-            $"posture={posture} ({source}); durable person + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2)"));
+            $"posture={posture} ({source}); audit={auditSnapshotMode}; erasure=preview+owner-receipt; " +
+            "durable person + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2)"));
     }
 }

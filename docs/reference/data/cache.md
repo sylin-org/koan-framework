@@ -198,3 +198,5 @@ node identity.
   remains a separate audited control plane.
 
 See the [architecture guide](../../architecture/koan-cache-module.md) for the internal boundary.
+The maintainer-facing [cache identity convergence](../../architecture/cache-scope-key-convergence.md)
+explains why repository access and explicit eviction share one rendered key plan.

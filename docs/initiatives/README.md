@@ -4,10 +4,10 @@ domain: framework
 title: "Koan Initiatives"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-07-27
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-16
+  date_last_tested: 2026-07-27
   status: verified
   scope: initiative index and links
 ---

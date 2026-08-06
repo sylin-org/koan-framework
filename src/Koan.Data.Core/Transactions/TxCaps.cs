@@ -10,8 +10,14 @@ namespace Koan.Data.Core.Transactions;
 /// </summary>
 public static class TxCaps
 {
-    /// <summary>Local (per-adapter) transactions via the Direct API.</summary>
+    /// <summary>
+    /// A genuine native local transaction. The logical Entity coordinator does not publish this token;
+    /// Direct/provider transaction implementations may publish it only when they own a native boundary.
+    /// </summary>
     public static readonly Capability Local = new("tx.local");
+
+    /// <summary>Deferred, explicitly non-atomic coordination of ordinary Entity operations.</summary>
+    public static readonly Capability DeferredCoordination = new("tx.deferredCoordination");
 
     /// <summary>Distributed (cross-adapter atomic) transactions.</summary>
     public static readonly Capability Distributed = new("tx.distributed");

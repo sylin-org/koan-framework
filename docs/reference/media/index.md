@@ -1,7 +1,7 @@
 ---
 type: REFERENCE
 domain: media
-title: "Media Pillar Reference"
+title: "Serve named media derivatives"
 audience: [developers, architects, support-engineers, ai-agents]
 last_updated: 2026-07-18
 framework_version: v0.20.0
@@ -12,7 +12,7 @@ validation:
   scope: recipe discovery, configuration, startup facts, pipeline, Entity source, and HTTP rendering
 ---
 
-# Media pillar reference
+# Serve named media derivatives
 
 Koan Media turns a stored Entity original plus a named recipe into inspectable, on-demand HTTP rendering.
 The application declares media meaning; Koan owns recipe discovery, validation, execution, negotiation, and
@@ -215,6 +215,9 @@ its storage. Applications that own deletion currently perform targeted derivativ
 context-free sweep: it cannot safely infer source absence across every tenant/access axis.
 
 ## Evidence
+
+For a task-oriented path from a direct transform to an Entity-backed HTTP recipe, use
+[Media recipes](../../guides/media-recipes-howto.md).
 
 - Media Core suite: recipe grammar, pipeline, formats, negotiation, limits, derivation behavior, and errors.
 - Media Web hosted suite: 7/7 for automatic/explicit/ambiguous source selection, Entity access gating, persisted

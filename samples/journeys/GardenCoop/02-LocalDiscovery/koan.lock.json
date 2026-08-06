@@ -8,15 +8,15 @@
   "modules": [
     {
       "id": "Koan.AI",
-      "version": "0.18"
+      "version": "0.20"
     },
     {
       "id": "Koan.AI.Connector.Onnx",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.AI.Contracts",
-      "version": "0.17"
+      "version": "0.20"
     },
     {
       "id": "Koan.Cache.Abstractions",
@@ -32,35 +32,35 @@
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Relational.Abstractions",
-      "version": "0.20"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Vector",
-      "version": "0.18"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Vector.Abstractions",
-      "version": "0.17"
+      "version": "0.21"
     },
     {
       "id": "Koan.Data.Vector.Connector.SqliteVec",
-      "version": "0.17"
+      "version": "0.21"
     },
     {
       "id": "Koan.Security.Trust",

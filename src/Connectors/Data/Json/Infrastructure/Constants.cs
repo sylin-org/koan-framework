@@ -1,26 +1,32 @@
 namespace Koan.Data.Connector.Json.Infrastructure;
 
-public static class Constants
+internal static class Constants
 {
-    public static class Provider
+    internal static class Provider
     {
-        public const string Name = "json";
+        internal const string Name = "json";
+        internal const string ReferenceIdentity = "Koan.Data.Connector.Json";
+        internal const string DefaultSource = "Default";
+        internal const int Priority = 0;
+        internal const int MaximumFilesPerHost = 1024;
+        internal const long MaximumFileBytes = 64L * 1024 * 1024;
     }
 
-    public static class Configuration
+    internal static class Configuration
     {
-        public const string Section_Data = "Koan:Data:Json";
-        public const string Section_Sources_Default = "Koan:Data:Sources:Default:json";
-
-        public static class Keys
-        {
-            public const string DirectoryPath = nameof(DirectoryPath);
-        }
+        internal const string Section = "Koan:Data:Json";
+        internal const string DefaultSourceSection = "Koan:Data:Sources:Default:json";
+        internal const string DirectoryPath = nameof(JsonDataOptions.DirectoryPath);
     }
 
-    public static class Bootstrap
+    internal static class Storage
     {
-        public const string DirectoryPath = "data.json.directory";
+        internal const string Extension = ".json";
+        internal const char PartitionSeparator = '#';
+    }
+
+    internal static class Bootstrap
+    {
+        internal const string DirectoryPath = "data.json.directory";
     }
 }
-

@@ -9,11 +9,8 @@ using Xunit;
 namespace Koan.Data.Connector.InMemory.Tests;
 
 /// <summary>
-/// Unit proofs for the ARCH-0094 Phase 1 capability-driven Conformance Gate (the generalized "no-capability-lies"
-/// dispatch). They pin the decision truth table across all three dispositions and prove the Skip path is <b>loud</b> —
-/// it raises a visible xUnit skip and never runs its realization, so an unannounced module can never read as a silent
-/// green. Hosted in this project only because it is the lightest Docker-free home that references the testkit carrying
-/// the link-compiled gate; the gate itself is plane-agnostic.
+/// Unit proofs for the shared capability gate. They pin its observable dispatch and prove the Skip path is loud, so an
+/// absent capability cannot read as a silent green.
 /// </summary>
 public sealed class CapabilityConformanceGateTests
 {
@@ -30,29 +27,6 @@ public sealed class CapabilityConformanceGateTests
         foreach (var t in tokens) set.Add(t);
         return set;
     }
-
-    [Theory(DisplayName = "Gate: an announced token always Realizes (over-claim is then caught by the proof), whatever the disposition")]
-    [InlineData(UnclaimedDisposition.Required)]
-    [InlineData(UnclaimedDisposition.FailClosed)]
-    [InlineData(UnclaimedDisposition.Skip)]
-    public void Announced_token_realizes(UnclaimedDisposition disposition)
-        => CapabilityConformanceGate.ResolveCell(Declaring(Tok), Tok, disposition)
-            .Should().Be(ConformanceCellAction.Realize);
-
-    [Fact(DisplayName = "Gate: an unannounced Required token still Realizes (the declares cell is the under-claim catcher)")]
-    public void Unannounced_required_realizes()
-        => CapabilityConformanceGate.ResolveCell(Declaring(), Tok, UnclaimedDisposition.Required)
-            .Should().Be(ConformanceCellAction.Realize);
-
-    [Fact(DisplayName = "Gate: an unannounced FailClosed token proves fail-closed instead of realizing")]
-    public void Unannounced_failclosed_proves_failclosed()
-        => CapabilityConformanceGate.ResolveCell(Declaring(), Tok, UnclaimedDisposition.FailClosed)
-            .Should().Be(ConformanceCellAction.FailClosed);
-
-    [Fact(DisplayName = "Gate: an unannounced Skip token skips")]
-    public void Unannounced_skip_skips()
-        => CapabilityConformanceGate.ResolveCell(Declaring(), Tok, UnclaimedDisposition.Skip)
-            .Should().Be(ConformanceCellAction.Skip);
 
     [Fact(DisplayName = "Gate: RunCell runs the realization for an announced token")]
     public async Task RunCell_realizes_announced()

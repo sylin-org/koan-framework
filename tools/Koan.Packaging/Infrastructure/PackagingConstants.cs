@@ -11,7 +11,6 @@ internal static class PackagingConstants
 
     public static class PackageValidation
     {
-        public const string PreviewVersionPrefix = "0.20.";
         public const string NuGetFlatContainerBaseUrl = "https://api.nuget.org/v3-flatcontainer/";
         public const string NuGetVersionsIndexFile = "index.json";
     }
@@ -27,19 +26,19 @@ internal static class PackagingConstants
         [
             ("supported-foundation",
                 "An admitted part of Koan's recommended application base with documented limits and terminal evidence.",
-                "Its owner and public Koan dependencies carry the 0.20 patch-compatibility promise."),
+                "Its owner and public Koan dependencies carry their declared patch-compatibility promise."),
             ("supported-extension",
                 "An admitted optional capability with documented prerequisites, limits, and terminal evidence.",
-                "Its owner and public Koan dependencies carry the 0.20 patch-compatibility promise."),
+                "Its owner and public Koan dependencies carry their declared patch-compatibility promise."),
             ("verified",
                 "Focused executable evidence covers the claim's stated boundary.",
-                "Evidence is current, but the claim has not been admitted to the 0.20 support promise."),
+                "Evidence is current, but the claim has not been admitted to a supported compatibility line."),
             ("demonstrated",
                 "At least one executable path shows the capability working within stated limits.",
                 "The path is useful evidence, not a support or patch-compatibility promise."),
             ("experimental",
                 "An implemented capability is available for evaluation while its public shape or guarantees may change.",
-                "Expect revision; do not rely on 0.20 compatibility unless a separate supported claim says otherwise."),
+                "Expect revision; do not rely on patch compatibility unless a separate supported claim says otherwise."),
             ("specified",
                 "The intended public outcome is documented, but terminal implementation or external proof remains pending.",
                 "Treat it as planned contract evidence, not an available support promise."),

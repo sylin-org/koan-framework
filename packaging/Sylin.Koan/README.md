@@ -9,9 +9,8 @@ Transport, and a bounded JSON provider for an immediate persistent result.
 dotnet add package Sylin.Koan
 ```
 
-This package belongs to Koan's supported 0.20 preview foundation. Public-feed publication follows the final
-package-only proof; the same command already runs against the exact locally compiled candidate used by release
-validation.
+The generated [product surface](../../docs/reference/product-surface.md) owns support maturity and
+publication truth for this package.
 
 ## Meaningful result
 

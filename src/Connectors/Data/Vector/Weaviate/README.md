@@ -1,35 +1,62 @@
 # Sylin.Koan.Data.Vector.Connector.Weaviate
 
-Use Weaviate behind Koan's entity-first vector API. Referencing this package activates the adapter; `AddKoan()` owns
-registration, provider election, schema naming, health participation, and startup reporting.
-
-## Install and use
+Use Weaviate as a durable Koan vector source without exposing collection, schema, vectorizer, GraphQL, or settling
+ceremony to application code.
 
 ```powershell
 dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
 ```
 
-```csharp
-public sealed class Article : Entity<Article> { }
+## Usage
 
-await Vector<Article>.Save(article.Id, embedding, new { category = "support" });
-var matches = await Vector<Article>.Search(embedding, topK: 12);
+```csharp
+services.AddKoan(koan => koan.Data
+    .Source("Search")
+    .Vector<Article>(space => space
+        .Name("content")
+        .Dimensions(1536)
+        .Metric(VectorMetric.Cosine)
+        .Visibility(VectorVisibility.Session)));
+
+await Vector<Article>.Save(article.Id, embedding, new { article.Category });
+var matches = await Vector<Article>.Search(embedding, query => query
+    .Top(12)
+    .Where(Filter.Eq("Category", "support")));
 ```
 
-No Weaviate-specific registration is required. With Weaviate at `http://localhost:8080`, no configuration is required.
-Set `Koan:Data:Weaviate:Endpoint` for another deployment and `ApiKey` when authentication is enabled.
+The local default is `http://localhost:8080`. Configure placement or authentication only when needed:
 
-Weaviate derives dimension from the first embedding and rejects later dimension changes for that entity collection.
-Koan defaults `topK` to 10; an explicit positive value is sent unchanged.
+```json
+{
+  "Koan": {
+    "Data": {
+      "Weaviate": {
+        "Endpoint": "https://cluster.example.weaviate.network",
+        "ApiKey": "use-a-secret-provider"
+      }
+    }
+  }
+}
+```
 
-## Honest capability boundary
+Source-specific endpoint, `StorageLifecycle`, and `Access` belong under `Koan:Data:Sources:{name}` like every Koan
+adapter. The declared vector plan—not provider options—owns dimensions, metric, model, space, source, and visibility.
 
-Weaviate supports KNN and hybrid text/vector search, native search continuation, metadata filtering, bulk operations,
-embedding reads, export, collection clear, and dynamic collection naming. Its filter operator set is deliberately
-declared and smaller than Koan's full AST (notably no `In`); unsupported predicates fail before I/O instead of silently
-broadening a query.
+## Guarantees
 
-When `Koan.ZenGarden` is also referenced and active, its Weaviate offering becomes one health-checked discovery
-candidate. Without that engine the capability remains inert. An explicit native endpoint always wins.
+- Self-provided vectors; Weaviate never vectorizes Entity data implicitly.
+- Fixed schema and immutable plan marker, validated before use.
+- Complete point reads: logical ID, original vector, and lossless neutral metadata.
+- Native bounded metadata prefilters for equality, set, collection membership, size, existence, and boolean composition.
+- Cosine, Euclidean, and dot-product distance normalization to finite Koan similarity in `[0,1]`.
+- Awaited Session visibility through `ALL` mutations and a bounded HNSW queue barrier.
+- Source, partition, and row-scope isolation across reads and mutations.
+- Read-only and External source policies fail before prohibited mutation.
 
-See [TECHNICAL.md](./TECHNICAL.md) for layered discovery, naming, health, and failure behavior.
+## Explicit limits
+
+Weaviate is not presented as a full ORM or a generic GraphQL client. The adapter declines portable hybrid search,
+Eventual visibility, search continuation, streaming export, atomic batch, and multiple vectors per Entity. Range and
+text-pattern metadata predicates are not claimed because the fixed lossless token projection cannot realize them
+exactly without dynamic user schema. Ordered batch methods remain available with per-item outcomes, but the adapter
+does not label serial create/replace behavior as native bulk.

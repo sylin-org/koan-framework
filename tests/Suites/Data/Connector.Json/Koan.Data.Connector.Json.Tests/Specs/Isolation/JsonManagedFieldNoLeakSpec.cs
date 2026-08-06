@@ -23,7 +23,7 @@ public sealed class JsonManagedFieldNoLeakSpec(JsonFixture fixture, ITestOutputH
     public async Task Json_realizes_shared_mode()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        await using var host = await BootAsync(ManagedFieldNoLeak.Declare);
 
         // The generic, tenancy-independent managed-field oracle: registers __scope, runs the full no-leak matrix against
         // whatever adapter the ambient host resolves (here Json), and resets the registry on exit.

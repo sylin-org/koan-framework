@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -12,16 +14,16 @@ namespace Koan.Data.Core;
 /// <summary>
 /// The one shared managed-field ⇄ JSON bridge (ARCH-0103 §5, §9 — lifted from the relational trio's
 /// <c>ManagedFieldContractResolver</c>). It centralises the knowledge of which invisible <c>__</c>-keys a type carries
-/// (<see cref="ManagedFieldRegistry"/>) and how they ride a serialized record, so both JSON-serializing storage families
+/// (<see cref="ManagedFieldRegistry"/>) and how they ride a serialized record, so JSON-serializing stores
 /// stamp the framework-managed discriminator the same way instead of each inventing its own:
 /// <list type="bullet">
 /// <item><b>The relational trio</b> (SQLite / Postgres / SqlServer) uses it as a <see cref="DefaultContractResolver"/>:
 /// it injects each applicable managed field into the entity's persisted JSON column from the ambient write scope
 /// (<see cref="ManagedFieldWriteScope.Effective"/>); the database then extracts them via <c>json_extract</c>.</item>
-/// <item><b>The <c>KeyValueStore</c> JSON-text family</b> (Json / Redis) uses the static <see cref="InjectManaged"/> /
+/// <item><b>JSON-text stores</b> (Json and Redis) use the static <see cref="InjectManaged"/> /
 /// <see cref="ExtractManaged"/> pair: it merges an explicit <b>per-record</b> managed dictionary into / out of the
 /// serialized value (the record carries its own stamped values, decoupled from the ambient scope at persist time), and
-/// the family's in-memory hybrid read-filter then matches it.</item>
+/// their bounded in-memory filter paths then match it.</item>
 /// </list>
 ///
 /// <para><b>Off ⇒ byte-identical:</b> when no module registers a managed field (<see cref="ManagedFieldRegistry.IsEmpty"/>)
@@ -30,7 +32,7 @@ namespace Koan.Data.Core;
 /// managed keys lead with <c>'_'</c> (a fixed point of camel-casing) so the write literal and the read literal stay
 /// identical on adapters that camel-case property names.</para>
 /// </summary>
-public sealed class ManagedFieldJsonInjector : DefaultContractResolver
+public sealed class ManagedFieldJsonInjector : EntityJsonContractResolver
 {
     private readonly IReadOnlyList<DataSegmentationField> _segmentationFields;
 
@@ -69,6 +71,7 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
         string name,
         Type clrType)
     {
+        EntityFamilyStorage.EnsureFieldAvailable(name, "A framework-managed field");
         if (props.Any(p => string.Equals(p.PropertyName, name, StringComparison.Ordinal)))
             return;
 
@@ -113,7 +116,10 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
     {
         if (managed is null || managed.Count == 0) return;
         foreach (var kv in managed)
+        {
+            EntityFamilyStorage.EnsureFieldAvailable(kv.Key, "A framework-managed field");
             json[kv.Key] = kv.Value is null ? JValue.CreateNull() : JToken.FromObject(kv.Value);
+        }
     }
 
     /// <summary>
@@ -137,12 +143,14 @@ public sealed class ManagedFieldJsonInjector : DefaultContractResolver
         Dictionary<string, object?>? dict = null;
         foreach (var d in managed)
         {
+            EntityFamilyStorage.EnsureFieldAvailable(d.StorageName, "A framework-managed field");
             if (!json.TryGetValue(d.StorageName, out var tok)) continue;
             dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);
             dict[d.StorageName] = tok.Type == JTokenType.Null ? null : tok.ToObject(d.ClrType);
         }
         foreach (var field in segmented)
         {
+            EntityFamilyStorage.EnsureFieldAvailable(field.StorageName, $"Segmentation dimension '{field.DimensionId}'");
             if (dict?.ContainsKey(field.StorageName) == true) continue;
             if (!json.TryGetValue(field.StorageName, out var tok)) continue;
             dict ??= new Dictionary<string, object?>(StringComparer.Ordinal);
