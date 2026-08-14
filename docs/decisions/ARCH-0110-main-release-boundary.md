@@ -1,10 +1,14 @@
 # ARCH-0110 — Main-boundary independently versioned package releases
 
-**Status**: Accepted
+**Status**: Superseded by [ARCH-0124](ARCH-0124-single-package-release-train.md)
 **Date**: 2026-07-14
 **Amended**: 2026-08-06 — dev is the sole development coalescence point; main remains the publication boundary
 **Deciders**: Framework maintainer
 **Scope**: Package versioning and NuGet publication
+
+> Historical record: ARCH-0124 replaces project-local versions and `main`-push publication with one
+> root release train and an explicit tag on validated `dev`. The rationale below is preserved as the
+> record of the former path.
 
 ## Context
 

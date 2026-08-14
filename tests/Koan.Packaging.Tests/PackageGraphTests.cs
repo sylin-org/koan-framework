@@ -34,54 +34,14 @@ public sealed class PackageGraphTests
     }
 
     [Fact]
-    public void ReverseClosureIncludesRootsAndAllTransitiveDependents()
-    {
-        var core = Project("Sylin.Koan.Core");
-        var data = Project("Sylin.Koan.Data", Reference(core));
-        var app = Project("Sylin.Koan.App", Reference(data));
-        var unrelated = Project("Sylin.Koan.Unrelated");
-        var graph = new PackageGraph([unrelated, app, data, core]);
-
-        var closure = graph.ReverseDependentClosure([core.PackageId]);
-
-        Assert.Equal([core.PackageId, data.PackageId, app.PackageId], closure);
-        Assert.DoesNotContain(unrelated.PackageId, closure);
-    }
-
-    [Fact]
-    public void SuppressedPackageDependenciesStillParticipateInSourceClosure()
+    public void SuppressedPackageDependenciesRemainSourceReferences()
     {
         var core = Project("Sylin.Koan.Core");
         var tool = Project("Sylin.Koan.Tool", suppressDependenciesWhenPacking: true, Reference(core));
         var graph = new PackageGraph([tool, core]);
 
-        Assert.Equal([core.PackageId, tool.PackageId], graph.ReverseDependentClosure([core.PackageId]));
         Assert.Equal([core.PackageId], graph.DependenciesOf(tool.PackageId));
         Assert.Empty(graph.PackageDependenciesOf(tool.PackageId));
-    }
-
-    [Fact]
-    public void ReverseClosureUnionsMultipleRootsDeterministically()
-    {
-        var left = Project("Sylin.Koan.Left");
-        var right = Project("Sylin.Koan.Right");
-        var bridge = Project("Sylin.Koan.Bridge", Reference(left), Reference(right));
-        var graph = new PackageGraph([bridge, right, left]);
-
-        var closure = graph.ReverseDependentClosure([right.PackageId, left.PackageId]);
-
-        Assert.Equal([left.PackageId, right.PackageId, bridge.PackageId], closure);
-    }
-
-    [Fact]
-    public void RejectsUnknownRoots()
-    {
-        var graph = new PackageGraph([Project("Sylin.Koan.Core")]);
-
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            graph.ReverseDependentClosure(["Sylin.Koan.Missing"]));
-
-        Assert.Contains("Sylin.Koan.Missing", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

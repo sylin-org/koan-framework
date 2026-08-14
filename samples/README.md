@@ -49,7 +49,7 @@ application learn something new without losing what already worked.
 Run any sample from the repository root with the command on its page. On Windows, its `start.bat`
 does the same thing from any directory and forwards any application arguments.
 
-These applications target the Koan 0.20 preview. See [what works today](../docs/reference/what-works.md)
+These applications target the stable Koan 1.0 train. See [what works today](../docs/reference/what-works.md)
 when deciding what to add to your own application.
 
 Want to see Koan inside a standalone product? Explore

@@ -32,8 +32,9 @@ guessed "works".
   tree* — so dormant/untested pillars are rendered `unknown since 2026-06-11` per the
   honesty rule, not "exercised on 2026-06-11".
 - **Guards marked `(local)`** run only in the local green-ratchet. `pr-gate.yml` protects pull
-  requests targeting `main`; `release-on-main.yml` packs and publishes after merge.
-  The cheap surface-ledger parser runs inside `pr-gate.yml`; it does not run the suites.
+  requests targeting `dev`; an explicit matching version tag certifies and publishes the complete
+  active package train. The cheap surface-ledger parser runs inside `pr-gate.yml`; it does not run
+  the suites.
 
 | Surface | Exercised by | Last exercised | Guard | Notes |
 |---|---|---|---|---|

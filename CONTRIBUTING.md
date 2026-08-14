@@ -40,8 +40,8 @@ and expected corrective failure. Run the repository’s relevant lint/example ch
 
 ## Keep one public story
 
-- Current guidance starts at the 0.20 preview, `AddKoan()`, the four-line host, and `Entity<T>`.
-- The [generated product surface](docs/reference/product-surface.md) owns support maturity and package lines.
+- Current guidance starts at the stable 1.0 train, `AddKoan()`, the four-line host, and `Entity<T>`.
+- The [generated product surface](docs/reference/product-surface.md) projects the active package inventory and capability maturity.
 - Link to one canonical explanation instead of copying another current guide.
 - Keep ADRs, initiatives, assessments, and superseded plans as dated evidence—not required user instructions.
 - Update package companions, templates, samples, skills, or feedback guidance when your public change affects them.

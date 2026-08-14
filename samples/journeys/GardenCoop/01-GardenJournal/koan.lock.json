@@ -2,65 +2,65 @@
   "schema": 2,
   "app": {
     "name": "GardenCoop.C01",
-    "koan": "0.20",
+    "koan": "1.0",
     "tfm": "net10.0"
   },
   "modules": [
     {
       "id": "Koan.Cache.Abstractions",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Core",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Data.Abstractions",
-      "version": "0.21"
+      "version": "1.0"
     },
     {
       "id": "Koan.Data.Connector.Sqlite",
-      "version": "0.21"
+      "version": "1.0"
     },
     {
       "id": "Koan.Data.Core",
-      "version": "0.21"
+      "version": "1.0"
     },
     {
       "id": "Koan.Data.Relational",
-      "version": "0.21"
+      "version": "1.0"
     },
     {
       "id": "Koan.Data.Relational.Abstractions",
-      "version": "0.21"
+      "version": "1.0"
     },
     {
       "id": "Koan.Security.Trust",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web.Admin",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web.Auth",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web.Auth.Abstractions",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web.Auth.Connector.Test",
-      "version": "0.20"
+      "version": "1.0"
     },
     {
       "id": "Koan.Web.OpenApi",
-      "version": "0.20"
+      "version": "1.0"
     }
   ],
   "directReferences": [

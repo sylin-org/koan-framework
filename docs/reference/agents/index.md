@@ -5,7 +5,7 @@ title: "Agents"
 audience: [developers, operators, architects, ai-agents]
 status: current
 last_updated: 2026-07-23
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-22
   status: verified
@@ -91,4 +91,4 @@ An agent does not have to guess what it connected to:
 
 - [Build an agent-native workflow](../../guides/mcp-agent-native-howto.md)
 - [Reach Koan over MCP HTTP](../../guides/mcp-http-sse-howto.md)
-- [See what works in Koan 0.20](../what-works.md)
+- [See what works in Koan 1.0](../what-works.md)

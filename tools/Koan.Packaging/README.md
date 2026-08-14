@@ -6,16 +6,15 @@ Repository-local package inventory and product-surface inspection.
 dotnet run --project tools/Koan.Packaging -- inventory
 dotnet run --project tools/Koan.Packaging -- quality
 dotnet run --project tools/Koan.Packaging -- product-surface --check
-dotnet run --project tools/Koan.Packaging -- api-baselines
 ```
 
-`inventory` evaluates packable MSBuild projects and requires one local `version.json` per package.
+`inventory` evaluates packable MSBuild projects and requires each one to inherit the root `version.json`.
 `quality` reports package metadata and documentation posture. `product-surface` compiles the declared
-public capability surface and check mode rejects generated drift. `api-baselines` verifies supported
-assembly packages against the earliest public 0.20 baseline. Product claims retain product judgment
-and point to family-owned evidence; ordinary test projects and direct provider workflows execute that
-evidence without a second admission vocabulary.
+public capability surface; check mode rejects drift in the checked-in Markdown projection. JSON is
+generated on demand for release automation instead of checked in twice. Its package list is the
+complete release inventory. Claims document evidence and maturity; they do not select which packages
+ship. Supported claims must include the complete public package dependency closure.
 
-The tool does not calculate a release wave, change Git, pack artifacts, publish packages, or access a
-credential. NuGet publication is the single manual GitHub Actions workflow documented in
+The tool does not change Git, pack artifacts, publish packages, query NuGet, or access a credential.
+NuGet publication is the single GitHub Actions workflow documented in
 [NuGet publishing](../../docs/engineering/nuget-publishing.md).

@@ -1,8 +1,12 @@
 <Project>
   <PropertyGroup>
-    <!-- First-publication floors recorded outside package-owned NBGV paths. Adding an immutable API
-         floor after NuGet indexing must not manufacture a behaviorless patch package. Existing
-         project-local declarations remain valid; new promotions use this central policy owner. -->
+    <!-- Bootstrap 1.0.0 keeps the historical package API floors below and in project files.
+         After the complete 1.0.0 train is public, set this once to 1.0.0. It then overrides those
+         historical floors as the shared SDK package-validation baseline for every assembly package. -->
+    <KoanTrainBaselineVersion Condition="'$(KoanTrainBaselineVersion)' == ''" />
+    <PackageValidationBaselineVersion Condition="'$(KoanTrainBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">$(KoanTrainBaselineVersion)</PackageValidationBaselineVersion>
+
+    <!-- Historical bootstrap floors. Keep these until the shared 1.0.0 baseline is established. -->
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage.Abstractions'">0.20.0</PackageValidationBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage'">0.20.0</PackageValidationBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(PackageValidationBaselineVersion)' == '' and '$(PackageId)' == 'Sylin.Koan.Storage.Connector.Local'">0.20.0</PackageValidationBaselineVersion>
@@ -15,20 +19,18 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- ARCH-0120: this targets file is evaluated after project-local or central baseline declaration.
-         Standard SDK validation protects later packs; release-on-main's api-baselines guard permits
-         a missing baseline only until the first immutable public 0.20 artifact exists. -->
-    <EnablePackageValidation Condition="'$(PackageValidationBaselineVersion)' != ''">true</EnablePackageValidation>
+    <!-- Use the SDK's built-in package validation whenever an assembly package has a baseline. -->
+    <EnablePackageValidation Condition="'$(PackageValidationBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">true</EnablePackageValidation>
   </PropertyGroup>
 
-  <!--
-    ARCH-0085: package versions are computed by Nerdbank.GitVersioning from each package's
-    version.json (operator-owned major.minor) + git commit height (automatic patch). nbgv sets
-    Version / AssemblyVersion / FileVersion directly. The old two-tier package-kind scheme from
-    ARCH-0082 is superseded and its non-behavioral metadata has been deleted.
+  <Target Name="ValidateKoanPackageTrainBaseline"
+          BeforeTargets="Pack"
+          Condition="'$(PublicRelease)' == 'true' and '$(IsPackable)' != 'false'">
+    <Error Condition="'$(PackageVersion)' != '1.0.0' and '$(KoanTrainBaselineVersion)' == ''"
+           Text="Public package train $(PackageVersion) requires KoanTrainBaselineVersion. After the complete 1.0.0 train is public, set the central property to 1.0.0 before packing another release." />
+  </Target>
 
-    See docs/decisions/ARCH-0085-versioning-compatibility-and-automation.md.
-  -->
+  <!-- NBGV computes every package version from the root release line and shared Git height. -->
 
   <!-- ARCH-0085 §3: rewrite Koan→Koan ProjectReference dependency versions to bounded
        compatibility ranges at pack time. See build/compat-ranges.targets. -->

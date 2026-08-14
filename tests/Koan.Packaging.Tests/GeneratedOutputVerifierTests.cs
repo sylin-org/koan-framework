@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using Koan.Packaging.Services;
 using Xunit;
 
@@ -12,11 +11,11 @@ public sealed class GeneratedOutputVerifierTests : IDisposable
         Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public void AcceptsAnExactGeneratedOutput()
+    public void AcceptsAnExactGeneratedMarkdownProjection()
     {
-        Seed("docs/reference/surface.json", "current" + Environment.NewLine);
+        Seed("docs/reference/surface.md", "current" + Environment.NewLine);
 
-        new GeneratedOutputVerifier(root).RequireMatch("docs/reference/surface.json", "current");
+        new GeneratedOutputVerifier(root).RequireMatch("docs/reference/surface.md", "current");
     }
 
     [Fact]
@@ -29,30 +28,7 @@ public sealed class GeneratedOutputVerifierTests : IDisposable
 
         Assert.Contains("docs/reference/surface.md", error.Message, StringComparison.Ordinal);
         Assert.Contains("stale", error.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("product-surface --output", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void DevPullRequestGateChecksProductTruthThenCheapRepositoryCoherence()
-    {
-        var workflow = File.ReadAllText(Path.Combine(FindKoanRoot(), ".github", "workflows", "pr-gate.yml"));
-        var surface = workflow.IndexOf(
-            "dotnet run --project tools/Koan.Packaging -- product-surface --check",
-            StringComparison.Ordinal);
-        var baselines = workflow.IndexOf(
-            "dotnet run --project tools/Koan.Packaging -- api-baselines",
-            StringComparison.Ordinal);
-        var repositoryCheck = workflow.IndexOf("./scripts/green-ratchet.ps1", StringComparison.Ordinal);
-
-        Assert.Contains("branches: [dev]", workflow, StringComparison.Ordinal);
-        Assert.True(surface >= 0, "the dev PR gate must execute the real product-surface compiler");
-        Assert.True(baselines > surface, "the supported API-baseline guard must follow valid product truth");
-        Assert.True(repositoryCheck > baselines, "both product guards must pass before repository coherence");
-        Assert.Contains("-SkipTests", workflow, StringComparison.Ordinal);
-        Assert.Contains("scripts/lint-surfaces.sh docs/SURFACES.md", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("dotnet test", workflow, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("terminal-outcomes", workflow, StringComparison.Ordinal);
-        Assert.DoesNotContain("$claims.admission", workflow, StringComparison.Ordinal);
+        Assert.Contains("product-surface --markdown", error.Message, StringComparison.Ordinal);
     }
 
     public void Dispose()
@@ -67,7 +43,4 @@ public sealed class GeneratedOutputVerifierTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
     }
-
-    private static string FindKoanRoot([CallerFilePath] string sourceFile = "") =>
-        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(sourceFile)!, "..", ".."));
 }

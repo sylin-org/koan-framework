@@ -4,45 +4,43 @@ domain: framework
 title: "Package versioning"
 audience: [maintainers, release-engineers]
 status: current
-last_updated: 2026-07-20
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 ---
 
 # Package versioning
 
-Each packable project owns its version independently through a project-local `version.json` and
-Nerdbank.GitVersioning (NBGV).
+All active Koan packages share one version. The repository-root `version.json` is the only NBGV
+authority; every packable project inherits it and therefore produces one release train from one
+commit. Shelved and explicitly non-packable projects are outside the train.
 
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "0.20",
-  "versionHeightOffset": -1,
-  "pathFilters": ["."]
-}
-```
+## Change the version
 
-- `version` is deliberate major/minor compatibility intent.
-- Git height supplies the patch.
-- `pathFilters` identifies source that changes the package's bits. Include a sibling path directly
-  when the package embeds output built from that sibling.
-- `PublicRelease=true` produces the stable public identity without a local commit suffix.
+- For an ordinary compatible change, leave `version.json` alone. Git height supplies the patch.
+- From 1.0 onward, advance the root major for a breaking change.
 
-Preview a package before release:
+Do not add a project-local `version.json`, set `Version` in a project, hand-edit a patch, or maintain a
+package-version map. A release tag confirms an already calculated version; it does not calculate one.
+
+Preview the train version from a full-history checkout:
 
 ```powershell
 dotnet nbgv get-version -p src/Koan.Core --public-release=true
 ```
 
-For an ordinary patch, change the package-owned source and leave `version.json` alone. For a pre-1.0
-breaking compatibility change, advance the minor; after 1.0, advance the major. Do not set MSBuild
-`Version`, hand-edit patches, or use tags to influence package identity.
+`PublicRelease=true` removes the development commit suffix. The release workflow requires the
+`vX.Y.Z` tag to equal that stable package version for the tagged commit.
 
-Every packable project must have its own `version.json`. Repository inventory fails correctively when
-one is missing or malformed:
+## Compatibility
 
-```powershell
-dotnet run --project tools/Koan.Packaging -- inventory
-```
+Internal Koan dependencies remain bounded to the next breaking line by
+`build/compat-ranges.targets`. A 1.x package emits `[1.x.y, 2.0.0)`, so an incompatible major mix
+fails at restore even though normal releases use one aligned version.
 
-See [NuGet publishing](nuget-publishing.md) for the explicit release action.
+Assembly packages validate against the preceding public train. The bootstrap `1.0.0` train keeps
+the historical package baselines. Any later `PublicRelease` pack fails while
+`KoanTrainBaselineVersion` is empty. After the complete train is public, set that central property to
+`1.0.0`; it becomes the shared SDK `PackageValidationBaselineVersion` source for subsequent releases.
+
+See [NuGet publishing](nuget-publishing.md) and
+[ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).

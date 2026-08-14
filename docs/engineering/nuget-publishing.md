@@ -4,59 +4,67 @@ domain: framework
 title: "NuGet publishing"
 audience: [maintainers, release-engineers]
 status: current
-last_updated: 2026-08-06
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 ---
 
 # NuGet publishing
 
-Koan integrates development through `dev` and publishes through one GitHub Actions workflow after the
-validated `dev` tree is promoted to `main`. Development commits and open pull requests do not publish
-packages.
+Koan integrates on `dev` and publishes only from an explicit `vX.Y.Z` tag whose commit is reachable
+from `dev`. Reachability makes the tag eligible; the release workflow independently certifies the
+tagged source before any package can publish. Branch pushes and pull requests cannot publish.
 
 ## Prerequisite
 
-The Actions secret `NUGET_API_KEY` available to the repository must contain the existing nuget.org
-publish key. No OIDC configuration, release branch, GitHub Release setting, tag convention, or remote
-state store is required.
+The repository Actions secret `NUGET_API_KEY` must contain the nuget.org publish key. Only the final
+publish job receives it.
 
-## Publish
+## Publish a train
 
-1. Open a focused pull request targeting `dev`. The cheap PR coherence job checks product/API truth, one
-   Release build, lockfiles, and structural documentation/tooling drift; affected behavior tests
-   remain part of developing and reviewing the change.
-2. Merge the pull request into `dev`. Topic branches coalesce nowhere else.
-3. When the integrated tree is ready to publish, promote that exact `dev` tree to `main` as one release
-   change. A deliberate direct commit to `main` has the same publication effect.
-4. Observe **Release packages** on the resulting `main` commit.
+1. Merge focused work to `dev` and resolve its ordinary coherence feedback.
+2. Choose the exact `dev` commit and preview its public NBGV version:
 
-The one job:
+   ```powershell
+   dotnet nbgv get-version -p src/Koan.Core --public-release=true
+   ```
 
-1. checks out full Git history from `main` so NBGV can calculate package versions;
-2. compiles the product surface, requiring local `version.json` ownership and exact agreement between
-   supported claims and every package owner's declared compatibility line;
-3. packs the solution and the packable template project with `PublicRelease=true`; and
-4. pushes only the supported packages matching those declared lines, with `--skip-duplicate`.
+3. Create and push the matching tag. For example:
 
-NuGet package identities are immutable. Rerunning the failed workflow run skips identities already
-present and attempts the remaining packages. A missing key, invalid version owner, pack failure, or
-push failure stops the job. A selected package with zero or multiple matching artifacts also stops
-before that identity is pushed.
+   ```powershell
+   git tag -a v1.0.0 <dev-sha> -m "Release 1.0.0"
+   git push origin v1.0.0
+   ```
 
-## Version changes
+4. Observe **Release packages**. Do not publish from a workstation.
 
-Ordinary changes mint the next patch through Git history. Change the `version` major/minor in the
-owning project's `version.json` only when changing its compatibility tier. See
-[Package versioning](versioning.md).
+The workflow rejects a tag that is not reachable from `origin/dev` or does not equal the stable NBGV
+package version for that commit. It then builds the Release solution and template on the tagged SHA
+before compiling the package inventory and packing.
 
-## Local preview
+## What the workflow proves
 
-```powershell
-dotnet nbgv get-version -p src/Koan.Core --public-release=true
-dotnet run --project tools/Koan.Packaging -- inventory
-```
+The first job has no NuGet credential. It checks the evaluated inventory, builds the public release,
+packs every active package once, verifies the complete local feed, runs the package-only App/JSON
+consumer, hashes the inventory plus package files, and uploads the result.
 
-Do not publish from a workstation, print the API key, or create a parallel package list.
+The publish job downloads that artifact, verifies every hash, derives a dependency-topological order
+from the certified inventory, and pushes dependencies before dependents. Its first attempt verifies
+that all primary identities are absent before pushing any package. If that attempt is interrupted,
+a rerun accepts an existing primary only when every original ZIP entry name and uncompressed byte
+hash matches the certified package; nuget.org's added `.signature.p7s` is the sole excluded entry.
+Certified `.snupkg` sidecars are pushed separately after all primaries. The job cannot rebuild or
+widen the inventory.
 
-The governing decisions are [ARCH-0110](../decisions/ARCH-0110-main-release-boundary.md) for the
-publisher and [ARCH-0121](../decisions/ARCH-0121-claim-scoped-validation.md) for validation boundaries.
+## Failure and recovery
+
+- For a transient registry or credential failure, correct the external cause and rerun only the
+  failed publish job. It reuses and re-hashes the certified artifact, verifies the content of any
+  primary already on nuget.org, and retries the certified symbol sidecars.
+- For a source, inventory, package, or consumer failure, merge a correction to `dev` and create the
+  new version's tag. Do not move a tag whose artifacts may have been published.
+- If local hashes, remote package content, dependency closure, or artifact selection differ,
+  publication stops rather than accepting a mixed train.
+
+There is no `dev`-to-`main` promotion, release branch, parallel package list, or repack-on-publish
+path. See [Package versioning](versioning.md) and
+[ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).

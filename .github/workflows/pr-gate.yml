@@ -6,8 +6,8 @@
 # developed. Whole-repository certification is an explicit milestone activity, not a merge or
 # publication prerequisite.
 #
-# Package publication remains owned by release-on-main.yml after the validated dev tree is promoted
-# to main; the publisher runs no tests.
+# A dev-ancestor tag is release-eligible; the release workflow rebuilds and verifies the exact
+# package inventory and package-only consumer on the tagged SHA before publication.
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: PR gate
@@ -41,9 +41,6 @@ jobs:
 
       - name: Compile product surface and reject generated drift
         run: dotnet run --project tools/Koan.Packaging -- product-surface --check
-
-      - name: Validate supported API baselines
-        run: dotnet run --project tools/Koan.Packaging -- api-baselines
 
       - name: Repository coherence (build + lockfile + docs/tooling lint; no tests)
         shell: pwsh

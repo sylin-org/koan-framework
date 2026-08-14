@@ -60,9 +60,10 @@ it here.
 ## Assessed capability summary
 
 Use the generated [product surface](../../reference/product-surface.md) for the current maturity,
-installable packages, targets, documentation, and evidence projection. Its machine-readable equivalent
-is [`product-surface.json`](../../reference/product-surface.json). The records below retain the deeper
-contract, unsupported scenarios, and open risks without duplicating maturity judgment.
+installable packages, targets, documentation, and evidence projection. Generate a machine-readable
+view on demand with `Koan.Packaging product-surface --output artifacts/product-surface.json`. The
+records below retain the deeper contract, unsupported scenarios, and open risks without duplicating
+maturity judgment.
 
 ## Capability records
 

@@ -5,7 +5,7 @@ title: "Koan documentation"
 audience: [developers, operators, architects, ai-agents]
 status: current
 last_updated: 2026-07-23
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-23
   status: reviewed
@@ -58,4 +58,4 @@ Add what the application asks for. The domain code should remain the easiest par
 - [Troubleshoot a running application](support/troubleshooting.md).
 - [Orient a coding agent](../llms.txt).
 
-> Koan 0.20 is a .NET 10 preview.
+> Koan 1.0 is the stable .NET 10 release train.

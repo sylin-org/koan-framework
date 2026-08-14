@@ -6,7 +6,6 @@ internal sealed class PackageGraph
 {
     private readonly Dictionary<string, PackageProject> projects;
     private readonly Dictionary<string, IReadOnlyList<string>> dependencies;
-    private readonly Dictionary<string, IReadOnlyList<string>> dependents;
 
     public PackageGraph(IReadOnlyCollection<PackageProject> source)
     {
@@ -26,22 +25,6 @@ internal sealed class PackageGraph
                 .Select(path => projectByPath.GetValueOrDefault(Path.GetFullPath(path))?.PackageId)
                 .Where(id => id is not null)
                 .Cast<string>()
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Order(StringComparer.OrdinalIgnoreCase)
-                .ToArray(),
-            StringComparer.OrdinalIgnoreCase);
-
-        var reverse = source.ToDictionary(
-            project => project.PackageId,
-            _ => new List<string>(),
-            StringComparer.OrdinalIgnoreCase);
-        foreach (var (packageId, packageDependencies) in dependencies)
-        {
-            foreach (var dependency in packageDependencies) reverse[dependency].Add(packageId);
-        }
-        dependents = reverse.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyList<string>)pair.Value
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
@@ -67,27 +50,6 @@ internal sealed class PackageGraph
     {
         var project = Project(packageId);
         return project.SuppressDependenciesWhenPacking ? [] : dependencies[packageId];
-    }
-
-    public IReadOnlyList<string> ReverseDependentClosure(IEnumerable<string> roots)
-    {
-        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pending = new Queue<string>();
-        foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase))
-        {
-            _ = Project(root);
-            if (selected.Add(root)) pending.Enqueue(root);
-        }
-
-        while (pending.TryDequeue(out var packageId))
-        {
-            foreach (var dependent in dependents[packageId])
-            {
-                if (selected.Add(dependent)) pending.Enqueue(dependent);
-            }
-        }
-
-        return TopologicalOrder(selected);
     }
 
     public IReadOnlyList<string> TopologicalOrder(IEnumerable<string> packageIds)

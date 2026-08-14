@@ -13,6 +13,11 @@ related:
 
 # ARCH-0121: Claim-scoped validation and a cheap main boundary
 
+> **Amended by [ARCH-0124](ARCH-0124-single-package-release-train.md):** claim-owned development
+> evidence remains current. ARCH-0124 supersedes the claim-selected/main-boundary publication model
+> and owns the complete active inventory, release identity, explicit tag trigger, and certification
+> of the exact package artifacts before publication.
+
 ## Outcome
 
 Koan validates the claim being made, at the owner that can prove it. An ordinary main pull request

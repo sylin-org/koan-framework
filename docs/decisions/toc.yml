@@ -162,7 +162,7 @@
       href: ARCH-0108-corrective-host-context-failures.md
     - name: ARCH-0109 Bootstrap evidence partitioned by composition cost
       href: ARCH-0109-bounded-bootstrap-test-lanes.md
-    - name: ARCH-0110 Main-boundary independently versioned package releases
+    - name: ARCH-0110 Main-boundary independently versioned package releases (superseded)
       href: ARCH-0110-main-release-boundary.md
     - name: ARCH-0111 One host-owned runtime fact envelope
       href: ARCH-0111-unified-runtime-facts.md
@@ -188,6 +188,8 @@
       href: ARCH-0121-claim-scoped-validation.md
     - name: ARCH-0122 Dogfood-derived runtime control and deterministic test seams
       href: ARCH-0122-dogfood-runtime-and-test-seams.md
+    - name: ARCH-0124 One stable release train for all active packages
+      href: ARCH-0124-single-package-release-train.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
