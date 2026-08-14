@@ -3,6 +3,9 @@
   "version": "0.20",
   "versionHeightOffset": -1,
   "pathFilters": [
-    "."
+    ".",
+    "../Koan.Core/version.json",
+    "../Koan.Data.Abstractions/version.json",
+    "../Koan.Data.Core/version.json"
   ]
 }
