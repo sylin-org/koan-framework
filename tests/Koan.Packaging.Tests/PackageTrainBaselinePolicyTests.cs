@@ -10,45 +10,31 @@ public sealed class PackageTrainBaselinePolicyTests
     private const string AssemblyProject = "src/Koan.Core/Koan.Core.csproj";
 
     [Fact]
-    public async Task BootstrapReleaseKeepsTheHistoricalPackageBaseline()
+    public async Task AssemblyPackagesUseTheSharedTrainBaseline()
     {
-        var properties = await EvaluateAsync("1.0.0");
-
-        Assert.Equal("", properties.GetProperty("KoanTrainBaselineVersion").GetString());
-        Assert.Equal("0.20.4", properties.GetProperty("PackageValidationBaselineVersion").GetString());
-        Assert.Equal("true", properties.GetProperty("EnablePackageValidation").GetString());
-    }
-
-    [Theory]
-    [InlineData(AssemblyProject)]
-    [InlineData("templates/Sylin.Koan.Templates.csproj")]
-    public async Task LaterPublicReleaseFailsWithoutTheCentralTrainBaseline(string projectPath)
-    {
-        var result = await new ProcessRunner().RunAsync(
-            "dotnet",
-            Arguments("1.0.1", projectPath: projectPath),
-            FindKoanRoot(),
-            CancellationToken.None);
-
-        Assert.NotEqual(0, result.ExitCode);
-        Assert.Contains("requires KoanTrainBaselineVersion", result.StandardError + result.StandardOutput, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task LaterPublicReleaseUsesTheCentralTrainBaseline()
-    {
-        var properties = await EvaluateAsync("1.0.1", "1.0.0");
+        var properties = await EvaluateAsync("1.0.1");
 
         Assert.Equal("1.0.0", properties.GetProperty("KoanTrainBaselineVersion").GetString());
         Assert.Equal("1.0.0", properties.GetProperty("PackageValidationBaselineVersion").GetString());
         Assert.Equal("true", properties.GetProperty("EnablePackageValidation").GetString());
     }
 
-    private static async Task<JsonElement> EvaluateAsync(string packageVersion, string? trainBaseline = null)
+    [Fact]
+    public async Task ContentOnlyPackagesDoNotReceiveAnAssemblyBaseline()
+    {
+        var properties = await EvaluateAsync("1.0.1", "templates/Sylin.Koan.Templates.csproj");
+
+        Assert.Equal("1.0.0", properties.GetProperty("KoanTrainBaselineVersion").GetString());
+        Assert.Equal("", properties.GetProperty("PackageValidationBaselineVersion").GetString());
+    }
+
+    private static async Task<JsonElement> EvaluateAsync(
+        string packageVersion,
+        string projectPath = AssemblyProject)
     {
         var output = await new ProcessRunner().RequireAsync(
             "dotnet",
-            Arguments(packageVersion, trainBaseline, readProperties: true),
+            Arguments(packageVersion, readProperties: true, projectPath: projectPath),
             FindKoanRoot(),
             CancellationToken.None);
         using var document = JsonDocument.Parse(output);
@@ -57,7 +43,6 @@ public sealed class PackageTrainBaselinePolicyTests
 
     private static IReadOnlyList<string> Arguments(
         string packageVersion,
-        string? trainBaseline = null,
         bool readProperties = false,
         string projectPath = AssemblyProject)
     {
@@ -70,10 +55,6 @@ public sealed class PackageTrainBaselinePolicyTests
             "-property:PublicRelease=true",
             $"-property:PackageVersion={packageVersion}"
         };
-        if (trainBaseline is not null)
-        {
-            arguments.Add($"-property:KoanTrainBaselineVersion={trainBaseline}");
-        }
         if (readProperties)
         {
             arguments.Add("-getProperty:KoanTrainBaselineVersion,PackageValidationBaselineVersion,EnablePackageValidation");
