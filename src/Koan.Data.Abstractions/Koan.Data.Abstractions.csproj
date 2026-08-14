@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageValidationBaselineVersion>0.21.0</PackageValidationBaselineVersion>
     <Description>Provider-neutral Koan data contracts for Entity identity, repositories, structured queries, capabilities, and canonical operations.</Description>
     <PackageTags>$(CommonPackageTags);data;contracts;repository;entity;query;capabilities</PackageTags>
   </PropertyGroup>
