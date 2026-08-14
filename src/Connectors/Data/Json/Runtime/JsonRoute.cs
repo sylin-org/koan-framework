@@ -6,7 +6,12 @@ using Microsoft.Extensions.Configuration;
 namespace Koan.Data.Connector.Json.Runtime;
 
 /// <summary>One canonical, policy-bearing JSON source route. Resolving it never touches storage.</summary>
-internal sealed record JsonRoute(string Source, string DirectoryPath, DataSourcePlan Policy)
+internal sealed record JsonRoute(
+    string Source,
+    string DirectoryPath,
+    JsonStorageLayout Layout,
+    string IndividualFilePath,
+    DataSourcePlan Policy)
 {
     internal static JsonRoute Resolve(
         IConfiguration configuration,
@@ -34,9 +39,44 @@ internal sealed record JsonRoute(string Source, string DirectoryPath, DataSource
         }
 
         var directory = Path.GetFullPath(configured);
+
+        var configuredLayout = AdapterConnectionResolver.GetSourceSetting(
+            configuration,
+            sources,
+            Infrastructure.Constants.Provider.Name,
+            resolvedSource,
+            Infrastructure.Constants.Configuration.Layout,
+            defaults.Layout.ToString(),
+            owner);
+        if (!Enum.TryParse<JsonStorageLayout>(configuredLayout, ignoreCase: true, out var layout) ||
+            !Enum.IsDefined(layout))
+        {
+            throw new InvalidOperationException(
+                $"JSON layout '{configuredLayout}' is invalid for source '{resolvedSource}'. Choose " +
+                $"'{JsonStorageLayout.Aggregate}' or '{JsonStorageLayout.IndividualFiles}'.");
+        }
+
+        var individualFilePath = AdapterConnectionResolver.GetSourceSetting(
+            configuration,
+            sources,
+            Infrastructure.Constants.Provider.Name,
+            resolvedSource,
+            Infrastructure.Constants.Configuration.IndividualFilePath,
+            defaults.IndividualFilePath,
+            owner);
+        if (layout == JsonStorageLayout.IndividualFiles && string.IsNullOrWhiteSpace(individualFilePath))
+        {
+            throw new InvalidOperationException(
+                $"JSON individual-file path is not configured for source '{resolvedSource}'. Set " +
+                $"{Infrastructure.Constants.Configuration.Section}:IndividualFilePath or the source-specific " +
+                "json:IndividualFilePath.");
+        }
+
         return new JsonRoute(
             resolvedSource,
             directory,
+            layout,
+            individualFilePath,
             sources.GetPlan(resolvedSource, Infrastructure.Constants.Provider.Name, directory));
     }
 

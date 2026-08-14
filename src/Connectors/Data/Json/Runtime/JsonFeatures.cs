@@ -30,4 +30,9 @@ internal static class JsonFeatures
         .Add(
             DataCaps.Query.FilterExecution,
             new FilterExecutionProfile(FilterExecutionKind.Scan, SupportsBoundedCandidates: true));
+
+    internal static void DescribeIndividualFilesBackend(ICapabilities capabilities) => capabilities
+        .Add(
+            DataCaps.Query.FilterExecution,
+            new FilterExecutionProfile(FilterExecutionKind.Scan, SupportsBoundedCandidates: true));
 }

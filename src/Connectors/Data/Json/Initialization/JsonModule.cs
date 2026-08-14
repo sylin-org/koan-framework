@@ -16,6 +16,7 @@ public sealed class JsonModule : KoanModule
     {
         services.AddKoanOptions<JsonDataOptions>(Infrastructure.Constants.Configuration.Section);
         services.TryAddSingleton<JsonFileRegistry>();
+        services.TryAddSingleton<JsonIndividualFileRegistry>();
         services.AddSingleton<IDataAdapterFactory, JsonAdapterFactory>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, JsonHealthContributor>());
     }
@@ -38,5 +39,27 @@ public sealed class JsonModule : KoanModule
             source: directory.Source,
             consumers: ["Koan.Data.Connector.Json.Runtime.JsonRoute"],
             sourceKey: directory.ResolvedKey);
+        var layout = Configuration.ReadFirstWithSource(
+            configuration,
+            new JsonDataOptions().Layout.ToString(),
+            $"{Infrastructure.Constants.Configuration.Section}:{Infrastructure.Constants.Configuration.Layout}",
+            $"{Infrastructure.Constants.Configuration.DefaultSourceSection}:{Infrastructure.Constants.Configuration.Layout}");
+        module.AddSetting(
+            Infrastructure.Constants.Bootstrap.Layout,
+            layout.Value,
+            source: layout.Source,
+            consumers: ["Koan.Data.Connector.Json.Runtime.JsonRoute"],
+            sourceKey: layout.ResolvedKey);
+        var individualFilePath = Configuration.ReadFirstWithSource(
+            configuration,
+            new JsonDataOptions().IndividualFilePath,
+            $"{Infrastructure.Constants.Configuration.Section}:{Infrastructure.Constants.Configuration.IndividualFilePath}",
+            $"{Infrastructure.Constants.Configuration.DefaultSourceSection}:{Infrastructure.Constants.Configuration.IndividualFilePath}");
+        module.AddSetting(
+            Infrastructure.Constants.Bootstrap.IndividualFilePath,
+            individualFilePath.Value,
+            source: individualFilePath.Source,
+            consumers: ["Koan.Data.Connector.Json.Runtime.JsonRoute"],
+            sourceKey: individualFilePath.ResolvedKey);
     }
 }

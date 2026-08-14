@@ -42,12 +42,23 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
             this,
             resolvedSource);
 
-        return new JsonRepository<TEntity, TKey>(
-            route,
-            services.GetRequiredService<JsonFileRegistry>(),
-            services.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>(),
-            this,
-            services);
+        return route.Layout switch
+        {
+            JsonStorageLayout.Aggregate => new JsonRepository<TEntity, TKey>(
+                route,
+                services.GetRequiredService<JsonFileRegistry>(),
+                services.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>(),
+                this,
+                services),
+            JsonStorageLayout.IndividualFiles => new JsonIndividualFilesRepository<TEntity, TKey>(
+                route,
+                services.GetRequiredService<JsonIndividualFileRegistry>(),
+                services.GetRequiredService<Koan.Data.Core.Semantics.DataSegmentationPlan>(),
+                this,
+                services),
+            _ => throw new InvalidOperationException(
+                $"JSON layout '{route.Layout}' is not supported for source '{resolvedSource}'.")
+        };
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
