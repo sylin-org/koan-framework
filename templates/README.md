@@ -9,8 +9,8 @@ generated application contains business code and ordinary .NET structure, not fr
 dotnet new install Sylin.Koan.Templates
 ```
 
-This is the canonical Koan 0.20 preview entry. The generated
-[product surface](../docs/reference/product-surface.md) owns package maturity and publication truth.
+This is the canonical stable Koan 1.0 entry. The generated
+[product surface](../docs/reference/product-surface.md) shows the active package inventory and capability maturity.
 
 ## First result
 
@@ -47,9 +47,9 @@ reference priority and uses `.koan/data/Koan.sqlite`; there is no generated `app
 schema script, repository, or version prompt. Add configuration only when the application intends to override a
 derived default.
 
-Each generated project uses the ordinary NuGet patch float `0.20.*`. NuGet selects the latest available
-compatible 0.20 fix and cannot cross into a future breaking 0.21 package. The application does not align
-independently versioned Koan packages itself.
+Each generated project uses the ordinary NuGet major float `1.*`. NuGet selects the latest compatible
+1.x train and cannot cross into a future breaking 2.0 package. The application does not align Koan
+packages itself.
 
 ## Inspectability and next steps
 

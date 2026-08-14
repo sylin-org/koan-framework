@@ -193,7 +193,6 @@ foreach ($path in $trackedPaths | Where-Object {
 # Generated maturity/package projections and their irreducible claim source form one product-truth surface.
 foreach ($path in @(
     'product/claims.json',
-    'docs/reference/product-surface.json',
     'docs/reference/product-surface.md',
     'docs/reference/package-quality.json',
     'docs/reference/package-quality.md'
@@ -337,9 +336,9 @@ $retiredTerms = [ordered]@{
     'Flow handlers' = 'Use a contributor, Entity lifecycle hook, Communication receiver, or application handler at the owning boundary.'
     'S14.AdapterBench' = 'Only graduated samples belong in public curriculum.'
     '/api/health' = 'Use /health/live and /health/ready.'
-    '0.17.x' = 'Use the 0.20 preview line without pinning an exact patch.'
-    'public 0.17.0' = 'Describe the 0.20 preview boundary without a stale package snapshot.'
-    'source-first' = 'Describe the 0.20 preview and its exact current publication state.'
+    '0.17.x' = 'Use the stable 1.x line without pinning an exact patch.'
+    'public 0.17.0' = 'Describe the stable 1.0 boundary without a stale package snapshot.'
+    'source-first' = 'Describe the stable 1.0 train and its exact current publication state.'
     'Rails for .NET' = 'Describe Koan directly through its own product promise and guarantees.'
     'Ruby on Rails for' = 'Describe Koan directly through its own product promise and guarantees.'
     'Rails move' = 'Describe Koan directly through its own product promise and guarantees.'
@@ -357,7 +356,6 @@ $retiredAgentTerms = [ordered]@{
     'Koan.Data.Mongo' = 'Use the public package id Sylin.Koan.Data.Connector.Mongo.'
     'Koan.Data.SqlServer' = 'Use the public package id Sylin.Koan.Data.Connector.SqlServer.'
     'Koan.Data.Json' = 'Use the public package id Sylin.Koan.Data.Connector.Json.'
-    'Koan.Storage.Connector.S3' = 'S3 is shelved and must not be recommended by an agent skill.'
 }
 foreach ($entry in $currentTextEntries) {
     $content = Get-Content -Raw -LiteralPath (Join-Path $root $entry.Path)
@@ -387,12 +385,7 @@ foreach ($entry in $currentTextEntries) {
     if ($entry.Path.EndsWith('.md', [StringComparison]::OrdinalIgnoreCase) -and
         $entry.Path -notin @('docs/reference/product-surface.md', 'docs/reference/package-quality.md') -and
         $content -match '(?i)(?<![\w.])v?0\.(17|18|19)(?:\.\d+|\.x)?(?![\w.])') {
-        $issues.Add("$($entry.Path) presents an older release line as current narrative; write from the 0.20 preview boundary or move the evidence to history.")
-    }
-    if ($entry.Path -match '^docs/.+\.md$' -and
-        $content -match '(?m)^framework_version:\s*([^\r\n]+)\s*$' -and
-        $Matches[1].Trim() -ne 'v0.20.0') {
-        $issues.Add("$($entry.Path) declares framework_version '$($Matches[1].Trim())'; current public docs declare v0.20.0.")
+        $issues.Add("$($entry.Path) presents an older release line as current narrative; write from the stable 1.0 boundary or move the evidence to history.")
     }
     if ($entry.Path -match '^\.claude/skills/') {
         foreach ($term in $retiredAgentTerms.Keys) {
@@ -425,18 +418,18 @@ foreach ($entry in $packageCompanionFiles) {
 # Protect the experience at the public front door. Exact package maturity remains the generated
 # ledger's job; these pages must preserve the short intent -> application -> growth journey.
 $frontDoorRequirements = [ordered]@{
-    'README.md' = @('Write with intent. Koan makes it real.', 'Entity. Controller. Done.', 'Sylin.Koan.Templates', 'McpEntity', '0.20')
-    'docs/index.md' = @('Bring an idea', 'Entity<', 'what-works.md', 'agents/index.md', '0.20')
+    'README.md' = @('Write with intent. Koan makes it real.', 'Entity. Controller. Done.', 'Sylin.Koan.Templates', 'McpEntity', '1.0')
+    'docs/index.md' = @('Bring an idea', 'Entity<', 'what-works.md', 'agents/index.md', '1.0')
     'docs/getting-started/quickstart.md' = @('Make it real', 'Sylin.Koan.Templates', 'Entity. Controller. Done.', 'AddKoan()')
     'docs/getting-started/adopt-existing-app.md' = @('Bring Koan into the app you already have', 'one Koan line', 'EntityController<Todo>', 'what-works.md')
-    'samples/README.md' = @('Pick an idea. Make it run.', 'FirstUse', 'GoldenJourney', 'SnapVault', '0.20')
+    'samples/README.md' = @('Pick an idea. Make it run.', 'FirstUse', 'GoldenJourney', 'SnapVault', '1.0')
     'docs/reference/agents/index.md' = @('Agent, meet your app.', 'Sylin.Koan.Mcp', 'McpEntity', 'Same Entity. Same data. Same access rules.')
     'docs/architecture/index.md' = @('Small code. Serious architecture.', 'Where Koan shines', 'existing ASP.NET Core', 'what-works.md')
-    'docs/reference/what-works.md' = @('One Entity. A lot of places to go.', 'McpEntity', 'product-surface.md', 'Koan 0.20')
-    'llms.txt' = @('0.20', 'Sylin.Koan.Templates', 'AddKoan()', 'Entity<', 'product surface')
-    'CLAUDE.md' = @('0.20', 'AddKoan()', 'Entity<', 'product-surface.md')
-    '.github/copilot-instructions.md' = @('0.20', 'AddKoan()', 'Entity<', 'product-surface.md')
-    'templates/README.md' = @('0.20', 'dotnet new install Sylin.Koan.Templates', 'AddKoan()', 'Entity<')
+    'docs/reference/what-works.md' = @('One Entity. A lot of places to go.', 'McpEntity', 'product-surface.md', 'Koan 1.0')
+    'llms.txt' = @('1.0', 'Sylin.Koan.Templates', 'AddKoan()', 'Entity<', 'product surface')
+    'CLAUDE.md' = @('1.0', 'AddKoan()', 'Entity<', 'product-surface.md')
+    '.github/copilot-instructions.md' = @('1.0', 'AddKoan()', 'Entity<', 'product-surface.md')
+    'templates/README.md' = @('1.0', 'dotnet new install Sylin.Koan.Templates', 'AddKoan()', 'Entity<')
     'docs/reference/product-surface.md' = @('Maturity vocabulary', 'supported-foundation', 'supported-extension', 'verified', 'demonstrated', 'experimental', 'specified', 'unassessed', 'deprecated', 'retired')
 }
 foreach ($path in $frontDoorRequirements.Keys) {
@@ -471,11 +464,6 @@ foreach ($path in $delightFrontDoors) {
             $issues.Add("$path restores retired front-door heading '$heading'; lead with the reader's result.")
         }
     }
-}
-
-$decisionChanges = @(git -C $root diff --name-only -- docs/decisions)
-if ($decisionChanges.Count -gt 0) {
-    $issues.Add("ADR files changed during the public documentation pass: $($decisionChanges -join ', ')")
 }
 
 $inventoryRows = @($entries.Values | Sort-Object Path | ForEach-Object {

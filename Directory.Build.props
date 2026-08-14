@@ -1,5 +1,5 @@
 <Project>
-  <!-- ARCH-0085/0110: every packable project owns an independent NBGV version. -->
+  <!-- ARCH-0124: every active package inherits the repository's single NBGV release train. -->
 
   <PropertyGroup>
     <!-- Generate XML docs for all projects to support API documentation. -->
@@ -56,9 +56,8 @@
   <AssemblyMetadata Include="KoanModuleIdentity" Value="$(KoanModuleIdentity)" />
   <!-- SourceLink for better debugging experience on NuGet -->
   <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
-  <!-- ARCH-0085: Nerdbank.GitVersioning is the single version source — Version / AssemblyVersion /
-       FileVersion are computed from each package's version.json (operator-owned major.minor) plus
-       git commit height (automatic patch). Replaces build/versions.props + scripts/versioning.
+  <!-- Nerdbank.GitVersioning is the single version source. Version / AssemblyVersion /
+       FileVersion are computed from the root version.json release line plus git commit height.
        PrivateAssets=all so it never flows to consumers. -->
   <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
   </ItemGroup>

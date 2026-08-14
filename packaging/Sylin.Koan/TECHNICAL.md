@@ -12,13 +12,12 @@ route changes Data election without changing the bundle or domain code.
 
 ## Version and artifact contract
 
-The bundle owns an independent NBGV version. Its evaluated lineage includes the composed package inputs; changing any
-tested component therefore mints a new foundation identity. Packing converts each direct `ProjectReference` to that
-component's actual bounded compatibility range through `build/compat-ranges.targets`.
+The bundle inherits the repository's shared NBGV train version. Packing converts each direct `ProjectReference` to
+the train's bounded compatibility range through `build/compat-ranges.targets`.
 
 The nupkg contains only dependency metadata, its owned README, and the canonical mascot. It intentionally emits no
 runtime assembly, PDB, or symbol package. Final package verification requires the packed dependency set and floors to
-match the evaluated release manifest.
+match the evaluated project graph.
 
 ## Boundaries
 

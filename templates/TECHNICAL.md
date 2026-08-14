@@ -8,8 +8,8 @@ the provider reference and SQLite's autonomous local target are sufficient inten
 
 ## Preparation and packing
 
-Template source contains its standard NuGet patch policy directly. Generated Koan references use `0.20.*`, which
-selects the latest available fix in the guaranteed 0.20 family and cannot cross into a future breaking 0.21 family.
+Template source contains its standard NuGet compatibility policy directly. Generated Koan references use `1.*`,
+which selects the latest available 1.x train and cannot cross into a future breaking 2.0 family.
 The content-only project packs directly with `dotnet pack`; there is no preparation or token-replacement phase.
 
 The packed artifact must contain both canonical `.template.config/template.json` files, `README.md`, and the exact

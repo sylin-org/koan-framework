@@ -77,4 +77,4 @@ one. Want to look behind the magic? Koan tells you what it chose and why.
 - [Understand the architecture](docs/architecture/index.md)
 - [See what works today](docs/reference/what-works.md)
 
-> Koan 0.20 is a .NET 10 preview.
+> Koan 1.0 is the stable .NET 10 release train.

@@ -5,7 +5,7 @@ title: "Build your first Koan application"
 audience: [developers, ai-agents]
 status: current
 last_updated: 2026-07-23
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-21
   status: passed
@@ -98,7 +98,7 @@ without replacing what already works.
 
 ## Start small. Know the edges.
 
-Koan 0.20 is a .NET 10 preview. The template uses compatible `0.20.*` packages and durable embedded
+Koan 1.0 is the stable .NET 10 train. The template uses compatible `1.*` packages and durable embedded
 SQLite storage, which is a great fit for local and single-node applications—not a promise of
 remote-database or multi-node-write behavior.
 

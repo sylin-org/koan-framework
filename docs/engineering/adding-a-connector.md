@@ -4,8 +4,8 @@ domain: framework
 title: "Adding a connector"
 audience: [maintainers, contributors]
 status: current
-last_updated: 2026-07-19
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 ---
 
 # Adding a connector
@@ -16,7 +16,7 @@ Wire a new external system (database, vector store, message broker, AI provider,
 > - [ARCH-0049 — `[KoanService]` service metadata](../decisions/) (runtime discovery and inspectability)
 > - [ARCH-0079 — Integration tests as canon](../decisions/) (every connector ships at least one integration spec)
 > - [ARCH-0080 — Shared transport ownership](../decisions/ARCH-0080-shared-transport-ownership.md) (historical context; shared backends now have their own functional owner)
-> - [ARCH-0085 — Versioning](../decisions/ARCH-0085-versioning-compatibility-and-automation.md) (each package owns version intent)
+> - [ARCH-0124 — Release train](../decisions/ARCH-0124-single-package-release-train.md) (one root version and one release inventory)
 >
 > Companion workbooks:
 > - [versioning.md](versioning.md) — what version your connector ships at and when it bumps
@@ -59,8 +59,8 @@ A Koan connector is **just** a few standard pieces:
 
 Most connector families publish as `Sylin.Koan.<Pillar>.Connector.<Name>`, but existing pillar
 metadata is the naming authority; Cache and other families may use a different established noun.
-Every package owns an independent `version.json`; Git impact and the package graph determine when it
-mints.
+Every packable package inherits the root release-train version. A supported product claim determines
+whether the connector ships; repository presence and packability alone do not.
 
 Reference example to model after: **Weaviate** (`src/Connectors/Data/Vector/Weaviate/`) — clean, modern, all the standard pieces.
 
@@ -286,24 +286,21 @@ unzip -p /tmp/test/Sylin.Koan.Data.Vector.Connector.Acme.*.nupkg '*.nuspec' | gr
 #   id should be `Sylin.Koan.Data.Vector.Connector.Acme`, description present.
 
 dotnet run --project tools/Koan.Packaging -- inventory
-#   Your new package should appear with complete metadata and an honest claim or unassessed disposition.
+#   Your new package should appear with complete metadata. Claims document its capability evidence.
 
 dotnet test tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests/Koan.Data.Connector.Acme.Tests.csproj
 #   At least one passing spec.
 ```
 
-### Step 9 — Open a pull request to `main`
+### Step 9 — Open a pull request to `dev`
 
-Development and review do not publish packages. After the pull request merges to `main`, the release
-workflow:
+Development and review do not publish packages. The pull request validates repository coherence; run
+the connector's focused behavior and provider-boundary tests as its owning evidence.
 
-- asks NBGV for the affected package version;
-- validates product and package coherence;
-- packs the selected supported identities from their declared compatibility lines; and
-- pushes missing immutable package identities with the repository NuGet key.
-
-Commit-message vocabulary does not calculate versions. Git height owns patch; an intentional
-major/minor change is an explicit `version.json` edit. See [versioning.md](versioning.md) and
+Every active packable connector joins the release inventory. When a maintainer later tags a validated
+`dev` commit, the workflow packs the complete inventory at the root train version, proves the staged
+feed, and publishes those same artifacts. Git height owns the patch; only a deliberate compatibility
+change edits the root `version.json`. See [versioning.md](versioning.md) and
 [nuget-publishing.md](nuget-publishing.md).
 
 ---

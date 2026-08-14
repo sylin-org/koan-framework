@@ -4,52 +4,56 @@ domain: engineering
 title: "NuGet packaging policy"
 audience: [developers, maintainers, ai-agents]
 status: current
-last_updated: 2026-08-06
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 ---
 
 # NuGet packaging policy
 
-## Contract
+## Package contract
 
-One packable MSBuild project owns one package ID and one local `version.json`. Standard MSBuild and
-NuGet metadata describe the package; NBGV owns its assembly/package version.
+One packable SDK project owns one package ID. Standard MSBuild and NuGet metadata describe the
+artifact; the root NBGV version supplies its identity.
 
 Every packable project under `src/`, `packaging/`, or the top level of `templates/` must:
 
-- evaluate an unambiguous `PackageId`;
-- own a project-local `version.json`;
-- provide a useful description, tags, README, license, repository metadata, icon, and symbols;
-- express internal package dependencies as ProjectReferences;
-- include every source path that produces its package bits in NBGV `pathFilters`; and
+- evaluate one unambiguous `PackageId`;
+- provide useful package metadata and its README;
+- express internal package dependencies as `ProjectReference` items;
+- use `IncludeBuildOutput=false` when it is dependency- or content-only; and
 - set `IsPackable=false` when it is an application, sample, fixture, or internal tool.
 
-Internal dependencies are converted to bounded compatibility ranges by
-`build/compat-ranges.targets`. Dependency-only bundles remain ordinary SDK projects with
-`IncludeBuildOutput=false`; do not create parallel nuspecs.
+`build/compat-ranges.targets` converts internal dependencies to the bounded next-breaking-line range.
+Do not add a nuspec, local version file, or dependency-version map when an SDK project can express the
+same package.
 
-## Inspect locally
+## Release inventory
+
+The packaging tool evaluates every active project and includes every unambiguous `IsPackable=true`
+project in the train. That evaluated inventory currently contains 94 packages. Code under
+`shelved/` and projects with `IsPackable=false` are excluded.
+
+`product/claims.json` documents capability maturity, guarantees, and evidence. It does not select
+which packages ship. The generated product surface is a reviewable projection of the evaluated
+inventory, not another release manifest.
+
+Inspect the package graph and generated projection locally:
 
 ```powershell
 dotnet run --project tools/Koan.Packaging -- inventory
 dotnet run --project tools/Koan.Packaging -- quality
-dotnet nbgv get-version -p src/Koan.Core --public-release=true
+dotnet run --project tools/Koan.Packaging -- product-surface --check
 ```
 
-These commands inspect product/package shape. They do not stage or publish anything.
+## Release proof
 
-## Publish
+An explicit `vX.Y.Z` tag starts the release workflow. The workflow packs every inventoried project once,
+then `scripts/verify-package-feed.ps1` proves the exact package IDs and train version, restores the
+checked-in `tests/PackageConsumers/AppJson` application from the staged feed, and records SHA-256
+hashes. Publication downloads and verifies that staged artifact instead of packing again.
 
-Coalesce focused pull requests into `dev`, then promote the validated integrated tree to `main` as one
-release change. The resulting `main` commit runs **Release packages**, which
-packs the solution and the packable template project with `PublicRelease=true`, then pushes each
-supported product-surface package from its validated compatibility line, using the repository's
-`NUGET_API_KEY`. Lower-maturity package artifacts are not published. Existing immutable identities
-are skipped; any other failure stops the job. Development commits and open pull requests cannot
-publish.
-
-Do not maintain package checklists, hand-authored manifests, release branches, escrow formats, or
-recovery ledgers. NuGet owns immutable publication; Git and each local `version.json` own identity.
+Dependency-only bundles and templates follow the same inventory, version, staging, and verification
+path as assembly packages. Content-only packages do not receive an assembly API baseline.
 
 See [Versioning](versioning.md), [NuGet publishing](nuget-publishing.md), and
-[ARCH-0110](../decisions/ARCH-0110-main-release-boundary.md).
+[ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).

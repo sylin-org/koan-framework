@@ -5,7 +5,7 @@ title: "Small code. Serious architecture."
 audience: [architects, developers, technical-leads, ai-agents]
 status: current
 last_updated: 2026-07-23
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-23
   status: reviewed
@@ -56,7 +56,7 @@ Koan is a strong fit when:
 
 Take a different path, or keep Koan at a smaller boundary, when the design depends on:
 
-- a stable 1.0 compatibility contract—Koan 0.20 is still a preview;
+- a support lifecycle beyond Koan's current 1.x compatibility contract;
 - general transactions across different providers;
 - transparent failover between providers with different guarantees;
 - framework-owned infrastructure provisioning, backup, or disaster recovery; or

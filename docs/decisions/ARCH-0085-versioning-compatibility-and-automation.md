@@ -1,6 +1,9 @@
 # ARCH-0085 — Versioning, compatibility ranges, and version automation
 
-**Status**: Accepted
+**Status**: Accepted in part
+**Superseded by**: [ARCH-0124](ARCH-0124-single-package-release-train.md) for independent
+package identity, project-local version ownership, and reverse-dependent version cascades. The
+bounded dependency ranges and deprecate-before-remove rule remain current.
 **Date**: 2026-06-01
 **Deciders**: Enterprise Architect
 **Scope**: NuGet package version *numbers* and dependency *compatibility* across the Koan monorepo

@@ -16,6 +16,11 @@ related:
 
 # ARCH-0120: Value-led promotion to the Koan 0.20 surface
 
+> **Superseded in part by [ARCH-0124](ARCH-0124-single-package-release-train.md):** claims remain the
+> authority for capability maturity, guarantees, and evidence, but no longer select publication.
+> Every active packable project now joins the shared stable train, and an explicit tag replaces the
+> former `main` publisher. The historical promotion rationale below is preserved as context.
+
 ## Outcome
 
 Koan promotes meaningful public capabilities to 0.20 in cohesive product families. Product intent

@@ -4,9 +4,9 @@ Koan is an opinionated .NET 10 meta-framework for agentic, Entity-centered appli
 the developer's business sentence inward: application code states intent while framework pillars own
 composition, provider negotiation, lifecycle, correction, and explanation.
 
-Koan 0.20 is the preview line. Only packages named by `supported-foundation` or
-`supported-extension` claims carry that signal; repository presence is not support. Read
-`docs/reference/product-surface.md` before strengthening a public promise.
+Koan 1.0 is the stable release train. Every active packable project ships at the same version. Read
+`docs/reference/product-surface.md` for the evaluated inventory and capability evidence before
+strengthening a public promise.
 
 ## Canonical application grammar
 

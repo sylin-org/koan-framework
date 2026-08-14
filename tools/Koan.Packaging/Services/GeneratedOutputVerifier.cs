@@ -10,7 +10,7 @@ internal sealed class GeneratedOutputVerifier(string repositoryRoot)
             throw new InvalidOperationException(
                 $"Generated product output '{repositoryPath}' is missing. Run: " +
                 "dotnet run --project tools/Koan.Packaging -- product-surface " +
-                "--output docs/reference/product-surface.json --markdown docs/reference/product-surface.md");
+                "--markdown docs/reference/product-surface.md");
         }
 
         var expected = generatedContent.TrimEnd() + Environment.NewLine;
@@ -20,7 +20,7 @@ internal sealed class GeneratedOutputVerifier(string repositoryRoot)
             throw new InvalidOperationException(
                 $"Generated product output '{repositoryPath}' is stale. Run: " +
                 "dotnet run --project tools/Koan.Packaging -- product-surface " +
-                "--output docs/reference/product-surface.json --markdown docs/reference/product-surface.md");
+                "--markdown docs/reference/product-surface.md");
         }
     }
 }

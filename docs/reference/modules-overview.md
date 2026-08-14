@@ -4,8 +4,8 @@ domain: platform
 title: "Koan Modules Reference"
 audience: [developers, architects, ai-agents]
 status: deprecated
-last_updated: 2026-07-17
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 validation:
   status: passed
   date_last_tested: 2026-07-17
@@ -18,10 +18,12 @@ The hand-maintained module catalog is retired. Use the generated
 [Koan product surface](product-surface.md), which derives installable package facts from evaluated .NET projects
 and joins them to explicit maturity and evidence claims.
 
-For machine consumption, use [`product-surface.json`](product-surface.json) or regenerate both views with:
+The Markdown projection is checked in for readers. Generate the machine-readable JSON only when a
+tool needs it:
 
 ```bash
 dotnet run --project tools/Koan.Packaging -- product-surface \
-  --output docs/reference/product-surface.json \
-  --markdown docs/reference/product-surface.md
+  --output artifacts/product-surface.json
 ```
+
+Refresh the checked-in projection with `product-surface --markdown docs/reference/product-surface.md`.

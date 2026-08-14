@@ -364,20 +364,11 @@
     {
       "id": "package-first-installation",
       "title": "Package-first installation",
-      "summary": "The foundation bundle, web application bundle, and templates install through ordinary NuGet and dotnet new flows, preserve independent package identity, and reach the documented first business result outside the repository.",
+      "summary": "The foundation bundle, web application bundle, and templates install through ordinary NuGet and dotnet new flows, resolve one coherent Koan train, and reach the documented first business result outside the repository.",
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan", "Sylin.Koan.App", "Sylin.Koan.Templates"],
       "documentation": ["docs/reference/core/index.md", "templates/README.md", "tools/Koan.Packaging/README.md", "samples/FirstUse/README.md", "samples/GoldenJourney/README.md"],
-      "evidence": ["docs/initiatives/koan-v1/work-items/r08/R08-05-initial-public-observation.md", "docs/initiatives/koan-v1/work-items/r11/R11-07-release-certification-boundary.md", "tests/Koan.Packaging.Tests"]
-    },
-    {
-      "id": "preview-evolution",
-      "title": "Preview upgrade and interrupted-release recovery",
-      "summary": "A later 0.20 package wave must prove that a public-created application upgrades cleanly and that interrupted publication recovers from immutable evidence.",
-      "maturity": "specified",
-      "packages": ["Sylin.Koan.Templates"],
-      "documentation": ["docs/initiatives/koan-v1/work-items/R12-road-to-020-preview.md", "tools/Koan.Packaging/README.md"],
-      "evidence": ["docs/initiatives/koan-v1/work-items/r08/R08-05-initial-public-observation.md", "tests/Koan.Packaging.Tests"]
+      "evidence": ["tests/PackageConsumers/AppJson", "scripts/verify-package-feed.ps1", "tests/Koan.Packaging.Tests"]
     },
     {
       "id": "operations-diagnostics",

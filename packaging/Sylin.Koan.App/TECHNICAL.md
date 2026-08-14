@@ -12,9 +12,8 @@ their activation through `KoanModule`; the bundle does not repeat those registra
 
 ## Version and artifact contract
 
-The bundle has its own NBGV lineage. Its evaluated inputs include the foundation and Web projects, so a changed tested
-composition mints a new App version without borrowing another package's version. Packing emits each dependency's
-actual bounded compatibility range through the shared compatibility target.
+The bundle inherits the repository's shared NBGV train version. Packing emits each dependency's bounded
+compatibility range through the shared compatibility target.
 
 The nupkg contains package metadata, its owned README, and the canonical mascot. `IncludeBuildOutput=false` and
 `IncludeSymbols=false` are deliberate: there is no App assembly or PDB to consume. Final packaging verifies that the
@@ -27,4 +26,4 @@ such as SQLite at priority 10, replaces it unless explicit source or Entity rout
 provider election contract, not bundle behavior.
 
 The bundle does not imply authentication, production data guarantees, a network transport, OpenAPI, MCP, jobs, or an
-external infrastructure provider. Those remain separate reference intents and independently versioned packages.
+external infrastructure provider. Those remain separate reference intents within the same release train.

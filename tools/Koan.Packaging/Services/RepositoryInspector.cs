@@ -48,105 +48,6 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         return packages;
     }
 
-    public async Task<string> ResolveCommitAsync(string revision, CancellationToken cancellationToken) =>
-        await processRunner.RequireAsync("git", ["rev-parse", "--verify", $"{revision}^{{commit}}"], repositoryRoot, cancellationToken);
-
-    public async Task<IReadOnlyList<string>> GetParentCommitsAsync(
-        string commit,
-        CancellationToken cancellationToken)
-    {
-        var output = await processRunner.RequireAsync(
-            "git",
-            ["rev-list", "--parents", "-n", "1", commit],
-            repositoryRoot,
-            cancellationToken);
-        return output.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).ToArray();
-    }
-
-    public async Task<IReadOnlyDictionary<string, string>> ReadTreeAsync(
-        string commit,
-        CancellationToken cancellationToken)
-    {
-        var output = await processRunner.RequireAsync(
-            "git",
-            ["ls-tree", "-r", "--full-tree", commit],
-            repositoryRoot,
-            cancellationToken);
-        return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(line => line.Split('\t', 2))
-            .ToDictionary(
-                fields => fields[1].Replace('\\', '/'),
-                fields => fields[0],
-                StringComparer.Ordinal);
-    }
-
-    public async Task<IReadOnlyList<string>> GetChangedPathsAsync(
-        string previousCommit,
-        string currentCommit,
-        CancellationToken cancellationToken)
-    {
-        var output = await processRunner.RequireAsync(
-            "git",
-            ["diff", "--name-only", "--no-renames", previousCommit, currentCommit, "--"],
-            repositoryRoot,
-            cancellationToken);
-        return output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(path => path.Replace('\\', '/'))
-            .ToArray();
-    }
-
-    public async Task<IReadOnlyDictionary<string, string?>> CalculateVersionsAsync(
-        IReadOnlyCollection<PackageProject> projects,
-        string commit,
-        CancellationToken cancellationToken)
-    {
-        var resolvedCommit = await ResolveCommitAsync(commit, cancellationToken);
-        var head = await ResolveCommitAsync("HEAD", cancellationToken);
-        if (!string.Equals(resolvedCommit, head, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Version calculation requires exact commit {resolvedCommit} to be checked out; HEAD is {head}.");
-        }
-
-        var versions = new ConcurrentDictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        await Parallel.ForEachAsync(
-            projects,
-            new ParallelOptions
-            {
-                MaxDegreeOfParallelism = PackagingConstants.EvaluationParallelism,
-                CancellationToken = cancellationToken
-            },
-            async (project, ct) =>
-            {
-                var result = await processRunner.RunAsync(
-                    "dotnet",
-                    [
-                        "nbgv", "get-version", "HEAD", "-p", project.ProjectDirectory,
-                        "--public-release=true", "--variable", "NuGetPackageVersion"
-                    ],
-                    repositoryRoot,
-                    ct);
-                if (result.ExitCode != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Unable to calculate {project.PackageId} at exact commit {resolvedCommit}: " +
-                        $"{result.StandardError}{result.StandardOutput}".Trim());
-                }
-                versions[project.PackageId] = result.StandardOutput.Trim();
-            });
-        return new Dictionary<string, string?>(versions, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public async Task<string?> TryReadFileAsync(string commit, string repositoryPath, CancellationToken cancellationToken)
-    {
-        var result = await processRunner.RunAsync(
-            "git",
-            ["show", $"{commit}:{repositoryPath.Replace('\\', '/')}"],
-            repositoryRoot,
-            cancellationToken);
-        return result.ExitCode == 0 ? result.StandardOutput : null;
-    }
-
     private async Task<PackageProject?> EvaluateProjectAsync(
         string project,
         CancellationToken cancellationToken)
@@ -155,7 +56,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             "dotnet",
             [
                 "msbuild", project, "-nologo",
-                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes,PackageValidationBaselineVersion,EnablePackageValidation",
+                "-getProperty:IsPackable,PackageId,PackageType,TargetFramework,TargetFrameworks,PackAsTool,IsRoslynComponent,IncludeBuildOutput,SuppressDependenciesWhenPacking,IncludeSymbols,PackageReadmeFile,Description,PackageTags,PackageIcon,PackageProjectUrl,RepositoryUrl,PackageLicenseExpression,PackageReleaseNotes",
                 "-getItem:ProjectReference", "-p:PublicRelease=true"
             ],
             repositoryRoot,
@@ -172,7 +73,14 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
         }
 
         var projectDirectory = Path.GetDirectoryName(project)!;
-        var versionIntent = ValidateVersionIntent(project, projectDirectory, packageId);
+        var versionOwner = ResolveVersionOwner(project, projectDirectory, packageId);
+        if (!string.Equals(versionOwner, ReleaseTrain.FileName, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Packable package '{packageId}' owned by '{Relative(project)}' resolves versioning from " +
+                $"'{versionOwner}'. Remove that nested version.json so every active package inherits " +
+                $"the root '{ReleaseTrain.FileName}' release train.");
+        }
 
         var references = new List<string>();
         if (document.RootElement.TryGetProperty("Items", out var items) &&
@@ -220,10 +128,7 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
             ReadString(properties, "PackageProjectUrl"),
             ReadString(properties, "RepositoryUrl"),
             ReadString(properties, "PackageLicenseExpression"),
-            ReadString(properties, "PackageReleaseNotes"),
-            versionIntent,
-            ReadString(properties, "PackageValidationBaselineVersion"),
-            ReadBoolean(properties, "EnablePackageValidation", defaultValue: false));
+            ReadString(properties, "PackageReleaseNotes"));
     }
 
     private static IReadOnlyList<string> ReadFrameworks(JsonElement properties)
@@ -243,30 +148,45 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
     private string? RelativeIfExists(string path) => File.Exists(path) ? Relative(path) : null;
 
-    private string ValidateVersionIntent(string project, string projectDirectory, string packageId)
+    private string ResolveVersionOwner(
+        string project,
+        string projectDirectory,
+        string packageId)
     {
-        var versionPath = Path.Combine(projectDirectory, VersionIntent.FileName);
-        var relativeVersionPath = Relative(versionPath);
         var owner = $"package '{packageId}' owned by '{Relative(project)}'";
-        if (!File.Exists(versionPath))
+        var root = Path.GetFullPath(repositoryRoot).TrimEnd(Path.DirectorySeparatorChar);
+        for (var directory = new DirectoryInfo(projectDirectory); directory is not null; directory = directory.Parent)
         {
-            throw new InvalidOperationException(
-                $"Packable {owner} has no project-local version intent at '{relativeVersionPath}'. " +
-                $"Add '{relativeVersionPath}' with a 'version' property set to exactly {VersionIntent.RequiredFormat}; " +
-                "NBGV owns patch versions.");
+            var current = directory.FullName.TrimEnd(Path.DirectorySeparatorChar);
+            if (!string.Equals(current, root, StringComparison.OrdinalIgnoreCase) &&
+                !current.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            var versionPath = Path.Combine(current, ReleaseTrain.FileName);
+            if (File.Exists(versionPath))
+            {
+                var relativeVersionPath = Relative(versionPath);
+                try
+                {
+                    _ = ReleaseTrain.ParseJson(File.ReadAllText(versionPath));
+                    return relativeVersionPath;
+                }
+                catch (Exception error) when (error is JsonException or InvalidOperationException)
+                {
+                    throw new InvalidOperationException(
+                        $"Packable {owner} has invalid version configuration at '{relativeVersionPath}': {error.Message}",
+                        error);
+                }
+            }
+
+            if (string.Equals(current, root, StringComparison.OrdinalIgnoreCase)) break;
         }
 
-        try
-        {
-            return VersionIntent.ParseJson(File.ReadAllText(versionPath)).ToString();
-        }
-        catch (Exception error) when (error is JsonException or InvalidOperationException)
-        {
-            throw new InvalidOperationException(
-                $"Packable {owner} has invalid version intent at '{relativeVersionPath}': {error.Message} " +
-                $"Set its 'version' property to exactly {VersionIntent.RequiredFormat}; NBGV owns patch versions.",
-                error);
-        }
+        throw new InvalidOperationException(
+            $"Packable {owner} has no '{ReleaseTrain.FileName}' between its project directory and the repository root. " +
+            "Add a version owner for the package or let it inherit the root release train.");
     }
 
     private string Relative(string path) => Path.GetRelativePath(repositoryRoot, path).Replace('\\', '/');

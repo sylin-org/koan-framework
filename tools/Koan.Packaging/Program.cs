@@ -50,7 +50,6 @@ internal static class PackagingProgram
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
                     var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
-                    var jsonContent = ProductSurfaceCompiler.ToJson(surface).TrimEnd();
                     var markdownContent = ProductSurfaceCompiler.ToMarkdown(surface).TrimEnd();
                     if (options.Has("check"))
                     {
@@ -60,16 +59,20 @@ internal static class PackagingProgram
                                 "product-surface --check uses the canonical generated paths and cannot write outputs.");
                         }
                         generatedOutputVerifier.RequireMatch(
-                            PackagingConstants.ProductSurface.GeneratedJsonPath,
-                            jsonContent);
-                        generatedOutputVerifier.RequireMatch(
                             PackagingConstants.ProductSurface.GeneratedMarkdownPath,
                             markdownContent);
                     }
                     else
                     {
-                        await WriteOutputAsync(options.Value("output"), jsonContent, cancellationToken);
+                        var output = options.Value("output");
                         var markdown = options.Value("markdown");
+                        if (output is not null || markdown is null)
+                        {
+                            await WriteOutputAsync(
+                                output,
+                                ProductSurfaceCompiler.ToJson(surface).TrimEnd(),
+                                cancellationToken);
+                        }
                         if (markdown is not null)
                         {
                             await WriteOutputAsync(markdown, markdownContent, cancellationToken);
@@ -81,23 +84,6 @@ internal static class PackagingProgram
                         (options.Has("check") ? ", generated outputs current" : string.Empty));
                     return 0;
                 }
-                case "api-baselines":
-                {
-                    var packages = await repository.DiscoverPackagesAsync(cancellationToken);
-                    var surface = await productSurfaceCompiler.CompileAsync(packages, cancellationToken);
-                    using var client = new HttpClient
-                    {
-                        BaseAddress = new Uri(PackagingConstants.PackageValidation.NuGetFlatContainerBaseUrl)
-                    };
-                    var validator = new PackageBaselineValidator(
-                        (packageId, ct) => PackageBaselineValidator.ReadNuGetVersionsAsync(client, packageId, ct));
-                    var report = await validator.ValidateAsync(packages, surface, cancellationToken);
-                    Console.WriteLine(
-                        $"api-baselines  {report.ConfiguredBaselines}/{report.AssemblyOwners} configured, " +
-                        $"{report.FirstPublicationPending} first-publication pending, " +
-                        $"{report.ContentOnlyOwners} content-only");
-                    return 0;
-                }
                 case "inventory":
                 {
                     var packages = await repository.DiscoverPackagesAsync(cancellationToken);
@@ -105,7 +91,7 @@ internal static class PackagingProgram
                         packages,
                         new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
                     await WriteOutputAsync(options.Value("output"), json, cancellationToken);
-                    Console.WriteLine($"inventory  {packages.Count} independently versioned package project(s)");
+                    Console.WriteLine($"inventory  {packages.Count} package project(s)");
                     return 0;
                 }
                 case "help":
@@ -130,7 +116,6 @@ internal static class PackagingProgram
           inventory       [--output PATH]
           quality         [--output PATH] [--markdown PATH]
           product-surface [--output PATH] [--markdown PATH] [--check]
-          api-baselines
         """);
 
     private static async Task WriteOutputAsync(string? path, string content, CancellationToken cancellationToken)
@@ -145,11 +130,12 @@ internal static class PackagingProgram
         await File.WriteAllTextAsync(path, content + Environment.NewLine, cancellationToken);
     }
 
-    private static string FindRepositoryRoot(string start)
+    internal static string FindRepositoryRoot(string start)
     {
         for (var directory = new DirectoryInfo(start); directory is not null; directory = directory.Parent)
         {
-            if (Directory.Exists(Path.Combine(directory.FullName, ".git"))) return directory.FullName;
+            var gitPath = Path.Combine(directory.FullName, ".git");
+            if (Directory.Exists(gitPath) || File.Exists(gitPath)) return directory.FullName;
         }
 
         throw new InvalidOperationException("Run Koan.Packaging from inside the Koan repository.");

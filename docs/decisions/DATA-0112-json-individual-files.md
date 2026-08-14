@@ -121,7 +121,8 @@ coding models do not branch.
 
 ## Release plan
 
-The change is an additive patch in the connector's existing `0.21` compatibility line. Publication occurs only from
-the repository's certified `main` workflow. The release must include the new
-`Sylin.Koan.Data.Connector.Json` identity and an updated coherent `Sylin.Koan`/`Sylin.Koan.App` bundle before an
-external consumer is told to pin it.
+The change ships in the first all-active `1.0.0` train. An explicit matching tag reachable from
+`dev` triggers self-contained release certification and packs the complete inventory once, including
+`Sylin.Koan.Data.Connector.Json`, `Sylin.Koan`, and `Sylin.Koan.App`, before those exact artifacts
+reach NuGet. External consumers pin the public train only after the package-only App/JSON proof
+passes.

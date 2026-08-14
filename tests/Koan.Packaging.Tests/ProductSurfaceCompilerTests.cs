@@ -9,6 +9,16 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
 {
     private readonly string root = Path.Combine(Path.GetTempPath(), "koan-product-surface-tests", Guid.NewGuid().ToString("N"));
 
+    public ProductSurfaceCompilerTests()
+    {
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, ReleaseTrain.FileName), """
+            {
+              "version": "1.0"
+            }
+            """ + Environment.NewLine);
+    }
+
     [Fact]
     public void KeepsAvailableButUnclaimedPackagesUnassessed()
     {
@@ -94,44 +104,14 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
     }
 
     [Fact]
-    public void RejectsSupportPromotionBelowTheSupportedVersionFloor()
-    {
-        SeedPath("docs/capability.md");
-        SeedPath("tests/evidence.txt");
-        var package = Project("Sylin.Koan.Core", versionIntent: "0.19");
-        var claim = Claim(package.PackageId) with { Maturity = "supported-foundation" };
-
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            Compiler().Compile([package], Claims(claim)));
-
-        Assert.Contains("version intent '0.19'", error.Message, StringComparison.Ordinal);
-        Assert.Contains("later compatibility line", error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Rejects020VersionIntentWithoutASupportedClaim()
-    {
-        SeedPath("docs/capability.md");
-        SeedPath("tests/evidence.txt");
-        var package = Project("Sylin.Koan.Core", versionIntent: "0.20");
-
-        var error = Assert.Throws<InvalidOperationException>(() =>
-            Compiler().Compile([package], Claims(Claim(package.PackageId))));
-
-        Assert.Contains("supported version intent '0.20'", error.Message, StringComparison.Ordinal);
-        Assert.Contains("no supported claim", error.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public void RejectsSupportedPackageWithAnUnsupportedPublicDependency()
     {
         SeedPath("docs/capability.md");
         SeedPath("tests/evidence.txt");
-        var dependency = Project("Sylin.Koan.Core", versionIntent: "0.17");
+        var dependency = Project("Sylin.Koan.Core");
         var application = Project(
             "Sylin.Koan.App",
-            references: [Reference(dependency)],
-            versionIntent: "0.20");
+            references: [Reference(dependency)]);
         var claim = Claim(application.PackageId) with { Maturity = "supported-foundation" };
 
         var error = Assert.Throws<InvalidOperationException>(() =>
@@ -143,15 +123,14 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
     }
 
     [Fact]
-    public void AcceptsCompleteSupportedDependencyClosureAcrossCompatibilityLines()
+    public void AcceptsCompleteSupportedDependencyClosureOnTheReleaseTrain()
     {
         SeedPath("docs/capability.md");
         SeedPath("tests/evidence.txt");
-        var dependency = Project("Sylin.Koan.Core", versionIntent: "0.20");
+        var dependency = Project("Sylin.Koan.Core");
         var application = Project(
             "Sylin.Koan.App",
-            references: [Reference(dependency)],
-            versionIntent: "0.21");
+            references: [Reference(dependency)]);
         var claim = Claim(application.PackageId) with
         {
             Maturity = "supported-foundation",
@@ -160,8 +139,13 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
 
         var surface = Compiler().Compile([application, dependency], Claims(claim));
 
-        Assert.Equal("0.20", surface.Packages.Single(package => package.PackageId == dependency.PackageId).VersionIntent);
-        Assert.Equal("0.21", surface.Packages.Single(package => package.PackageId == application.PackageId).VersionIntent);
+        Assert.Equal("1.0", surface.ReleaseTrain);
+        Assert.Equal(
+            dependency.ProjectPath,
+            surface.Packages.Single(package => package.PackageId == dependency.PackageId).ProjectPath);
+        Assert.Equal(
+            application.ProjectPath,
+            surface.Packages.Single(package => package.PackageId == application.PackageId).ProjectPath);
     }
 
     [Fact]
@@ -182,7 +166,8 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             Claims(Claim(library.PackageId)));
 
         Assert.Equal(ProductSurfaceCompiler.ToJson(first), ProductSurfaceCompiler.ToJson(second));
-        Assert.Contains("framework_version: v0.20.0", ProductSurfaceCompiler.ToMarkdown(first), StringComparison.Ordinal);
+        Assert.Contains("framework_version: v1.0", ProductSurfaceCompiler.ToMarkdown(first), StringComparison.Ordinal);
+        Assert.Contains("release train `1.0`", ProductSurfaceCompiler.ToMarkdown(first), StringComparison.Ordinal);
         Assert.Equal("library", first.Packages.Single(package => package.PackageId == library.PackageId).Shape);
         Assert.Equal("bundle", first.Packages.Single(package => package.PackageId == bundle.PackageId).Shape);
         Assert.Equal("template", first.Packages.Single(package => package.PackageId == template.PackageId).Shape);
@@ -238,8 +223,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
         bool isRoslynComponent = false,
         bool includeBuildOutput = true,
         bool ownsReadme = true,
-        string[]? references = null,
-        string versionIntent = "0.17")
+        string[]? references = null)
     {
         var name = id.Replace('.', '-');
         var directory = Path.Combine(root, "src", name);
@@ -260,8 +244,7 @@ public sealed class ProductSurfaceCompilerTests : IDisposable
             ownsReadme ? $"src/{name}/TECHNICAL.md" : null,
             "Description",
             "koan;test",
-            references ?? [],
-            VersionIntent: versionIntent);
+            references ?? []);
     }
 
     private static string Reference(PackageProject project) =>

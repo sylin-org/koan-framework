@@ -1,4 +1,5 @@
 <Project>
-  <!-- Intentionally EMPTY: stops inheritance of the repo-root Directory.Build.targets for the
-       content-only template pack. See Directory.Build.props in this folder for the rationale. -->
+  <!-- Keep the template's build props isolated, but share the repository's package-train guard and
+       pack policies so this content-only package cannot bypass a public release invariant. -->
+  <Import Project="../Directory.Build.targets" />
 </Project>

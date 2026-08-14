@@ -74,13 +74,11 @@ Events mean something happened to the Entity. Transport distributes an isolated 
 Entity state. Persistence knows neither. Both terminals are local-first and lift pointwise over
 finite Entity collections and lazy streams.
 
-## Preview boundary
+## Stable boundary
 
-Koan 0.20 is the current preview line. The generated
-`docs/reference/product-surface.md` is the authority: only packages owned by supported-foundation or
-supported-extension claims carry 0.20. Verified, demonstrated, experimental, specified, unassessed,
-deprecated, and retired are separate dispositions defined in that document; dependency proximity
-does not promote a package or turn evidence into a support promise.
+Koan 1.0 is the stable release train. Every active packable project ships at the same version. The
+generated `docs/reference/product-surface.md` projects that inventory and remains the authority for
+capability maturity and evidence; maturity labels do not select package publication.
 
 ## Module authoring
 

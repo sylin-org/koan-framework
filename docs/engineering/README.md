@@ -4,8 +4,8 @@ domain: framework
 title: "Koan operational workbooks"
 audience: [maintainers, contributors]
 status: current
-last_updated: 2026-07-19
-framework_version: v0.20.0
+last_updated: 2026-08-14
+framework_version: v1.0.0
 ---
 
 # Koan workbooks
@@ -38,9 +38,9 @@ The voice is imperative. Commands are concrete. Explanations sit alongside what 
 
 | Workbook | What it covers |
 |---|---|
-| [versioning.md](versioning.md) | How per-package NBGV versions follow Git and how to express major/minor intent |
-| [packaging.md](packaging.md) | The evaluated package contract, bundle shape, and local release proof |
-| [nuget-publishing.md](nuget-publishing.md) | What every advancement of `dev` publishes and how failed events converge |
+| [versioning.md](versioning.md) | How one root NBGV version defines the all-package train |
+| [packaging.md](packaging.md) | Package shape, evaluated release inventory, and artifact proof |
+| [nuget-publishing.md](nuget-publishing.md) | How an explicit tag certifies and publishes one exact package set |
 | [adding-a-connector.md](adding-a-connector.md) | Scaffolding a new connector (data store, vector store, AI provider, broker, storage) from csproj to integration tests |
 | [docs-build-and-lint.md](docs-build-and-lint.md) | Building and validating the public documentation surface |
 | [samples-organization.md](samples-organization.md) | Organizing, graduating, and validating product samples |

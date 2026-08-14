@@ -26,6 +26,7 @@ internal sealed class ProductSurface
     [JsonRequired]
     public int SchemaVersion { get; init; } = PackagingConstants.ProductSurface.Schema;
     public required string Source { get; init; }
+    public required string ReleaseTrain { get; init; }
     public List<ProductClaim> Claims { get; init; } = [];
     public List<ProductPackage> Packages { get; init; } = [];
 }
@@ -41,7 +42,7 @@ internal sealed record ProductClaim(
 
 internal sealed record ProductPackage(
     string PackageId,
-    string? VersionIntent,
+    string ProjectPath,
     string Shape,
     string Description,
     IReadOnlyList<string> TargetFrameworks,

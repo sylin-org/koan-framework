@@ -4,9 +4,8 @@ Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applicati
 states business intent; capability pillars own composition, provider negotiation, lifecycle, and
 explanation.
 
-Current line: 0.20 preview. Use the generated product surface at
-docs/reference/product-surface.md as the sole maturity and supported-package authority. Package
-presence, repository proximity, or historical documentation does not imply support.
+Current line: stable 1.0. Every active packable project ships in one train. Use the generated product surface at
+docs/reference/product-surface.md for the evaluated inventory, capability maturity, and evidence.
 
 ## Canonical application grammar
 

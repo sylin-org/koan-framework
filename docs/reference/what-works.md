@@ -5,11 +5,11 @@ title: "What you can make with Koan today"
 audience: [developers, architects, technical-leads, ai-agents]
 status: current
 last_updated: 2026-07-23
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-23
   status: reviewed
-  scope: human-readable outcome map over the generated v0.20 product surface
+  scope: human-readable outcome map over the generated 1.0 product surface
 ---
 
 # One Entity. A lot of places to go.
@@ -55,7 +55,7 @@ The same access declaration can govern what HTTP callers and agents are allowed 
 ## Teach it to understand meaning
 
 Chat, stream responses, or create embeddings through one application-facing client when an active
-provider supports the operation. Koan 0.20 works locally with Ollama, LM Studio, and in-process ONNX
+provider supports the operation. Koan 1.0 works locally with Ollama, LM Studio, and in-process ONNX
 within their model and runtime limits.
 
 Use Koan's Entity vector API for semantic search. Begin in memory or with embedded `sqlite-vec`;
@@ -102,7 +102,7 @@ box.
 
 ## The honest edges
 
-Koan 0.20 is a .NET 10 preview. It does not provision production infrastructure, promise general
+Koan 1.0 is the stable .NET 10 train. It does not provision production infrastructure, promise general
 cross-provider transactions or transparent failover, manage backups and disaster recovery, or
 support NativeAOT. Provider-specific consistency, query, durability, and deployment limits still
 matter.
