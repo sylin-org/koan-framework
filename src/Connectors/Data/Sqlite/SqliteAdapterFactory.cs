@@ -63,7 +63,7 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         IServiceProvider services,
         string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>
-        where TKey : notnull => new SqliteRepository<TEntity, TKey>(services, ResolveRoute(services, source));
+        where TKey : notnull => new SqliteRepository<TEntity, TKey>(services, ResolveRoute(services, source), this);
 
     internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
     {

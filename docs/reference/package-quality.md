@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 93 | 0 | 10 | 83 | 93 | 93 | 18 |
+| 94 | 0 | 10 | 84 | 94 | 94 | 18 |
 
 ## Packages
 
@@ -70,6 +70,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Data.Connector.Sqlite`<br>[`src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj`](../../src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj) | provider / library<br>net10.0 | `review-required` | [README](../../src/Connectors/Data/Sqlite/README.md)<br>[TECHNICAL](../../src/Connectors/Data/Sqlite/TECHNICAL.md) | `docs.readme.boundaries.missing` (warning): The README has no recognizable guarantees, requirements, failure, or limitation section. |
 | `Sylin.Koan.Data.Connector.SqlServer`<br>[`src/Connectors/Data/SqlServer/Koan.Data.Connector.SqlServer.csproj`](../../src/Connectors/Data/SqlServer/Koan.Data.Connector.SqlServer.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/SqlServer/README.md)<br>[TECHNICAL](../../src/Connectors/Data/SqlServer/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Core`<br>[`src/Koan.Data.Core/Koan.Data.Core.csproj`](../../src/Koan.Data.Core/Koan.Data.Core.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Core/README.md)<br>[TECHNICAL](../../src/Koan.Data.Core/TECHNICAL.md) | none |
+| `Sylin.Koan.Data.Cutover`<br>[`src/Koan.Data.Cutover/Koan.Data.Cutover.csproj`](../../src/Koan.Data.Cutover/Koan.Data.Cutover.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Cutover/README.md)<br>[TECHNICAL](../../src/Koan.Data.Cutover/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Relational`<br>[`src/Koan.Data.Relational/Koan.Data.Relational.csproj`](../../src/Koan.Data.Relational/Koan.Data.Relational.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Relational/README.md)<br>[TECHNICAL](../../src/Koan.Data.Relational/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Relational.Abstractions`<br>[`src/Koan.Data.Relational.Abstractions/Koan.Data.Relational.Abstractions.csproj`](../../src/Koan.Data.Relational.Abstractions/Koan.Data.Relational.Abstractions.csproj) | contracts / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Relational.Abstractions/README.md)<br>[TECHNICAL](../../src/Koan.Data.Relational.Abstractions/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Relational.Npgsql`<br>[`src/Koan.Data.Relational.Npgsql/Koan.Data.Relational.Npgsql.csproj`](../../src/Koan.Data.Relational.Npgsql/Koan.Data.Relational.Npgsql.csproj) | capability / library<br>net10.0 | `structurally-ready` | [README](../../src/Koan.Data.Relational.Npgsql/README.md)<br>[TECHNICAL](../../src/Koan.Data.Relational.Npgsql/TECHNICAL.md) | none |

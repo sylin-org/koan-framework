@@ -1,0 +1,5 @@
+suite: Koan.Data.Cutover.CrossProvider.Tests
+lane: docker
+scope: capability
+module: Data.Cutover
+description: Real SQLite to MongoDB to PostgreSQL and back verified default-route transitions, including durable restart.

@@ -251,6 +251,7 @@ function Create-TestProject {
     <ProjectReference Include="..\..\src\Koan.Core\Koan.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Koan.Data.Cutover\Koan.Data.Cutover.csproj" />
     <ProjectReference Include="..\..\src\Koan.Web\Koan.Web.csproj" />
     <ProjectReference Include="..\..\src\Koan.AI\Koan.AI.csproj" />
     <!-- DX-0048: pillar refs so each skill's canonical pattern compiles under the gate. -->

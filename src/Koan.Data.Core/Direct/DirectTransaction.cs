@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.SourceIntegration.Runtime;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core.Direct;
 
@@ -16,7 +17,8 @@ internal sealed class DirectTransaction(
     int maxRows,
     DataSourcePlan sourcePlan,
     DataOperationEffect effect,
-    RecordSetMaterializer materializer) : IDirectTransaction
+    RecordSetMaterializer materializer,
+    DataOperationLease operationLease) : IDirectTransaction
 {
     public async Task<int> Execute(string sql, object? parameters = null, CancellationToken ct = default)
     {
@@ -130,7 +132,14 @@ internal sealed class DirectTransaction(
         }
         finally
         {
-            await conn.DisposeAsync().ConfigureAwait(false);
+            try
+            {
+                await conn.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                await operationLease.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 }

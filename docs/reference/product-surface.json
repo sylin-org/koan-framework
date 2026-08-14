@@ -831,6 +831,26 @@
       ]
     },
     {
+      "id": "verified-default-data-cutover",
+      "title": "Verified cross-provider default Data cutover",
+      "summary": "A single-host application can copy its active default Entity database to a distinct empty SQLite, MongoDB, or PostgreSQL source, prove identity-matched canonical logical equivalence, and durably activate the target without changing ordinary Entity calls.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Cutover"
+      ],
+      "documentation": [
+        "docs/guides/data/default-route-cutover.md",
+        "docs/reference/data/index.md",
+        "src/Koan.Data.Cutover/README.md",
+        "src/Koan.Data.Cutover/TECHNICAL.md"
+      ],
+      "evidence": [
+        "docs/decisions/DATA-0111-verified-default-data-cutover.md",
+        "tests/Suites/Data/Cutover/Koan.Data.Cutover.CrossProvider.Tests",
+        "tests/Suites/Data/Cutover/Koan.Data.Cutover.Tests"
+      ]
+    },
+    {
       "id": "web-api-conventions",
       "title": "Web/API conventions",
       "summary": "Entity controllers expose business-readable HTTP APIs through framework conventions.",
@@ -1704,6 +1724,26 @@
       ]
     },
     {
+      "packageId": "Sylin.Koan.Data.Cutover",
+      "versionIntent": "0.22",
+      "shape": "library",
+      "description": "Verified, provider-bounded promotion of a configured Data source to the active Koan default.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core"
+      ],
+      "readme": "src/Koan.Data.Cutover/README.md",
+      "ownsReadme": true,
+      "technicalDocumentation": "src/Koan.Data.Cutover/TECHNICAL.md",
+      "claims": [
+        "verified-default-data-cutover"
+      ]
+    },
+    {
       "packageId": "Sylin.Koan.Data.Relational",
       "versionIntent": "0.21",
       "shape": "library",
@@ -1920,7 +1960,8 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions",
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "ownsReadme": true,

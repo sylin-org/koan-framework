@@ -7,6 +7,13 @@ The adapter has four runtime responsibilities:
 - `WeaviateFilter` projects neutral metadata into a constant `text[]` schema and writes exact GraphQL prefilters.
 - `WeaviateRepository` realizes the immutable `VectorSpacePlan`, point lifecycle, search, visibility, and isolation.
 
+## Placement and discovery
+
+An explicit HTTP endpoint is authoritative. `auto` uses the service-discovery coordinator and may fall back to the
+local default when no healthy candidate wins. A `zen-garden://...` connection intent is different: the options owner
+parses it through `Koan.ZenGarden.Contracts`, requests required resolution from the coordinator, and fails before
+connector I/O when no matching ready offering exists. Required intent never enters the autonomous fallback branch.
+
 ## Physical shape
 
 Every physical collection name is a readable GraphQL-safe prefix plus a SHA-256 suffix over Koan's lossless logical

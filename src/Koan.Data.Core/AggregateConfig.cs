@@ -7,20 +7,19 @@ public sealed class AggregateConfig<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    public string Provider { get; }
+    private readonly IServiceProvider _services;
+
+    public string Provider => AdapterResolver.ResolveDecisionForEntity<TEntity>(
+        _services,
+        _services.GetRequiredService<DataSourceRegistry>()).Adapter;
     public AggregateMetadata.IdSpec? Id { get; }
 
-    private readonly Lazy<IDataRepository<TEntity, TKey>> _repo;
-    public IDataRepository<TEntity, TKey> Repository => _repo.Value;
+    public IDataRepository<TEntity, TKey> Repository =>
+        _services.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>();
 
-    internal AggregateConfig(string provider, AggregateMetadata.IdSpec? id, IServiceProvider sp)
+    internal AggregateConfig(AggregateMetadata.IdSpec? id, IServiceProvider sp)
     {
-        Provider = provider;
+        _services = sp;
         Id = id;
-        // Compatibility surface, one execution owner: AggregateConfig no longer constructs a parallel,
-        // decorator-free repository graph. IDataService owns routing, decoration and the outer Data facade.
-        _repo = new Lazy<IDataRepository<TEntity, TKey>>(
-            () => sp.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>(),
-            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 }

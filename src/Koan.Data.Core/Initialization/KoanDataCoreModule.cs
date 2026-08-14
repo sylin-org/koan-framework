@@ -31,6 +31,19 @@ public sealed class KoanDataCoreModule : KoanModule
 
     public override System.Threading.Tasks.Task Start(IServiceProvider services, System.Threading.CancellationToken ct)
     {
+        // Hydrate durable default-route truth before any hosted workload can resolve an Entity repository. A corrupt,
+        // unknown, or drifted route record refuses startup rather than silently returning to the configured default.
+        // StartKoan() can host service collections with Data semantics but no resident adapter. Preserve that inert
+        // shape, while eagerly hydrating whenever provider intent or a durable route record makes Data operational.
+        var providers = services.GetService<Routing.DataProviderCatalog>();
+        var sources = services.GetService<DataSourceRegistry>();
+        var configuredDefault = sources?.GetSource("Default")?.Adapter;
+        var routeOptions = services.GetService<Microsoft.Extensions.Options.IOptions<Options.DataRouteOptions>>();
+        var environment = services.GetService<IHostEnvironment>();
+        var hasState = routeOptions is not null &&
+                       Routing.DefaultDataRouteAuthority.HasDurableState(routeOptions, environment);
+        if (providers is { Candidates.Count: > 0 } || !string.IsNullOrWhiteSpace(configuredDefault) || hasState)
+            _ = services.GetRequiredService<Routing.DefaultDataRouteAuthority>().Current;
         // ARCH-0101 §8: the boot-refuses-leaky-axis pre-flight. Loud warning in Development (boot continues), boot
         // refusal in Production. No-op when no always-on predicate axis is registered (off = byte-identical).
         var env = services.GetRequiredService<IHostEnvironment>();

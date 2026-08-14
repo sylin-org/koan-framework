@@ -13,6 +13,7 @@ public static class Constants
             public const string LifecycleSelected = "koan.data.lifecycle.selected";
             public const string SourcePlanSelected = "koan.data.source.plan.selected";
             public const string SourceClaimsSelected = "koan.data.source.claims.selected";
+            public const string DefaultRouteSelected = "koan.data.route.default.selected";
         }
 
         public static class Reasons
@@ -63,6 +64,12 @@ public static class Constants
         public const int RepositoryEntries = 1_024;
         public const int VariantRepositoryEntries = 1_024;
         public const int DoctorTimeoutSeconds = 10;
+        public const int DataRouteDrainTimeoutSeconds = 30;
+        public const int DataRouteTrackedRoutes = 256;
+        public const string DataRouteStateDirectory = ".Koan";
+        public const string DataRouteStateSubdirectory = "data";
+        public const string DataRouteStateFile = "active-route.json";
+        public const int DataRouteStateSchema = 1;
         public const string SourceContinuationPrefix = "koan-source-v1.";
 
         // Default page size used by facade loops when materializing "All"/"QueryAll" across providers.
@@ -74,6 +81,7 @@ public static class Constants
     {
         public const string SourceIntegration = "Koan:Data:SourceIntegration";
         public const string Mapping = "Koan:Data:Mapping";
+        public const string Route = "Koan:Data:Route";
 
         public static class Direct
         {

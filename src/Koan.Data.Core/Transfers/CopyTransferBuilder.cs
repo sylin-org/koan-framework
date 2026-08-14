@@ -16,6 +16,7 @@ public sealed class CopyTransferBuilder<TEntity, TKey>
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
         DemandDestination();
+        await using var operationHorizon = await EnterOperationHorizon(ct).ConfigureAwait(false);
         var progress = new TransferProgress();
         if (HasSameContext()) return Complete(TransferKind.Copy, 0, 0, 0, progress);
         var read = 0;

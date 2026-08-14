@@ -4,7 +4,7 @@ description: Provider transparency, capability detection (CapabilitySet / DataCa
 pillar: data
 card: docs/reference/data/index.md
 status: current
-last_validated: 2026-07-22
+last_validated: 2026-08-06
 ---
 
 # Koan Multi-Provider Transparency
@@ -16,11 +16,15 @@ last_validated: 2026-07-22
 - `Data<T, K>.Capabilities`, `CapabilitySet.Has(...)`, `DataCaps.Query.Linq` / `DataCaps.Write.FastRemove`
 - `Todo.SupportsFastRemove` / `RemoveAll(RemoveStrategy.Fast)`
 - A vector entity with `[Embedding]` routed to Weaviate / Qdrant / Milvus
-- "provider transparency", "capability detection", "multi-tenant partition", "read replica", "switch databases"
+- "provider transparency", "capability detection", "multi-tenant partition", "read replica", "route one operation"
 
 ## Core principle
 
 **Write entity code once; the provider is a deployment detail.** The adapter is chosen by package reference + config (Reference = Intent), and the [ARCH-0084](../../../docs/decisions/ARCH-0084-unified-capability-model.md) capability model decides *per call* whether a query is pushed down or evaluated in-memory — no adapter carries fallback logic. Routing is **ambient and scoped** via `EntityContext`; `Source` and `Adapter` are **mutually exclusive** ([DATA-0077](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)) — passing both is a hard `InvalidOperationException`, not a silent override.
+
+Ambient routing does not durably change the application default. When the intent is to copy, verify,
+and activate a new default SQLite, MongoDB, or PostgreSQL source, load
+[`koan-data-cutover`](../koan-data-cutover/SKILL.md) instead.
 
 <!-- validate -->
 ```csharp
@@ -64,7 +68,7 @@ public sealed class TodoService
             return await Todo.Query(t => !t.Done, ct);
     }
 
-    public async Task Migrate(CancellationToken ct = default)
+    public async Task WriteToMongoPartition(CancellationToken ct = default)
     {
         using (EntityContext.Adapter("mongo"))              // explicit provider override (NOT with Source)
         using (EntityContext.Partition($"tenant-42"))       // logical isolation within the provider
@@ -108,6 +112,7 @@ Scopes nest and replace inner-most-wins; dispose restores the outer value. `Part
 | `Todo.Query("CONTAINS(Title, '...')")` (SQL text in the string overload) | The `string` overload is the **JSON filter DSL** (`{"Tags":{"$in":["x"]}}`); use `Todo.QueryRaw(...)` for provider-native. |
 | `[VectorField] float[] Embedding` on a property | Class-level `[Embedding]` (`Koan.Data.AI.Attributes`) — Koan composes & stores the vector; no hand-held float array. |
 | `EntityContext.Source("x")` nested inside `EntityContext.Adapter("y")` | Pick one. Both set is a hard `InvalidOperationException` (DATA-0077), never "undefined behaviour". |
+| `EntityContext.Source("mongo")` presented as changing the application default | It scopes only the contained operations. Use verified default-route cutover for durable promotion. |
 | `[DataAdapter("pgvector")]` | pgvector is removed — route to `weaviate` / `qdrant` / `milvus`. |
 
 ## Escape hatches
@@ -120,6 +125,7 @@ Scopes nest and replace inner-most-wins; dispose restores the outer value. `Part
 ## See also
 
 - [Data capability](../../../docs/reference/data/index.md) — provider choice, routing, and correction
+- [Verified default-route cutover](../koan-data-cutover/SKILL.md) — durable promotion of the active default database
 - [Entity capabilities how-to](../../../docs/guides/entity-capabilities-howto.md) — capability tokens, query pushdown, counts
 - [DATA-0077 — context routing (partition / source / adapter)](../../../docs/decisions/DATA-0077-entity-context-source-adapter-partition-routing.md)
 - [ARCH-0084 — unified capability model (`CapabilitySet` / `DataCaps`)](../../../docs/decisions/ARCH-0084-unified-capability-model.md)

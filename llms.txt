@@ -48,6 +48,7 @@ hatch.
 - Engineer or migrate an application with an agent: docs/guides/agent-application-engineering.md
 - Foundation/composition/configuration: docs/reference/core/index.md
 - Entity persistence/query/providers: docs/reference/data/index.md
+- Move the active default Entity database: docs/guides/data/default-route-cutover.md
 - HTTP/API/OpenAPI/SSE: docs/reference/web/index.md
 - Authentication/authorization/tenancy: docs/reference/identity/index.md
 - Jobs/Events/Transport: docs/reference/work/index.md

@@ -39,6 +39,24 @@ The local default is `http://localhost:8080`. Configure placement or authenticat
 }
 ```
 
+To require a Weaviate offering supplied by Zen Garden, reference `Sylin.Koan.ZenGarden` and make that
+placement decision explicit:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Weaviate": {
+        "ConnectionString": "zen-garden://weaviate"
+      }
+    }
+  }
+}
+```
+
+That intent resolves to a ready matching offering or rejects startup with corrective guidance. It never
+silently falls back to localhost. Use `"auto"` when autonomous fallback is the intended policy.
+
 Source-specific endpoint, `StorageLifecycle`, and `Access` belong under `Koan:Data:Sources:{name}` like every Koan
 adapter. The declared vector plan—not provider options—owns dimensions, metric, model, space, source, and visibility.
 

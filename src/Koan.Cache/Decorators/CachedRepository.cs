@@ -14,6 +14,7 @@ using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Core;
+using Koan.Data.Core.Decorators;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Cache.Decorators;
@@ -36,16 +37,22 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly EntityCachePlan.Resolution _plan;
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
     private readonly string _entityName;
+    private readonly string? _routeNamespace;
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
         CacheClient cacheClient,
         EntityCachePlan.Resolution plan,
+        DataRepositoryDecorationContext decorationContext,
         ILogger<CachedRepository<TEntity, TKey>> logger)
     {
         _inner = inner ?? throw new ArgumentNullException(nameof(inner));
         _cacheClient = cacheClient ?? throw new ArgumentNullException(nameof(cacheClient));
         _plan = plan ?? throw new ArgumentNullException(nameof(plan));
+        ArgumentNullException.ThrowIfNull(decorationContext);
+        _routeNamespace = string.IsNullOrWhiteSpace(decorationContext.RouteNamespace)
+            ? null
+            : decorationContext.RouteNamespace;
         _entityPolicy = plan.Policy;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
@@ -340,7 +347,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
     private bool TryBuildEntityKey(TEntity? entity, object? id, out CacheKey key)
     {
-        if (!_plan.TryBuildKey(entity, id, out key))
+        if (!_plan.TryBuildKey(entity, id, out key, _routeNamespace))
         {
             _logger.LogDebug(
                 "Cache policy for {Entity} could not resolve key template '{Template}'. Skipping cache interaction.",

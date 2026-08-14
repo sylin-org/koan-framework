@@ -30,7 +30,8 @@ public sealed class DataService : IDataService
         Type EntityType,
         Type KeyType,
         string Adapter,
-        string Source);
+        string Source,
+        string BindingIdentity);
 
     public DataService(IServiceProvider services, IOptions<DataRuntimeOptions> options)
     {
@@ -72,18 +73,21 @@ public sealed class DataService : IDataService
         var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(_sp, sourceRegistry);
         var adapter = decision.Adapter;
         var source = decision.Source;
-        var sourcePlan = sourceRegistry.GetPlan(source, adapter);
+        var binding = decision.Binding
+            ?? throw new InvalidOperationException("The resolved Data route did not carry an operation binding.");
+        var sourcePlan = binding.Plan;
 
-        var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source);
+        var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source, binding.RepositoryIdentity);
 
         return (IDataRepository<TEntity, TKey>)_cache.GetOrAdd(
             key,
-            () => CreateRepository<TEntity, TKey>(decision, sourcePlan));
+            () => CreateRepository<TEntity, TKey>(decision, sourcePlan, binding));
     }
 
     private object CreateRepository<TEntity, TKey>(
         AdapterResolutionDecision decision,
-        DataSourcePlan sourcePlan)
+        DataSourcePlan sourcePlan,
+        DataRouteBinding binding)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -95,7 +99,12 @@ public sealed class DataService : IDataService
         // construction or the first provider operation cannot connect.
         var diagnostics = _sp.GetService<DataDiagnostics>();
         diagnostics?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory, source));
-        diagnostics?.ObserveParticipation(factory.Provider, source);
+        diagnostics?.ObserveParticipation(
+            factory.Provider,
+            source,
+            binding.IsDefaultDerived
+                ? DataAdapterParticipationRole.DefaultDerived
+                : DataAdapterParticipationRole.Explicit);
 
         // Create repository with source context
         var repo = factory.Create<TEntity, TKey>(_sp, source);
@@ -103,7 +112,7 @@ public sealed class DataService : IDataService
         // Provider/module decorators sit inside the Data-owned facade. They may cache or specialize
         // physical access, but cannot bypass guards, isolation, transforms, or Lifecycle by returning
         // early. The facade is therefore the one unavoidable application-facing repository boundary.
-        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, _sp);
+        var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, binding, _sp);
 
         // Wrap once with the Data-owned semantic boundary: source policy, guards, isolation, transforms,
         // write stamps and Lifecycle. The legacy provisioning-ready seam is used only for Managed + ReadWrite;
@@ -114,7 +123,15 @@ public sealed class DataService : IDataService
         var segmentation = _sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
         var fieldTransforms = _sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         var facade = new RepositoryFacade<TEntity, TKey>(
-            decorated, guards, readContributors, lifecycle, segmentation, fieldTransforms, sourcePlan);
+            decorated,
+            guards,
+            readContributors,
+            lifecycle,
+            segmentation,
+            fieldTransforms,
+            sourcePlan,
+            _sp.GetRequiredService<DataOperationHorizon>(),
+            binding);
 
         // Repository construction is the activation boundary: inspection and route description remain pure, while
         // any runtime path that actually asks for a repository makes that provider/source visible to readiness.
@@ -149,7 +166,9 @@ public sealed class DataService : IDataService
         var sourceRegistry = _sp.GetRequiredService<DataSourceRegistry>();
         var decision = AdapterResolver.ResolveDecisionForEntity<TEntity>(_sp, sourceRegistry);
         var source = decision.Source;
-        var sourcePlan = sourceRegistry.GetPlan(source, decision.Adapter);
+        var binding = decision.Binding
+            ?? throw new InvalidOperationException("The resolved Data route did not carry an operation binding.");
+        var sourcePlan = binding.Plan;
         var factory = decision.Factory;
         _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(sourcePlan, DataClaimSet.Describe(factory, source));
         var repo = factory.Create<TEntity, TKey>(_sp, source);
@@ -159,7 +178,15 @@ public sealed class DataService : IDataService
         var segmentation = _sp.GetRequiredService<Semantics.DataSegmentationPlan>().For(typeof(TEntity));
         var fieldTransforms = _sp.GetRequiredService<Pipeline.StorageFieldTransformPlan>();
         return new RepositoryFacade<TEntity, TKey>(
-            repo, guards, readContributors, lifecycle, segmentation, fieldTransforms, sourcePlan);
+            repo,
+            guards,
+            readContributors,
+            lifecycle,
+            segmentation,
+            fieldTransforms,
+            sourcePlan,
+            _sp.GetRequiredService<DataOperationHorizon>(),
+            binding);
     }
 
     /// <inheritdoc />
@@ -183,6 +210,7 @@ public sealed class DataService : IDataService
         Type entityType,
         Type keyType,
         IDataRepository<TEntity, TKey> repository,
+        DataRouteBinding binding,
         IServiceProvider services)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
@@ -194,10 +222,16 @@ public sealed class DataService : IDataService
         }
 
         object current = repository;
+        var context = new Decorators.DataRepositoryDecorationContext(
+            binding.Plan.Source,
+            binding.Plan.Adapter,
+            binding.Namespace);
 
         foreach (var decorator in decorators)
         {
-            var result = decorator.TryDecorate(entityType, keyType, current, services);
+            var result = decorator is Decorators.IDataRouteAwareRepositoryDecorator routeAware
+                ? routeAware.TryDecorate(entityType, keyType, current, context, services)
+                : decorator.TryDecorate(entityType, keyType, current, services);
             if (result is not null)
             {
                 current = result;

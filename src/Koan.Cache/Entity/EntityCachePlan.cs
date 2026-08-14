@@ -4,6 +4,7 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Routing;
 
 namespace Koan.Cache.Entity;
 
@@ -132,7 +133,11 @@ internal sealed class EntityCachePlan(
         /// </summary>
         public bool IsReadScopedNow() => readScopedNow();
 
-        public bool TryBuildKey(object? entity, object? id, out CacheKey key)
+        public bool TryBuildKey(
+            object? entity,
+            object? id,
+            out CacheKey key,
+            string? routeNamespace = null)
         {
             var context = EntityContext.Current;
             var ambient = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -156,7 +161,10 @@ internal sealed class EntityCachePlan(
                 return false;
             }
 
-            key = new CacheKey(formatted);
+            routeNamespace ??= DataRouteOperationContext.CurrentNamespace;
+            key = new CacheKey(string.IsNullOrWhiteSpace(routeNamespace)
+                ? formatted
+                : $"{routeNamespace}:{formatted}");
             return true;
         }
     }
