@@ -77,6 +77,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.17.0" />
     <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
     <PackageVersion Include="SharpCompress" Version="0.50.0" />
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <!-- ImageSharp.Drawing 3 requires a private build license; use the newest distributable 2.x/3.x pair. -->
     <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
     <PackageVersion Include="SixLabors.ImageSharp.Drawing" Version="2.1.7" />
