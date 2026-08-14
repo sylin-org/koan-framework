@@ -15,6 +15,18 @@ namespace Koan.Tests.Data.Core.Specs.Hosting;
 public sealed class DataAdapterParticipationSpec
 {
     [Fact]
+    public void Participation_info_preserves_the_original_two_value_shape()
+    {
+        var participation = new DataAdapterParticipationInfo("provider", "source");
+
+        var (provider, source) = participation;
+
+        provider.Should().Be("provider");
+        source.Should().Be("source");
+        participation.Role.Should().Be(DataAdapterParticipationRole.Explicit);
+    }
+
+    [Fact]
     public void Repository_use_records_canonical_provider_and_every_logical_source()
     {
         using var services = Services();
