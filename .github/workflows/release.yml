@@ -50,7 +50,7 @@ jobs:
 
           dotnet tool restore
           if ($LASTEXITCODE -ne 0) { throw 'Local tool restore failed.' }
-          $computed = (dotnet nbgv get-version -v SimpleVersion).Trim()
+          $computed = (dotnet nbgv get-version --public-release=true -v NuGetPackageVersion).Trim()
           if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($computed)) {
             throw 'Nerdbank.GitVersioning did not produce a package version.'
           }
