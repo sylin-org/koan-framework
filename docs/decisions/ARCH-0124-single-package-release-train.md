@@ -95,17 +95,16 @@ change the selected set.
 
 ### API-baseline transition
 
-The first shared train has no shared public predecessor. Its `1.0.0` release therefore retains each
-assembly package's existing historical baseline where one exists while packing the complete active
-inventory at `1.0.0`.
+The first shared train had no shared public predecessor, so its `1.0.0` release retained each
+assembly package's existing historical baseline while packing the complete active inventory. Once
+that train was public, `KoanTrainBaselineVersion=1.0.0` became the single shared
+`PackageValidationBaselineVersion` source and the historical project-local declarations were
+removed.
 
-After `1.0.0` is public for the complete inventory, one follow-up change sets
-`KoanTrainBaselineVersion=1.0.0` centrally; it becomes the shared
-`PackageValidationBaselineVersion` source and the historical project-local declarations can then be
-removed. MSBuild rejects any post-bootstrap public pack while the central property is empty. The next
-release validates every assembly package against that common predecessor. Content-only packages
-remain covered by dependency-shape and package-consumer proof. The policy is evaluated from source;
-it does not discover or choose baselines from live registry state.
+Each later release validates every assembly package against the preceding complete train. After a
+train is public, maintainers advance the one central baseline before preparing the following train.
+Content-only packages remain covered by dependency-shape and package-consumer proof. The policy is
+evaluated from source; it does not discover or choose baselines from live registry state.
 
 ## Consequences
 

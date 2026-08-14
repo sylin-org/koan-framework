@@ -37,10 +37,10 @@ Internal Koan dependencies remain bounded to the next breaking line by
 `build/compat-ranges.targets`. A 1.x package emits `[1.x.y, 2.0.0)`, so an incompatible major mix
 fails at restore even though normal releases use one aligned version.
 
-Assembly packages validate against the preceding public train. The bootstrap `1.0.0` train keeps
-the historical package baselines. Any later `PublicRelease` pack fails while
-`KoanTrainBaselineVersion` is empty. After the complete train is public, set that central property to
-`1.0.0`; it becomes the shared SDK `PackageValidationBaselineVersion` source for subsequent releases.
+Assembly packages validate against the preceding public train. `KoanTrainBaselineVersion` is the
+single SDK `PackageValidationBaselineVersion` source and is currently `1.0.0`; there are no
+project-local baseline declarations. After publishing a complete train, advance this central value
+to that released version before preparing the following train.
 
 See [NuGet publishing](nuget-publishing.md) and
 [ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).
