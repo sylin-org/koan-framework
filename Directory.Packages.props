@@ -2,6 +2,7 @@
   <PropertyGroup>
     <!-- One evaluated dependency constitution for every release-relevant project. -->
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <!-- Historical and explicitly shelved trees preserve their frozen manifests and are not release inputs. -->
     <_KoanAtticRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)attic'))</_KoanAtticRoot>
     <_KoanShelvedRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)shelved'))</_KoanShelvedRoot>

@@ -27,8 +27,6 @@
     <PackageReference Include="Testcontainers.Redis" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="Testcontainers.Couchbase" />
-    <!-- Pin Testcontainers' transitive SSH client above GHSA-q939-rpr3-3284. -->
-    <PackageReference Include="SSH.NET" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
