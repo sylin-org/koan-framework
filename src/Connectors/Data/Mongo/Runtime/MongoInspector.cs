@@ -7,13 +7,42 @@ using MongoDB.Driver;
 
 namespace Koan.Data.Connector.Mongo.Runtime;
 
-internal sealed class MongoInspector(MongoRoute route, MongoClientManager clients) : IDataSourceInspectorAdapter
+internal sealed class MongoInspector(MongoRoute route, MongoClientManager clients) :
+    IDataSourceInspectorAdapter,
+    IDataSourceStatusInspector
 {
     public SourceInspectionCapabilities Capabilities =>
         SourceInspectionCapabilities.ListContainers |
         SourceInspectionCapabilities.ResolveAddress |
         SourceInspectionCapabilities.DescribeContainer |
         SourceInspectionCapabilities.SampleRecords;
+
+    public IDataSourceNativeInspector Native => this;
+
+    public async Task<DataSourceStorageState> Status(CancellationToken ct = default)
+    {
+        try
+        {
+            await clients.Ping(route, ct).ConfigureAwait(false);
+            return new DataSourceStorageState(DataSourceStorageStatus.Ready, Constants.StorageStatus.Ready);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TimeoutException)
+        {
+            return new DataSourceStorageState(DataSourceStorageStatus.Unavailable, Constants.StorageStatus.Timeout);
+        }
+        catch (MongoException)
+        {
+            return new DataSourceStorageState(DataSourceStorageStatus.Unavailable, Constants.StorageStatus.Unavailable);
+        }
+        catch
+        {
+            return new DataSourceStorageState(DataSourceStorageStatus.Unavailable, Constants.StorageStatus.Unavailable);
+        }
+    }
 
     public async Task<SourceContainerBatch> Containers(
         int take,

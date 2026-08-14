@@ -21,6 +21,13 @@ public static class DatabaseRouteRegistry
         return Current()?.ResolveSourceKey(entityType);
     }
 
+    /// <summary>Whether any composed Database-axis route structurally applies to an Entity type.</summary>
+    public static bool AppliesTo(Type entityType)
+    {
+        ArgumentNullException.ThrowIfNull(entityType);
+        return Current()?.AppliesTo(entityType) ?? false;
+    }
+
     public static void Reset() => Current()?.Reset();
 
     private static DatabaseRouteCatalog Composition()
@@ -67,6 +74,13 @@ public static class DatabaseRouteRegistry
                 if (!string.IsNullOrWhiteSpace(key)) return key;
             }
             return null;
+        }
+
+        public bool AppliesTo(Type type)
+        {
+            foreach (var route in _snapshot)
+                if (route.AppliesTo(type)) return true;
+            return false;
         }
 
         public void Reset()

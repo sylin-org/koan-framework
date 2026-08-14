@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 93,
+    "packages": 94,
     "repairRequired": 0,
     "reviewRequired": 10,
-    "structurallyReady": 83,
-    "ownedReadmes": 93,
-    "technicalCompanions": 93,
+    "structurallyReady": 84,
+    "ownedReadmes": 94,
+    "technicalCompanions": 94,
     "findings": 18
   },
   "findingDefinitions": [
@@ -714,7 +714,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "In-memory data provider for Koan: thread-safe repository for testing, development, and ephemeral storage scenarios.",
+      "description": "Host-ephemeral Koan Entity adapter with detached snapshots, exact isolation, and bounded in-process state.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -898,6 +898,26 @@
       ],
       "readme": "src/Koan.Data.Core/README.md",
       "technicalDocumentation": "src/Koan.Data.Core/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Cutover",
+      "projectPath": "src/Koan.Data.Cutover/Koan.Data.Cutover.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "structurally-ready",
+      "description": "Verified, provider-bounded promotion of a configured Data source to the active Koan default.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core"
+      ],
+      "readme": "src/Koan.Data.Cutover/README.md",
+      "technicalDocumentation": "src/Koan.Data.Cutover/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },
@@ -1127,7 +1147,8 @@
         "Sylin.Koan.Data.Abstractions",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Vector",
-        "Sylin.Koan.Data.Vector.Abstractions"
+        "Sylin.Koan.Data.Vector.Abstractions",
+        "Sylin.Koan.ZenGarden.Contracts"
       ],
       "readme": "src/Connectors/Data/Vector/Weaviate/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Weaviate/TECHNICAL.md",

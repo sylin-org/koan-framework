@@ -42,6 +42,7 @@ public static class ServiceCollectionExtensions
         services.AddKoanOptions<Options.DirectOptions>(Infrastructure.Constants.Configuration.Direct.Section);
         services.AddKoanOptions<Options.SourceIntegrationOptions>(Infrastructure.Constants.Configuration.SourceIntegration);
         services.AddKoanOptions<Options.MappingOptions>(Infrastructure.Constants.Configuration.Mapping);
+        services.AddKoanOptions<Options.DataRouteOptions>(Infrastructure.Constants.Configuration.Route);
         // Vector defaults now live in Koan.Data.Vector; apps should call AddKoanDataVector() to enable vector features.
         services.AddKoanOptions<DataRuntimeOptions>();
         services.TryAddSingleton(sp => new Koan.Data.Abstractions.Naming.StorageNameCache(
@@ -91,6 +92,9 @@ public static class ServiceCollectionExtensions
             sp.GetServices<IDataAdapterFactory>(),
             sp.GetService<Koan.Core.Composition.KoanApplicationReferenceManifest>()));
         services.AddSingleton<Routing.DataDefaultProviderPlan>();
+        services.AddSingleton<Routing.DefaultDataRouteAuthority>();
+        services.AddSingleton<Routing.DataOperationHorizon>();
+        services.AddSingleton<Composition.DataApplicationManifest>();
         services.TryAddSingleton<DataOperationCatalog>();
         services.TryAddSingleton<Mapping.Composition.MappingDeclarationCatalog>();
         services.TryAddSingleton<IDataMappingPlans, Mapping.Runtime.DataMappingPlans>();

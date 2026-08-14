@@ -5,11 +5,59 @@ using Microsoft.Data.Sqlite;
 
 namespace Koan.Data.Connector.Sqlite.Runtime;
 
-internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections connections) : IDataSourceInspectorAdapter
+internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections connections) :
+    IDataSourceInspectorAdapter,
+    IDataSourceStatusInspector
 {
     public SourceInspectionCapabilities Capabilities =>
         SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
         SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords;
+
+    public IDataSourceNativeInspector Native => this;
+
+    public async Task<DataSourceStorageState> Status(CancellationToken ct = default)
+    {
+        SqliteConnectionStringBuilder builder;
+        try
+        {
+            builder = connections.Parse(route.ConnectionString);
+        }
+        catch
+        {
+            return new DataSourceStorageState(DataSourceStorageStatus.Unavailable, "connection-invalid");
+        }
+
+        var memory = builder.Mode == SqliteOpenMode.Memory ||
+                     string.Equals(builder.DataSource, ":memory:", StringComparison.OrdinalIgnoreCase);
+        var uri = builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
+        if (!memory && !uri && !File.Exists(Path.GetFullPath(builder.DataSource)))
+            return new DataSourceStorageState(DataSourceStorageStatus.Missing, "file-missing");
+
+        try
+        {
+            await using var connection = await Open(ct).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA quick_check";
+            var result = await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+            return string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase)
+                ? new DataSourceStorageState(DataSourceStorageStatus.Ready, "ready")
+                : new DataSourceStorageState(DataSourceStorageStatus.Unavailable, "integrity-check-failed");
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (SqliteException error)
+        {
+            return new DataSourceStorageState(
+                DataSourceStorageStatus.Unavailable,
+                $"sqlite-{error.SqliteErrorCode}");
+        }
+        catch
+        {
+            return new DataSourceStorageState(DataSourceStorageStatus.Unavailable, "open-failed");
+        }
+    }
 
     public async Task<SourceContainerBatch> Containers(int take, string? providerContinuation, CancellationToken ct = default)
     {

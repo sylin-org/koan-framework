@@ -4,11 +4,50 @@ using Npgsql;
 
 namespace Koan.Data.Connector.Postgres.Runtime;
 
-internal sealed class PostgresInspector(PostgresRoute route) : IDataSourceInspectorAdapter
+internal sealed class PostgresInspector(PostgresRoute route) :
+    IDataSourceInspectorAdapter,
+    IDataSourceStatusInspector
 {
     public SourceInspectionCapabilities Capabilities =>
         SourceInspectionCapabilities.ListContainers | SourceInspectionCapabilities.ResolveAddress |
         SourceInspectionCapabilities.DescribeContainer | SourceInspectionCapabilities.SampleRecords;
+
+    public IDataSourceNativeInspector Native => this;
+
+    public async Task<DataSourceStorageState> Status(CancellationToken ct = default)
+    {
+        try
+        {
+            await using var connection = await Open(ct).ConfigureAwait(false);
+            await using var command = new NpgsqlCommand("SELECT 1", connection);
+            _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+            return new DataSourceStorageState(
+                DataSourceStorageStatus.Ready,
+                Infrastructure.Constants.StorageStatus.Ready);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (TimeoutException)
+        {
+            return new DataSourceStorageState(
+                DataSourceStorageStatus.Unavailable,
+                Infrastructure.Constants.StorageStatus.Timeout);
+        }
+        catch (NpgsqlException)
+        {
+            return new DataSourceStorageState(
+                DataSourceStorageStatus.Unavailable,
+                Infrastructure.Constants.StorageStatus.Unavailable);
+        }
+        catch
+        {
+            return new DataSourceStorageState(
+                DataSourceStorageStatus.Unavailable,
+                Infrastructure.Constants.StorageStatus.Unavailable);
+        }
+    }
 
     public async Task<SourceContainerBatch> Containers(int take, string? providerContinuation, CancellationToken ct = default)
     {

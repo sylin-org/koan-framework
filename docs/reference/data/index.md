@@ -4,10 +4,10 @@ domain: data
 title: "Persist and query business state"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-24
+last_updated: 2026-08-06
 framework_version: v0.20.0
 validation:
-  date_last_tested: 2026-07-22
+  date_last_tested: 2026-08-06
   status: verified
   scope: Entity grammar, provider choice, query cost, relationships, lifecycle, and correction paths
 ---
@@ -182,6 +182,31 @@ Or choose the application default in configuration:
 Explicit intent fails loudly. If the selected adapter is not referenced, Koan reports
 `adapter-unavailable`, lists the available choices, and names the package or configuration correction.
 It does not silently move the Entity to another store.
+
+## Promote a verified default across databases
+
+Reference `Sylin.Koan.Data.Cutover` when a single-host application must move its active default database to a new empty
+SQLite, MongoDB, or PostgreSQL source without changing application Entity calls. Configure the target as a distinct Managed +
+ReadWrite source, prove that external writers are absent or paused, then inspect the complete plan before running:
+
+```csharp
+using Koan.Data.Core;
+using Koan.Data.Cutover;
+
+var transition = Data.Source("Mongo").PromoteToDefault();
+var plan = await transition.Plan(ct);
+if (!plan.CanRun) return;
+
+var receipt = await transition.Run(ct);
+```
+
+The first supported provider set is SQLite, MongoDB, and PostgreSQL, including verified moves between unlike stores.
+The envelope remains string-keyed default-routed Entity roots and one host. The operation
+fails closed for a nonempty target, unexplained source containers, managed or segmented slices, stored transforms,
+custom filters, mappings, provider drift, incomplete inventory, or unproven writer ownership. It copies in bounded pages,
+matches target records by exact identity, proves canonical logical readback and cardinality, durably activates one route pointer, invalidates retained default handles, and never rolls back
+automatically. Follow the [verified default-route cutover how-to](../../guides/data/default-route-cutover.md) for the
+operator sequence; the [package companion](../../../src/Koan.Data.Cutover/README.md) owns installation and package-specific limits.
 
 ## Relationships stay in the model
 

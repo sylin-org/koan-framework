@@ -4,6 +4,7 @@ using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Abstractions.Sources;
@@ -36,6 +37,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 {
     private readonly IServiceProvider _services;
     private readonly SqliteRoute _route;
+    private readonly SqliteAdapterFactory _factory;
     private readonly SqliteConnections _connections;
     private readonly DataSourceReadinessCoordinator _readiness;
     private readonly DataSegmentationPlan _segmentation;
@@ -43,10 +45,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly object _planGate = new();
     private readonly Dictionary<string, SqliteEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
 
-    internal SqliteRepository(IServiceProvider services, SqliteRoute route)
+    internal SqliteRepository(IServiceProvider services, SqliteRoute route, SqliteAdapterFactory factory)
     {
         _services = services;
         _route = route;
+        _factory = factory;
         _connections = services.GetRequiredService<SqliteConnections>();
         _readiness = services.GetRequiredService<DataSourceReadinessCoordinator>();
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
@@ -383,7 +386,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             throw new NotSupportedException(
                 $"Explicit SQLite map '{_declaredMapping.Id}' pins one physical container and cannot accept an ambient partition.");
         var table = _declaredMapping?.Container.Name ??
-                    Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_services);
+                    ((INamingProvider)_factory).ResolveStorage(
+                        typeof(TEntity),
+                        EntityContext.Current?.Partition,
+                        _services);
         var key = _declaredMapping?.Id ?? table;
         lock (_planGate)
         {

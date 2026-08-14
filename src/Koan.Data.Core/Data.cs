@@ -16,6 +16,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core.Querying;
+using Koan.Data.Core.Routing;
 using Koan.Data.Core.Sorting;
 using Koan.Data.Core.Execution;
 using Koan.Data.Core.Transfers;
@@ -34,6 +35,18 @@ public static class Data<TEntity, TKey>
 
     private static IDataRepository<TEntity, TKey> Repo
         => Service.GetRepository<TEntity, TKey>();
+
+    private static ValueTask<DataMultiOperationLease> EnterMutationHorizon(
+        IDataRepository<TEntity, TKey> repository,
+        string operation,
+        CancellationToken ct)
+    {
+        if (repository is not RepositoryFacade<TEntity, TKey> { RouteBinding: { } binding })
+            throw new InvalidOperationException(
+                $"The repository for '{typeof(TEntity).FullName}' is not bound to a physical Data route.");
+        return AppHost.GetRequiredService<DataOperationHorizon>(operation)
+            .EnterMany([binding], operation, ct);
+    }
 
     /// <summary>
     /// The provider's capabilities as the unified <see cref="CapabilitySet"/> (ARCH-0084), resolved
@@ -366,6 +379,7 @@ public static class Data<TEntity, TKey>
         CancellationToken ct = default)
     {
         var repo = Repo;
+        await using var horizon = await EnterMutationHorizon(repo, "entity patch", ct);
         var current = await repo.Get(payload.Id, ct);
         if (current is null) return null;
         Koan.Data.Core.Patch.PatchOpsExecutor.Apply<TEntity, TKey>(current, payload);
@@ -617,9 +631,11 @@ public static class Data<TEntity, TKey>
     public static async Task<int> Delete(Expression<Func<TEntity, bool>> predicate, string partition, CancellationToken ct = default)
     {
         using var _ = WithPartition(partition);
+        var repo = Repo;
+        await using var horizon = await EnterMutationHorizon(repo, "predicate entity delete", ct);
         var items = (await QueryWithCount(predicate, QueryDefinition.All, ct)).Items;
         var ids = items.Select(e => e.Id);
-        return await Repo.DeleteMany(ids, ct);
+        return await repo.DeleteMany(ids, ct);
     }
 
     // ------------------------------------------------------------------

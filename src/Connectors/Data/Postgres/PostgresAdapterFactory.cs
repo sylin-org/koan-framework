@@ -82,7 +82,7 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
             SchemaMatching = route.Options.SchemaMatching,
             AllowProductionDdl = route.Options.AllowProductionDdl,
             SourcePlan = route.Plan
-        }, services.GetRequiredService<IStorageNameResolver>());
+        }, services.GetRequiredService<IStorageNameResolver>(), this);
     }
 
     internal PostgresRoute ResolveRoute(IServiceProvider services, string source)

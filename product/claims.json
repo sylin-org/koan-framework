@@ -38,6 +38,15 @@
       "evidence": ["tests/Suites/Data/Connector.Sqlite", "tests/Suites/Web/AdapterSurface/Koan.Web.AdapterSurface.Sqlite.Tests", "samples/FirstUse", "samples/GoldenJourney"]
     },
     {
+      "id": "verified-default-data-cutover",
+      "title": "Verified cross-provider default Data cutover",
+      "summary": "A single-host application can copy its active default Entity database to a distinct empty SQLite, MongoDB, or PostgreSQL source, prove identity-matched canonical logical equivalence, and durably activate the target without changing ordinary Entity calls.",
+      "maturity": "supported-extension",
+      "packages": ["Sylin.Koan.Data.Cutover"],
+      "documentation": ["docs/reference/data/index.md", "docs/guides/data/default-route-cutover.md", "src/Koan.Data.Cutover/README.md", "src/Koan.Data.Cutover/TECHNICAL.md"],
+      "evidence": ["tests/Suites/Data/Cutover/Koan.Data.Cutover.Tests", "tests/Suites/Data/Cutover/Koan.Data.Cutover.CrossProvider.Tests", "docs/decisions/DATA-0111-verified-default-data-cutover.md"]
+    },
+    {
       "id": "postgresql-data-provider",
       "title": "PostgreSQL Entity persistence",
       "summary": "PostgreSQL preserves Koan Entity CRUD, query, paging, provider-bounded streaming, source routing, schema policy, health, and declared isolation semantics through an application-facing connector and a module-free shared Npgsql mechanism.",

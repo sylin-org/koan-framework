@@ -65,16 +65,19 @@ internal sealed class DataDiagnostics : IDataDiagnostics
         }
     }
 
-    internal void ObserveParticipation(string provider, string source)
+    internal void ObserveParticipation(
+        string provider,
+        string source,
+        DataAdapterParticipationRole role = DataAdapterParticipationRole.Explicit)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
         var normalizedProvider = provider.Trim();
         var normalizedSource = string.IsNullOrWhiteSpace(source) ? "Default" : source.Trim();
-        var key = new ParticipationKey(normalizedProvider, normalizedSource);
+        var key = new ParticipationKey(normalizedProvider, normalizedSource, role);
         lock (_gate)
         {
             if (_participations.ContainsKey(key) || _participations.Count < _limit)
-                _participations[key] = new DataAdapterParticipationInfo(normalizedProvider, normalizedSource);
+                _participations[key] = new DataAdapterParticipationInfo(normalizedProvider, normalizedSource, role);
         }
     }
 
@@ -100,7 +103,10 @@ internal sealed class DataDiagnostics : IDataDiagnostics
         }
     }
 
-    private readonly record struct ParticipationKey(string Provider, string Source);
+    private readonly record struct ParticipationKey(
+        string Provider,
+        string Source,
+        DataAdapterParticipationRole Role);
 
     private sealed class ParticipationKeyComparer : IEqualityComparer<ParticipationKey>
     {
@@ -108,10 +114,11 @@ internal sealed class DataDiagnostics : IDataDiagnostics
 
         public bool Equals(ParticipationKey x, ParticipationKey y) =>
             StringComparer.OrdinalIgnoreCase.Equals(x.Provider, y.Provider) &&
-            StringComparer.OrdinalIgnoreCase.Equals(x.Source, y.Source);
+            StringComparer.OrdinalIgnoreCase.Equals(x.Source, y.Source) && x.Role == y.Role;
 
         public int GetHashCode(ParticipationKey value) => HashCode.Combine(
             StringComparer.OrdinalIgnoreCase.GetHashCode(value.Provider),
-            StringComparer.OrdinalIgnoreCase.GetHashCode(value.Source));
+            StringComparer.OrdinalIgnoreCase.GetHashCode(value.Source),
+            value.Role);
     }
 }

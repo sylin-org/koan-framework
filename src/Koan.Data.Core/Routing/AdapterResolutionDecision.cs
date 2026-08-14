@@ -6,7 +6,8 @@ namespace Koan.Data.Core.Routing;
 internal sealed record AdapterResolutionDecision(
     IDataAdapterFactory Factory,
     string Source,
-    ProviderSelectionReceipt Receipt)
+    ProviderSelectionReceipt Receipt,
+    DataRouteBinding? Binding = null)
 {
     public string Adapter => Receipt.ProviderId;
     public string Via => Receipt.Reason;

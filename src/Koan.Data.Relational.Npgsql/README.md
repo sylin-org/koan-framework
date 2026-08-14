@@ -22,6 +22,8 @@ A concrete provider maps its resolved endpoint, identity, schema policy, and nam
 `NpgsqlRepositoryOptions`, then returns `NpgsqlRepository<TEntity,TKey>` from its normal `IDataAdapterFactory`. The
 repository supplies the shared Entity CRUD, query, paging, batch, isolation, and schema behavior without borrowing or
 activating another provider connector.
+The constructing provider supplies its naming capability directly, so an inactive target repository never derives its
+table name from whichever provider currently owns the application's default route.
 
 Managed Id+object storage and explicit physical maps both compile into `NpgsqlEntityPlan<TEntity,TKey>` and execute
 through the same repository. Scalar names, object roots, nested `jsonb` paths, composite keys, and generated keys are

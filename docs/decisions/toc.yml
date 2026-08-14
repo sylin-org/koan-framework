@@ -302,6 +302,10 @@
       href: DATA-0109-polymorphic-entity-roots.md
     - name: DATA-0110 Compact provider-neutral Data adapter language
       href: DATA-0110-compact-data-adapter-language.md
+    - name: DATA-0111 Verified runtime default Data cutover
+      href: DATA-0111-verified-default-data-cutover.md
+    - name: DATA-0112 JSON individual-file persistence
+      href: DATA-0112-json-individual-files.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
