@@ -55,6 +55,41 @@ try {
 
     function Fail([string]$Message) { $failures.Add($Message) | Out-Null }
 
+    # --- distribution --------------------------------------------------------------------------
+    # The skills reach a developer as a plugin. `.agents` is the plugin directory: Claude Code looks
+    # for <plugin>/skills/<name>/SKILL.md, which is the layout already there, so nothing is copied
+    # or moved. These checks keep the shipped catalog and the source roster from drifting apart.
+    $marketplacePath = '.claude-plugin/marketplace.json'
+    $pluginManifestPath = "$skillsRoot/../.claude-plugin/plugin.json"
+    if (-not (Test-Path -LiteralPath $marketplacePath -PathType Leaf)) {
+        Fail "marketplace catalog is missing: $marketplacePath"
+    }
+    elseif (-not (Test-Path -LiteralPath $pluginManifestPath -PathType Leaf)) {
+        Fail "plugin manifest is missing: $pluginManifestPath"
+    }
+    else {
+        $marketplace = Get-Content -Raw -LiteralPath $marketplacePath | ConvertFrom-Json
+        $plugin = Get-Content -Raw -LiteralPath $pluginManifestPath | ConvertFrom-Json
+        $entries = @($marketplace.plugins)
+        if ($entries.Count -ne 1) {
+            Fail "marketplace must list exactly one plugin; found $($entries.Count)"
+        }
+        else {
+            if ($entries[0].name -ne $plugin.name) {
+                Fail "marketplace entry '$($entries[0].name)' does not match plugin manifest name '$($plugin.name)'"
+            }
+            # The source must resolve to the directory that actually holds the skills, or an install
+            # succeeds and delivers nothing.
+            $sourceDir = [IO.Path]::GetFullPath((Join-Path $repoRoot ([string]$entries[0].source)))
+            if ($sourceDir -ne [IO.Path]::GetFullPath((Join-Path $repoRoot (Split-Path -Parent $skillsRoot)))) {
+                Fail "marketplace plugin source '$($entries[0].source)' does not point at the skill root"
+            }
+            if ($entries[0].version -ne $plugin.version) {
+                Fail "marketplace entry version '$($entries[0].version)' does not match plugin manifest '$($plugin.version)'"
+            }
+        }
+    }
+
     # --- routing -------------------------------------------------------------------------------
     $skillDirs = @()
     if (Test-Path -LiteralPath $skillsRoot -PathType Container) {
@@ -214,7 +249,7 @@ $refs
     }
 
     Write-Host ''
-    if ($Structure) { Write-Host 'skills-verify: structure passed (routing, links, shelf).' }
+    if ($Structure) { Write-Host 'skills-verify: structure passed (distribution, routing, links, shelf).' }
     else { Write-Host "skills-verify: passed. Shelf identifiers restore; $journeyCount journey(s) compile against published $PackageVersion." }
     exit 0
 }

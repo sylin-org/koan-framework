@@ -14,6 +14,20 @@ validation:
 
 # Choose one Koan skill
 
+## Install
+
+```
+/plugin marketplace add sylin-org/koan-framework
+/plugin install koan@koan
+```
+
+That installs all three skills. Update them later with `/plugin marketplace update koan`.
+
+The skills are also readable straight from the repository under `.agents/skills/` — the same files the
+plugin serves, so a harness that reads a portable skill directory can point at them directly.
+
+## Choose by outcome
+
 Koan has three coding-agent entry points. Choose by the outcome, not by a package or subsystem.
 
 | Skill | Say this when you want to… | Promise |

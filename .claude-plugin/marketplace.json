@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "koan",
+  "description": "Koan's official coding-agent surface: build, explain, and upgrade Koan applications.",
+  "owner": {
+    "name": "Sylin",
+    "url": "https://github.com/sylin-org"
+  },
+  "plugins": [
+    {
+      "name": "koan",
+      "source": "./.agents",
+      "displayName": "Koan",
+      "description": "Build, explain, and upgrade Koan applications. Installs the koan, koan-explain, and koan-upgrade skills.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Sylin",
+        "url": "https://github.com/sylin-org"
+      },
+      "homepage": "https://github.com/sylin-org/koan-framework/blob/main/docs/guides/agent-skills.md",
+      "repository": "https://github.com/sylin-org/koan-framework",
+      "license": "Apache-2.0",
+      "category": "frameworks",
+      "keywords": ["koan", "dotnet", "entity", "framework", "aspnetcore"]
+    }
+  ]
+}

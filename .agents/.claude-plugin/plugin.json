@@ -1,0 +1,20 @@
+{
+  "name": "koan",
+  "displayName": "Koan",
+  "description": "Build, explain, and upgrade Koan applications. Turns an outcome into the smallest coherent Koan composition, explains an application without changing it, or moves an older application to current Koan.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sylin",
+    "url": "https://github.com/sylin-org"
+  },
+  "homepage": "https://github.com/sylin-org/koan-framework/blob/main/docs/guides/agent-skills.md",
+  "repository": "https://github.com/sylin-org/koan-framework",
+  "license": "Apache-2.0",
+  "keywords": [
+    "koan",
+    "dotnet",
+    "entity",
+    "framework",
+    "aspnetcore"
+  ]
+}
