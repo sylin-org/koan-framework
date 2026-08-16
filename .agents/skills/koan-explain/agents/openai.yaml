@@ -1,0 +1,6 @@
+interface:
+  display_name: "Koan Explain"
+  short_description: "Explain Koan from local read-only evidence"
+  default_prompt: "Use $koan-explain to explain this Koan application from local evidence without changing it."
+policy:
+  allow_implicit_invocation: true

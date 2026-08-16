@@ -1,0 +1,6 @@
+interface:
+  display_name: "Koan"
+  short_description: "Compose and prove the next useful Koan outcome"
+  default_prompt: "Use $koan to turn this outcome into the smallest coherent Koan application change and prove it."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Koan Upgrade"
+  short_description: "Move older Koan apps to current Koan"
+  default_prompt: "Use $koan-upgrade to migrate this older Koan application to current Koan while preserving its observable contracts."
+policy:
+  allow_implicit_invocation: true

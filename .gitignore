@@ -77,3 +77,7 @@ node_modules/
 /samples/S7.Meridian/scripts/phase4.5/try-it-yourself/output
 nul
 /other/zen-garden/dist
+
+# Journey builds emit a composition lockfile; it is a build artifact, not a fixture.
+evals/koan/journeys/*/koan.lock.json
+/tmp/

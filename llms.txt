@@ -16,6 +16,8 @@ Install and create:
 
 Host:
 
+    using Koan.Core;
+
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddKoan();
     var app = builder.Build();

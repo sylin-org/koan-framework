@@ -1,0 +1,37 @@
+name: skills-verify
+
+# Compiles the koan skill's claims against the packages published to nuget.org. This needs network
+# access and a real restore, so it runs on a schedule rather than in the per-PR gate -- and it
+# catches drift the PR gate structurally cannot: an identifier that no longer resolves, or an API
+# that changed under guidance which still pattern-matches as correct.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      packageVersion:
+        description: Published Koan package version to verify against
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Verify skill claims against published packages
+        shell: pwsh
+        run: |
+          $version = '${{ github.event.inputs.packageVersion }}'
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = '1.0.0' }
+          ./scripts/skills-verify.ps1 -PackageVersion $version
+          if ($LASTEXITCODE -ne 0) { throw 'Skill verification failed.' }

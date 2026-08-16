@@ -1,0 +1,839 @@
+{
+  "schemaVersion": "1.0.0",
+  "verifiedOn": "2026-08-15",
+  "canonicalManifest": ".agents/skills/manifest.json",
+  "canonicalSkillsRoot": ".agents/skills",
+  "canonicalSkills": [
+    "koan",
+    "koan-explain",
+    "koan-upgrade"
+  ],
+  "scope": "Publicly discoverable Koan skill listings, catalog copies, registry packages, and install or download surfaces associated with the retired granular and first-generation skill sets.",
+  "methodology": {
+    "verifiedListing": "An exact public URL or public registry API record was observed during the investigation. Search-result evidence is identified when the destination itself was not directly inspectable.",
+    "candidateAlias": "A name follows a platform's observed naming convention or was seen in earlier coverage, but its exact public URL could not be revalidated. Candidates are not counted as verified listings.",
+    "consumerEvidence": "An install, download, export, or repository-fetch instruction proves that a listing can distribute legacy content; it does not prove that a third party installed or used it.",
+    "usageSignal": "Stars, forks, quality scores, and views are recorded only with their platform meaning and are not converted into install counts.",
+    "externalMutationPerformed": false
+  },
+  "sourceRepository": {
+    "owner": "sylin-org",
+    "repository": "koan-framework",
+    "url": "https://github.com/sylin-org/koan-framework",
+    "canonicalSkillsPath": ".agents/skills",
+    "legacyRepositoryPath": ".claude/skills",
+    "disposition": "Publish and index only the three canonical skills. Legacy loader paths are removed; retain their identities only in non-loader historical inventory and migration records."
+  },
+  "platforms": [
+    {
+      "id": "mcpmarket",
+      "platform": "mcpmarket.com",
+      "status": "verified-legacy-listings",
+      "verificationMethod": "public-page-and-search-result-observation",
+      "verifiedListings": [
+        {
+          "alias": "koan-data-modeling",
+          "retirement": "koan-data-modeling",
+          "url": "https://mcpmarket.com/tools/skills/koan-data-modeling",
+          "evidence": "Exact listing supplied by the requester and retained as the investigation anchor.",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-entity-first-data-access",
+          "retirement": "koan-entity-first",
+          "url": "https://mcpmarket.com/tools/skills/koan-entity-first-data-access",
+          "evidence": "Public listing attributed to sylin-org; the page exposed a skillfish install command for the legacy entity-first skill.",
+          "signals": [
+            {
+              "metric": "displayed-source-repository-stars",
+              "value": 2,
+              "interpretation": "Repository metadata shown by the marketplace, not listing adoption."
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-performance-optimizer",
+          "retirement": "koan-performance",
+          "url": "https://mcpmarket.com/tools/skills/koan-performance-optimizer",
+          "evidence": "Public listing attributed to sylin-org; the page exposed a skillfish install command for the legacy performance skill.",
+          "signals": [
+            {
+              "metric": "displayed-source-repository-stars",
+              "value": 2,
+              "interpretation": "Repository metadata shown by the marketplace, not listing adoption."
+            }
+          ],
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "install-command",
+          "listingUrl": "https://mcpmarket.com/tools/skills/koan-entity-first-data-access",
+          "command": "npx skillfish add sylin-org/koan-framework entity-first",
+          "interpretation": "A legacy repository subdirectory can be installed from the listing."
+        },
+        {
+          "type": "install-command",
+          "listingUrl": "https://mcpmarket.com/tools/skills/koan-performance-optimizer",
+          "command": "npx skillfish add sylin-org/koan-framework performance",
+          "interpretation": "A legacy repository subdirectory can be installed from the listing."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Request removal of every Koan listing derived from .claude/skills or a first-generation alias.",
+        "replace": "Publish only koan, koan-explain, and koan-upgrade from .agents/skills.",
+        "fallback": "If deletion is unavailable, mark the listing deprecated and link to the canonical manifest."
+      },
+      "confidence": "high",
+      "limits": [
+        "An earlier search pass observed five Koan-related MCPMarket results, but only three exact durable URLs were retained and revalidated; the remaining two identifiers are intentionally not invented.",
+        "The marketplace sitemap was behind a Vercel checkpoint during revalidation.",
+        "Displayed repository stars do not establish listing installs or active consumers."
+      ]
+    },
+    {
+      "id": "skills-rest",
+      "platform": "skills.rest",
+      "status": "verified-complete-first-generation-copy",
+      "verificationMethod": "public-page-observation",
+      "commonEvidence": {
+        "reportedVersion": "1.0.0",
+        "reportedPublishedOn": "2025-11-08",
+        "reportedInstallsPerListing": 0,
+        "reportedAuthor": "sylin-org",
+        "downloadSource": "https://github.com/sylin-org/koan-framework/archive/main.zip",
+        "interpretation": "The catalog exposes repository-archive downloads for snapshots named after the twelve first-generation skills."
+      },
+      "verifiedListings": [
+        {
+          "alias": "koan-ai-integration",
+          "retirement": "koan-ai",
+          "url": "https://skills.rest/skill/koan-ai-integration",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-api-building",
+          "retirement": "koan-web",
+          "url": "https://skills.rest/skill/koan-api-building",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-bootstrap",
+          "retirement": "koan-bootstrap",
+          "url": "https://skills.rest/skill/koan-bootstrap",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-data-modeling",
+          "retirement": "koan-data-modeling",
+          "url": "https://skills.rest/skill/koan-data-modeling",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-debugging",
+          "retirement": "koan-debugging",
+          "url": "https://skills.rest/skill/koan-debugging",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-entity-first",
+          "retirement": "koan-entity-first",
+          "url": "https://skills.rest/skill/koan-entity-first",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-mcp-integration",
+          "retirement": "koan-mcp-integration",
+          "url": "https://skills.rest/skill/koan-mcp-integration",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-multi-provider",
+          "retirement": "koan-multi-provider",
+          "url": "https://skills.rest/skill/koan-multi-provider",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-performance",
+          "retirement": "koan-performance",
+          "url": "https://skills.rest/skill/koan-performance",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-quickstart",
+          "retirement": "koan-quickstart",
+          "url": "https://skills.rest/skill/koan-quickstart",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-relationships",
+          "retirement": "koan-data-modeling",
+          "url": "https://skills.rest/skill/koan-relationships",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-vector-migration",
+          "retirement": "koan-vector",
+          "url": "https://skills.rest/skill/koan-vector-migration",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "archive-download",
+          "listingUrl": "https://skills.rest/skill/koan-data-modeling",
+          "downloadUrl": "https://github.com/sylin-org/koan-framework/archive/main.zip#koan-data-modeling",
+          "interpretation": "The catalog offers a direct repository archive with a legacy skill fragment."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Request removal of all twelve version 1.0.0 legacy pages and invalidate their archive-fragment installation guidance.",
+        "replace": "Submit only the three canonical skill entrypoints if the platform supports repository-local skills."
+      },
+      "confidence": "high",
+      "limits": [
+        "The displayed zero-install counter is platform-reported and does not rule out direct archive downloads outside its telemetry.",
+        "The pages are catalog copies; their publication date is not the date of the underlying Git commit."
+      ]
+    },
+    {
+      "id": "skillsmp",
+      "platform": "skillsmp.com",
+      "status": "verified-partial-first-generation-copy",
+      "verificationMethod": "public-page-and-search-result-observation",
+      "verifiedListings": [
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-api-building-skill-md",
+          "retirement": "koan-web",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-api-building-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-data-modeling-skill-md",
+          "retirement": "koan-data-modeling",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-data-modeling-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-debugging-skill-md",
+          "retirement": "koan-debugging",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-debugging-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-mcp-integration-skill-md",
+          "retirement": "koan-mcp-integration",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-mcp-integration-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-multi-provider-skill-md",
+          "retirement": "koan-multi-provider",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-multi-provider-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-quickstart-skill-md",
+          "retirement": "koan-quickstart",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-quickstart-skill-md",
+          "confidence": "high"
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-vector-migration-skill-md",
+          "retirement": "koan-vector",
+          "url": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-vector-migration-skill-md",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-ai-integration-skill-md",
+          "retirement": "koan-ai",
+          "confidence": "medium",
+          "reason": "The slug follows the verified source-path convention, but an exact public page was not revalidated."
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-bootstrap-skill-md",
+          "retirement": "koan-bootstrap",
+          "confidence": "medium",
+          "reason": "The slug follows the verified source-path convention, but an exact public page was not revalidated."
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-entity-first-skill-md",
+          "retirement": "koan-entity-first",
+          "confidence": "medium",
+          "reason": "The slug follows the verified source-path convention, but an exact public page was not revalidated."
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-performance-skill-md",
+          "retirement": "koan-performance",
+          "confidence": "medium",
+          "reason": "The slug follows the verified source-path convention, but an exact public page was not revalidated."
+        },
+        {
+          "alias": "sylin-org-koan-framework-claude-skills-relationships-skill-md",
+          "retirement": "koan-data-modeling",
+          "confidence": "medium",
+          "reason": "The slug follows the verified source-path convention, but an exact public page was not revalidated."
+        }
+      ],
+      "relatedSurfaces": [
+        {
+          "url": "https://skillsmp.com/creators/sylin-org/koan-framework/claude-skills-multi-provider",
+          "evidence": "Creator/source-path route demonstrating that the catalog has indexed Koan skill material under more than one route shape.",
+          "confidence": "high"
+        }
+      ],
+      "consumerEvidence": [
+        {
+          "type": "install-guidance",
+          "listingUrl": "https://skillsmp.com/skills/sylin-org-koan-framework-claude-skills-data-modeling-skill-md",
+          "interpretation": "The listing exposes source-repository installation guidance for stale .claude/skills content."
+        }
+      ],
+      "disposition": {
+        "action": "delist-reindex-and-replace",
+        "delist": "Remove every page whose source path contains .claude/skills or a first-generation directory name.",
+        "reindex": "Purge duplicate creator/source-path routes before crawling the canonical directory.",
+        "replace": "Index only .agents/skills/koan, .agents/skills/koan-explain, and .agents/skills/koan-upgrade."
+      },
+      "confidence": "high-for-seven-urls-medium-for-five-candidates",
+      "limits": [
+        "Five convention-derived aliases are retained as candidates without fabricated URLs.",
+        "Repository fork or star metadata shown by the catalog does not identify a mirror owner and is not treated as consumer evidence."
+      ]
+    },
+    {
+      "id": "claude-plugins",
+      "platform": "claude-plugins.dev",
+      "status": "verified-partial-first-generation-copy",
+      "verificationMethod": "public-page-and-search-result-observation",
+      "verifiedListings": [
+        {
+          "alias": "@sylin-org/koan-framework/ai-integration",
+          "retirement": "koan-ai",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/ai-integration",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/api-building",
+          "retirement": "koan-web",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/api-building",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/bootstrap",
+          "retirement": "koan-bootstrap",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/bootstrap",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/data-modeling",
+          "retirement": "koan-data-modeling",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/data-modeling",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/debugging",
+          "retirement": "koan-debugging",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/debugging",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/entity-first",
+          "retirement": "koan-entity-first",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/entity-first",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/mcp-integration",
+          "retirement": "koan-mcp-integration",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/mcp-integration",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/multi-provider",
+          "retirement": "koan-multi-provider",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/multi-provider",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/performance",
+          "retirement": "koan-performance",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/performance",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/quickstart",
+          "retirement": "koan-quickstart",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/quickstart",
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework/vector-migration",
+          "retirement": "koan-vector",
+          "url": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/vector-migration",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "install-command",
+          "listingUrl": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/data-modeling",
+          "interpretation": "The catalog exposes a command that writes the selected legacy skill into a consumer's .agents/skills directory."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Request removal of the eleven verified legacy routes and search for an unverified relationships route by repository identity during operator cleanup.",
+        "replace": "Publish only the canonical outcome skills under their exact names."
+      },
+      "confidence": "high",
+      "limits": [
+        "No exact relationships route was verified on this platform.",
+        "The presence of an installation command does not establish that it was executed."
+      ]
+    },
+    {
+      "id": "prpm",
+      "platform": "prpm.dev",
+      "status": "verified-live-registry-packages",
+      "verificationMethod": "public-registry-api-observation",
+      "registryQueryUrl": "https://registry.prpm.dev/api/v1/search?q=koan",
+      "verifiedListings": [
+        {
+          "alias": "@sylin-org/koan-framework-performance",
+          "retirement": "koan-performance",
+          "url": "https://prpm.dev/packages/sylin-org/koan-framework-performance",
+          "reportedCreatedAt": "2025-11-11T14:21:55.108Z",
+          "reportedVersionCount": 1,
+          "reportedDeprecated": false,
+          "reportedCounters": {
+            "downloads": 0,
+            "installs": 0,
+            "views": 0
+          },
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework-api-building",
+          "retirement": "koan-web",
+          "url": "https://prpm.dev/packages/sylin-org/koan-framework-api-building",
+          "reportedCreatedAt": "2025-11-11T14:22:39.814Z",
+          "reportedVersionCount": 1,
+          "reportedDeprecated": false,
+          "reportedCounters": {
+            "downloads": 0,
+            "installs": 0,
+            "views": 0
+          },
+          "confidence": "high"
+        },
+        {
+          "alias": "@sylin-org/koan-framework-relationships",
+          "retirement": "koan-data-modeling",
+          "url": "https://prpm.dev/packages/sylin-org/koan-framework-relationships",
+          "reportedCreatedAt": "2025-11-11T14:24:53.246Z",
+          "reportedVersionCount": 1,
+          "reportedDeprecated": false,
+          "reportedCounters": {
+            "downloads": 0,
+            "installs": 0,
+            "views": 0
+          },
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "installable-registry-package",
+          "listingUrl": "https://prpm.dev/packages/sylin-org/koan-framework-performance",
+          "interpretation": "The public, non-deprecated package state makes the legacy skill available to registry consumers even though the reported counters are zero."
+        }
+      ],
+      "disposition": {
+        "action": "deprecate-delist-and-replace",
+        "deprecate": "Immediately mark all three packages deprecated with a canonical replacement notice.",
+        "delist": "Remove the old packages if PRPM lifecycle policy permits it.",
+        "replace": "Publish three canonical packages only if Koan chooses PRPM as a supported distribution channel."
+      },
+      "confidence": "high",
+      "limits": [
+        "Registry counters are point-in-time API values and may change after verification.",
+        "Zero reported counters do not prove that no out-of-band package retrieval occurred."
+      ]
+    },
+    {
+      "id": "aimcp",
+      "platform": "aimcp.info",
+      "status": "verified-legacy-listings",
+      "verificationMethod": "public-page-observation",
+      "verifiedListings": [
+        {
+          "alias": "koan-entity-first",
+          "retirement": "koan-entity-first",
+          "url": "https://www.aimcp.info/en/skills/ad879df3-9a6e-4430-8b2e-ea9a0d8c2c5b",
+          "reportedViews": 137,
+          "reportedSourcePath": ".claude/skills/entity-first",
+          "confidence": "high"
+        },
+        {
+          "alias": "koan-vector-migration",
+          "retirement": "koan-vector",
+          "url": "https://www.aimcp.info/en/skills/ea0fc0f4-c71c-48f3-ba78-4510a845d094",
+          "reportedViews": 149,
+          "reportedSourcePath": ".claude/skills/vector-migration",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "install-command",
+          "listingUrl": "https://www.aimcp.info/en/skills/ad879df3-9a6e-4430-8b2e-ea9a0d8c2c5b",
+          "interpretation": "The page exposes commands that install content from a retired source path."
+        },
+        {
+          "type": "install-command",
+          "listingUrl": "https://www.aimcp.info/en/skills/ea0fc0f4-c71c-48f3-ba78-4510a845d094",
+          "interpretation": "The page exposes commands that install content from a retired source path."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Remove both UUID-addressed legacy listings and their stale source-path install commands.",
+        "replace": "Create canonical listings only after the platform can target .agents/skills."
+      },
+      "confidence": "high",
+      "limits": [
+        "View counts measure page exposure, not installs or successful Koan use.",
+        "The UUID URLs reveal no stable alias convention for discovering additional copies."
+      ]
+    },
+    {
+      "id": "killer-skills",
+      "platform": "killer-skills.com",
+      "status": "verified-legacy-listing",
+      "verificationMethod": "public-page-observation",
+      "verifiedListings": [
+        {
+          "alias": "koan-performance",
+          "retirement": "koan-performance",
+          "url": "https://killer-skills.com/de/skills/sylin-org/koan-framework",
+          "reportedVersion": "1.0.0",
+          "reportedUpdatedOn": "2026-02-28",
+          "reportedQualityScore": 36,
+          "reportedQualityBand": "Top 5%",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "install-command",
+          "listingUrl": "https://killer-skills.com/de/skills/sylin-org/koan-framework",
+          "interpretation": "The page offers an installation path for the legacy performance skill."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Remove the repository-level page while it resolves to koan-performance 1.0.0.",
+        "replace": "Create separate canonical records for the three outcome skills or omit the channel."
+      },
+      "confidence": "high",
+      "limits": [
+        "The quality score and percentile are platform ratings, not community adoption or compatibility evidence.",
+        "The locale-specific URL may have equivalent localized copies that were not enumerated."
+      ]
+    },
+    {
+      "id": "agent-skills-index",
+      "platform": "agentskillsindex.com",
+      "status": "verified-index-entry",
+      "verificationMethod": "public-category-page-observation",
+      "verifiedListings": [
+        {
+          "alias": "koan-mcp-integration.md",
+          "retirement": "koan-mcp-integration",
+          "url": "https://agentskillsindex.com/en/categories/development?sort=newest&subcategory=backend",
+          "reportedDate": "2026-01-05",
+          "confidence": "high"
+        }
+      ],
+      "candidateAliases": [],
+      "consumerEvidence": [
+        {
+          "type": "index-export-or-install-surface",
+          "listingUrl": "https://agentskillsindex.com/en/categories/development?sort=newest&subcategory=backend",
+          "interpretation": "The category entry makes the legacy skill discoverable through the index's export or installation workflow."
+        }
+      ],
+      "disposition": {
+        "action": "delist-and-replace",
+        "delist": "Remove koan-mcp-integration.md from the index and any generated exports.",
+        "replace": "Index only the three canonical skill entrypoints."
+      },
+      "confidence": "high",
+      "limits": [
+        "The verified URL is a filtered category page rather than a stable skill-detail permalink.",
+        "The displayed date is recorded as a platform field without inferring whether it means publish, update, or crawl time."
+      ]
+    },
+    {
+      "id": "skills-sh",
+      "platform": "skills.sh",
+      "status": "unresolved-coverage",
+      "verificationMethod": "catalog-root-and-api-access-check",
+      "verifiedListings": [],
+      "candidateAliases": [],
+      "relatedSurfaces": [
+        {
+          "url": "https://www.skills.sh/",
+          "evidence": "Catalog root retained as the revalidation surface.",
+          "confidence": "high"
+        }
+      ],
+      "disposition": {
+        "action": "operator-search-and-delist",
+        "delist": "Search by repository URL, sylin-org, and every alias in the canonical manifest using authenticated operator access; remove any legacy matches.",
+        "replace": "Submit only the three canonical skills if the platform is retained."
+      },
+      "confidence": "low-for-listing-count",
+      "limits": [
+        "An earlier pass observed two Koan records, but exact identifiers and durable URLs were not retained and therefore are not asserted here.",
+        "The public API required Vercel OIDC during revalidation, preventing exact listing confirmation."
+      ]
+    }
+  ],
+  "verifiedMirrorRepositories": [
+    {
+      "repository": "majiayu000/claude-skill-registry",
+      "url": "https://github.com/majiayu000/claude-skill-registry",
+      "defaultBranch": "main",
+      "role": "generated public registry mirror",
+      "verificationMethod": "GitHub repository page plus unauthenticated Git tree API, queried by exact sylin-org-koan-framework path marker",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        "skills/ai-llm/ai-integration-sylin-org-koan-framework-2",
+        "skills/ai-llm/ai-integration-sylin-org-koan-framework",
+        "skills/development/bootstrap-sylin-org-koan-framework-2",
+        "skills/development/bootstrap-sylin-org-koan-framework",
+        "skills/development/entity-first-sylin-org-koan-framework",
+        "skills/performance/sylin-org-koan-framework-claude-skills-performance"
+      ],
+      "disposition": "Request source-url purge/deprecation through the registry data/core owner; replace only with generated canonical three-skill artifacts.",
+      "confidence": "high-for-listed-paths",
+      "limits": [
+        "The repository-wide recursive tree response was truncated; category-level verification established these paths but does not prove this is the complete registry count.",
+        "The -2 entries are independent archived copies, not newer Koan compatibility claims."
+      ]
+    },
+    {
+      "repository": "majiayu000/claude-skill-registry-data",
+      "url": "https://github.com/majiayu000/claude-skill-registry-data",
+      "defaultBranch": "main",
+      "role": "canonical archived data tree for the generated registry",
+      "verificationMethod": "GitHub repository page plus unauthenticated Git tree API, queried by exact sylin-org-koan-framework path marker",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        "ai-llm/ai-integration-sylin-org-koan-framework-2",
+        "ai-llm/ai-integration-sylin-org-koan-framework",
+        "development/bootstrap-sylin-org-koan-framework-2",
+        "development/bootstrap-sylin-org-koan-framework",
+        "development/entity-first-sylin-org-koan-framework",
+        "performance/sylin-org-koan-framework-claude-skills-performance"
+      ],
+      "disposition": "Purge or mark the archived records deprecated at this data owner so regenerated mirrors stop re-publishing them.",
+      "confidence": "high-for-listed-paths",
+      "limits": [
+        "The repository-wide recursive tree response was truncated; the listed paths are an exact verified minimum, not a complete count."
+      ]
+    },
+    {
+      "repository": "sairin1202/claude-skill-factory",
+      "url": "https://github.com/sairin1202/claude-skill-factory",
+      "defaultBranch": "main",
+      "role": "third-party JSON snapshot corpus",
+      "verificationMethod": "Unauthenticated GitHub repository and recursive Git tree API",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        "skills/sylin-org-koan-framework-claude-skills-ai-integration-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-api-building-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-bootstrap-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-data-modeling-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-debugging-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-entity-first-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-mcp-integration-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-multi-provider-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-performance-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-quickstart-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-relationships-skill-md.json",
+        "skills/sylin-org-koan-framework-claude-skills-vector-migration-skill-md.json"
+      ],
+      "disposition": "Request deprecation/removal of all twelve snapshots and prevent them from being emitted as current skills.",
+      "confidence": "high",
+      "limits": []
+    },
+    {
+      "repository": "mattnigh/skills_collection",
+      "url": "https://github.com/mattnigh/skills_collection",
+      "defaultBranch": "main",
+      "role": "third-party searchable skill corpus",
+      "verificationMethod": "GitHub repository page plus unauthenticated recursive Git tree API",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        "collection/sylin-org__koan-framework__claude__skills__performance__SKILL.md",
+        "collection/sylin-org__koan-framework__claude__skills__relationships__SKILL.md"
+      ],
+      "disposition": "Request removal/deprecation by canonical repository source URL and replace only with the generated three-skill set if the corpus retains Koan.",
+      "confidence": "high",
+      "limits": []
+    },
+    {
+      "repository": "diegosouzapw/awesome-omni-skill",
+      "url": "https://github.com/diegosouzapw/awesome-omni-skill",
+      "defaultBranch": "main",
+      "role": "third-party aggregated skill corpus",
+      "verificationMethod": "GitHub repository search plus unauthenticated recursive Git tree API",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        "skills/ai-agents/koan-ai-integration",
+        "skills/backend/koan-api-building",
+        "skills/development/koan-entity-first-majiayu000",
+        "skills/development/koan-entity-first-sylin-org",
+        "skills/development/koan-entity-first",
+        "skills/development/koan-performance"
+      ],
+      "disposition": "Request removal/deprecation of all six copied entries, including the three independently named entity-first copies.",
+      "confidence": "high",
+      "limits": []
+    },
+    {
+      "repository": "MikeCheng1208/BattleTree",
+      "url": "https://github.com/MikeCheng1208/BattleTree",
+      "defaultBranch": "main",
+      "role": "direct downstream application copy",
+      "verificationMethod": "GitHub repository page plus unauthenticated recursive Git tree API",
+      "verifiedOn": "2026-08-15",
+      "legacyPaths": [
+        ".agents/skills/koan-ai-integration",
+        ".agents/skills/koan-api-building",
+        ".agents/skills/koan-entity-first",
+        ".agents/skills/koan-performance"
+      ],
+      "disposition": "Notify the repository owner that these four installed entries are retired and should be replaced by the canonical three-skill release.",
+      "confidence": "high",
+      "limits": [
+        "Repository presence proves copied installation, not that any skill was invoked."
+      ]
+    }
+  ],
+  "mirrorInvestigation": {
+    "status": "exact-public-copies-verified-with-partial-large-registry-coverage",
+    "evidence": "Direct public repository pages and unauthenticated GitHub tree API responses verified six repositories containing at least 36 copied directories, files, or snapshots of retired Koan skills.",
+    "limits": [
+      "GitHub's recursive tree response is truncated for the two very large majiayu000 registry repositories; their listed paths are exact verified minimums rather than a complete copy count.",
+      "Repository presence and copied files do not prove invocation or active use.",
+      "Ordinary forks that do not independently publish copied paths were not counted as listings."
+    ],
+    "followUp": "Ask each owner to purge by upstream source URL and historical blob fingerprints; re-enumerate the two generated registries through their operator APIs to close the truncated-tree count."
+  },
+  "knownConsumerEvidence": [
+    {
+      "channel": "skills.rest",
+      "type": "direct-archive-download",
+      "evidenceUrl": "https://skills.rest/skill/koan-data-modeling",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "All twelve public pages offered repository-archive distribution; the observed install counters were zero."
+    },
+    {
+      "channel": "mcpmarket.com",
+      "type": "skillfish-install-command",
+      "evidenceUrl": "https://mcpmarket.com/tools/skills/koan-entity-first-data-access",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "At least two verified MCPMarket pages could direct a consumer to install a retired repository skill."
+    },
+    {
+      "channel": "claude-plugins.dev",
+      "type": "agents-directory-install-command",
+      "evidenceUrl": "https://claude-plugins.dev/skills/%40sylin-org/koan-framework/data-modeling",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "The command targets the modern .agents/skills destination while sourcing legacy content, which can make a stale skill appear canonical locally."
+    },
+    {
+      "channel": "prpm.dev",
+      "type": "public-non-deprecated-package",
+      "evidenceUrl": "https://registry.prpm.dev/api/v1/search?q=koan",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "Three legacy packages remained publicly available and not deprecated at verification time; their reported counters were zero."
+    },
+    {
+      "channel": "aimcp.info",
+      "type": "install-command-and-page-views",
+      "evidenceUrl": "https://www.aimcp.info/en/skills/ad879df3-9a6e-4430-8b2e-ea9a0d8c2c5b",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "The page had visible exposure and an install path, but no verified install count."
+    },
+    {
+      "channel": "killer-skills.com",
+      "type": "install-command",
+      "evidenceUrl": "https://killer-skills.com/de/skills/sylin-org/koan-framework",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "A rated legacy performance listing remained installable; the rating is not evidence of use."
+    },
+    {
+      "channel": "agentskillsindex.com",
+      "type": "index-export-or-install-surface",
+      "evidenceUrl": "https://agentskillsindex.com/en/categories/development?sort=newest&subcategory=backend",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "The legacy MCP skill remained discoverable through a public index."
+    },
+    {
+      "channel": "GitHub downstream repositories",
+      "type": "copied-skill-presence",
+      "evidenceUrl": "https://github.com/MikeCheng1208/BattleTree/tree/main/.agents/skills",
+      "affectedLegacyGeneration": "public-legacy-v1",
+      "interpretation": "A downstream application repository contains four retired Koan skills under its active .agents/skills path; this proves installation/copying, not invocation."
+    }
+  ],
+  "unresolvedCoverage": [
+    {
+      "surface": "mcpmarket.com",
+      "gap": "Two results from an earlier five-result observation lack retained exact identifiers.",
+      "requiredAction": "Use marketplace operator search or an accessible sitemap; match by repository URL before delisting.",
+      "confidence": "medium"
+    },
+    {
+      "surface": "skills.sh",
+      "gap": "Two earlier observed records could not be revalidated through the OIDC-protected API.",
+      "requiredAction": "Re-run the search with authorized catalog access and record exact URLs before lifecycle action.",
+      "confidence": "low"
+    },
+    {
+      "surface": "GitHub forks and mirrors",
+      "gap": "Six exact repositories and at least 36 copied artifacts are verified, but two generated registries return truncated recursive trees and may contain additional copies.",
+      "requiredAction": "Purge by canonical source URL and verified blob fingerprints through the registry operators, then record the operator-level final count.",
+      "confidence": "high-for-listed-paths-medium-for-total-count"
+    },
+    {
+      "surface": "localized and duplicate catalog routes",
+      "gap": "Some platforms generate locale, creator, category, and source-path variants that may not have stable detail URLs.",
+      "requiredAction": "Ask each platform operator to purge by canonical repository URL as well as by alias.",
+      "confidence": "high"
+    }
+  ],
+  "globalDisposition": {
+    "repository": "Make .agents/skills the sole canonical source, remove legacy loader entrypoints, and preserve legacy identities only in non-loader retirement and inventory records.",
+    "marketplaces": "Delist every legacy listing and candidate alias; where removal is impossible, mark it deprecated and point to the canonical manifest.",
+    "replacement": "Publish only koan, koan-explain, and koan-upgrade, each from its canonical .agents/skills directory.",
+    "verification": "After operator actions, repeat exact-URL checks, repository-identity searches, and install-path checks; record action receipts separately from this pre-action evidence ledger."
+  }
+}

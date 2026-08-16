@@ -38,9 +38,13 @@ remain compositional patterns.
 Reference one embedding provider and one vector provider. Provider packages bring their functional runtimes; do not
 manually assemble the abstraction packages.
 
+`Sylin.Koan.Data.AI` owns `[Embedding]` and the `EntityAi` operations this guide teaches, and nothing else brings it in
+transitively — reference it explicitly whenever an Entity save should produce a vector.
+
 ```powershell
 dotnet add package Sylin.Koan.AI.Connector.Ollama
 dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
+dotnet add package Sylin.Koan.Data.AI
 ```
 
 Then boot Koan once:

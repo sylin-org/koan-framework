@@ -50,3 +50,11 @@ jobs:
       - name: Validate the surface ledger
         shell: bash
         run: bash scripts/lint-surfaces.sh docs/SURFACES.md
+
+      - name: Verify agent skills (structure)
+        shell: pwsh
+        run: |
+          # Routing, links, and capability-shelf parity are free. Proving the identifiers and APIs
+          # actually exist needs a real restore, so that runs in skills-verify.yml on a schedule.
+          ./scripts/skills-verify.ps1 -Structure
+          if ($LASTEXITCODE -ne 0) { throw 'Skill verification failed.' }
