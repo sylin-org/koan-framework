@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "koan": {
+      "source": {
+        "source": "github",
+        "repo": "sylin-org/koan-framework"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "koan@koan": true
+  }
+}

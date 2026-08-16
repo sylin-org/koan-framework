@@ -16,15 +16,28 @@ validation:
 
 ## Install
 
+**A new application already has them.** Scaffolding writes a project `.claude/settings.json` that
+registers Koan's marketplace and enables the plugin, so the skills arrive when you trust the folder —
+no commands:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+```
+
+**An existing application adds them once:**
+
 ```
 /plugin marketplace add sylin-org/koan-framework
 /plugin install koan@koan
 ```
 
-That installs all three skills. Update them later with `/plugin marketplace update koan`.
+Either way the skills are referenced, not copied, so they follow the framework rather than freezing
+into the project. Update with `/plugin marketplace update koan`; remove the two keys from
+`.claude/settings.json` to opt a scaffolded project out.
 
-The skills are also readable straight from the repository under `.agents/skills/` — the same files the
-plugin serves, so a harness that reads a portable skill directory can point at them directly.
+The same files are readable directly under `.agents/skills/` for a harness that loads a portable
+skill directory.
 
 ## Choose by outcome
 

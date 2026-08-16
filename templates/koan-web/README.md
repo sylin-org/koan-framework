@@ -23,6 +23,11 @@ Invoke-RestMethod http://localhost:5000/api/todos
 | `TodosController.cs` | expose Todos through the standard Entity API |
 | `Program.cs` | compose referenced Koan capabilities |
 | `KoanWebApp.csproj` | choose the Koan web entry and durable embedded SQLite provider |
+| `.claude/settings.json` | make Koan's coding skills available to an agent working here |
+
+`.claude/settings.json` registers Koan's plugin marketplace and enables the `koan` plugin, so a coding
+agent gains the `koan`, `koan-explain`, and `koan-upgrade` skills once you trust the folder. The skills
+are referenced rather than copied, so they follow the framework. Delete the file to opt out.
 
 SQLite is elected from the package reference and defaults to `.koan/data/Koan.sqlite`. No provider registration,
 connection setting, schema script, repository, or endpoint mapping is required. Startup output and

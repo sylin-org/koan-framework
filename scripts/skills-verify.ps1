@@ -87,6 +87,23 @@ try {
             if ($entries[0].version -ne $plugin.version) {
                 Fail "marketplace entry version '$($entries[0].version)' does not match plugin manifest '$($plugin.version)'"
             }
+
+            # A scaffolded project pre-registers the marketplace and enables the plugin, so a new
+            # application has the skills without anyone running a command. That reference is written
+            # as a name, so renaming the marketplace or plugin would break every scaffold silently.
+            $qualified = "$($entries[0].name)@$($marketplace.name)"
+            foreach ($settings in @(Get-ChildItem -Path 'templates' -Recurse -File -Filter 'settings.json' -ErrorAction SilentlyContinue |
+                Where-Object { $_.DirectoryName -match '\.claude$' })) {
+                $rel = [IO.Path]::GetRelativePath($repoRoot, $settings.FullName).Replace('\', '/')
+                $declared = Get-Content -Raw -LiteralPath $settings.FullName | ConvertFrom-Json
+                $known = @($declared.extraKnownMarketplaces.PSObject.Properties.Name)
+                if ($marketplace.name -notin $known) {
+                    Fail "$rel does not pre-register the '$($marketplace.name)' marketplace"
+                }
+                if (($declared.enabledPlugins.PSObject.Properties.Name) -notcontains $qualified) {
+                    Fail "$rel does not enable '$qualified'"
+                }
+            }
         }
     }
 
