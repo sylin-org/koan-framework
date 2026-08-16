@@ -32,6 +32,7 @@ capability.
 | Test Entity and provider behavior | Testing and operations | [Testing an application](testing-your-app.md) |
 | Review composition drift | Foundation and composition | [Composition lockfile](composition-lockfile.md) |
 | Engineer or migrate an application with a coding agent | Framework | [Agent application engineering](agent-application-engineering.md) |
+| Choose the coding skill for an outcome | Framework | [Agent skills](agent-skills.md) |
 
 For cache, storage, media, AI, vector, Web, and operational diagnostics, begin at the
 [capability curriculum](../index.md). Package companions own provider-specific details.

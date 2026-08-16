@@ -4,11 +4,12 @@ domain: framework
 title: "Koan agent skills"
 audience: [developers, ai-agents]
 status: current
-last_updated: 2026-08-15
+last_updated: 2026-08-16
+framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-15
-  status: reviewed
-  scope: official three-skill chooser and trust boundaries
+  date_last_tested: 2026-08-16
+  status: verified
+  scope: three-skill chooser, trust boundaries, and skill verification
 ---
 
 # Choose one Koan skill
@@ -44,8 +45,34 @@ tenancy, jobs and communication, storage and media, AI and vector search, Canon,
 loads only the relevant recipe and still considers the whole application so a new piece does not
 create a second architecture.
 
-Its capability chooser links each pillar and provider directly to the canonical online Koan recipe,
-so exact details stay one click away without crowding the conversation.
+Its capability shelf names the exact package identifier for each piece and links the recipe that owns
+that piece's install command, configuration keys, and provider limits — so exact details stay one
+click away without crowding the conversation. Package identifiers are not derivable from product
+names, so the shelf is where they are read rather than constructed.
+
+The shelf reports product truth; it does not set it. A package carrying a product claim appears as an
+ordinary choice. A package carrying none is marked *not assessed*, so an agent can still reach for it
+when the outcome needs it while saying plainly what is and is not promised.
+
+## How the skills stay true
+
+`scripts/skills-verify.ps1` checks four things, each answering a failure that would otherwise pass
+unnoticed:
+
+| Check | Answers |
+|---|---|
+| Routing | Does each skill still declare the name and description that select it? |
+| Links | Does every reference and pinned recipe still resolve? |
+| Shelf | Does the capability shelf match the claim ledger and package inventory? |
+| Truth | Does every package identifier restore, and does every construct the skill teaches compile? |
+
+The first three run in the pull-request gate. The fourth needs a real restore from nuget.org, so it
+runs on a schedule — against the **published** packages a developer installs, never a repository
+project reference. A journey that compiled against repository sources would pass while the guidance
+it verifies was unusable.
+
+Verification proves the guidance is true. Whether it is *good* is judged by running real prompts
+against [the evaluation rubric](../../evals/koan/rubric.md).
 
 ## Trust boundaries
 

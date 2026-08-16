@@ -123,6 +123,11 @@ Initiatives, assessments, plans, proposals, and archives are engineering evidenc
 application patterns. ADRs are dated records and remain unchanged unless the task explicitly owns a
 decision update.
 
+The application-facing skill surface is `.agents/skills`: `$koan` builds, extends, repairs, and
+proves an application; `$koan-explain` explains one without changing anything; `$koan-upgrade` moves
+an older application to current Koan. Choose by outcome — see
+[agent skills](docs/guides/agent-skills.md).
+
 Before changing production code, follow `.codex/skills/explore/SKILL.md`: map the business intent,
 layers, existing contracts/options/constants, closest pattern, exact owner, failure boundary, and
 focused proof before editing.

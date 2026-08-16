@@ -23,7 +23,6 @@ A journey exists to make a claim in the skill falsifiable by the compiler:
 |---|---|
 | `grammar` | Every construct the main skill teaches — the bootstrap, Entity operations, scoped context switches, the HTTP projection, durable work, embeddings, the agent surface, and model calls |
 
-Two defects were caught the first time this ran: a job handler signature that did not exist, and a
-canonical bootstrap snippet missing its `using` directive. Both had passed every pattern-based check.
-
-Add a journey whenever the skill starts teaching something a compiler could disprove.
+A journey catches what pattern matching cannot: a signature that does not exist, a snippet missing a
+`using`, an identifier that no longer resolves. Add one whenever the skill starts teaching something
+a compiler could disprove.

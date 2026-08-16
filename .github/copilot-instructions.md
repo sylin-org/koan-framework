@@ -68,6 +68,9 @@ await todo.Remove();
 
 - Before production code, follow `.codex/skills/explore/SKILL.md` and record the architecture
   checkpoint required there.
+- Route application work through `.agents/skills`: `$koan` to build, extend, repair, or prove;
+  `$koan-explain` for read-only explanation; `$koan-upgrade` for framework migration. See
+  `docs/guides/agent-skills.md`.
 - Reuse the closest existing owner, option, constant, contributor, and test pattern before creating a
   new abstraction.
 - Keep public APIs small; use internal helpers for mechanics.
