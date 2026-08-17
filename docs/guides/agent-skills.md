@@ -101,6 +101,82 @@ it verifies was unusable.
 Verification proves the guidance is true. Whether it is *good* is judged by running real prompts
 against [the evaluation rubric](../../evals/koan/rubric.md).
 
+## Your first application
+
+Scaffolding gives you a running, persisted API before any agent gets involved:
+
+```powershell
+dotnet new install Sylin.Koan.Templates
+dotnet new koan-web -o TodoApi
+cd TodoApi
+dotnet run
+```
+
+Six files, three of which are your application:
+
+```
+TodoApi/
+  Program.cs             compose referenced Koan capabilities
+  Todo.cs                the state the application owns
+  TodosController.cs     expose Todos over HTTP
+  TodoApi.csproj         Sylin.Koan.App + Sylin.Koan.Data.Connector.Sqlite
+  .claude/settings.json  make Koan's skills available to an agent working here
+  README.md
+```
+
+`Program.cs` is the whole host:
+
+```csharp
+using Koan.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
+
+It works immediately:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/todos `
+  -ContentType application/json -Body '{"title":"buy milk"}'
+# {"title":"buy milk","done":false,"id":"01a01087-c881-7059-aca7-d6d528b77d65"}
+
+Invoke-RestMethod http://localhost:5000/api/todos
+# [{"title":"buy milk","done":false,"id":"01a01087-c881-7059-aca7-d6d528b77d65"}]
+```
+
+No adapter registration, repository, mapping, or endpoint wiring was written. SQLite was elected from
+the package reference and the database landed at `.koan/data/Koan.sqlite`. `/health/live` and
+`/health/ready` answer `200`, and `/.well-known/Koan/facts` reports what composed.
+
+`.claude/settings.json` registers Koan's marketplace and enables the plugin, so an agent opening this
+folder already has `$koan`, `$koan-explain`, and `$koan-upgrade`. Delete the file to opt out.
+
+## What to say next
+
+Describe the outcome in business terms. The skill picks the packages, configuration, and proof — you
+do not name a subsystem or choose a route.
+
+| You want | Say something like |
+|---|---|
+| A new slice | “Build a reading-list app with durable local data, an HTTP surface, and a health check.” |
+| A different store | “Use Mongo for new Order records. Keep the existing HTTP contract.” |
+| Sign-in | “Enable sign-in and protect writes to the inventory; reads stay public.” |
+| AI and search | “Add a concise product-summary operation and semantic search over the catalog.” |
+| A provider move | “Switch the Order default route from MongoDB to PostgreSQL. Preserve existing data.” |
+| Something broken | “Startup says Redis is unhealthy but facts show an in-memory cache. Fix it.” |
+| Deployment readiness | “Prepare this service for its container deployment. Preserve routes and PostgreSQL.” |
+| An explanation only | “Why did Mongo win for Order when both Mongo and PostgreSQL are referenced?” |
+| An older app | “Bring this older Koan application to current Koan. Preserve its public contract.” |
+
+Before changing anything, `$koan` shows the stack it intends — what is required now, what stays easy
+later, and what it will preserve — then builds one working vertical slice and proves it.
+
+These are the prompts the skills are evaluated against; the full corpus lives in
+[evals/koan/cases.jsonl](../../evals/koan/cases.jsonl), including cases where the skills should
+*not* engage.
+
 ## Trust boundaries
 
 Skill selection never grants extra permission. Destructive data changes, credentials, publication,
