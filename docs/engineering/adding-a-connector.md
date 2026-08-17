@@ -297,11 +297,12 @@ dotnet test tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests/Koan
 Development and review do not publish packages. The pull request validates repository coherence; run
 the connector's focused behavior and provider-boundary tests as its owning evidence.
 
-Every active packable connector joins the release inventory. When a maintainer later tags a validated
-`dev` commit, the workflow packs the complete inventory at the root train version, proves the staged
-feed, and publishes those same artifacts. Git height owns the patch; only a deliberate compatibility
-change edits the root `version.json`. See [versioning.md](versioning.md) and
-[nuget-publishing.md](nuget-publishing.md).
+Every active packable connector joins the release inventory, and needs its own `version.json` to do so
+— the packaging tool rejects a packable project that inherits an ancestor's. Git height owns the
+patch, so the connector advances when its own sources change and holds still when they do not. When a
+maintainer later fast-forwards `main` from `dev`, the workflow publishes the connector only if its
+version is not already on nuget.org. Only a deliberate compatibility change edits a `version` field.
+See [versioning.md](versioning.md) and the [release playbook](nuget-publishing.md).
 
 ---
 

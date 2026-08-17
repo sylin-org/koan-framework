@@ -38,9 +38,9 @@ The voice is imperative. Commands are concrete. Explanations sit alongside what 
 
 | Workbook | What it covers |
 |---|---|
-| [versioning.md](versioning.md) | How one root NBGV version defines the all-package train |
+| [versioning.md](versioning.md) | How each package owns its version on one shared compatibility train |
 | [packaging.md](packaging.md) | Package shape, evaluated release inventory, and artifact proof |
-| [nuget-publishing.md](nuget-publishing.md) | How an explicit tag certifies and publishes one exact package set |
+| [nuget-publishing.md](nuget-publishing.md) | Release playbook: fast-forward `main`, publish only what changed, and recover when a step fails |
 | [adding-a-connector.md](adding-a-connector.md) | Scaffolding a new connector (data store, vector store, AI provider, broker, storage) from csproj to integration tests |
 | [docs-build-and-lint.md](docs-build-and-lint.md) | Building and validating the public documentation surface |
 | [samples-organization.md](samples-organization.md) | Organizing, graduating, and validating product samples |

@@ -84,6 +84,10 @@ Bounded dependency ranges, not matching version numbers, keep a package mix cohe
 `docs/reference/product-surface.md` projects that inventory and remains the authority for capability
 maturity and evidence; maturity labels do not select package publication.
 
+Never hand-edit a package version. Releasing is a fast-forward of `main` from `dev`, which publishes
+only the packages whose versions are absent from nuget.org; follow
+[the release playbook](docs/engineering/nuget-publishing.md).
+
 ## Module authoring
 
 Create a `KoanModule` only for real registration, one-time startup, or reporting responsibility:

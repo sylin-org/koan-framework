@@ -46,6 +46,13 @@ and expected corrective failure. Run the repository’s relevant lint/example ch
 - Keep ADRs, initiatives, assessments, and superseded plans as dated evidence—not required user instructions.
 - Update package companions, templates, samples, skills, or feedback guidance when your public change affects them.
 
+## Versions and releasing
+
+Never set or hand-edit a package version. Each packable project owns a `version.json` and its patch
+comes from the commits that touched it, so changing a project is what publishes it. Merge to `dev`;
+a maintainer fast-forwards `main`, which publishes only the packages whose versions are not already
+on nuget.org. See the [release playbook](docs/engineering/nuget-publishing.md).
+
 ## Review and safety
 
 Reviewers look for correctness, a small public surface, explicit application responsibilities, actionable failures,

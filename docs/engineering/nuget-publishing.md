@@ -1,70 +1,135 @@
 ---
 type: DEV
 domain: framework
-title: "NuGet publishing"
-audience: [maintainers, release-engineers]
+title: "Release playbook"
+audience: [maintainers, release-engineers, ai-agents]
 status: current
-last_updated: 2026-08-14
+last_updated: 2026-08-17
 framework_version: v1.0.0
 ---
 
-# NuGet publishing
+# Release playbook
 
-Koan integrates on `dev` and publishes only from an explicit `vX.Y.Z` tag whose commit is reachable
-from `dev`. Reachability makes the tag eligible; the release workflow independently certifies the
-tagged source before any package can publish. Branch pushes and pull requests cannot publish.
+`main` is the published state. Fast-forward `main` from `dev` and Koan publishes whatever changed
+since the last release — nothing more, nothing less.
 
-## Prerequisite
+## The one rule
 
-The repository Actions secret `NUGET_API_KEY` must contain the nuget.org publish key. Only the final
-publish job receives it.
+**You never set a version.** Each packable project owns a `version.json` and its patch comes from the
+commits that touched it. A release is a set difference: every project's computed version, minus the
+versions nuget.org already has. Change code, merge to `dev`, fast-forward `main`.
 
-## Publish a train
+A merge that changed no packable source publishes nothing and is a green no-op.
 
-1. Merge focused work to `dev` and resolve its ordinary coherence feedback.
-2. Choose the exact `dev` commit and preview its public NBGV version:
+## Prerequisites
 
-   ```powershell
-   dotnet nbgv get-version -p src/Koan.Core --public-release=true
-   ```
+- Repository secret `NUGET_API_KEY` holds the nuget.org push key. Only the final publish job receives it.
+- `main` and `dev` carry the "Koan release trust boundary" ruleset: no deletion, no force-push,
+  linear history required.
+- Work reaches `main` only by fast-forward from `dev`.
 
-3. Create and push the matching tag. For example:
+## Release
 
-   ```powershell
-   git tag -a v1.0.0 <dev-sha> -m "Release 1.0.0"
-   git push origin v1.0.0
-   ```
+```powershell
+git checkout main
+git merge --ff-only dev
+git push origin main
+```
 
-4. Observe **Release packages**. Do not publish from a workstation.
+Then watch the **Release** workflow. Never publish from a workstation.
 
-The workflow rejects a tag that is not reachable from `origin/dev` or does not equal the stable NBGV
-package version for that commit. It then builds the Release solution and template on the tagged SHA
-before compiling the package inventory and packing.
+If `--ff-only` refuses, `main` and `dev` have diverged — see [Recovery](#recovery).
 
-## What the workflow proves
+## Know what will ship, before you push
 
-The first job has no NuGet credential. It checks the evaluated inventory, builds the public release,
-packs every active package once, verifies the complete local feed, runs the package-only App/JSON
-consumer, hashes the inventory plus package files, and uploads the result.
+The plan is reproducible locally and touches nothing:
 
-The publish job downloads that artifact, verifies every hash, derives a dependency-topological order
-from the certified inventory, and pushes dependencies before dependents. Its first attempt verifies
-that all primary identities are absent before pushing any package. If that attempt is interrupted,
-a rerun accepts an existing primary only when every original ZIP entry name and uncompressed byte
-hash matches the certified package; nuget.org's added `.signature.p7s` is the sole excluded entry.
-Certified `.snupkg` sidecars are pushed separately after all primaries. The job cannot rebuild or
-widen the inventory.
+```powershell
+dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/release/inventory.json
+./scripts/plan-release.ps1 -InventoryPath artifacts/release/inventory.json -OutputPath artifacts/release/release-plan.json
+```
 
-## Failure and recovery
+It prints one line per package and a summary:
 
-- For a transient registry or credential failure, correct the external cause and rerun only the
-  failed publish job. It reuses and re-hashes the certified artifact, verifies the content of any
-  primary already on nuget.org, and retries the certified symbol sidecars.
-- For a source, inventory, package, or consumer failure, merge a correction to `dev` and create the
-  new version's tag. Do not move a tag whose artifacts may have been published.
-- If local hashes, remote package content, dependency closure, or artifact selection differ,
-  publication stops rather than accepting a mixed train.
+```
+PLAN|Sylin.Koan.Observability|1.0.1|new
+RELEASE-PLAN|train=1.0|inventory=94|publish=1
+```
 
-There is no `dev`-to-`main` promotion, release branch, parallel package list, or repack-on-publish
-path. See [Package versioning](versioning.md) and
-[ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).
+`publish=0` means nothing changed and the release will be a no-op.
+
+## What the workflow does
+
+| Step | Script | Proves | Marker |
+|---|---|---|---|
+| Guard | — | the pushed commit is reachable from `origin/dev` | step fails otherwise |
+| Plan | `plan-release.ps1` | each version, and which are absent from nuget.org | `RELEASE-PLAN\|train=…\|publish=N` |
+| Pack | `pack-release.ps1` | only the changed set builds and packs | `PACK\|PACKED\|N` |
+| Prove | `verify-release.ps1` | a package-only app restores from the feed **plus** nuget.org, builds, and runs | `VERIFY\|OK\|resolved=…\|staged=…` |
+| Publish | `publish-release.ps1` | the planned packages reach nuget.org, dependencies first | `PUBLISH\|DONE\|N` |
+
+The publish job runs separately so the credential never exists in the environment that built the
+packages. **Nothing is published unless every earlier step passed.**
+
+An unchanged package is never rebuilt. The build stamps the current commit into the assembly, so
+rebuilding unchanged sources at a later commit would produce different bytes under an already
+published version — see [ARCH-0125](../decisions/ARCH-0125-per-project-package-versions.md).
+
+## Adding a new package
+
+A new packable project needs its own `version.json` before it can join the inventory. Copy one from a
+sibling and set `versionHeightOffset` to `0` so it starts at the train's `.0`. The packaging tool
+rejects a packable project that inherits an ancestor `version.json`, so this cannot be missed
+silently.
+
+## Moving the compatibility line
+
+This is the **only** time a human edits a version. Moving `1.0` to `1.1` (additive line) or `2.0`
+(breaking line) means changing the `version` field in the root `version.json` **and in every
+project's `version.json`**, and resetting each `versionHeightOffset` to `0` — changing `version`
+restarts NBGV's height lineage, so the old offset would no longer apply.
+
+Do not trust the arithmetic. Verify before pushing:
+
+```powershell
+dotnet nbgv get-version -p src/Koan.Core --public-release=true
+dotnet nbgv get-version -p src/Koan.AI  --public-release=true
+```
+
+Every project must report the new `X.Y.0`. Then advance `KoanTrainBaselineVersion` in
+`Directory.Build.targets` to the last fully published version before preparing the new train.
+
+## Recovery
+
+| Failure | Meaning | Do this |
+|---|---|---|
+| `--ff-only` refuses, or the guard step fails | `main` is not reachable from `dev` — someone merged instead of fast-forwarding, or committed on `main` | Reset `main` to `dev`. Archive first: `git tag archive/main-<date> origin/main && git push origin --tags` |
+| Plan fails | a project's version is off-train, or NBGV cannot resolve it | Fix on `dev`; check the project's `version.json` |
+| Pack fails | ordinary build failure in a changed project | Fix on `dev` and merge again |
+| Prove fails | the real signal: a package does not resolve, or the app does not run | Fix on `dev`. Common cause: a dependency range that excludes an already published package |
+| Publish fails | usually transient registry or credential trouble | Rerun **only** the publish job. `--skip-duplicate` makes whatever already landed a no-op |
+
+Failures before the publish step cost nothing — no package has been pushed. A partially completed
+publish is safe to rerun: no version is ever republished.
+
+If a released package is wrong, **fix forward**. Never delete, re-push, or reuse a published version.
+
+## Never
+
+- Never hand-edit a package version, or set `<Version>` in a project file.
+- Never commit directly on `main`. It only ever fast-forwards from `dev`.
+- Never force-push `main` or `dev`; the ruleset blocks it, and it would break version height.
+- Never publish from a workstation.
+- Never move or reuse a published version.
+
+## Confirm a release landed
+
+```powershell
+curl -sI https://api.nuget.org/v3-flatcontainer/sylin.koan.observability/1.0.1/sylin.koan.observability.1.0.1.nupkg
+```
+
+`HTTP 200` means live. Expect roughly five minutes between a successful push and availability while
+nuget.org validates the package; a `404` in that window is normal, not a failure.
+
+See [Package versioning](versioning.md), [Packaging](packaging.md), and
+[ARCH-0125](../decisions/ARCH-0125-per-project-package-versions.md).
