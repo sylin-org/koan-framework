@@ -21,11 +21,14 @@
 
 .EXAMPLE
   pwsh scripts/skills-verify.ps1 -Structure
-  pwsh scripts/skills-verify.ps1 -PackageVersion 1.0.0
+  pwsh scripts/skills-verify.ps1 -PackageVersion 1.*
 #>
 [CmdletBinding()]
 param(
-    [string]$PackageVersion = '1.0.0',
+    # A range, not a fixed version. Each package owns its own version, so pinning one number would
+    # verify whatever that number happens to name rather than what a developer resolves today. This
+    # matches the reference the template itself emits.
+    [string]$PackageVersion = '1.*',
     [switch]$Structure
 )
 

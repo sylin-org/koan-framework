@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
     inputs:
       packageVersion:
-        description: Published Koan package version to verify against
+        description: Published Koan package version range to verify against
         required: false
-        default: '1.0.0'
+        default: '1.*'
 
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ github.event.inputs.packageVersion }}'
-          if ([string]::IsNullOrWhiteSpace($version)) { $version = '1.0.0' }
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = '1.*' }
           ./scripts/skills-verify.ps1 -PackageVersion $version
           if ($LASTEXITCODE -ne 0) { throw 'Skill verification failed.' }

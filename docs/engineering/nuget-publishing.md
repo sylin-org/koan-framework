@@ -128,8 +128,23 @@ If a released package is wrong, **fix forward**. Never delete, re-push, or reuse
 curl -sI https://api.nuget.org/v3-flatcontainer/sylin.koan.observability/1.0.1/sylin.koan.observability.1.0.1.nupkg
 ```
 
-`HTTP 200` means live. Expect roughly five minutes between a successful push and availability while
-nuget.org validates the package; a `404` in that window is normal, not a failure.
+`HTTP 200` means the version **exists**. Expect roughly five minutes between a successful push and
+that probe turning green while nuget.org validates the package; a `404` in that window is normal.
+
+Existence and installability propagate separately, and this trips people up:
+
+| Probe | Answers | Lags |
+|---|---|---|
+| the package URL above | does this version exist? | ~5 min after push |
+| `dotnet add package` / `dotnet new install` | can a consumer resolve it? | longer — needs the search and registration indexes |
+
+So immediately after a release, `dotnet new install <package>` can still hand you the previous
+version while the direct probe says 200. That is propagation, not a failed publish. Wait, or ask for
+the exact version with `::<version>`.
+
+`plan-release.ps1` deliberately uses the existence probe. It answers "has this version been
+published?", which is what prevents republishing; resolving through the search index would risk
+pushing over a version that exists but is not yet indexed.
 
 See [Package versioning](versioning.md), [Packaging](packaging.md), and
 [ARCH-0125](../decisions/ARCH-0125-per-project-package-versions.md).
