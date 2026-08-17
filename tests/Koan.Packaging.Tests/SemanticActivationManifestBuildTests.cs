@@ -207,12 +207,15 @@ public sealed class SemanticActivationManifestBuildTests
             await runner.RequireAsync(
                 "dotnet",
                 [
+                    // Build what is packed. Reusing whatever happens to sit in bin/ makes the test
+                    // depend on ambient state: a stale assembly gets a freshly stamped package
+                    // version, and package validation then compares an old assembly against the
+                    // published baseline (CP0003) for reasons that have nothing to do with the
+                    // behavior under test.
                     "pack",
                     CoreProject(),
                     "-c",
                     BuildConfiguration,
-                    "--no-build",
-                    "--no-restore",
                     "--nologo",
                     "--output",
                     feed,
