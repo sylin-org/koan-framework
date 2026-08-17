@@ -17,7 +17,7 @@ internal sealed record ObservabilityPlan(
     string ServiceInstanceId,
     string StatusDetail)
 {
-    public string Exporter => OtlpEndpoint is null ? "none" : "otlp";
+    public string Exporter => DescribeExporter(OtlpEndpoint);
 
     public static ObservabilityPlan Compile(IConfiguration? configuration, IHostEnvironment? environment)
     {
@@ -39,13 +39,7 @@ internal sealed record ObservabilityPlan(
             ?? "Koan-app";
         var serviceVersion = entry?.GetName().Version?.ToString() ?? "0.0.0";
 
-        var detail = !requested
-            ? $"inactive: {Constants.Configuration.Enabled}=false"
-            : !traces && !metrics
-                ? "inactive: traces and metrics are disabled"
-                : production && string.IsNullOrWhiteSpace(endpointText)
-                    ? $"inactive: Production requires {Constants.Configuration.OtlpEndpoint} or OTEL_EXPORTER_OTLP_ENDPOINT"
-                    : $"active: traces={traces.ToString().ToLowerInvariant()}, metrics={metrics.ToString().ToLowerInvariant()}, exporter={(endpoint is null ? "none" : "otlp")}";
+        var detail = DescribeStatus(requested, traces, metrics, production, endpointText, endpoint);
 
         return new ObservabilityPlan(
             active,
@@ -58,6 +52,30 @@ internal sealed record ObservabilityPlan(
             serviceVersion,
             Environment.MachineName,
             detail);
+    }
+
+    // One owner for the exporter name. It is reported both as plan state and inside the status
+    // detail, and those two answers must never be able to disagree.
+    private static string DescribeExporter(Uri? endpoint) => endpoint is null ? "none" : "otlp";
+
+    private static string DescribeStatus(
+        bool requested,
+        bool traces,
+        bool metrics,
+        bool production,
+        string? endpointText,
+        Uri? endpoint)
+    {
+        if (!requested) return $"inactive: {Constants.Configuration.Enabled}=false";
+        if (!traces && !metrics) return "inactive: traces and metrics are disabled";
+        if (production && string.IsNullOrWhiteSpace(endpointText))
+        {
+            return $"inactive: Production requires {Constants.Configuration.OtlpEndpoint} or OTEL_EXPORTER_OTLP_ENDPOINT";
+        }
+
+        return $"active: traces={Format(traces)}, metrics={Format(metrics)}, exporter={DescribeExporter(endpoint)}";
+
+        static string Format(bool value) => value ? "true" : "false";
     }
 
     private static bool ReadBoolean(IConfiguration? configuration, string key, bool fallback)
