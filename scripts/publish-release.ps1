@@ -23,16 +23,19 @@ $feedPath = [IO.Path]::GetFullPath((Join-Path (Get-Location) $FeedDirectory))
 if (-not (Test-Path -LiteralPath $planFile -PathType Leaf)) {
     throw "Certified release plan '$planFile' does not exist."
 }
-if (-not (Test-Path -LiteralPath $feedPath -PathType Container)) {
-    throw "Certified package feed '$feedPath' does not exist."
-}
 
 $plan = Get-Content -LiteralPath $planFile -Raw | ConvertFrom-Json
 $selected = @(@($plan.packages) | Where-Object { $_.publish })
 
+# Decide before looking at the feed. When nothing changed there is no feed to look at: packing
+# produced no files, and an empty directory does not survive the artifact upload between jobs.
 if ($selected.Count -eq 0) {
     Write-Host 'PUBLISH|NOTHING-TO-DO|no package changed since the published train'
     return
+}
+
+if (-not (Test-Path -LiteralPath $feedPath -PathType Container)) {
+    throw "Certified package feed '$feedPath' does not exist."
 }
 
 $pushes = [Collections.Generic.List[object]]::new()
