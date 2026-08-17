@@ -76,27 +76,41 @@ Because filters are not retroactive, every project shared the same pre-existing 
 `versionHeightOffset` cancels exactly that measured height, so the whole inventory starts at `1.0.0`
 — the version already published — and diverges only on subsequent change.
 
-### One release event, many versions
+### The release is a set difference
 
-`scripts/get-package-versions.ps1` asks NBGV for each project's version before anything is packed and
-writes `package-versions.json`. Pack, feed verification, and publication all agree against that
-manifest rather than a single expected number. The manifest is a publication input, so it is covered
-by the same SHA-256 gate as the packages.
+`scripts/plan-release.ps1` asks NBGV for each project's version and nuget.org which of those versions
+already exist. A version that is already published means that package did not change, so it is not
+built, not packed, and not pushed. The resulting `release-plan.json` — train, per-package version,
+publish flag, dependency-first order — is the only thing pack, verification, and publication consume.
+Nothing downstream recomputes a version or re-decides what ships.
 
-The tag is validated for form, for `dev` reachability, and for belonging to the root train. It is no
-longer required to equal a computed package version, because there is no longer one.
+`main` is the published state. Merging `dev` into `main` releases whatever changed; a merge that
+touched no packable source produces an empty plan and publishes nothing. Because versions come from
+commit height, `main` must contain exactly `dev`'s commits: the workflow requires the pushed commit to
+be reachable from `origin/dev`, which rejects a merge commit and enforces fast-forward.
 
-### Publication of an unchanged package
+### An unchanged package is not rebuilt
 
-Presence of a package version on nuget.org is expected, not a collision: an unchanged package keeps
-its published version. The integrity rule is stricter than presence — an existing version must
-contain exactly the certified bytes, verified by entry-level content comparison excluding the
-repository signature. The publisher classifies the entire train before pushing anything, so an
-integrity failure cannot leave a release half-published.
+A package's bytes are **not** a function of its version. The build stamps the current commit into the
+assembly — `AssemblyInformationalVersion` carries `+<sha>` and `FileVersion` varies with it — so the
+same source rebuilt at a later commit produces a different artifact wearing an already published
+version.
+
+Any rule of the form "an existing version must contain exactly the bytes we just built" is therefore
+unsatisfiable after the first release, and a design that compares them blocks every subsequent
+release. The correct rule is to never produce the artifact at all: unchanged packages are excluded by
+the plan, so there is nothing to compare and nothing to reconcile. Publication uses `--skip-duplicate`,
+which makes re-running an interrupted push a no-op for whatever already landed.
+
+The clean-consumer proof restores the staged feed **and** nuget.org, so it exercises the real mix a
+developer gets — newly published packages resolving against previously published ones. An all-local
+feed could not test that, and it is exactly where a wrong dependency range would surface.
 
 ## Consequences
 
-- A release ships only what changed. Packages whose bytes did not change are verified and skipped.
+- A release ships only what changed. Unchanged packages are never built, so a release's cost scales
+  with the change, not with the size of the inventory.
+- Publication is idempotent. Re-running a release that changed nothing is a green no-op.
 - A consumer no longer reads one number across the closure. Bounded dependency ranges, not aligned
   version numbers, are what make a Koan mix coherent; an incompatible major mix still fails at
   restore.

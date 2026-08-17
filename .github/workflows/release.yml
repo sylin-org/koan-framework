@@ -1,9 +1,12 @@
-name: Release package train
+name: Release
+
+# `main` is the published state. Merging `dev` into `main` releases whatever changed since the last
+# release, and nothing else: each package owns its version, so a merge that changed no packable
+# source produces an empty plan and publishes nothing.
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
 
 concurrency:
   group: koan-nuget-publication
@@ -14,13 +17,11 @@ permissions:
 
 jobs:
   certify:
-    name: Build and certify packages
+    name: Plan, pack, and prove
     runs-on: ubuntu-24.04
-    outputs:
-      release: ${{ steps.version.outputs.release }}
 
     steps:
-      - name: Check out the tagged commit
+      - name: Check out the pushed commit
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
@@ -30,151 +31,85 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Verify release tag eligibility
-        id: version
+      - name: Require a fast-forward of dev
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_TYPE -ne 'tag') {
-            throw 'Package publication requires a Git tag.'
-          }
-          if ($env:GITHUB_REF_NAME -notmatch '^v(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-            throw "Release tag '$env:GITHUB_REF_NAME' must have the form vX.Y.Z."
-          }
-          $tagTrain = "$($Matches.major).$($Matches.minor)"
-
+          # Package versions come from commit height, so main must contain exactly dev's commits.
+          # A merge commit on main is not reachable from dev and would compute different heights for
+          # the same sources, so this one check enforces the fast-forward rule.
           git fetch --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch origin/dev.' }
           git merge-base --is-ancestor $env:GITHUB_SHA origin/dev
           if ($LASTEXITCODE -ne 0) {
-            throw "Tagged commit '$env:GITHUB_SHA' is not an ancestor of origin/dev."
+            throw "Commit '$env:GITHUB_SHA' is not reachable from origin/dev. Fast-forward main from dev."
           }
 
-          # Package versions belong to each project's own version.json, so the tag no longer names
-          # one package version. It names the release event, and only has to agree with the
-          # repository's compatibility train.
-          $rootTrain = [string](Get-Content version.json -Raw | ConvertFrom-Json).version
-          if ($tagTrain -ne $rootTrain) {
-            throw "Release tag '$env:GITHUB_REF_NAME' does not belong to release train '$rootTrain'."
-          }
-
-          dotnet tool restore
-          if ($LASTEXITCODE -ne 0) { throw 'Local tool restore failed.' }
-          "release=$env:GITHUB_REF_NAME" >> $env:GITHUB_OUTPUT
-
-      - name: Build the release solution
-        run: dotnet build Koan.sln --configuration Release --property:PublicRelease=true --nologo
+      - name: Restore local tools
+        run: dotnet tool restore
 
       - name: Compile the package inventory
-        run: dotnet run --project tools/Koan.Packaging -- product-surface --output artifacts/release/product-surface.json
+        run: dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/release/inventory.json
 
-      - name: Build the template release input
+      - name: Plan the release
         shell: pwsh
         run: |
-          dotnet build templates/Sylin.Koan.Templates.csproj --configuration Release --property:PublicRelease=true --nologo
-          if ($LASTEXITCODE -ne 0) { throw 'Template build failed.' }
+          ./scripts/plan-release.ps1 `
+            -InventoryPath artifacts/release/inventory.json `
+            -OutputPath artifacts/release/release-plan.json
 
-      - name: Resolve each project's package version
+      - name: Pack what changed
         shell: pwsh
         run: |
-          ./scripts/get-package-versions.ps1 `
-            -ProductSurfacePath artifacts/release/product-surface.json `
-            -OutputPath artifacts/release/package-versions.json
-
-      - name: Pack the complete train once
-        shell: pwsh
-        run: |
-          ./scripts/pack-package-train.ps1 `
-            -ProductSurfacePath artifacts/release/product-surface.json `
+          ./scripts/pack-release.ps1 `
+            -PlanPath artifacts/release/release-plan.json `
             -OutputDirectory artifacts/release/feed `
-            -VersionManifestPath artifacts/release/package-versions.json `
             -Configuration Release
 
-      - name: Stage the checked publisher
-        shell: pwsh
-        run: Copy-Item scripts/publish-package-train.ps1 artifacts/release/publish-package-train.ps1
-
-      - name: Verify the staged feed through a clean consumer
+      - name: Prove the release through a package-only application
         shell: pwsh
         run: |
-          ./scripts/verify-package-feed.ps1 `
-            -ProductSurfacePath artifacts/release/product-surface.json `
-            -FeedDirectory artifacts/release/feed `
-            -VersionManifestPath artifacts/release/package-versions.json `
-            -HashManifestPath artifacts/release/SHA256SUMS
+          ./scripts/verify-release.ps1 `
+            -PlanPath artifacts/release/release-plan.json `
+            -FeedDirectory artifacts/release/feed
 
-      - name: Upload the certified release bytes
+      - name: Upload the certified release
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: koan-package-train-${{ steps.version.outputs.release }}
+          name: koan-release-${{ github.sha }}
           path: artifacts/release
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
 
   publish:
-    name: Publish certified packages
+    name: Publish
     needs: certify
     runs-on: ubuntu-24.04
 
-    # If a push is interrupted, rerun only this failed job. GitHub reuses the successful
-    # certify artifact, whose hashes are verified again before publication resumes.
+    # A separate job so the credential never exists in the environment that built the packages.
+    # If a push is interrupted, rerun this job: --skip-duplicate makes whatever already landed a
+    # no-op, and no version is ever republished.
 
     steps:
-      - name: Download the certified release bytes
+      - name: Check out the pushed commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download the certified release
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: koan-package-train-${{ needs.certify.outputs.release }}
+          name: koan-release-${{ github.sha }}
           path: artifacts/release
 
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
 
-      - name: Verify artifact hashes
-        shell: pwsh
-        working-directory: artifacts/release
-        run: |
-          $manifest = Get-Content SHA256SUMS
-          if ($manifest.Count -eq 0) { throw 'SHA256SUMS contains no package entries.' }
-
-          $listed = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-          foreach ($line in $manifest) {
-            if ($line -notmatch '^(?<hash>[A-F0-9]{64})  (?<path>.+)$') {
-              throw "Invalid SHA256SUMS line: '$line'."
-            }
-            $relative = $Matches.path.Replace('/', [IO.Path]::DirectorySeparatorChar)
-            if ([IO.Path]::IsPathRooted($relative) -or $relative.Split([IO.Path]::DirectorySeparatorChar) -contains '..') {
-              throw "Unsafe SHA256SUMS path: '$relative'."
-            }
-            if (-not $listed.Add($relative)) { throw "Duplicate SHA256SUMS path: '$relative'." }
-            if (-not (Test-Path -LiteralPath $relative -PathType Leaf)) {
-              throw "Missing staged package '$relative'."
-            }
-            $actual = (Get-FileHash -LiteralPath $relative -Algorithm SHA256).Hash
-            if ($actual -ne $Matches.hash) { throw "Hash mismatch for '$relative'." }
-          }
-
-          $staged = @(
-            Get-Item product-surface.json
-            Get-Item package-versions.json
-            Get-Item publish-package-train.ps1
-            Get-ChildItem feed -File | Where-Object { $_.Name -match '\.(s)?nupkg$' }
-          )
-          if ($staged.Count -ne $listed.Count) {
-            throw "Staged package count $($staged.Count) differs from manifest count $($listed.Count)."
-          }
-          foreach ($package in $staged) {
-            $relative = [IO.Path]::GetRelativePath((Get-Location).Path, $package.FullName)
-            if (-not $listed.Contains($relative)) { throw "Unlisted staged package '$relative'." }
-          }
-
-      - name: Publish the certified package train
+      - name: Publish the planned packages
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          & ./artifacts/release/publish-package-train.ps1 `
-            -ProductSurfacePath artifacts/release/product-surface.json `
-            -FeedDirectory artifacts/release/feed `
-            -VersionManifestPath artifacts/release/package-versions.json
+          ./scripts/publish-release.ps1 `
+            -PlanPath artifacts/release/release-plan.json `
+            -FeedDirectory artifacts/release/feed

@@ -54,14 +54,32 @@ silently.
 
 ## Releasing
 
-A `vX.Y.Z` tag on a `dev`-reachable commit starts a release. The tag names the release event and must
-belong to the root train; it does not name a package version. The workflow resolves each project's
-version into `package-versions.json`, packs once, verifies the feed and a package-only consumer
-against that manifest, then publishes.
+`main` is the published state. Fast-forward `main` from `dev` and the release runs:
 
-A package whose certified bytes already exist at its version is verified and skipped rather than
-republished. An existing version whose remote content differs from the certified bytes fails the
-release before anything is pushed.
+```powershell
+git checkout main
+git merge --ff-only dev
+git push origin main
+```
+
+The workflow computes a release plan — each project's version from NBGV, minus the versions already
+on nuget.org — then builds, packs, proves, and publishes only that difference. A merge that changed no
+packable source yields an empty plan and publishes nothing.
+
+`main` must **fast-forward**. Versions come from commit height, so a merge commit would give `main` a
+different history than `dev` and compute different patch numbers for the same sources. The workflow
+requires the pushed commit to be reachable from `origin/dev` and fails otherwise.
+
+An unchanged package is never rebuilt. The build stamps the commit into the assembly, so rebuilding
+unchanged sources at a later commit would produce different bytes under an already published version;
+excluding it from the plan is what keeps "no change, no new package" true.
+
+Inspect a release without publishing:
+
+```powershell
+dotnet run --project tools/Koan.Packaging -- inventory --output artifacts/release/inventory.json
+./scripts/plan-release.ps1 -InventoryPath artifacts/release/inventory.json -OutputPath artifacts/release/release-plan.json
+```
 
 ## Compatibility
 

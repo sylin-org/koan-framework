@@ -368,7 +368,7 @@
       "maturity": "supported-foundation",
       "packages": ["Sylin.Koan", "Sylin.Koan.App", "Sylin.Koan.Templates"],
       "documentation": ["docs/reference/core/index.md", "templates/README.md", "tools/Koan.Packaging/README.md", "samples/FirstUse/README.md", "samples/GoldenJourney/README.md"],
-      "evidence": ["tests/PackageConsumers/AppJson", "scripts/verify-package-feed.ps1", "tests/Koan.Packaging.Tests"]
+      "evidence": ["tests/PackageConsumers/AppJson", "scripts/verify-release.ps1", "tests/Koan.Packaging.Tests"]
     },
     {
       "id": "operations-diagnostics",

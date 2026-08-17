@@ -47,13 +47,14 @@ dotnet run --project tools/Koan.Packaging -- product-surface --check
 
 ## Release proof
 
-An explicit `vX.Y.Z` tag starts the release workflow. The workflow packs every inventoried project once,
-then `scripts/verify-package-feed.ps1` proves the exact package IDs and train version, restores the
-checked-in `tests/PackageConsumers/AppJson` application from the staged feed, and records SHA-256
-hashes. Publication downloads and verifies that staged artifact instead of packing again.
+A fast-forward push of `main` starts the release workflow. `scripts/plan-release.ps1` resolves every
+project's version and subtracts what nuget.org already has; `scripts/pack-release.ps1` builds and packs
+only that difference; `scripts/verify-release.ps1` restores and runs the checked-in
+`tests/PackageConsumers/AppJson` application against the staged feed plus nuget.org, proving the real
+package mix; `scripts/publish-release.ps1` pushes the planned set from a job that never built anything.
 
-Dependency-only bundles and templates follow the same inventory, version, staging, and verification
-path as assembly packages. Content-only packages do not receive an assembly API baseline.
+Dependency-only bundles and templates follow the same inventory, planning, and verification path as
+assembly packages. Content-only packages do not receive an assembly API baseline.
 
 See [Versioning](versioning.md), [NuGet publishing](nuget-publishing.md), and
-[ARCH-0124](../decisions/ARCH-0124-single-package-release-train.md).
+[ARCH-0125](../decisions/ARCH-0125-per-project-package-versions.md).
