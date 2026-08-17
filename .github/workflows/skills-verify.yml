@@ -23,6 +23,11 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Pinned recipe links are checked with `git cat-file -e v1.0.0:<path>`, so the release tag
+          # must be present. A default shallow checkout fetches no tags, which makes every pinned
+          # link report as unresolvable regardless of whether the file exists.
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
