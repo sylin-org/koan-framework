@@ -102,6 +102,12 @@ try {
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="*" />
+      <!-- The Koan patterns must be repeated here, not left to "*". NuGet selects sources by the
+           MOST SPECIFIC matching pattern, so listing Sylin.Koan.* only under the local feed makes
+           nuget.org ineligible for Koan packages entirely — and an unchanged package is not in the
+           local feed. Both sources must carry the specific patterns for the mix to resolve. -->
+      <package pattern="Sylin.Koan" />
+      <package pattern="Sylin.Koan.*" />
     </packageSource>
   </packageSourceMapping>
 </configuration>
