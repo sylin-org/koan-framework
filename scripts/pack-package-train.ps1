@@ -7,7 +7,7 @@ param(
     [string] $OutputDirectory,
 
     [Parameter(Mandatory)]
-    [string] $ExpectedVersion,
+    [string] $VersionManifestPath,
 
     [ValidateNotNullOrEmpty()]
     [string] $Configuration = 'Release'
@@ -29,8 +29,18 @@ $releaseTrain = [string]$surface.releaseTrain
 if ([string]::IsNullOrWhiteSpace($releaseTrain)) {
     throw 'The product surface does not declare releaseTrain.'
 }
-if ($ExpectedVersion -notmatch ('^' + [Regex]::Escape($releaseTrain) + '\.[0-9]+$')) {
-    throw "Expected version '$ExpectedVersion' is not part of release train '$releaseTrain'."
+$manifestPath = [IO.Path]::GetFullPath((Join-Path (Get-Location) $VersionManifestPath))
+if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    throw "Version manifest '$manifestPath' does not exist."
+}
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+if ($manifest.Count -eq 0) {
+    throw 'The version manifest is empty.'
+}
+foreach ($entry in $manifest.GetEnumerator()) {
+    if ([string]$entry.Value -notmatch ('^' + [Regex]::Escape($releaseTrain) + '\.[0-9]+$')) {
+        throw "Package '$($entry.Key)' has version '$($entry.Value)', which is not part of release train '$releaseTrain'."
+    }
 }
 
 $packageRecords = @($surface.packages)
@@ -42,6 +52,19 @@ if ($duplicateIds.Count -ne 0) {
     throw "Package ID '$($duplicateIds[0].Name)' appears $($duplicateIds[0].Count) times in the product surface."
 }
 $releaseIds = @($packageRecords.packageId | Sort-Object)
+
+# The manifest and the inventory must describe the same package set, or a project could be
+# packed at a version nothing later checks.
+foreach ($packageId in $releaseIds) {
+    if (-not $manifest.ContainsKey($packageId)) {
+        throw "Package '$packageId' is in the inventory but absent from the version manifest."
+    }
+}
+foreach ($manifestId in $manifest.Keys) {
+    if ($releaseIds -notcontains $manifestId) {
+        throw "Version manifest lists '$manifestId', which is absent from the inventory."
+    }
+}
 
 $projects = @(
     foreach ($packageId in $releaseIds) {
@@ -102,4 +125,5 @@ foreach ($package in ($projects | Sort-Object PackageId)) {
     }
 }
 
-Write-Host "PACKAGE-TRAIN|PACKED|$($projects.Count)|$ExpectedVersion"
+$distinctVersions = @($manifest.Values | Sort-Object -Unique)
+Write-Host "PACKAGE-TRAIN|PACKED|$($projects.Count)|train=$releaseTrain|distinct-versions=$($distinctVersions.Count)"

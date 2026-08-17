@@ -34,9 +34,9 @@ public sealed class RepositoryInspectorVersionOwnershipTests
     }
 
     [Fact]
-    public async Task InventoryInheritsTheRootVersionOwner()
+    public async Task InventoryAcceptsAProjectOwnedVersion()
     {
-        using var repository = TestRepository.Create(rootVersion: "1.0", projectVersion: null);
+        using var repository = TestRepository.Create(rootVersion: "1.0", projectVersion: "1.0");
         var inspector = new RepositoryInspector(repository.Root, new ProcessRunner());
 
         var package = Assert.Single(await inspector.DiscoverPackagesAsync(CancellationToken.None));
@@ -45,16 +45,18 @@ public sealed class RepositoryInspectorVersionOwnershipTests
     }
 
     [Fact]
-    public async Task InventoryRejectsANestedVersionOwner()
+    public async Task InventoryRejectsAProjectWithoutItsOwnVersionOwner()
     {
-        using var repository = TestRepository.Create(rootVersion: "1.0", projectVersion: "0.19");
+        // Inheriting an ancestor version.json would tie the package's patch number to commits that
+        // never touched it, which is exactly what per-project ownership exists to prevent.
+        using var repository = TestRepository.Create(rootVersion: "1.0", projectVersion: null);
         var inspector = new RepositoryInspector(repository.Root, new ProcessRunner());
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             inspector.DiscoverPackagesAsync(CancellationToken.None));
 
         Assert.Contains("src/Example/version.json", error.Message, StringComparison.Ordinal);
-        Assert.Contains("every active package inherits", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("owns its own version", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

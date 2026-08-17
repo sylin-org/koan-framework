@@ -7,7 +7,7 @@ param(
     [string] $FeedDirectory,
 
     [Parameter(Mandatory)]
-    [string] $ExpectedVersion,
+    [string] $VersionManifestPath,
 
     [Parameter(Mandatory)]
     [string] $HashManifestPath,
@@ -79,8 +79,18 @@ $releaseTrain = [string]$surface.releaseTrain
 if ([string]::IsNullOrWhiteSpace($releaseTrain)) {
     throw 'The product surface does not declare releaseTrain.'
 }
-if ($ExpectedVersion -notmatch ('^' + [Regex]::Escape($releaseTrain) + '\.[0-9]+$')) {
-    throw "Expected version '$ExpectedVersion' is not part of release train '$releaseTrain'."
+$versionManifestFile = [IO.Path]::GetFullPath((Join-Path (Get-Location) $VersionManifestPath))
+if (-not (Test-Path -LiteralPath $versionManifestFile -PathType Leaf)) {
+    throw "Version manifest '$versionManifestFile' does not exist."
+}
+$versionManifest = Get-Content -LiteralPath $versionManifestFile -Raw | ConvertFrom-Json -AsHashtable
+if ($versionManifest.Count -eq 0) {
+    throw 'The version manifest is empty.'
+}
+foreach ($entry in $versionManifest.GetEnumerator()) {
+    if ([string]$entry.Value -notmatch ('^' + [Regex]::Escape($releaseTrain) + '\.[0-9]+$')) {
+        throw "Package '$($entry.Key)' has version '$($entry.Value)', which is not part of release train '$releaseTrain'."
+    }
 }
 
 $packageRecords = @($surface.packages)
@@ -100,6 +110,14 @@ if (-not $trainPackages.Contains('Sylin.Koan.App')) {
     throw 'The package train does not contain Sylin.Koan.App.'
 }
 
+# The consumer fixture references exactly one package (asserted below), so it needs only that
+# package's version. Its transitive Koan closure is pinned by the bounded dependency ranges each
+# package carries, and every resolved version is checked against the manifest after restore.
+$appVersion = [string]$versionManifest['Sylin.Koan.App']
+if ([string]::IsNullOrWhiteSpace($appVersion)) {
+    throw 'The version manifest does not contain Sylin.Koan.App.'
+}
+
 $nupkgs = @(Get-ChildItem -LiteralPath $feedPath -File -Filter *.nupkg)
 if ($nupkgs.Count -ne $releaseIds.Count) {
     throw "Feed contains $($nupkgs.Count) NuGet packages; the inventory requires $($releaseIds.Count)."
@@ -113,8 +131,12 @@ foreach ($group in ($identities | Group-Object Id)) {
     if ($group.Count -ne 1) {
         throw "Feed contains $($group.Count) packages for '$($group.Name)'; expected exactly one."
     }
-    if ($group.Group[0].Version -ne $ExpectedVersion) {
-        throw "Package '$($group.Name)' has version '$($group.Group[0].Version)', expected '$ExpectedVersion'."
+    $expected = [string]$versionManifest[$group.Name]
+    if ([string]::IsNullOrWhiteSpace($expected)) {
+        throw "Feed contains package '$($group.Name)' that is absent from the version manifest."
+    }
+    if ($group.Group[0].Version -ne $expected) {
+        throw "Package '$($group.Name)' has version '$($group.Group[0].Version)', expected '$expected'."
     }
 }
 foreach ($packageId in $releaseIds) {
@@ -173,7 +195,7 @@ try {
         '--configfile', (Join-Path $consumerRoot 'NuGet.config'),
         '--packages', $packagesRoot,
         '--force-evaluate',
-        "--property:KoanTrainVersion=$ExpectedVersion",
+        "--property:KoanTrainVersion=$appVersion",
         '--nologo'
     ) $consumerRoot
     Invoke-DotNet @(
@@ -181,14 +203,14 @@ try {
         '--configfile', (Join-Path $consumerRoot 'NuGet.config'),
         '--packages', $packagesRoot,
         '--locked-mode',
-        "--property:KoanTrainVersion=$ExpectedVersion",
+        "--property:KoanTrainVersion=$appVersion",
         '--nologo'
     ) $consumerRoot
     Invoke-DotNet @(
         'build', $project,
         '--configuration', 'Release',
         '--no-restore',
-        "--property:KoanTrainVersion=$ExpectedVersion",
+        "--property:KoanTrainVersion=$appVersion",
         '--nologo'
     ) $consumerRoot
 
@@ -202,8 +224,12 @@ try {
                 if ([string]$entry.Value.type -ne 'package') {
                     throw "Resolved Koan dependency '$($entry.Key)' is not a NuGet package."
                 }
-                if ($parts[1] -ne $ExpectedVersion) {
-                    throw "Resolved Koan dependency '$id' has version '$($parts[1])', expected '$ExpectedVersion'."
+                $expectedResolved = [string]$versionManifest[$id]
+                if ([string]::IsNullOrWhiteSpace($expectedResolved)) {
+                    throw "Resolved Koan dependency '$id' is absent from the version manifest."
+                }
+                if ($parts[1] -ne $expectedResolved) {
+                    throw "Resolved Koan dependency '$id' has version '$($parts[1])', expected '$expectedResolved'."
                 }
                 if (-not $trainPackages.Contains($id)) {
                     throw "Resolved Koan dependency '$id' is not in the package train."
@@ -240,6 +266,9 @@ if (-not (Test-Path -LiteralPath $publisherPath -PathType Leaf)) {
 }
 $artifactFiles = @(
     Get-Item -LiteralPath $surfacePath
+    # The version manifest decides which identity each certified package is published under, so it
+    # is a publication input and must be covered by the same hash gate as the packages themselves.
+    Get-Item -LiteralPath $versionManifestFile
     Get-Item -LiteralPath $publisherPath
     Get-ChildItem -LiteralPath $feedPath -File |
         Where-Object { $_.Name -match '\.(s)?nupkg$' }
@@ -253,4 +282,5 @@ $hashLines = @(
 )
 Set-Content -LiteralPath $manifestPath -Value $hashLines -Encoding ascii
 
-Write-Host "PACKAGE-TRAIN|VERIFIED|$($releaseIds.Count)|$ExpectedVersion"
+$distinctVerified = @($versionManifest.Values | Sort-Object -Unique)
+Write-Host "PACKAGE-TRAIN|VERIFIED|$($releaseIds.Count)|train=$releaseTrain|distinct-versions=$($distinctVerified.Count)"

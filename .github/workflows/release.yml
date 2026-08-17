@@ -17,7 +17,7 @@ jobs:
     name: Build and certify packages
     runs-on: ubuntu-24.04
     outputs:
-      package-version: ${{ steps.version.outputs.package-version }}
+      release: ${{ steps.version.outputs.release }}
 
     steps:
       - name: Check out the tagged commit
@@ -30,16 +30,17 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Verify release tag eligibility and version
+      - name: Verify release tag eligibility
         id: version
         shell: pwsh
         run: |
           if ($env:GITHUB_REF_TYPE -ne 'tag') {
             throw 'Package publication requires a Git tag.'
           }
-          if ($env:GITHUB_REF_NAME -notmatch '^v(?<version>0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
             throw "Release tag '$env:GITHUB_REF_NAME' must have the form vX.Y.Z."
           }
+          $tagTrain = "$($Matches.major).$($Matches.minor)"
 
           git fetch --no-tags origin +refs/heads/dev:refs/remotes/origin/dev
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch origin/dev.' }
@@ -48,16 +49,17 @@ jobs:
             throw "Tagged commit '$env:GITHUB_SHA' is not an ancestor of origin/dev."
           }
 
+          # Package versions belong to each project's own version.json, so the tag no longer names
+          # one package version. It names the release event, and only has to agree with the
+          # repository's compatibility train.
+          $rootTrain = [string](Get-Content version.json -Raw | ConvertFrom-Json).version
+          if ($tagTrain -ne $rootTrain) {
+            throw "Release tag '$env:GITHUB_REF_NAME' does not belong to release train '$rootTrain'."
+          }
+
           dotnet tool restore
           if ($LASTEXITCODE -ne 0) { throw 'Local tool restore failed.' }
-          $computed = (dotnet nbgv get-version --public-release=true -v NuGetPackageVersion).Trim()
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($computed)) {
-            throw 'Nerdbank.GitVersioning did not produce a package version.'
-          }
-          if ($env:GITHUB_REF_NAME -ne "v$computed") {
-            throw "Tag '$env:GITHUB_REF_NAME' does not match repository version 'v$computed'."
-          }
-          "package-version=$computed" >> $env:GITHUB_OUTPUT
+          "release=$env:GITHUB_REF_NAME" >> $env:GITHUB_OUTPUT
 
       - name: Build the release solution
         run: dotnet build Koan.sln --configuration Release --property:PublicRelease=true --nologo
@@ -71,13 +73,20 @@ jobs:
           dotnet build templates/Sylin.Koan.Templates.csproj --configuration Release --property:PublicRelease=true --nologo
           if ($LASTEXITCODE -ne 0) { throw 'Template build failed.' }
 
+      - name: Resolve each project's package version
+        shell: pwsh
+        run: |
+          ./scripts/get-package-versions.ps1 `
+            -ProductSurfacePath artifacts/release/product-surface.json `
+            -OutputPath artifacts/release/package-versions.json
+
       - name: Pack the complete train once
         shell: pwsh
         run: |
           ./scripts/pack-package-train.ps1 `
             -ProductSurfacePath artifacts/release/product-surface.json `
             -OutputDirectory artifacts/release/feed `
-            -ExpectedVersion '${{ steps.version.outputs.package-version }}' `
+            -VersionManifestPath artifacts/release/package-versions.json `
             -Configuration Release
 
       - name: Stage the checked publisher
@@ -90,13 +99,13 @@ jobs:
           ./scripts/verify-package-feed.ps1 `
             -ProductSurfacePath artifacts/release/product-surface.json `
             -FeedDirectory artifacts/release/feed `
-            -ExpectedVersion '${{ steps.version.outputs.package-version }}' `
+            -VersionManifestPath artifacts/release/package-versions.json `
             -HashManifestPath artifacts/release/SHA256SUMS
 
       - name: Upload the certified release bytes
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: koan-package-train-${{ steps.version.outputs.package-version }}
+          name: koan-package-train-${{ steps.version.outputs.release }}
           path: artifacts/release
           if-no-files-found: error
           compression-level: 0
@@ -114,7 +123,7 @@ jobs:
       - name: Download the certified release bytes
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          name: koan-package-train-${{ needs.certify.outputs.package-version }}
+          name: koan-package-train-${{ needs.certify.outputs.release }}
           path: artifacts/release
 
       - name: Set up .NET
@@ -148,6 +157,7 @@ jobs:
 
           $staged = @(
             Get-Item product-surface.json
+            Get-Item package-versions.json
             Get-Item publish-package-train.ps1
             Get-ChildItem feed -File | Where-Object { $_.Name -match '\.(s)?nupkg$' }
           )
@@ -167,4 +177,4 @@ jobs:
           & ./artifacts/release/publish-package-train.ps1 `
             -ProductSurfacePath artifacts/release/product-surface.json `
             -FeedDirectory artifacts/release/feed `
-            -ExpectedVersion '${{ needs.certify.outputs.package-version }}'
+            -VersionManifestPath artifacts/release/package-versions.json

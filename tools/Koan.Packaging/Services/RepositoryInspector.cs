@@ -74,12 +74,13 @@ internal sealed class RepositoryInspector(string repositoryRoot, ProcessRunner p
 
         var projectDirectory = Path.GetDirectoryName(project)!;
         var versionOwner = ResolveVersionOwner(project, projectDirectory, packageId);
-        if (!string.Equals(versionOwner, ReleaseTrain.FileName, StringComparison.OrdinalIgnoreCase))
+        var expectedOwner = Relative(Path.Combine(projectDirectory, ReleaseTrain.FileName));
+        if (!string.Equals(versionOwner, expectedOwner, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
                 $"Packable package '{packageId}' owned by '{Relative(project)}' resolves versioning from " +
-                $"'{versionOwner}'. Remove that nested version.json so every active package inherits " +
-                $"the root '{ReleaseTrain.FileName}' release train.");
+                $"'{versionOwner}'. Add '{expectedOwner}' so the package owns its own version and only " +
+                $"its own changes advance it.");
         }
 
         var references = new List<string>();

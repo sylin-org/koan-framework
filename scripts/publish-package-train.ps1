@@ -7,7 +7,7 @@ param(
     [string] $FeedDirectory,
 
     [Parameter(Mandatory)]
-    [string] $ExpectedVersion,
+    [string] $VersionManifestPath,
 
     [switch] $PlanOnly
 )
@@ -197,19 +197,32 @@ if (-not (Test-Path -LiteralPath $feedPath -PathType Container)) {
 
 $surface = Get-Content -LiteralPath $surfacePath -Raw | ConvertFrom-Json
 $order = Resolve-PublicationOrder $surface
+
+$manifestPath = [IO.Path]::GetFullPath((Join-Path (Get-Location) $VersionManifestPath))
+if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+    throw "Certified version manifest '$manifestPath' does not exist."
+}
+$versions = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+foreach ($id in $order) {
+    if ([string]::IsNullOrWhiteSpace([string]$versions[$id])) {
+        throw "Certified version manifest does not contain '$id'."
+    }
+}
+
 $primaryPaths = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
 $symbolPaths = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
 $expectedPrimaryPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 $allowedSymbolPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($id in $order) {
-    $primaryPath = [IO.Path]::GetFullPath((Join-Path $feedPath "$id.$ExpectedVersion.nupkg"))
+    $version = [string]$versions[$id]
+    $primaryPath = [IO.Path]::GetFullPath((Join-Path $feedPath "$id.$version.nupkg"))
     if (-not (Test-Path -LiteralPath $primaryPath -PathType Leaf)) {
         throw "Certified package '$id' is missing at '$primaryPath'."
     }
     $primaryPaths.Add($id, $primaryPath)
     $null = $expectedPrimaryPaths.Add($primaryPath)
 
-    $symbolPath = [IO.Path]::GetFullPath((Join-Path $feedPath "$id.$ExpectedVersion.snupkg"))
+    $symbolPath = [IO.Path]::GetFullPath((Join-Path $feedPath "$id.$version.snupkg"))
     $null = $allowedSymbolPaths.Add($symbolPath)
     if (Test-Path -LiteralPath $symbolPath -PathType Leaf) {
         $symbolPaths.Add($id, $symbolPath)
@@ -248,41 +261,49 @@ $isRecovery = $runAttempt -gt 1
 $client = [Net.Http.HttpClient]::new()
 $client.Timeout = [TimeSpan]::FromMinutes(2)
 try {
-    if (-not $isRecovery) {
-        $collisions = [Collections.Generic.List[string]]::new()
-        foreach ($id in $order) {
-            if (Test-NuGetPackageExists $client $id $ExpectedVersion) {
-                $collisions.Add("$id.$ExpectedVersion")
-            }
-        }
-        if ($collisions.Count -ne 0) {
-            throw "NuGet already contains train identities: $($collisions -join ', '). No package was pushed."
-        }
-    }
-
+    # Each project owns its version, so a package whose source did not change keeps the version it
+    # already published. A remote identity is therefore expected, not a collision — but presence
+    # alone is not enough: an existing version must contain exactly the certified bytes, otherwise
+    # the same version would mean two different packages. Classify the entire train first so an
+    # integrity failure cannot leave a release half-published.
+    $toPush = [Collections.Generic.List[string]]::new()
+    $unchanged = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
     $remotePath = [IO.Path]::GetTempFileName()
     try {
         foreach ($id in $order) {
-            $packagePath = $primaryPaths[$id]
-            if ($isRecovery -and (Get-RemotePackage $client $id $ExpectedVersion $remotePath)) {
-                Assert-EquivalentPackageContent $packagePath $remotePath
-                Write-Host "PUBLISH|PRIMARY-VERIFIED|$id|$ExpectedVersion"
+            $version = [string]$versions[$id]
+            if (-not (Test-NuGetPackageExists $client $id $version)) {
+                $toPush.Add($id)
+                continue
             }
-            else {
-                Write-Host "PUBLISH|PRIMARY-PUSH|$id|$ExpectedVersion"
-                Invoke-NuGetPush $packagePath $false $false
+            if (-not (Get-RemotePackage $client $id $version $remotePath)) {
+                throw "NuGet reports '$id.$version' exists but it could not be downloaded for verification."
             }
+            Assert-EquivalentPackageContent $primaryPaths[$id] $remotePath
+            $null = $unchanged.Add($id)
+            Write-Host "PUBLISH|PRIMARY-VERIFIED|$id|$version"
         }
     }
     finally {
         Remove-Item -LiteralPath $remotePath -Force -ErrorAction SilentlyContinue
     }
 
+    Write-Host "PUBLISH|PLAN|push=$($toPush.Count)|unchanged=$($unchanged.Count)"
+
+    foreach ($id in $order) {
+        if (-not $toPush.Contains($id)) { continue }
+        $version = [string]$versions[$id]
+        Write-Host "PUBLISH|PRIMARY-PUSH|$id|$version"
+        Invoke-NuGetPush $primaryPaths[$id] $false $false
+    }
+
     foreach ($id in $order) {
         if ($symbolPaths.ContainsKey($id)) {
-            $mode = if ($isRecovery) { 'RESUME' } else { 'PUSH' }
-            Write-Host "PUBLISH|SYMBOL-$mode|$id|$ExpectedVersion"
-            Invoke-NuGetPush $symbolPaths[$id] $true $isRecovery
+            $version = [string]$versions[$id]
+            $tolerateExisting = $isRecovery -or $unchanged.Contains($id)
+            $mode = if ($tolerateExisting) { 'RESUME' } else { 'PUSH' }
+            Write-Host "PUBLISH|SYMBOL-$mode|$id|$version"
+            Invoke-NuGetPush $symbolPaths[$id] $true $tolerateExisting
         }
     }
 }
