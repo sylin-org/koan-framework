@@ -190,6 +190,8 @@
       href: ARCH-0122-dogfood-runtime-and-test-seams.md
     - name: ARCH-0124 One stable release train for all active packages
       href: ARCH-0124-single-package-release-train.md
+    - name: ARCH-0125 Each package owns its version on one shared compatibility train
+      href: ARCH-0125-per-project-package-versions.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

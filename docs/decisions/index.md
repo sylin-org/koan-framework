@@ -65,7 +65,8 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0120 | [Value-led promotion to the Koan 0.20 surface](ARCH-0120-terminal-package-maturity.md) | Accepted | Product intent selects meaningful public families; provider, consumer, dependency, and API evidence promote them with no second maturity or admission subsystem |
 | ARCH-0121 | [Claim-scoped validation and a cheap main boundary](ARCH-0121-claim-scoped-validation.md) | Accepted in part | Claim-owned evidence and cheap PR coherence remain; ARCH-0124 replaces its release boundary |
 | ARCH-0122 | [Dogfood-derived runtime control and deterministic test seams](ARCH-0122-dogfood-runtime-and-test-seams.md) | Accepted | Exact SSE intent, AI source lifecycle and inspection, public deterministic Jobs testing, and concise agent workflow |
-| ARCH-0124 | [One stable release train for all active packages](ARCH-0124-single-package-release-train.md) | Accepted | Root train version, complete active inventory, explicit tag, and certify-once artifact handoff |
+| ARCH-0124 | [One stable release train for all active packages](ARCH-0124-single-package-release-train.md) | Accepted in part | Complete active inventory, explicit tag, and certify-once artifact handoff remain; ARCH-0125 replaces its single version authority |
+| ARCH-0125 | [Each package owns its version on one shared compatibility train](ARCH-0125-per-project-package-versions.md) | Accepted | Project-local version ownership, a per-package version manifest, and publication that skips unchanged packages |
 
 ## Authoring Principles
 
