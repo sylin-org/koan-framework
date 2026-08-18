@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -104,6 +104,13 @@ public static class ServiceCollectionExtensions
             logging.AddConsole(options =>
             {
                 options.FormatterName = KoanConsoleFormatter.FormatterName;
+                // When a capability owns stdout for a protocol, diagnostics belong on stderr.
+                // Evaluated when options materialize (after Build), so a claim made during
+                // composition is honored even though this callback was registered earlier.
+                options.LogToStandardErrorThreshold =
+                    Koan.Core.Hosting.KoanStandardStreams.IsStandardOutputClaimed
+                        ? LogLevel.Trace
+                        : LogLevel.None;
             });
             logging.AddConsoleFormatter<KoanConsoleFormatter, KoanConsoleFormatterOptions>(options =>
             {

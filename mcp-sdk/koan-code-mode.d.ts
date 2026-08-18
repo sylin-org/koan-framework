@@ -1,0 +1,122 @@
+﻿// Auto-generated TypeScript definitions for Koan MCP Code Mode
+// Generated: 2026-08-18T00:49:54.3025363Z
+// Use these type definitions to guide code generation.
+// Code execution is JavaScript-only (no TypeScript transpilation).
+
+declare namespace Koan {
+  // ──────────────────────────────────────────────────
+  // Entity Domain - Auto-discovered entity operations
+  // ──────────────────────────────────────────────────
+  namespace Entities {
+
+    // AuditLog - Read-only audit log
+    interface AuditLog {
+      /** Full-text query term. */
+      q: string;
+      /** JSON filter expression compiled into repository predicates. */
+      filter: string;
+      /** When true string comparisons ignore case sensitivity. */
+      ignoreCase: boolean;
+      /** Page number to request. */
+      page: number;
+      /** Number of items per page (default 50). */
+      pageSize: number;
+      /** Sort expression using field[:direction] format. */
+      sort: string;
+      /** Optional Accept header override (view negotiation). */
+      accept: string;
+      /** When true forces pagination even when repository returns a full set. */
+      forcePagination: boolean;
+      /** Additional query parameters forwarded to hooks. */
+      extras: Record<string, any>;
+      /** Dataset key when using multitenant routing. */
+      set: string;
+      /** Response shaping hint. */
+      shape: "map" | "dict";
+      /** Relationship expansion hints (e.g. with=all). */
+      with: string;
+    }
+
+    interface IAuditLogOperations {
+      /** List Read-only audit log records with paging, filtering, and shaping. */
+      collection(params?: { filter?: any; pageSize?: number; page?: number; sort?: string; set?: string; with?: string }): { items: AuditLog[]; page: number; pageSize: number; totalCount: number };
+
+      /** Retrieve a Read-only audit log by identifier. */
+      getById(id: string, options?: { set?: string; with?: string }): AuditLog;
+
+    }
+
+    const AuditLog: IAuditLogOperations;
+
+    // Todo - Test todo entity
+    interface Todo {
+      /** Full-text query term. */
+      q: string;
+      /** JSON filter expression compiled into repository predicates. */
+      filter: string;
+      /** When true string comparisons ignore case sensitivity. */
+      ignoreCase: boolean;
+      /** Page number to request. */
+      page: number;
+      /** Number of items per page (default 50). */
+      pageSize: number;
+      /** Sort expression using field[:direction] format. */
+      sort: string;
+      /** Optional Accept header override (view negotiation). */
+      accept: string;
+      /** When true forces pagination even when repository returns a full set. */
+      forcePagination: boolean;
+      /** Additional query parameters forwarded to hooks. */
+      extras: Record<string, any>;
+      /** Dataset key when using multitenant routing. */
+      set: string;
+      /** Response shaping hint. */
+      shape: "map" | "dict";
+      /** Relationship expansion hints (e.g. with=all). */
+      with: string;
+    }
+
+    interface ITodoOperations {
+      /** List Test todo entity records with paging, filtering, and shaping. */
+      collection(params?: { filter?: any; pageSize?: number; page?: number; sort?: string; set?: string; with?: string }): { items: Todo[]; page: number; pageSize: number; totalCount: number };
+
+      /** Retrieve a Test todo entity by identifier. */
+      getById(id: string, options?: { set?: string; with?: string }): Todo;
+
+      /** Insert or update a Test todo entity record. */
+      upsert(model: Todo, options?: { set?: string }): Todo;
+
+      /** Delete a Test todo entity by identifier. */
+      delete(id: string, options?: { set?: string }): number;
+
+      /** Delete multiple Test todo entity records by identifier. */
+      deleteMany(ids: string[], options?: { set?: string }): number;
+
+    }
+
+    const Todo: ITodoOperations;
+  }
+
+  // ──────────────────────────────────────────────────
+  // Output Domain - Communication with user
+  // ──────────────────────────────────────────────────
+  namespace Out {
+    /** Send final answer to the user */
+    function answer(text: string): void;
+
+    /** Log informational message */
+    function info(message: string): void;
+
+    /** Log warning message */
+    function warn(message: string): void;
+  }
+}
+
+// ──────────────────────────────────────────────────
+// Runtime Context - Available to JavaScript code
+// ──────────────────────────────────────────────────
+export interface CodeModeContext {
+  SDK: typeof Koan;
+}
+
+// integrity-sha256: 458be9c5f8a1e28a8a56a0b4238d65fb414e561c2df75b0a545b48d92ab1ed91

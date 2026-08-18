@@ -1,3 +1,4 @@
+using Koan.Core.Hosting;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -154,9 +155,9 @@ internal sealed class AppRuntime : IAppRuntime
                 {
                     if (timeline.HasValues)
                     {
-                        Console.WriteLine($"[K:PHASE] {KoanConsoleBlocks.FormatStartupPhases(timeline)}");
+                        KoanStandardStreams.Diagnostics.WriteLine($"[K:PHASE] {KoanConsoleBlocks.FormatStartupPhases(timeline)}");
                     }
-                    Console.Write(startupBlock);
+                    KoanStandardStreams.Diagnostics.Write(startupBlock);
                 }
                 catch
                 {

@@ -1,3 +1,4 @@
+using Koan.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -228,7 +229,7 @@ internal sealed class ContextAwareLogger : ILogger
         
         // This is where integration with the actual logging system would happen
         // For now, this demonstrates the concept
-        Console.WriteLine($"[{context?.Name ?? "Koan:runtime"}] {message}");
+        KoanStandardStreams.Diagnostics.WriteLine($"[{context?.Name ?? "Koan:runtime"}] {message}");
     }
 
     private sealed class NullScope : IDisposable

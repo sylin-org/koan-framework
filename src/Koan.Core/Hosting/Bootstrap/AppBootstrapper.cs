@@ -1,3 +1,4 @@
+using Koan.Core.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -305,7 +306,7 @@ public static class AppBootstrapper
             .ToDictionary(g => g.Key, g => g.Count());
 
         var breakdownText = string.Join(" ", breakdown.Select(kvp => $"{kvp.Key}={kvp.Value}"));
-        Console.WriteLine($"ASSEMBLIES|loaded={assemblies.Count} {breakdownText}");
+        KoanStandardStreams.Diagnostics.WriteLine($"ASSEMBLIES|loaded={assemblies.Count} {breakdownText}");
 
         if (discoveredAssemblies.Count > 0)
         {
@@ -314,7 +315,7 @@ public static class AppBootstrapper
                 var name = a.GetName();
                 return $"{name.Name}({name.Version})";
             }));
-            Console.WriteLine($"ASSEMBLIES|new={delta}");
+            KoanStandardStreams.Diagnostics.WriteLine($"ASSEMBLIES|new={delta}");
         }
 
         var payload = new
@@ -324,15 +325,15 @@ public static class AppBootstrapper
             categories = breakdown,
             discovered = discoveredAssemblies.Select(a => a.GetName().Name ?? "").ToArray()
         };
-        Console.WriteLine(JsonSerializer.Serialize(payload));
+        KoanStandardStreams.Diagnostics.WriteLine(JsonSerializer.Serialize(payload));
 
         // TIER A counts (fail-fast.json): absent/unloadable references skipped during closure are
         // no longer silent — surface them here alongside the assembly listing.
-        Console.WriteLine($"ASSEMBLIES|lenientSkips={lenientAssemblySkips}");
+        KoanStandardStreams.Diagnostics.WriteLine($"ASSEMBLIES|lenientSkips={lenientAssemblySkips}");
         foreach (var entry in assemblyLog.OrderBy(a => a.Assembly.GetName().Name, StringComparer.OrdinalIgnoreCase))
         {
             var name = entry.Assembly.GetName();
-            Console.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: ALC={entry.LoadContext}");
+            KoanStandardStreams.Diagnostics.WriteLine($"ASSEMBLY|{name.Name} {name.Version} :: ALC={entry.LoadContext}");
         }
     }
 

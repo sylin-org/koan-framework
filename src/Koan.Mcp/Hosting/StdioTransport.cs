@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -75,6 +75,11 @@ public sealed class StdioTransport : BackgroundService
             return;
         }
 
+        // Interim mitigation, retained deliberately. KoanStandardStreams is the intended owner, but its
+        // claim does not yet fire (McpModule.Register cannot reach IConfiguration on every host shape),
+        // so removing this would make stdout pollution worse than before. It only redirects writes that
+        // happen after this point -- the boot report and console logger have already bound -- which is
+        // exactly why the ownership primitive exists. Delete once the claim is wired.
         Console.SetOut(Console.Error);
 
         // Hoist the std streams to fields (NOT `using`) so StopAsync can dispose stdin to unblock a pending

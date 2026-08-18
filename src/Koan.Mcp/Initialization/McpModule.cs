@@ -1,7 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Koan.Core;
+using Koan.Core.Hosting;
+using Koan.Mcp.Options;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Provenance;
 using Koan.Mcp.Infrastructure;
@@ -17,6 +19,25 @@ public sealed class McpModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
+        // Hosting STDIO turns this process's standard output into a JSON-RPC channel. The claim must
+        // happen here, during composition: the boot report and the console logger both bind their
+        // destination before any hosted service runs, so claiming later (as Report() or the transport
+        // itself would) is already too late and leaves log output interleaved with protocol frames.
+        var configuration = services
+            .FirstOrDefault(d => d.ServiceType == typeof(IConfiguration))?.ImplementationInstance as IConfiguration;
+        var stdioEnabled = configuration is null
+            ? new McpServerOptions().EnableStdioTransport
+            : Configuration.Read(
+                configuration,
+                ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStdioTransport),
+                new McpServerOptions().EnableStdioTransport);
+        if (stdioEnabled)
+        {
+            KoanStandardStreams.TryClaimStandardOutput(
+                owner: "Koan.Mcp/stdio",
+                reason: "MCP STDIO transport frames JSON-RPC on standard output.");
+        }
+
         services.AddMcpServices();
         // WEB-0069: map MCP endpoints via the typed endpoint-contributor seam (replaces KoanWebStartupFilter's
         // reflection into this assembly). Self-gates on the explicit HTTP transport switches.
@@ -30,7 +51,7 @@ public sealed class McpModule : KoanModule
 
         module.Describe(Version);
         var section = configuration.GetSection(ConfigurationConstants.Section);
-        var enableStdio = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStdioTransport), true);
+        var enableStdio = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.EnableStdioTransport), false);
         module.AddSetting(
             McpProvenanceItems.EnableStdioTransport,
             FromConfigurationValue(enableStdio),

@@ -1,3 +1,4 @@
+using Koan.Core.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -39,7 +40,7 @@ public static class KoanEnv
         }
 
         // Fallback to console output if no logger available
-        Console.WriteLine("[K:SNAP] env.snapshot environment={0} isDevelopment={1} isProduction={2} isStaging={3} inContainer={4} isCi={5} allowMagicInProduction={6} processStart={7:o} orchestrationMode={8} sessionId={9} assemblies={10} application={11} applicationCode={12}",
+        KoanStandardStreams.Diagnostics.WriteLine("[K:SNAP] env.snapshot environment={0} isDevelopment={1} isProduction={2} isStaging={3} inContainer={4} isCi={5} allowMagicInProduction={6} processStart={7:o} orchestrationMode={8} sessionId={9} assemblies={10} application={11} applicationCode={12}",
             snap.EnvironmentName,
             snap.IsDevelopment,
             snap.IsProduction,

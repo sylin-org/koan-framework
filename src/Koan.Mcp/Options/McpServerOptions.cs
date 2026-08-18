@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Koan.Core;
 using Koan.Mcp;
@@ -11,9 +11,16 @@ namespace Koan.Mcp.Options;
 public sealed class McpServerOptions
 {
     /// <summary>
-    /// Controls whether the STDIO transport is hosted automatically.
+    /// Controls whether the STDIO transport is hosted.
     /// </summary>
-    public bool EnableStdioTransport { get; set; } = true;
+    /// <remarks>
+    /// Off by default, deliberately. Hosting STDIO claims this process's standard output for JSON-RPC,
+    /// and a package reference declares that a capability is available -- not that it may seize a
+    /// process-global resource. An MCP client launches the server with a command line it controls, so
+    /// activation belongs to that deployment decision. Turn it on with
+    /// <c>Koan:Mcp:EnableStdioTransport=true</c>.
+    /// </remarks>
+    public bool EnableStdioTransport { get; set; } = false;
 
     /// <summary>
     /// Controls whether the MCP Streamable HTTP transport is hosted. The transport is secure opt-in.
