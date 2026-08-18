@@ -11,10 +11,15 @@ namespace Koan.Mcp.Hosting;
 
 public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
+    /// <summary>The exact options this transport frames JSON-RPC messages with.</summary>
+    /// <remarks>Public so conformance tests can pin the wire contract without spawning a process.</remarks>
+    public static readonly JsonSerializerOptions WireSerializerOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        // MCP payloads are Newtonsoft trees; this transport frames them with System.Text.Json.
+        // Without the bridge, arguments cannot be read and schemas serialize as nested empty arrays.
+        Converters = { new JTokenJsonConverterFactory() }
     };
 
     private readonly ILogger<StreamJsonRpcTransportDispatcher> _logger;
@@ -32,7 +37,7 @@ public sealed class StreamJsonRpcTransportDispatcher : IMcpTransportDispatcher
 
         var formatter = new SystemTextJsonFormatter
         {
-            JsonSerializerOptions = SerializerOptions
+            JsonSerializerOptions = WireSerializerOptions
         };
         using var handler = new NewLineDelimitedMessageHandler(output, input, formatter);
         using var rpc = new JsonRpc(handler, target);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
@@ -59,7 +59,7 @@ public sealed class McpRpcHandler
     /// <summary>WEB-0072 — the MCP <c>initialize</c> handshake. Advertises the protocol version + capabilities and,
     /// crucially, the server identity (<c>serverInfo</c> from <c>[KoanApp]</c>) and <c>instructions</c> (the
     /// LLM-facing guidance) the client surfaces. Sourced declare-once from the application identity.</summary>
-    [JsonRpcMethod("initialize")]
+    [JsonRpcMethod("initialize", UseSingleObjectParameterDeserialization = true)]
     public Task<InitializeResult> Initialize(InitializeParams? parameters, CancellationToken cancellationToken)
         => Task.FromResult(BuildInitializeResult(parameters));
 
@@ -144,7 +144,7 @@ public sealed class McpRpcHandler
     // anonymous principal STAMPED origin:local (SEC-0004): the *caller* is nobody (unauthenticated), yet the call
     // demonstrably arrived over STDIO, so an [Access(... "origin:local")] gate admits it while a remote call does
     // not. The HTTP/SSE bridge calls CallToolFor with the session principal (stamped remote/internal) instead.
-    [JsonRpcMethod("tools/call")]
+    [JsonRpcMethod("tools/call", UseSingleObjectParameterDeserialization = true)]
     public Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
         => CallToolFor(
             parameters,
@@ -282,7 +282,7 @@ public sealed class McpRpcHandler
     public Task<ResourcesListResponse> ListResources(CancellationToken cancellationToken)
         => Task.FromResult(ListResourcesFor(null));
 
-    [JsonRpcMethod("resources/read")]
+    [JsonRpcMethod("resources/read", UseSingleObjectParameterDeserialization = true)]
     public Task<ReadResourceResult> ReadResource(ReadResourceParams parameters, CancellationToken cancellationToken)
         => Task.FromResult(ReadResourceFor(parameters?.Uri, null));
 
