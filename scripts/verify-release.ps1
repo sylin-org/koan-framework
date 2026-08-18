@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $PlanPath,
@@ -49,6 +49,9 @@ if (-not $planned.ContainsKey('Sylin.Koan.App')) {
 }
 $appVersion = $planned['Sylin.Koan.App']
 
+$publishing = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($package in @($plan.packages | Where-Object { $_.publish })) { $null = $publishing.Add([string]$package.packageId) }
+
 # The feed must hold exactly the packages the plan selected: nothing missing, nothing extra.
 $expectedFeed = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($package in @($plan.packages | Where-Object { $_.publish })) {
@@ -83,6 +86,23 @@ New-Item -ItemType Directory -Path $consumerRoot, $packagesRoot, $dataRoot -Forc
 
 try {
     Get-ChildItem -LiteralPath $fixture -Force | Copy-Item -Destination $consumerRoot -Recurse -Force
+
+    # NuGet resolves the LOWEST version satisfying a range, so a changed dependency is not pulled in
+    # merely by being on the feed: Sylin.Koan.App pins Core >= 1.0.0 and would restore the published
+    # 1.0.0 while the release under proof sits unused beside it. Reference every publishable library
+    # explicitly at its planned version so the proof exercises the set actually being shipped.
+    $referenceable = @($plan.packages | Where-Object { $_.publish -and $_.referenceable })
+    if ($referenceable.Count -gt 0) {
+        $projectFile = Join-Path $consumerRoot 'PackageConsumer.csproj'
+        $projectXml = Get-Content -LiteralPath $projectFile -Raw
+        $injected = ($referenceable | ForEach-Object {
+            "    <PackageReference Include=`"$($_.packageId)`" Version=`"[$($_.version)]`" />"
+        }) -join "`n"
+        # -replace takes no count; a single insertion needs Regex.Replace.
+        $projectXml = [regex]::new('<ItemGroup>').Replace($projectXml, "<ItemGroup>`n$injected", 1)
+        Set-Content -LiteralPath $projectFile -Value $projectXml -Encoding utf8
+        Write-Host "VERIFY|EXERCISING|$(($referenceable | ForEach-Object packageId) -join ', ')"
+    }
     $feedForXml = [Security.SecurityElement]::Escape($feedPath)
 
     # Koan packages may come from either source: the changed ones from the staged feed, the rest from
@@ -148,8 +168,16 @@ try {
         if (-not $planned.ContainsKey($id)) {
             throw "Resolved Koan dependency '$id' is not part of the release inventory."
         }
-        if ($parts[1] -ne $planned[$id]) {
-            throw "Resolved Koan dependency '$id' has version '$($parts[1])', expected '$($planned[$id])'."
+        # A package this release publishes must resolve at exactly the version being published; it was
+        # referenced explicitly above. Anything else may legitimately resolve lower -- that simply means
+        # the closure did not need a newer one -- but it must still be a version of this train.
+        if ($publishing.Contains($id)) {
+            if ($parts[1] -ne $planned[$id]) {
+                throw "Published package '$id' resolved as '$($parts[1])', expected '$($planned[$id])'."
+            }
+        }
+        elseif ($parts[1] -notmatch ('^' + [Regex]::Escape([string]$plan.train) + '\.[0-9]+$')) {
+            throw "Resolved Koan dependency '$id' has version '$($parts[1])', which is not on train '$($plan.train)'."
         }
         $resolved.Add($id)
     }

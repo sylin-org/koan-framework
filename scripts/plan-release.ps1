@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)]
     [string] $InventoryPath,
@@ -118,11 +118,19 @@ try {
         }
 
         $published = Test-PublishedVersion $client $packageId $version
+        # Whether a consumer can name this package in a PackageReference. Template and tool packages
+        # carry no assembly to reference; the release proof injects only the referenceable ones.
+        # MSBuild leaves PackageType empty for an ordinary library and labels only the special shapes,
+        # so this excludes what cannot be referenced rather than requiring a label that is usually absent.
+        $packageType = [string]$entry.packageType
+        $referenceable = -not [bool]$entry.packAsTool -and $packageType -ne 'Template'
+
         $packages.Add([ordered]@{
             packageId = $packageId
             projectPath = $projectPath
             version = $version
             publish = (-not $published)
+            referenceable = $referenceable
         })
         Write-Host ("PLAN|{0}|{1}|{2}" -f $packageId, $version, $(if ($published) { 'published' } else { 'new' }))
     }
