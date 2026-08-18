@@ -67,6 +67,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0122 | [Dogfood-derived runtime control and deterministic test seams](ARCH-0122-dogfood-runtime-and-test-seams.md) | Accepted | Exact SSE intent, AI source lifecycle and inspection, public deterministic Jobs testing, and concise agent workflow |
 | ARCH-0124 | [One stable release train for all active packages](ARCH-0124-single-package-release-train.md) | Accepted in part | Complete active inventory, explicit tag, and certify-once artifact handoff remain; ARCH-0125 replaces its single version authority |
 | ARCH-0125 | [Each package owns its version on one shared compatibility train](ARCH-0125-per-project-package-versions.md) | Accepted | Project-local version ownership, a per-package version manifest, and publication that skips unchanged packages |
+| ARCH-0126 | [A process-global resource is owned by a process-derived fact](ARCH-0126-process-global-resource-ownership.md) | Accepted | Standard output ownership resolved from the process before composition; capabilities observe it rather than claim it |
 
 ## Authoring Principles
 

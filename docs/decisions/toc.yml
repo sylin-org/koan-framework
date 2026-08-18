@@ -192,6 +192,8 @@
       href: ARCH-0124-single-package-release-train.md
     - name: ARCH-0125 Each package owns its version on one shared compatibility train
       href: ARCH-0125-per-project-package-versions.md
+    - name: ARCH-0126 A process-global resource is owned by a process-derived fact
+      href: ARCH-0126-process-global-resource-ownership.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

@@ -16,11 +16,11 @@ public static class LoggingServiceCollectionExtensions
             builder.AddConsole(options =>
             {
                 options.FormatterName = "Koan";
-                // When a capability owns stdout for a protocol, diagnostics belong on stderr.
-                // Evaluated when options materialize (after Build), so a claim made during
-                // composition is honored even though this callback was registered earlier.
+                // When standard output carries a protocol, diagnostics belong on stderr.
+                // The channel is process-derived, so this is already correct no matter when options
+                // materialize.
                 options.LogToStandardErrorThreshold =
-                    Koan.Core.Hosting.KoanStandardStreams.IsStandardOutputClaimed
+                    Koan.Core.Hosting.KoanStandardStreams.IsStandardOutputProtocol
                         ? LogLevel.Trace
                         : LogLevel.None;
             })
@@ -35,11 +35,11 @@ public static class LoggingServiceCollectionExtensions
         return builder.AddConsole(options =>
         {
             options.FormatterName = "Koan";
-                // When a capability owns stdout for a protocol, diagnostics belong on stderr.
-                // Evaluated when options materialize (after Build), so a claim made during
-                // composition is honored even though this callback was registered earlier.
+                // When standard output carries a protocol, diagnostics belong on stderr.
+                // The channel is process-derived, so this is already correct no matter when options
+                // materialize.
                 options.LogToStandardErrorThreshold =
-                    Koan.Core.Hosting.KoanStandardStreams.IsStandardOutputClaimed
+                    Koan.Core.Hosting.KoanStandardStreams.IsStandardOutputProtocol
                         ? LogLevel.Trace
                         : LogLevel.None;
         })

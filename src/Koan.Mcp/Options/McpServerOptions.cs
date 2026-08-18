@@ -14,13 +14,11 @@ public sealed class McpServerOptions
     /// Controls whether the STDIO transport is hosted.
     /// </summary>
     /// <remarks>
-    /// Off by default, deliberately. Hosting STDIO claims this process's standard output for JSON-RPC,
-    /// and a package reference declares that a capability is available -- not that it may seize a
-    /// process-global resource. An MCP client launches the server with a command line it controls, so
-    /// activation belongs to that deployment decision. Turn it on with
-    /// <c>Koan:Mcp:EnableStdioTransport=true</c>.
+    /// Hosting STDIO additionally requires the process to have been launched with standard output as a
+    /// protocol channel (<c>KOAN_MCP_STDIO=1</c> or <c>--mcp-stdio</c>). That launch signal is the gate;
+    /// this switch only narrows it, so the two can never disagree about who owns standard output.
     /// </remarks>
-    public bool EnableStdioTransport { get; set; } = false;
+    public bool EnableStdioTransport { get; set; } = true;
 
     /// <summary>
     /// Controls whether the MCP Streamable HTTP transport is hosted. The transport is secure opt-in.

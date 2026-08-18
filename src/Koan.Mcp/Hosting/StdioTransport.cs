@@ -1,4 +1,5 @@
 ﻿using System;
+using Koan.Core.Hosting;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -53,7 +54,18 @@ public sealed class StdioTransport : BackgroundService
         var transportLogger = _loggerFactory.CreateLogger(options.Transport.LoggerCategory ?? "Koan.Transport.Mcp");
 
         var registrations = _server.Registrations;
-        var globallyEnabled = options.EnableStdioTransport;
+        // Hosting STDIO means framing JSON-RPC on standard output, so the process must have been
+        // launched with standard output as a protocol channel. The launch signal is the gate; the
+        // configuration switch can only narrow it. Because one signal decides both, the transport and
+        // the diagnostics writers can never disagree about who owns the stream.
+        var stdoutIsProtocol = KoanStandardStreams.IsStandardOutputProtocol;
+        var globallyEnabled = options.EnableStdioTransport && stdoutIsProtocol;
+        if (options.EnableStdioTransport && !stdoutIsProtocol)
+        {
+            _logger.LogInformation(
+                "MCP STDIO transport not hosted: standard output is a diagnostic channel. " +
+                "Launch with KOAN_MCP_STDIO=1 (or --mcp-stdio) to hand standard output to the protocol.");
+        }
 
         if (!globallyEnabled)
         {
@@ -74,13 +86,6 @@ public sealed class StdioTransport : BackgroundService
             PublishTransportHealth(HealthStatus.Healthy, "STDIO transport idle (no exposed tools).", options, registrations.Count, 0);
             return;
         }
-
-        // Interim mitigation, retained deliberately. KoanStandardStreams is the intended owner, but its
-        // claim does not yet fire (McpModule.Register cannot reach IConfiguration on every host shape),
-        // so removing this would make stdout pollution worse than before. It only redirects writes that
-        // happen after this point -- the boot report and console logger have already bound -- which is
-        // exactly why the ownership primitive exists. Delete once the claim is wired.
-        Console.SetOut(Console.Error);
 
         // Hoist the std streams to fields (NOT `using`) so StopAsync can dispose stdin to unblock a pending
         // read. A console/pipe read does not honor a CancellationToken, so cancellation alone cannot end the
