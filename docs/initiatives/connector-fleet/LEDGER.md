@@ -21,7 +21,7 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 > **Next task:** none — initiative complete
 > **State:** complete; T1 through T4 are Done and no task is in progress
-> **Last commit touching this initiative:** this commit (`feat(connector): mongo atlas vector search on the vector plane`)
+> **Last commit touching this initiative:** `a2525921b` (`feat(connector): mongo atlas vector search on the vector plane`)
 >
 > Do not extend this fleet without a new decision under ARCH-0127.
 
@@ -32,10 +32,10 @@ leaves an accurate resume point rather than a stale one.
 
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
-| T1 | pgvector | Done | this commit | 0 |
-| T2 | Redis vector | Done | this commit | 0 |
-| T3 | MySQL / MariaDB | Done | this commit | 0 |
-| T4 | Mongo Atlas Vector | Done | this commit | 0 |
+| T1 | pgvector | Done | `43a6fe5b3` | 0 |
+| T2 | Redis vector | Done | `e9d11c507` | 0 |
+| T3 | MySQL / MariaDB | Done | `1b02cf21e` | 0 |
+| T4 | Mongo Atlas Vector | Done | `a2525921b` | 0 |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
 
@@ -291,7 +291,7 @@ unchanged. Execution resumes at T1 in the original order.
 
 ### T1 — pgvector — Done — 2026-08-19
 
-Commit: this commit (`feat(connector): pgvector on the vector plane`)
+Commit: `43a6fe5b3` (`feat(connector): pgvector on the vector plane`)
 Oracle: `pwsh scripts/forge-verify.ps1 -Adapter PgVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
 Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
 
@@ -325,7 +325,7 @@ save/delete. The full solution build completed with 0 warnings and package quali
 
 ### T2 — Redis vector — Done — 2026-08-19
 
-Commit: this commit (`feat(connector): redis vector search on the vector plane`)
+Commit: `e9d11c507` (`feat(connector): redis vector search on the vector plane`)
 Oracle: `pwsh scripts/forge-verify.ps1 -Adapter RedisVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
 Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass · discoverability done · package quality regenerated
 
@@ -363,7 +363,7 @@ reports 96 packages, 0 repair, 10 review, and 86 structurally ready.
 
 ### T3 — MySQL / MariaDB — Done — 2026-08-19
 
-Commit: this commit (`feat(connector): mysql on the record plane`)
+Commit: `1b02cf21e` (`feat(connector): mysql on the record plane`)
 Oracle: `pwsh scripts/forge-verify.ps1 -Adapter MySql -Plane record` -> exit 0 (6 passed, 0 failed, 0 skipped)
 Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
 
@@ -392,7 +392,7 @@ with 0 warnings. Package quality reports 97 packages, 0 repair, 10 review, and 8
 
 ### T4 — Mongo Atlas Vector — Done — 2026-08-19
 
-Commit: this commit (`feat(connector): mongo atlas vector search on the vector plane`)
+Commit: `a2525921b` (`feat(connector): mongo atlas vector search on the vector plane`)
 Oracle: `pwsh scripts/forge-verify.ps1 -Adapter MongoAtlasVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
 Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
 
