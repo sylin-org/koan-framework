@@ -37,3 +37,10 @@ The module's startup responsibility remains ensuring five starter produce listin
 
 The supported deployment shape is a self-contained folder. This chapter does not claim NativeAOT, a literal
 single-file artifact, or untested operating-system portability.
+
+---
+
+**Working with a coding agent?** [AGENTS.md](../../../../AGENTS.md) at the repository root orients any
+agent to Koan's application grammar, the evidence an application produces about itself, and the
+capability map. If you lifted this sample out of the repository, start from the
+[agent retrieval map](https://github.com/sylin-org/koan-framework/blob/v1.0.0/llms.txt).

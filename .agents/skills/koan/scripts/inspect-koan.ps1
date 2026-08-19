@@ -1,3 +1,22 @@
+<#
+.SYNOPSIS
+  Orient in a Koan application from the evidence it already produces.
+
+.DESCRIPTION
+  A Koan application describes its own composition. The build writes koan.lock.json beside the project
+  (referenced modules and direct application references), and a non-production boot writes the richer
+  resolved twin to obj/koan.lock.resolved.json (elections, entity traits, capabilities, configuration
+  KEYS). This script reads those first, because they are what the framework decided -- not what a
+  pattern in a source file suggests.
+
+  Code signals remain, demoted to what they are: hints. They matter when no lockfile exists yet
+  (nothing has been built), and they are never a reason to contradict a lockfile that does.
+
+  Configuration VALUES are never read. The resolved twin carries configuration keys only.
+
+.EXAMPLE
+  pwsh inspect-koan.ps1 . -Format Json
+#>
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
@@ -21,6 +40,83 @@ function Get-RelativePath([string]$ItemPath) {
 
 function Test-IsBuildOutput([string]$ItemPath) {
     (Get-RelativePath $ItemPath) -match "(^|/)(bin|obj)(/|$)"
+}
+
+function Get-JsonProperty($Object, [string]$Name) {
+    if ($null -eq $Object) { return $null }
+    if ($Object.PSObject.Properties.Name -notcontains $Name) { return $null }
+    $Object.$Name
+}
+
+# --- composition: what the framework actually resolved -----------------------------------------
+function Read-Lockfile([string]$FilePath, [string]$Kind) {
+    try {
+        $json = Get-Content -Raw -LiteralPath $FilePath | ConvertFrom-Json
+    }
+    catch {
+        return [pscustomobject]@{
+            path = Get-RelativePath $FilePath
+            kind = $Kind
+            parseError = $_.Exception.Message
+        }
+    }
+
+    $app = Get-JsonProperty $json 'app'
+    $elections = Get-JsonProperty $json 'elections'
+    $capabilities = Get-JsonProperty $json 'capabilities'
+    $entities = Get-JsonProperty $json 'entities'
+    $configKeys = Get-JsonProperty $json 'configKeys'
+    $directReferences = Get-JsonProperty $json 'directReferences'
+
+    [pscustomobject]@{
+        path = Get-RelativePath $FilePath
+        kind = $Kind
+        schema = Get-JsonProperty $json 'schema'
+        app = if ($null -eq $app) { $null } else {
+            [pscustomobject]@{
+                name = Get-JsonProperty $app 'name'
+                koan = Get-JsonProperty $app 'koan'
+                tfm = Get-JsonProperty $app 'tfm'
+            }
+        }
+        modules = @(@(Get-JsonProperty $json 'modules') | Where-Object { $_ } |
+            ForEach-Object { "$(Get-JsonProperty $_ 'id') $(Get-JsonProperty $_ 'version')".Trim() })
+        # Direct references are application intent; transitive modules are consequence.
+        directReferences = @(@($directReferences) | Where-Object { $_ } |
+            ForEach-Object { "$(Get-JsonProperty $_ 'kind'): $(Get-JsonProperty $_ 'id')" })
+        # Present only in the resolved twin -- this is why a provider won.
+        elections = if ($null -eq $elections) { @() } else {
+            @($elections.PSObject.Properties | ForEach-Object {
+                $via = Get-JsonProperty $_.Value 'via'
+                $adapter = Get-JsonProperty $_.Value 'adapter'
+                "$($_.Name) -> $adapter (via $via)"
+            })
+        }
+        entities = if ($null -eq $entities) { @() } else {
+            @(@($entities) | ForEach-Object {
+                $traits = @(Get-JsonProperty $_ 'traits')
+                $suffix = if ($traits.Count) { " [$($traits -join ', ')]" } else { "" }
+                "$(Get-JsonProperty $_ 'type')$suffix"
+            })
+        }
+        capabilities = if ($null -eq $capabilities) { @() } else {
+            @($capabilities.PSObject.Properties | ForEach-Object { "$($_.Name): $(@($_.Value) -join ', ')" })
+        }
+        configKeyCount = @($configKeys).Count
+        parseError = $null
+    }
+}
+
+$lockfiles = @()
+foreach ($file in @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter "koan.lock.json" -ErrorAction SilentlyContinue |
+    Where-Object { -not (Test-IsBuildOutput $_.FullName) } | Sort-Object FullName)) {
+    $lockfiles += Read-Lockfile $file.FullName "build"
+}
+# The twin lives under obj/ by design (a diagnostic artifact, not a checked-in one), so it is the one
+# build-output path worth reading.
+foreach ($file in @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter "koan.lock.resolved.json" -ErrorAction SilentlyContinue |
+    Sort-Object FullName)) {
+    $lockfiles += Read-Lockfile $file.FullName "resolved"
 }
 
 $projects = foreach ($projectFile in Get-ChildItem -LiteralPath $root -Recurse -File -Filter "*.csproj" |
@@ -109,18 +205,56 @@ $configurationFiles = @(Get-ChildItem -LiteralPath $root -Recurse -File |
     Sort-Object FullName |
     ForEach-Object { Get-RelativePath $_.FullName })
 
+$hasComposition = @($lockfiles | Where-Object { -not $_.parseError }).Count -gt 0
+
+# --- composed packages: the subtractable set ----------------------------------------------------
+# The one list to compare against the capability shelf when asking "what could I add?". Two sources
+# are unioned deliberately: a project file states what the application asked for, and the lockfile
+# states what those references actually composed -- a bundle such as Sylin.Koan.App brings in Web and
+# more, so a project-file-only view would recommend adding pieces the application already has.
+#
+# Namespaces are Koan.*; packages are Sylin.Koan.*. Normalizing to the package form is what makes the
+# comparison against the shelf mechanical instead of eyeballed.
+function ConvertTo-PackageId([string]$Identifier) {
+    if ([string]::IsNullOrWhiteSpace($Identifier)) { return $null }
+    if ($Identifier.StartsWith("Sylin.Koan.", [StringComparison]::OrdinalIgnoreCase)) { return $Identifier }
+    if ($Identifier.StartsWith("Koan.", [StringComparison]::OrdinalIgnoreCase)) { return "Sylin.$Identifier" }
+    return $null
+}
+
+$composedRaw = @()
+foreach ($project in $projects) { $composedRaw += @($project.koanReferences) }
+foreach ($lock in $lockfiles) {
+    if ($lock.parseError) { continue }
+    # modules[] carries ids; directReferences[] was flattened to "kind: id" for display.
+    $composedRaw += @($lock.modules | ForEach-Object { ($_ -split '\s+')[0] })
+    $composedRaw += @($lock.directReferences | ForEach-Object { ($_ -split ':\s*', 2)[-1] })
+}
+
+$composedPackages = @($composedRaw |
+    ForEach-Object { ConvertTo-PackageId $_ } |
+    Where-Object { $_ } |
+    Sort-Object -Unique)
+
 $result = [pscustomobject]@{
-    schemaVersion = "1"
+    schemaVersion = "2"
     root = $root
+    composition = @($lockfiles)
+    composedPackages = $composedPackages
     projects = @($projects)
     evidence = [pscustomobject]@{
         configurationFileNames = $configurationFiles
-        koanLockPresent = $configurationFiles -contains "koan.lock.json"
+        koanLockPresent = $hasComposition
     }
     codeSignals = [pscustomobject]$signals
     notes = @(
-        "Configuration contents and secret values were not read.",
-        "Code signals are orientation hints; verify behavior and provider selection from current application evidence."
+        "Composition is read from koan.lock.json and, where present, obj/koan.lock.resolved.json.",
+        "Configuration contents and secret values were not read; the resolved twin carries keys only.",
+        $(if ($hasComposition) {
+            "Code signals are hints only. Where they disagree with the lockfile, the lockfile is what the framework resolved."
+        } else {
+            "No lockfile found -- build the application to produce one. Code signals below are orientation hints, not evidence."
+        })
     )
 }
 
@@ -131,6 +265,34 @@ if ($Format -eq "Json") {
 
 Write-Output "Koan application snapshot"
 Write-Output "Root: $root"
+Write-Output ""
+
+if ($hasComposition) {
+    Write-Output "Composition (framework evidence):"
+    foreach ($lock in $result.composition) {
+        if ($lock.parseError) {
+            Write-Output "- $($lock.path) [$($lock.kind)] UNREADABLE: $($lock.parseError)"
+            continue
+        }
+        $appName = if ($lock.app) { "$($lock.app.name) · Koan $($lock.app.koan) · $($lock.app.tfm)" } else { "unknown app" }
+        Write-Output "- $($lock.path) [$($lock.kind)] $appName"
+        Write-Output "    modules: $(@($lock.modules).Count)"
+        foreach ($reference in $lock.directReferences) { Write-Output "    reference: $reference" }
+        foreach ($election in $lock.elections) { Write-Output "    election: $election" }
+        foreach ($entity in $lock.entities) { Write-Output "    entity: $entity" }
+        foreach ($capability in $lock.capabilities) { Write-Output "    capability: $capability" }
+        if ($lock.configKeyCount) { Write-Output "    config keys observed: $($lock.configKeyCount)" }
+    }
+}
+else {
+    Write-Output "Composition: no lockfile found. Build the application to produce koan.lock.json."
+}
+
+Write-Output ""
+Write-Output "Composed packages ($($composedPackages.Count)) — subtract these from the capability shelf:"
+foreach ($package in $composedPackages) { Write-Output "- $package" }
+
+Write-Output ""
 Write-Output "Projects: $($result.projects.Count)"
 foreach ($project in $result.projects) {
     $frameworks = if ($project.targetFrameworks.Count) { $project.targetFrameworks -join ", " } else { "unknown" }
@@ -139,9 +301,10 @@ foreach ($project in $result.projects) {
         Write-Output "    $reference"
     }
 }
-Write-Output "Koan lock present: $($result.evidence.koanLockPresent)"
+
+Write-Output ""
 Write-Output "Configuration files (names only): $($result.evidence.configurationFileNames.Count)"
-Write-Output "Code signals:"
+Write-Output $(if ($hasComposition) { "Code signals (hints; the lockfile above is authoritative):" } else { "Code signals (no lockfile -- hints only):" })
 foreach ($property in $result.codeSignals.psobject.Properties) {
     Write-Output "- $($property.Name): $($property.Value.fileCount) file(s)"
 }

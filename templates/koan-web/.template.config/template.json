@@ -15,5 +15,18 @@
   "preferNameDirectory": true,
   "primaryOutputs": [
     { "path": "KoanWebApp.csproj" }
+  ],
+  "postActions": [
+    {
+      "id": "nextSteps",
+      "description": "Next steps",
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true,
+      "manualInstructions": [
+        {
+          "text": "Run it:\n  dotnet run\n\nThen POST and GET /api/todos. It persists across restarts.\n\nWorking with a coding agent:\n  AGENTS.md orients any agent to this application and to Koan's capability map.\n  Claude Code also gains the koan, koan-explain, and koan-upgrade skills once you trust this folder."
+        }
+      ]
+    }
   ]
 }

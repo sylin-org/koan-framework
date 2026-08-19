@@ -2,6 +2,26 @@
 
 Use this reference when adding, replacing, routing, or combining a capability.
 
+## “What could I add?”
+
+The answer is two fetches and no local machinery — but which two depends on how specific the request already is.
+
+**A vague outcome is not yet a choice.** “Add AI to this” could be semantic search, question answering, vision, an acting agent, or human review of model output — five different projects with different runtimes and operating costs. Read the [recipe index](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/index.md) and compose the answer yourself: *Works if* tells you which recipes this application is a small step from, *Costs* tells you what each would add to operate, and *Not yet* tells you what does not exist (there is no OpenAI, Anthropic, or Gemini connector). Offer the two or three that fit, then open the one recipe they choose. Answering with a package name skips the only part that mattered.
+
+**A named piece goes straight through.** “Add Mongo”, “use SqliteVec” — take the row from the [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md), take the exact package, open its recipe for the install command, configuration keys, working code, and provider limits.
+
+Either way, lead with an observation about *their* application before offering options, and walk the result with them.
+
+Only when the question is genuinely open — “what *could* I add?” — is a local read worth it, and only as a guard against recommending what the application already has: `scripts/inspect-koan.ps1 -Path <root> -Format Json` reports `composedPackages`, the project's references unioned with what the lockfile shows they actually composed. A bundle pulls in pieces the project file never names. Subtract that set, then name only what the outcome earns — listing everything absent is a catalog, and the developer could already read a catalog.
+
+Keep it honest:
+
+- Say what a piece lets the application *do*, in business terms, before naming its package.
+- A piece the shelf marks *not assessed* may still be the right answer; say plainly that nothing has been promised about it.
+- A store the application already has is not replaced merely because another exists.
+- Copy identifiers from the shelf; never construct one from a product name.
+- If the shelf cannot be retrieved, say so and answer only from what is already referenced.
+
 ## Universal move
 
 - Name the new business job; “add a reference” is not the outcome.

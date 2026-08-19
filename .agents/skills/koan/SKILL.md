@@ -77,7 +77,7 @@ public sealed class Review : Entity<Review>, IKoanJob<Review>
 
 ## The real shape
 
-Every Koan package identifier begins `Sylin.Koan.` while namespaces stay `Koan.*`. Identifiers are exact and are not derivable from a product name — copy them from [capabilities.md](references/capabilities.md); never construct them.
+Every Koan package identifier begins `Sylin.Koan.` while namespaces stay `Koan.*`. Identifiers are exact and are not derivable from a product name — copy them from [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md); never construct them.
 
 A new application starts from the template rather than a reconstructed host:
 
@@ -134,7 +134,19 @@ Keep the full application story visible while adding only the pieces required no
 - **Trusted records:** Canon for reconciling imperfect arrivals into explainable Entities.
 - **Proof and operations:** local test infrastructure, facts, health, diagnostics, telemetry, and topology evidence.
 
-Load [capabilities.md](references/capabilities.md) whenever choosing a piece; it carries the exact package identifier and recipe link for each one, and flags the one piece that is shelved. Load [stacks.md](references/stacks.md) when the outcome crosses pieces or the developer asks what to combine.
+Load the [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md) when the request already names a piece; it carries the exact package identifier and recipe link for each one, and flags the one piece that is shelved. Load [stacks.md](references/stacks.md) to show a developer the version that *runs* — it maps outcomes to compiled samples, which cannot drift from the framework.
+
+When the request is an outcome rather than a named piece, start from the [recipe index](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/index.md) instead: each entry states what it gets you, what must already be true, and what it costs to operate, so you can offer the two or three this application is actually close to. [extend.md](references/extend.md) owns that move.
+
+## Run the conversation, do not run a menu
+
+These hold for every domain, and they are the part no index can carry:
+
+- **Read the application before offering anything.** “You already have `Article` with a title and body, so search by meaning is a small step” beats any list. What is already there decides which options are cheap and which are a project.
+- **Say what does not exist, early.** A missing piece stated in the first minute is useful; discovered after an afternoon of wiring it is expensive. Never imply something exists because the vendor is famous.
+- **Name the operating cost.** Whether it runs offline, adds a process to operate, or adds a credential to rotate is usually what decides the choice.
+- **Ask at most a couple of questions, and only ones that change the answer.** If the repository settles it, state your assumption and move. An interrogation is not a conversation.
+- **Offer the thing they need but did not ask for** — human review in front of model output, isolation before there is data — once, plainly, without insisting.
 
 Open the linked recipe before writing code against a piece this application has not used yet — it owns the install command, configuration keys, working code, and provider limits that this skill deliberately does not duplicate. When a link cannot be retrieved, say so and proceed only on what the skill states.
 

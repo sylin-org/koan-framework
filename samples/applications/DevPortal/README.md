@@ -98,3 +98,10 @@ docker compose -f docker/compose.yml down
 The current transfer builder materializes its selected source before destination batches. This sample does
 not claim streaming, checkpoints, cross-provider transactions, benchmark equivalence, or automatic data
 migration. Large/resumable publication flows need an application-owned bounded stream and job/checkpoint policy.
+
+---
+
+**Working with a coding agent?** [AGENTS.md](../../../AGENTS.md) at the repository root orients any
+agent to Koan's application grammar, the evidence an application produces about itself, and the
+capability map. If you lifted this sample out of the repository, start from the
+[agent retrieval map](https://github.com/sylin-org/koan-framework/blob/v1.0.0/llms.txt).

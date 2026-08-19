@@ -470,6 +470,22 @@
       href: DX-0042-narrative-samples-simple-entity-names.md
     - name: DX-0043 Connector naming for external integrations
       href: DX-0043-connector-naming-for-external-integrations.md
+    - name: DX-0044 Adapter benchmark sample
+      href: DX-0044-adapter-benchmark-sample.md
+    - name: DX-0045 Sample collection strategic realignment
+      href: DX-0045-sample-collection-strategic-realignment.md
+    - name: DX-0046 SnapVault feature specification
+      href: DX-0046-s6-snapvault-feature-specification.md
+    - name: DX-0046 SnapVault implementation guide
+      href: DX-0046-IMPLEMENTATION.md
+    - name: DX-0047 Fluent media transformation pipeline API
+      href: DX-0047-fluent-media-transform-api.md
+    - name: DX-0048 Card-anchored skill architecture and validation gate
+      href: DX-0048-card-anchored-skill-architecture.md
+    - name: DX-0049 Three-skill public agent surface
+      href: DX-0049-three-skill-public-agent-surface.md
+    - name: DX-0050 Portable agent bootstrap
+      href: DX-0050-portable-agent-bootstrap.md
 - name: Jobs (JOBS)
   items:
     - name: JOBS-0001 Jobs pillar — entity-first task management

@@ -3,7 +3,7 @@
   Verify the Koan agent skills are true, reachable, and complete.
 
 .DESCRIPTION
-  One script, four checks, each justified by a failure that is silent -- nobody notices a skill has
+  One script, six checks, each justified by a failure that is silent -- nobody notices a skill has
   gone wrong, they just get worse results:
 
     routing    frontmatter name and description, because a broken one disables the skill entirely
@@ -11,6 +11,12 @@
                is the worst case: the agent does not know it is missing anything
     shelf      the capability shelf matches the product actually shipped, because capability drift is
                invisible until an agent hand-rolls something the framework provides
+    bootstrap  every scaffold, sample, and this repository carries a portable AGENTS.md that names no
+               capability, because the skills reach one harness and a bootstrap that lists packages
+               becomes a second inventory nobody remembers to update (DX-0050)
+    recipes    every recipe declares what it gets you, what must already be true, and what it costs;
+               every ingredient names a package that ships; the generated index still matches -- a
+               stale index recommends confidently and wrongly rather than failing (DX-0051)
     truth      every package identifier restores and every taught construct compiles, against the
                packages a developer installs -- not a repository ProjectReference
 
@@ -42,7 +48,32 @@ try {
 
     $skillsRoot = '.agents/skills'
     $expectedSkills = @('koan', 'koan-explain', 'koan-upgrade')
-    $shelfPath = "$skillsRoot/koan/references/capabilities.md"
+    # DX-0050. The capability map is a public document, not skill internals: any agent fetches it
+    # directly. It is also the one repository link that must NOT be pinned -- a frozen map hides every
+    # capability shipped since that tag, which is the opposite of what "what can I add?" needs. So it
+    # is verified against the local tree (it must exist and ship) rather than against the tag.
+    $shelfPath = 'docs/reference/capability-map.md'
+    $recipeIndexPath = 'docs/recipes/index.md'
+    # Channel documents answer "what exists now", so pinning them would hide everything shipped since
+    # the tag. They track the release branch and are therefore verified against the local tree -- they
+    # must exist here and ship -- rather than against an immutable revision.
+    $channelDocs = @($shelfPath, $recipeIndexPath)
+    $channelPrefix = 'https://github.com/sylin-org/koan-framework/blob/main/'
+    $capabilityMapUrl = "$channelPrefix$shelfPath"
+    function Test-ChannelLink([string]$Url, [ref]$Reason) {
+        if (-not $Url.StartsWith($channelPrefix, [StringComparison]::Ordinal)) { return $false }
+        $path = $Url.Substring($channelPrefix.Length)
+        if ($path -notin $channelDocs) {
+            $Reason.Value = "unpinned repository link is not a channel document: $path"
+            return $true
+        }
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            $Reason.Value = "channel link has no local target: $path"
+            return $true
+        }
+        $Reason.Value = $null
+        return $true
+    }
     # Product truth is the claim ledger plus the generated package inventory; there is no single
     # combined projection, so read both.
     $claimsPath = 'product/claims.json'
@@ -152,6 +183,11 @@ try {
                 continue
             }
             if ($target -match '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|#)') {
+                $reason = $null
+                if (Test-ChannelLink $target ([ref]$reason)) {
+                    if ($reason) { Fail "$rel : $reason" }
+                    continue
+                }
                 if ($target -match '^https://github\.com/sylin-org/koan-framework/blob/') {
                     Fail "$rel : repository link must use the pinned revision ${pinnedTag}: $target"
                 }
@@ -177,6 +213,17 @@ try {
         $shelfRaw = Get-Content -Raw -LiteralPath $shelfPath
         $shelfLines = @($shelfRaw -split '\r?\n')
 
+        # A capability row is an outcome, not a package: one outcome can need several packages. Without
+        # the companion column an agent installs the one named package and ships something that composes
+        # and does nothing, so a table that drops the column is a defect, not a formatting choice.
+        # Keyed on the Package column so the prose decision-aid tables (which compare choices rather
+        # than name pieces) are not swept in.
+        foreach ($header in @($shelfLines | Where-Object { $_ -match '^\|\s*(Outcome|Store)\s*\|\s*Package\s*\|' })) {
+            if ($header -notmatch '\|\s*Also needs\s*\|') {
+                Fail "capability map has a table without an 'Also needs' column: $($header.Trim())"
+            }
+        }
+
         foreach ($id in $shippedIds) {
             # Only assessed pieces are required on the shelf; an unassessed package may be listed
             # deliberately, but is never owed a row.
@@ -199,6 +246,183 @@ try {
                     Fail "capability shelf row presents unassessed package '$mention' as an ordinary choice"
                 }
             }
+        }
+    }
+
+    # --- recipes -------------------------------------------------------------------------------
+    # DX-0051. Recipes are keyed on what a person asks for; the index is generated from their
+    # frontmatter and is the one fetch an agent makes for a vague request. Two things rot silently
+    # here: an ingredient naming a package that no longer ships, and an index that stopped matching
+    # the recipes. Both produce confident, wrong recommendations rather than a visible failure.
+    $recipeRoot = 'docs/recipes'
+    $recipeRequired = @('type', 'recipe', 'title', 'gets_you', 'works_if', 'costs')
+    if (-not (Test-Path -LiteralPath $recipeRoot -PathType Container)) {
+        Fail "recipe directory is missing: $recipeRoot"
+    }
+    else {
+        $recipeShipped = @()
+        if (Test-Path -LiteralPath $inventoryPath -PathType Leaf) {
+            $recipeShipped = @((Get-Content -Raw -LiteralPath $inventoryPath | ConvertFrom-Json).packages |
+                ForEach-Object { [string]$_.packageId })
+        }
+
+        $recipeFiles = @(Get-ChildItem -LiteralPath $recipeRoot -File -Filter '*.md' |
+            Where-Object { $_.Name -ne 'index.md' } | Sort-Object Name)
+        if ($recipeFiles.Count -eq 0) { Fail "no recipes found under $recipeRoot" }
+
+        foreach ($recipe in $recipeFiles) {
+            $rel = [IO.Path]::GetRelativePath($repoRoot, $recipe.FullName).Replace('\', '/')
+            $raw = Get-Content -Raw -LiteralPath $recipe.FullName
+            $fm = [regex]::Match($raw, '(?s)^---\s*\r?\n(?<body>.*?)\r?\n---\s*(\r?\n|$)')
+            if (-not $fm.Success) { Fail "$rel : no frontmatter"; continue }
+            $body = $fm.Groups['body'].Value
+
+            foreach ($key in $recipeRequired) {
+                if ($body -notmatch "(?m)^$key\s*:\s*\S") { Fail "$rel : frontmatter is missing '$key'" }
+            }
+            # The index cannot help an agent decide without these, so an empty one is a silent defect.
+            if ($body -notmatch '(?m)^ingredients\s*:') { Fail "$rel : frontmatter is missing 'ingredients'" }
+
+            # Every identifier an ingredient names must be a package that actually ships.
+            foreach ($named in @([regex]::Matches($body, 'Sylin\.Koan(?:\.[A-Za-z0-9]+)+') |
+                ForEach-Object { $_.Value } | Sort-Object -Unique)) {
+                if ($recipeShipped.Count -gt 0 -and $named -notin $recipeShipped) {
+                    Fail "$rel : ingredient names a package outside the shipped set: $named"
+                }
+            }
+
+            # An absent ingredient without today's alternative is a dead end, which is the failure this
+            # whole decision exists to prevent.
+            $absentBlock = [regex]::Match($body, '(?s)(?m)^absent:\s*\r?\n(?<items>(?:\s+-.*\r?\n?)+)')
+            if ($absentBlock.Success) {
+                foreach ($item in @($absentBlock.Groups['items'].Value -split '\r?\n' |
+                    Where-Object { $_ -match '^\s+-' })) {
+                    if (@($item -split '\s*\|\s*').Count -lt 3) {
+                        Fail "$rel : absent ingredient must name today's alternative: $($item.Trim())"
+                    }
+                }
+            }
+
+            foreach ($m in [regex]::Matches($raw, '\[[^\]]*\]\((?<t>[^)\r\n]+)\)')) {
+                $target = $m.Groups['t'].Value.Trim()
+                if ($target -match '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|#)') { continue }
+                $pathPart = ($target -split '#', 2)[0]
+                if ([string]::IsNullOrWhiteSpace($pathPart)) { continue }
+                if (-not (Test-Path -LiteralPath ([IO.Path]::GetFullPath((Join-Path $recipe.DirectoryName $pathPart))))) {
+                    Fail "$rel : broken link: $target"
+                }
+            }
+        }
+
+        # A generated artifact that is edited by hand is a lie with a timestamp.
+        & "$repoRoot/scripts/build-recipe-index.ps1" -Check *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Fail "docs/recipes/index.md is stale -- run: pwsh scripts/build-recipe-index.ps1"
+        }
+    }
+
+    # --- bootstrap -----------------------------------------------------------------------------
+    # DX-0050. The skills reach one harness; AGENTS.md is the portable floor beneath them, and it is
+    # a router rather than a catalog. Naming a capability in a bootstrap would create a second
+    # inventory that rots on every release, so a package identifier there is a failure by itself --
+    # the property is cheap to state and impossible to keep by review alone.
+    $bootstrapName = 'AGENTS.md'
+    $retrievalMap = 'llms.txt'
+    $bootstraps = [System.Collections.Generic.List[string]]::new()
+    $bootstraps.Add($bootstrapName) | Out-Null
+
+    # The scaffold roster comes from the template configs that actually ship, so it cannot drift from
+    # the package.
+    foreach ($config in @(Get-ChildItem -Path 'templates' -Recurse -File -Filter 'template.json' -ErrorAction SilentlyContinue |
+        Where-Object { $_.DirectoryName -match '\.template\.config$' -and $_.FullName -notmatch '[/\\](bin|obj)[/\\]' })) {
+        $templateRoot = Split-Path -Parent $config.DirectoryName
+        $templateRel = [IO.Path]::GetRelativePath($repoRoot, $templateRoot).Replace('\', '/')
+        $bootstraps.Add("$templateRel/$bootstrapName") | Out-Null
+
+        # A file nobody is told about is a file nobody reads: creation must name it.
+        $templateJson = Get-Content -Raw -LiteralPath $config.FullName | ConvertFrom-Json
+        $announced = $false
+        if ($templateJson.PSObject.Properties.Name -contains 'postActions') {
+            foreach ($action in @($templateJson.postActions)) {
+                foreach ($instruction in @($action.manualInstructions)) {
+                    if ([string]$instruction.text -match [regex]::Escape($bootstrapName)) { $announced = $true }
+                }
+            }
+        }
+        if (-not $announced) { Fail "$templateRel does not announce $bootstrapName after creation" }
+    }
+
+    # A graduated sample is one that both builds and documents itself. The stack cards send developers
+    # to these as the working version of a composition, so each must reach the same bootstrap.
+    foreach ($project in @(Get-ChildItem -Path 'samples' -Recurse -File -Filter '*.csproj' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[/\\](archive|bin|obj)[/\\]' })) {
+        $sampleReadme = Join-Path $project.DirectoryName 'README.md'
+        if (-not (Test-Path -LiteralPath $sampleReadme -PathType Leaf)) { continue }
+        $sampleRel = [IO.Path]::GetRelativePath($repoRoot, $sampleReadme).Replace('\', '/')
+        $sampleText = Get-Content -Raw -LiteralPath $sampleReadme
+        $pointers = @([regex]::Matches($sampleText, '\[[^\]]*\]\((?<t>[^)\r\n]*AGENTS\.md)\)'))
+        if ($pointers.Count -eq 0) {
+            Fail "$sampleRel does not point a coding agent at $bootstrapName"
+            continue
+        }
+        foreach ($pointer in $pointers) {
+            $resolved = [IO.Path]::GetFullPath((Join-Path $project.DirectoryName $pointer.Groups['t'].Value))
+            if (-not (Test-Path -LiteralPath $resolved -PathType Leaf)) {
+                Fail "$sampleRel : bootstrap pointer does not resolve: $($pointer.Groups['t'].Value)"
+            }
+        }
+    }
+
+    foreach ($bootstrap in $bootstraps) {
+        if (-not (Test-Path -LiteralPath $bootstrap -PathType Leaf)) { Fail "bootstrap is missing: $bootstrap"; continue }
+        $bootstrapText = Get-Content -Raw -LiteralPath $bootstrap
+        $bootstrapDir = Split-Path -Parent ([IO.Path]::GetFullPath((Join-Path $repoRoot $bootstrap)))
+
+        foreach ($named in @([regex]::Matches($bootstrapText, 'Sylin\.Koan(?:\.[A-Za-z0-9]+)*') |
+            ForEach-Object { $_.Value } | Sort-Object -Unique)) {
+            Fail "$bootstrap names a package ('$named'); a bootstrap routes to the capability map instead"
+        }
+
+        # The map is the primary route -- outcome to package to recipe in one hop. Matching the file
+        # name covers both the in-repo relative link and the fetchable URL a scaffold carries.
+        if ($bootstrapText -notmatch 'capability-map\.md') {
+            Fail "$bootstrap does not link the capability map"
+        }
+        # A stated need routes to the map; a vague one has to reach the recipe index or the agent
+        # answers "add AI" with a package name (DX-0051).
+        if ($bootstrapText -notmatch 'recipes/index\.md') {
+            Fail "$bootstrap does not link the recipe index"
+        }
+
+        if ($bootstrapText -notmatch [regex]::Escape($retrievalMap)) {
+            Fail "$bootstrap does not link the agent retrieval map ($retrievalMap)"
+        }
+
+        # Repository links must be pinned and must resolve at the tag. Matched over raw text so an
+        # autolink is covered as well as a markdown link. The capability map is the one deliberate
+        # exception: it tracks the release branch, so it is checked against the local tree instead.
+        foreach ($m in [regex]::Matches($bootstrapText, 'https://github\.com/sylin-org/koan-framework/blob/(?<rev>[^/\s>)]+)/(?<p>[^\s>)]+)')) {
+            $reason = $null
+            if (Test-ChannelLink $m.Value ([ref]$reason)) {
+                if ($reason) { Fail "$bootstrap : $reason" }
+                continue
+            }
+            if ($m.Groups['rev'].Value -ne $pinnedTag) {
+                Fail "$bootstrap : repository link must use the pinned revision ${pinnedTag}: $($m.Value)"
+                continue
+            }
+            $objectPath = (($m.Groups['p'].Value -split '#', 2)[0]).TrimEnd('.', ',')
+            & git -C $repoRoot cat-file -e "${pinnedTag}:$objectPath" 2>$null
+            if ($LASTEXITCODE -ne 0) { Fail "$bootstrap : pinned link does not resolve at ${pinnedTag}: $objectPath" }
+        }
+
+        foreach ($m in [regex]::Matches($bootstrapText, '\[[^\]]*\]\((?<t>[^)\r\n]+)\)')) {
+            $target = $m.Groups['t'].Value.Trim()
+            if ($target -match '^(?:[a-zA-Z][a-zA-Z0-9+.-]*:|#)') { continue }
+            $pathPart = ($target -split '#', 2)[0]
+            if ([string]::IsNullOrWhiteSpace($pathPart)) { continue }
+            $resolved = [IO.Path]::GetFullPath((Join-Path $bootstrapDir $pathPart))
+            if (-not (Test-Path -LiteralPath $resolved)) { Fail "$bootstrap : broken link: $target" }
         }
     }
 
@@ -269,7 +493,7 @@ $refs
     }
 
     Write-Host ''
-    if ($Structure) { Write-Host 'skills-verify: structure passed (distribution, routing, links, shelf).' }
+    if ($Structure) { Write-Host 'skills-verify: structure passed (distribution, routing, links, shelf, recipes, bootstrap).' }
     else { Write-Host "skills-verify: passed. Shelf identifiers restore; $journeyCount journey(s) compile against published $PackageVersion." }
     exit 0
 }

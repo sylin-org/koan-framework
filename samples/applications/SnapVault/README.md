@@ -76,3 +76,10 @@ dotnet test tests/Suites/Samples/Koan.Samples.SnapVault.Tests/Koan.Samples.SnapV
 The cumulative proof boots the real web application on SQLite, uploads a generated JPEG over HTTP, drains its
 durable job, verifies the stored event and photo, serves media, and checks readiness and runtime facts. Focused
 tests also cover tenant isolation, guest gallery grants, proofing, cleanup, progress, and mutation behavior.
+
+---
+
+**Working with a coding agent?** [AGENTS.md](../../../AGENTS.md) at the repository root orients any
+agent to Koan's application grammar, the evidence an application produces about itself, and the
+capability map. If you lifted this sample out of the repository, start from the
+[agent retrieval map](https://github.com/sylin-org/koan-framework/blob/v1.0.0/llms.txt).

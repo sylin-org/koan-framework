@@ -39,6 +39,13 @@ into the project. Update with `/plugin marketplace update koan`; remove the two 
 The same files are readable directly under `.agents/skills/` for a harness that loads a portable
 skill directory.
 
+**Every other harness gets the bootstrap.** Scaffolding also writes an `AGENTS.md`, and every
+graduated sample points at the one in this repository. It is deliberately small: the two rules that
+shorten most work, the evidence an application produces about itself, and one pinned link to the
+agent retrieval map. It names no capability, so shipping a package never edits it, and it defers to
+the three skills wherever a harness supports them. See
+[DX-0050](../decisions/DX-0050-portable-agent-bootstrap.md).
+
 ## Choose by outcome
 
 Koan has three coding-agent entry points. Choose by the outcome, not by a package or subsystem.
@@ -91,9 +98,10 @@ unnoticed:
 | Routing | Does each skill still declare the name and description that select it? |
 | Links | Does every reference and pinned recipe still resolve? |
 | Shelf | Does the capability shelf match the claim ledger and package inventory? |
+| Bootstrap | Does every scaffold and sample still carry a portable `AGENTS.md` that names no capability? |
 | Truth | Does every package identifier restore, and does every construct the skill teaches compile? |
 
-The first three run in the pull-request gate. The fourth needs a real restore from nuget.org, so it
+The first four run in the pull-request gate. The fifth needs a real restore from nuget.org, so it
 runs on a schedule — against the **published** packages a developer installs, never a repository
 project reference. A journey that compiled against repository sources would pass while the guidance
 it verifies was unusable.

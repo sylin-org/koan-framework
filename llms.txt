@@ -7,6 +7,9 @@ explanation.
 Current line: stable 1.0. Every active packable project ships in one train. Use the generated product surface at
 docs/reference/product-surface.md for the evaluated inventory, capability maturity, and evidence.
 
+Paths in this file are repository-relative. Resolve them against the revision this file was fetched
+from; for the stable train that is https://github.com/sylin-org/koan-framework/blob/v1.0.0/.
+
 ## Canonical application grammar
 
 Install and create:
@@ -44,6 +47,8 @@ hatch.
 
 ## Intent-to-document map
 
+- Add a capability, stated as an outcome ("add AI", "let people sign in"): docs/recipes/index.md
+- Add a capability, named as a piece ("add Mongo"): docs/reference/capability-map.md
 - Start or orient: README.md, docs/getting-started/quickstart.md, docs/index.md
 - Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
 - Choose a coding skill: docs/guides/agent-skills.md (`koan` to build, extend, repair, or prove;

@@ -72,3 +72,10 @@ Use a streaming-capable adapter when the business requires provider-bounded stre
 - `Todo.cs` — Entity state plus the `Complete()` business operation
 - `LocalChecklist.csproj` — the single foundation capability reference
 - `koan.lock.json` — reviewable static composition emitted on build
+
+---
+
+**Working with a coding agent?** [AGENTS.md](../../../AGENTS.md) at the repository root orients any
+agent to Koan's application grammar, the evidence an application produces about itself, and the
+capability map. If you lifted this sample out of the repository, start from the
+[agent retrieval map](https://github.com/sylin-org/koan-framework/blob/v1.0.0/llms.txt).
