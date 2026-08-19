@@ -91,7 +91,13 @@ try {
     # merely by being on the feed: Sylin.Koan.App pins Core >= 1.0.0 and would restore the published
     # 1.0.0 while the release under proof sits unused beside it. Reference every publishable library
     # explicitly at its planned version so the proof exercises the set actually being shipped.
-    $referenceable = @($plan.packages | Where-Object { $_.publish -and $_.referenceable })
+    # Sylin.Koan.App is excluded deliberately: the fixture already declares it, pinned through
+    # KoanTrainVersion to this plan's App version. Injecting it again produces two PackageReference
+    # items for the same id and restore fails with NU1504. This stayed latent while App happened to be
+    # unchanged in every release, and fires the first time App is itself published.
+    $referenceable = @($plan.packages | Where-Object {
+        $_.publish -and $_.referenceable -and $_.packageId -ne 'Sylin.Koan.App'
+    })
     if ($referenceable.Count -gt 0) {
         $projectFile = Join-Path $consumerRoot 'PackageConsumer.csproj'
         $projectXml = Get-Content -LiteralPath $projectFile -Raw
