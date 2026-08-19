@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 96,
+    "packages": 97,
     "repairRequired": 0,
     "reviewRequired": 10,
-    "structurallyReady": 86,
-    "ownedReadmes": 96,
-    "technicalCompanions": 96,
+    "structurallyReady": 87,
+    "ownedReadmes": 97,
+    "technicalCompanions": 97,
     "findings": 18
   },
   "findingDefinitions": [
@@ -770,6 +770,27 @@
       "findings": [
         "docs.readme.meaningful-use.missing"
       ]
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Connector.MySql",
+      "projectPath": "src/Connectors/Data/MySql/Koan.Data.Connector.MySql.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "MySQL provider for Koan relational data with native filtering, atomic writes, and governed source routing.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational"
+      ],
+      "readme": "src/Connectors/Data/MySql/README.md",
+      "technicalDocumentation": "src/Connectors/Data/MySql/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
     },
     {
       "packageId": "Sylin.Koan.Data.Connector.OpenSearch",

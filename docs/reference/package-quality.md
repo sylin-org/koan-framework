@@ -22,7 +22,7 @@ This report separates objective package repairs from human review. `structurally
 
 | Packages | Repair required | Review required | Structurally ready | Owned READMEs | Technical companions | Findings |
 |---:|---:|---:|---:|---:|---:|---:|
-| 96 | 0 | 10 | 86 | 96 | 96 | 18 |
+| 97 | 0 | 10 | 87 | 97 | 97 | 18 |
 
 ## Packages
 
@@ -64,6 +64,7 @@ This report separates objective package repairs from human review. `structurally
 | `Sylin.Koan.Data.Connector.InMemory`<br>[`src/Connectors/Data/InMemory/Koan.Data.Connector.InMemory.csproj`](../../src/Connectors/Data/InMemory/Koan.Data.Connector.InMemory.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/InMemory/README.md)<br>[TECHNICAL](../../src/Connectors/Data/InMemory/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Connector.Json`<br>[`src/Connectors/Data/Json/Koan.Data.Connector.Json.csproj`](../../src/Connectors/Data/Json/Koan.Data.Connector.Json.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/Json/README.md)<br>[TECHNICAL](../../src/Connectors/Data/Json/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Connector.Mongo`<br>[`src/Connectors/Data/Mongo/Koan.Data.Connector.Mongo.csproj`](../../src/Connectors/Data/Mongo/Koan.Data.Connector.Mongo.csproj) | provider / library<br>net10.0 | `review-required` | [README](../../src/Connectors/Data/Mongo/README.md)<br>[TECHNICAL](../../src/Connectors/Data/Mongo/TECHNICAL.md) | `docs.readme.meaningful-use.missing` (warning): The README has no recognizable meaningful-use or behavior section. |
+| `Sylin.Koan.Data.Connector.MySql`<br>[`src/Connectors/Data/MySql/Koan.Data.Connector.MySql.csproj`](../../src/Connectors/Data/MySql/Koan.Data.Connector.MySql.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/MySql/README.md)<br>[TECHNICAL](../../src/Connectors/Data/MySql/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Connector.OpenSearch`<br>[`src/Connectors/Data/OpenSearch/Koan.Data.Connector.OpenSearch.csproj`](../../src/Connectors/Data/OpenSearch/Koan.Data.Connector.OpenSearch.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/OpenSearch/README.md)<br>[TECHNICAL](../../src/Connectors/Data/OpenSearch/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Connector.Postgres`<br>[`src/Connectors/Data/Postgres/Koan.Data.Connector.Postgres.csproj`](../../src/Connectors/Data/Postgres/Koan.Data.Connector.Postgres.csproj) | provider / library<br>net10.0 | `structurally-ready` | [README](../../src/Connectors/Data/Postgres/README.md)<br>[TECHNICAL](../../src/Connectors/Data/Postgres/TECHNICAL.md) | none |
 | `Sylin.Koan.Data.Connector.Redis`<br>[`src/Connectors/Data/Redis/Koan.Data.Connector.Redis.csproj`](../../src/Connectors/Data/Redis/Koan.Data.Connector.Redis.csproj) | provider / library<br>net10.0 | `review-required` | [README](../../src/Connectors/Data/Redis/README.md)<br>[TECHNICAL](../../src/Connectors/Data/Redis/TECHNICAL.md) | `docs.readme.meaningful-use.missing` (warning): The README has no recognizable meaningful-use or behavior section. |

@@ -14,8 +14,8 @@ gets_you: "A second, named store that only receives what you approved — withou
 works_if: "Some records are drafts and some are published, and readers should only ever see the published ones."
 costs: "A second store to configure and back up. Both can be embedded files, so this need not add a service."
 ingredients:
-  - "one | entity store for the working set | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.Mongo"
-  - "one | a second configured source for the channel | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.Mongo"
+  - "one | entity store for the working set | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.MySql, Sylin.Koan.Data.Connector.Mongo"
+  - "one | a second configured source for the channel | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.MySql, Sylin.Koan.Data.Connector.Mongo"
 ---
 
 # Publish approved records to a separate store

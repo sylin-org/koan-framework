@@ -20,7 +20,7 @@ the capability map. Once the answer is yes, the map carries the exact package an
 
 | Family | Providers |
 |---|---|
-| Entity store | Cockroach · Couchbase · Elasticsearch · InMemory · Json · Mongo · OpenSearch · Postgres · Redis · SQL Server · SQLite |
+| Entity store | Cockroach · Couchbase · Elasticsearch · InMemory · Json · Mongo · MySql ⚠ · OpenSearch · Postgres · Redis · SQL Server · SQLite |
 | Vector index | InMemory · Milvus · PgVector ⚠ · Qdrant · RedisVector ⚠ · SqliteVec · Weaviate |
 | AI runtime | Hugging Face ⚠ · LM Studio · Ollama · ONNX |
 | Object storage | Local · S3 ⚠ |

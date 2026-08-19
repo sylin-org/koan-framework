@@ -67,6 +67,7 @@
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.301" />
     <PackageVersion Include="Minio" Version="7.0.0" />
     <PackageVersion Include="MongoDB.Driver" Version="3.10.0" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.1" />
     <PackageVersion Include="Nerdbank.GitVersioning" Version="3.10.91" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
@@ -97,6 +98,7 @@
     <PackageVersion Include="Testcontainers.Couchbase" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.MongoDb" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
+    <PackageVersion Include="Testcontainers.MySql" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.RabbitMq" Version="4.13.0" />
     <PackageVersion Include="Testcontainers.Redis" Version="4.13.0" />

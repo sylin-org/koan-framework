@@ -15,7 +15,7 @@ works_if: "Always. This is where most applications start."
 costs: "Nothing to operate on the embedded path. A server-backed store adds a process to run."
 ingredients:
   - "one | web application bundle | Sylin.Koan.App"
-  - "one | entity store, user's choice | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Json, Sylin.Koan.Data.Connector.InMemory, Sylin.Koan.Data.Connector.Mongo, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.SqlServer, Sylin.Koan.Data.Connector.Couchbase, Sylin.Koan.Data.Connector.Cockroach, Sylin.Koan.Data.Connector.Redis"
+  - "one | entity store, user's choice | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Json, Sylin.Koan.Data.Connector.InMemory, Sylin.Koan.Data.Connector.Mongo, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.MySql, Sylin.Koan.Data.Connector.SqlServer, Sylin.Koan.Data.Connector.Couchbase, Sylin.Koan.Data.Connector.Cockroach, Sylin.Koan.Data.Connector.Redis"
   - "optional | recoverable deletion | Sylin.Koan.Data.SoftDelete"
   - "optional | move the store later, verifiably | Sylin.Koan.Data.Cutover"
 ---

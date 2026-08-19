@@ -651,6 +651,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Vector.Connector.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.VectorAdapterSurface.RedisVector.Tests", "tests\Suites\Data\VectorAdapterSurface\Koan.Data.VectorAdapterSurface.RedisVector.Tests\Koan.Data.VectorAdapterSurface.RedisVector.Tests.csproj", "{4DD62BB7-5852-4B96-8DBB-7495D2FC9B94}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.MySql", "src\Connectors\Data\MySql\Koan.Data.Connector.MySql.csproj", "{6379211F-E74B-4AEB-AE89-890331B69BEA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Connector.MySql", "Connector.MySql", "{91D28223-0D0A-E5FD-2DAB-9EDD5B42B30A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Data.Connector.MySql.Tests", "tests\Suites\Data\Connector.MySql\Koan.Data.Connector.MySql.Tests\Koan.Data.Connector.MySql.Tests.csproj", "{419BA099-EA42-4122-8D09-52C3F815C64B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -3371,6 +3377,30 @@ Global
 		{4DD62BB7-5852-4B96-8DBB-7495D2FC9B94}.Release|x64.Build.0 = Release|Any CPU
 		{4DD62BB7-5852-4B96-8DBB-7495D2FC9B94}.Release|x86.ActiveCfg = Release|Any CPU
 		{4DD62BB7-5852-4B96-8DBB-7495D2FC9B94}.Release|x86.Build.0 = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|x64.Build.0 = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Debug|x86.Build.0 = Debug|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|x64.ActiveCfg = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|x64.Build.0 = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|x86.ActiveCfg = Release|Any CPU
+		{6379211F-E74B-4AEB-AE89-890331B69BEA}.Release|x86.Build.0 = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|x64.Build.0 = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Debug|x86.Build.0 = Debug|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|x64.ActiveCfg = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|x64.Build.0 = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|x86.ActiveCfg = Release|Any CPU
+		{419BA099-EA42-4122-8D09-52C3F815C64B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -3688,6 +3718,9 @@ Global
 		{1C4B3B37-BE0B-2A37-5E23-85D1FE09C3D0} = {50016D06-9933-125F-84C4-B9F9B90C374B}
 		{7E6A7A68-6309-4C41-842B-83A2E6A67A65} = {1C4B3B37-BE0B-2A37-5E23-85D1FE09C3D0}
 		{4DD62BB7-5852-4B96-8DBB-7495D2FC9B94} = {E19DE968-F9C4-C371-351B-E94BA6875ADF}
+		{6379211F-E74B-4AEB-AE89-890331B69BEA} = {1F5CC4C7-1255-AAD3-2DDB-2EEFC1110E38}
+		{91D28223-0D0A-E5FD-2DAB-9EDD5B42B30A} = {96C9A827-DD11-51F2-22BF-E3C00045C44D}
+		{419BA099-EA42-4122-8D09-52C3F815C64B} = {91D28223-0D0A-E5FD-2DAB-9EDD5B42B30A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

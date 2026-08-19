@@ -25,6 +25,23 @@ adapter all differ from T1 and T2. Do not carry those tasks' details across.
 Close the largest absence in the record plane. Eleven data connectors ship and MySQL is not among them,
 despite being one of the most widely deployed databases in existence.
 
+## Active work card
+
+- **Application intent:** persist ordinary Koan Entities in an existing MySQL deployment without learning a
+  provider-specific data API.
+- **Complete expression:** reference `Sylin.Koan.Data.Connector.MySql`, keep the application's single `AddKoan()`
+  composition point and existing `Entity<T>` operations, then supply `ConnectionStrings:MySql` (or the standard
+  named-source connection) when autonomous discovery is not appropriate.
+- **Guarantee and correction:** managed Entities receive native filtering, atomic writes, provider-bounded paging,
+  and row/container/database isolation through the record-plane contract. Unreachable MySQL, an incompatible or
+  externally managed schema, an unconfigured source, or denied write/DDL intent fails at the connector boundary with
+  a corrective error rather than falling back to another store or an unbounded client scan.
+- **Coalescence:** `Koan.Data.Relational` continues to own mapping plans, structured-value encoding, schema policy,
+  and filter translation. The connector owns only MySQL routing, driver lifetime, SQL dialect/DDL lowering,
+  discovery, health, and capability truth; no new shared relational layer or application registration API is added.
+- **Ergonomics:** adding one package preserves `Save`, `Get`, `Query`, `Page`, and stream expressions unchanged;
+  MySQL contributes no new application-side concept beyond its endpoint and optional source placement.
+
 ## STOP preconditions
 
 If any fails: revert, record BLOCKED with which one, move to T4.

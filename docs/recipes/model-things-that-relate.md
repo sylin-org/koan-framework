@@ -14,7 +14,7 @@ gets_you: "Parent and child Entities that read naturally one at a time, as a set
 works_if: "Anything in the domain belongs to something else — items to a list, posts to an author."
 costs: "Nothing to operate. Unbounded child reads are the cost, which is why paging belongs here too."
 ingredients:
-  - "one | any entity store | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.Mongo"
+  - "one | any entity store | Sylin.Koan.Data.Connector.Sqlite, Sylin.Koan.Data.Connector.Postgres, Sylin.Koan.Data.Connector.MySql, Sylin.Koan.Data.Connector.Mongo"
   - "one | HTTP conventions and EntityController | Sylin.Koan.Web"
   - "optional | cache a rarely-changing lookup | Sylin.Koan.Cache"
 ---

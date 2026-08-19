@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T3 — [MySQL / MariaDB](tasks/T3-mysql.md)
+> **Next task:** T4 — [Mongo Atlas Vector](tasks/T4-mongo-atlas-vector.md)
 > **State:** ready
-> **Last commit touching this initiative:** this T2 delivery commit
+> **Last commit touching this initiative:** this T3 delivery commit
 >
-> Begin T3 from its STOP checks and mirror the current Postgres record-plane shape.
+> Begin T4 from its STOP checks and keep Mongo record/vector storage physically disjoint while reusing one service.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -34,7 +34,7 @@ leaves an accurate resume point rather than a stale one.
 |---|---|---|---|---|
 | T1 | pgvector | Done | this commit | 0 |
 | T2 | Redis vector | Done | this commit | 0 |
-| T3 | MySQL / MariaDB | Not started | — | — |
+| T3 | MySQL / MariaDB | Done | this commit | 0 |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
@@ -360,3 +360,32 @@ supports session-visible pipelined bulk operations, and rejects unsupported inte
 solution compiled with 0 errors; NuGet's vulnerability endpoint was unavailable during final acceptance, so
 the build emitted only external `NU1900` audit warnings and no compiler or connector warnings. Package quality
 reports 96 packages, 0 repair, 10 review, and 86 structurally ready.
+
+### T3 — MySQL / MariaDB — Done — 2026-08-19
+
+Commit: this commit (`feat(connector): mysql on the record plane`)
+Oracle: `pwsh scripts/forge-verify.ps1 -Adapter MySql -Plane record` -> exit 0 (6 passed, 0 failed, 0 skipped)
+Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
+
+Deviations:
+1. Concrete record suites live under `tests/Suites/Data/Connector.<Name>/`, not the as-authored AdapterSurface
+   location. The repaired task and MySQL suite follow the current tree without changing the shared facts.
+2. Shared relational code owns mapping, structured values, schema policy, and filter translation, but its Npgsql
+   executor cannot lower MySQL SQL. The connector keeps only the provider-specific dialect, schema, and execution
+   path local; no shared relational or existing connector code changed.
+3. The fixture is test-local rather than expanding the shipped container harness for one suite. It pins MySQL
+   8.4.11 by digest and uses root credentials because the inherited database-isolation proof creates two databases.
+4. The current recipe scan found three genuine entity-store choice recipes, not only `store-and-expose.md`; all
+   three now list MySQL, while the SQLite-specific single-binary recipe remains unchanged.
+5. MySqlConnector 2.6.1 joins the existing Testcontainers 4.13.0 dependency train. The new package uses the
+   initiative's narrow NBGV/new-package baseline exceptions; no existing version owner was changed.
+6. MySQL's default `LIKE` escape literal and JSON boolean coercion differ from the shared neutral lowering. The
+   provider rewrites only that emitted escape token and uses an explicit boolean CASE, both verified on the pinned
+   server without mutating session SQL mode.
+7. This task targets MySQL only. MariaDB compatibility is deliberately not claimed without running the same suite
+   unchanged against MariaDB.
+
+Notes: The connector preserves the Entity API, supports discovered and named-source placement, executes filters and
+stable paging natively, guards managed-scope writes/deletes, uses InnoDB transactions for atomic batches, and rejects
+denied DDL, cross-database inspection, or incompatible schemas at the connector boundary. The full solution compiled
+with 0 warnings. Package quality reports 97 packages, 0 repair, 10 review, and 87 structurally ready.
