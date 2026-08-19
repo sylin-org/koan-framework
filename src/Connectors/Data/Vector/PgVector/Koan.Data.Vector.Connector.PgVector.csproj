@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.Vector.Connector.PgVector</AssemblyName>
+    <RootNamespace>Koan.Data.Vector.Connector.PgVector</RootNamespace>
+    <KoanHasPublishedBaseline>false</KoanHasPublishedBaseline>
+    <Description>pgvector provider for Koan: plan-bound exact vector search and native JSONB metadata filtering on PostgreSQL.</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;pgvector;postgresql;knn</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+</Project>

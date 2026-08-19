@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T1 delivery retry — [pgvector](tasks/T1-pgvector.md)
-> **State:** in progress after maintainer-authorized requirement realignment
-> **Last commit touching this initiative:** `d89472a85`
+> **Next task:** T2 — [Redis vector](tasks/T2-redis-vector.md)
+> **State:** ready; T1 is green and complete
+> **Last commit touching this initiative:** this T1 delivery commit
 >
-> Requirements now match the current vector proof surface and NBGV ownership law; resume T1 in order.
+> Begin T2 from its STOP checks and keep the Redis vector plane on the shared Koan.Redis connection owner.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -32,7 +32,7 @@ leaves an accurate resume point rather than a stale one.
 
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
-| T1 | pgvector | In progress | — | — |
+| T1 | pgvector | Done | this commit | 0 |
 | T2 | Redis vector | Not started | — | — |
 | T3 | MySQL / MariaDB | Not started | — | — |
 | T4 | Mongo Atlas Vector | Not started | — | — |
@@ -288,3 +288,37 @@ new proof seams, and treats three blockers as an authority audit rather than a m
 and T4 now authorize the inherited provider-proof hook without changing any shared `[Fact]`; T3 now
 uses the concrete record-suite location present in the tree. Historical BLOCKED attempts above remain
 unchanged. Execution resumes at T1 in the original order.
+
+### T1 — pgvector — Done — 2026-08-19
+
+Commit: this commit (`feat(connector): pgvector on the vector plane`)
+Oracle: `pwsh scripts/forge-verify.ps1 -Adapter PgVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
+Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
+
+Deviations:
+1. The as-authored BootHost-only test shape contradicted the current 24-cell provider proof seam. The
+   maintainer-authorized requirement repair pinned V-01 through V-24; T1 implements them without adding,
+   replacing, or skipping shared facts.
+2. Qdrant's mirrored layout names a separate client wrapper. PgVector uses direct, parameterized Npgsql
+   commands in the repository because a pass-through client would add no lifecycle or semantic value.
+3. A new package cannot validate against its own unpublished `1.0.0` baseline. `Directory.Build.targets`
+   gained the default-on `KoanHasPublishedBaseline` switch, and only this new project opts out until it has
+   a published baseline.
+4. Shared storage naming does not emit the provider key, so record and vector tables for one Entity would
+   collide in the same Postgres database. PgVector uses a deterministic `_vector` anchor suffix and the
+   live V-03 proof saves both representations side by side.
+5. Lossless neutral metadata uses PostgreSQL `json`, not `jsonb`, because `jsonb` collapses duplicate keys
+   and property order. A separate `jsonb` projection owns native filtering.
+6. The fixture uses `pgvector/pgvector:pg16` because the task did not pin an image digest. The test project
+   references the existing Postgres record connector only to prove the core no-second-service outcome and
+   cross-store rejection; production connectors remain independent.
+7. V-24's thread-local allocation counter was invalid across asynchronous continuations. The proof profile
+   now measures total managed allocation across the complete save/get/search cycles.
+8. The new-package baseline switch and the async-safe V-24 wording touch central files not named by T1;
+   both were required for truthful green acceptance rather than task-specific scaffolding.
+
+Notes: The connector reuses explicit, discovered, named, and partial-URI Postgres placement; preserves
+record/vector coexistence; installs pgvector under a database-wide first-use lock; validates native shape;
+forces exact scans even with an ANN index present; pushes filters natively; and performs set-based bulk
+save/delete. The full solution build completed with 0 warnings and package quality reports 95 packages,
+0 repair, 10 review, and 85 structurally ready.

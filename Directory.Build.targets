@@ -1,13 +1,14 @@
 <Project>
   <PropertyGroup>
     <!-- Every assembly package validates against the preceding public train. -->
+    <KoanHasPublishedBaseline Condition="'$(KoanHasPublishedBaseline)' == ''">true</KoanHasPublishedBaseline>
     <KoanTrainBaselineVersion Condition="'$(KoanTrainBaselineVersion)' == ''">1.0.0</KoanTrainBaselineVersion>
-    <PackageValidationBaselineVersion Condition="'$(KoanTrainBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">$(KoanTrainBaselineVersion)</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion Condition="'$(KoanHasPublishedBaseline)' == 'true' and '$(KoanTrainBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">$(KoanTrainBaselineVersion)</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <PropertyGroup>
     <!-- Use the SDK's built-in package validation whenever an assembly package has a baseline. -->
-    <EnablePackageValidation Condition="'$(PackageValidationBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">true</EnablePackageValidation>
+    <EnablePackageValidation Condition="'$(KoanHasPublishedBaseline)' == 'true' and '$(PackageValidationBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">true</EnablePackageValidation>
   </PropertyGroup>
 
   <Target Name="ValidateKoanPackageTrainBaseline"

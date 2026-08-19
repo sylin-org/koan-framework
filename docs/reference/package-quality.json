@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 94,
+    "packages": 95,
     "repairRequired": 0,
     "reviewRequired": 10,
-    "structurallyReady": 84,
-    "ownedReadmes": 94,
-    "technicalCompanions": 94,
+    "structurallyReady": 85,
+    "ownedReadmes": 95,
+    "technicalCompanions": 95,
     "findings": 18
   },
   "findingDefinitions": [
@@ -1081,6 +1081,28 @@
       ],
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Milvus/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Vector.Connector.PgVector",
+      "projectPath": "src/Connectors/Data/Vector/PgVector/Koan.Data.Vector.Connector.PgVector.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "pgvector provider for Koan: plan-bound exact vector search and native JSONB metadata filtering on PostgreSQL.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
+      ],
+      "readme": "src/Connectors/Data/Vector/PgVector/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/PgVector/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },

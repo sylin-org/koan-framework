@@ -74,6 +74,7 @@ without one — they are installable and documented, but nothing has been promis
 | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | The only hosted-model connector; the local providers are assessed |
 | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | The only shared cache; the durable local adapter is assessed |
 | `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and `EntityAi`, which the AI/vector recipe teaches as the shortest path to vector indexing |
+| `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | Reuses an application's PostgreSQL service for exact vector search when the `vector` extension is available |
 
 Recommend one only when the outcome needs it, and say plainly that it is not assessed. The complete
 picture is in the
@@ -196,6 +197,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Entity vector semantics | `Sylin.Koan.Data.Vector` | **one vector connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Data.Vector.Abstractions/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/ai/vector.md) |
 | In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/InMemory/README.md) |
 | Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/SqliteVec/README.md) |
+| pgvector | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | **Postgres with the `vector` extension** | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/PgVector/README.md) |
 | Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Qdrant/README.md) |
 | Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Weaviate/README.md) |
 | Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Milvus/README.md) |
@@ -269,6 +271,7 @@ Keep four choices separate even when one story uses all of them:
 
 - Use the in-memory index only for bounded disposable work.
 - Prefer SqliteVec when a durable local index matches the application's topology.
+- Prefer PgVector when the application already operates Postgres and can enable its `vector` extension.
 - Treat Qdrant, Weaviate, and Milvus as external dependencies with provider-specific filtering,
   paging, and operations.
 - Treat Elasticsearch and OpenSearch as search-engine-backed paths; do not infer dedicated-vector

@@ -100,7 +100,7 @@ These outcomes are pinned before connector implementation:
 | V-21 | Partition/source isolation protects get, search, save, delete, and clear surfaces. |
 | V-22 | Cross-store transaction intent fails before vector mutation when atomic coordination is not claimed. |
 | V-23 | Cancellation propagates, data survives a real backend restart, and a disposed repository rejects later operations. |
-| V-24 | Sixteen local-container save/get/search warm cycles stay below 64 MiB thread allocation and 15 seconds after one warm-up cycle. |
+| V-24 | Sixteen local-container save/get/search warm cycles stay below 64 MiB total managed allocation and 15 seconds after one warm-up cycle. |
 
 The profile is intentionally capability-honest: it proves native support where each provider has it
 and proves explicit rejection where the Koan connector does not claim a portable guarantee. Provider

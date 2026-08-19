@@ -18,7 +18,7 @@ ingredients:
   - "one-or-more | model runtime, user's choice | Sylin.Koan.AI.Connector.Ollama, Sylin.Koan.AI.Connector.Onnx, Sylin.Koan.AI.Connector.LMStudio, Sylin.Koan.AI.Connector.HuggingFace"
   - "one | embedding ownership on the Entity | Sylin.Koan.Data.AI"
   - "one | vector runtime | Sylin.Koan.Data.Vector"
-  - "one | vector index, user's choice | Sylin.Koan.Data.Vector.Connector.SqliteVec, Sylin.Koan.Data.Vector.Connector.InMemory, Sylin.Koan.Data.Vector.Connector.Qdrant, Sylin.Koan.Data.Vector.Connector.Weaviate, Sylin.Koan.Data.Vector.Connector.Milvus"
+  - "one | vector index, user's choice | Sylin.Koan.Data.Vector.Connector.SqliteVec, Sylin.Koan.Data.Vector.Connector.InMemory, Sylin.Koan.Data.Vector.Connector.PgVector, Sylin.Koan.Data.Vector.Connector.Qdrant, Sylin.Koan.Data.Vector.Connector.Weaviate, Sylin.Koan.Data.Vector.Connector.Milvus"
 absent:
   - "hosted frontier embedding model | no OpenAI, Anthropic, or Gemini connector exists | run embeddings locally, or call the vendor directly with an HttpClient and store the vector yourself"
 ---
@@ -42,6 +42,7 @@ matrix:
 |---|---|---|---|
 | InMemory | no | no | they are still exploring and will say so |
 | SqliteVec | no | yes | a real single-node application — the usual answer |
+| PgVector | no new process | yes | they already operate Postgres with the `vector` extension |
 | Qdrant · Weaviate · Milvus | yes | yes | they already operate one; do not introduce a second |
 | Elasticsearch · OpenSearch | yes | yes | they already run it; search-engine-backed, so do not promise dedicated-vector behavior |
 
