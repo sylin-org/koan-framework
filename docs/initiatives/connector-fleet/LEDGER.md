@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T1 — [pgvector](tasks/T1-pgvector.md)
-> **State:** not started
+> **Next task:** T2 — [Redis vector](tasks/T2-redis-vector.md)
+> **State:** in progress
 > **Last commit touching this initiative:** none
 >
-> Read [BOOTSTRAP.md](BOOTSTRAP.md) before doing anything. Check T1's STOP preconditions first.
+> Read [BOOTSTRAP.md](BOOTSTRAP.md) before doing anything. Check T2's STOP preconditions first.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -32,7 +32,7 @@ leaves an accurate resume point rather than a stale one.
 
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
-| T1 | pgvector | Not started | — | — |
+| T1 | pgvector | BLOCKED | none | not run |
 | T2 | Redis vector | Not started | — | — |
 | T3 | MySQL / MariaDB | Not started | — | — |
 | T4 | Mongo Atlas Vector | Not started | — | — |
@@ -66,3 +66,32 @@ equally valid; do not invent deviations to seem thorough.
 ---
 
 <!-- Entries begin below. Newest last. -->
+
+### T1 — pgvector — BLOCKED — 2026-08-19
+
+Commit: none
+Oracle: not run — STOP precondition 5 failed
+Acceptance: skills-verify not run · docs-lint not run · build not run · discoverability not
+
+Deviations: none
+
+Notes: STOP precondition 5 failed because no available container engine could start a pgvector image.
+The exact runtime check was:
+
+```text
+docker version --format '{{json .}}'
+```
+
+It exited 1 with:
+
+```text
+{"Client":{"Version":"29.5.3","ApiVersion":"1.54","DefaultAPIVersion":"1.54","GitCommit":"d1c06ef","GoVersion":"go1.26.4","Os":"windows","Arch":"amd64","BuildTime":"Wed Jun  3 18:03:06 2026","Context":"default"},"Server":null}
+WARNING: Error loading config file: open C:\Users\onose\.docker\config.json: Access is denied.
+failed to connect to the docker API at npipe:////./pipe/docker_engine; check if the path is correct and if the daemon is running: open //./pipe/docker_engine: The system cannot find the file specified.
+```
+
+`podman` and `nerdctl` were not installed. `com.docker.service` existed but was stopped. The attempted
+command `Start-Service -Name 'com.docker.service' -ErrorAction Stop` also exited 1 with `Service
+'Docker Desktop Service (com.docker.service)' cannot be started due to the following error: Cannot open
+'com.docker.service' service on computer '.'.` Unblocking requires an accessible running container
+engine; then start a Postgres image containing the `vector` extension and rerun T1 from its STOP checks.
