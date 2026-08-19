@@ -23,6 +23,22 @@ Expose Redis's vector search as a vector-plane connector, so an application alre
 semantic search without adopting a second service. Redis already ships as a record connector *and* as a
 cache adapter, so for many applications this adds a capability to a process they are already operating.
 
+## Active work card
+
+- **Application intent:** keep records and semantic search on one Redis deployment when that deployment
+  includes Redis Search vector support.
+- **Complete expression:** reference `Sylin.Koan.Data.Vector.Connector.RedisVector`, keep ordinary
+  `AddKoan()` composition, declare a vector space through the existing `koan.Data.Source(...).Vector<T>(...)`
+  surface, and point the shared `ConnectionStrings:Redis` or a named Redis source at a vector-enabled server.
+- **Guarantee and correction:** awaited mutations are session-visible; search is exact FLAT k-NN with native
+  metadata predicates and isolation. A plain Redis server, incompatible native index, unsupported visibility,
+  or unsupported query fails with a corrective exception rather than silently changing semantics.
+- **Coalescence:** the connector owns vector keys, index shape, commands, and capability truth. `Koan.Redis`
+  remains the only discovery, multiplexer, pooling, and disposal owner; Redis record and cache packages remain
+  unchanged. No connector-local discovery adapter, service descriptor, or pass-through client is created.
+- **Ergonomics:** applications gain one package and continue using the existing `Vector<T>` and source APIs;
+  there is no Redis-specific registration call, second connection setting, or new application-side concept.
+
 ## STOP preconditions
 
 If any fails: revert, record BLOCKED with which one, move to T3.

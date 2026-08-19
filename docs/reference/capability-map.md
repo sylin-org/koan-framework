@@ -198,6 +198,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/InMemory/README.md) |
 | Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/SqliteVec/README.md) |
 | pgvector | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | **Postgres with the `vector` extension** | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/PgVector/README.md) |
+| Redis vectors | `Sylin.Koan.Data.Vector.Connector.RedisVector` — **not assessed** | **a Redis deployment with Search/vector support**; plain Redis is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/RedisVector/README.md) |
 | Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Qdrant/README.md) |
 | Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Weaviate/README.md) |
 | Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Milvus/README.md) |
@@ -272,6 +273,8 @@ Keep four choices separate even when one story uses all of them:
 - Use the in-memory index only for bounded disposable work.
 - Prefer SqliteVec when a durable local index matches the application's topology.
 - Prefer PgVector when the application already operates Postgres and can enable its `vector` extension.
+- Prefer RedisVector when the application already operates Redis with Search/vector support; plain Redis is
+  not enough.
 - Treat Qdrant, Weaviate, and Milvus as external dependencies with provider-specific filtering,
   paging, and operations.
 - Treat Elasticsearch and OpenSearch as search-engine-backed paths; do not infer dedicated-vector

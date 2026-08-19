@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T2 — [Redis vector](tasks/T2-redis-vector.md)
-> **State:** ready; T1 is green and complete
-> **Last commit touching this initiative:** this T1 delivery commit
+> **Next task:** T3 — [MySQL / MariaDB](tasks/T3-mysql.md)
+> **State:** ready
+> **Last commit touching this initiative:** this T2 delivery commit
 >
-> Begin T2 from its STOP checks and keep the Redis vector plane on the shared Koan.Redis connection owner.
+> Begin T3 from its STOP checks and mirror the current Postgres record-plane shape.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -33,7 +33,7 @@ leaves an accurate resume point rather than a stale one.
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
 | T1 | pgvector | Done | this commit | 0 |
-| T2 | Redis vector | Not started | — | — |
+| T2 | Redis vector | Done | this commit | 0 |
 | T3 | MySQL / MariaDB | Not started | — | — |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
@@ -322,3 +322,41 @@ record/vector coexistence; installs pgvector under a database-wide first-use loc
 forces exact scans even with an ANN index present; pushes filters natively; and performs set-based bulk
 save/delete. The full solution build completed with 0 warnings and package quality reports 95 packages,
 0 repair, 10 review, and 85 structurally ready.
+
+### T2 — Redis vector — Done — 2026-08-19
+
+Commit: this commit (`feat(connector): redis vector search on the vector plane`)
+Oracle: `pwsh scripts/forge-verify.ps1 -Adapter RedisVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
+Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass · discoverability done · package quality regenerated
+
+Deviations:
+1. The original BootHost-only test shape contradicted the current 24-cell provider proof seam. The
+   maintainer-authorized requirement repair pins V-01 through V-24; the concrete suite implements that
+   proof hook while leaving every shared `[Fact]` inherited and unchanged.
+2. The Qdrant reference has connector-owned discovery, service metadata, and a client wrapper. RedisVector
+   deliberately has none: it reuses `Sylin.Koan.Redis` as the single discovery, multiplexer, pooling, and
+   disposal owner, and executes native commands directly through its shared connection provider.
+3. Redis Search 2.10.20 accepts vector indexes only in logical database 0. RedisVector therefore keeps its
+   indexes in DB 0 while records and cache entries may use another logical database on the same Redis process;
+   provider-scoped routing still coalesces on the same named endpoint.
+4. The task did not pin a fixture image. The proof uses the immutable Redis Stack digest
+   `sha256:798ab84d9f266936b034ab11c4d04a2b8e4b441884c5aa7d17ac951eefdf742a`, verifies Search 2.10.20,
+   and enables synchronous AOF so V-23 exercises real restart durability.
+5. Redis negotiates RESP3 by default through the shared StackExchange.Redis client, whereas most command
+   examples document RESP2. The repository parses both native result shapes and the fixture proves the live
+   RESP3 path.
+6. RediSearch has a fixed schema rather than arbitrary JSON paths. Native filtering uses bounded hashed TAG
+   projections plus lazily added NUMERIC fields, with cross-process locking and cache refresh. Finite values
+   that cannot be represented exactly by Redis numerics remain lossless metadata but relational filters on
+   them fail closed instead of silently changing meaning.
+7. Readiness uses a low-privilege `FT.INFO` probe rather than admin-only `FT._LIST`; exact vector algorithm,
+   type, dimension, metric, prefixes, and filter field shapes are validated at the first managed use.
+8. Only `search-by-meaning.md` is currently a genuine vector-provider choice recipe. SQLite-specific recipes
+   were not broadened simply to mention the new package.
+
+Notes: RedisVector coexists with the record and cache planes on one vector-enabled Redis deployment, owns
+disjoint vector keys, reports exact FLAT execution, pushes the complete declared filter algebra natively,
+supports session-visible pipelined bulk operations, and rejects unsupported intent correctively. The full
+solution compiled with 0 errors; NuGet's vulnerability endpoint was unavailable during final acceptance, so
+the build emitted only external `NU1900` audit warnings and no compiler or connector warnings. Package quality
+reports 96 packages, 0 repair, 10 review, and 86 structurally ready.
