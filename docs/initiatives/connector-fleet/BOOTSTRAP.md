@@ -78,7 +78,7 @@ These outcomes are pinned before connector implementation:
 | ID | Required outcome |
 |---|---|
 | V-01 | Reject a wrong embedding dimension before mutation and reject an existing native space with an incompatible dimension or metric. |
-| V-02 | Reject empty, wrong-sized, non-finite, and zero-norm embeddings before provider mutation. |
+| V-02 | Reject empty, wrong-sized, and non-finite embeddings before provider mutation; reject zero-norm embeddings when the selected metric requires it (Cosine), while preserving the valid Euclidean zero-vector case used by V-08. |
 | V-03 | Re-saving one identity replaces its vector and metadata without creating a duplicate. |
 | V-04 | Delete returns `true` for an existing point, `false` for a missing point, and propagates cancellation or provider failure. |
 | V-05 | Get-many preserves input order, duplicate positions, and `null` slots for missing identities. |
