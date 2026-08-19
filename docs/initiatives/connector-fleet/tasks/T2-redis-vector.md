@@ -53,9 +53,13 @@ Adapter name `RedisVector` everywhere, no casing variation.
   `Sylin.Koan.Data.Vector.Connector.RedisVector`. Mirror the Qdrant file layout.
 - Conformance: `tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.RedisVector.Tests/`
   containing exactly `RedisVectorVectorAodbConformanceSpec.cs` — one sealed class deriving from
-  `VectorAodbConformanceSpecsBase`, overriding `BootHostAsync()` only.
+  `VectorAodbConformanceSpecsBase`, overriding `BootHostAsync()` and
+  `ProveVectorAnnexCellAsync()` only. Every `[Fact]` remains inherited. Implement every V-01 through
+  V-24 outcome pinned in BOOTSTRAP's vector annex proof profile using private provider-specific helpers.
 - Adapter key: `redis-vector`, lowercase.
 - Add both projects to `Koan.sln`.
+- Create the connector's project-local `version.json` through BOOTSTRAP's new-project exception with
+  compatibility line `1.0`, `versionHeightOffset` `0`, and the standard path filters.
 
 ## Oracle
 

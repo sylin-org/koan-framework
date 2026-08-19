@@ -62,10 +62,14 @@ Adapter name `MongoAtlasVector` everywhere, that casing exactly.
 - Conformance: `tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.MongoAtlasVector.Tests/`
   containing exactly `MongoAtlasVectorVectorAodbConformanceSpec.cs` — note the doubled `Vector`, which
   is correct: the adapter name ends in `Vector` and the required suffix is
-  `VectorAodbConformanceSpec.cs`. Derive from `VectorAodbConformanceSpecsBase`, override
-  `BootHostAsync()` only.
+  `VectorAodbConformanceSpec.cs`. Derive from `VectorAodbConformanceSpecsBase`; override
+  `BootHostAsync()` and `ProveVectorAnnexCellAsync()` only. Every `[Fact]` remains inherited. Implement
+  every V-01 through V-24 outcome pinned in BOOTSTRAP's vector annex proof profile using private
+  provider-specific helpers.
 - Adapter key: `mongo-atlas-vector`, lowercase.
 - Add both projects to `Koan.sln`.
+- Create the connector's project-local `version.json` through BOOTSTRAP's new-project exception with
+  compatibility line `1.0`, `versionHeightOffset` `0`, and the standard path filters.
 
 ## Oracle
 

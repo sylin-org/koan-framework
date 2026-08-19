@@ -47,8 +47,8 @@ If any fails: revert, record BLOCKED with which one, move to T4.
   Postgres, Redis, SqlServer, Sqlite.
 - Record-plane registration is by a file named `<Adapter>AodbConformanceSpec.cs` — **no `Vector`
   infix**. Existing examples: `PostgresAodbConformanceSpec.cs`, `SqlServerAodbConformanceSpec.cs`.
-- Test projects for the record plane live under `tests/Suites/Data/AdapterSurface/`. Confirm the exact
-  sibling naming from an existing record adapter before creating yours.
+- Current concrete record-provider suites live under `tests/Suites/Data/Connector.<Name>/`; the shared
+  kit alone lives under `tests/Suites/Data/AdapterSurface/`.
 
 ## Required artifacts — exact names
 
@@ -56,12 +56,14 @@ Adapter name `MySql` everywhere — that casing exactly, not `MySQL` or `Mysql`.
 
 - Connector: `src/Connectors/Data/MySql/`, project `Koan.Data.Connector.MySql.csproj`, package
   `Sylin.Koan.Data.Connector.MySql`. Mirror the Postgres connector's layout.
-- Conformance: a test project beside the other record-plane suites containing exactly
-  `MySqlAodbConformanceSpec.cs`, deriving from `AodbConformanceSpecsBase` and overriding only what that
-  base declares abstract. Read the base to find out what that is; do not assume it matches the vector
-  base.
+- Conformance: `tests/Suites/Data/Connector.MySql/Koan.Data.Connector.MySql.Tests/` containing exactly
+  `Specs/MySqlAodbConformanceSpec.cs`, deriving from `AodbConformanceSpecsBase` and overriding only what
+  that base declares abstract. Read the base to find out what that is; do not assume it matches the
+  vector base.
 - Adapter key: `mysql`, lowercase.
 - Add both projects to `Koan.sln`.
+- Create the connector's project-local `version.json` through BOOTSTRAP's new-project exception with
+  compatibility line `1.0`, `versionHeightOffset` `0`, and the standard path filters.
 
 **MariaDB compatibility:** target MySQL. If MariaDB works unchanged, say so in the README. Do not add
 a second connector, a compatibility flag, or dialect branching for it in this task.

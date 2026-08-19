@@ -24,9 +24,11 @@ file. Everything you need is here or is cited from here.
 2. **Re-read the tree.** Every fact in a task prompt is labelled as-of-authoring. Verify it against the
    working tree before relying on it. Where they disagree, the tree wins and the disagreement is a
    deviation to record.
-3. **Never derive an expected result.** Expected outcomes are pinned in the task prompt. If something
-   you must assert is not pinned, that is a STOP condition — do not invent the expectation, because an
-   expectation you derive will validate your own bug.
+3. **Pin expected results before implementation.** Expected outcomes come from the task prompt. When
+   the working tree has gained a conformance proof surface since the prompt was authored, repair the
+   initiative requirements first: record the complete expected-outcome profile from the current kit
+   and named reference, commit that requirement repair, and only then implement. Never tune an
+   expectation after seeing a provider fail it.
 4. **Copy the closest existing pattern.** Every task has a named reference adapter already in the tree.
    Match its structure, naming, and file layout rather than designing a new one.
 5. **A green run is not acceptance.** Read the acceptance contract in [README.md](README.md). Exit code
@@ -63,6 +65,47 @@ The `Provenance` table in ARCH-0127 records questions that are already settled. 
   is no list to edit.
 - Oracle exit codes: `0` all passed · `1` a test failed · `2` one or more skipped · `3` runner error.
 - Package versions come from NBGV. Never hand-write a version.
+
+## Vector annex proof profile
+
+The current vector kit inherits 24 provider proof-seam facts in addition to the AODB isolation cells.
+T1, T2, and T4 are authorized and required to override `ProveVectorAnnexCellAsync` while leaving every
+`[Fact]` inherited and unchanged. The override dispatches every ID below to private provider-specific
+proof helpers. An unknown ID delegates to the base so a future kit addition remains a loud skip.
+
+These outcomes are pinned before connector implementation:
+
+| ID | Required outcome |
+|---|---|
+| V-01 | Reject a wrong embedding dimension before mutation and reject an existing native space with an incompatible dimension or metric. |
+| V-02 | Reject empty, wrong-sized, non-finite, and zero-norm embeddings before provider mutation. |
+| V-03 | Re-saving one identity replaces its vector and metadata without creating a duplicate. |
+| V-04 | Delete returns `true` for an existing point, `false` for a missing point, and propagates cancellation or provider failure. |
+| V-05 | Get-many preserves input order, duplicate positions, and `null` slots for missing identities. |
+| V-06 | Metadata round-trips through the neutral value algebra without aliasing caller buffers; reserved managed keys fail closed. |
+| V-07 | Search is bounded, unique, similarity-descending, and identity-stable at equal scores. |
+| V-08 | Cosine, Euclidean, and dot-product scores normalize to finite `[0,1]` similarities whose order is higher-is-closer, and execution reports the requested metric. |
+| V-09 | An undeclared or incompatible named space fails before a query reaches the provider. |
+| V-10 | Execution truth matches native work: PgVector reports an exact SQL scan, RedisVector an exact FLAT search, and MongoAtlasVector an exact Atlas vector query; none invents candidate counts or continuations. |
+| V-11 | Awaited save and delete are immediately visible in `Session` mode without sleeps. |
+| V-12 | `Eventual` visibility is rejected because none of these three connectors supplies a bounded `Sync` barrier. |
+| V-13 | The connector declares filters and pushes the neutral equality, comparison, set, existence, size, boolean, and negation matrix into the native prefilter; unsupported operators fail closed. |
+| V-14 | Hybrid search is not declared and text/semantic weighting throws `NotSupportedException`. |
+| V-15 | Multiple named vectors per Entity are not declared and an undeclared space fails closed. |
+| V-16 | Native continuation is not declared and a continuation token throws `NotSupportedException`. |
+| V-17 | Native bulk save/delete preserves per-item inserted/updated/deleted/missing outcomes, prevalidates the whole request, and reports `NotGuaranteed` atomicity. |
+| V-18 | Atomic batch is not declared; invalid mixed input performs no mutation and a valid batch reports `NotGuaranteed`. |
+| V-19 | Streaming export is not declared and `ExportAll` throws `NotSupportedException`. |
+| V-20 | Ensure, sync, clear, read-only, and external lifecycle policies are honored at the owning boundary. |
+| V-21 | Partition/source isolation protects get, search, save, delete, and clear surfaces. |
+| V-22 | Cross-store transaction intent fails before vector mutation when atomic coordination is not claimed. |
+| V-23 | Cancellation propagates, data survives a real backend restart, and a disposed repository rejects later operations. |
+| V-24 | Sixteen local-container save/get/search warm cycles stay below 64 MiB thread allocation and 15 seconds after one warm-up cycle. |
+
+The profile is intentionally capability-honest: it proves native support where each provider has it
+and proves explicit rejection where the Koan connector does not claim a portable guarantee. Provider
+tests may inspect captured native plans or backend schema, but may not add, replace, skip, or weaken a
+shared conformance fact.
 
 ## Task sequence
 
@@ -109,8 +152,11 @@ When a task cannot complete:
 3. **Continue to the next task.** Do not halt the initiative, and do not attempt a task out of order to
    compensate.
 
-Three consecutive BLOCKED tasks means something is wrong with the initiative rather than the tasks.
-Stop and say so in the ledger.
+Three consecutive BLOCKED tasks trigger an initiative-authority audit rather than an automatic halt.
+If the blockers are contradictions between the task prompts and the current tree, repair the
+requirements in one reviewable documentation commit and resume from the first affected task. Stop
+only when completion genuinely requires unavailable infrastructure, credentials, external
+coordination, or authority that the executor does not have, and say so in the ledger.
 
 Never make a failing check pass by weakening the check. Skipping a spec, loosening an assertion,
 editing a kit, or excluding a test from a run is a worse outcome than a recorded BLOCKED.
@@ -127,7 +173,7 @@ Each entry names its single sanctioned exception, or states that there is none.
 | `product/claims.json` and any maturity or product-claim wording | **None.** ARCH-0120 owns maturity. |
 | `docs/recipes/index.md` | **None** by hand — it is generated. Regenerate with `pwsh scripts/build-recipe-index.ps1`. |
 | `docs/reference/connector-matrix.md` | **None** by hand — it is generated from the package graph. Regenerate with `pwsh scripts/build-connector-matrix.ps1`. Your connector must appear there or nobody asking "does Koan support X?" will find it. |
-| Any `version.json`, or any hand-written package version | **None.** NBGV owns versions. |
+| Existing `version.json` files, or any hand-written package version | **New packable project only:** copy the closest sibling's compatibility-line file, set `versionHeightOffset` to `0`, and change nothing else. NBGV owns the resulting version. |
 | `AGENTS.md` at the repository root or in `templates/` | **None.** By DX-0050, adding a capability must edit no bootstrap. Needing to is a design smell — record it as a deviation. |
 | `src/Koan.Core/**` | **None.** |
 | `Directory.Packages.props` | **Permitted, narrowly.** Central package management is on, so a new connector's client library needs a `PackageVersion` entry here. Add only the entries your task's connector requires; change no existing version. |

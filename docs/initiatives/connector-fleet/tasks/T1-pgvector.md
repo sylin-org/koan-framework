@@ -24,6 +24,27 @@ Postgres gains semantic search **without adopting a second service**. That sente
 of the task; if the result still requires a separate vector service, the task has failed regardless of
 which tests pass.
 
+## Delivery evidence
+
+- **Application intent:** an application already operating Postgres can persist and search Entity
+  embeddings without operating a second vector service.
+- **Public expression:** reference `Sylin.Koan.Data.Vector.Connector.PgVector`, call `AddKoan()` once,
+  select adapter `pgvector` on the intended data source, declare the Entity's vector space, then use
+  `Vector<TEntity>.Save`, `Get`, `Search`, `Delete`, and lifecycle operations. Configuration supplies
+  the Postgres connection string; the runtime supplies Postgres with the `vector` extension.
+- **Guarantee and correction:** awaited Session mutations, exact similarity search, native metadata
+  prefiltering, and Koan source/partition isolation are guaranteed. Missing extension, incompatible
+  native schema, unsupported visibility/search intent, or unavailable Postgres fails at the adapter
+  boundary with a corrective exception or readiness result.
+- **Complete intent surface:** package reference, one `AddKoan()` composition, source configuration,
+  vector-space declaration, and a reachable pgvector runtime; no provider registration or record-store
+  change is required.
+- **Coalescence:** keep vector planning, scope decoration, neutral metadata, and capability policy in
+  the shared vector pillar; rebuild only Qdrant's backend-mechanics shape as a PgVector adapter. The
+  Postgres record connector remains independent because record and vector lifecycles differ.
+- **Ergonomics:** `pgvector` is the only new application-visible selector; provider mechanics remain
+  behind the existing `Vector<TEntity>` vocabulary and explain themselves through facts and health.
+
 ## STOP preconditions
 
 Check each before editing anything. If any fails, revert, record BLOCKED in the ledger with which one
@@ -65,15 +86,21 @@ Use `PgVector` as the adapter name everywhere, with no variation in casing.
 
 **Conformance** — `tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.PgVector.Tests/`
 containing a file named **exactly** `PgVectorVectorAodbConformanceSpec.cs`. It declares one sealed
-class deriving from `VectorAodbConformanceSpecsBase` and overrides `BootHostAsync()` only. Every spec
-is inherited — do not add, rename, override, or skip any conformance test. Supply a container fixture
-beside it, following `QdrantTestFactory`, that returns an unavailability reason rather than throwing
-when no runtime is present.
+class deriving from `VectorAodbConformanceSpecsBase`. Override `BootHostAsync()` and
+`ProveVectorAnnexCellAsync()` only. Every `[Fact]` remains inherited — do not add, rename, override,
+or skip a conformance test. Implement every V-01 through V-24 outcome pinned in BOOTSTRAP's vector
+annex proof profile, using private provider-specific helpers. Supply a container fixture beside it,
+following `QdrantTestFactory`, that returns an unavailability reason rather than throwing when no
+runtime is present.
 
 **Adapter identifier** — the configuration adapter key is `pgvector`, lowercase, matching the pattern
 where Qdrant uses `qdrant`.
 
 **Solution** — add both new projects to `Koan.sln`.
+
+**Version ownership** — create the connector's project-local `version.json` using BOOTSTRAP's narrow
+new-project exception: compatibility line `1.0`, `versionHeightOffset` `0`, and the standard path
+filters. Do not edit an existing version file.
 
 ## Oracle
 

@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** None — initiative stopped under BOOTSTRAP's failure protocol
-> **State:** T1, T2, and T3 retries are three consecutive BLOCKED tasks
-> **Last commit touching this initiative:** `83cd8b64b`
+> **Next task:** T1 delivery retry — [pgvector](tasks/T1-pgvector.md)
+> **State:** in progress after maintainer-authorized requirement realignment
+> **Last commit touching this initiative:** `d89472a85`
 >
-> T4 remains not started. Resume only after the task authority conflicts in the retry log are resolved.
+> Requirements now match the current vector proof surface and NBGV ownership law; resume T1 in order.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -32,9 +32,9 @@ leaves an accurate resume point rather than a stale one.
 
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
-| T1 | pgvector | BLOCKED | none | not run |
-| T2 | Redis vector | BLOCKED | none | not run |
-| T3 | MySQL / MariaDB | BLOCKED | none | not run |
+| T1 | pgvector | In progress | — | — |
+| T2 | Redis vector | Not started | — | — |
+| T3 | MySQL / MariaDB | Not started | — | — |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
@@ -278,3 +278,13 @@ project-local version ownership and the initiative's absolute version-file prohi
 failure protocol therefore requires the executor to stop. T4 was not opened or attempted and remains
 `Not started`; the initiative is not complete. Resume only after the task authority is reconciled with
 the current conformance and packaging contracts.
+
+### Initiative resumed — 2026-08-19
+
+The maintainer explicitly authorized repairing requirements that were misaligned with the initiative's
+user outcome and requested delivered connectors. BOOTSTRAP now permits only the mandatory NBGV file
+for a new packable project, requires a committed expected-outcome profile when the current kit has
+new proof seams, and treats three blockers as an authority audit rather than a magical stop. T1, T2,
+and T4 now authorize the inherited provider-proof hook without changing any shared `[Fact]`; T3 now
+uses the concrete record-suite location present in the tree. Historical BLOCKED attempts above remain
+unchanged. Execution resumes at T1 in the original order.
