@@ -29,6 +29,7 @@ architecture canon:
 | Initiative | Mission | State |
 |---|---|---|
 | [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R09 Semantic Composition Kernel |
+| [Connector fleet](connector-fleet/README.md) | Make stores an application already operates do more, so a capability stops requiring a new service | Active — T1 not started |
 
 ## Initiative contract
 

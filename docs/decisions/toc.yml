@@ -194,6 +194,8 @@
       href: ARCH-0125-per-project-package-versions.md
     - name: ARCH-0126 A process-global resource is owned by a process-derived fact
       href: ARCH-0126-process-global-resource-ownership.md
+    - name: ARCH-0127 Connector fleet strategy — capability without infrastructure
+      href: ARCH-0127-connector-fleet-strategy.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
