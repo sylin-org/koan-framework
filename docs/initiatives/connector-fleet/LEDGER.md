@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T2 retry — [Redis vector](tasks/T2-redis-vector.md)
+> **Next task:** T3 retry — [MySQL / MariaDB](tasks/T3-mysql.md)
 > **State:** in progress after container-runtime recovery
-> **Last commit touching this initiative:** `ebf04678a`
+> **Last commit touching this initiative:** `ddfe8e9a3`
 >
-> Recheck T2's STOP preconditions before implementation; preserve both earlier attempts in the log.
+> Recheck T3's STOP preconditions before implementation; preserve both earlier attempts in the log.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -33,8 +33,8 @@ leaves an accurate resume point rather than a stale one.
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
 | T1 | pgvector | BLOCKED | none | not run |
-| T2 | Redis vector | In progress | — | — |
-| T3 | MySQL / MariaDB | BLOCKED | none | not run |
+| T2 | Redis vector | BLOCKED | none | not run |
+| T3 | MySQL / MariaDB | In progress | — | — |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
@@ -192,3 +192,36 @@ PgVector subclass to override `BootHostAsync()` only, while the default proof se
 Qdrant's extra override would violate the task and derive PgVector expectations that the prompt does
 not pin. The kit and runner are NEVER-touch files. Unblocking requires revised task authority that
 explicitly permits and pins the PgVector V-01 through V-24 provider proofs against the current kit.
+
+### T2 — Redis vector retry — BLOCKED — 2026-08-19
+
+Commit: none
+Oracle: not run — implementation-readiness verification found an unsatisfiable conformance contract
+Acceptance: skills-verify not run · docs-lint not run · build not run · discoverability not
+
+Deviations:
+1. The current vector kit has 24 provider proof-seam facts that were not reflected in T2's required
+   BootHost-only subclass shape. Every current sibling overrides the additional proof seam.
+
+Notes: All STOP preconditions passed. `redis/redis-stack-server:latest` started successfully,
+`redis-cli PING` returned `PONG`, and `MODULE LIST` reported the `search` module at version `21020`.
+Step 3 then found that T2 cannot satisfy both its required artifact and exit-0 oracle. The exact
+verification command was:
+
+```powershell
+$task='docs/initiatives/connector-fleet/tasks/T2-redis-vector.md'; Select-String -LiteralPath $task -Pattern 'overriding `BootHostAsync\(\)` only' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }; $kit='tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit/VectorAodbConformanceSpecsBase.cs'; Select-String -LiteralPath $kit -Pattern 'protected virtual Task ProveVectorAnnexCellAsync|Assert.Skip\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }; Write-Output ('PROOF_SEAM_FACTS=' + (Select-String -LiteralPath $kit -Pattern '=> ProveVectorAnnexCellAsync\(').Count)
+```
+
+It exited 0 with:
+
+```text
+56:`VectorAodbConformanceSpecsBase`, overriding `BootHostAsync()` only.
+155:protected virtual Task ProveVectorAnnexCellAsync(string acceptanceId, string proof)
+158:Assert.Skip($"{acceptanceId} provider proof seam is registered but not yet supplied: {proof}.");
+PROOF_SEAM_FACTS=24
+```
+
+`scripts/forge-verify.ps1` maps every skipped outcome to exit 2. Adding the proof override would
+violate T2 and derive RedisVector expectations that the prompt does not pin; the kit and runner are
+NEVER-touch files. Unblocking requires revised task authority that explicitly permits and pins the
+RedisVector V-01 through V-24 provider proofs against the current kit.
