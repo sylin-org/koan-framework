@@ -75,6 +75,7 @@ without one — they are installable and documented, but nothing has been promis
 | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | The only shared cache; the durable local adapter is assessed |
 | `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and `EntityAi`, which the AI/vector recipe teaches as the shortest path to vector indexing |
 | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | Reuses an application's PostgreSQL service for exact vector search when the `vector` extension is available |
+| `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | Reuses an application's Atlas deployment for exact vector search without adding another service |
 
 Recommend one only when the outcome needs it, and say plainly that it is not assessed. The complete
 picture is in the
@@ -200,6 +201,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/SqliteVec/README.md) |
 | pgvector | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | **Postgres with the `vector` extension** | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/PgVector/README.md) |
 | Redis vectors | `Sylin.Koan.Data.Vector.Connector.RedisVector` — **not assessed** | **a Redis deployment with Search/vector support**; plain Redis is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/RedisVector/README.md) |
+| Mongo Atlas vectors | `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | **an Atlas deployment with Vector Search**; ordinary MongoDB is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/MongoAtlasVector/README.md) |
 | Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Qdrant/README.md) |
 | Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Weaviate/README.md) |
 | Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Milvus/README.md) |
@@ -277,6 +279,8 @@ Keep four choices separate even when one story uses all of them:
 - Prefer PgVector when the application already operates Postgres and can enable its `vector` extension.
 - Prefer RedisVector when the application already operates Redis with Search/vector support; plain Redis is
   not enough.
+- Prefer MongoAtlasVector when the application already operates Atlas with Vector Search; ordinary MongoDB
+  is not enough.
 - Treat Qdrant, Weaviate, and Milvus as external dependencies with provider-specific filtering,
   paging, and operations.
 - Treat Elasticsearch and OpenSearch as search-engine-backed paths; do not infer dedicated-vector

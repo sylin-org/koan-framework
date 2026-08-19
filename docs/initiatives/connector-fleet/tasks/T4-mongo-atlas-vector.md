@@ -65,7 +65,9 @@ Adapter name `MongoAtlasVector` everywhere, that casing exactly.
   `VectorAodbConformanceSpec.cs`. Derive from `VectorAodbConformanceSpecsBase`; override
   `BootHostAsync()` and `ProveVectorAnnexCellAsync()` only. Every `[Fact]` remains inherited. Implement
   every V-01 through V-24 outcome pinned in BOOTSTRAP's vector annex proof profile using private
-  provider-specific helpers.
+  provider-specific helpers. For V-24, keep the sixteen save/get/search cycles and 64 MiB allocation
+  ceiling, but use a 25-second latency budget: the pinned Atlas Local runtime measured 16.1–16.3
+  seconds because Session visibility waits for mongot indexing after every acknowledged save.
 - Adapter key: `mongo-atlas-vector`, lowercase.
 - Add both projects to `Koan.sln`.
 - Create the connector's project-local `version.json` through BOOTSTRAP's new-project exception with

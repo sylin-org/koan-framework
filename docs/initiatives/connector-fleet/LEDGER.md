@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T4 — [Mongo Atlas Vector](tasks/T4-mongo-atlas-vector.md)
-> **State:** ready
-> **Last commit touching this initiative:** this T3 delivery commit
+> **Next task:** none — initiative complete
+> **State:** complete; T1 through T4 are Done and no task is in progress
+> **Last commit touching this initiative:** this commit (`feat(connector): mongo atlas vector search on the vector plane`)
 >
-> Begin T4 from its STOP checks and keep Mongo record/vector storage physically disjoint while reusing one service.
+> Do not extend this fleet without a new decision under ARCH-0127.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -35,7 +35,7 @@ leaves an accurate resume point rather than a stale one.
 | T1 | pgvector | Done | this commit | 0 |
 | T2 | Redis vector | Done | this commit | 0 |
 | T3 | MySQL / MariaDB | Done | this commit | 0 |
-| T4 | Mongo Atlas Vector | Not started | — | — |
+| T4 | Mongo Atlas Vector | Done | this commit | 0 |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
 
@@ -389,3 +389,46 @@ Notes: The connector preserves the Entity API, supports discovered and named-sou
 stable paging natively, guards managed-scope writes/deletes, uses InnoDB transactions for atomic batches, and rejects
 denied DDL, cross-database inspection, or incompatible schemas at the connector boundary. The full solution compiled
 with 0 warnings. Package quality reports 97 packages, 0 repair, 10 review, and 87 structurally ready.
+
+### T4 — Mongo Atlas Vector — Done — 2026-08-19
+
+Commit: this commit (`feat(connector): mongo atlas vector search on the vector plane`)
+Oracle: `pwsh scripts/forge-verify.ps1 -Adapter MongoAtlasVector -Plane vector` -> exit 0 (28 passed, 0 failed, 0 skipped)
+Acceptance: skills-verify pass · docs-lint Errors: 0 · build pass with 0 warnings · discoverability done · package quality regenerated
+
+Deviations:
+1. The task did not pin an executable Atlas image. The test-local fixture uses the official Atlas Local image at
+   immutable digest `sha256:3597ce32156af585890ddb4b08d0484f33d596d7ae9140a62199872185d91c41` and proves native
+   exact search, filtering, asynchronous index readiness, and a real stop/start without cloud credentials.
+2. Existing Mongo discovery and client managers are internal to the record connector. Production remains independent
+   of that package: MongoAtlasVector reuses the selected Mongo endpoint and service identity through its own bounded
+   client manager, but adds no second service, record-connector edit, or autonomous Mongo lifecycle.
+3. Vector collections live in the vector-owned `KoanVectors` database and carry a deterministic `_vector` suffix.
+   Shared naming otherwise emits the same Entity anchor, so both boundaries are required for same-service record/vector
+   coexistence without collection collision.
+4. Native filtering uses one standard Atlas Search index with dynamic keyword mappings and explicit vector mapping,
+   then executes `$search.vectorSearch` with `exact: true`. Fixed typed SHA-256 projection tokens preserve exact
+   equality/set semantics without rebuilding an index for every metadata path.
+5. Atlas Local removes search-index namespaces asynchronously after a database drop. Reusing the same namespace per
+   inherited fact caused the next legitimate index build to remain pending for 120 seconds. The disposable fixture now
+   gives each fact isolated `KoanVectors_*`/`KoanRecords_*` databases and lets container teardown reclaim them; the
+   production default remains exactly `KoanVectors`.
+6. Atlas Search reports Euclidean similarity from squared distance (`1/26` for a 3-4-5 displacement). The connector
+   converts that native score to Koan's portable higher-is-closer distance normalization (`1/6`) while retaining the
+   native score for deterministic tie ordering.
+7. The global 15-second V-24 default contradicted Atlas Session visibility, which must wait for mongot after every
+   acknowledged save. Two isolated pinned-runtime measurements were 16.13 and 16.25 seconds, so the repaired T4 profile
+   pins 25 seconds while retaining all sixteen save/get/search cycles and the 64 MiB allocation ceiling.
+8. Only `search-by-meaning.md` currently enumerates interchangeable vector providers. Recipes that intentionally pin a
+   single local provider were not broadened merely to advertise another package.
+
+Notes: MongoAtlasVector keeps the ordinary `Vector<TEntity>` API, coalesces on an existing Mongo deployment while
+keeping record/vector storage disjoint, validates immutable native shape and exact-filter analyzers, pushes the declared
+filter algebra before ranking, performs native bulk work, and provides bounded Session visibility. Ordinary MongoDB
+fails correctively because Atlas Search is required. The full solution compiled with 0 warnings. Package quality reports
+98 packages, 0 repair, 10 review, and 88 structurally ready; the generated connector matrix reports 33 providers.
+
+### Initiative complete — 2026-08-19
+
+T1 pgvector, T2 Redis vector, T3 MySQL, and T4 Mongo Atlas Vector are all Done. Every literal provider oracle exits 0,
+no task is in progress, discoverability/package artifacts are current, and the connector-fleet initiative is complete.

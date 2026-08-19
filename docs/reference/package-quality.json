@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 97,
+    "packages": 98,
     "repairRequired": 0,
     "reviewRequired": 10,
-    "structurallyReady": 87,
-    "ownedReadmes": 97,
-    "technicalCompanions": 97,
+    "structurallyReady": 88,
+    "ownedReadmes": 98,
+    "technicalCompanions": 98,
     "findings": 18
   },
   "findingDefinitions": [
@@ -1102,6 +1102,28 @@
       ],
       "readme": "src/Connectors/Data/Vector/Milvus/README.md",
       "technicalDocumentation": "src/Connectors/Data/Vector/Milvus/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Vector.Connector.MongoAtlasVector",
+      "projectPath": "src/Connectors/Data/Vector/MongoAtlasVector/Koan.Data.Vector.Connector.MongoAtlasVector.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "MongoDB Atlas Vector Search provider for Koan: exact semantic search and native metadata filtering on an existing Atlas deployment.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
+      ],
+      "readme": "src/Connectors/Data/Vector/MongoAtlasVector/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/MongoAtlasVector/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },

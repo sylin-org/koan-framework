@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Koan.Data.Vector.Connector.MongoAtlasVector</AssemblyName>
+    <RootNamespace>Koan.Data.Vector.Connector.MongoAtlasVector</RootNamespace>
+    <KoanHasPublishedBaseline>false</KoanHasPublishedBaseline>
+    <Description>MongoDB Atlas Vector Search provider for Koan: exact semantic search and native metadata filtering on an existing Atlas deployment.</Description>
+    <PackageTags>$(CommonPackageTags);data;vector;mongodb;atlas;search;knn</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Vector\Koan.Data.Vector.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\Koan.Core\Koan.Core.csproj" />
+    <PackageReference Include="MongoDB.Driver" />
+  </ItemGroup>
+</Project>
