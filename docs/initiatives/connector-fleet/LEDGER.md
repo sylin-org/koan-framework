@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** none — stopped after three consecutive BLOCKED tasks
-> **State:** stopped by the bootstrap failure protocol
-> **Last commit touching this initiative:** this T3 BLOCKED ledger commit
+> **Next task:** T2 retry — [Redis vector](tasks/T2-redis-vector.md)
+> **State:** in progress after container-runtime recovery
+> **Last commit touching this initiative:** `ebf04678a`
 >
-> Do not begin T4 until the shared container-runtime blocker is resolved and this stop is reviewed.
+> Recheck T2's STOP preconditions before implementation; preserve both earlier attempts in the log.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -33,7 +33,7 @@ leaves an accurate resume point rather than a stale one.
 | # | Task | State | Commit | Oracle exit |
 |---|---|---|---|---|
 | T1 | pgvector | BLOCKED | none | not run |
-| T2 | Redis vector | BLOCKED | none | not run |
+| T2 | Redis vector | In progress | — | — |
 | T3 | MySQL / MariaDB | BLOCKED | none | not run |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
@@ -158,3 +158,37 @@ BOOTSTRAP's failure protocol says this indicates an initiative-level environment
 the executor to stop. T4 was therefore not opened or attempted, remains `Not started`, and the
 initiative is not complete. Resume only after a container engine is accessible in the execution
 session; then review the three BLOCKED entries and restart at the appropriate task under BOOTSTRAP.
+
+### T1 — pgvector retry — BLOCKED — 2026-08-19
+
+Commit: none
+Oracle: not run — implementation-readiness verification found an unsatisfiable conformance contract
+Acceptance: skills-verify not run · docs-lint not run · build not run · discoverability not
+
+Deviations:
+1. The current vector kit has 24 provider proof-seam facts that were not reflected in T1's required
+   BootHost-only subclass shape. Every current sibling overrides the additional proof seam.
+
+Notes: Docker recovery was verified before this attempt: `pgvector/pgvector:pg16` started successfully,
+PostgreSQL accepted connections, and `pg_available_extensions` reported vector `0.8.6`. Step 3 then
+found that T1 cannot satisfy both its required artifact and its exit-0 oracle without inventing
+provider-specific expectations. The exact verification command was:
+
+```powershell
+$kit='tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit/VectorAodbConformanceSpecsBase.cs'; Select-String -LiteralPath $kit -Pattern 'protected virtual Task ProveVectorAnnexCellAsync|Assert.Skip\(' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }; Write-Output ('PROOF_SEAM_FACTS=' + (Select-String -LiteralPath $kit -Pattern '=> ProveVectorAnnexCellAsync\(').Count); $qdrant='tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests/QdrantVectorAodbConformanceSpec.cs'; Select-String -LiteralPath $qdrant -Pattern 'protected override Task ProveVectorAnnexCellAsync' | ForEach-Object { '{0}:{1}' -f $_.LineNumber,$_.Line.Trim() }
+```
+
+It exited 0 and showed:
+
+```text
+155:protected virtual Task ProveVectorAnnexCellAsync(string acceptanceId, string proof)
+158:Assert.Skip($"{acceptanceId} provider proof seam is registered but not yet supplied: {proof}.");
+PROOF_SEAM_FACTS=24
+62:protected override Task ProveVectorAnnexCellAsync(string acceptanceId, string proof)
+```
+
+`scripts/forge-verify.ps1` maps every skipped outcome to `INCONCLUSIVE` and exit 2. T1 requires the
+PgVector subclass to override `BootHostAsync()` only, while the default proof seam skips; copying
+Qdrant's extra override would violate the task and derive PgVector expectations that the prompt does
+not pin. The kit and runner are NEVER-touch files. Unblocking requires revised task authority that
+explicitly permits and pins the PgVector V-01 through V-24 provider proofs against the current kit.
