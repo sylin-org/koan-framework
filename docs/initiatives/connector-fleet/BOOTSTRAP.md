@@ -86,8 +86,15 @@ the next one.
      --markdown docs/reference/package-quality.md
    ```
 
-   Commit the regenerated files with your work. If the run fails, that is a STOP condition — a stale
-   inventory makes the capability map unverifiable.
+   Then regenerate the connector matrix, which reads that inventory:
+
+   ```powershell
+   pwsh scripts/build-connector-matrix.ps1
+   ```
+
+   Commit both regenerated outputs with your work. If either run fails, that is a STOP condition —
+   a stale inventory makes the capability map unverifiable, and a stale matrix hides your connector
+   from the one page that answers "does Koan support X?".
 
 8. Commit — one commit, message `feat(connector): <what it adds>`.
 9. Write the ledger entry, including numbered deviations. An empty deviation list is a valid entry.
@@ -119,6 +126,7 @@ Each entry names its single sanctioned exception, or states that there is none.
 | `scripts/skills-verify.ps1`, `scripts/docs-lint.ps1`, `scripts/build-recipe-index.ps1` | **None.** Run them; do not modify them. |
 | `product/claims.json` and any maturity or product-claim wording | **None.** ARCH-0120 owns maturity. |
 | `docs/recipes/index.md` | **None** by hand — it is generated. Regenerate with `pwsh scripts/build-recipe-index.ps1`. |
+| `docs/reference/connector-matrix.md` | **None** by hand — it is generated from the package graph. Regenerate with `pwsh scripts/build-connector-matrix.ps1`. Your connector must appear there or nobody asking "does Koan support X?" will find it. |
 | Any `version.json`, or any hand-written package version | **None.** NBGV owns versions. |
 | `AGENTS.md` at the repository root or in `templates/` | **None.** By DX-0050, adding a capability must edit no bootstrap. Needing to is a design smell — record it as a deviation. |
 | `src/Koan.Core/**` | **None.** |

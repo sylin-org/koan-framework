@@ -92,6 +92,8 @@
   items:
     - name: What works today
       href: reference/what-works.md
+    - name: Connector matrix — what Koan plugs into
+      href: reference/connector-matrix.md
     - name: Capability map — outcome, package, recipe
       href: reference/capability-map.md
     - name: Exact package and support status

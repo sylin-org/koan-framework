@@ -15,8 +15,9 @@
                capability, because the skills reach one harness and a bootstrap that lists packages
                becomes a second inventory nobody remembers to update (DX-0050)
     recipes    every recipe declares what it gets you, what must already be true, and what it costs;
-               every ingredient names a package that ships; the generated index still matches -- a
-               stale index recommends confidently and wrongly rather than failing (DX-0051)
+               every ingredient names a package that ships; the generated recipe index and connector
+               matrix still match their sources -- a stale index recommends confidently and wrongly
+               rather than failing (DX-0051)
     truth      every package identifier restores and every taught construct compiles, against the
                packages a developer installs -- not a repository ProjectReference
 
@@ -54,10 +55,11 @@ try {
     # is verified against the local tree (it must exist and ship) rather than against the tag.
     $shelfPath = 'docs/reference/capability-map.md'
     $recipeIndexPath = 'docs/recipes/index.md'
+    $connectorMatrixPath = 'docs/reference/connector-matrix.md'
     # Channel documents answer "what exists now", so pinning them would hide everything shipped since
     # the tag. They track the release branch and are therefore verified against the local tree -- they
     # must exist here and ship -- rather than against an immutable revision.
-    $channelDocs = @($shelfPath, $recipeIndexPath)
+    $channelDocs = @($shelfPath, $recipeIndexPath, $connectorMatrixPath)
     $channelPrefix = 'https://github.com/sylin-org/koan-framework/blob/main/'
     $capabilityMapUrl = "$channelPrefix$shelfPath"
     function Test-ChannelLink([string]$Url, [ref]$Reason) {
@@ -318,6 +320,14 @@ try {
         & "$repoRoot/scripts/build-recipe-index.ps1" -Check *> $null
         if ($LASTEXITCODE -ne 0) {
             Fail "docs/recipes/index.md is stale -- run: pwsh scripts/build-recipe-index.ps1"
+        }
+
+        # The connector matrix is the cheap "can Koan talk to X?" fetch, derived from the evaluated
+        # package graph. A new connector that never appears there is invisible to anyone asking that
+        # question, so drift is a failure rather than a formatting nit.
+        & "$repoRoot/scripts/build-connector-matrix.ps1" -Check *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Fail "$connectorMatrixPath is stale -- run: pwsh scripts/build-connector-matrix.ps1"
         }
     }
 

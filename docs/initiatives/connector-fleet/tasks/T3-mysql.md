@@ -96,6 +96,7 @@ dotnet build Koan.sln                                        # succeeds, no new 
 pwsh scripts/skills-verify.ps1 -Structure                    # exit 0
 pwsh scripts/docs-lint.ps1                                   # Errors: 0
 pwsh scripts/build-recipe-index.ps1 -Check                   # exit 0
+pwsh scripts/build-connector-matrix.ps1                       # regenerate, then -Check must exit 0
 dotnet run --project tools/Koan.Packaging -- quality `
   --output docs/reference/package-quality.json `
   --markdown docs/reference/package-quality.md      # regenerate; commit the result

@@ -30,6 +30,7 @@ request:
 |---|---|
 | A vague outcome — *"I want to add AI"*, *"make it multi-tenant"* | the [recipe index](../recipes/index.md). Read it against the application in front of you and compose the answer: **Works if** says which recipes are a small step from here, **Costs** says what each would add to operate. |
 | A named piece — *"add Mongo"*, *"use SqliteVec"* | the tables below |
+| Only *"can this talk to X?"* | the [connector matrix](connector-matrix.md) — every provider Koan ships, on one screen, without reading this page |
 
 Answering a vague ask with a package name skips the only part that mattered — which of five different
 things they wanted, and whether the runtime they need exists at all.

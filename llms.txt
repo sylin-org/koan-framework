@@ -49,6 +49,7 @@ hatch.
 
 - Add a capability, stated as an outcome ("add AI", "let people sign in"): docs/recipes/index.md
 - Add a capability, named as a piece ("add Mongo"): docs/reference/capability-map.md
+- Does Koan connect to X? (one screen, every provider): docs/reference/connector-matrix.md
 - Start or orient: README.md, docs/getting-started/quickstart.md, docs/index.md
 - Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
 - Choose a coding skill: docs/guides/agent-skills.md (`koan` to build, extend, repair, or prove;

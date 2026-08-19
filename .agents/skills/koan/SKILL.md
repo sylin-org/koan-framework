@@ -136,6 +136,8 @@ Keep the full application story visible while adding only the pieces required no
 
 Load the [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md) when the request already names a piece; it carries the exact package identifier and recipe link for each one, and flags the one piece that is shelved. Load [stacks.md](references/stacks.md) to show a developer the version that *runs* — it maps outcomes to compiled samples, which cannot drift from the framework.
 
+To answer only "does Koan support X?", fetch the [connector matrix](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/connector-matrix.md) — every shipped provider by family, on one screen, and far cheaper than the capability map.
+
 When the request is an outcome rather than a named piece, start from the [recipe index](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/index.md) instead: each entry states what it gets you, what must already be true, and what it costs to operate, so you can offer the two or three this application is actually close to. [extend.md](references/extend.md) owns that move.
 
 ## Run the conversation, do not run a menu

@@ -1,0 +1,159 @@
+<#
+.SYNOPSIS
+  Generate docs/reference/connector-matrix.md — what Koan plugs into, on one screen.
+
+.DESCRIPTION
+  The capability map answers "which package for this outcome" across ten tables. It cannot answer
+  "can Koan talk to X?" in one glance, and an agent should not fetch three hundred lines to find out.
+  This is that one glance, and it is small enough to be a cheap fetch.
+
+  Everything here is derived, so it is generated rather than maintained:
+
+    providers   packages whose evaluated role is 'provider' in the package graph
+    families    the segment between 'Sylin.Koan.' and '.Connector.'/'.Adapter.'
+    claims      product/claims.json — a package absent from it carries no promise
+
+  Deliberately absent: what Koan does NOT connect to. ARCH-0127 owns the ranked gaps, and duplicating
+  them would give that fact two owners.
+
+  -Check regenerates in memory and fails on drift, so a new connector cannot land without appearing.
+
+.EXAMPLE
+  pwsh scripts/build-connector-matrix.ps1
+  pwsh scripts/build-connector-matrix.ps1 -Check
+#>
+[CmdletBinding()]
+param([switch]$Check)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+Push-Location (Resolve-Path "$PSScriptRoot/..")
+try {
+    $inventoryPath = 'docs/reference/package-quality.json'
+    $claimsPath = 'product/claims.json'
+    $outputPath = 'docs/reference/connector-matrix.md'
+
+    foreach ($required in @($inventoryPath, $claimsPath)) {
+        if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
+            Write-Host "connector-matrix: missing input $required" -ForegroundColor Red
+            exit 1
+        }
+    }
+
+    # Family order is editorial: what an evaluator asks about first. Names are display-only, and an
+    # unknown family or provider falls back to its raw identifier rather than being dropped -- a new
+    # connector always appears, even before anyone gives it a pretty name.
+    $familyOrder = @('Data', 'Data.Vector', 'AI', 'Storage', 'Cache', 'Web.Auth', 'Communication')
+    $familyNames = @{
+        'Data'          = 'Entity store'
+        'Data.Vector'   = 'Vector index'
+        'AI'            = 'AI runtime'
+        'Storage'       = 'Object storage'
+        'Cache'         = 'Cache tier'
+        'Web.Auth'      = 'Sign-in provider'
+        'Communication' = 'Message transport'
+    }
+    $displayNames = @{
+        'SqlServer'    = 'SQL Server'
+        'Sqlite'       = 'SQLite'
+        'ElasticSearch' = 'Elasticsearch'
+        'RabbitMq'     = 'RabbitMQ'
+        'LMStudio'     = 'LM Studio'
+        'Onnx'         = 'ONNX'
+        'HuggingFace'  = 'Hugging Face'
+    }
+
+    $inventory = Get-Content -Raw -LiteralPath $inventoryPath | ConvertFrom-Json
+    $claims = Get-Content -Raw -LiteralPath $claimsPath | ConvertFrom-Json
+    $claimed = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($claim in @($claims.claims)) {
+        foreach ($package in @($claim.packages)) { [void]$claimed.Add([string]$package) }
+    }
+
+    $providers = @($inventory.packages | Where-Object { $_.role -eq 'provider' })
+    $families = [ordered]@{}
+    $ungrouped = @()
+    foreach ($package in $providers) {
+        $id = [string]$package.packageId
+        $m = [regex]::Match($id, '^Sylin\.Koan\.(?<fam>.+)\.(?:Connector|Adapter)\.(?<name>[^.]+)$')
+        if (-not $m.Success) { $ungrouped += $id; continue }
+        $family = $m.Groups['fam'].Value
+        $raw = $m.Groups['name'].Value
+        $label = if ($displayNames.ContainsKey($raw)) { $displayNames[$raw] } else { $raw }
+        if (-not $claimed.Contains($id)) { $label = "$label ⚠" }
+        if (-not $families.Contains($family)) { $families[$family] = @() }
+        $families[$family] += $label
+    }
+
+    # A provider that does not fit the naming shape is a finding, not something to hide.
+    if ($ungrouped.Count -gt 0) {
+        Write-Host "connector-matrix: provider package(s) outside the expected naming shape:" -ForegroundColor Yellow
+        $ungrouped | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    }
+
+    $ordered = @($familyOrder | Where-Object { $families.Contains($_) }) +
+               @($families.Keys | Where-Object { $_ -notin $familyOrder })
+
+    $sb = [System.Text.StringBuilder]::new()
+    [void]$sb.AppendLine('---')
+    [void]$sb.AppendLine('type: REFERENCE')
+    [void]$sb.AppendLine('domain: framework')
+    [void]$sb.AppendLine('title: "Koan connector matrix"')
+    [void]$sb.AppendLine('audience: [ai-agents, developers, architects]')
+    [void]$sb.AppendLine('status: current')
+    [void]$sb.AppendLine("last_updated: $(Get-Date -Format 'yyyy-MM-dd')")
+    [void]$sb.AppendLine('framework_version: v1.0.0')
+    [void]$sb.AppendLine('validation:')
+    [void]$sb.AppendLine('  status: generated')
+    [void]$sb.AppendLine('  scope: docs/reference/connector-matrix.md')
+    [void]$sb.AppendLine('---')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('<!-- GENERATED by scripts/build-connector-matrix.ps1 from the evaluated package graph. Do not edit. -->')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('# Connector matrix')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('What Koan plugs into, on one screen. Use it to answer "can this talk to X?" without reading')
+    [void]$sb.AppendLine('the capability map. Once the answer is yes, the map carries the exact package and its recipe.')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('| Family | Providers |')
+    [void]$sb.AppendLine('|---|---|')
+    foreach ($family in $ordered) {
+        $label = if ($familyNames.ContainsKey($family)) { $familyNames[$family] } else { $family }
+        [void]$sb.AppendLine("| $label | $((@($families[$family]) | Sort-Object) -join ' · ') |")
+    }
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('**⚠ carries no product claim.** It is installable and documented, and nothing has been promised')
+    [void]$sb.AppendLine('about it. Say so plainly when recommending one; the')
+    [void]$sb.AppendLine('[capability map](capability-map.md) records why each is listed, and the')
+    [void]$sb.AppendLine('[product surface](product-surface.md) is the evaluated authority.')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('A family with one provider, or one unclaimed provider, is a real constraint on what an')
+    [void]$sb.AppendLine('application can be deployed against. Read the short rows as carefully as the long ones.')
+    [void]$sb.AppendLine()
+    [void]$sb.AppendLine('This page does not list what Koan cannot reach — the ranked gaps and the reasoning behind them')
+    [void]$sb.AppendLine('belong to [ARCH-0127](../decisions/ARCH-0127-connector-fleet-strategy.md).')
+
+    $generated = $sb.ToString() -replace '\r\n', "`n"
+
+    if ($Check) {
+        if (-not (Test-Path -LiteralPath $outputPath -PathType Leaf)) {
+            Write-Host "connector-matrix: MISSING $outputPath -- run scripts/build-connector-matrix.ps1" -ForegroundColor Red
+            exit 1
+        }
+        $current = (Get-Content -Raw -LiteralPath $outputPath) -replace '\r\n', "`n"
+        $strip = { param($t) ($t -split "`n" | Where-Object { $_ -notmatch '^last_updated:' }) -join "`n" }
+        if ((& $strip $current) -ne (& $strip $generated)) {
+            Write-Host 'connector-matrix: DRIFT -- matrix does not match the package graph.' -ForegroundColor Red
+            Write-Host '  run: pwsh scripts/build-connector-matrix.ps1' -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "connector-matrix: current ($($providers.Count) provider(s), $($ordered.Count) famil(ies))."
+        exit 0
+    }
+
+    Set-Content -LiteralPath $outputPath -Value $generated -NoNewline -Encoding utf8
+    Write-Host "connector-matrix: wrote $outputPath ($($providers.Count) provider(s), $($ordered.Count) famil(ies))."
+    exit 0
+}
+finally { Pop-Location }

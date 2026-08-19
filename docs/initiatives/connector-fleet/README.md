@@ -69,7 +69,9 @@ A task is complete when **all** of the following hold. Nothing here is a matter 
      --markdown docs/reference/package-quality.md
    ```
 
-7. The ledger entry for the task is written, including any deviations.
+7. The connector matrix is regenerated and committed — `pwsh scripts/build-connector-matrix.ps1` —
+   so the new provider appears on the one page that answers "does Koan support X?".
+8. The ledger entry for the task is written, including any deviations.
 
 The initiative is complete when T1–T4 are each Done or BLOCKED with a recorded reason, and no task is
 left in progress.
