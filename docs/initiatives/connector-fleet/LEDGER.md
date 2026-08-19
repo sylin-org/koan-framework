@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T3 — [MySQL / MariaDB](tasks/T3-mysql.md)
-> **State:** in progress
-> **Last commit touching this initiative:** `a2d6449f2`
+> **Next task:** none — stopped after three consecutive BLOCKED tasks
+> **State:** stopped by the bootstrap failure protocol
+> **Last commit touching this initiative:** this T3 BLOCKED ledger commit
 >
-> Read [BOOTSTRAP.md](BOOTSTRAP.md) before doing anything. Check T3's STOP preconditions first.
+> Do not begin T4 until the shared container-runtime blocker is resolved and this stop is reviewed.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -34,7 +34,7 @@ leaves an accurate resume point rather than a stale one.
 |---|---|---|---|---|
 | T1 | pgvector | BLOCKED | none | not run |
 | T2 | Redis vector | BLOCKED | none | not run |
-| T3 | MySQL / MariaDB | Not started | — | — |
+| T3 | MySQL / MariaDB | BLOCKED | none | not run |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
@@ -123,3 +123,38 @@ The other STOP checks passed: the vector kit and Qdrant reference exist, and the
 `src/Connectors/Data/Redis/` and `src/Koan.Redis/`. `podman` and `nerdctl` were not installed. T1's
 attempt to start `com.docker.service` had already failed because this session cannot open the service.
 Unblocking requires an accessible running container engine and a Redis image with vector search.
+
+### T3 — MySQL / MariaDB — BLOCKED — 2026-08-19
+
+Commit: none
+Oracle: not run — STOP precondition 4 failed
+Acceptance: skills-verify not run · docs-lint not run · build not run · discoverability not
+
+Deviations: none
+
+Notes: STOP precondition 4 failed because the installed Docker client could not reach an engine, so a
+MySQL or MariaDB image could not start. The exact runtime check was:
+
+```text
+docker version --format '{{json .}}'
+```
+
+It exited 1 with:
+
+```text
+{"Client":{"Version":"29.5.3","ApiVersion":"1.54","DefaultAPIVersion":"1.54","GitCommit":"d1c06ef","GoVersion":"go1.26.4","Os":"windows","Arch":"amd64","BuildTime":"Wed Jun  3 18:03:06 2026","Context":"default"},"Server":null}
+WARNING: Error loading config file: open C:\Users\onose\.docker\config.json: Access is denied.
+failed to connect to the docker API at npipe:////./pipe/docker_engine; check if the path is correct and if the daemon is running: open //./pipe/docker_engine: The system cannot find the file specified.
+```
+
+The other STOP checks passed: the record conformance kit and Postgres structural reference exist, and
+the tree contains `src/Koan.Data.Relational/` plus `src/Koan.Data.Relational.Abstractions/`.
+Unblocking requires an accessible running container engine and a startable MySQL or MariaDB image.
+
+### Initiative stopped — 2026-08-19
+
+T1, T2, and T3 are three consecutive BLOCKED tasks with the same unavailable-container-runtime cause.
+BOOTSTRAP's failure protocol says this indicates an initiative-level environment problem and requires
+the executor to stop. T4 was therefore not opened or attempted, remains `Not started`, and the
+initiative is not complete. Resume only after a container engine is accessible in the execution
+session; then review the three BLOCKED entries and restart at the appropriate task under BOOTSTRAP.
