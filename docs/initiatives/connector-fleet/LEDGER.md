@@ -19,11 +19,11 @@ right. Update it in the same commit as the work it describes, or immediately aft
 
 ## RESUME HERE
 
-> **Next task:** T3 retry — [MySQL / MariaDB](tasks/T3-mysql.md)
-> **State:** in progress after container-runtime recovery
-> **Last commit touching this initiative:** `ddfe8e9a3`
+> **Next task:** None — initiative stopped under BOOTSTRAP's failure protocol
+> **State:** T1, T2, and T3 retries are three consecutive BLOCKED tasks
+> **Last commit touching this initiative:** `83cd8b64b`
 >
-> Recheck T3's STOP preconditions before implementation; preserve both earlier attempts in the log.
+> T4 remains not started. Resume only after the task authority conflicts in the retry log are resolved.
 
 Whoever picks this up next: update the three lines above **before** you start, so an interruption
 leaves an accurate resume point rather than a stale one.
@@ -34,7 +34,7 @@ leaves an accurate resume point rather than a stale one.
 |---|---|---|---|---|
 | T1 | pgvector | BLOCKED | none | not run |
 | T2 | Redis vector | BLOCKED | none | not run |
-| T3 | MySQL / MariaDB | In progress | — | — |
+| T3 | MySQL / MariaDB | BLOCKED | none | not run |
 | T4 | Mongo Atlas Vector | Not started | — | — |
 
 States: `Not started` · `In progress` · `Done` · `BLOCKED`.
@@ -225,3 +225,56 @@ PROOF_SEAM_FACTS=24
 violate T2 and derive RedisVector expectations that the prompt does not pin; the kit and runner are
 NEVER-touch files. Unblocking requires revised task authority that explicitly permits and pins the
 RedisVector V-01 through V-24 provider proofs against the current kit.
+
+### T3 — MySQL / MariaDB retry — BLOCKED — 2026-08-19
+
+Commit: none
+Oracle: not run — step 3 found an unsatisfiable package-versioning contract before implementation
+Acceptance: skills-verify not run · docs-lint not run · build not run · discoverability not
+
+Deviations:
+1. The current packaging tool requires every new packable project to own a project-local
+   `version.json`, but BOOTSTRAP forbids touching any `version.json` with no sanctioned exception.
+   T3's required MySql package therefore cannot enter the inventory or pass package quality.
+2. T3 says record-plane test projects live under `tests/Suites/Data/AdapterSurface/`; current concrete
+   suites instead live under `tests/Suites/Data/Connector.<Name>/`.
+3. T3 identifies `store-and-expose.md` as the as-of-authoring store-choice recipe. The current recipe
+   scan also finds server-store choice lists in `model-things-that-relate.md` and
+   `publish-to-a-named-channel.md`; all three would need MySql if the task were unblocked.
+
+Notes: All numbered STOP preconditions passed. Docker started `mysql:8.4`, `mysqladmin ping` reported
+the server alive, and MySQL reported version `8.4.11`. Exploration stopped before production edits
+when the required connector artifact was compared with the NEVER-touch table and packaging
+enforcement. The exact verification command was:
+
+```powershell
+$task = Select-String -LiteralPath 'docs/initiatives/connector-fleet/tasks/T3-mysql.md' -Pattern 'Connector: `src/Connectors/Data/MySql/`'; $never = Select-String -LiteralPath 'docs/initiatives/connector-fleet/BOOTSTRAP.md' -Pattern 'Any `version.json`'; $versioning = Select-String -LiteralPath 'docs/engineering/versioning.md' -Pattern 'A new packable project needs its own `version.json`'; $source = Get-Content -LiteralPath 'tools/Koan.Packaging/Services/RepositoryInspector.cs'; 'TASK ' + $task.LineNumber + ': ' + $task.Line.Trim(); 'BOOTSTRAP ' + $never.LineNumber + ': ' + $never.Line.Trim(); 'VERSIONING ' + $versioning.LineNumber + ': ' + $versioning.Line.Trim(); for ($i=77; $i -le 82; $i++) { 'PACKAGING ' + ($i+1) + ': ' + $source[$i].Trim() }; 'RESULT=T3 cannot add its required packable project without a forbidden version.json; package-quality would reject the inherited root owner.'; exit 1
+```
+
+It exited 1 with:
+
+```text
+TASK 57: - Connector: `src/Connectors/Data/MySql/`, project `Koan.Data.Connector.MySql.csproj`, package
+BOOTSTRAP 130: | Any `version.json`, or any hand-written package version | **None.** NBGV owns versions. |
+VERSIONING 50: A new packable project needs its own `version.json` before it can join the inventory. Copy one from a
+PACKAGING 78: if (!string.Equals(versionOwner, expectedOwner, StringComparison.OrdinalIgnoreCase))
+PACKAGING 79: {
+PACKAGING 80: throw new InvalidOperationException(
+PACKAGING 81: $"Packable package '{packageId}' owned by '{Relative(project)}' resolves versioning from " +
+PACKAGING 82: $"'{versionOwner}'. Add '{expectedOwner}' so the package owns its own version and only " +
+PACKAGING 83: $"its own changes advance it.");
+RESULT=T3 cannot add its required packable project without a forbidden version.json; package-quality would reject the inherited root owner.
+```
+
+No production, conformance, generated, or version files were changed. Unblocking requires task
+authority to add a narrow exception permitting creation of the mandatory project-local `version.json`,
+or a repository versioning change that lets a new packable connector pass package quality without one.
+
+### Initiative stopped — 2026-08-19
+
+The recovered-runtime retries of T1, T2, and T3 are three consecutive BLOCKED tasks. T1 and T2
+conflict with the current vector proof-seam kit; T3 conflicts with the repository's mandatory
+project-local version ownership and the initiative's absolute version-file prohibition. BOOTSTRAP's
+failure protocol therefore requires the executor to stop. T4 was not opened or attempted and remains
+`Not started`; the initiative is not complete. Resume only after the task authority is reconciled with
+the current conformance and packaging contracts.
