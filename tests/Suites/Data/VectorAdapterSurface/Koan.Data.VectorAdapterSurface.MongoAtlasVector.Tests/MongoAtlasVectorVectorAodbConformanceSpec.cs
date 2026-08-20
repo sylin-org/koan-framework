@@ -596,9 +596,13 @@ public sealed class MongoAtlasVectorVectorAodbConformanceSpec(MongoAtlasVectorTe
         await fixture.Restart();
         _ = await fixture.WaitForSearchIndex(collection, SearchIndex);
         Assert.NotNull(await Vector<VectorConformancePartitionDoc>.Get("durable"));
-        Assert.Contains(
-            (await Vector<VectorConformancePartitionDoc>.Search(Point(1), query => query.Top(10))).Items,
-            item => item.Id == "durable");
+
+        // Readable by id immediately; searchable once the restarted index has caught up with what was already
+        // stored. Both are asserted — the point must survive, and it must come back through search.
+        await MongoAtlasVectorTestFactory.WaitUntil(
+            async () => (await Vector<VectorConformancePartitionDoc>.Search(Point(1), query => query.Top(10)))
+                .Items.Any(item => item.Id == "durable"),
+            "the restarted search index to return the point that outlived the restart");
 
         var factory = Host!.Services.GetRequiredService<MongoAtlasVectorAdapterFactory>();
         var repository = factory.Create<VectorConformancePartitionDoc, string>(Host.Services,

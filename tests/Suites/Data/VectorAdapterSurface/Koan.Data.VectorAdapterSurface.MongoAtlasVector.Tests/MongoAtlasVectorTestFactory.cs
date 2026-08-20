@@ -130,6 +130,41 @@ public sealed class MongoAtlasVectorTestFactory : IAsyncLifetime
             $"Atlas search index '{index}' on '{VectorDatabase}.{collection}' did not become queryable.", last);
     }
 
+    /// <summary>
+    /// Waits for something Atlas makes true eventually rather than immediately.
+    ///
+    /// <para>A search index reports READY once it exists and accepts queries, which is not the same as having
+    /// finished indexing the documents already in the collection. After a restart the two diverge: a point is
+    /// readable by id straight away and absent from search results for a while longer. Asserting the second
+    /// against the first is a race, and it fails on whichever machine is slower that day.</para>
+    ///
+    /// <para>Waiting does not soften the claim. A point that is genuinely lost never appears, and the timeout
+    /// then names what never became true.</para>
+    /// </summary>
+    public static async Task WaitUntil(
+        Func<Task<bool>> satisfied,
+        string description,
+        CancellationToken ct = default)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromMinutes(2));
+        while (!timeout.IsCancellationRequested)
+        {
+            if (await satisfied().ConfigureAwait(false)) return;
+            try
+            {
+                await Task.Delay(100, timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+
+        if (await satisfied().ConfigureAwait(false)) return;
+        throw new TimeoutException($"Waited for {description}, which never became true.");
+    }
+
     public async Task EnableProfiling(bool enabled, CancellationToken ct = default)
     {
         _ = await Database().RunCommandAsync<BsonDocument>(
