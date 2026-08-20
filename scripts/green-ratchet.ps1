@@ -12,6 +12,11 @@
     A'. Test        dotnet test per project  — runs every deterministic suite in its own host lifecycle
                     through a bounded parallel wave with per-host hang detection. Real provider
                     boundaries are owned by direct workflow checks. Skip with -SkipTests.
+                    Every project emits a TRX; scripts/aggregate-test-evidence.ps1 merges them into
+                    artifacts/ratchet/test-manifest.json with per-project and aggregate
+                    total/passed/failed/skipped/duration, the failing projects, and any project that
+                    produced no readable TRX (what a hang looks like). The manifest is written before
+                    the verdict, so a red run keeps its evidence. It never changes pass/fail.
     B.  Docs lint   scripts/docs-lint.ps1    — links / front-matter / anchors / terms.
                     Errors are fatal; warnings are not.
     B'. Public docs scripts/public-docs-lint.ps1 — current navigation boundary, retired
@@ -60,6 +65,12 @@ $root = (Resolve-Path "$PSScriptRoot/..").ProviderPath
 # Certification policy: provider suites remain comprehensive and project-isolated; shared provider
 # resources cannot make release evidence order-dependent, and an inactive host cannot retain the queue.
 $testProjectMarker = 'Microsoft.NET.Test.Sdk'
+# PMC-020: a run that only prints its evidence has none. A buffered or truncated supervising console
+# cannot reconstruct aggregate counts afterwards, and the failing or hung project is exactly what gets
+# lost first. Every project emits a TRX; one deterministic manifest aggregates them.
+$ratchetEvidenceRoot = Join-Path $root 'artifacts/ratchet'
+$ratchetTrxRoot = Join-Path $ratchetEvidenceRoot 'trx'
+$ratchetTestManifest = Join-Path $ratchetEvidenceRoot 'test-manifest.json'
 $testHostHangTimeout = '5m'
 $effectiveTestProjectConcurrency = if ($TestProjectConcurrency -gt 0) {
     $TestProjectConcurrency
@@ -128,6 +139,11 @@ try {
             # Packaging tests launch their own dotnet build/run processes. Running that nested process tree inside
             # the outer wave made it 5-10x slower under CI contention, so keep the same suite complete but give it
             # one uncontended host after the ordinary project wave.
+            # Fresh per run: a stale TRX from a previous run would silently attribute old counts to this one.
+            if (Test-Path $ratchetTrxRoot) { Remove-Item -LiteralPath $ratchetTrxRoot -Recurse -Force }
+            New-Item -ItemType Directory -Path $ratchetTrxRoot -Force | Out-Null
+            $runStartedUtc = [DateTimeOffset]::UtcNow
+
             $isolatedTestProjects = @($testProjects | Where-Object Name -eq 'Koan.Packaging.Tests.csproj')
             $parallelTestProjects = @($testProjects | Where-Object Name -ne 'Koan.Packaging.Tests.csproj')
             Write-Host "[ratchet] runnable-test-projects=$($testProjects.Count)  parallel=$($parallelTestProjects.Count)  nested-process-isolated=$($isolatedTestProjects.Count)  concurrency=$effectiveTestProjectConcurrency"
@@ -138,6 +154,9 @@ try {
                     $configuration = $using:Configuration
                     $hangTimeout = $using:testHostHangTimeout
                     $relativeProject = [System.IO.Path]::GetRelativePath($testRoot, $project.FullName)
+                    $trxRoot = $using:ratchetTrxRoot
+                    $trxName = $relativeProject.Replace([char]92, '_').Replace('/', '_') + '.trx'
+                    $startedUtc = [DateTimeOffset]::UtcNow
                     $timer = [System.Diagnostics.Stopwatch]::StartNew()
                     Write-Host "[ratchet] test-project started: $relativeProject"
                     $arguments = @(
@@ -146,6 +165,8 @@ try {
                         '--no-build',
                         '--nologo',
                         '--filter', 'KoanLane!=native',
+                        '--results-directory', $trxRoot,
+                        '--logger', "trx;LogFileName=$trxName",
                         '--blame-hang-timeout', $hangTimeout,
                         '--blame-hang-dump-type', 'none'
                     )
@@ -159,12 +180,17 @@ try {
                         Project = $relativeProject
                         ExitCode = $exitCode
                         ElapsedSeconds = $timer.Elapsed.TotalSeconds
+                        StartedUtc = $startedUtc
+                        Trx = (Join-Path $trxRoot $trxName)
+                        Lane = 'parallel'
                     }
                 } -ThrottleLimit $effectiveTestProjectConcurrency
 
                 $isolatedTestProjects | ForEach-Object {
                     $project = $_
                     $relativeProject = [System.IO.Path]::GetRelativePath($root, $project.FullName)
+                    $trxName = $relativeProject.Replace([char]92, '_').Replace('/', '_') + '.trx'
+                    $startedUtc = [DateTimeOffset]::UtcNow
                     $timer = [System.Diagnostics.Stopwatch]::StartNew()
                     Write-Host "[ratchet] nested-process test-project started in isolation: $relativeProject"
                     $arguments = @(
@@ -173,6 +199,8 @@ try {
                         '--no-build',
                         '--nologo',
                         '--filter', 'KoanLane!=native',
+                        '--results-directory', $ratchetTrxRoot,
+                        '--logger', "trx;LogFileName=$trxName",
                         '--blame-hang-timeout', $testHostHangTimeout,
                         '--blame-hang-dump-type', 'none'
                     )
@@ -186,9 +214,37 @@ try {
                         Project = $relativeProject
                         ExitCode = $exitCode
                         ElapsedSeconds = $timer.Elapsed.TotalSeconds
+                        StartedUtc = $startedUtc
+                        Trx = (Join-Path $ratchetTrxRoot $trxName)
+                        Lane = 'isolated'
                     }
                 }
             )
+
+            # Aggregate BEFORE deciding the verdict: evidence matters most on the run that failed, and a
+            # manifest written only on success would be missing exactly when it is needed. The aggregator
+            # is a separate script so its failure and evidence-gap paths can be exercised directly.
+            $runRecordPath = Join-Path $ratchetEvidenceRoot 'test-run-records.json'
+            New-Item -ItemType Directory -Path $ratchetEvidenceRoot -Force | Out-Null
+            @($testResults | ForEach-Object {
+                [ordered]@{
+                    project        = $_.Project
+                    lane           = $_.Lane
+                    exitCode       = $_.ExitCode
+                    elapsedSeconds = $_.ElapsedSeconds
+                    startedUtc     = $_.StartedUtc.ToString('o')
+                    trx            = $_.Trx
+                }
+            }) | ConvertTo-Json -Depth 4 -AsArray | Set-Content -LiteralPath $runRecordPath -Encoding utf8
+
+            & "$root/scripts/aggregate-test-evidence.ps1" `
+                -RunRecordPath $runRecordPath `
+                -OutputPath $ratchetTestManifest `
+                -RepositoryRoot $root `
+                -Configuration $Configuration `
+                -Concurrency $effectiveTestProjectConcurrency `
+                -HangTimeout $testHostHangTimeout `
+                -StartedUtc $runStartedUtc.ToString('o')
 
             $failedProjects = @($testResults | Where-Object ExitCode -ne 0 | Sort-Object Project)
             Write-Host "`n[ratchet] test-project summary ($($testResults.Count) project(s))"
