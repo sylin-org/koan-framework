@@ -14,9 +14,14 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
         var context = new ParameterContext();
         var where = query.Filter is null ? null : Filter(query.Filter, context);
         var order = Order(query.Sort);
-        var limit = forcedLimit ?? (query.HasPagination ? query.EffectivePageSize() : null);
-        var offset = query.HasPagination ? query.EffectiveOffset() : 0;
-        return new CouchbaseQueryPlan(where, order.Sql, order.Handled, context.Parameters, limit, offset);
+
+        // A page is only a page of an ordered set. On the rare key SQL++ cannot express, Data finishes the
+        // ordering over the whole result, so the window has to be taken there too — slicing here would hand
+        // back an arbitrary few rows for Data to sort among themselves.
+        var ordered = order.Handled.Count == query.Sort.Count;
+        var limit = forcedLimit ?? (query.HasPagination && ordered ? query.EffectivePageSize() : null);
+        var offset = query.HasPagination && ordered ? query.EffectiveOffset() : 0;
+        return new CouchbaseQueryPlan(where, order.Sql, order.Handled, context.Parameters, limit, offset, ordered);
     }
 
     private string Filter(Filter filter, ParameterContext context) => filter switch
@@ -84,17 +89,41 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
         };
     }
 
+    /// <summary>
+    /// Builds the ORDER BY, including keys that reach through a collection.
+    ///
+    /// <para>Such a key is an aggregate over a nested array, which SQL++ expresses directly, so Couchbase
+    /// orders and pages the query rather than returning the collection for the framework to sort. Where the
+    /// plan cannot express one — an explicit map, a second collection inside the path, positional
+    /// First/Last — the whole ordering is declined instead of refused, and the framework completes it.
+    /// Refusing was the earlier behavior, and it turned a query every other adapter answers into a 400.</para>
+    ///
+    /// <para>Declining is all or nothing: a partial ORDER BY is discarded by the sort that follows it, and
+    /// reporting it as handled would let a page be taken against an ordering never fully applied.</para>
+    /// </summary>
     private (string Sql, IReadOnlySet<SortSpec> Handled) Order(IReadOnlyList<SortSpec> sorts)
     {
         var values = new List<string>(sorts.Count + 1);
         foreach (var sort in sorts)
         {
+            string value;
             if (sort.Path.TraversesCollection || sort.Aggregation != SortAggregation.None)
-                throw new NotSupportedException($"Couchbase cannot natively order collection path '{sort.Path}'.");
-            var path = FieldPath.Of(sort.Path.Members.Select(static member => member.Name).ToArray());
-            var resolved = FieldPathResolver.Resolve(typeof(TEntity), path);
-            values.Add("doc." + entity.Field(path, resolved, MappingConsumer.Order) + (sort.Desc ? " DESC" : " ASC"));
+            {
+                var aggregate = entity.CollectionOrderValue(sort.Path, sort.Aggregation);
+                // META(doc).id alone still gives the scan a stable, repeatable order for the framework to sort.
+                if (aggregate is null) return ("META(doc).id ASC", RepositoryQueryResult<TEntity>.NoSortHandled);
+                value = aggregate;
+            }
+            else
+            {
+                var path = FieldPath.Of(sort.Path.Members.Select(static member => member.Name).ToArray());
+                var resolved = FieldPathResolver.Resolve(typeof(TEntity), path);
+                value = "doc." + entity.Field(path, resolved, MappingConsumer.Order);
+            }
+
+            values.Add(value + (sort.Desc ? " DESC" : " ASC"));
         }
+
         values.Add("META(doc).id ASC");
         return (string.Join(", ", values), sorts.ToHashSet());
     }
@@ -124,7 +153,9 @@ internal sealed record CouchbaseQueryPlan(
     IReadOnlySet<SortSpec> SortHandled,
     IReadOnlyDictionary<string, object?> Parameters,
     int? Limit,
-    int Offset);
+    int Offset,
+    // Whether SQL++ applied the caller's whole ordering, and so whether a page below it is real.
+    bool Ordered = true);
 
 internal readonly record struct CouchbaseContainer(string Scope, string Collection)
 {

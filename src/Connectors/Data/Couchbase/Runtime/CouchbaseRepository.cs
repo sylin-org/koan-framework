@@ -96,7 +96,9 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             IsEstimate = false,
             CountExecution = total is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = plan.SortHandled,
-            PaginationHandled = query.HasPagination,
+            // Only when the plan actually applied the caller's ordering; otherwise Data owns both the sort
+            // and the window, and claiming the page here would give it an arbitrary slice to order.
+            PaginationHandled = query.HasPagination && plan.Ordered,
             ProjectionHandled = false
         };
     }
