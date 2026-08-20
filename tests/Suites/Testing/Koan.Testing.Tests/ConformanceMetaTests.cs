@@ -67,14 +67,24 @@ public class ConformanceBatteriesHaveTeeth
     public async Task Provider_failure_is_not_reclassified_as_an_infrastructure_skip()
     {
         var spec = new MissingProviderConformance();
-        await ((IAsyncLifetime)spec).InitializeAsync();
         try
         {
-            var exception = await Record.ExceptionAsync(spec.RoundTrip_persists_and_reads_back_by_id);
+            // Where the refusal lands is the framework's own choice, and it has moved: composition rejects an
+            // unknown provider while the host starts, rather than on the first data touch. That is the better
+            // place for it, so the spec covers both rather than pinning one. What must never change is that it
+            // stays a failure — a skip here would let a broken composition read as absent infrastructure and
+            // leave a green suite behind.
+            var exception = await Record.ExceptionAsync(async () =>
+            {
+                await ((IAsyncLifetime)spec).InitializeAsync();
+                await spec.RoundTrip_persists_and_reads_back_by_id();
+            });
 
             exception.Should().NotBeNull("an unknown configured provider is a conformance failure");
             exception!.GetType().FullName.Should().NotContain("Skip",
                 "composition and provider defects must remain visible instead of producing a green suite");
+            exception.Message.Should().Contain("provider-that-does-not-exist",
+                "the refusal has to name the misconfiguration, or it only says that something is wrong");
         }
         finally
         {
