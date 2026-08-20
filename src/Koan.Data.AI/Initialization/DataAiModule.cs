@@ -11,6 +11,10 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
+using Koan.AI.Contracts.Options;
+using Koan.AI.Contracts.Sources;
+using Koan.AI.Contracts.Categories;
+using Microsoft.Extensions.Options;
 using Koan.Data.Core;  // For .Save() extension method
 
 namespace Koan.Data.AI.Initialization;
@@ -147,23 +151,58 @@ public sealed class DataAiModule : KoanModule
     [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
     [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
     /// <summary>
-    /// Derives the Entity's vector space from its <c>[Embedding]</c> declaration: the space is named for the
-    /// Entity, carries the declared model and width, and uses cosine — the metric every text-embedding model
-    /// in practice expects. Contributed only when a width was declared; without one there is nothing to derive
-    /// and the application must declare the space itself.
+    /// Derives the Entity's vector space from its <c>[Embedding]</c> declaration, resolving the width through
+    /// Koan's layered defaults — most local wins:
+    /// <list type="number">
+    ///   <item><description><c>[Embedding(Dimensions = ...)]</c> on the Entity — local.</description></item>
+    ///   <item><description><c>Koan:Ai:Embed:Dimensions</c> — global.</description></item>
+    ///   <item><description>whatever the elected adapter reports for its embedding capability — the floor.</description></item>
+    /// </list>
+    /// Nothing is invented: when no layer supplies a width, no space is derived and the Vector pillar keeps its
+    /// corrective, because a wrong width fails on the first embed rather than at composition.
     /// </summary>
     private static void DeclareDerivedVectorSpace(IServiceCollection services, Type entityType, EmbeddingMetadata metadata)
     {
-        if (metadata.Dimensions <= 0) return;
-        services.ContributeVectorSpace(
-            entityType,
-            new VectorSpacePlan(
+        services.ContributeVectorSpace(entityType, provider =>
+        {
+            var dimensions = ResolveDimensions(metadata, provider);
+            if (dimensions <= 0) return null;
+            return new VectorSpacePlan(
                 source: "Default",
                 name: entityType.Name,
-                dimensions: metadata.Dimensions,
+                dimensions: dimensions,
                 metric: VectorMetric.Cosine,
                 visibility: VectorVisibility.Session,
-                model: metadata.Model));
+                model: metadata.Model ?? EmbedCategory(provider)?.Model);
+        });
+    }
+
+    private static int ResolveDimensions(EmbeddingMetadata metadata, IServiceProvider? provider)
+    {
+        if (metadata.Dimensions > 0) return metadata.Dimensions;                       // local
+        var configured = EmbedCategory(provider)?.Dimensions ?? 0;
+        if (configured > 0) return configured;                                          // global
+        return AdapterDimensions(provider, metadata.Model);                             // adapter floor
+    }
+
+    private static AiCategoryOptions? EmbedCategory(IServiceProvider? provider) =>
+        provider?.GetService<IOptions<AiOptions>>()?.Value?.Embed;
+
+    /// <summary>The lowest layer: what a source reports for the embedding capability it serves.</summary>
+    private static int AdapterDimensions(IServiceProvider? provider, string? model)
+    {
+        var sources = provider?.GetService<IAiSourceRegistry>()?.GetSourcesWithCapability("Embedding");
+        if (sources is null) return 0;
+        foreach (var source in sources)
+        {
+            if (!source.Capabilities.TryGetValue("Embedding", out var capability)) continue;
+            if (capability.Dimensions <= 0) continue;
+            // When the Entity named a model, only a source serving that model may speak for its width.
+            if (!string.IsNullOrWhiteSpace(model) &&
+                !string.Equals(capability.Model, model, StringComparison.OrdinalIgnoreCase)) continue;
+            return capability.Dimensions;
+        }
+        return 0;
     }
 
     private static void RegisterEmbeddingHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)

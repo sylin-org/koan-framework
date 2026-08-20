@@ -63,7 +63,7 @@ internal sealed class VectorService : IVectorService, IVectorRuntime, IDisposabl
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
 
         var route = RoutedSource.Resolve<TEntity>();
-        var space = _spaces.Resolve(typeof(TEntity), route);
+        var space = _spaces.Resolve(typeof(TEntity), route, _services);
         var factory = SelectFactory<TEntity>(space.Source);
         var source = _sources.GetPlan(space.Source, factory.Provider);
         source.Demand(effect, operation);

@@ -31,6 +31,12 @@ public sealed class DerivedVectorSpaceSpec
     [Embedding(Model = "test-embed")]
     public sealed class WidthlessDoc : Entity<WidthlessDoc> { public string Title { get; set; } = ""; }
 
+    [Embedding(Model = "test-embed")]
+    public sealed class GlobalWidthDoc : Entity<GlobalWidthDoc> { public string Title { get; set; } = ""; }
+
+    [Embedding(Model = "test-embed", Dimensions = 4)]
+    public sealed class LocalBeatsGlobalDoc : Entity<LocalBeatsGlobalDoc> { public string Title { get; set; } = ""; }
+
     [Fact(DisplayName = "an [Embedding] width lets a vector Entity work from a bare AddKoan()")]
     public async Task Width_derives_the_space()
     {
@@ -72,20 +78,54 @@ public sealed class DerivedVectorSpaceSpec
             .WithMessage("*has no declared space*");
     }
 
+    [Fact(DisplayName = "Koan:Ai:Embed:Dimensions supplies the width when the Entity does not")]
+    public async Task Global_layer_supplies_the_width()
+    {
+        using var host = await Boot(_ => { }, new() { ["Koan:Ai:Embed:Dimensions"] = "5" });
+
+        // GlobalWidthDoc declares a model but no width, so the global layer answers.
+        await Vector<GlobalWidthDoc>.Save("a", new[] { 1f, 0f, 0f, 0f, 0f });
+
+        var tooNarrow = () => Vector<GlobalWidthDoc>.Save("b", new[] { 1f, 0f, 0f, 0f });
+        await tooNarrow.Should().ThrowAsync<Exception>("five is the configured width");
+    }
+
+    [Fact(DisplayName = "the Entity's own width outranks the global default")]
+    public async Task Local_outranks_global()
+    {
+        using var host = await Boot(_ => { }, new() { ["Koan:Ai:Embed:Dimensions"] = "5" });
+
+        // Most local wins: the attribute says four, so four it is, global default notwithstanding.
+        await Vector<LocalBeatsGlobalDoc>.Save("a", new[] { 1f, 0f, 0f, 0f });
+
+        var globalWidth = () => Vector<LocalBeatsGlobalDoc>.Save("b", new[] { 1f, 0f, 0f, 0f, 0f });
+        await globalWidth.Should().ThrowAsync<Exception>("the Entity's declaration is the most local layer");
+    }
+
     private static async Task<IHost> Boot(Action<KoanApplicationBuilder> compose)
     {
         // In a shipping application the [Embedding] registry is source-generated. This assembly deliberately
         // does not run that generator — it also hosts fixtures that are invalid on purpose — so these three
         // entities register themselves, which is the same input the generator would supply.
-        EmbeddingRegistry.RegisterTypes([typeof(DerivedDoc), typeof(DeclaredDoc), typeof(WidthlessDoc)]);
+        EmbeddingRegistry.RegisterTypes([
+            typeof(DerivedDoc), typeof(DeclaredDoc), typeof(WidthlessDoc),
+            typeof(GlobalWidthDoc), typeof(LocalBeatsGlobalDoc)]);
+
+        return await Boot(compose, new Dictionary<string, string?>());
+    }
+
+    private static async Task<IHost> Boot(Action<KoanApplicationBuilder> compose, Dictionary<string, string?> settings)
+    {
+        EmbeddingRegistry.RegisterTypes([
+            typeof(DerivedDoc), typeof(DeclaredDoc), typeof(WidthlessDoc),
+            typeof(GlobalWidthDoc), typeof(LocalBeatsGlobalDoc)]);
+
+        settings["Koan:Data:Sources:Default:Adapter"] = "inmemory";
+        settings["Koan:Data:VectorDefaults:DefaultProvider"] = "inmemory";
+        settings["Koan:Data:AI:EmbeddingWorker:Enabled"] = "false";
 
         var host = Host.CreateDefaultBuilder()
-            .ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
-                ["Koan:Data:VectorDefaults:DefaultProvider"] = "inmemory",
-                ["Koan:Data:AI:EmbeddingWorker:Enabled"] = "false"
-            }))
+            .ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings))
             .ConfigureServices(services => services.AddKoan(compose))
             .Build();
         await host.StartAsync();

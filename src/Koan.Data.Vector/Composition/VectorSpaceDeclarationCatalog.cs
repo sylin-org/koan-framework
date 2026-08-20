@@ -14,7 +14,8 @@ internal sealed class VectorSpaceDeclarationCatalog
     // Source-agnostic fallbacks contributed by another pillar (Koan.Data.AI derives one from [Embedding]).
     // Kept apart from _plans so an explicit declaration always outranks a derived one and the two can never
     // collide on ordering: whoever composes first, the declared space still wins.
-    private readonly ConcurrentDictionary<Type, VectorSpacePlan> _derived = new();
+    private readonly ConcurrentDictionary<Type, Func<IServiceProvider?, VectorSpacePlan?>> _derived = new();
+    private readonly ConcurrentDictionary<Type, VectorSpacePlan> _derivedResolved = new();
     private bool _frozen;
 
     public static void Declare(Type entityType, VectorSpacePlan plan)
@@ -46,15 +47,21 @@ internal sealed class VectorSpaceDeclarationCatalog
     /// composes from a bare <c>AddKoan()</c>. Never overrides an explicit
     /// <c>koan.Data.Source(...).Vector&lt;TEntity&gt;(...)</c> declaration.
     /// </summary>
-    internal static void DeclareDerived(IServiceCollection services, Type entityType, VectorSpacePlan plan)
+    internal static void DeclareDerived(
+        IServiceCollection services,
+        Type entityType,
+        Func<IServiceProvider?, VectorSpacePlan?> derive)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(entityType);
-        ArgumentNullException.ThrowIfNull(plan);
-        Locate(services)._derived.TryAdd(entityType, plan);
+        ArgumentNullException.ThrowIfNull(derive);
+        // Deferred on purpose. The contributing pillar knows the Entity at composition, but the layers beneath
+        // it — configuration and whatever an adapter reports — are only settled later. Resolving here would
+        // make the answer depend on module ordering.
+        Locate(services)._derived.TryAdd(entityType, derive);
     }
 
-    public VectorSpacePlan Resolve(Type entityType, RoutedSource route)
+    public VectorSpacePlan Resolve(Type entityType, RoutedSource route, IServiceProvider? services = null)
     {
         ArgumentNullException.ThrowIfNull(entityType);
         Freeze();
@@ -66,7 +73,7 @@ internal sealed class VectorSpaceDeclarationCatalog
             if (route.Kind == RouteKind.DatabaseAxis)
             {
                 if (_axisPlans.TryGetValue(key, out var routed)) return routed;
-                var template = SinglePlan(entityType, routedSource);
+                var template = SinglePlan(entityType, routedSource, services);
                 return _axisPlans.GetOrAdd(
                     key,
                     static (_, state) => new VectorSpacePlan(
@@ -84,17 +91,17 @@ internal sealed class VectorSpaceDeclarationCatalog
                 "Declare it with koan.Data.Source(...).Vector<TEntity>(...) or correct the source context.");
         }
 
-        return SinglePlan(entityType, routedSource: null);
+        return SinglePlan(entityType, routedSource: null, services);
     }
 
-    private VectorSpacePlan SinglePlan(Type entityType, string? routedSource)
+    private VectorSpacePlan SinglePlan(Type entityType, string? routedSource, IServiceProvider? services)
     {
         var candidates = _plans
             .Where(entry => entry.Key.Entity == entityType)
             .Select(static entry => entry.Value)
             .OrderBy(static plan => plan.Source, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        if (candidates.Length == 0 && _derived.TryGetValue(entityType, out var derived))
+        if (candidates.Length == 0 && TryDerive(entityType, services, out var derived))
         {
             var source = string.IsNullOrWhiteSpace(routedSource) ? derived.Source : routedSource;
             return derived.Source.Equals(source, StringComparison.OrdinalIgnoreCase)
@@ -118,6 +125,17 @@ internal sealed class VectorSpaceDeclarationCatalog
                       $"{string.Join(", ", candidates.Select(static plan => plan.Source))}. " +
                       "Declare that routed source explicitly or keep one source-independent vector shape.")
         };
+    }
+
+    /// <summary>Resolve a contributed derivation once, then reuse it; a space must not change under a host.</summary>
+    private bool TryDerive(Type entityType, IServiceProvider? services, out VectorSpacePlan plan)
+    {
+        if (_derivedResolved.TryGetValue(entityType, out var cached)) { plan = cached; return true; }
+        if (!_derived.TryGetValue(entityType, out var derive)) { plan = null!; return false; }
+        var produced = derive(services);
+        if (produced is null) { plan = null!; return false; }
+        plan = _derivedResolved.GetOrAdd(entityType, produced);
+        return true;
     }
 
     private void Add(Type entityType, VectorSpacePlan plan)

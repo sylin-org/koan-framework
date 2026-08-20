@@ -20,4 +20,11 @@ public sealed class AiCategoryOptions
 
     /// <summary>Fallback source if primary is unavailable.</summary>
     public string? Fallback { get; set; }
+
+    /// <summary>
+    /// Width of the vectors this category's model produces, for the Embed category. The global layer of Koan's
+    /// layered defaults: an Entity's <c>[Embedding(Dimensions = ...)]</c> overrides it, and an adapter supplies
+    /// one when neither is set.
+    /// </summary>
+    public int? Dimensions { get; set; }
 }

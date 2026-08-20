@@ -19,15 +19,21 @@ public static class VectorSpaceContributionExtensions
     /// <c>koan.Data.Source(...).Vector&lt;TEntity&gt;(...)</c> always outranks it, whichever composes first,
     /// and the first contribution for an Entity wins over later ones.
     /// </summary>
+    /// <param name="derive">
+    /// Produces the space when it is first needed, or <see langword="null"/> when the contributing pillar
+    /// cannot supply one. It is deferred rather than eager because the layers a contributor reads from —
+    /// configuration, and whatever an adapter reports — settle after composition; resolving eagerly would make
+    /// the answer depend on module ordering. It runs once per Entity and the result is reused.
+    /// </param>
     public static IServiceCollection ContributeVectorSpace(
         this IServiceCollection services,
         Type entityType,
-        VectorSpacePlan plan)
+        Func<IServiceProvider?, VectorSpacePlan?> derive)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(entityType);
-        ArgumentNullException.ThrowIfNull(plan);
-        VectorSpaceDeclarationCatalog.DeclareDerived(services, entityType, plan);
+        ArgumentNullException.ThrowIfNull(derive);
+        VectorSpaceDeclarationCatalog.DeclareDerived(services, entityType, derive);
         return services;
     }
 }
