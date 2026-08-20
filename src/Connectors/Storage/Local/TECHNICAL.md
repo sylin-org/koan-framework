@@ -3,8 +3,9 @@
 ## Activation and options
 
 `LocalStorageModule` binds `Koan:Storage:Providers:Local`, registers `LocalStorageProvider`, and reports its resolved
-configuration/capability posture. `BasePath` is required; relative paths resolve against the process working directory
-once when the singleton provider is constructed.
+configuration/capability posture. `BasePath` defaults to `.koan/storage`, so a bare reference composes; an explicitly empty value still fails
+validation. Relative paths resolve against the process working directory once when the singleton provider is
+constructed.
 
 ## Physical layout and safety
 
