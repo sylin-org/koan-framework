@@ -156,11 +156,6 @@ public sealed class DataAiModule : KoanModule
     }
 
     /// <summary>
-    /// Registers the typed host-owned lifecycle contribution for a discovered entity type.
-    /// </summary>
-    [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
-    [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
-    /// <summary>
     /// Derives the Entity's vector space from its <c>[Embedding]</c> declaration, resolving the width through
     /// Koan's layered defaults — most local wins:
     /// <list type="number">
@@ -260,6 +255,11 @@ public sealed class DataAiModule : KoanModule
         }
     }
 
+    /// <summary>
+    /// Registers the typed host-owned lifecycle contribution for a discovered entity type.
+    /// </summary>
+    [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
+    [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
     private static void RegisterEmbeddingHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)
     {
         // Find the Entity<T> or Entity<T, TKey> base class

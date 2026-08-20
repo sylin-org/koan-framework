@@ -19,6 +19,8 @@ public static class VectorSpaceContributionExtensions
     /// <c>koan.Data.Source(...).Vector&lt;TEntity&gt;(...)</c> always outranks it, whichever composes first,
     /// and the first contribution for an Entity wins over later ones.
     /// </summary>
+    /// <param name="services">The composing service collection.</param>
+    /// <param name="entityType">The Entity the space belongs to.</param>
     /// <param name="derive">
     /// Produces the space when it is first needed, or <see langword="null"/> when the contributing pillar
     /// cannot supply one. It is deferred rather than eager because the layers a contributor reads from —
