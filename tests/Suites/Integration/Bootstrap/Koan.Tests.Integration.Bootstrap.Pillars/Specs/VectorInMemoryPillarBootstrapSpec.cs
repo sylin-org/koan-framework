@@ -21,6 +21,8 @@ namespace Koan.Tests.Integration.Bootstrap.Pillars.Specs;
 /// </summary>
 public sealed class VectorInMemoryPillarBootstrapSpec
 {
+    private const string VecBootSpace = "vec-boot";
+
     public sealed class VecBootDoc : Entity<VecBootDoc> { }
 
     [Fact]
@@ -29,7 +31,11 @@ public sealed class VectorInMemoryPillarBootstrapSpec
         await using var host = await PillarHost.Configure()
             .WithSetting("Koan:Data:Sources:Default:Adapter", "inmemory")
             .WithSetting("Koan:Environment", "Test")
-            .ConfigureServices(services => services.AddKoan())
+            // The space declaration is schema, not registration: dimension and metric cannot be inferred from
+            // an entity, exactly as a relational entity's column widths cannot. The claim under test is that
+            // the adapter is DISCOVERED and ELECTED without AddKoanDataVector(), which still holds.
+            .ConfigureServices(services => services.AddKoan(koan =>
+                koan.Data.Source("Default").Vector<VecBootDoc>(space => space.Name(VecBootSpace).Dimensions(3))))
             .StartAsync();
 
         // Reference = Intent: with Koan.Data.Vector + the InMemory vector connector referenced,
@@ -39,12 +45,15 @@ public sealed class VectorInMemoryPillarBootstrapSpec
         var repo = vectors.TryGetRepository<VecBootDoc, string>();
         repo.Should().NotBeNull("the InMemory vector connector must be discovered via Reference = Intent");
 
-        await repo!.Upsert("east", new[] { 1f, 0f, 0f });
-        await repo.Upsert("north", new[] { 0f, 1f, 0f });
+        // The legacy Upsert overload is a NotSupportedException default on the current contract; points go
+        // through Save(VectorPoint, VectorScope).
+        await repo!.Save(new VectorPoint<string>("east", new[] { 1f, 0f, 0f }, null), VectorScope.Unscoped);
+        await repo.Save(new VectorPoint<string>("north", new[] { 0f, 1f, 0f }, null), VectorScope.Unscoped);
 
         // A query leaning east must rank "east" first — proves the TensorPrimitives cosine path runs.
-        var result = await repo.Search(new VectorQueryOptions(new[] { 0.9f, 0.1f, 0f }, TopK: 2));
-        result.Matches.Should().HaveCount(2);
-        ((string)(object)result.Matches[0].Id).Should().Be("east");
+        var result = await repo.Search(
+            new VectorSearchRequest(new[] { 0.9f, 0.1f, 0f }, Top: 2, Space: VecBootSpace), VectorScope.Unscoped);
+        result.Items.Should().HaveCount(2);
+        ((string)(object)result.Items[0].Id).Should().Be("east");
     }
 }

@@ -97,7 +97,10 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
                 .ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings))
                 .ConfigureServices(services =>
                 {
-                    services.AddKoan();
+                    // Boot the sample the way its own Program.cs does: the PhotoAsset vector space is declared
+                    // by SnapVaultModule.Compose, so a fixture calling bare AddKoan() would exercise a
+                    // composition the application never ships.
+                    services.AddKoan(SnapVaultModule.Compose);
                     services.Configure<JobsOptions>(options =>
                     {
                         options.EnableWorker = false;
@@ -208,8 +211,11 @@ public sealed class SnapVaultTenancyFlagshipSpec
     [Fact(DisplayName = "vector: a studio's semantic search never returns another studio's photos")]
     public async Task Vector_search_is_studio_isolated()
     {
-        var acmePoint = new[] { 1f, 0f, 0f };
-        var globexPoint = new[] { 0f, 1f, 0f };
+        // Conform to the space SnapVaultModule declares for PhotoAsset. The proof is that the tenant filter
+        // excludes the nearer point, not the distance itself, so two orthogonal unit vectors of the declared
+        // width say exactly what three did.
+        var acmePoint = UnitVector(0);
+        var globexPoint = UnitVector(1);
 
         using (Tenant.Use(StudioA)) await Vector<PhotoAsset>.Save("acme-1", acmePoint);
         using (Tenant.Use(StudioB)) await Vector<PhotoAsset>.Save("globex-1", globexPoint);
@@ -228,6 +234,17 @@ public sealed class SnapVaultTenancyFlagshipSpec
             r.Matches.Select(m => m.Id).Should().Equal("globex-1");
         }
     }
+
+    /// <summary>One-hot vector of the width SnapVault declares for the PhotoAsset space.</summary>
+    private static float[] UnitVector(int axis)
+    {
+        var point = new float[PhotoSpaceDimensions];
+        point[axis] = 1f;
+        return point;
+    }
+
+    /// <summary>Mirrors SnapVaultModule's declared dimension; a drift here fails loudly rather than silently.</summary>
+    private const int PhotoSpaceDimensions = 768;
 
     // ───────────────────────── Leg 4 — [HostScoped] system styles are shared ─────────────────────────
 
