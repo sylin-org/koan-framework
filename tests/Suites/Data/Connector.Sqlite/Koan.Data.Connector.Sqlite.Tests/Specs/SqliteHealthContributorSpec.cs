@@ -141,7 +141,13 @@ public sealed class SqliteHealthContributorSpec
                 var absent = await contributor.Check();
 
                 contributor.IsCritical.Should().BeTrue();
-                absent.State.Should().Be(HealthState.Unhealthy);
+
+                // A managed database that has not been written to yet is not a fault, and this spec used to say
+                // it was. Readiness gates traffic: if it stays red until something provisions, and nothing
+                // provisions until traffic arrives, the probe can never pass — a fresh host would sit at 503
+                // forever under any orchestrator. What must not change is that observing never provisions,
+                // which the two File.Exists assertions below still hold to.
+                absent.State.Should().Be(HealthState.Healthy);
                 File.Exists(databasePath).Should().BeFalse("health is an observation, not a provisioning path");
                 File.Exists(fallbackPath).Should().BeFalse(
                     "health must inspect the same configured Default source used by repositories");

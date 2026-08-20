@@ -65,7 +65,6 @@ public abstract class DataAdapterHealthContributorBase(
             }
             catch (Exception ex)
             {
-                _ = ex;
                 var plan = FindPlan(source);
                 return new HealthReport(
                     Name,
@@ -79,6 +78,11 @@ public abstract class DataAdapterHealthContributorBase(
                         ["sourceCount"] = sources.Count,
                         ["failedDecision"] = plan?.RouteIdentity,
                         ["failureCode"] = "koan.data.health.probe-failed",
+                        // The reason used to be discarded. "Unavailable" with no cause is a dead end for whoever
+                        // is looking at a red /health/ready at 3am; the message is de-identified because a
+                        // provider exception routinely quotes the connection string that caused it.
+                        ["failureType"] = ex.GetType().Name,
+                        ["failureReason"] = Redaction.DeIdentify(ex.Message),
                         ["claims"] = plan is null ? string.Empty : string.Join(",", plan.ClaimReferences)
                     });
             }

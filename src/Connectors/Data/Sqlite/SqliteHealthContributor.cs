@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Connector.Sqlite.Runtime;
 using Koan.Data.Core;
@@ -29,10 +30,48 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
     protected override async Task ProbeSource(string source, CancellationToken ct)
     {
         var route = _factory.ResolveRoute(_services, source);
+
+        // A managed file database that has not been created yet is not a fault. The probe deliberately opens
+        // non-creating, so on a fresh host it would otherwise report "unavailable" for a store that is simply
+        // waiting to be provisioned — a 503 on the first boot of an application that is working perfectly.
+        // An external store is different: its absence is a real dependency failure and still fails.
+        if (route.Policy.StorageLifecycle == StorageLifecycle.Managed && IsAwaitingProvisioning(route.ConnectionString))
+        {
+            return;
+        }
+
         await using var connection = _connections.Create(route.ConnectionString, route.Source, nonCreating: true);
         await connection.OpenAsync(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT 1";
         _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether this managed route is simply not provisioned yet, as opposed to broken.
+    ///
+    /// <para>The distinction is the parent directory. A missing database file under a usable directory is what
+    /// every fresh host looks like before its first write. A missing file whose parent is absent — or is itself
+    /// a file — is a real fault and still probes, and still fails.</para>
+    /// </summary>
+    private bool IsAwaitingProvisioning(string connectionString)
+    {
+        try
+        {
+            var builder = _connections.Parse(connectionString);
+            if (string.IsNullOrWhiteSpace(builder.DataSource)) return false;
+            if (builder.DataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)) return false;
+            if (builder.DataSource.Contains("://", StringComparison.Ordinal)) return false;
+
+            var path = Path.GetFullPath(builder.DataSource);
+            if (File.Exists(path)) return false;
+
+            var directory = Path.GetDirectoryName(path);
+            return !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }
