@@ -28,12 +28,31 @@ public sealed class ClassificationModule : KoanModule
     {
         var environment = services.GetRequiredService<IHostEnvironment>();
         var provider = services.GetRequiredService<IClassificationKeyProvider>();
-        if (!environment.IsDevelopment() && provider is EphemeralClassificationKeyProvider)
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Classification");
+        var ephemeral = provider is EphemeralClassificationKeyProvider;
+
+        // Production is the gate, not Development. Koan's convention is that a capability works from a
+        // bare reference everywhere and asks for explicit consent only in Production -- the same shape
+        // as AllowProductionDdl, and honoring the framework-wide Koan:AllowMagicInProduction escape
+        // hatch. Gating on !IsDevelopment() instead turned a production safety rail into a functionality
+        // block that broke Test and Staging, including CI.
+        if (ephemeral && environment.IsProduction() && !KoanEnv.AllowMagicInProduction)
             throw new InvalidOperationException(
                 $"Koan Classification refuses ephemeral keys in environment '{environment.EnvironmentName}'. " +
-                $"Register a durable {nameof(IClassificationKeyProvider)} before AddKoan() completes composition.");
+                $"An ephemeral key is regenerated per process, so data encrypted with it cannot be read after a " +
+                $"restart. Register a durable {nameof(IClassificationKeyProvider)} before AddKoan() completes composition.");
 
-        services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Classification").LogInformation(
+        // Loud outside Development, because an ephemeral key is a real data-loss boundary the moment
+        // anything persists across a restart -- but it is a warning to act on, not a wall.
+        if (ephemeral && !environment.IsDevelopment())
+            logger?.LogWarning(
+                "Classification is using an ephemeral key in environment '{Environment}'. Keys are regenerated per " +
+                "process, so anything encrypted now becomes unreadable after a restart. Register a durable {Contract} " +
+                "before this reaches production.",
+                environment.EnvironmentName,
+                nameof(IClassificationKeyProvider));
+
+        logger?.LogInformation(
             "Classification field-at-rest protection active: cipher=AES-256-GCM; key-provider={Provider}; scope=compiled segmentation.",
             provider.GetType().FullName ?? provider.GetType().Name);
         return Task.CompletedTask;
