@@ -1,3 +1,4 @@
+using Koan.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -5,8 +6,9 @@ namespace Koan.Tenancy;
 
 /// <summary>
 /// The resolved tenancy runtime (ARCH-0099 §1) — computes the <see cref="TenancyPosture"/> once, per host, from
-/// the <b>per-host</b> <see cref="IHostEnvironment"/> (the same ASP.NET <c>IsDevelopment()</c> rule the in-core
-/// <c>KoanEnv</c> snapshot is itself computed from) plus any explicit <see cref="TenancyOptions.Posture"/>
+/// the <b>per-host</b> <see cref="IHostEnvironment"/> (through <see cref="Koan.Core.KoanEnv.Gate.DevelopmentOnly"/>,
+/// so an open posture obeys the same rule as every other development-only surface) plus any explicit
+/// <see cref="TenancyOptions.Posture"/>
 /// override, and holds it so the hot-path gate reads a field, not a derivation.
 ///
 /// <para>It is deliberately <b>per-host</b>, not the process-global <c>KoanEnv</c> snapshot: <c>KoanEnv</c> latches
@@ -23,6 +25,6 @@ public sealed class TenancyRuntime
     public TenancyRuntime(IOptions<TenancyOptions> options, IHostEnvironment environment)
     {
         var o = options?.Value ?? new TenancyOptions();
-        Posture = TenancyPostureResolver.Resolve(environment?.IsDevelopment() ?? false, o.Posture);
+        Posture = TenancyPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(environment), o.Posture);
     }
 }

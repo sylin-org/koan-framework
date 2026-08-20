@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Web.Admin.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +16,7 @@ internal sealed class KoanAdminAuthorizationFilter(
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var snapshot = options.Value;
-        if (!environment.IsDevelopment() || !snapshot.Enabled)
+        if (!KoanEnv.Gate.DevelopmentOnly(environment) || !snapshot.Enabled)
         {
             context.Result = new NotFoundResult();
             return;

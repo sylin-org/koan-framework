@@ -11,7 +11,7 @@ using System.Reflection;
 namespace Koan.Core;
 
 // Single, immutable runtime snapshot available statically
-public static class KoanEnv
+public static partial class KoanEnv
 {
     /// <summary>
     /// Dumps the current environment snapshot using proper logging.

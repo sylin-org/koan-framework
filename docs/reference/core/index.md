@@ -66,6 +66,47 @@ Contracts assembly; referencing contracts must not activate functionality.
 and `ReportComposition` project resolved facts; applications do not call them. Recurring or pokable
 work belongs to the background-service or Jobs contracts, not `Start`.
 
+## Environment posture
+
+A module that gates behavior on the environment names the decision it is making. `KoanEnv.IsDevelopment`
+and `IsProduction` stay available and are the right read for diagnostics — log level, banner detail —
+but they are the wrong tool for deciding whether a capability composes, because that has a law.
+
+**A convenience that is safe everywhere but risky in Production** — schema auto-creation, endpoint
+auto-discovery, a local key file — declares itself and lets the gate apply the law:
+
+```csharp
+KoanEnv.Gate.Enforce(new KoanMagic(
+    Capability: "automatic schema creation",
+    Risk: "Koan issues CREATE and ALTER against whatever database the connection string resolves to.",
+    Remedy: "provision the schema out of band, or set AllowProductionDdl on the source",
+    Consent: options.AllowProductionDdl), environment, logger);
+```
+
+Production is the gate, not Development. The capability runs from a bare reference in Development,
+Staging, Test, and CI — warning outside Development — and in Production asks for consent rather than
+disappearing. Consent is the capability's own option **or** `Koan:AllowMagicInProduction`. A refusal
+names the capability, the risk, the remedy, and the flag, so an operator can act on it without reading
+source. Use `Gate.Announce` instead of `Enforce` when skipping is a coherent outcome and refusing the
+host would be wrong.
+
+**A surface that must not exist outside Development** — an admin console, a dev token endpoint, seeded
+credentials — uses the other gate:
+
+```csharp
+if (!KoanEnv.Gate.DevelopmentOnly(environment)) return;
+```
+
+It takes no consent parameter and no flag unlocks it, deliberately: a convenience flag that also
+switched on seeded credentials would be an authentication bypass. Whatever it guards should be absent
+from the production service graph, not merely unreachable.
+
+**An unconfigured default** uses `KoanEnv.Gate.LooksDeployed(environment)` — Production, or anything in
+a container. It picks what a setting should be when nobody said; it is a heuristic and never decides
+whether a request is authorized.
+
+See [ARCH-0128](../../decisions/ARCH-0128-environment-posture-is-a-named-decision.md).
+
 ## Composition and provider decisions
 
 Core compiles structural contributions once per host shape. Pillars then own semantic policy and

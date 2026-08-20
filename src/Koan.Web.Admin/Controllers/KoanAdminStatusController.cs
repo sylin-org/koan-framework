@@ -58,7 +58,7 @@ public sealed class KoanAdminStatusController(
         return Ok(BuildHealth());
     }
 
-    private bool IsActive() => environment.IsDevelopment() && options.Value.Enabled;
+    private bool IsActive() => KoanEnv.Gate.DevelopmentOnly(environment) && options.Value.Enabled;
 
     private KoanAdminHealthDocument BuildHealth()
     {

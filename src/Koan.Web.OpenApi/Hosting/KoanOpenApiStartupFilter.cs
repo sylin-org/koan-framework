@@ -1,3 +1,4 @@
+using Koan.Core;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
@@ -121,7 +122,7 @@ internal sealed class KoanOpenApiStartupFilter(
     private static ResolvedOpenApiOptions Resolve(KoanOpenApiOptions options, IHostEnvironment environment)
     {
         var documentEnabled = options.Enabled ?? true;
-        var uiEnabled = documentEnabled && (options.EnableUi ?? environment.IsDevelopment());
+        var uiEnabled = documentEnabled && (options.EnableUi ?? KoanEnv.Gate.DevelopmentOnly(environment));
 
         if (documentEnabled && string.IsNullOrWhiteSpace(options.RoutePattern))
         {
@@ -145,7 +146,7 @@ internal sealed class KoanOpenApiStartupFilter(
         return new ResolvedOpenApiOptions(
             documentEnabled,
             uiEnabled,
-            uiEnabled && !environment.IsDevelopment() && options.RequireAuthenticationOutsideDevelopment,
+            uiEnabled && !KoanEnv.Gate.DevelopmentOnly(environment) && options.RequireAuthenticationOutsideDevelopment,
             routePattern,
             documentPath,
             uiRoutePrefix,

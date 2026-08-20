@@ -75,10 +75,10 @@ public sealed class SecIdentityModule : KoanModule
         var options = services.GetService<IOptions<IdentityOptions>>()?.Value ?? new IdentityOptions();
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Identity");
 
-        var posture = IdentityPostureResolver.Resolve(env.IsDevelopment(), options.Posture);
+        var posture = IdentityPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), options.Posture);
 
         // Fail-closed (mirrors Trust/Tenancy): Open auto-seeds dev users and is legal only in Development.
-        if (posture == IdentityPosture.Open && !env.IsDevelopment())
+        if (posture == IdentityPosture.Open && !KoanEnv.Gate.DevelopmentOnly(env))
             throw new InvalidOperationException(
                 "SEC-0007 fail-closed: Identity posture 'Open' (which auto-seeds dev users) is only valid in " +
                 $"Development; environment '{env.EnvironmentName}' must resolve 'Closed'. Remove the " +
@@ -86,7 +86,7 @@ public sealed class SecIdentityModule : KoanModule
 
         logger?.LogInformation("Koan.Identity posture resolved: {Posture}.", posture);
 
-        if (ShouldSeedDevUsers(env.IsDevelopment(), posture, options.SeedDevUsers))
+        if (ShouldSeedDevUsers(KoanEnv.Gate.DevelopmentOnly(env), posture, options.SeedDevUsers))
         {
             var reconciler = services.GetService<IIdentityReconciler>() ?? new IdentityReconciler();
             var devUser = (options.DevUser ?? Environment.UserName).Trim();
@@ -125,8 +125,8 @@ public sealed class SecIdentityModule : KoanModule
         var auditSnapshotMode = cfg.GetValue<Audit.IdentityAuditSnapshotMode?>(
             $"{IdentityOptions.SectionPath}:{nameof(IdentityOptions.AuditSnapshotMode)}")
             ?? Audit.IdentityAuditSnapshotMode.PrivacySafe;
-        var posture = IdentityPostureResolver.Resolve(env.IsDevelopment(), configured);
-        var source = configured is null ? (env.IsDevelopment() ? "dev-open" : "closed") : "override";
+        var posture = IdentityPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), configured);
+        var source = configured is null ? (KoanEnv.Gate.DevelopmentOnly(env) ? "dev-open" : "closed") : "override";
         module.SetSetting("Identity", b => b.Value(
             $"posture={posture} ({source}); audit={auditSnapshotMode}; erasure=preview+owner-receipt; " +
             "durable person + IUserStore/IExternalIdentityStore reconciliation; no per-MAU axis (SEC-0007 D2)"));

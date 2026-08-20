@@ -49,7 +49,7 @@ public sealed class AuthServerModule : KoanModule
         services.AddDataProtection();
         services.AddSingleton<PersistedIssuerKeyStore>();
         services.Replace(ServiceDescriptor.Singleton<IIssuerKeyStore>(sp =>
-            sp.GetRequiredService<IHostEnvironment>().IsDevelopment()
+            KoanEnv.Gate.DevelopmentOnly(sp.GetRequiredService<IHostEnvironment>())
                 ? new EphemeralIssuerKeyStore()
                 : sp.GetRequiredService<PersistedIssuerKeyStore>()));
         services.AddHostedService<IssuerKeyRotationService>();
@@ -81,7 +81,7 @@ public sealed class AuthServerModule : KoanModule
     /// <summary>
     /// SEC-0006 addendum (WEB-0072 P3) — seed the well-known public dev client (<see cref="DevExplorerClientId"/>)
     /// the MCP Explorer's device-flow exerciser posts against. Two-gate fail-closed, mirroring the dev-token
-    /// endpoint: the <c>IHostEnvironment.IsDevelopment()</c> gate is the real safety (a guessable
+    /// endpoint: the <see cref="KoanEnv.Gate.DevelopmentOnly"/> gate is the real safety (a guessable
     /// pre-registered client must never exist in production), with <see cref="AuthServerOptions.SeedDevClient"/> as
     /// the operator opt-out. Idempotent (seed-once). The client is <b>public</b> — its security rests on PKCE + the
     /// device-consent ceremony, not a secret — and carries no redirect URIs (the device grant never redirects).
@@ -97,7 +97,7 @@ public sealed class AuthServerModule : KoanModule
     private static async Task SeedDevExplorerClientAsync(
         IHostEnvironment env, AuthServerOptions options, IServiceProvider services, CancellationToken ct)
     {
-        if (!env.IsDevelopment() || !options.SeedDevClient) return;
+        if (!KoanEnv.Gate.DevelopmentOnly(env) || !options.SeedDevClient) return;
 
         using var scope = AppHost.PushScope(services);
 
@@ -117,7 +117,7 @@ public sealed class AuthServerModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        module.AddNote(env.IsDevelopment()
+        module.AddNote(KoanEnv.Gate.DevelopmentOnly(env)
             ? $"Embedded OAuth 2.1 AS — ephemeral ES256 key; dev-token endpoint (GET {AuthServerRoutes.DevToken}) ENABLED."
             : "Embedded OAuth 2.1 AS — persisted + rotating ES256 key (encrypted-at-rest); dev-token endpoint is dev-only (404 here).");
     }

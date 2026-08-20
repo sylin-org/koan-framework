@@ -55,7 +55,7 @@ public sealed class TenancyModule : KoanModule, IContributeTo<SegmentationContri
         var runtime = services.GetRequiredService<TenancyRuntime>();
         var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Tenancy");
 
-        if (runtime.Posture == TenancyPosture.Open && !env.IsDevelopment())
+        if (runtime.Posture == TenancyPosture.Open && !KoanEnv.Gate.DevelopmentOnly(env))
             throw new InvalidOperationException(
                 "Tenancy posture resolved to Open outside Development. Remove the " +
                 $"{TenancyOptions.SectionPath}:Posture=Open override or run the host in Development.");
@@ -77,9 +77,9 @@ public sealed class TenancyModule : KoanModule, IContributeTo<SegmentationContri
         var overrideRaw = cfg[$"{TenancyOptions.SectionPath}:Posture"];
         TenancyPosture? overridePosture =
             Enum.TryParse<TenancyPosture>(overrideRaw, ignoreCase: true, out var parsed) ? parsed : null;
-        var posture = TenancyPostureResolver.Resolve(env.IsDevelopment(), overridePosture);
+        var posture = TenancyPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), overridePosture);
 
-        var source = overridePosture is null ? (env.IsDevelopment() ? "dev-open" : "closed") : "override";
+        var source = overridePosture is null ? (KoanEnv.Gate.DevelopmentOnly(env) ? "dev-open" : "closed") : "override";
         module.SetSetting("Tenancy", b => b.Value(
             $"posture={posture} ({source}); segmentation=tenant/hard; realization=pillar-owned"));
     }

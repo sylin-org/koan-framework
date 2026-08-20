@@ -53,7 +53,7 @@ public sealed class AdminModule : KoanModule
             defaults.Authorization.AutoCreateDevelopmentPolicy);
 
         var routes = KoanAdminPathUtility.BuildMap(prefix.Value);
-        var active = env.IsDevelopment() && enabled.Value;
+        var active = KoanEnv.Gate.DevelopmentOnly(env) && enabled.Value;
 
         module.AddSetting(AdminProvenanceItems.Enabled, FromConfigurationValue(enabled), active,
             sourceKey: enabled.ResolvedKey, usedDefault: enabled.UsedDefault);
@@ -64,7 +64,7 @@ public sealed class AdminModule : KoanModule
         module.AddSetting(AdminProvenanceItems.AuthorizationAutoCreatePolicy, FromConfigurationValue(autoPolicy), autoPolicy.Value,
             sourceKey: autoPolicy.ResolvedKey, usedDefault: autoPolicy.UsedDefault);
 
-        if (!env.IsDevelopment())
+        if (!KoanEnv.Gate.DevelopmentOnly(env))
         {
             module.AddNote("Koan Web Admin is Development-only; routes remain inactive in this environment.");
             return;

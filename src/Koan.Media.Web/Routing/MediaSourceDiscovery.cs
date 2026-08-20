@@ -9,6 +9,8 @@ namespace Koan.Media.Web.Routing;
 /// <summary>Compiles the default media source choice from the application's concrete media Entities.</summary>
 internal static class MediaSourceDiscovery
 {
+    /// <param name="CandidateCount">How many concrete media Entities the application declares.</param>
+    /// <param name="Summary">One line for startup reporting, naming the choice or why there was none.</param>
     /// <param name="SourceRegistered">
     /// False when the application declares no media Entity at all. Media Web then composes inertly:
     /// referencing a projection is the intent to expose media once there is some, not an assertion that

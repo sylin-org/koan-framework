@@ -54,7 +54,7 @@ public sealed class McpServerOptions
     /// </summary>
     public bool RequireAuthentication
     {
-        get => _requireAuthentication ?? (KoanEnv.IsProduction || KoanEnv.InContainer);
+        get => _requireAuthentication ?? KoanEnv.Gate.LooksDeployed();
         set => _requireAuthentication = value;
     }
 

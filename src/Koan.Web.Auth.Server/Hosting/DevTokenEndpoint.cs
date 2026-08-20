@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Web.Auth.Server.Options;
 using Koan.Security.Trust.Issuer;
 using Microsoft.AspNetCore.Http;
@@ -26,7 +27,7 @@ internal static class DevTokenEndpoint
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
 
         // HARD dev-gate, fail-closed: 404 (don't even acknowledge the endpoint) outside Development or when disabled.
-        if (!env.IsDevelopment() || !options.DevTokenEnabled)
+        if (!KoanEnv.Gate.DevelopmentOnly(env) || !options.DevTokenEnabled)
         {
             ctx.Response.StatusCode = StatusCodes.Status404NotFound;
             return;

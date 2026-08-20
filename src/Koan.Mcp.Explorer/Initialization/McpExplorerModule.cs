@@ -29,7 +29,7 @@ public sealed class McpExplorerModule : KoanModule
         ArgumentNullException.ThrowIfNull(module);
 
         var configured = configuration.GetValue<bool?>("Koan:Mcp:Explorer:Enabled");
-        var enabled = configured ?? (!environment.IsProduction() && !KoanEnv.InContainer);
+        var enabled = configured ?? !KoanEnv.Gate.LooksDeployed(environment);
         if (!enabled)
         {
             module.Describe(Version, "mcp.explorer: inactive");
@@ -40,7 +40,7 @@ public sealed class McpExplorerModule : KoanModule
         route = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
         var role = configuration["Koan:Mcp:Explorer:AdminRole"];
         var scope = configuration["Koan:Mcp:Explorer:AdminScope"];
-        var accessMap = environment.IsDevelopment()
+        var accessMap = KoanEnv.Gate.DevelopmentOnly(environment)
             ? "development"
             : !string.IsNullOrWhiteSpace(role) || !string.IsNullOrWhiteSpace(scope)
                 ? "admin-gated"

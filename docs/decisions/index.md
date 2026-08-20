@@ -69,6 +69,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0125 | [Each package owns its version on one shared compatibility train](ARCH-0125-per-project-package-versions.md) | Accepted | Project-local version ownership, a per-package version manifest, and publication that skips unchanged packages |
 | ARCH-0126 | [A process-global resource is owned by a process-derived fact](ARCH-0126-process-global-resource-ownership.md) | Accepted | Standard output ownership resolved from the process before composition; capabilities observe it rather than claim it |
 | ARCH-0127 | [Connector fleet strategy — capability without infrastructure](ARCH-0127-connector-fleet-strategy.md) | Accepted | Connectors ranked by capability added per unit of infrastructure imposed; a connector without an existing conformance oracle is not delegable |
+| ARCH-0128 | [Environment posture is a named decision, not a boolean read](ARCH-0128-environment-posture-is-a-named-decision.md) | Accepted | Capabilities gate on a named decision (`KoanEnv.Gate`), not on `IsDevelopment`/`IsProduction`; Production is the gate and consent is the unlock, except where nothing may unlock |
 
 ## Authoring Principles
 

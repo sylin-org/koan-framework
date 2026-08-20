@@ -73,7 +73,7 @@ public sealed class KoanTenancyWebModule : KoanModule
         // naive env check — otherwise a dev host with Posture=Closed would announce "just-works" while the gate 403s.
         var postureOverride = Enum.TryParse<TenancyPosture>(cfg[$"{TenancyOptions.SectionPath}:Posture"], ignoreCase: true, out var p)
             ? (TenancyPosture?)p : null;
-        var posture = TenancyPostureResolver.Resolve(env.IsDevelopment(), postureOverride) == TenancyPosture.Open
+        var posture = TenancyPostureResolver.Resolve(KoanEnv.Gate.DevelopmentOnly(env), postureOverride) == TenancyPosture.Open
             ? "Open (dev — just-works)"
             : "Closed (requires grant, fail-closed)";
         var operators = cfg.GetSection($"{section}:Grant:Operators").GetChildren().Count();

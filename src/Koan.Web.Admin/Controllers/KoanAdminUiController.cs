@@ -1,3 +1,4 @@
+using Koan.Core;
 using Koan.Web.Admin.Infrastructure;
 using Koan.Web.Admin.Options;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +34,7 @@ public sealed class KoanAdminUiController(
     public IActionResult Assets(string? asset)
         => IsActive() ? Serve(asset) : NotFound();
 
-    private bool IsActive() => environment.IsDevelopment() && options.Value.Enabled;
+    private bool IsActive() => KoanEnv.Gate.DevelopmentOnly(environment) && options.Value.Enabled;
 
     private IActionResult Serve(string? asset)
     {

@@ -59,7 +59,7 @@ public sealed class HttpSseTransport
             return;
         }
 
-        if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContainer))
+        if (!options.RequireAuthentication && KoanEnv.Gate.LooksDeployed())
         {
             _logger.LogWarning(
                 "SECURITY WARNING: legacy MCP HTTP+SSE transport running without authentication in {Environment}.",

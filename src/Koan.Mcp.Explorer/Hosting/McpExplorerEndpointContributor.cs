@@ -1,3 +1,4 @@
+using Koan.Core;
 using System;
 using System.Linq;
 using System.Text.Json;
@@ -67,7 +68,7 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
     {
         var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
         var options = context.RequestServices.GetRequiredService<IOptionsMonitor<McpExplorerOptions>>().CurrentValue;
-        if (!AccessMapGate.Allowed(env.IsDevelopment(), context.User, options))
+        if (!AccessMapGate.Allowed(KoanEnv.Gate.DevelopmentOnly(env), context.User, options))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;

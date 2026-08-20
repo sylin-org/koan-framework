@@ -18,9 +18,9 @@ internal static class SqliteSchema
         if (route.Options.DdlPolicy != RelationalDdlPolicy.AutoCreate)
             throw new InvalidOperationException(
                 $"SQLite cannot provision '{plan.Table}' because DdlPolicy is {route.Options.DdlPolicy}.");
-        if (Koan.Core.KoanEnv.IsProduction && !route.Options.AllowProductionDdl)
+        if (!RelationalDdlGate.Allowed(route.Options.AllowProductionDdl))
             throw new InvalidOperationException(
-                $"SQLite production DDL is disabled for '{plan.Table}'. Enable it only for a Koan-owned store.");
+                $"SQLite cannot provision '{plan.Table}'. {RelationalDdlGate.Refusal}");
 
         connections.PrepareManaged(route.ConnectionString);
         await using var connection = connections.Create(route.ConnectionString, route.Source);

@@ -1,3 +1,4 @@
+using Koan.Core;
 using Microsoft.Extensions.Hosting;
 
 namespace Koan.Web.Auth.Connector.Test.Options;
@@ -40,6 +41,6 @@ public sealed class TestProviderOptions
     /// attribute-routed endpoints remain fail-closed outside Development unless explicitly enabled.
     /// </summary>
     public bool IsActive(IHostEnvironment? env)
-        => Enabled || (env?.IsDevelopment() ?? false);
+        => Enabled || KoanEnv.Gate.DevelopmentOnly(env);
 }
 

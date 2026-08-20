@@ -31,7 +31,7 @@ public sealed class WellKnownController(
     IKoanRuntimeFacts runtimeFacts
 ) : ControllerBase
 {
-    private bool CanExposeObservability() => env.IsDevelopment() || (webOptions?.Value?.ExposeObservabilitySnapshot == true);
+    private bool CanExposeObservability() => KoanEnv.Gate.DevelopmentOnly(env) || (webOptions?.Value?.ExposeObservabilitySnapshot == true);
 
     [HttpGet("observability")]
     public IActionResult Observability()
@@ -50,7 +50,7 @@ public sealed class WellKnownController(
 
         var payload = new
         {
-            enabled = opts.Enabled && (!string.IsNullOrWhiteSpace(otlpEndpoint) || env.IsDevelopment()),
+            enabled = opts.Enabled && (!string.IsNullOrWhiteSpace(otlpEndpoint) || KoanEnv.Gate.DevelopmentOnly(env)),
             resource = new { serviceName, serviceVersion, serviceInstanceId },
             traces = new
             {

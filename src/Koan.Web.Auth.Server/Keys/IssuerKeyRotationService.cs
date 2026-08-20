@@ -34,7 +34,9 @@ internal sealed class IssuerKeyRotationService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Development uses an ephemeral key — nothing to rotate or persist.
+        // Development uses an ephemeral key — nothing to rotate or persist. This reads the environment directly
+        // rather than KoanEnv.Gate.DevelopmentOnly: the gate answers "may this surface exist", and no surface is
+        // being gated here — a background schedule simply has no work to do.
         if (_env.IsDevelopment()) return;
 
         var checkEvery = _options.KeyRotationInterval < TimeSpan.FromHours(4)

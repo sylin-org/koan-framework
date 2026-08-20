@@ -158,8 +158,16 @@ internal sealed class LMStudioAdapterContributor : IAiProviderActivator
             ["Embedding"] = new() { Model = model ?? string.Empty }
         };
 
+    // Production is the gate, not Development. This used to read IsDevelopment, which silently refused
+    // discovery in Staging, Test, and CI -- environments where probing a local endpoint is exactly as
+    // reasonable as it is on a laptop, and where MESS-0026 says discovery should be on.
     private static bool ShouldDiscover(AiOptions options) =>
-        options.AutoDiscoveryEnabled && (KoanEnv.IsDevelopment || options.AllowDiscoveryInNonDev);
+        options.AutoDiscoveryEnabled && KoanEnv.Gate.Allows(new KoanMagic(
+            Capability: "LM Studio endpoint auto-discovery",
+            Risk: "Koan probes well-known local addresses and adopts whatever answers, which in production "
+                + "means the model serving your users is whatever happened to be listening.",
+            Remedy: "configure the endpoint explicitly, or set AllowDiscoveryInNonDev to accept discovery there",
+            Consent: options.AllowDiscoveryInNonDev));
 
     private static Uri? FirstEndpoint(AiSourceDefinition? source)
     {

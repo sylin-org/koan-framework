@@ -12,6 +12,9 @@ internal static class IssuerKeyGuard
     public static void EnsurePersistedOutsideDevelopment(bool isEphemeral, IHostEnvironment env, bool acknowledged)
     {
         if (!isEphemeral) return;
+        // Production AND Staging, which is neither KoanEnv.Gate predicate: this guard protects token continuity,
+        // and Staging issues tokens real clients hold. Its acknowledgement is a dedicated option, deliberately not
+        // Koan:AllowMagicInProduction — a convenience flag must not be able to destabilize a published JWKS.
         if (!(env.IsProduction() || env.IsStaging())) return;
         if (acknowledged) return;
 

@@ -1,3 +1,4 @@
+using Koan.Core;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Security.Trust.Dev;
@@ -17,7 +18,7 @@ internal sealed class DevIdentityContributor(
 
     public ValueTask ContributeAsync(WebContext context)
     {
-        if (environment.IsDevelopment()
+        if (KoanEnv.Gate.DevelopmentOnly(environment)
             && DevIdentity.Resolve(context.HttpContext, options.Value) is { } principal)
             context.UsePrincipal(principal);
         return ValueTask.CompletedTask;

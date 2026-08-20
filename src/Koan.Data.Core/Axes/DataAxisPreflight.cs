@@ -48,6 +48,9 @@ public static class DataAxisPreflight
         var leaks = DetectLeaks(services);
         if (leaks.Count == 0) return;
 
+        // Deliberately NOT KoanEnv.Gate: that gate lets Koan:AllowMagicInProduction unlock a convenience, and a
+        // confirmed cross-tenant read is not a convenience. Nothing may unlock this one, so it reads the
+        // environment directly.
         var refuses = environment.IsProduction();
         var message = Format(leaks, refuses);
         if (refuses)

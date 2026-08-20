@@ -122,7 +122,7 @@ public sealed class OpenApiModule : KoanModule
             routePattern,
             uiRoute,
             requireAuthentication,
-            env.IsDevelopment());
+            KoanEnv.Gate.DevelopmentOnly(env));
     }
 
     private sealed record OpenApiOptionSnapshot(

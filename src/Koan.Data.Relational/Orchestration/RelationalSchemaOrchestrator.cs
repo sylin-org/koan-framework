@@ -278,16 +278,15 @@ internal sealed class RelationalSchemaOrchestrator :
             ? "StorageLifecycle=External forbids shape mutation."
             : policy.Ddl != RelationalDdlPolicy.AutoCreate
                 ? $"DDL is disabled by policy '{policy.Ddl}'."
-                : "DDL is not allowed in production.";
+                : RelationalDdlGate.Refusal;
         throw new InvalidOperationException(
-            $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason} " +
-            "Set the selected provider's DdlPolicy to AutoCreate and explicitly allow production DDL only when intended.");
+            $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason}");
     }
 
     private static bool IsDdlAllowed(RelationalSchemaPolicy policy) =>
         policy.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.Managed &&
         policy.Ddl == RelationalDdlPolicy.AutoCreate &&
-        (!Koan.Core.KoanEnv.IsProduction || policy.AllowProductionDdl);
+        RelationalDdlGate.Allowed(policy.AllowProductionDdl);
 
     private static bool DefinitionEquals(RelationalColumnDefinition expected, RelationalColumnDefinition actual) =>
         expected.ClrType == actual.ClrType &&

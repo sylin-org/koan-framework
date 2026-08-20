@@ -37,28 +37,18 @@ public sealed class ClassificationModule : KoanModule
         // the host. Either is fine to develop against and neither is a production key service.
         var localCustody = provider is EphemeralClassificationKeyProvider or LocalFileClassificationKeyProvider;
 
-        // Production is the gate, not Development. Koan's convention is that a capability works from a
-        // bare reference everywhere and asks for explicit consent only in Production -- the same shape
-        // as AllowProductionDdl, and honoring the framework-wide Koan:AllowMagicInProduction escape
-        // hatch. Gating on !IsDevelopment() instead turned a production safety rail into a functionality
-        // block that broke Test and Staging, including CI.
-        if (localCustody && environment.IsProduction() && !KoanEnv.AllowMagicInProduction)
-            throw new InvalidOperationException(
-                $"Koan Classification refuses a local-custody key in environment '{environment.EnvironmentName}'. " +
-                $"The built-in providers keep key material beside the data and never rotate it, which is a " +
-                $"development posture. Register an {nameof(IClassificationKeyProvider)} backed by your key service " +
-                $"before AddKoan() completes composition, or set Koan:AllowMagicInProduction to accept local custody.");
-
-        // Loud outside Development, because an ephemeral key is a real data-loss boundary the moment
-        // anything persists across a restart -- but it is a warning to act on, not a wall.
-        if (localCustody && !environment.IsDevelopment())
-            logger?.LogWarning(
-                "Classification is using local key custody in environment '{Environment}' ({Provider}). Key material " +
-                "sits beside the data it protects and is never rotated. Register an {Contract} backed by your key " +
-                "service before this reaches production.",
-                environment.EnvironmentName,
-                provider.GetType().Name,
-                nameof(IClassificationKeyProvider));
+        // The shared law: refuses in Production without consent, warns in Staging/Test/CI, silent in
+        // Development. Spelling that out by hand cost a bug already -- an earlier version of this gate
+        // read !IsDevelopment(), which turned a production safety rail into a functionality block that
+        // broke Test, Staging, and CI.
+        if (localCustody)
+            KoanEnv.Gate.Enforce(new KoanMagic(
+                Capability: "a local-custody key",
+                Risk: "the built-in providers keep key material beside the data it protects and never rotate it, "
+                    + "so anyone who can read the database can read the keyring.",
+                Remedy: $"register an {nameof(IClassificationKeyProvider)} backed by your key service before "
+                    + "AddKoan() completes composition"),
+                environment, logger);
 
         // Name the custody, not just the type. "Which file holds my keys?" is the first question anyone asks
         // the moment classified data matters, and it should not require reading the source to answer.

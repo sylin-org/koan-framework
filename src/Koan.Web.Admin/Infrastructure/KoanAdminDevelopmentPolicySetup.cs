@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Koan.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Web.Admin.Options;
@@ -10,7 +11,7 @@ internal sealed class KoanAdminDevelopmentPolicySetup(IHostEnvironment environme
 {
     public void Configure(AuthorizationOptions authorization)
     {
-        if (!environment.IsDevelopment())
+        if (!KoanEnv.Gate.DevelopmentOnly(environment))
         {
             return;
         }

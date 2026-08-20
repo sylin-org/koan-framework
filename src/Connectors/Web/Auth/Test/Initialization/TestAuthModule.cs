@@ -43,7 +43,7 @@ public sealed class TestAuthModule : KoanModule
             cfg,
             $"{TestProviderOptions.SectionPath}:{nameof(TestProviderOptions.Enabled)}",
             false);
-        var active = enabledOption.Value || env.IsDevelopment();
+        var active = enabledOption.Value || KoanEnv.Gate.DevelopmentOnly(env);
 
         module.PublishConfigValue(
             TestProviderItems.Enabled,

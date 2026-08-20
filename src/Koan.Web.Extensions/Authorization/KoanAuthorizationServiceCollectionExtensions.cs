@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Koan.Core;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Koan.Web.Extensions.Authorization.Internal;
@@ -40,7 +41,7 @@ public static class KoanAuthorizationServiceCollectionExtensions
                 new DelegateClaimsTransformation(principal =>
                 {
                     var env = sp.GetRequiredService<IHostEnvironment>();
-                    if (!env.IsDevelopment())
+                    if (!KoanEnv.Gate.DevelopmentOnly(env))
                     {
                         return Task.FromResult(principal);
                     }

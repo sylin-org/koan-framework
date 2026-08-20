@@ -215,7 +215,7 @@ internal static class MySqlSchema
         options.SourcePlan.StorageLifecycle == StorageLifecycle.Managed &&
         options.SourcePlan.Access == DataSourceAccess.ReadWrite &&
         options.DdlPolicy == RelationalDdlPolicy.AutoCreate &&
-        (!Koan.Core.KoanEnv.IsProduction || options.AllowProductionDdl);
+        RelationalDdlGate.Allowed(options.AllowProductionDdl);
 
     private static SchemaMismatchException Mismatch<TEntity, TKey>(
         MySqlEntityPlan<TEntity, TKey> plan,

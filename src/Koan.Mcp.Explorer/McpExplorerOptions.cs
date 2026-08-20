@@ -15,7 +15,7 @@ public sealed class McpExplorerOptions
     /// </summary>
     public bool Enabled
     {
-        get => _enabled ?? !(KoanEnv.IsProduction || KoanEnv.InContainer);
+        get => _enabled ?? !KoanEnv.Gate.LooksDeployed();
         set => _enabled = value;
     }
 

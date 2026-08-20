@@ -339,7 +339,7 @@ public sealed class StreamableHttpTransport
             return false;
         }
 
-        if (!options.RequireAuthentication && (KoanEnv.IsProduction || KoanEnv.InContainer))
+        if (!options.RequireAuthentication && KoanEnv.Gate.LooksDeployed())
         {
             _logger.LogWarning(
                 "SECURITY WARNING: MCP Streamable HTTP transport running without authentication in {Environment}.",
