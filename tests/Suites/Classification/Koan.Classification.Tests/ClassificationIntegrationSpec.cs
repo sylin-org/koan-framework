@@ -169,7 +169,9 @@ public sealed class ClassificationIntegrationSpec
     {
         await using var fx = await ClassificationRuntimeFixture.CreateAsync();
         fx.ResetEntityCaches();
-        using var _iso = Isolate();
+        // No partition: this test ends in raw SQL that names the table literally, and a partition routes
+        // writes to a partitioned table the literal name does not resolve. The fresh per-test database
+        // already isolates, which is the same reasoning the write-path test states.
 
         var a = await new Patient { Name = "Edsger", Ward = "shortest-path" }.Save();
         var b = await new Patient { Name = "Donald", Ward = "concrete" }.Save();
@@ -181,8 +183,11 @@ public sealed class ClassificationIntegrationSpec
         // All / structured Query
         (await Patient.All()).Select(p => p.Name).Should().BeEquivalentTo("Edsger", "Donald");
         (await Patient.Query(p => p.Ward == "concrete")).Select(p => p.Name).Should().Equal("Donald");
-        // QueryRaw — the values come back from raw SQL still protected; the reverse restores them
-        (await Patient.QueryRaw("SELECT Id, Json FROM Patient")).Select(p => p.Name)
+        // QueryRaw — the rows come back from raw SQL still protected; the reverse restores them.
+        // QueryRaw takes a PREDICATE, not a statement: the provider wraps it as
+        // SELECT <plan> FROM <table> AS koan_row WHERE (<predicate>). Referencing the koan_row alias
+        // keeps this honest — it only compiles into the real generated statement.
+        (await Patient.QueryRaw("koan_row.Id IS NOT NULL")).Select(p => p.Name)
             .Should().BeEquivalentTo("Edsger", "Donald");
     }
 
