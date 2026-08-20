@@ -11,14 +11,14 @@ namespace Koan.Classification.Tests;
 public sealed class ClassificationModulePostureSpec
 {
     [Fact]
-    public async Task Production_refuses_the_development_only_ephemeral_provider()
+    public async Task Production_refuses_a_local_custody_provider()
     {
         using var provider = Services(Environments.Production).BuildServiceProvider();
 
         var start = () => new ClassificationModule().Start(provider, CancellationToken.None);
 
         await start.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*refuses ephemeral keys*Production*IClassificationKeyProvider*");
+            .WithMessage("*refuses a local-custody key*Production*IClassificationKeyProvider*");
     }
 
     [Fact]

@@ -158,7 +158,7 @@ public sealed class ClassificationIntegrationSpec
         var p = await new Patient { Name = "to be forgotten", Ward = "A-1" }.Save();
 
         fx.Services.GetRequiredService<IClassificationKeyProvider>().Should()
-            .BeOfType<EphemeralClassificationKeyProvider>().Which.Dispose();
+            .BeOfType<LocalFileClassificationKeyProvider>().Which.Dispose();
 
         var read = async () => await Patient.Get(p.Id);
         await read.Should().ThrowAsync<ObjectDisposedException>();
@@ -229,7 +229,7 @@ public sealed class ClassificationIntegrationSpec
         // Lose local key custody. A cached plaintext copy would survive and return; an excluded Entity re-enters Data
         // and fails at the key boundary.
         fx.Services.GetRequiredService<IClassificationKeyProvider>().Should()
-            .BeOfType<EphemeralClassificationKeyProvider>().Which.Dispose();
+            .BeOfType<LocalFileClassificationKeyProvider>().Which.Dispose();
 
         // If the entity were cached, this would be a cache HIT returning the stale PLAINTEXT — the L2 leak. Because it
         // is excluded, the read goes to the store and fails at the missing key boundary.
@@ -293,7 +293,7 @@ public sealed class ClassificationIntegrationSpec
         fact.Subject.Should().Be("classification:field-at-rest");
         fact.ReasonCode.Should().Be("compiled-field-transform");
         fact.Summary.Should().Contain("AES-256-GCM")
-            .And.Contain(typeof(EphemeralClassificationKeyProvider).FullName!)
+            .And.Contain(typeof(LocalFileClassificationKeyProvider).FullName!)
             .And.Contain("compiled segmentation")
             .And.Contain("No search, masking, backfill, redaction, or erasure")
             .And.NotContain("tenant-a");

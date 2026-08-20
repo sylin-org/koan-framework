@@ -2,7 +2,7 @@
 
 ## Composition owner
 
-`ClassificationModule` registers one cipher, a lowest-ceremony Development key provider, and one
+`ClassificationModule` registers one cipher, a durable local-file key provider as the floor, and one
 `IFieldTransformContributor`. Data Core owns the contributor contract and compiles one immutable, type-memoized
 transform plan per host. Classification does not mutate a process-static registry and the hot path does not resolve
 services through `AppHost.Current`.
@@ -34,9 +34,18 @@ The runtime asks `IClassificationKeyProvider.GetActiveKey(scope)` only when a no
 encryption. Reads resolve the envelope's key id with `GetForDecrypt(keyId)`; they do not rely on the caller's current
 scope, which permits retained keys to decrypt data after rotation.
 
-`EphemeralClassificationKeyProvider` retains per-scope active and historical keys in process memory, rotates by
-encryption count, and zeroes retained material on disposal. Module start rejects it outside Development. A custom
-provider registered before `AddKoan()` replaces the default through standard DI `TryAdd` precedence.
+`LocalFileClassificationKeyProvider` is the registered default. It keeps a per-scope active key plus every key it
+has ever issued in a JSON keyring at `.koan/keys/classification.json` (owner-only where the filesystem expresses
+it), writes through a temporary file so an interrupted save cannot truncate custody, refuses to start over a
+corrupt keyring rather than silently re-keying live data, and zeroes retained material on disposal. Historical keys
+are never dropped, because discarding one strands every row still encrypted under it.
+
+`EphemeralClassificationKeyProvider` remains available for genuinely disposable runs; it holds the same structure in
+process memory only.
+
+Module start treats both as local custody: a warning outside Development, and a refusal in Production unless
+`Koan:AllowMagicInProduction` is set. A custom provider registered before `AddKoan()` replaces the default through
+standard DI `TryAdd` precedence.
 
 ## Cache and observability
 

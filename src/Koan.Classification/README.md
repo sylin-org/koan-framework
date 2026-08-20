@@ -41,12 +41,15 @@ describe meaning; they do not imply masking, search, tokenization, or different 
 
 ## Local and production custody
 
-In Development, the package supplies an in-memory key provider automatically. This gives a complete local-first
-experience with no configuration, but its keys disappear with the process: previously stored protected values are
-not readable after restart.
+The package supplies a local key provider automatically, so a bare reference works with no configuration. Keys
+persist in a keyring under the application's own `.koan/keys/classification.json`, which means protected values
+written today are still readable after a restart — the ordinary run-stop-run loop does not destroy them. Startup
+reports the exact keyring path.
 
-Outside Development, Koan refuses startup while that ephemeral provider is selected. Register an application-owned
-`IClassificationKeyProvider` before `AddKoan()`:
+Local custody is not production custody. The key sits beside the data it protects, is never rotated on a schedule,
+and inherits only the filesystem's protection. Koan warns about it outside Development and refuses it in Production
+unless `Koan:AllowMagicInProduction` is set. A real deployment registers its own `IClassificationKeyProvider` over
+whatever key service it already trusts, before `AddKoan()`:
 
 ```csharp
 builder.Services.AddSingleton<IClassificationKeyProvider, ApplicationKeyProvider>();
