@@ -257,14 +257,18 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         _repository.CountCalls.Should().Be(0);
     }
 
+    /// <summary>
+    /// What still cannot carry a stream, and why each one is a difference in meaning rather than caution.
+    /// A string and a Guid order by database collation, so the same two rows can come back in either order on
+    /// a different deployment of the same store. A nullable column orders by provider null placement, which is
+    /// not normalized. A <see cref="DateTime"/> carries no offset, so its ordering depends on the kind the
+    /// value happened to be written with.
+    /// </summary>
     [Fact]
-    public async Task Scalars_without_a_portable_cross_adapter_order_reject_before_provider_io()
+    public async Task Orders_that_mean_different_things_per_backend_reject_before_provider_io()
     {
         _repository.Reset(Rows(1, 2, 3));
 
-        var decimalRejection = await Reject(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.Amount),
-            batchSize: 2));
         var dateTimeRejection = await Reject(StreamingRecord.AllStream(
             sort => sort.OrderBy(record => record.ObservedAt),
             batchSize: 2));
@@ -274,17 +278,35 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         var nullableRejection = await Reject(StreamingRecord.AllStream(
             sort => sort.OrderBy(record => record.OptionalSequence),
             batchSize: 2));
-        var wideIntegerRejection = await Reject(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.Revision),
-            batchSize: 2));
 
-        decimalRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
         dateTimeRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
         stringRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
         nullableRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        wideIntegerRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
         _repository.QueryCalls.Should().BeEmpty();
         _repository.CountCalls.Should().Be(0);
+    }
+
+    /// <summary>
+    /// A value whose ordering the cross-adapter oracle proves may carry a stream, and reaches the provider
+    /// rather than being turned away. These two were refused until that proof existed — the floor is a record
+    /// of what has been demonstrated, so it moves when the demonstration does.
+    /// </summary>
+    [Fact]
+    public async Task Orders_proven_across_adapters_reach_the_provider()
+    {
+        _repository.Reset(Rows(1, 2, 3));
+        _ = await Collect(StreamingRecord.AllStream(
+            sort => sort.OrderBy(record => record.Amount), batchSize: 2));
+
+        _repository.QueryCalls.Should().NotBeEmpty("a decimal order is proven and belongs to the provider");
+        _repository.QueryCalls[0].Sort.Select(spec => spec.Path.DotPath)
+            .Should().Equal(nameof(StreamingRecord.Amount), nameof(StreamingRecord.Id));
+
+        _repository.Reset(Rows(1, 2, 3));
+        _ = await Collect(StreamingRecord.AllStream(
+            sort => sort.OrderBy(record => record.Revision), batchSize: 2));
+
+        _repository.QueryCalls.Should().NotBeEmpty("a long orders exactly as an int does on every adapter");
     }
 
     [Theory]
@@ -294,21 +316,27 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     [InlineData(typeof(short), true)]
     [InlineData(typeof(ushort), true)]
     [InlineData(typeof(int), true)]
+    [InlineData(typeof(long), true)]
+    [InlineData(typeof(decimal), true)]
+    [InlineData(typeof(double), true)]
+    [InlineData(typeof(DateTimeOffset), true)]
+    [InlineData(typeof(DateOnly), true)]
+    [InlineData(typeof(TimeOnly), true)]
+    [InlineData(typeof(StreamSortTier), true)]
+    // Nullable: provider null placement is not normalized for a plain column.
     [InlineData(typeof(int?), false)]
+    // Collation, not values: the same rows order differently under a different database collation.
     [InlineData(typeof(string), false)]
     [InlineData(typeof(char), false)]
-    [InlineData(typeof(uint), false)]
-    [InlineData(typeof(long), false)]
-    [InlineData(typeof(ulong), false)]
-    [InlineData(typeof(decimal), false)]
-    [InlineData(typeof(float), false)]
-    [InlineData(typeof(double), false)]
-    [InlineData(typeof(DateTime), false)]
-    [InlineData(typeof(DateTimeOffset), false)]
-    [InlineData(typeof(DateOnly), false)]
-    [InlineData(typeof(TimeOnly), false)]
-    [InlineData(typeof(TimeSpan), false)]
     [InlineData(typeof(Guid), false)]
+    // Proven divergent: one adapter still stores a TimeSpan in .NET's default form, where 24h precedes 23h.
+    [InlineData(typeof(TimeSpan), false)]
+    // No offset, so the ordering depends on the kind each value was written with.
+    [InlineData(typeof(DateTime), false)]
+    // Never put through the cross-adapter corpus; the list is evidence, so absence of proof keeps them out.
+    [InlineData(typeof(uint), false)]
+    [InlineData(typeof(ulong), false)]
+    [InlineData(typeof(float), false)]
     public void Portable_stream_sort_floor_is_exact(Type type, bool expected)
     {
         TypeClassification.IsPortableStreamSortScalar(type).Should().Be(expected);
@@ -451,6 +479,7 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         public int Sequence { get; set; }
         public bool Include { get; set; }
         public string Title { get; set; } = "";
+        public StreamSortTier Tier { get; set; }
         public int? OptionalSequence { get; set; }
         public long Revision { get; set; }
         public decimal Amount { get; set; }
@@ -664,3 +693,6 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         public IBatchSet<StreamingRecord, string> CreateBatch() => throw new NotSupportedException();
     }
 }
+
+/// <summary>An enum orders by its underlying integral value, which every adapter agrees on.</summary>
+public enum StreamSortTier { Bronze = 1, Silver = 2, Gold = 3 }

@@ -51,18 +51,18 @@ internal static class QueryStreamCoordinator
 
         query = query.WithoutPagination().WithCountStrategy(null);
 
-        // The currently qualified adapter contract has one deliberately conservative portable sort
-        // floor. Validate the caller's semantic order before appending Koan's provider-stable Entity Id
-        // tie-breaker: a physical key may be stable enough to prevent page drift without promising CLR
-        // numeric or cross-provider string ordering when the caller explicitly sorts by Id.
-        if (query.Sort.Any(spec =>
-                spec.Path.TraversesCollection ||
-                spec.Path.Members.Count != 1 ||
-                IsEntityIdentifier<TEntity, TKey>(spec.Path) ||
-                !TypeClassification.IsPortableStreamSortScalar(spec.Path.ValueType)))
+        // A stream pages from the provider and never sees the whole set, so it can only carry an order whose
+        // meaning is the same on every backend — otherwise the same code would hand back a different sequence
+        // depending on where the Entity happens to live, and nothing would say so. The admitted set is
+        // evidence: see TypeClassification.IsPortableStreamSortScalar. Validate the caller's order before
+        // appending Koan's provider-stable Entity Id tie-breaker, since a key may be stable enough to prevent
+        // page drift without promising an ordering when the caller sorts by Id explicitly.
+        if (query.Sort.Any(spec => !IsPortableStreamSort<TEntity, TKey>(spec)))
             throw Reject<TEntity>(facts, provider,
                 Infrastructure.Constants.Diagnostics.Reasons.UnsupportedStreamSort,
-                "Use a proven portable top-level order, or materialize the query before applying this sort.",
+                "Order by a value whose ordering is proven across adapters — a number, an enum, a date, a time, " +
+                "or an aggregate over a collection of those. Strings and Guids order by database collation and " +
+                "nullable columns by provider null placement, so neither carries a stream.",
                 batchSize);
 
         query = EnsureTotalOrder<TEntity, TKey>(query);
@@ -151,6 +151,25 @@ internal static class QueryStreamCoordinator
                     "Narrow the query; its numbered-page range exceeded the supported limit.", batchSize);
             pageNumber++;
         }
+    }
+
+    /// <summary>
+    /// Whether one order key may carry a provider-paged stream.
+    ///
+    /// <para>A plain column qualifies when its type is in the proven set. A key that reaches through a
+    /// collection qualifies on the same terms, because every adapter now computes that aggregate itself and
+    /// states where its null — an Entity whose collection is empty — belongs; a plain nullable column has no
+    /// such statement, which is why the two differ.</para>
+    /// </summary>
+    private static bool IsPortableStreamSort<TEntity, TKey>(SortSpec spec)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        if (IsEntityIdentifier<TEntity, TKey>(spec.Path)) return false;
+        if (!TypeClassification.IsPortableStreamSortScalar(spec.Path.ValueType)) return false;
+        return spec.Path.TraversesCollection
+            ? spec.Path.CollectionSegmentIndex >= 1
+            : spec.Path.Members.Count == 1;
     }
 
     private static QueryDefinition EnsureTotalOrder<TEntity, TKey>(QueryDefinition query)
