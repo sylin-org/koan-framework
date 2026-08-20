@@ -1,14 +1,13 @@
 using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Web.Extensions;
-using SnapVault.Initialization;
 
 [assembly: KoanApp(Name = "SnapVault", Code = "snap-vault", Description = "Photo management and AI analysis")]
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
-    .AddKoan(SnapVaultModule.Compose)
+    .AddKoan()
     .AsWebApi();
 
 var app = builder.Build();

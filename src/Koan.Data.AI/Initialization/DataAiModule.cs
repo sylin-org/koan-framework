@@ -9,6 +9,8 @@ using Koan.Core.Context;
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Data.AI.Attributes;
+using Koan.Data.Vector;
+using Koan.Data.Vector.Abstractions;
 using Koan.Data.Core;  // For .Save() extension method
 
 namespace Koan.Data.AI.Initialization;
@@ -35,6 +37,12 @@ public sealed class DataAiModule : KoanModule
             {
                 RegisterEmbeddingHooks(entityType);
             }
+
+            // Reference = Intent: an Entity that declared its embedding model and width has said everything a
+            // vector space needs, so contribute one rather than making the application restate it in a
+            // composition callback. Vector cannot read [Embedding] (it does not reference this pillar), so the
+            // contribution flows this way. An explicit declaration always outranks it.
+            DeclareDerivedVectorSpace(services, entityType, metadata);
         }
 
         // Register EmbeddingWorker as a hosted service (background worker)
@@ -138,6 +146,26 @@ public sealed class DataAiModule : KoanModule
     /// </summary>
     [RequiresUnreferencedCode("Embedding hooks use reflection against entity lifecyle APIs.")]
     [RequiresDynamicCode("Embedding hooks create closed generic delegates at runtime.")]
+    /// <summary>
+    /// Derives the Entity's vector space from its <c>[Embedding]</c> declaration: the space is named for the
+    /// Entity, carries the declared model and width, and uses cosine — the metric every text-embedding model
+    /// in practice expects. Contributed only when a width was declared; without one there is nothing to derive
+    /// and the application must declare the space itself.
+    /// </summary>
+    private static void DeclareDerivedVectorSpace(IServiceCollection services, Type entityType, EmbeddingMetadata metadata)
+    {
+        if (metadata.Dimensions <= 0) return;
+        services.ContributeVectorSpace(
+            entityType,
+            new VectorSpacePlan(
+                source: "Default",
+                name: entityType.Name,
+                dimensions: metadata.Dimensions,
+                metric: VectorMetric.Cosine,
+                visibility: VectorVisibility.Session,
+                model: metadata.Model));
+    }
+
     private static void RegisterEmbeddingHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)
     {
         // Find the Entity<T> or Entity<T, TKey> base class

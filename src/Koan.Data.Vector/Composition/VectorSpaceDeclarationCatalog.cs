@@ -11,6 +11,10 @@ internal sealed class VectorSpaceDeclarationCatalog
     private readonly object _gate = new();
     private Dictionary<(Type Entity, string Source), VectorSpacePlan> _plans = new();
     private readonly ConcurrentDictionary<(Type Entity, string Source), VectorSpacePlan> _axisPlans = new();
+    // Source-agnostic fallbacks contributed by another pillar (Koan.Data.AI derives one from [Embedding]).
+    // Kept apart from _plans so an explicit declaration always outranks a derived one and the two can never
+    // collide on ordering: whoever composes first, the declared space still wins.
+    private readonly ConcurrentDictionary<Type, VectorSpacePlan> _derived = new();
     private bool _frozen;
 
     public static void Declare(Type entityType, VectorSpacePlan plan)
@@ -19,6 +23,11 @@ internal sealed class VectorSpaceDeclarationCatalog
         ArgumentNullException.ThrowIfNull(plan);
         var services = KoanCompositionScope.RequireServices(
             $"Vector space '{plan.Name}' for '{entityType.FullName}'");
+        Locate(services).Add(entityType, plan);
+    }
+
+    private static VectorSpaceDeclarationCatalog Locate(IServiceCollection services)
+    {
         var catalog = services
             .Where(static descriptor => descriptor.ServiceType == typeof(VectorSpaceDeclarationCatalog))
             .Select(static descriptor => descriptor.ImplementationInstance)
@@ -29,7 +38,20 @@ internal sealed class VectorSpaceDeclarationCatalog
             catalog = new VectorSpaceDeclarationCatalog();
             services.AddSingleton(catalog);
         }
-        catalog.Add(entityType, plan);
+        return catalog;
+    }
+
+    /// <summary>
+    /// Contributes a derived space for an Entity that declared its embedding elsewhere, so a vector Entity
+    /// composes from a bare <c>AddKoan()</c>. Never overrides an explicit
+    /// <c>koan.Data.Source(...).Vector&lt;TEntity&gt;(...)</c> declaration.
+    /// </summary>
+    internal static void DeclareDerived(IServiceCollection services, Type entityType, VectorSpacePlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(entityType);
+        ArgumentNullException.ThrowIfNull(plan);
+        Locate(services)._derived.TryAdd(entityType, plan);
     }
 
     public VectorSpacePlan Resolve(Type entityType, RoutedSource route)
@@ -72,6 +94,14 @@ internal sealed class VectorSpaceDeclarationCatalog
             .Select(static entry => entry.Value)
             .OrderBy(static plan => plan.Source, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        if (candidates.Length == 0 && _derived.TryGetValue(entityType, out var derived))
+        {
+            var source = string.IsNullOrWhiteSpace(routedSource) ? derived.Source : routedSource;
+            return derived.Source.Equals(source, StringComparison.OrdinalIgnoreCase)
+                ? derived
+                : new VectorSpacePlan(source, derived.Name, derived.Dimensions, derived.Metric, derived.Visibility, derived.Model);
+        }
+
         return candidates.Length switch
         {
             1 => candidates[0],

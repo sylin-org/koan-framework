@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.AI;
 using Koan.Data.Core;
 using Koan.Data.Core.Axes;
 using Koan.Data.Core.Model;
@@ -97,10 +98,7 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
                 .ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings))
                 .ConfigureServices(services =>
                 {
-                    // Boot the sample the way its own Program.cs does: the PhotoAsset vector space is declared
-                    // by SnapVaultModule.Compose, so a fixture calling bare AddKoan() would exercise a
-                    // composition the application never ships.
-                    services.AddKoan(SnapVaultModule.Compose);
+                    services.AddKoan();
                     services.Configure<JobsOptions>(options =>
                     {
                         options.EnableWorker = false;
@@ -243,8 +241,11 @@ public sealed class SnapVaultTenancyFlagshipSpec
         return point;
     }
 
-    /// <summary>Mirrors SnapVaultModule's declared dimension; a drift here fails loudly rather than silently.</summary>
-    private const int PhotoSpaceDimensions = 768;
+    /// <summary>
+    /// Read from PhotoAsset's own [Embedding] declaration rather than restated here. The width has exactly one
+    /// owner, so this spec cannot drift away from the space the sample actually composes.
+    /// </summary>
+    private static int PhotoSpaceDimensions => EmbeddingMetadata.Resolve(typeof(PhotoAsset)).Dimensions;
 
     // ───────────────────────── Leg 4 — [HostScoped] system styles are shared ─────────────────────────
 

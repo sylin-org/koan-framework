@@ -4,14 +4,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Koan.Core;
-using Koan.Data.Core;
-using Koan.Data.Vector;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Web.Hosting;
 using Koan.Web.Context;
 using SnapVault.Configuration;
-using SnapVault.Models;
 using SnapVault.Services;
 
 namespace SnapVault.Initialization;
@@ -21,23 +18,6 @@ namespace SnapVault.Initialization;
 /// </summary>
 public sealed class SnapVaultModule : KoanModule
 {
-    // PhotoAsset's embedding model is declared on the entity ([Embedding(Model = ...)]); the space it lands in
-    // is declared here, because dimension and metric cannot be inferred from a model name. Stored and query
-    // embeddings must share one space, so both halves are pinned together.
-    private const string PhotoSpace = "snapvault-photos";
-    private const string PhotoModel = "nomic-embed-text";
-    private const int PhotoDimensions = 768;
-
-    /// <summary>
-    /// Declares the vector space PhotoAsset searches in. Passed to <c>AddKoan()</c> from Program.cs, which keeps
-    /// the declaration next to the business module rather than in the host bootstrap.
-    /// </summary>
-    public static void Compose(KoanApplicationBuilder koan) =>
-        koan.Data.Source("Default").Vector<PhotoAsset>(space => space
-            .Name(PhotoSpace)
-            .Dimensions(PhotoDimensions)
-            .Model(PhotoModel));
-
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<CollectionOptions>("SnapVault:Collections");

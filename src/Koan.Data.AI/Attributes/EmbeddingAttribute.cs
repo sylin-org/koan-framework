@@ -16,6 +16,16 @@ public class EmbeddingAttribute : Attribute
     public EmbeddingPolicy Policy { get; set; } = EmbeddingPolicy.AllStrings;
 
     /// <summary>
+    /// Width of the vectors <see cref="Model"/> produces. Stated here because it belongs to the model, which is
+    /// already declared here — and because it lets Koan derive the Entity's vector space, so a vector Entity
+    /// composes from a bare <c>AddKoan()</c> with no separate declaration.
+    ///
+    /// <para>Leave unset when the application declares the space explicitly with
+    /// <c>koan.Data.Source(...).Vector&lt;TEntity&gt;(...)</c>; that declaration always wins.</para>
+    /// </summary>
+    public int Dimensions { get; set; }
+
+    /// <summary>
     /// Template string for composing embedding text (e.g., "{Title}\n\n{Content}").
     /// Property names in braces are replaced with their values.
     /// Takes precedence over Properties and Policy.

@@ -31,6 +31,9 @@ public class EmbeddingMetadata
     public string[] Properties { get; init; } = [];
     public bool Async { get; init; }
     public string? Model { get; init; }
+
+    /// <summary>Vector width declared alongside the model, or 0 when the application declares the space itself.</summary>
+    public int Dimensions { get; init; }
     public string? Source { get; init; }
     public int MaxTokens { get; init; }
     public int MaxDepth { get; init; }
@@ -103,6 +106,7 @@ public class EmbeddingMetadata
             Properties = properties,
             Async = attr.Async,
             Model = attr.Model,
+            Dimensions = attr.Dimensions,
             Source = attr.Source,
             MaxTokens = attr.MaxTokens,
             MaxDepth = attr.MaxDepth,
