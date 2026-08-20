@@ -29,7 +29,9 @@ public sealed class LocalChecklistGoldenPathSpec
             process.StartInfo.ArgumentList.Add("--project");
             process.StartInfo.ArgumentList.Add(Path.Combine(projectDirectory, "LocalChecklist.csproj"));
             process.StartInfo.ArgumentList.Add("-c");
-            process.StartInfo.ArgumentList.Add("Release");
+            // Not a literal: --no-build can only be honest about the configuration this suite was built in,
+            // because that is the one its ProjectReference just produced.
+            process.StartInfo.ArgumentList.Add(Metadata("LocalChecklistConfiguration"));
             process.StartInfo.ArgumentList.Add("--no-build");
             process.StartInfo.Environment["Koan__Data__Json__DirectoryPath"] = dataDirectory;
             process.StartInfo.Environment["DOTNET_NOLOGO"] = "1";
@@ -75,9 +77,11 @@ public sealed class LocalChecklistGoldenPathSpec
         }
     }
 
-    private static string ProjectDirectory()
+    private static string ProjectDirectory() => Metadata("LocalChecklistProjectDirectory");
+
+    private static string Metadata(string key)
         => Assembly.GetExecutingAssembly()
             .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Single(attribute => attribute.Key == "LocalChecklistProjectDirectory")
+            .Single(attribute => attribute.Key == key)
             .Value!;
 }

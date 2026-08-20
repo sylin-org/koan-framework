@@ -14,6 +14,13 @@
       <_Parameter1>LocalChecklistProjectDirectory</_Parameter1>
       <_Parameter2>$(LocalChecklistProjectDirectory)</_Parameter2>
     </AssemblyAttribute>
+    <!-- The ProjectReference above builds the sample in whatever configuration this suite is built in, so
+         the spec must run that same configuration. Naming one here would make the spec pass or fail on
+         whether someone had previously built the sample by hand. -->
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>LocalChecklistConfiguration</_Parameter1>
+      <_Parameter2>$(Configuration)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AwesomeAssertions" />
