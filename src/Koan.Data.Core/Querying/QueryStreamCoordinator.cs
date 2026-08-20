@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Koan.Core.Diagnostics;
 using Koan.Data.Abstractions;
@@ -108,16 +109,12 @@ internal static class QueryStreamCoordinator
                     $"The provider returned more than the requested {batchSize} candidates; correct or replace the adapter.",
                     batchSize);
             if (!result.SortFullyHandled(adapterPage))
-            {
-                var declined = string.Join(", ", adapterPage.Sort
-                    .Where(spec => !result.SortHandled.Contains(spec))
-                    .Select(static spec => spec.Path.DotPath));
                 throw Reject<TEntity>(facts, provider,
                     Infrastructure.Constants.Diagnostics.Reasons.StreamSortNotHandled,
-                    "Provider " + provider + " does not order " + declined + " itself, and a stream cannot " +
-                    "finish an ordering it never sees whole. Order by something this provider can apply, route " +
-                    "the Entity to one that can, or materialize the query and sort it explicitly.", batchSize);
-            }
+                    DescribeUnorderedKeys(provider, adapterPage.Sort
+                        .Where(spec => !result.SortHandled.Contains(spec))
+                        .ToArray()),
+                    batchSize);
             try
             {
                 QueryReceiptValidator.Validate(adapterPage, result);
@@ -162,6 +159,46 @@ internal static class QueryStreamCoordinator
                     "Narrow the query; its numbered-page range exceeded the supported limit.", batchSize);
             pageNumber++;
         }
+    }
+
+    /// <summary>
+    /// Explains, in the caller's terms, why the query could not be streamed in the order they asked for.
+    ///
+    /// <para>Streaming a sorted query is otherwise unremarkable — page after page of
+    /// <c>ORDER BY … LIMIT … OFFSET …</c> — so what this message owes the reader is the specific reason this
+    /// key was not among them, and it leads with that.</para>
+    ///
+    /// <para>The two reasons are not the same shape, so they do not get the same answer. A key naming a whole
+    /// object has no ordering anywhere — no store can order by it and neither can the framework, whose sorter
+    /// would fall back to comparing <c>ToString()</c> and produce a stable-looking nonsense. Recommending a
+    /// materializing read there would be recommending that nonsense, so it is not offered; the fix is to name
+    /// a value inside the object, and the message names one that exists. When instead the provider simply did
+    /// not apply an otherwise orderable key, a materializing read genuinely does finish that ordering, and
+    /// saying so beats telling the caller to sort it themselves.</para>
+    /// </summary>
+    private static string DescribeUnorderedKeys(string provider, IReadOnlyList<SortSpec> declined)
+    {
+        var unordered = declined.FirstOrDefault(static spec => !TypeClassification.IsSimple(spec.Path.ValueType));
+        if (unordered is not null)
+        {
+            var type = unordered.Path.ValueType;
+            var example = type.GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Where(static property => property.GetIndexParameters().Length == 0)
+                .FirstOrDefault(static property => TypeClassification.IsSimple(property.PropertyType));
+            var suggestion = example is null
+                ? "a single value rather than a whole object"
+                : $"{unordered.Path.DotPath}.{example.Name}";
+            return $"'{unordered.Path.DotPath}' is a {type.Name}, which has no ordering of its own — no store " +
+                   $"can order by a whole object, and neither can Koan. Order by {suggestion} instead.";
+        }
+
+        var names = string.Join("', '", declined.Select(static spec => spec.Path.DotPath));
+        return $"'{provider}' did not apply the order '{names}', most often because it does not keep that value " +
+               "somewhere it can compare. A stream is read one provider page at a time, so the provider has to " +
+               "be the one that orders it — Koan never holds the whole result, and sorting a single page would " +
+               "not put the sequence in order. Order by a value this provider can apply, route the Entity to " +
+               "one that can, or read the query with All() or Page(), where Koan finishes the ordering itself " +
+               "at the cost of materializing the result.";
     }
 
     /// <summary>

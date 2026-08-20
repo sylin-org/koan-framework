@@ -262,9 +262,17 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             batchSize: 2));
 
         exception.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.StreamSortNotHandled);
+
+        // Leads with the reason this key in particular could not be ordered, in the caller's own terms, and
+        // names the read that will finish the ordering for them rather than telling them to sort it themselves.
         exception.Correction.Should().Contain(nameof(StreamingRecord.Detail))
-            .And.Contain("does not order");
-        exception.Provider.Should().NotBeNullOrWhiteSpace();
+            .And.Contain(nameof(StreamingDetail))
+            .And.Contain("no ordering of its own")
+            // Names a field that actually exists on the type, rather than gesturing at one.
+            .And.Contain($"{nameof(StreamingRecord.Detail)}.")
+            // A materializing read is NOT offered here: the in-memory sorter would compare ToString() and
+            // produce a stable-looking nonsense, so recommending it would be recommending that.
+            .And.NotContain("All() or Page()");
     }
 
     /// <summary>
