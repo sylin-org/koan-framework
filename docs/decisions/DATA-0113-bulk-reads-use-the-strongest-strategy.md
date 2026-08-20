@@ -124,14 +124,19 @@ consumer taking that route deliberately and declaring it, which is what "Koan ne
 to complete-result materialization" asks for.
 
 Data Backup follows the same rule, and this reverses the source-read position DATA-0107 and DATA-0108
-recorded for it. That position rested on backup's archive being accumulated in one `MemoryStream` —
-but that cost exists whatever the read strategy is, and it is not reduced by refusing to read. What
-refusing *did* accomplish was making backup untryable on JSON: a developer who references
+recorded for it. That position rested on backup's archive being accumulated in one `MemoryStream`, so
+a full source scan would have fed an unbounded in-memory archive. **That premise had already lapsed.**
+`a39edffa4` moved archive creation onto a temporary `FileStream`; no `MemoryStream` remains in
+`Koan.Data.Backup`, and its own `TECHNICAL.md` states that no complete archive is retained in memory.
+The rejection was therefore still defending a cost that had been paid off.
+
+What it did still accomplish was making backup untryable on JSON: a developer who references
 `Koan.Data.Backup` in the configuration Koan composes by default could not run it at all. A capability
 that cannot be tried where people start is not a safe boundary, it is a dead end.
 
-The memory concern is real and unaddressed either way; it belongs to the archive writer, which is
-where DATA-0107 already located it.
+One bounded cost remains and is stated rather than assumed: on an unqualified provider the matching
+record set is held in memory once, bounded by that adapter's own residency. The archive itself streams
+to disk on every provider.
 
 ## Consequences
 
