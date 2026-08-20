@@ -1,6 +1,7 @@
 ﻿---
 id: BUILD-0072
 status: superseded
+superseded_by: ARCH-0085, ARCH-0110
 date: 2025-09-29
 related:
   - tools/versioning-script

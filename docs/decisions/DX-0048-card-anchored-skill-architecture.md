@@ -2,6 +2,7 @@
 id: DX-0048
 title: Card-anchored skill architecture + validation gate
 status: Accepted
+superseded_by: DX-0049
 date: 2026-06-18
 area: DX / AX
 supersedes: []

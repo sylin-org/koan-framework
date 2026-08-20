@@ -1,6 +1,7 @@
 # ARCH-0085 — Versioning, compatibility ranges, and version automation
 
 **Status**: Accepted in part
+amended_by: ARCH-0125
 **Superseded by**: [ARCH-0124](ARCH-0124-single-package-release-train.md) for independent
 package identity, project-local version ownership, and reverse-dependent version cascades. The
 bounded dependency ranges and deprecate-before-remove rule remain current.

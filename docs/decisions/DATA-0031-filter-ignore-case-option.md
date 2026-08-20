@@ -3,8 +3,8 @@ id: DATA-0031
 slug: DATA-0031-filter-ignore-case-option
 domain: DATA
 status: Superseded
+superseded_by: DATA-0096
 date: 2025-08-17
-superseded-by: DATA-0096
 ---
 
 > **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** `$options.ignoreCase` is

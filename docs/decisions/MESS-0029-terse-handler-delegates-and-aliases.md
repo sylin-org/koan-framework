@@ -3,6 +3,7 @@ id: MESS-0029
 slug: MESS-0029-terse-handler-delegates-and-aliases
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 date: 2025-08-24
 title: Terse handler delegates and semantic aliases (On/Handle; Command/Event)
 ---

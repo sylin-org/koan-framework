@@ -4,6 +4,7 @@ id: ARCH-0059
 slug: koan-cache-module
 domain: Architecture
 status: approved
+amended_by: ARCH-0075
 date: 2025-10-06
 title: Koan Cache Module and Adapter Architecture
 ---

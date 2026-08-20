@@ -3,6 +3,7 @@ id: ARCH-0053
 slug: Koan-flow-pillar-entity-first-and-auto-registrar
 domain: Architecture
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-08-30
 title: Koan.Canon pillar - Entity-first pipeline with per-view sets and AutoRegistrar defaults
 ---

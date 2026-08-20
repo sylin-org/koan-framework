@@ -1,6 +1,7 @@
 # WEB-0065 Auth event contributor pipeline
 
-**Status**: Accepted, 2026-05-15
+**Status**: Accepted, 2026-05-15  
+**Amended by:** WEB-0066
 **Drivers**: Source-of-truth correctness for role assignments, unified extensibility surface
 **Deciders**: Koan Framework maintainers
 **Inputs**: `Koan.Web.Auth`, `Koan.Web.Auth.Roles`, downstream platform (a downstream consumer)

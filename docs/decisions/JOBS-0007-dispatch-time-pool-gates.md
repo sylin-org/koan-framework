@@ -1,6 +1,7 @@
 # JOBS-0007: Dispatch-Time Gate Resolution for Runtime Resource Pools
 
 **Status**: Accepted
+amended_by: JOBS-0008
 **Pillar**: Jobs
 **Depends on**: JOBS-0005 §6 (gate keys), JOBS-0005 §18 (runtime gate resolution), ARCH-0079 (integration tests are canon)
 

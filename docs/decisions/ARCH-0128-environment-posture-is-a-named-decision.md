@@ -8,7 +8,6 @@ title: Environment posture is a named decision, not a boolean read
 related:
   - DATA-0046
   - SEC-0001
-  - MESS-0026
 ---
 
 # ARCH-0128: Environment posture is a named decision, not a boolean read
@@ -123,8 +122,12 @@ Behavior changes, both corrections:
 - **Auto-DDL now honors `Koan:AllowMagicInProduction`**, as DATA-0046 always specified. Setting the
   flag in Production previously did nothing for schema creation.
 - **AI endpoint auto-discovery now runs in Staging, Test, and CI**, with a warning, instead of being
-  silently off. This matches MESS-0026's stated policy ("off by default in Production, on in other
-  environments") and removes the unexplained divergence from DDL. Production behavior is unchanged.
+  silently off. It follows from the law above — Production is the gate — and removes the unexplained
+  divergence from auto-DDL. Production behavior is unchanged.
+
+  An earlier draft of this ADR cited MESS-0026 as supporting policy. That was wrong twice over: MESS-0026
+  is Retired, and it governs MQ inbox discovery rather than AI provider discovery. It is cited here only
+  as the mistake that motivated the ADR-precedence guard in `docs-lint`.
 
 Everything else is a refactor: all 43 decision points now say which decision they are making, and a reader
 can answer "can this be turned on in production?" by reading the method name.

@@ -1,4 +1,11 @@
-# ARCH-0103 Addendum — The Document-Store Family: Ideal-State Catalogue & Golden-Mongo Rebuild Spec
+---
+id: ARCH-0131
+former_id: ARCH-0103
+---
+
+# ARCH-0131 Addendum — The Document-Store Family: Ideal-State Catalogue & Golden-Mongo Rebuild Spec
+
+> **Renumbered from ARCH-0103.** That number was issued twice; this decision moved to ARCH-0131 so a reference to either is unambiguous. Content is unchanged.
 
 **Status:** Accepted (catalogue / build spec) · **Parent:** [ARCH-0103](ARCH-0103-aodb-adapter-conformance.md) §5 (P3 — the `DocumentStore` family base) · **Date:** 2026-06-25
 

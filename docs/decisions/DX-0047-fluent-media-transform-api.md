@@ -4,6 +4,7 @@ domain: media
 title: "Fluent Media Transformation Pipeline API"
 audience: [developers, architects, ai-agents]
 status: current
+amended_by: MEDIA-0004
 last_updated: 2025-10-16
 framework_version: v0.6.3
 related_adrs: [DX-0046]

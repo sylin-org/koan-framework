@@ -3,6 +3,7 @@ id: WEB-0041
 slug: WEB-0041-graphql-module-and-controller
 domain: WEB
 status: Superseded
+superseded_by: none
 date: 2025-08-19
 title: GraphQL module (Koan.Web.Connector.GraphQl) - controller-hosted schema from IEntity<>, typed filters/sorts, display field
 ---

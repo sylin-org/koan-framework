@@ -53,9 +53,9 @@
     - name: AI-0013 MCP HTTP SSE deployment
       href: AI-0013-mcp-http-sse-deployment.md
     - name: AI-0013 S12 MedTrials sample
-      href: AI-0013-s12-medtrials-sample.md
+      href: AI-0038-s12-medtrials-sample.md
     - name: AI-0014 AI modernization sources and fallbacks
-      href: AI-0014-ai-modernization-sources-capabilities-fallback.md
+      href: AI-0039-ai-modernization-sources-capabilities-fallback.md
     - name: AI-0014 MCP code mode
       href: AI-0014-mcp-code-mode.md
     - name: AI-0037 MCP Streamable HTTP transport
@@ -99,7 +99,7 @@
     - name: ARCH-0045 Foundational SoC namespaces and abstractions
       href: ARCH-0045-foundational-soc-namespaces-and-abstractions.md
     - name: ARCH-0045 Proactive assembly loading for auto-registration
-      href: ARCH-0045-proactive-assembly-loading-for-autoreg.md
+      href: ARCH-0129-proactive-assembly-loading-for-autoreg.md
     - name: ARCH-0046 Integration recipes – bootstrap and layered config
       href: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config.md
     - name: ARCH-0047 Orchestration – hosting and exporters as adapters
@@ -215,7 +215,7 @@
     - name: DATA-0006 Instruction execution API
       href: DATA-0006-instruction-execution-api.md
     - name: DATA-0007 Relational LINQ-to-SQL helper
-      href: DATA-0007-relational-linq-to-sql-helper.md
+      href: DATA-0114-relational-linq-to-sql-helper.md
     - name: DATA-0007 Transactional batch and concurrency
       href: DATA-0007-transactional-batch-and-concurrency.md
     - name: DATA-0008 Relational command caching
@@ -279,7 +279,7 @@
     - name: DATA-0070 External ID correlation framework
       href: DATA-0070-external-id-correlation.md
     - name: DATA-0072 Messaging envelope transformers
-      href: DATA-0072-messaging-envelope-transformers.md
+      href: DATA-0115-messaging-envelope-transformers.md
     - name: DATA-0072 Parent relationship attribute explicit type
       href: DATA-0072-parent-relationship-attribute-explicit-type.md
     - name: DATA-0073 JObject for dynamic entities
@@ -291,7 +291,7 @@
     - name: DATA-0076 Mongo `_id` index governance
       href: DATA-0076-mongo-id-index-governance.md
     - name: DATA-0077 Canonical patch operations
-      href: DATA-0077-canonical-patch-operations.md
+      href: DATA-0116-canonical-patch-operations.md
     - name: DATA-0084 Vector workflows and profiles
       href: DATA-0084-vector-workflows-and-profiles.md
     - name: DATA-0085 Isolate vector workflows into Koan.Data.Vector

@@ -3,8 +3,8 @@ id: DATA-0092
 slug: DATA-0092-structured-sort-contract-and-adapter-pushdown
 domain: DATA
 status: Superseded
+superseded_by: DATA-0096
 date: 2026-05-17
-superseded-by: DATA-0096
 ---
 
 > **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** The structured-sort model

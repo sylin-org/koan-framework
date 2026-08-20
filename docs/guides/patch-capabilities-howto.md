@@ -61,7 +61,7 @@ Think of this guide as a conversation with a colleague who's implemented partial
 - Provider pushdown used when available; otherwise in-process fallback applies
 
 **See also:**
-- Canonical model: [DATA-0077: Canonical Patch Operations](../decisions/DATA-0077-canonical-patch-operations.md)
+- Canonical model: [DATA-0077: Canonical Patch Operations](../decisions/DATA-0116-canonical-patch-operations.md)
 - Web API details: [PATCH formats and normalization](../api/patch-normalization.md)
 
 ---
@@ -1780,11 +1780,11 @@ You've now seen Koan's full patch capabilities—from quick HTTP PATCH endpoints
 5. **Read related guides:**
    - [Entity Capabilities](entity-capabilities-howto.md) - Entity-first patterns
    - [Canon Capabilities](canon-capabilities-howto.md) - Versioning and migrations
-   - [DATA-0077](../decisions/DATA-0077-canonical-patch-operations.md) - Canonical model deep dive
+   - [DATA-0077](../decisions/DATA-0116-canonical-patch-operations.md) - Canonical model deep dive
 
 **Questions or Issues?**
 - Check [Troubleshooting](#12-troubleshooting) section above
-- Review [DATA-0077](../decisions/DATA-0077-canonical-patch-operations.md) for canonical model details
+- Review [DATA-0077](../decisions/DATA-0116-canonical-patch-operations.md) for canonical model details
 - See [entity-capabilities-howto.md](entity-capabilities-howto.md) for Entity<T> static method patterns
 
 Remember: PATCH is about describing *what changed*, not *how to change it*. Let Koan handle normalization, provider optimization, and lifecycle hooks—you focus on business logic.

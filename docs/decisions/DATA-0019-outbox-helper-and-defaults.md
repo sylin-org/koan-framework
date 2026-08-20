@@ -3,6 +3,7 @@ id: DATA-0019
 slug: DATA-0019-outbox-helper-and-defaults
 domain: DATA
 status: Superseded
+superseded_by: JOBS-0005
 date: 2025-08-17
 title: Outbox helper conventions and defaults
 ---

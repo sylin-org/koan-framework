@@ -3,6 +3,7 @@ id: WEB-0050
 slug: s8-flow-iot-sample-and-sse-monitor
 domain: Web
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-08-30
 title: S8 Flow IoT sample with multi-key aggregation, namespaced tags, and SSE monitor
 ---

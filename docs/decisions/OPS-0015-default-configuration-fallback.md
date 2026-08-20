@@ -10,7 +10,7 @@ superseded_by: ARCH-0119
  
 # 0015: Default IConfiguration fallback in Koan
 
-> Superseded by [ARCH-0119](ARCH-0119-one-console-host-lifecycle.md). `StartKoan()` now uses the
+> **Superseded by [ARCH-0119](ARCH-0119-one-console-host-lifecycle.md).** `StartKoan()` now uses the
 > standard .NET Generic Host and its configuration pipeline instead of maintaining a raw-provider
 > fallback.
 

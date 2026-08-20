@@ -1,4 +1,11 @@
-# AI-0013 - S12.MedTrials sample adoption
+---
+id: AI-0038
+former_id: AI-0013
+---
+
+# AI-0038 - S12.MedTrials sample adoption
+
+> **Renumbered from AI-0013.** That number was issued twice; this decision moved to AI-0038 so a reference to either is unambiguous. Content is unchanged.
 
 Status: Accepted
 Date: 2025-02-15

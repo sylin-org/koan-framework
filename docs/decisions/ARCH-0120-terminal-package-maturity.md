@@ -3,6 +3,7 @@ id: ARCH-0120
 slug: terminal-package-maturity
 domain: Architecture
 status: Accepted
+amended_by: ARCH-0124
 date: 2026-07-21
 title: Value-led promotion to the Koan 0.20 surface
 related:

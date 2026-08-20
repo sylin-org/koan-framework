@@ -3,6 +3,7 @@ id: FLOW-0102
 slug: identity-map-provisional-and-aliasing
 domain: flow
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-08-31
 title: Identity map, provisional mappings, aliasing (cap=1), and value‑object indexing
 ---

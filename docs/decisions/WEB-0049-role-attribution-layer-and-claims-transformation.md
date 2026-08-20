@@ -4,6 +4,7 @@ id: WEB-0049
 slug: role-attribution-layer-and-claims-transformation
 domain: Web
 status: Accepted
+amended_by: WEB-0065
 date: 2025-08-30
 title: Role attribution layer - claims transformation, policies, and auto-registration
 

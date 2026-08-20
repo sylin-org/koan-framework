@@ -3,6 +3,7 @@ id: FLOW-0106
 slug: adapter-auto-scan-and-minimal-boot
 domain: Flow
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-09-02
 title: Flow adapter auto-scan and minimal boot (Core host binder + adapter auto-registration)
 ---

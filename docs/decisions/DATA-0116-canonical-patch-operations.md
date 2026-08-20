@@ -1,12 +1,15 @@
 ﻿---
-id: DATA-0077
+id: DATA-0116
+former_id: DATA-0077
 slug: DATA-0077-canonical-patch-operations
 domain: DATA
 status: Accepted
 date: 2025-10-09
 ---
 
-# DATA-0077: Canonical patch operations and multi-format normalization
+# DATA-0116: Canonical patch operations and multi-format normalization
+
+> **Renumbered from DATA-0077.** That number was issued twice; this decision moved to DATA-0116 so a reference to either is unambiguous. Content is unchanged.
 
 Date: 2025-10-09
 

@@ -3,6 +3,7 @@ id: DATA-0097
 slug: DATA-0097-vector-pathway-parity
 domain: DATA
 status: Accepted
+amended_by: DATA-0103
 date: 2026-05-31
 supersedes: [DATA-0056]
 relates-to: [DATA-0096, DATA-0054, ADR-0051, ADR-0052, ADR-0053, DATA-0078, DATA-0084, DATA-0087]

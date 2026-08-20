@@ -1,12 +1,15 @@
 ---
-id: ARCH-0066
+id: ARCH-0130
+former_id: ARCH-0066
 slug: moss-txt-record-completeness
 domain: ARCH
 status: Proposed
 date: 2025-02-09
 ---
 
-# ARCH-0066: Moss TXT record completeness
+# ARCH-0130: Moss TXT record completeness
+
+> **Renumbered from ARCH-0066.** That number was issued twice; this decision moved to ARCH-0130 so a reference to either is unambiguous. Content is unchanged.
 
 Date: 2025-02-09
 

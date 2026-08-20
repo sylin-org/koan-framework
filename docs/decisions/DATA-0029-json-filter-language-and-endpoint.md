@@ -3,7 +3,7 @@ id: DATA-0029
 slug: DATA-0029-json-filter-language-and-endpoint
 domain: DATA
 status: Superseded
-superseded-by: DATA-0096
+superseded_by: DATA-0096
 ---
 
 > **Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md).** The JSON filter DSL and

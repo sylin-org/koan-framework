@@ -1,4 +1,11 @@
+---
+id: ARCH-0129
+former_id: ARCH-0045
+---
+
 # ADR: Proactive Koan.* Assembly Loading for Zero-Config Adapter Auto-Registration
+
+> **Renumbered from ARCH-0045.** That number was issued twice; this decision moved to ARCH-0129 so a reference to either is unambiguous. Content is unchanged.
 
 ## Status
 Accepted

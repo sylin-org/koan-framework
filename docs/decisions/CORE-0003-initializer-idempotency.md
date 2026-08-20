@@ -4,7 +4,8 @@
 > Multi-container idempotency remains required, but registration now runs through the retained
 > `KoanModule`; the initializer interface and registry described below were removed.
 
-**Status**: Accepted
+**Status**: Accepted  
+**Amended by:** ARCH-0116
 **Date**: 2025-10-03
 **Deciders**: Enterprise Architecture Team
 

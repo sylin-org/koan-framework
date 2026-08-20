@@ -1,5 +1,6 @@
 ---
-id: DATA-0087
+id: DATA-0118
+former_id: DATA-0087
 slug: DATA-0087-vector-table-name-collision-prevention
 domain: DATA
 status: Proposed
@@ -7,7 +8,9 @@ date: 2025-11-13
 title: Vector Table Name Collision Prevention via "_vector" Suffix
 ---
 
-# ADR DATA-0087 - Vector Table Name Collision Prevention
+# DATA-0118 - Vector Table Name Collision Prevention
+
+> **Renumbered from DATA-0087.** That number was issued twice; this decision moved to DATA-0118 so a reference to either is unambiguous. Content is unchanged.
 
 ## Summary
 

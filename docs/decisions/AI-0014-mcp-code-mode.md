@@ -1,6 +1,7 @@
 # AI-0014 - MCP Code Mode: JavaScript Execution Surface
 
 Status: Approved
+amended_by: AI-0015
 Date: 2025-10-07
 Owners: Koan AI Platform, Koan.Mcp Team
 

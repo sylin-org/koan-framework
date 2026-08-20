@@ -3,6 +3,7 @@ id: WEB-0042
 slug: WEB-0042-graphql-naming-and-discovery
 domain: WEB
 status: Superseded
+superseded_by: none
 date: 2025-08-19
 title: GraphQL naming & discovery policy - storage-based names, IEntity-only, collision handling
 ---

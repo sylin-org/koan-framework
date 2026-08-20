@@ -1,4 +1,11 @@
-﻿# Decision Record: DATA-0072-messaging-envelope-transformers
+---
+id: DATA-0115
+former_id: DATA-0072
+---
+
+# DATA-0115: Messaging envelope transformers
+
+> **Renumbered from DATA-0072.** That number was issued twice; this decision moved to DATA-0115 so a reference to either is unambiguous. Content is unchanged.
 
 ## Title
 Koan Messaging Envelope and Transformer Architecture

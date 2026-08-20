@@ -1,4 +1,13 @@
-# AI-0014: AI Modernization - Source Abstraction, Capability Mapping, and Fallback Groups
+---
+id: AI-0039
+former_id: AI-0014
+status: superseded
+superseded_by: AI-0015
+---
+
+# AI-0039: AI Modernization - Source Abstraction, Capability Mapping, and Fallback Groups
+
+> **Superseded by [AI-0015](AI-0015-canonical-source-member-architecture.md).** Renumbered from AI-0014: That number was issued twice; this decision moved to AI-0039 so a reference to either is unambiguous. Content is unchanged.
 
 Status: Approved
 **Amendment:** 2025-10-01 - Terminology Correction (See Below)
@@ -18,7 +27,7 @@ Status: Approved
 | "ollama-auto-host"       | **ollama::host**  | Member naming pattern                      |
 | "ollama-auto" group      | **ollama** source | Source naming pattern                      |
 
-**Canonical Reference:** See [AI-SOURCE-MEMBER-ARCHITECTURE.md](../AI-SOURCE-MEMBER-ARCHITECTURE.md) for complete model.
+**Canonical Reference:** See [AI-0015](AI-0015-canonical-source-member-architecture.md) for complete model.
 
 **Key Changes:**
 

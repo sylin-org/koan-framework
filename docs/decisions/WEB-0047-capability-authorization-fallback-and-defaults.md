@@ -3,6 +3,7 @@ id: WEB-0047
 slug: capability-authorization-fallback-and-defaults
 domain: Web
 status: superseded
+superseded_by: SEC-0002
 date: 2025-08-28
 title: Capability authorization - global allow/deny fallback and per-entity defaults
 ---

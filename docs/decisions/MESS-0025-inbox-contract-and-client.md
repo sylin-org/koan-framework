@@ -3,6 +3,7 @@ id: MESS-0025
 slug: MESS-0025-inbox-contract-and-client
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 title: Inbox contract, client behavior, and provider discovery
 ---
 

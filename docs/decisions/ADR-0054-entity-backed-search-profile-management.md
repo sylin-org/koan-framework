@@ -1,6 +1,7 @@
 # ADR-0054: Entity-Backed Search Profile Management with Managed Taxonomies
 
 **Status:** Paused (historical snapshot; tracked via ARCH-0074)
+amended_by: ADR-0055
 **Date:** 2025-11-09
 **Context:** KoanContext semantic search intelligence and RAG quality improvements
 **Decision Makers:** Architecture review

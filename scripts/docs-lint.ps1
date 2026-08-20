@@ -399,6 +399,121 @@ foreach ($entry in $docEntries) {
         }
     }
 
+# --- ADR precedence -------------------------------------------------------------------------------
+# A retired decision that does not say what replaced it is a trap: a reader — human or agent — finds
+# coherent, confident guidance with no signal that it is dead. That happened: MESS-0026 (Retired) was
+# cited as live policy in a shipped ADR. Every retired decision must therefore point forward, and every
+# forward pointer must resolve.
+$adrDir = Join-Path $repoRoot 'docs/decisions'
+if (-not (Test-Path $adrDir)) {
+    # Never skip silently: an absent decision directory means the check did not run, and a check that
+    # quietly does nothing is worse than no check at all.
+    Add-Issue -Path 'docs/decisions' -Severity 'Error' -Check 'AdrPrecedence' `
+        -Message 'Decision directory not found; the ADR precedence check could not run.'
+}
+else {
+    $adrFiles = Get-ChildItem -LiteralPath $adrDir -Filter '*.md' -File |
+        Where-Object { $_.Name -notin @('index.md', 'README.md', '_template.md') }
+
+    # The id comes from the filename: most decisions carry no 'id:' key, so frontmatter alone would leave
+    # the checker blind to the majority of the corpus and let pointers to real ADRs read as broken.
+    $knownIds = @{}
+    $duplicateIds = @{}
+    foreach ($adr in $adrFiles) {
+        # A companion note (DX-0046-IMPLEMENTATION.md) documents the same decision; it is not a second one.
+        if ($adr.Name -match '-(IMPLEMENTATION|NOTES|ADDENDUM)\.md$') { continue }
+        if ($adr.Name -notmatch '^([A-Za-z]+-\d{4})-') { continue }
+        $adrId = $Matches[1].ToUpperInvariant()
+        if ($knownIds.ContainsKey($adrId)) {
+            if (-not $duplicateIds.ContainsKey($adrId)) { $duplicateIds[$adrId] = @($knownIds[$adrId]) }
+            $duplicateIds[$adrId] += $adr.Name
+        }
+        else { $knownIds[$adrId] = $adr.Name }
+    }
+
+    # One id, one decision. Reusing a taken number produces two documents a reader cannot tell apart, and
+    # every cross-reference to that number becomes ambiguous.
+    foreach ($dupe in $duplicateIds.Keys) {
+        Add-Issue -Path "docs/decisions/$($duplicateIds[$dupe][-1])" -Severity 'Error' -Check 'AdrPrecedence' `
+            -Message "ADR id '$dupe' is used by more than one decision: $($duplicateIds[$dupe] -join ', '). Allocate the next unused number."
+    }
+
+    foreach ($adr in $adrFiles) {
+        $rel = "docs/decisions/$($adr.Name)"
+        $text = Get-Content -Raw -LiteralPath $adr.FullName
+        $status = if ($text -match '(?m)^status:\s*(.+?)\s*$') { $Matches[1].Trim().ToLowerInvariant() } else { '' }
+
+        # One spelling only. 'superseded-by' drifted in alongside 'superseded_by'; a checker that accepts
+        # both teaches neither.
+        if ($text -match '(?m)^superseded-by:') {
+            Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                -Message "Uses 'superseded-by'; the key is 'superseded_by' (underscore, matching last_updated)."
+        }
+
+        $forward = if ($text -match '(?m)^superseded_by:\s*(.+?)\s*$') { $Matches[1].Trim() } else { $null }
+        $amended = if ($text -match '(?m)^amended_by:\s*(.+?)\s*$') { $Matches[1].Trim() } else { $null }
+
+        if ($status -in @('superseded', 'retired', 'deprecated', 'archived')) {
+            if (-not $forward) {
+                Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                    -Message "status '$status' but no 'superseded_by'. Name the decision that replaced it, or 'none' when the capability was removed outright."
+            }
+            if ($text -notmatch '(?m)^>\s*\*\*') {
+                Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                    -Message "status '$status' but no leading '> **...**' banner. Front-matter is invisible to someone reading the body."
+            }
+        }
+
+        # Backward and forward must agree. ARCH-0056 declared 'supersedes: ARCH-0053' while ARCH-0053 said
+        # nothing — so a reader arriving at the retired decision had no way to reach the live one. A
+        # one-directional link is the whole failure mode this check exists to prevent.
+        # Older decisions write '**Supersedes:** X' in bold body text rather than a front-matter key.
+        # A checker that only understood the front-matter form missed AI-0015 -> AI-0014 entirely.
+        $selfId = if ($adr.Name -match '^([A-Za-z]+-\d{4})-') { $Matches[1].ToUpperInvariant() } else { $null }
+        $supersedesRaw = if ($text -match '(?m)^\**supersedes:?\**[ \t]*\r?\n((?:[ \t]*-[ \t]*[A-Za-z]+-\d{4}[^\r\n]*\r?\n)+)') { $Matches[1] }
+                         elseif ($text -match '(?m)^\**supersedes:?\**\s*(.+?)\s*$') { $Matches[1] }
+                         else { '' }
+        $listed = [regex]::Matches($supersedesRaw, '\b([A-Za-z]+-\d{4})\b') |
+            ForEach-Object { $_.Groups[1].Value.ToUpperInvariant() } | Select-Object -Unique
+
+        foreach ($older in $listed) {
+            if ($older -eq $selfId) { continue }
+            if (-not $knownIds.ContainsKey($older)) {
+                Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                    -Message "supersedes names '$older', which is not an ADR id in docs/decisions."
+                continue
+            }
+            $olderText = Get-Content -Raw -LiteralPath (Join-Path $adrDir $knownIds[$older])
+            # Either forward key satisfies this. A dead decision is 'superseded_by'; one that still stands
+            # while a later decision replaces part of it is 'amended_by'. Both let a reader move forward,
+            # which is the property being checked; which one is right is the author's judgement.
+            $pointsForward = $olderText -match "(?mi)^(\**(superseded|amended)[_ ]by:?\**).*$([regex]::Escape($selfId))"
+            if ($selfId -and -not $pointsForward) {
+                Add-Issue -Path "docs/decisions/$($knownIds[$older])" -Severity 'Error' -Check 'AdrPrecedence' `
+                    -Message "$selfId declares it supersedes this decision, but this decision does not point forward. Add 'superseded_by: $selfId' if it is fully replaced, or 'amended_by: $selfId' if it still stands in part."
+            }
+        }
+
+        # Every pointer resolves, whichever direction it goes.
+        foreach ($pair in @(@{ Key = 'superseded_by'; Value = $forward }, @{ Key = 'amended_by'; Value = $amended })) {
+            if (-not $pair.Value) { continue }
+            if ($pair.Value.Trim() -eq 'none') { continue }
+            $ids = [regex]::Matches($pair.Value, '\b([A-Za-z]+-\d{4})\b') |
+                ForEach-Object { $_.Groups[1].Value.ToUpperInvariant() } | Select-Object -Unique
+            if (-not $ids) {
+                Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                    -Message "$($pair.Key) is '$($pair.Value)', which names no ADR id. Use an id, or 'none' when nothing replaced it."
+            }
+            foreach ($id in $ids) {
+                if (-not $knownIds.ContainsKey($id)) {
+                    Add-Issue -Path $rel -Severity 'Error' -Check 'AdrPrecedence' `
+                        -Message "$($pair.Key) names '$id', which is not an ADR id in docs/decisions."
+                }
+            }
+        }
+    }
+}
+
 $errors = @($issues | Where-Object { $_.Severity -eq "Error" })
 $warnings = @($issues | Where-Object { $_.Severity -eq "Warning" })
 

@@ -3,6 +3,7 @@ id: FLOW-0103
 slug: flow-dx-toolkit-controllers-monitor-adapter
 domain: flow
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-09-01
 title: Flow DX toolkit - FlowEntityController, mutable OnProjected monitor, adapter metadata, and actions (OOB via AutoRegistrar)
 ---

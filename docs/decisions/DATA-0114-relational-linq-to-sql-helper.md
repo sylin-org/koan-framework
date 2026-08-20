@@ -1,11 +1,14 @@
 ---
-id: DATA-0007
+id: DATA-0114
+former_id: DATA-0007
 slug: DATA-0007-relational-linq-to-sql-helper
 domain: DATA
 status: Accepted
 ---
 
-# 0007: Minimal LINQ-to-SQL helper for relational adapters
+# DATA-0114: Minimal LINQ-to-SQL helper for relational adapters
+
+> **Renumbered from DATA-0007.** That number was issued twice; this decision moved to DATA-0114 so a reference to either is unambiguous. Content is unchanged.
 
  
 

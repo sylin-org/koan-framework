@@ -2,7 +2,7 @@
 
 **Status:** Accepted (Canonical) - **PHASE 3 COMPLETE**
 **Date:** 2025-10-01
-**Supersedes:** AI-0014, AI-SOURCE-ROUTING-FIX, AI-SOURCE-MEMBER-IMPLEMENTATION-PLAN
+**Supersedes:** AI-0039 (renumbered from AI-0014), AI-SOURCE-ROUTING-FIX, AI-SOURCE-MEMBER-IMPLEMENTATION-PLAN
 **Implementation Started:** 2025-10-01
 
 > **Implementation update (2026-07-27):** health probing is provider-owned when an adapter implements

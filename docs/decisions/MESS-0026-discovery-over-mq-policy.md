@@ -3,6 +3,7 @@ id: MESS-0026
 slug: MESS-0026-discovery-over-mq-policy
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 title: Optional discovery-over-MQ (ping/announce) policy and gating
 ---
 

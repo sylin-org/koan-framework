@@ -3,8 +3,7 @@
 Status: Accepted  
 Date: 2025-10-08  
 Authors: Koan Framework Team  
-Supersedes: ARCH-0056 (scope: Canon naming) (clarifies separation)  
-Relates-To: DX-0040, ARCH-0053, ARCH-0059  
+Relates-To: ARCH-0056 (clarifies scope separation from Canon naming; does not replace it), DX-0040, ARCH-0053, ARCH-0059  
 
 ## 1. Decision
 Remove the archived `legacy/S8.Canon-legacy-20251005` snapshot (six projects) from the repository and solution to:

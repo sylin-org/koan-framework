@@ -1,6 +1,7 @@
 ﻿---
 title: "FLOW-0105: External ID translation, adapter identity, and normalized payload ingestion"
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-09-01
 related:
   - ARCH-0040-config-and-constants-naming.md

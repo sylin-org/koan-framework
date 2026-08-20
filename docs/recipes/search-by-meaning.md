@@ -108,8 +108,7 @@ addition breaks:
 
 Each category takes `Source`, `Model`, `Via`, and `Fallback` independently.
 
-Depth: [AI and vector how-to](../guides/ai-vector-howto.md) ·
-[embedding best practices](../guides/embedding-best-practices.md).
+Depth: [AI and vector how-to](../guides/ai-vector-howto.md).
 
 ## Prove it
 

@@ -3,6 +3,7 @@ id: MESS-0021
 slug: MESS-0021-messaging-capabilities-and-negotiation
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 title: Messaging capabilities and framework negotiation
 ---
 

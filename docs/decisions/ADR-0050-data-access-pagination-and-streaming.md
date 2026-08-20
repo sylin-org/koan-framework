@@ -1,6 +1,7 @@
 # ADR-0050: Data access semantics - All/Query materialize fully; add streaming and cursor/pager APIs
 
-Status: Superseded for streaming/cursor design by [DATA-0107](DATA-0107-provider-bounded-entity-streams.md)
+Status: Superseded for streaming/cursor design by [DATA-0107](DATA-0107-provider-bounded-entity-streams.md)  
+**Superseded by:** ADR-0056
 
 > Historical duplicate of DATA-0061: the cursor, Pager, `AllUnbounded`, and `QueryAll` surfaces below
 > were not implemented. Current Entity streaming uses capability-qualified provider-bounded numbered

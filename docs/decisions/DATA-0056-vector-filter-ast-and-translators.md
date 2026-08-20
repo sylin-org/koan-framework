@@ -1,6 +1,7 @@
 # DATA-0056 - Vector Filter AST and Translators
 
 Status: Superseded by [DATA-0096](DATA-0096-unified-filter-pipeline.md) (unified Filter AST) and [DATA-0097](DATA-0097-vector-pathway-parity.md) (vector pathway parity)
+superseded_by: DATA-0096, DATA-0097
 
 Date: 2025-08-20
 

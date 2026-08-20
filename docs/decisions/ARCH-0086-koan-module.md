@@ -5,6 +5,7 @@
 > is now the only bootstrap primitive.
 
 **Status**: Accepted (2026-06-02) — additive-base approach + keep `[Before]/[After]` ordering, both signed off by the Enterprise Architect. **Settled (2026-06-03):** stages (a)–(d) complete; the `KoanModule` + ordered `Start` + `Report` surface is landed and proven, the auth off-registry split-brain is healed, and the `IKoanInitializer`-only fragmentation is folded. Remaining registrar→`KoanModule` conversions are opportunistic (see the ledger).
+amended_by: ARCH-0116
 **Date**: 2026-06-02
 **Deciders**: Enterprise Architect
 **Scope**: Facet 2 of the [foundation consolidation plan](../architecture/foundation-consolidation-plan.md): the **boot-time** registration + bootstrap + self-report story. Lands `KoanModule` in `Koan.Core` as the single primitive an assembly author writes, *over* the existing source-generated discovery (`KoanRegistry`) and topological ordering (`RegistrarOrdering`). Builds on the Facet 1 capability model (ARCH-0084) but — see the granularity finding below — does **not** host it.

@@ -3,6 +3,7 @@ id: MESS-0028
 slug: MESS-0028-mq-provisioning-plan-diff-apply-modes
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 date: 2025-08-24
 title: MQ provisioning - plan/diff/apply architecture and modes
 ---

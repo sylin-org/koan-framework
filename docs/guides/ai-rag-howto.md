@@ -11,7 +11,6 @@ validation:
   scope: docs/guides/ai-rag-howto.md
 related_guides:
   - ai-vector-howto.md
-  - embedding-best-practices.md
   - entity-capabilities-howto.md
   - jobs-howto.md
 ---
@@ -64,8 +63,7 @@ public sealed class Article : Entity<Article>
 ```
 
 The template is the retrieval contract. It decides what "similar" means, so choose the fields a reader
-would actually match on and leave out identifiers and boilerplate. See
-[embedding best practices](embedding-best-practices.md).
+would actually match on and leave out identifiers and boilerplate.
 
 ## 3. Retrieve, then ask
 

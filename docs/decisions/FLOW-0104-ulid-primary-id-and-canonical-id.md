@@ -3,6 +3,7 @@
 > **Status: Retired.** Describes the original Flow pillar generation, superseded by the Koan.Canon rebuild.
 
 Status: Retired
+superseded_by: ARCH-0056
 
 ## Contract
 

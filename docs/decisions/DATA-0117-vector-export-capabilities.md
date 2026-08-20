@@ -1,12 +1,15 @@
 ---
-id: DATA-0078
+id: DATA-0117
+former_id: DATA-0078
 slug: data-0078-vector-export-capabilities
 domain: DATA
 status: Proposed
 date: 2025-10-02
 ---
 
-# DATA-0078: Vector Database Export Capabilities - Provider-Agnostic Batch Export
+# DATA-0117: Vector Database Export Capabilities - Provider-Agnostic Batch Export
+
+> **Renumbered from DATA-0078.** That number was issued twice; this decision moved to DATA-0117 so a reference to either is unambiguous. Content is unchanged.
 
 Date: 2025-10-02
 

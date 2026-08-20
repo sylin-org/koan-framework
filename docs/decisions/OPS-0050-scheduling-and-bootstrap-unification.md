@@ -1,6 +1,7 @@
 ---
 title: OPS-0050 - Scheduling core and Bootstrap unification (readiness-gated, auto-registered)
 status: Superseded
+superseded_by: JOBS-0005
 date: 2025-08-21
 ---
 

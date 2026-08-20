@@ -1,6 +1,7 @@
 # JOBS-0005: Job Orchestrator rebuild — a durable, edge+level-triggered state machine
 
 **Status**: **Accepted (2026-06-04)** · **Implemented — in-memory + durable tiers, SQLite-verified (2026-06-04; see §16)**. All positions ratified by the architect (§12). Greenfield rebuild: **supersedes JOBS-0001, JOBS-0002, JOBS-0003** and the in-code "JOBS-0004" partition tier. The current `Koan.Jobs.Core` module is discarded.
+amended_by: JOBS-0008
 **Date**: 2026-06-04
 **Deciders**: Enterprise Architect
 **Scope**: Replace the scattered job subsystem with a single, encapsulated **Job Orchestrator** concern that owns a ledger, dispatch/recall, cancellation, and scheduling. Define the entity-first authoring surface, the capability-graded backend, and the state-machine execution model (edge-triggered `Submit` + level-triggered `Schedule`).

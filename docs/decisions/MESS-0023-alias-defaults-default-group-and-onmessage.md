@@ -3,6 +3,7 @@ id: MESS-0023
 slug: MESS-0023-alias-defaults-default-group-and-onmessage
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 date: 2025-08-17
 title: Alias defaults, default group, auto-subscribe, and OnMessage sugar
 ---

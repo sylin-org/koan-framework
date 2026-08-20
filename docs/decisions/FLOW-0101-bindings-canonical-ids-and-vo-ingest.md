@@ -3,6 +3,7 @@ id: FLOW-0101
 slug: bindings-canonical-ids-and-vo-ingest
 domain: flow
 status: Retired
+superseded_by: ARCH-0056
 date: 2025-08-31
 title: Flow bindings, canonical ID resolution, and independent value-object ingest
 ---

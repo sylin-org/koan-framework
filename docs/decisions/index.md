@@ -80,6 +80,18 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 4. Prefer removal over indefinite deprecation when safe (reduces cognitive load).
 5. Reference = Intent: an application reference activates a module's contribution; repository or
    solution membership alone implies no maturity or support promise.
+6. **Precedence points forward.** A decision that is no longer in force must say what took over, in
+   front matter *and* in a leading `> **...**` banner — front matter is invisible to someone reading the
+   body. Use `superseded_by:` when the decision is fully replaced, `amended_by:` when it still stands and
+   a later decision replaces only part of it, and `superseded_by: none` when the capability was removed
+   outright. When a newer decision declares `supersedes:`, the older one must point back at it; a
+   one-directional link leaves a reader stranded on dead guidance that reads as live.
+7. **An ADR id is issued once.** Allocate the next unused number for the domain; never reuse one. If a
+   collision has to be repaired, renumber the less-referenced side, keep the old number in `former_id:`,
+   and say so in a banner so an older reference is still findable.
+
+`docs-lint` enforces 6 and 7 as errors, so neither can drift back in. It exists because a retired
+decision that named no successor was cited as live policy in a shipped ADR (see ARCH-0128).
 
 ## Change Workflow (Summary)
 

@@ -3,6 +3,7 @@ id: ARCH-0046
 slug: ARCH-0046-recipes-intention-driven-bootstrap-and-layered-config
 domain: ARCH
 status: Superseded
+superseded_by: ARCH-0086
 date: 2025-08-26
 ---
 

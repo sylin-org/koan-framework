@@ -3,6 +3,7 @@ id: MESS-0024
 slug: MESS-0024-batch-semantics-and-aliasing
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 title: Batch semantics, handlers, and aliasing
 ---
 

@@ -3,6 +3,7 @@ id: MESS-0022
 slug: MESS-0022-mq-provisioning-aliases-and-dispatcher
 domain: MESS
 status: Retired
+superseded_by: ARCH-0113
 date: 2025-08-17
 title: MQ provisioning defaults, type aliases/attributes, and dispatcher
 ---

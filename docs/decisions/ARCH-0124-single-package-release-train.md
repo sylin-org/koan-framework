@@ -3,6 +3,7 @@ id: ARCH-0124
 slug: single-package-release-train
 domain: Architecture
 status: Accepted
+amended_by: ARCH-0125
 date: 2026-08-13
 title: One stable release train for all active packages
 related:

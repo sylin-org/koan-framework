@@ -69,7 +69,7 @@ Conducted online research across major vector database providers:
 
 Created **DATA-0078: Vector Database Export Capabilities**
 
-**Location:** `docs/decisions/DATA-0078-vector-export-capabilities.md`
+**Location:** `docs/decisions/DATA-0117-vector-export-capabilities.md`
 
 **Key Design Decisions:**
 
@@ -413,7 +413,7 @@ See DATA-0078 ADR for complete design rationale and alternatives considered.
 ```
 
 **Files Changed:**
-- `docs/decisions/DATA-0078-vector-export-capabilities.md` (new)
+- `docs/decisions/DATA-0117-vector-export-capabilities.md` (new)
 - `src/Koan.Data.Vector.Abstractions/VectorExportBatch.cs` (new)
 - `src/Koan.Data.Vector.Abstractions/IVectorSearchRepository.cs` (modified)
 - `src/Connectors/Data/ElasticSearch/ElasticSearchVectorRepository.cs` (modified)

@@ -3,6 +3,7 @@ id: DATA-0074
 slug: data-0074-entity-lifecycle-event-pipeline
 domain: DATA
 status: Superseded
+superseded_by: ARCH-0113
 date: 2025-09-28
 ---
 
