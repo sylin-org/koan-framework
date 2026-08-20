@@ -104,6 +104,18 @@ The MCP transports' plaintext warning (`IsProduction && !InContainer && !IsHttps
 no TLS-terminating proxy in front") stays a transport-local heuristic. It is one concept in one pillar
 and does not earn a framework name.
 
+### Enforcement
+
+The rule was already written when the drift happened, because a direct `IsDevelopment()` read compiles,
+passes review, and looks exactly like correct code. Prose alone does not hold it, so the law is
+structural: `EnvironmentGateConformanceSpec` scans `src/` and enumerates every direct environment read
+with the reason it is allowed. A new one fails the build with a message that names the three gates and
+asks which decision the author is making. Removing one also fails, so the list cannot accumulate
+entries that stopped being true.
+
+The allowlist is keyed by file **and count**, so a new gate added inside an already-allowed file is
+caught too. `KoanEnv.cs` and `KoanEnvGate.cs` are excluded as the mechanism itself.
+
 ## Consequences
 
 Behavior changes, both corrections:
@@ -128,6 +140,11 @@ uninitialized (an unset environment name is neither Development nor Production).
 - `tests/Suites/Core/Koan.Core.Tests/Hosting/EnvironmentGateSpec.cs` — 10 specs pinning the law,
   including that every environment below Production runs the convenience and that a refusal names all
   four of capability, risk, remedy, and flag
+- `tests/Suites/Core/Koan.Core.Tests/Hosting/EnvironmentGateConformanceSpec.cs` — the structural
+  guard, mutation-verified in both directions: an injected bespoke gate in a new file and a second
+  read inside an allowed file each fail with the teaching message
+- The law is stated once and routed to, not restated: `CLAUDE.md` architectural laws and
+  `.codex/skills/explore/SKILL.md` global constraints each carry one line pointing here
 - Full solution builds with 0 warnings; Core (349), Classification (60), Identity (90), MCP
   Conformance (84), MCP Explorer (16), Auth Server (50), Web Admin (13), OpenAPI (12), Tenancy Web
   (13), Data Core (474), Sqlite (48), Relational (18) all green

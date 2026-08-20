@@ -44,6 +44,11 @@ public sealed class TodosController : EntityController<Todo>;
 - Prefer standard .NET hosting, DI, options, health, assembly, MSBuild, and NuGet concepts before
   creating a Koan-specific part.
 - Complexity centralized at one owner is acceptable; the same complexity distributed across consumers is not.
+- Environment posture is a named decision, never a raw `IsDevelopment()` / `IsProduction()` read.
+  A convenience that is risky only in production declares a `KoanMagic` and passes it to `KoanEnv.Gate`
+  (Production is the gate, so it still runs in Staging, Test, and CI); a surface that must not exist
+  outside development uses `KoanEnv.Gate.DevelopmentOnly`, which nothing unlocks. Diagnostics may read
+  the environment directly. A guard spec enumerates every exception — see ARCH-0128.
 
 ## Application patterns
 

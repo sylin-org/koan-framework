@@ -131,11 +131,11 @@ public sealed class OpenApiModule : KoanModule
         string RoutePattern,
         string UiRoutePrefix,
         bool RequireAuthenticationOutsideDevelopment,
-        bool IsDevelopment)
+        bool AllowsDevelopmentSurfaces)
     {
         public bool DocumentEnabled => Enabled ?? true;
-        public bool UiEnabled => DocumentEnabled && (EnableUi ?? IsDevelopment);
-        public bool RequiresAuthentication => UiEnabled && !IsDevelopment && RequireAuthenticationOutsideDevelopment;
+        public bool UiEnabled => DocumentEnabled && (EnableUi ?? AllowsDevelopmentSurfaces);
+        public bool RequiresAuthentication => UiEnabled && !AllowsDevelopmentSurfaces && RequireAuthenticationOutsideDevelopment;
         public string DocumentRoute => RoutePattern.Replace("{documentName}", KoanOpenApiOptions.DefaultDocumentName, StringComparison.OrdinalIgnoreCase);
         public string UiRoute => "/" + UiRoutePrefix.Trim('/');
     }

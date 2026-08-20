@@ -13,6 +13,10 @@ Do not write production code until all steps are done.
 - Entity-first data access: prefer `Entity<T>` statics; avoid repositories and `Data<TEntity,TKey>` unless no static exists.
 - Controllers-only HTTP: no inline endpoints (`MapGet`/`MapPost`/etc) unless an ADR explicitly allows it.
 - No magic literals: stable identifiers go in `Infrastructure/Constants`; tunables are typed `*Options`.
+- Environment posture: gate capabilities through `KoanEnv.Gate` — a `KoanMagic` for a convenience that is
+  risky only in production (Production is the gate, so Staging/Test/CI still run it), `DevelopmentOnly`
+  for a surface nothing may unlock — never a raw `IsDevelopment()`/`IsProduction()`. Diagnostics may
+  read directly; a guard spec enumerates every exception (ARCH-0128).
 - Docs posture: instruction-first (no tutorials); update ADRs and TOCs when behavior/policy changes.
 - Per-project docs: `README.md` + `TECHNICAL.md` at project roots for reusable modules.
 - Large data paths: use capability-qualified streaming or explicit paging. InMemory, JSON, and Redis
