@@ -29,6 +29,17 @@ public sealed class SqliteAdapterFactory : AdapterTestFactoryBase
         return ValueTask.CompletedTask;
     }
 
+    /// <summary>
+    /// Clears rows, and deliberately does not drop tables.
+    ///
+    /// <para>Provisioning is memoized per host by <c>DataSourceReadinessCoordinator</c> — Koan's
+    /// "compile once per host shape" law. Dropping a table out of band leaves the host believing it
+    /// still exists, so every later spec died on a raw driver error ("no such table"). A between-spec
+    /// reset wants the data gone, not the schema; that is what InMemory's <c>Widget.RemoveAll()</c>
+    /// already does. A test that genuinely needs a schema reset must call
+    /// <c>DataSourceReadinessCoordinator.InvalidateShape</c>, the sanctioned way to declare an
+    /// authorized shape change.</para>
+    /// </summary>
     public override async Task ResetAsync()
     {
         await using var conn = new SqliteConnection(ConnectionString);
@@ -45,9 +56,9 @@ public sealed class SqliteAdapterFactory : AdapterTestFactoryBase
         }
         foreach (var name in names)
         {
-            await using var drop = conn.CreateCommand();
-            drop.CommandText = $"DROP TABLE IF EXISTS \"{name}\"";
-            await drop.ExecuteNonQueryAsync().ConfigureAwait(false);
+            await using var clear = conn.CreateCommand();
+            clear.CommandText = $"DELETE FROM \"{name}\"";
+            await clear.ExecuteNonQueryAsync().ConfigureAwait(false);
         }
     }
 }

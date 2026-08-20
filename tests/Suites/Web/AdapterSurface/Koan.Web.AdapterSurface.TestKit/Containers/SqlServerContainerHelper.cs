@@ -11,8 +11,10 @@ public sealed class SqlServerContainerHelper : KoanWebContainerHelper<SqlServerF
         await using var conn = new SqlConnection(ConnectionString);
         await conn.OpenAsync().ConfigureAwait(false);
         await using var cmd = new SqlCommand(
+            // Rows, not tables: provisioning is memoized per host, so dropping out of band leaves the
+            // host believing the table still exists and every later spec fails on a raw driver error.
             @"DECLARE @sql NVARCHAR(MAX) = N'';
-                  SELECT @sql += 'DROP TABLE [' + s.name + '].[' + t.name + '];' + CHAR(13)
+                  SELECT @sql += 'DELETE FROM [' + s.name + '].[' + t.name + '];' + CHAR(13)
                   FROM sys.tables t INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
                   WHERE s.name = 'dbo';
                   IF LEN(@sql) > 0 EXEC sp_executesql @sql;",

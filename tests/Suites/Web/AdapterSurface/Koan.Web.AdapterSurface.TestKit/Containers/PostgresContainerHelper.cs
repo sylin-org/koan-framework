@@ -11,7 +11,9 @@ public sealed class PostgresContainerHelper : KoanWebContainerHelper<PostgresFix
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync().ConfigureAwait(false);
         await using var cmd = new NpgsqlCommand(
-            "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END $$;",
+            // Rows, not tables: provisioning is memoized per host, so dropping out of band leaves the
+            // host believing the table still exists and every later spec fails on a raw driver error.
+            "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP EXECUTE 'TRUNCATE TABLE public.' || quote_ident(r.tablename) || ' CASCADE'; END LOOP; END $$;",
             conn);
         await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
     }

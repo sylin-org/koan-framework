@@ -477,6 +477,34 @@ public static class Data<TEntity, TKey>
         return StreamCore(query, batchSize, ct);
     }
 
+    /// <summary>
+    /// Whether this Entity's routed provider advertises provider-bounded paging — that is, whether
+    /// <see cref="AllStream(int?, CancellationToken)"/> and <see cref="QueryStream(Expression{Func{TEntity, bool}}, int?, CancellationToken)"/>
+    /// will be honored rather than rejected (DATA-0107).
+    ///
+    /// <para>A bulk consumer that must read every row asks this <b>before</b> choosing a read strategy, so it
+    /// can materialize deliberately on an unqualified adapter instead of discovering the answer as an
+    /// exception mid-enumeration. Catching the rejection instead would also swallow the other rejection
+    /// reasons — an unsupported sort, an offset overflow — which are real errors, not a strategy signal.</para>
+    /// </summary>
+    internal static bool SupportsProviderBoundedStreams()
+    {
+        var dataService = Service; // Preserve the standard missing/disposed-host failure contract.
+        var services = AppHost.Current!;
+        var carrierRegistry = services.GetService(typeof(KoanContextCarrierRegistry)) as KoanContextCarrierRegistry;
+
+        // Resolve under the caller's ambient context: routing is context-sensitive, so the capability
+        // answer must come from the repository the read would actually use.
+        using (EnterCapturedContext(EntityContext.Current, carrierRegistry, carrierRegistry?.Capture()))
+        {
+            var repo = dataService.GetRepository<TEntity, TKey>();
+            var sourceRegistry = (DataSourceRegistry?)services.GetService(typeof(DataSourceRegistry))
+                ?? throw new InvalidOperationException("Data source registry is unavailable. Ensure AddKoanDataCore() ran during startup.");
+            var (provider, _) = AdapterResolver.ResolveForEntity<TEntity>(services, sourceRegistry);
+            return DataCaps.Describe(repo, provider).Has(DataCaps.Query.ProviderBoundedPaging);
+        }
+    }
+
     private static async IAsyncEnumerable<TEntity> StreamCore(
         QueryDefinition query,
         int? batchSize,

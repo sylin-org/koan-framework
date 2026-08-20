@@ -376,26 +376,42 @@ public sealed class EntityTransferDslSpec
         repository.UpsertManyCalls.Should().Be(1);
     }
 
+    /// <summary>
+    /// DATA-0108. This spec previously asserted that a transfer over an adapter without provider-bounded
+    /// paging throws <c>QueryStreamRejectedException</c>. That contradicted the real-adapter conformance
+    /// kit — which asserts transfers work and had been red for InMemory, JSON, and Redis ever since — and
+    /// it left <c>Copy</c>/<c>Move</c> broken on JSON, the Data pillar's own floor adapter. The transfer
+    /// DSL now reads with the strongest strategy the provider supports, and says which one it used.
+    /// </summary>
     [Fact]
-    public async Task Copy_MissingBoundedPaging_FailsBeforeProviderWork()
+    public async Task Copy_MissingBoundedPaging_MaterializesTheSourceAndReportsIt()
     {
         await using var runtime = await CreateRuntime();
         await Reset(runtime);
         runtime.BindHost();
+
+        using (runtime.UsePartition("active"))
+            for (var i = 0; i < 3; i++)
+                await new TransferTodo { Title = $"unbounded-{i}", Active = true }.Save();
 
         var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
             .Repository<TransferTodo>();
         repository.ResetObservations();
         repository.AdvertiseBoundedPaging = false;
 
-        var act = () => TransferTodo.Copy()
+        var result = await TransferTodo.Copy()
+            .From(partition: "active")
             .To(partition: "archive")
             .Batch(2)
             .Run();
 
-        await act.Should().ThrowAsync<QueryStreamRejectedException>();
-        repository.QueryCalls.Should().Be(0);
-        repository.UpsertManyCalls.Should().Be(0);
+        result.CopiedCount.Should().Be(3, "an unqualified provider must not silently drop the transfer");
+        result.Warnings.Should().Contain(
+            warning => warning.Contains("provider-bounded paging"),
+            "materializing instead of streaming is reported, never silent");
+
+        // Writes stay batched even when the read could not be: 3 rows at Batch(2) is two dispatches.
+        repository.UpsertManyCalls.Should().Be(2);
     }
 
     [Fact]

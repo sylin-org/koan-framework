@@ -78,6 +78,40 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
     protected void SkipIfTransferUnsupported()
         => Assert.SkipWhen(!Factory.SupportsCrossPartitionTransfer, $"[{typeof(TFactory).Name}] does not support cross-partition transfer.");
 
+    /// <summary>
+    /// Whether this adapter advertises provider-bounded paging (DATA-0107). Qualified adapters stream a
+    /// transfer's source read; the three that do not — InMemory, JSON, Redis — materialize it instead and
+    /// must say so on the result.
+    /// </summary>
+    protected virtual bool ProviderStreamsAreBounded => true;
+
+    [Fact]
+    public async Task Transfer_reports_a_materialized_read_exactly_when_the_provider_cannot_stream()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("src", count: 3);
+
+        var result = await Data<Widget, string>.Copy()
+            .From(partition: "src")
+            .To(partition: "dst")
+            .Run();
+
+        result.CopiedCount.Should().Be(3);
+
+        var materialized = result.Warnings.Any(
+            warning => warning.Contains("provider-bounded paging", StringComparison.Ordinal));
+
+        // Both directions matter. A qualified adapter must still stream, or the DATA-0107 guarantee has
+        // quietly become "everything materializes"; an unqualified one must never materialize silently.
+        materialized.Should().Be(
+            !ProviderStreamsAreBounded,
+            ProviderStreamsAreBounded
+                ? "a stream-qualified adapter must keep streaming the source read"
+                : "materializing on an unqualified adapter has to be reported, never silent");
+    }
+
     // ============================================================================================
     // Entity<T>.Copy().From().To().Run()
     // ============================================================================================
