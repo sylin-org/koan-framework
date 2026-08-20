@@ -12,6 +12,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.VectorAdapterSurface.TestKit\Koan.Data.VectorAdapterSurface.TestKit.csproj" />
+    <!-- V-22 is the one Framework cell that coordinates an Entity write with a vector write, so this host
+         needs an elected record provider as well as the vector adapter under test. Milvus/Qdrant/Weaviate
+         reference no record connector at all; ElasticSearch/OpenSearch reference one but configure only a
+         vector space, so no record source is elected. Either way V-22 died on "no provider candidates"
+         rather than on the behaviour it proves. JSON is the Data pillar floor: it composes from a bare
+         reference, registers no vector adapter (so the single-vector-adapter rule still holds), and yields
+         to any configured record source. -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\ElasticSearch\Koan.Data.Connector.ElasticSearch.csproj" />
     <!-- The production-adapter AODB isolation spec boots a real AddKoan() host (tenancy + a Database-mode axis)
          against the live Elasticsearch container, beyond the custom-SP surface harness. -->

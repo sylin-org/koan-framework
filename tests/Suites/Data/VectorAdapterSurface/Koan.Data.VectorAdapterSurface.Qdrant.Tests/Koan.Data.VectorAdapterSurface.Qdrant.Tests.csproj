@@ -13,6 +13,13 @@
   <ItemGroup>
     <ProjectReference Include="..\Koan.Data.VectorAdapterSurface.TestKit\Koan.Data.VectorAdapterSurface.TestKit.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\Qdrant\Koan.Data.Vector.Connector.Qdrant.csproj" />
+    <!-- V-22 is the one Framework cell that coordinates an Entity write with a vector write, so this host
+         needs a record store as well as the vector adapter under test. The adapters whose backing store also
+         serves records (PgVector/RedisVector/SqliteVec/MongoAtlas) got one incidentally; the pure vector
+         stores did not, and V-22 failed on "no provider candidates" rather than on the behaviour it proves.
+         JSON is the Data pillar floor: it composes from a bare reference and registers no vector adapter,
+         so the single-vector-adapter conformance rule still holds. -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
     <!-- The production-adapter AODB isolation spec boots a real AddKoan() host (tenancy + a Database-mode axis)
          against the live Qdrant container, beyond the custom-SP surface harness. -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
