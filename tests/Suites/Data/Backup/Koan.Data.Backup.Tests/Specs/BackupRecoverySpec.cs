@@ -229,10 +229,17 @@ public sealed class BackupRecoverySpec
         });
     }
 
+    /// <summary>
+    /// DATA-0108. This previously asserted that backup <i>rejects</i> on the resident adapters. Refusing a
+    /// backup on JSON — the Data pillar's floor, and the adapter a developer starts from — made a capability
+    /// untryable in the configuration it ships in, which is not a boundary worth defending: the whole set is
+    /// already resident, so materializing it costs nothing the adapter was not already paying. The read
+    /// strategy is recorded as a runtime fact, so "how was this read?" still has one honest answer.
+    /// </summary>
     [Theory]
     [InlineData("inmemory")]
     [InlineData("json")]
-    public async Task Unsupported_resident_adapters_reject_before_query_or_archive_publish(string provider)
+    public async Task Resident_adapters_back_up_via_a_materialized_read_and_record_it(string provider)
     {
         await WithRuntime(provider, async runtime =>
         {
@@ -244,17 +251,23 @@ public sealed class BackupRecoverySpec
             DataCaps.Describe(repository, provider).Has(DataCaps.Query.ProviderBoundedPaging).Should().BeFalse();
 
             using var scope = runtime.Services.CreateScope();
-            Func<Task> backup = () => scope.ServiceProvider.GetRequiredService<IBackupService>()
+            var receipt = await scope.ServiceProvider.GetRequiredService<IBackupService>()
                 .Create<BackupRecord, string>(
-                    $"unsupported-{provider}",
+                    $"resident-{provider}",
                     new BackupRequest { PageSize = 2, StorageProfile = Profile });
 
-            var rejection = (await backup.Should().ThrowAsync<QueryStreamRejectedException>()).Which;
-            rejection.EntityType.Should().Contain(nameof(BackupRecord));
-            rejection.Provider.Should().Be(provider);
-            runtime.Probe.RequestedPages.Should().BeEmpty();
-            runtime.Probe.CountCalls.Should().Be(0);
-            PublishedArchives(runtime.StorageRoot).Should().BeEmpty();
+            receipt.RecordCount.Should().Be(5);
+            (await ReadIds(scope.ServiceProvider, receipt)).Should().Equal(ExpectedIds);
+
+            // One read, not a page walk. The streamed path over the same five records at PageSize 2 requests
+            // pages 1, 2, 3 (see Bounded_pages above); materializing asks once.
+            runtime.Probe.RequestedPages.Should().ContainSingle();
+
+            var fact = runtime.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts.Single(item =>
+                item.Code == Constants.Diagnostics.Codes.StreamExecution
+                && item.Subject.EndsWith(nameof(BackupRecord), StringComparison.Ordinal));
+            fact.State.Should().Be(KoanFactState.Selected);
+            fact.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.MaterializedBulkRead);
         });
     }
 

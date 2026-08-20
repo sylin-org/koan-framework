@@ -70,7 +70,7 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0126 | [A process-global resource is owned by a process-derived fact](ARCH-0126-process-global-resource-ownership.md) | Accepted | Standard output ownership resolved from the process before composition; capabilities observe it rather than claim it |
 | ARCH-0127 | [Connector fleet strategy — capability without infrastructure](ARCH-0127-connector-fleet-strategy.md) | Accepted | Connectors ranked by capability added per unit of infrastructure imposed; a connector without an existing conformance oracle is not delegable |
 | ARCH-0128 | [Environment posture is a named decision, not a boolean read](ARCH-0128-environment-posture-is-a-named-decision.md) | Accepted | Capabilities gate on a named decision (`KoanEnv.Gate`), not on `IsDevelopment`/`IsProduction`; Production is the gate and consent is the unlock, except where nothing may unlock |
-| DATA-0108 | [Transfers read with the strongest strategy the provider supports](DATA-0108-transfers-read-with-the-strongest-available-strategy.md) | Accepted | Copy/Move/Mirror stream on a DATA-0107-qualified adapter and materialize explicitly — reported, never silent — on one that is not |
+| DATA-0108 | [Bulk reads use the strongest strategy the provider supports](DATA-0108-transfers-read-with-the-strongest-available-strategy.md) | Accepted | Transfers and Backup stream on a DATA-0107-qualified adapter and materialize explicitly — recorded, never silent — on one that is not; the choice has one owner |
 
 ## Authoring Principles
 

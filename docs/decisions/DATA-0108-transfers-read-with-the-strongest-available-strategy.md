@@ -4,19 +4,23 @@ slug: transfers-read-with-the-strongest-available-strategy
 domain: DATA
 status: Accepted
 date: 2026-08-20
-title: Transfers read with the strongest strategy the provider supports
+title: Bulk reads use the strongest strategy the provider supports
 related:
   - DATA-0107
 ---
 
-# DATA-0108: Transfers read with the strongest strategy the provider supports
+# DATA-0108: Bulk reads use the strongest strategy the provider supports
 
 ## Outcome
 
-The Entity transfer DSL — `Copy()`, `Move()`, `Mirror()` — reads its source with a provider-bounded
-stream when the routed adapter advertises `DataCaps.Query.ProviderBoundedPaging`, and with an
-explicitly materialized query when it does not. The materialized path is reported on
-`TransferResult.Warnings`; it is never silent. Writes stay batched in both cases.
+A **bulk read** — one that must touch every matching row — uses a provider-bounded stream when the
+routed adapter advertises `DataCaps.Query.ProviderBoundedPaging`, and an explicitly materialized query
+when it does not. The choice is never silent: it records a `koan.data.stream.execution` runtime fact
+either way, and a consumer may add its own notice.
+
+The decision lives in one owner, `Data<TEntity, TKey>.BulkRead`, so a bulk consumer inherits it rather
+than re-deriving it. Both consumers are on it: the transfer DSL (`Copy`/`Move`/`Mirror`, which also
+surfaces a `TransferResult.Warnings` entry and keeps its writes batched) and Data Backup.
 
 ## Context
 
@@ -86,14 +90,20 @@ already costs. And DATA-0107's own rejection message names "materialize the quer
 sanctioned alternative; this is a consumer taking that route deliberately and declaring it, which is
 what "Koan never silently returns to complete-result materialization" asks for.
 
-Data Backup keeps rejecting. It exports an unbounded set to an archive that is still accumulated in
-one `MemoryStream` (DATA-0107 §Consequences), so failing before export remains the honest outcome
-there. The boundary is per consumer, decided by what the consumer does with the rows — not inherited
-blindly.
+Data Backup follows the same rule, and this reverses the position DATA-0107 recorded for it. That
+position rested on backup's archive being accumulated in one `MemoryStream` — but that cost exists
+whatever the read strategy is, and it is not reduced by refusing to read. What refusing *did*
+accomplish was making backup untryable on JSON: a developer who references `Koan.Data.Backup` in the
+configuration Koan composes by default could not run it at all. A capability that cannot be tried
+where people start is not a safe boundary, it is a dead end.
+
+The memory concern is real and unaddressed either way; it belongs to the archive writer, which is
+where DATA-0107 already located it.
 
 ## Consequences
 
-- `Copy` / `Move` / `Mirror` work on every adapter, including the pillar's floor.
+- `Copy` / `Move` / `Mirror` and Data Backup work on every adapter, including the pillar's floor.
+- A third bulk consumer inherits the strategy by calling `BulkRead`, rather than choosing again.
 - A transfer on an unqualified adapter holds the matching set in memory once. That is acceptable for
   the three adapters in question and is stated on the result rather than assumed.
 - A future unqualified adapter over a genuinely large store would inherit the materialized path. The
@@ -111,3 +121,7 @@ blindly.
 - `EntityTransferDsl.Spec.Copy_MissingBoundedPaging_MaterializesTheSourceAndReportsIt` pins the
   restated contract on the synthetic adapter, including that 3 rows at `Batch(2)` still dispatch two
   writes — the read materialized, the writes did not.
+- `BackupRecoverySpec.Resident_adapters_back_up_via_a_materialized_read_and_record_it` replaces the
+  rejection theory over `inmemory` and `json`: the archive round-trips all five records, and the probe
+  shows a single read rather than the `1, 2, 3` page walk the streamed path performs, with the runtime
+  fact reporting `materialized-bulk-read`. Backup 9/9, Data Core 474/474.

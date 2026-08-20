@@ -478,30 +478,73 @@ public static class Data<TEntity, TKey>
     }
 
     /// <summary>
-    /// Whether this Entity's routed provider advertises provider-bounded paging — that is, whether
-    /// <see cref="AllStream(int?, CancellationToken)"/> and <see cref="QueryStream(Expression{Func{TEntity, bool}}, int?, CancellationToken)"/>
-    /// will be honored rather than rejected (DATA-0107).
+    /// Read every matching Entity for a <b>bulk</b> operation — a transfer, an export — using the strongest
+    /// strategy the routed provider supports (DATA-0108).
     ///
-    /// <para>A bulk consumer that must read every row asks this <b>before</b> choosing a read strategy, so it
-    /// can materialize deliberately on an unqualified adapter instead of discovering the answer as an
-    /// exception mid-enumeration. Catching the rejection instead would also swallow the other rejection
-    /// reasons — an unsupported sort, an offset overflow — which are real errors, not a strategy signal.</para>
+    /// <para>A provider that advertises <c>ProviderBoundedPaging</c> is streamed, so a bulk operation over a
+    /// large table stays provider-bounded exactly as DATA-0107 requires. A provider that does not is read with
+    /// one explicitly materialized query — the alternative being that the operation simply does not work on
+    /// the Data pillar's own floor adapter, which is not a boundary worth defending. The three adapters this
+    /// reaches keep their whole set resident or local, so the materialized read costs what every other read
+    /// on them already costs.</para>
+    ///
+    /// <para>The choice is never silent: it records a <c>koan.data.stream.execution</c> fact either way, and
+    /// <paramref name="onMaterialized"/> lets a caller add its own user-facing notice. This lives here, not in
+    /// each consumer, so the next bulk consumer inherits the decision instead of re-deriving it.</para>
     /// </summary>
-    internal static bool SupportsProviderBoundedStreams()
+    /// <param name="predicate">Optional filter; <see langword="null"/> reads everything.</param>
+    /// <param name="batchSize">Bound for the streamed path's candidate page.</param>
+    /// <param name="onMaterialized">Invoked once, before the first item, only when the read is materialized.</param>
+    /// <param name="ct">Cancellation observed between items on both paths.</param>
+    internal static async IAsyncEnumerable<TEntity> BulkRead(
+        Expression<Func<TEntity, bool>>? predicate,
+        int? batchSize,
+        Action? onMaterialized,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        var (bounded, provider, facts) = ResolveBulkStrategy();
+        if (bounded)
+        {
+            var stream = predicate is null ? AllStream(batchSize, ct) : QueryStream(predicate, batchSize, ct);
+            await foreach (var entity in stream.WithCancellation(ct).ConfigureAwait(false))
+                yield return entity;
+            yield break;
+        }
+
+        onMaterialized?.Invoke();
+        QueryStreamCoordinator.RecordMaterializedBulkRead<TEntity>(facts, provider);
+
+        var materialized = predicate is null
+            ? await All(ct).ConfigureAwait(false)
+            : await Query(predicate, ct).ConfigureAwait(false);
+        foreach (var entity in materialized)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return entity;
+        }
+    }
+
+    /// <summary>
+    /// Resolve, once, whether the Entity's routed provider can stream, and the provider/fact channel used to
+    /// report the choice. Asked before any read: catching <c>QueryStreamRejectedException</c> instead would
+    /// also swallow unsupported-sort and offset-overflow rejections, which are real errors.
+    /// </summary>
+    private static (bool Bounded, string Provider, IKoanRuntimeFactRecorder? Facts) ResolveBulkStrategy()
     {
         var dataService = Service; // Preserve the standard missing/disposed-host failure contract.
         var services = AppHost.Current!;
         var carrierRegistry = services.GetService(typeof(KoanContextCarrierRegistry)) as KoanContextCarrierRegistry;
+        var facts = services.GetService(typeof(IKoanRuntimeFactRecorder)) as IKoanRuntimeFactRecorder;
 
-        // Resolve under the caller's ambient context: routing is context-sensitive, so the capability
-        // answer must come from the repository the read would actually use.
+        // Resolve under the caller's ambient context: routing is context-sensitive, so the capability answer
+        // must come from the repository the read would actually use.
         using (EnterCapturedContext(EntityContext.Current, carrierRegistry, carrierRegistry?.Capture()))
         {
             var repo = dataService.GetRepository<TEntity, TKey>();
             var sourceRegistry = (DataSourceRegistry?)services.GetService(typeof(DataSourceRegistry))
                 ?? throw new InvalidOperationException("Data source registry is unavailable. Ensure AddKoanDataCore() ran during startup.");
             var (provider, _) = AdapterResolver.ResolveForEntity<TEntity>(services, sourceRegistry);
-            return DataCaps.Describe(repo, provider).Has(DataCaps.Query.ProviderBoundedPaging);
+            return (DataCaps.Describe(repo, provider).Has(DataCaps.Query.ProviderBoundedPaging), provider, facts);
         }
     }
 

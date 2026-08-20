@@ -36,6 +36,7 @@ public static class Constants
             public const string ResultLimit = "relationship-result-limit";
             public const string ProviderBoundedPaging = "provider-bounded-paging";
             public const string MissingProviderBoundedPaging = "missing-provider-bounded-paging";
+            public const string MaterializedBulkRead = "materialized-bulk-read";
             public const string InvalidStreamBatchSize = "invalid-stream-batch-size";
             public const string UnsupportedStreamSort = "unsupported-stream-sort";
             public const string PaginationNotHandled = "provider-pagination-not-handled";

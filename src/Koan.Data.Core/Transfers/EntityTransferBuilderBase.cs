@@ -72,17 +72,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         => SnapshotFor(FromContext) == SnapshotFor(ToContext);
 
     /// <summary>
-    /// Read the source in batches, using the strongest read the routed provider actually supports.
-    ///
-    /// <para>A qualified adapter (DATA-0107) streams, so a transfer over a large table stays
-    /// provider-bounded. An unqualified adapter — InMemory, JSON, Redis — materializes instead, because
-    /// the alternative is that a first-class Entity verb simply does not work on the Data pillar's own
-    /// floor adapter. Those three keep the whole set local or resident anyway, so the materialized read
-    /// costs what every other read on them already costs.</para>
-    ///
-    /// <para>The fallback is never silent: it is reported on <see cref="TransferResult{TKey}.Warnings"/>,
-    /// which is what DATA-0107 means by refusing to return quietly to complete-result materialization.
-    /// Writes stay batched either way.</para>
+    /// Read the source in batches. Strategy selection lives in <c>Data&lt;TEntity, TKey&gt;.BulkRead</c>
+    /// (DATA-0108) so every bulk consumer inherits it; this method only decides how to group the result.
+    /// Writes stay batched at <see cref="BatchSize"/> whichever read strategy was used.
     /// </summary>
     protected async IAsyncEnumerable<IReadOnlyList<TEntity>> ReadBatches(
         TransferContextOptions? context,
@@ -90,39 +82,16 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     {
         using var scope = context?.Apply();
 
-        // Asked before reading, not discovered by catching the rejection: the same exception also carries
-        // unsupported-sort and offset-overflow reasons, which must still fail the transfer.
-        if (!Data<TEntity, TKey>.SupportsProviderBoundedStreams())
-        {
-            AddWarning(
-                $"Read the source with an explicitly materialized query because the routed provider does not "
-                + $"advertise provider-bounded paging (DATA-0107). The whole matching set was held in memory "
-                + $"once; writes remained batched at {BatchSize}.");
-
-            var materialized = Predicate is null
-                ? await Data<TEntity, TKey>.All(ct).ConfigureAwait(false)
-                : await Data<TEntity, TKey>.Query(Predicate, ct).ConfigureAwait(false);
-
-            for (var offset = 0; offset < materialized.Count; offset += BatchSize)
-            {
-                ct.ThrowIfCancellationRequested();
-                // Index directly: LINQ's Skip only short-circuits for IList<T>, and the read returns an
-                // IReadOnlyList, so Skip/Take would risk re-walking the set once per batch.
-                var take = Math.Min(BatchSize, materialized.Count - offset);
-                var slice = new TEntity[take];
-                for (var index = 0; index < take; index++) slice[index] = materialized[offset + index];
-                yield return slice;
-            }
-
-            yield break;
-        }
-
-        var stream = Predicate is null
-            ? Data<TEntity, TKey>.AllStream(BatchSize, ct)
-            : Data<TEntity, TKey>.QueryStream(Predicate, BatchSize, ct);
-
         var batch = new List<TEntity>(BatchSize);
-        await foreach (var entity in stream.WithCancellation(ct).ConfigureAwait(false))
+        var source = Data<TEntity, TKey>.BulkRead(
+            Predicate,
+            BatchSize,
+            onMaterialized: () => AddWarning(
+                "Read the source with an explicitly materialized query because the routed provider does not "
+                + $"advertise provider-bounded paging (DATA-0107). Writes remained batched at {BatchSize}."),
+            ct);
+
+        await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
         {
             batch.Add(entity);
             if (batch.Count != BatchSize) continue;
