@@ -13,9 +13,11 @@ migration, encryption, or transactions.
 
 1. Validate the name and positive page size.
 2. Resolve the source partition from `BackupRequest.Partition` or the current `EntityContext`.
-3. Stream `Data<TEntity,TKey>.AllStream(pageSize)` into `entity.jsonl` in a temporary ZIP while computing SHA-256.
-   Provider capability qualification occurs before the first page; unsupported resident providers fail before
-   publication.
+3. Read every record through `Data<TEntity,TKey>.BulkRead(pageSize)` into `entity.jsonl` in a temporary ZIP while
+   computing SHA-256. Strategy is selected before the first record and recorded as a `koan.data.stream.execution`
+   fact (DATA-0113): a provider advertising bounded paging is streamed a page at a time; a provider that does not
+   — InMemory, JSON, Redis — is read with one explicitly materialized query, because those keep the whole set
+   resident anyway and refusing would make backup untryable on the pillar's floor adapter.
 4. Write `manifest.json` with format version, collision-proof archive ID, stable assembly/type identities, source
    partition, record count, data entry, and checksum.
 5. Close the ZIP and publish the complete seekable file through host-scoped `IStorageService.Put` in the `backups`
@@ -24,6 +26,9 @@ migration, encryption, or transactions.
 
 No complete archive is retained in memory. The selected provider's `Put` semantics govern physical publication; the
 package supplies a complete closed archive and never publishes its working file while records are still being read.
+
+A materialized source read (step 3) does hold the matching record set in memory once. That is bounded by the
+adapter's own residency rather than by this package, and it never applies to a stream-qualified provider.
 
 ## Restore failure ordering
 
