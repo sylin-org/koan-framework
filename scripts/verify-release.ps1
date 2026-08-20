@@ -79,12 +79,25 @@ if (Get-ChildItem -LiteralPath $fixture -Recurse -File | Select-String -SimpleMa
 }
 
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "koan-package-consumer-$([Guid]::NewGuid().ToString('N'))"
+# The release makes two different claims, and conflating them made one artificial application
+# responsible for both. They are proved separately:
+#
+#   compose  every publishable package referenced at its planned version restores and builds together.
+#            Proves the release is internally coherent. Never run: referencing every capability at once
+#            is a shape no application ships in, so booting it asserts nothing a consumer would hit.
+#   boot     the fixture's own coherent shape -- Sylin.Koan.App over JSON -- restores, builds, and RUNS.
+#            Proves the released App actually works through its declared dependency ranges.
+#
+# In Koan a reference IS activation, so one project cannot reference broadly and activate narrowly.
+# Two projects can.
+$composeRoot = Join-Path $tempRoot 'compose'
 $consumerRoot = Join-Path $tempRoot 'app'
 $packagesRoot = Join-Path $tempRoot 'packages'
 $dataRoot = Join-Path $tempRoot 'workspace'
-New-Item -ItemType Directory -Path $consumerRoot, $packagesRoot, $dataRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $composeRoot, $consumerRoot, $packagesRoot, $dataRoot -Force | Out-Null
 
 try {
+    Get-ChildItem -LiteralPath $fixture -Force | Copy-Item -Destination $composeRoot -Recurse -Force
     Get-ChildItem -LiteralPath $fixture -Force | Copy-Item -Destination $consumerRoot -Recurse -Force
 
     # NuGet resolves the LOWEST version satisfying a range, so a changed dependency is not pulled in
@@ -99,7 +112,7 @@ try {
         $_.publish -and $_.referenceable -and $_.packageId -ne 'Sylin.Koan.App'
     })
     if ($referenceable.Count -gt 0) {
-        $projectFile = Join-Path $consumerRoot 'PackageConsumer.csproj'
+        $projectFile = Join-Path $composeRoot 'PackageConsumer.csproj'
         $projectXml = Get-Content -LiteralPath $projectFile -Raw
         $injected = ($referenceable | ForEach-Object {
             "    <PackageReference Include=`"$($_.packageId)`" Version=`"[$($_.version)]`" />"
@@ -138,28 +151,36 @@ try {
   </packageSourceMapping>
 </configuration>
 "@
+    Set-Content -LiteralPath (Join-Path $composeRoot 'NuGet.config') -Value $nugetConfig -Encoding utf8
     Set-Content -LiteralPath (Join-Path $consumerRoot 'NuGet.config') -Value $nugetConfig -Encoding utf8
 
-    $project = Join-Path $consumerRoot 'PackageConsumer.csproj'
-    Invoke-DotNet @(
-        'restore', $project,
-        '--configfile', (Join-Path $consumerRoot 'NuGet.config'),
-        '--packages', $packagesRoot,
-        '--force-evaluate',
-        "--property:KoanTrainVersion=$appVersion",
-        '--nologo'
-    ) $consumerRoot
-    Invoke-DotNet @(
-        'build', $project,
-        '--configuration', 'Release',
-        '--no-restore',
-        "--property:KoanTrainVersion=$appVersion",
-        '--nologo'
-    ) $consumerRoot
+    function Build-Consumer([string]$Root) {
+        $csproj = Join-Path $Root 'PackageConsumer.csproj'
+        Invoke-DotNet @(
+            'restore', $csproj,
+            '--configfile', (Join-Path $Root 'NuGet.config'),
+            '--packages', $packagesRoot,
+            '--force-evaluate',
+            "--property:KoanTrainVersion=$appVersion",
+            '--nologo'
+        ) $Root
+        Invoke-DotNet @(
+            'build', $csproj,
+            '--configuration', 'Release',
+            '--no-restore',
+            "--property:KoanTrainVersion=$appVersion",
+            '--nologo'
+        ) $Root
+    }
+
+    # compose: everything referenced, built, never run.
+    Build-Consumer $composeRoot
+    # boot: the fixture as authored, built and run below.
+    Build-Consumer $consumerRoot
 
     # Every Koan package the application actually resolved must be the version this release plans,
     # whether it came from the staged feed or from nuget.org.
-    $assets = Get-Content -LiteralPath (Join-Path $consumerRoot 'obj/project.assets.json') -Raw |
+    $assets = Get-Content -LiteralPath (Join-Path $composeRoot 'obj/project.assets.json') -Raw |
         ConvertFrom-Json -AsHashtable
     $resolved = [Collections.Generic.List[string]]::new()
     foreach ($entry in $assets.libraries.GetEnumerator()) {
@@ -191,6 +212,9 @@ try {
         throw 'The clean consumer did not resolve Sylin.Koan.App.'
     }
 
+    # Only the coherent shape is executed. The compose project proved the full set builds together;
+    # running it would assert that one application can activate every capability at once, which no
+    # consumer does and which turns any capability's own precondition into a release blocker.
     $assembly = Join-Path $consumerRoot 'bin/Release/net10.0/Koan.PackageConsumer.AppJson.dll'
     $output = & dotnet $assembly $dataRoot
     if ($LASTEXITCODE -ne 0) { throw "Package consumer exited with code $LASTEXITCODE." }
@@ -198,7 +222,7 @@ try {
         throw 'Package consumer did not report success.'
     }
 
-    Write-Host "VERIFY|OK|resolved=$($resolved.Count)|staged=$($actualFeed.Count)"
+    Write-Host "VERIFY|OK|composed=$($resolved.Count)|booted=Sylin.Koan.App|staged=$($actualFeed.Count)"
 }
 finally {
     if ($KeepConsumer) {
