@@ -59,6 +59,14 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   passed while the pillar's central promise — messy arrivals converge — was broken for every real
   adapter. A double must be honest about the property that makes storage storage: serialization.
   Making it so gave an existing spec teeth it had never had. (2026-08-20)
+- **A spec that only compares answers cannot see whether the store did the work.** Every adapter ordered
+  `-Sightings.LastChangedAt` correctly while none of them pushed it down: the framework's sorter finished
+  the job over the whole materialized result. The surface suites were green throughout. Where pushdown
+  matters, assert the adapter's receipt (`SortHandled`, `PaginationHandled`) alongside the ordering — and
+  read a receipt before believing a claim about which layer answered. (2026-08-20)
+- **A cross-adapter ordering corpus must be a total order.** Ties pin LINQ's stable sort against databases
+  that promise nothing among equals, and fail on whichever store breaks them differently — a failure that
+  is not a defect. (2026-08-20)
 - **A suite that shells out must inherit its own build configuration.** A sample spec pinned
   `-c Release --no-build` while its build produced Debug, so it passed only on a machine where
   someone had previously built that sample by hand. (2026-08-20)
