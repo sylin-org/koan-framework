@@ -17,6 +17,11 @@ follow [.codex/skills/explore/SKILL.md](.codex/skills/explore/SKILL.md).
 **Working on an application in [samples/](samples/README.md), or on your own Koan application.**
 Continue below.
 
+**Picking work up where a previous session left it.** [docs/MEMORY.md](docs/MEMORY.md) indexes where
+current state lives and carries the working conventions and hard-won lessons that are written nowhere
+else. It is model-agnostic and lives in the repository on purpose: an assistant's private memory is a
+cache, not the source.
+
 ## The application grammar
 
 ```csharp

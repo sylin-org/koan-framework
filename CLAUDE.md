@@ -124,6 +124,7 @@ provider-specific behavior without a capability boundary.
 
 Current guidance is:
 
+- `docs/MEMORY.md`, which indexes the rest and holds durable working conventions;
 - `README.md` and `llms.txt`;
 - `docs/toc.yml` and its linked pages;
 - `samples/README.md` and graduated samples;
