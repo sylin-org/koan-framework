@@ -377,7 +377,7 @@ public sealed class EntityTransferDslSpec
     }
 
     /// <summary>
-    /// DATA-0108. This spec previously asserted that a transfer over an adapter without provider-bounded
+    /// DATA-0113. This spec previously asserted that a transfer over an adapter without provider-bounded
     /// paging throws <c>QueryStreamRejectedException</c>. That contradicted the real-adapter conformance
     /// kit — which asserts transfers work and had been red for InMemory, JSON, and Redis ever since — and
     /// it left <c>Copy</c>/<c>Move</c> broken on JSON, the Data pillar's own floor adapter. The transfer

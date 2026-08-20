@@ -230,7 +230,7 @@ public sealed class BackupRecoverySpec
     }
 
     /// <summary>
-    /// DATA-0108. This previously asserted that backup <i>rejects</i> on the resident adapters. Refusing a
+    /// DATA-0113. This previously asserted that backup <i>rejects</i> on the resident adapters. Refusing a
     /// backup on JSON — the Data pillar's floor, and the adapter a developer starts from — made a capability
     /// untryable in the configuration it ships in, which is not a boundary worth defending: the whole set is
     /// already resident, so materializing it costs nothing the adapter was not already paying. The read

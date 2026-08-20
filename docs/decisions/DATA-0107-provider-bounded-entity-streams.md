@@ -4,9 +4,15 @@ slug: DATA-0107-provider-bounded-entity-streams
 domain: DATA
 status: Accepted
 date: 2026-07-15
+amended_by: DATA-0113
 ---
 
 # DATA-0107: Provider-bounded Entity streams
+
+> **Amended by [DATA-0113](DATA-0113-bulk-reads-use-the-strongest-strategy.md) (2026-08-20).** The
+> fail-closed contract below remains authoritative for direct `AllStream` / `QueryStream` calls.
+> DATA-0113 replaces only the statements that every bulk consumer—including Data Backup—must inherit
+> that rejection; bulk consumers now select and record the strongest supported read strategy.
 
 ## Context
 

@@ -1,15 +1,46 @@
 ---
-id: DATA-0108
-slug: transfers-read-with-the-strongest-available-strategy
+id: DATA-0113
+slug: bulk-reads-use-the-strongest-strategy
 domain: DATA
 status: Accepted
 date: 2026-08-20
 title: Bulk reads use the strongest strategy the provider supports
 related:
+  - DATA-0079
   - DATA-0107
+  - DATA-0108
 ---
 
-# DATA-0108: Bulk reads use the strongest strategy the provider supports
+# DATA-0113: Bulk reads use the strongest strategy the provider supports
+
+## Precedence
+
+This record is authoritative for **bulk-consumer source-read selection**. It amends DATA-0107 only
+where that record made bulk consumers inherit public-stream rejection, and DATA-0108 only where that
+record required Backup to stream or reject. DATA-0107 continues to govern direct Entity streams;
+DATA-0108 continues to govern archive integrity and recovery.
+
+## Application contract
+
+**Business sentence:** copy, move, mirror, or back up the matching Entities without making application
+code choose a provider read mechanism.
+
+**Complete expression:** existing calls remain complete; no strategy option or registration is added.
+
+```csharp
+await Widget.Copy().To(partition: "archive").Run(ct);
+await backup.Create<Widget, string>("before-import", request, ct);
+```
+
+The selected provider and, for Backup, the requested storage profile must be available. A qualified
+provider guarantees a bounded source stream. A resident/local provider guarantees an explicit
+materialized bulk read whose selection is recorded; transfers also return a warning. Direct
+`AllStream` / `QueryStream` calls retain DATA-0107's corrective rejection because those APIs promise
+streaming, not merely completion.
+
+`BulkRead` is the single internal owner. Application code gains no concept or branch, IntelliSense
+stays on the existing Entity and Backup verbs, and runtime facts explain the strategy a human or
+agent could not see from the provider-neutral call.
 
 ## Outcome
 
@@ -73,29 +104,31 @@ the strongest strategy available:
 
 | Routed provider | Source read | Reported |
 |---|---|---|
-| Advertises provider-bounded paging | Streamed, page at a time | nothing to report |
-| Does not | One explicitly materialized query | warning on `TransferResult.Warnings` |
+| Advertises provider-bounded paging | Streamed, page at a time | selected runtime fact; no consumer warning |
+| Does not | One explicitly materialized query | selected runtime fact; transfer warning |
 
-`Data<TEntity, TKey>.SupportsProviderBoundedStreams()` answers the question **before** the read
-begins. The alternative — catching `QueryStreamRejectedException` and falling back — was rejected: the
-same exception also carries unsupported-sort and offset-overflow reasons, which are real errors and
-must still fail the transfer. A strategy decision must not be made by catching an error that means
-several different things.
+`Data<TEntity, TKey>.BulkRead(...)` owns the choice and resolves the routed provider's capability
+**before** the read begins. The alternative — catching `QueryStreamRejectedException` and falling
+back — was rejected: the same exception also carries unsupported-sort and offset-overflow reasons,
+which are real errors and must still fail the transfer. A strategy decision must not be made by
+catching an error that means several different things.
 
-This does not weaken DATA-0107. A qualified adapter still streams, so a transfer over a large
-relational table stays provider-bounded exactly as before. The fallback reaches only the three
-adapters DATA-0107 itself lists under "corrective rejection" — InMemory, JSON, Redis — all of which
-keep the whole set resident or local, so a materialized read costs what every other read on them
-already costs. And DATA-0107's own rejection message names "materialize the query explicitly" as the
-sanctioned alternative; this is a consumer taking that route deliberately and declaring it, which is
-what "Koan never silently returns to complete-result materialization" asks for.
+DATA-0107 remains authoritative for direct `AllStream` / `QueryStream` calls: an unqualified adapter
+still rejects instead of pretending to stream. This record owns the narrower bulk-consumer decision.
+A qualified adapter still streams, so a transfer over a large relational table stays
+provider-bounded exactly as before. The fallback reaches only the three adapters DATA-0107 itself
+lists under "corrective rejection" — InMemory, JSON, Redis — all of which keep the whole set resident
+or local, so a materialized read costs what every other read on them already costs. DATA-0107's own
+rejection message names "materialize the query explicitly" as the sanctioned alternative; this is a
+consumer taking that route deliberately and declaring it, which is what "Koan never silently returns
+to complete-result materialization" asks for.
 
-Data Backup follows the same rule, and this reverses the position DATA-0107 recorded for it. That
-position rested on backup's archive being accumulated in one `MemoryStream` — but that cost exists
-whatever the read strategy is, and it is not reduced by refusing to read. What refusing *did*
-accomplish was making backup untryable on JSON: a developer who references `Koan.Data.Backup` in the
-configuration Koan composes by default could not run it at all. A capability that cannot be tried
-where people start is not a safe boundary, it is a dead end.
+Data Backup follows the same rule, and this reverses the source-read position DATA-0107 and DATA-0108
+recorded for it. That position rested on backup's archive being accumulated in one `MemoryStream` —
+but that cost exists whatever the read strategy is, and it is not reduced by refusing to read. What
+refusing *did* accomplish was making backup untryable on JSON: a developer who references
+`Koan.Data.Backup` in the configuration Koan composes by default could not run it at all. A capability
+that cannot be tried where people start is not a safe boundary, it is a dead end.
 
 The memory concern is real and unaddressed either way; it belongs to the archive writer, which is
 where DATA-0107 already located it.

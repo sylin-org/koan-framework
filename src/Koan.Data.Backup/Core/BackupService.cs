@@ -143,7 +143,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         using var partitionScope = partition is null ? null : EntityContext.With(partition: partition);
 
         var count = 0;
-        // DATA-0108: stream when the provider advertises bounded paging, materialize once when it does not.
+        // DATA-0113: stream when the provider advertises bounded paging, materialize once when it does not.
         // A backup that refuses on the JSON floor adapter is a capability a developer cannot try in the
         // configuration they actually start from. The choice is recorded as a runtime fact either way.
         var source = Data<TEntity, TKey>.BulkRead(predicate: null, pageSize, onMaterialized: null, ct);

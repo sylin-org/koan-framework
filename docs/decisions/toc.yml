@@ -314,6 +314,8 @@
       href: DATA-0111-verified-default-data-cutover.md
     - name: DATA-0112 JSON individual-file persistence
       href: DATA-0112-json-individual-files.md
+    - name: DATA-0113 Bulk reads use the strongest strategy the provider supports
+      href: DATA-0113-bulk-reads-use-the-strongest-strategy.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

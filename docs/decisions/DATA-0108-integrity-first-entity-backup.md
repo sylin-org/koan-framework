@@ -1,14 +1,21 @@
 ---
 type: ADR
+id: DATA-0108
 domain: data
 title: "DATA-0108 - Integrity-first Entity backup and recovery"
 audience: [architects, maintainers, developers, ai-agents]
 status: accepted
-last_updated: 2026-07-18
+last_updated: 2026-08-20
 framework_version: source-first
+amended_by: DATA-0113
 ---
 
 # DATA-0108 — Integrity-first Entity backup and recovery
+
+> **Amended by [DATA-0113](DATA-0113-bulk-reads-use-the-strongest-strategy.md) (2026-08-20).** This
+> record remains authoritative for archive integrity and recovery. DATA-0113 replaces only its
+> source-read rule: Backup streams on qualified providers and explicitly materializes, with a runtime
+> fact, on resident adapters instead of rejecting them.
 
 ## Context
 

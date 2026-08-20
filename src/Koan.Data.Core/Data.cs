@@ -479,7 +479,7 @@ public static class Data<TEntity, TKey>
 
     /// <summary>
     /// Read every matching Entity for a <b>bulk</b> operation — a transfer, an export — using the strongest
-    /// strategy the routed provider supports (DATA-0108).
+    /// strategy the routed provider supports (DATA-0113).
     ///
     /// <para>A provider that advertises <c>ProviderBoundedPaging</c> is streamed, so a bulk operation over a
     /// large table stays provider-bounded exactly as DATA-0107 requires. A provider that does not is read with

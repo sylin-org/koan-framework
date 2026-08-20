@@ -73,7 +73,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     /// <summary>
     /// Read the source in batches. Strategy selection lives in <c>Data&lt;TEntity, TKey&gt;.BulkRead</c>
-    /// (DATA-0108) so every bulk consumer inherits it; this method only decides how to group the result.
+    /// (DATA-0113) so every bulk consumer inherits it; this method only decides how to group the result.
     /// Writes stay batched at <see cref="BatchSize"/> whichever read strategy was used.
     /// </summary>
     protected async IAsyncEnumerable<IReadOnlyList<TEntity>> ReadBatches(

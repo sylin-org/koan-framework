@@ -198,7 +198,7 @@ internal static class QueryStreamCoordinator
 
     /// <summary>
     /// Record that a bulk consumer read this Entity with an explicitly materialized query because the
-    /// provider advertises no bounded paging (DATA-0108). It is a selected strategy, not a rejection —
+    /// provider advertises no bounded paging (DATA-0113). It is a selected strategy, not a rejection —
     /// but it is recorded on the same fact code as streaming so "how was this read?" has one answer.
     /// </summary>
     internal static void RecordMaterializedBulkRead<TEntity>(IKoanRuntimeFactRecorder? facts, string provider)
