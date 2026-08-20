@@ -1,4 +1,7 @@
 using AwesomeAssertions;
+using Koan.AI;
+using Koan.AI.Contracts;
+using Koan.AI.Contracts.Models;
 using Koan.Core;
 using Koan.Data.AI.Attributes;
 using Koan.Data.Core;
@@ -36,6 +39,9 @@ public sealed class DerivedVectorSpaceSpec
 
     [Embedding(Model = "test-embed", Dimensions = 4)]
     public sealed class LocalBeatsGlobalDoc : Entity<LocalBeatsGlobalDoc> { public string Title { get; set; } = ""; }
+
+    [Embedding(Model = "measured-embed")]
+    public sealed class MeasuredDoc : Entity<MeasuredDoc> { public string Title { get; set; } = ""; }
 
     [Fact(DisplayName = "an [Embedding] width lets a vector Entity work from a bare AddKoan()")]
     public async Task Width_derives_the_space()
@@ -102,6 +108,37 @@ public sealed class DerivedVectorSpaceSpec
         await globalWidth.Should().ThrowAsync<Exception>("the Entity's declaration is the most local layer");
     }
 
+    [Fact(DisplayName = "with no width declared anywhere, the model itself supplies one")]
+    public async Task Measured_width_is_the_floor()
+    {
+        // The floor layer: nothing declares a width, so Koan asks the model that will actually produce the
+        // vectors. Measuring beats a table of model names, which would be silently wrong the day a model ships
+        // a new variant — and the error would only surface as a rejected write much later.
+        using var pipeline = Client.With(new FixedWidthPipeline(9));
+        using var host = await Boot(_ => { });
+
+        await Vector<MeasuredDoc>.Save("a", new float[9]);
+
+        var wrongWidth = () => Vector<MeasuredDoc>.Save("b", new float[8]);
+        await wrongWidth.Should().ThrowAsync<Exception>("nine is what the model reported");
+    }
+
+    /// <summary>A pipeline that only answers the one question the width probe asks.</summary>
+    private sealed class FixedWidthPipeline(int width) : IAiPipeline
+    {
+        public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default) =>
+            Task.FromResult(new AiEmbeddingsResponse { Vectors = [new float[width]], Model = "measured-embed" });
+
+        public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public IAsyncEnumerable<AiChatChunk> Stream(AiChatRequest request, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public IAsyncEnumerable<AiChatChunk> Stream(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
     private static async Task<IHost> Boot(Action<KoanApplicationBuilder> compose)
     {
         // In a shipping application the [Embedding] registry is source-generated. This assembly deliberately
@@ -109,7 +146,7 @@ public sealed class DerivedVectorSpaceSpec
         // entities register themselves, which is the same input the generator would supply.
         EmbeddingRegistry.RegisterTypes([
             typeof(DerivedDoc), typeof(DeclaredDoc), typeof(WidthlessDoc),
-            typeof(GlobalWidthDoc), typeof(LocalBeatsGlobalDoc)]);
+            typeof(GlobalWidthDoc), typeof(LocalBeatsGlobalDoc), typeof(MeasuredDoc)]);
 
         return await Boot(compose, new Dictionary<string, string?>());
     }

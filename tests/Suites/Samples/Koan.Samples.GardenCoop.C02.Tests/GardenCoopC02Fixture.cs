@@ -50,7 +50,7 @@ public sealed class GardenCoopC02Fixture : IAsyncLifetime
                 }))
                 .ConfigureServices(services =>
                 {
-                    services.AddKoan(GardenCoopModule.Compose);
+                    services.AddKoan();
                     services.AddKoanControllersFrom<ProduceSearchController>();
                 })
                 .Configure(_ => { }))

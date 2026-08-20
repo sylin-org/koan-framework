@@ -19,16 +19,6 @@ namespace GardenCoop.Initialization;
 [After(typeof(AiModule))]
 public sealed class GardenCoopModule : KoanModule
 {
-    private const string ProduceSpace = "garden-produce";
-    private const string ProduceModel = "all-MiniLM-L6-v2";
-    private const int ProduceDimensions = 384;
-
-    public static void Compose(KoanApplicationBuilder koan) =>
-        koan.Data.Source("Default").Vector<Produce>(space => space
-            .Name(ProduceSpace)
-            .Dimensions(ProduceDimensions)
-            .Model(ProduceModel));
-
     public override void Register(IServiceCollection services) => GardenAutomation.Configure();
 
     public override async Task Start(IServiceProvider services, CancellationToken ct)

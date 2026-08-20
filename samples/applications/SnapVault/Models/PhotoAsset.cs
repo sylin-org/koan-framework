@@ -17,7 +17,6 @@ namespace SnapVault.Models;
     MaxTokens = 8191,
     Version = 2,
     Model = "nomic-embed-text",
-    Dimensions = 768,   // nomic-embed-text; Koan derives PhotoAsset's vector space from this
     Exclude = ["EventId", "InferredStyleId"])]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {

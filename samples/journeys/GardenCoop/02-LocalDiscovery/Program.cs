@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Builder;
 )]
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan(GardenCoopModule.Compose);
+builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 

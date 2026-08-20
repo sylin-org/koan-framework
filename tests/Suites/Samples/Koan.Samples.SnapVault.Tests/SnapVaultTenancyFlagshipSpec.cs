@@ -77,6 +77,8 @@ public sealed class SnapVaultHostFixture : IAsyncLifetime
             ["Koan:Data:Sources:Default:ConnectionString"] =
                 $"Data Source={Path.Combine(_storageRoot, "snapvault.db")}",
             ["Koan:Data:VectorDefaults:DefaultProvider"] = "inmemory",
+            // PhotoAsset declares no width; with no AI provider here to measure one, the global layer supplies it.
+            ["Koan:Ai:Embed:Dimensions"] = "3",
             ["Koan:Data:AI:EmbeddingWorker:Enabled"] = "false",
             ["Koan:Data:AI:MediaAnalysis:Enabled"] = "false",
             ["Koan:BackgroundServices:Enabled"] = "false",
@@ -242,10 +244,12 @@ public sealed class SnapVaultTenancyFlagshipSpec
     }
 
     /// <summary>
-    /// Read from PhotoAsset's own [Embedding] declaration rather than restated here. The width has exactly one
-    /// owner, so this spec cannot drift away from the space the sample actually composes.
+    /// PhotoAsset declares no width — in a real deployment Koan measures it from nomic-embed-text at startup.
+    /// This fixture has no AI provider to measure against, so it sets the width through the global layer
+    /// (<c>Koan:Ai:Embed:Dimensions</c>) instead. Three floats prove tenant isolation exactly as well as 768,
+    /// and keep the spec fast.
     /// </summary>
-    private static int PhotoSpaceDimensions => EmbeddingMetadata.Resolve(typeof(PhotoAsset)).Dimensions;
+    private const int PhotoSpaceDimensions = 3;
 
     // ───────────────────────── Leg 4 — [HostScoped] system styles are shared ─────────────────────────
 

@@ -15,6 +15,11 @@ using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Sources;
 using Koan.AI.Contracts.Categories;
 using Microsoft.Extensions.Options;
+using Koan.AI;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Koan.AI.Initialization;
+using Koan.Core.Ordering;
 using Koan.Data.Core;  // For .Save() extension method
 
 namespace Koan.Data.AI.Initialization;
@@ -24,6 +29,9 @@ namespace Koan.Data.AI.Initialization;
 /// and assembly scanning, wiring up entity lifecycle hooks.
 /// Automatically configures embedding generation and media analysis on Save().
 /// </summary>
+// The width probe asks a live adapter, and AiModule.Start is what activates the provider plan. Without this
+// ordering the probe runs against an empty registry and silently measures nothing.
+[After(typeof(AiModule))]
 public sealed class DataAiModule : KoanModule
 {
     private const string ContextCaptureOperation = "embedding job context capture";
@@ -48,6 +56,8 @@ public sealed class DataAiModule : KoanModule
             // contribution flows this way. An explicit declaration always outranks it.
             DeclareDerivedVectorSpace(services, entityType, metadata);
         }
+
+        services.TryAddSingleton<MeasuredEmbeddingWidths>();
 
         // Register EmbeddingWorker as a hosted service (background worker)
         services.AddHostedService<Workers.EmbeddingWorker>();
@@ -191,8 +201,11 @@ public sealed class DataAiModule : KoanModule
     /// <summary>The lowest layer: what a source reports for the embedding capability it serves.</summary>
     private static int AdapterDimensions(IServiceProvider? provider, string? model)
     {
+        // A source may state its width outright; otherwise use what the model itself reported at startup.
+        var measured = provider?.GetService<MeasuredEmbeddingWidths>()?.Get(model) ?? 0;
+
         var sources = provider?.GetService<IAiSourceRegistry>()?.GetSourcesWithCapability("Embedding");
-        if (sources is null) return 0;
+        if (sources is null) return measured;
         foreach (var source in sources)
         {
             if (!source.Capabilities.TryGetValue("Embedding", out var capability)) continue;
@@ -202,7 +215,49 @@ public sealed class DataAiModule : KoanModule
                 !string.Equals(capability.Model, model, StringComparison.OrdinalIgnoreCase)) continue;
             return capability.Dimensions;
         }
-        return 0;
+        return measured;
+    }
+
+    /// <summary>
+    /// Ask each embedding model how wide its vectors are, once, so an application need not say. This is the
+    /// floor of the layered default: an Entity that declares <c>Dimensions</c>, or a configured
+    /// <c>Koan:Ai:Embed:Dimensions</c>, is never probed for.
+    /// </summary>
+    public override async Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        var widths = services.GetService<MeasuredEmbeddingWidths>();
+        if (widths is null) return;
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Data.AI");
+        var configured = services.GetService<IOptions<AiOptions>>()?.Value?.Embed;
+
+        foreach (var model in EmbeddingRegistry.GetRegisteredTypes()
+                     .Select(EmbeddingMetadata.Resolve)
+                     .Where(metadata => metadata.Dimensions <= 0 && (configured?.Dimensions ?? 0) <= 0)
+                     .Select(metadata => metadata.Model)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .ToArray())
+        {
+            if (widths.Knows(model)) continue;
+            try
+            {
+                var probe = model is null
+                    ? await Client.Embed("koan embedding width probe", ct).ConfigureAwait(false)
+                    : await Client.Embed("koan embedding width probe", new EmbedOptions { Model = model }, ct).ConfigureAwait(false);
+                widths.Record(model, probe.Length);
+                logger?.LogInformation(
+                    "Embedding width measured: model={Model}; dimensions={Dimensions}. Vector spaces for entities that " +
+                    "declare no width use this.", model ?? "(configured default)", probe.Length);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                // Not fatal: an application that cannot embed cannot search either, and the Vector pillar's
+                // corrective says so at the point of use rather than failing every boot.
+                logger?.LogInformation(
+                    "Embedding width for model '{Model}' could not be measured ({Reason}). Declare it with " +
+                    "[Embedding(Dimensions = ...)] or Koan:Ai:Embed:Dimensions if this Entity needs a vector space.",
+                    model ?? "(configured default)", error.Message);
+            }
+        }
     }
 
     private static void RegisterEmbeddingHooks([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.PublicMethods)] Type entityType)
