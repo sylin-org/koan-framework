@@ -16,7 +16,7 @@ internal sealed class MongoQueryCompiler<TEntity, TKey>(MongoEntityPlan<TEntity,
     {
         ArgumentNullException.ThrowIfNull(query);
         var filter = query.Filter is null ? new BsonDocument() : Visit(query.Filter);
-        var handledSort = Sort(query.Sort, out var sort);
+        var handledSort = Sort(query.Sort, out var sort, out var computed, out var sortDocument);
         var canPage = handledSort.Count == query.Sort.Count;
         var limit = hardLimit ?? (query.HasPagination && canPage ? query.EffectivePageSize() : (int?)null);
         var skip = hardLimit is null && query.HasPagination && canPage ? query.EffectiveOffset() : 0;
@@ -28,7 +28,10 @@ internal sealed class MongoQueryCompiler<TEntity, TKey>(MongoEntityPlan<TEntity,
             true,
             handledSort.ToFrozenSet(),
             query.HasPagination && canPage,
-            query.CountStrategy is null ? CountExecutionKind.None : CountExecutionKind.Exact);
+            query.CountStrategy is null ? CountExecutionKind.None : CountExecutionKind.Exact,
+            filter,
+            computed,
+            sortDocument);
     }
 
     public FilterDefinition<BsonDocument> Predicate(Filter filter)
@@ -107,36 +110,74 @@ internal sealed class MongoQueryCompiler<TEntity, TKey>(MongoEntityPlan<TEntity,
         };
     }
 
+    /// <summary>
+    /// Resolves the requested order into something MongoDB can apply.
+    ///
+    /// <para>Most keys are fields, which <c>find</c> sorts directly. A key that reaches through a collection is
+    /// an aggregate over a nested array, which <c>find</c> cannot sort by at all — so the compiler emits the
+    /// expression as an added field and the repository runs the query as a pipeline instead. Either way the
+    /// server does the ordering; the alternative is returning the whole collection for the framework to sort.
+    /// </para>
+    ///
+    /// <para>All or nothing, as before: a partial order is discarded by the sort that follows it, and reporting
+    /// it as handled would let a page be taken against an order never fully applied.</para>
+    /// </summary>
     private IReadOnlyList<SortSpec> Sort(
         IReadOnlyList<SortSpec> requested,
-        out SortDefinition<BsonDocument>? definition)
+        out SortDefinition<BsonDocument>? definition,
+        out BsonDocument? computed,
+        out BsonDocument? sortDocument)
     {
-        if (requested.Count == 0)
-        {
-            definition = null;
-            return [];
-        }
+        definition = null;
+        computed = null;
+        sortDocument = null;
+        if (requested.Count == 0) return [];
+
         var parts = new List<SortDefinition<BsonDocument>>(requested.Count);
+        var order = new BsonDocument();
+        var added = new BsonDocument();
         var handled = new List<SortSpec>(requested.Count);
         foreach (var sort in requested)
         {
-            if (sort.Path.TraversesCollection || sort.Aggregation != SortAggregation.None) break;
-            var path = FieldPath.Of(sort.Path.Members.Select(static member => member.Name).ToArray());
-            var resolved = FieldPathResolver.Resolve(typeof(TEntity), path);
-            var name = entity.Field(path, resolved, MappingConsumer.Order);
+            string name;
+            if (sort.Path.TraversesCollection || sort.Aggregation != SortAggregation.None)
+            {
+                var expression = entity.CollectionOrderExpression(sort.Path, sort.Aggregation);
+                if (expression is null) break;
+                // Prefixed so it cannot collide with a document field, and removed again before the
+                // documents are materialized.
+                name = ComputedOrderField + handled.Count.ToString(CultureInfo.InvariantCulture);
+                added[name] = expression;
+            }
+            else
+            {
+                var path = FieldPath.Of(sort.Path.Members.Select(static member => member.Name).ToArray());
+                var resolved = FieldPathResolver.Resolve(typeof(TEntity), path);
+                name = entity.Field(path, resolved, MappingConsumer.Order);
+            }
+
             parts.Add(sort.Desc
                 ? Builders<BsonDocument>.Sort.Descending(name)
                 : Builders<BsonDocument>.Sort.Ascending(name));
+            order[name] = sort.Desc ? -1 : 1;
             handled.Add(sort);
         }
-        if (handled.Count != requested.Count)
+
+        if (handled.Count != requested.Count) return [];
+
+        if (added.ElementCount > 0)
         {
-            definition = null;
-            return [];
+            computed = added;
+            sortDocument = order;
+            return handled;
         }
+
         definition = Builders<BsonDocument>.Sort.Combine(parts);
         return handled;
     }
+
+    /// <summary>Prefix for the fields a pipeline adds to hold a collection aggregate while it sorts.</summary>
+    internal const string ComputedOrderField = "__koanOrder";
 
     private static BsonDocument Compare(string path, string operation, BsonValue value) =>
         new(path, new BsonDocument(operation, value));
@@ -163,4 +204,9 @@ internal sealed record MongoQueryPlan(
     bool FilterHandled,
     IReadOnlySet<SortSpec> SortHandled,
     bool PaginationHandled,
-    CountExecutionKind CountExecution);
+    CountExecutionKind CountExecution,
+    // The same filter as a document, and the fields a collection order key needs computed before the sort.
+    // When Computed is present the query runs as a pipeline, because find cannot sort by an expression.
+    BsonDocument FilterDocument,
+    BsonDocument? Computed,
+    BsonDocument? SortDocument);

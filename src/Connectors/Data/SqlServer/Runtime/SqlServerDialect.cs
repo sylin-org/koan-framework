@@ -15,6 +15,22 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
         return Cast($"JSON_VALUE({root}, '{jsonPath}')", physicalType);
     }
 
+    public string? JsonArrayOrderTerm(
+        string arraySql,
+        IReadOnlyList<string> elementSegments,
+        bool max,
+        bool descending,
+        Type elementValueType)
+    {
+        var value = Cast($"JSON_VALUE(koan_element.[value], '{JsonPath(elementSegments)}')", elementValueType);
+        // JSON_QUERY already returns NULL for anything that is not an object or array, so an absent path
+        // becomes an empty array rather than an error. No rows means NULL, which sorts first.
+        var aggregate = $"(SELECT {(max ? "MAX" : "MIN")}({value}) FROM OPENJSON(ISNULL({arraySql}, N'[]')) AS koan_element)";
+        // SQL Server sorts NULL first ascending and last descending, which is where the framework's sorter
+        // puts it, so the direction alone is enough.
+        return descending ? $"{aggregate} DESC" : $"{aggregate} ASC";
+    }
+
     public string QuoteIdent(string ident) => Quote(ident);
     public string EscapeLike(string fragment) => fragment.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
     public string Parameter(int index) => $"@p{index}";

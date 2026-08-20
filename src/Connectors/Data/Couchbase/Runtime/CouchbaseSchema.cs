@@ -1,5 +1,6 @@
 using Couchbase;
 using Couchbase.Management.Collections;
+using Couchbase.Core.Exceptions;
 using Couchbase.Query;
 using Koan.Data.Abstractions.Sources;
 
@@ -76,8 +77,44 @@ internal sealed class CouchbaseSchema(CouchbaseRoute route, CouchbaseResourcePoo
         if (route.StorageLifecycle == StorageLifecycle.External) return;
         route.Plan.Demand(DataOperationEffect.SchemaOrAdmin, "create Couchbase query index");
         var statement = $"CREATE PRIMARY INDEX IF NOT EXISTS ON {container.Qualified(route.Bucket)} USING GSI";
-        var result = await target.Cluster.QueryAsync<dynamic>(statement, options =>
-            options.Readonly(false).Timeout(route.QueryTimeout)).ConfigureAwait(false);
-        await foreach (var _ in result.Rows.WithCancellation(ct).ConfigureAwait(false)) { }
+        await Index(target, statement, container, ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Creates the primary index, allowing for the query service not having seen the collection yet.
+    ///
+    /// <para>Creating a collection is answered by the data service, while the statement below is answered by the
+    /// query service, and the cluster map reaches the second a moment after the first. In that window the
+    /// keyspace that certainly exists is reported as not found, so the very first query against a newly created
+    /// collection fails — the fresh-application case, and the harder one to reproduce precisely because it needs
+    /// the write and the query to be close together.</para>
+    ///
+    /// <para>Waiting is bounded. A misconfiguration that would never succeed still surfaces, a few seconds
+    /// later, with the provider's own error.</para>
+    /// </summary>
+    private async Task Index(
+        CouchbaseTarget target,
+        string statement,
+        CouchbaseContainer container,
+        CancellationToken ct)
+    {
+        var deadline = DateTimeOffset.UtcNow + KeyspaceVisibilityWindow;
+        while (true)
+        {
+            try
+            {
+                var result = await target.Cluster.QueryAsync<dynamic>(statement, options =>
+                    options.Readonly(false).Timeout(route.QueryTimeout)).ConfigureAwait(false);
+                await foreach (var _ in result.Rows.WithCancellation(ct).ConfigureAwait(false)) { }
+                return;
+            }
+            catch (IndexFailureException) when (DateTimeOffset.UtcNow < deadline)
+            {
+                await Task.Delay(KeyspaceVisibilityInterval, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static readonly TimeSpan KeyspaceVisibilityWindow = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan KeyspaceVisibilityInterval = TimeSpan.FromMilliseconds(100);
 }

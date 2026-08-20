@@ -1,7 +1,9 @@
 using System.Globalization;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using System.Reflection;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core;
 using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Polymorphism;
@@ -166,6 +168,62 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
         if (path.Segments.Count == 1 && string.Equals(path.Leaf, IdentityName, StringComparison.Ordinal))
             return Infrastructure.Constants.Storage.Identity;
         return string.Join('.', path.Segments.Select(Camel));
+    }
+
+    /// <summary>
+    /// The aggregation expression an order key reaches for when its path runs through a collection.
+    ///
+    /// <para><c>-Sightings.LastChangedAt</c> orders widgets by their latest sighting, which is an aggregate
+    /// over a nested array rather than a field. <c>find</c> cannot sort by one, but the aggregation language
+    /// states it plainly — <c>$max</c> over a <c>$map</c> of the array — so MongoDB orders and pages the query
+    /// itself instead of returning the whole collection for the framework to sort.</para>
+    ///
+    /// <para>An absent or empty array maps to nothing and aggregates to null, and BSON sorts null before every
+    /// value, so a widget with no sightings lands first ascending and last descending — where the framework's
+    /// own sorter puts it.</para>
+    ///
+    /// <para>Returns <see langword="null"/> where this plan cannot express the key: an explicit map may bind
+    /// one logical path across several physical ones, a second collection inside the path would need an
+    /// aggregate of aggregates, and positional First/Last depend on an element order a document store does not
+    /// promise.</para>
+    /// </summary>
+    public BsonDocument? CollectionOrderExpression(MemberPath path, SortAggregation aggregation)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var accumulator = aggregation switch
+        {
+            // None over a collection leaf means what it means to the in-memory sorter: take the maximum.
+            SortAggregation.Max or SortAggregation.None => "$max",
+            SortAggregation.Min => "$min",
+            _ => null
+        };
+        if (accumulator is null || _mapping is not null) return null;
+
+        var boundary = path.CollectionSegmentIndex;
+        if (boundary <= 0 || boundary >= path.Members.Count) return null;
+        for (var index = boundary; index < path.Members.Count; index++)
+            if (IsCollectionMember(path.Members[index])) return null;
+
+        var array = string.Join('.', path.Members.Take(boundary).Select(static member => Camel(member.Name)));
+        var leaf = string.Join('.', path.Members.Skip(boundary).Select(static member => Camel(member.Name)));
+        return new BsonDocument(accumulator, new BsonDocument("$map", new BsonDocument
+        {
+            ["input"] = new BsonDocument("$ifNull", new BsonArray { "$" + array, new BsonArray() }),
+            ["as"] = "koanElement",
+            ["in"] = "$$koanElement." + leaf
+        }));
+    }
+
+    private static bool IsCollectionMember(MemberInfo member)
+    {
+        var type = member switch
+        {
+            PropertyInfo property => property.PropertyType,
+            FieldInfo field => field.FieldType,
+            _ => typeof(object)
+        };
+        return type != typeof(string) && type != typeof(byte[]) &&
+               typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
     }
 
     public BsonValue FilterValue(FieldPath path, ResolvedField resolved, object? value)

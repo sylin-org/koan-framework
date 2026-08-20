@@ -14,6 +14,26 @@ internal sealed class MySqlDialect : IRelationalMappingDialect
         return Cast($"JSON_UNQUOTE({extracted})", physicalType);
     }
 
+    public string? JsonArrayOrderTerm(
+        string arraySql,
+        IReadOnlyList<string> elementSegments,
+        bool max,
+        bool descending,
+        Type elementValueType)
+    {
+        var extracted = $"JSON_UNQUOTE(JSON_EXTRACT(koan_element.koan_value, '{JsonPath(elementSegments)}'))";
+        var value = Cast(extracted, elementValueType);
+        // JSON_TABLE refuses anything but an array, and a document may hold no array at that path at all, so
+        // the type is checked rather than assumed. No rows means NULL, which sorts first — where the
+        // in-memory sorter puts a widget with no sightings.
+        var array = $"CASE WHEN JSON_TYPE({arraySql}) = 'ARRAY' THEN {arraySql} ELSE JSON_ARRAY() END";
+        var aggregate = $"(SELECT {(max ? "MAX" : "MIN")}({value}) " +
+                        $"FROM JSON_TABLE({array}, '$[*]' COLUMNS (koan_value JSON PATH '$')) AS koan_element)";
+        // MySQL sorts NULL first ascending and last descending, which is where the framework's sorter puts
+        // it, so the direction alone is enough.
+        return descending ? $"{aggregate} DESC" : $"{aggregate} ASC";
+    }
+
     public string QuoteIdent(string ident) => Quote(ident);
     public string EscapeLike(string fragment) => fragment.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("%", "\\%", StringComparison.Ordinal)

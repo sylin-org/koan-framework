@@ -26,6 +26,28 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
             : extracted;
     }
 
+    public string? JsonArrayOrderTerm(
+        string arraySql,
+        IReadOnlyList<string> elementSegments,
+        bool max,
+        bool descending,
+        Type elementValueType)
+    {
+        var extracted = $"json_extract(koan_element.value, '{JsonPath(elementSegments)}')";
+        var type = Nullable.GetUnderlyingType(elementValueType) ?? elementValueType;
+        var value = IsNumeric(type) || type == typeof(bool) || type == typeof(TimeSpan)
+            ? $"CAST({extracted} AS NUMERIC)"
+            : extracted;
+        // json_each rejects a scalar, and a document may hold no array at that path at all, so the type is
+        // checked rather than assumed. No rows means NULL, which sorts first — where the in-memory sorter
+        // puts a widget with no sightings.
+        var array = $"CASE WHEN json_type({arraySql}) = 'array' THEN {arraySql} ELSE '[]' END";
+        var aggregate = $"(SELECT {(max ? "MAX" : "MIN")}({value}) FROM json_each({array}) AS koan_element)";
+        // SQLite sorts NULL first ascending and last descending, which is where the framework's sorter puts
+        // it, so the direction alone is enough.
+        return descending ? $"{aggregate} DESC" : $"{aggregate} ASC";
+    }
+
     internal static string Quote(string identifier) =>
         $"\"{identifier.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 

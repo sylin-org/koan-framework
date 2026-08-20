@@ -463,6 +463,18 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var handled = new List<SortSpec>();
         foreach (var item in sort)
         {
+            // An order key that reaches through a collection is an aggregate over a nested array, so it has
+            // no binding of its own; the dialect expresses it directly instead of the framework sorting the
+            // whole result in memory to answer it.
+            if (item.Path.TraversesCollection || item.Aggregation != SortAggregation.None)
+            {
+                var term = RelationalCollectionOrder.Term(plan.Dialect, plan.Mapping, item);
+                if (term is null) continue;
+                clauses.Add(term);
+                handled.Add(item);
+                continue;
+            }
+
             try
             {
                 var use = plan.Mapping.Use(

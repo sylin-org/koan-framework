@@ -319,11 +319,47 @@ internal sealed class MongoRepository<TEntity, TKey> :
         MongoQueryPlan plan,
         CancellationToken ct)
     {
+        if (plan.Computed is not null)
+            return await ReadPipeline(collection, plan, ct).ConfigureAwait(false);
+
         var find = collection.Find(plan.Filter);
         if (plan.Sort is not null) find = find.Sort(plan.Sort);
         if (plan.Skip != 0) find = find.Skip(plan.Skip);
         if (plan.Limit is { } limit) find = find.Limit(limit);
         var documents = await find.ToListAsync(ct).ConfigureAwait(false);
+        return documents.Select(_entity.Read).ToArray();
+    }
+
+    /// <summary>
+    /// Runs the query as a pipeline, which is the only way MongoDB will sort by an expression.
+    ///
+    /// <para>An order key that reaches through a collection — "by each widget's latest sighting" — is an
+    /// aggregate over a nested array, so it is computed into a field, sorted and paged on the server, and the
+    /// field removed again before the documents are materialized. Nothing the caller stored is disturbed:
+    /// $addFields shapes the stream, never the collection.</para>
+    /// </summary>
+    private async Task<IReadOnlyList<TEntity>> ReadPipeline(
+        IMongoCollection<BsonDocument> collection,
+        MongoQueryPlan plan,
+        CancellationToken ct)
+    {
+        var stages = new List<BsonDocument>(6)
+        {
+            new("$match", plan.FilterDocument),
+            new("$addFields", plan.Computed)
+        };
+        if (plan.SortDocument is not null) stages.Add(new BsonDocument("$sort", plan.SortDocument));
+        if (plan.Skip != 0) stages.Add(new BsonDocument("$skip", plan.Skip));
+        if (plan.Limit is { } limit) stages.Add(new BsonDocument("$limit", limit));
+
+        var hide = new BsonDocument();
+        foreach (var element in plan.Computed!) hide[element.Name] = 0;
+        stages.Add(new BsonDocument("$project", hide));
+
+        var documents = await collection
+            .Aggregate<BsonDocument>(PipelineDefinition<BsonDocument, BsonDocument>.Create(stages),
+                cancellationToken: ct)
+            .ToListAsync(ct).ConfigureAwait(false);
         return documents.Select(_entity.Read).ToArray();
     }
 

@@ -1,0 +1,22 @@
+using Koan.Data.AdapterSurface.TestKit;
+
+namespace Koan.Data.Connector.Cockroach.Tests.Specs;
+
+/// <summary>
+/// Cockroach derivation of the collection-order oracle (<see cref="SortPushdownConvergence"/>, ARCH-0079).
+/// Container-backed: skips without a reachable backing store. Proves the store computes "by each widget's
+/// latest sighting" itself — the shared Npgsql jsonb path — and that its ordering is the one the framework's own sorter would
+/// have produced.
+/// </summary>
+public sealed class CockroachSortPushdownSpec(CockroachFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<CockroachFixture>(fixture, output)
+{
+    [Fact(DisplayName = "Cockroach: a collection order key is computed by the store, not in memory")]
+    public async Task Collection_order_is_pushed_down()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        await SortPushdownConvergence.AssertConvergesAsync(host.Services);
+        await SortPushdownConvergence.AssertPagesAsync();
+    }
+}

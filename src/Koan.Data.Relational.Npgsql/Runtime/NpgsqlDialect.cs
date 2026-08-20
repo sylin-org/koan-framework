@@ -14,6 +14,25 @@ internal sealed class NpgsqlDialect : IRelationalMappingDialect
         return Cast($"({root} #>> {literal})", physicalType);
     }
 
+    public string? JsonArrayOrderTerm(
+        string arraySql,
+        IReadOnlyList<string> elementSegments,
+        bool max,
+        bool descending,
+        Type elementValueType)
+    {
+        var literal = "'{" + string.Join(',', elementSegments.Select(EscapePath)) + "}'";
+        var value = Cast($"(koan_element.value #>> {literal})", elementValueType);
+        // A document may hold no array at that path at all, and jsonb_array_elements refuses a scalar, so the
+        // type is checked rather than assumed. An absent or empty array yields NULL, which sorts first —
+        // the same place the in-memory sorter puts a widget with no sightings.
+        var array = $"CASE WHEN jsonb_typeof({arraySql}) = 'array' THEN {arraySql} ELSE '[]'::jsonb END";
+        var aggregate = $"(SELECT {(max ? "MAX" : "MIN")}({value}) FROM jsonb_array_elements({array}) AS koan_element(value))";
+        // PostgreSQL treats NULL as larger than every value, which is the opposite of the framework's sorter,
+        // so the placement is stated rather than defaulted.
+        return descending ? $"{aggregate} DESC NULLS LAST" : $"{aggregate} ASC NULLS FIRST";
+    }
+
     public string QuoteIdent(string ident) => Quote(ident);
     public string EscapeLike(string fragment) => fragment.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     public string Parameter(int index) => $"@p{index}";

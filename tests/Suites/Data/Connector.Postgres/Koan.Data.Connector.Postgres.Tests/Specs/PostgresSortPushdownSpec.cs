@@ -1,0 +1,22 @@
+using Koan.Data.AdapterSurface.TestKit;
+
+namespace Koan.Data.Connector.Postgres.Tests.Specs;
+
+/// <summary>
+/// Postgres derivation of the collection-order oracle (<see cref="SortPushdownConvergence"/>, ARCH-0079).
+/// Container-backed: skips without a reachable backing store. Proves the store computes "by each widget's
+/// latest sighting" itself — jsonb_array_elements over the document column, with NULL placement stated because PostgreSQL sorts NULL as larger than every value — and that its ordering is the one the framework's own sorter would
+/// have produced.
+/// </summary>
+public sealed class PostgresSortPushdownSpec(PostgresFixture fixture, ITestOutputHelper output)
+    : KoanDataSpec<PostgresFixture>(fixture, output)
+{
+    [Fact(DisplayName = "Postgres: a collection order key is computed by the store, not in memory")]
+    public async Task Collection_order_is_pushed_down()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        await SortPushdownConvergence.AssertConvergesAsync(host.Services);
+        await SortPushdownConvergence.AssertPagesAsync();
+    }
+}
