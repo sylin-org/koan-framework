@@ -9,7 +9,12 @@ namespace Koan.Media.Web.Routing;
 /// <summary>Compiles the default media source choice from the application's concrete media Entities.</summary>
 internal static class MediaSourceDiscovery
 {
-    internal sealed record Selection(int CandidateCount, string Summary);
+    /// <param name="SourceRegistered">
+    /// False when the application declares no media Entity at all. Media Web then composes inertly:
+    /// referencing a projection is the intent to expose media once there is some, not an assertion that
+    /// some already exists, so a bare reference must not stop the host from starting.
+    /// </param>
+    internal sealed record Selection(int CandidateCount, string Summary, bool SourceRegistered);
 
     public static Selection RegisterDefault(IServiceCollection services)
     {
@@ -32,30 +37,39 @@ internal static class MediaSourceDiscovery
         if (services.Any(static descriptor => descriptor.ServiceType == typeof(IMediaSource)))
         {
             return new Selection(candidates.Count,
-                $"Explicit IMediaSource; {candidates.Count} concrete MediaEntity candidate(s) discovered.");
+                $"Explicit IMediaSource; {candidates.Count} concrete MediaEntity candidate(s) discovered.", true);
         }
 
         if (candidates.Count == 1)
         {
             var implementation = typeof(MediaEntitySource<>).MakeGenericType(candidates[0]);
             services.TryAdd(ServiceDescriptor.Singleton(typeof(IMediaSource), implementation));
-            return new Selection(1, $"Automatic Entity source: {candidates[0].FullName}.");
+            return new Selection(1, $"Automatic Entity source: {candidates[0].FullName}.", true);
         }
 
-        var candidateNames = candidates.Count == 0
-            ? "none"
-            : string.Join(", ", candidates.Select(static type => type.FullName ?? type.Name));
-        var correction = candidates.Count == 0
-            ? "Define one MediaEntity<T>, register a custom IMediaSource, or remove the Media Web reference."
-            : "Select the source explicitly with services.AddMediaSource<T>() or register a custom IMediaSource.";
+        // Nothing to serve is not a misconfiguration. An application that references Media Web before it
+        // declares a MediaEntity — or that carries the reference through a bundle — composes and starts;
+        // the media routes simply have no source until one exists. Refusing to boot here made a
+        // projection's own precondition fatal to the whole host, which no other Koan projection does.
+        if (candidates.Count == 0)
+        {
+            return new Selection(0,
+                "Inert: no concrete MediaEntity discovered, so Media Web exposes no default source. " +
+                "Define a MediaEntity<T> or register an IMediaSource to serve media.", false);
+        }
+
+        // More than one candidate is genuine ambiguity in an application that does have media Entities.
+        // Koan will not guess which one the routes mean, so this stays a host-start correction.
+        var candidateNames = string.Join(", ", candidates.Select(static type => type.FullName ?? type.Name));
         var message = $"Koan Media Web cannot select a default media source: discovered {candidates.Count} " +
-                      $"concrete MediaEntity candidate(s) ({candidateNames}). {correction}";
+                      $"concrete MediaEntity candidate(s) ({candidateNames}). " +
+                      "Select the source explicitly with services.AddMediaSource<T>() or register a custom IMediaSource.";
 
         // This fallback is deliberately lazy so an application module that runs later can replace it with an
         // explicit source. MediaWebModule.Start resolves the final registration and turns an unresolved choice into
         // a host-start correction rather than a generic controller-activation failure on the first request.
         services.TryAddSingleton<IMediaSource>(_ => throw new InvalidOperationException(message));
-        return new Selection(candidates.Count, message);
+        return new Selection(candidates.Count, message, true);
     }
 
     private static bool IsConcreteMediaEntity(Type type)

@@ -62,7 +62,13 @@ public sealed class MediaWebModule : KoanModule
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        _ = services.GetRequiredService<IMediaSource>();
+        // Resolve only when a source is meant to exist, so an ambiguous choice still fails at host start
+        // with its correction. With no MediaEntity at all the module stays inert rather than stopping a
+        // host that simply has no media yet.
+        if (_sourceSelection?.SourceRegistered != false)
+        {
+            _ = services.GetRequiredService<IMediaSource>();
+        }
         return Task.CompletedTask;
     }
 
