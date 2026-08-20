@@ -59,6 +59,12 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   passed while the pillar's central promise — messy arrivals converge — was broken for every real
   adapter. A double must be honest about the property that makes storage storage: serialization.
   Making it so gave an existing spec teeth it had never had. (2026-08-20)
+- **A capability question belongs to the provider, not to a static list.** Streaming refused an order key by
+  its CLR type before any adapter was asked, which held every provider to what the weakest one manages — and
+  the remedy it offered, "materialize the query", was the one thing streaming exists to avoid. The per-provider
+  check already existed a few lines below. Prefer: attempt, let the provider decline, and name it in the
+  refusal. Where behaviour merely *varies* by backend rather than being unavailable, explain it in the facts
+  instead of forbidding it. (2026-08-20)
 - **A spec that only compares answers cannot see whether the store did the work.** Every adapter ordered
   `-Sightings.LastChangedAt` correctly while none of them pushed it down: the framework's sorter finished
   the job over the whole materialized result. The surface suites were green throughout. Where pushdown
