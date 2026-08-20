@@ -51,20 +51,19 @@ internal static class QueryStreamCoordinator
 
         query = query.WithoutPagination().WithCountStrategy(null);
 
-        // A stream pages from the provider and never sees the whole set, so it can only carry an order whose
-        // meaning is the same on every backend — otherwise the same code would hand back a different sequence
-        // depending on where the Entity happens to live, and nothing would say so. The admitted set is
-        // evidence: see TypeClassification.IsPortableStreamSortScalar. Validate the caller's order before
-        // appending Koan's provider-stable Entity Id tie-breaker, since a key may be stable enough to prevent
-        // page drift without promising an ordering when the caller sorts by Id explicitly.
-        if (query.Sort.Any(spec => !IsPortableStreamSort<TEntity, TKey>(spec)))
-            throw Reject<TEntity>(facts, provider,
-                Infrastructure.Constants.Diagnostics.Reasons.UnsupportedStreamSort,
-                "Order by a value whose ordering is proven across adapters — a number, an enum, a date, a time, " +
-                "or an aggregate over a collection of those. Strings and Guids order by database collation and " +
-                "nullable columns by provider null placement, so neither carries a stream.",
-                batchSize);
-
+        // Whether this provider can order this key is the provider's answer, taken below from its receipt,
+        // not a guess made here from the CLR type. Refusing up front held every provider to what the weakest
+        // one could do: ordering a stream by a string was refused on stores that order strings perfectly well,
+        // and the caller was told to materialize — to load the whole set, which is the one thing a stream
+        // exists to avoid. Paging integrity does not depend on the key's type either; it comes from a total
+        // order, which the Entity Id tie-breaker below guarantees.
+        //
+        // What does vary by backend is what an ordering *means*: a string orders by the store's collation, a
+        // null by the store's placement. That is worth saying, and it is said — see the fact recorded
+        // below — rather than used as grounds for refusal.
+        // Captured before the Id tie-breaker is appended, so the fact below reports the keys the caller chose
+        // rather than the one Koan adds to every stream.
+        var requestedSort = query.Sort;
         query = EnsureTotalOrder<TEntity, TKey>(query);
         if (query.Sort.Any(spec =>
                 IsEntityIdentifier<TEntity, TKey>(spec.Path) &&
@@ -73,6 +72,11 @@ internal static class QueryStreamCoordinator
                 Infrastructure.Constants.Diagnostics.Reasons.UnsupportedStreamSort,
                 "Use an Entity identifier shape with a proven provider-stable stream tie-breaker, or materialize the query explicitly.",
                 batchSize);
+
+        // Say once, per stream, which keys the store rather than Koan defines the order of. The ordering is
+        // stable and complete either way; what changes with the backend is its meaning, and a caller comparing
+        // runs across two stores deserves to find that in the facts instead of inferring it.
+        RecordProviderDefinedOrder<TEntity, TKey>(facts, provider, requestedSort);
 
         var filterSupport = capabilities.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
         var (adapterBase, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
@@ -104,9 +108,16 @@ internal static class QueryStreamCoordinator
                     $"The provider returned more than the requested {batchSize} candidates; correct or replace the adapter.",
                     batchSize);
             if (!result.SortFullyHandled(adapterPage))
+            {
+                var declined = string.Join(", ", adapterPage.Sort
+                    .Where(spec => !result.SortHandled.Contains(spec))
+                    .Select(static spec => spec.Path.DotPath));
                 throw Reject<TEntity>(facts, provider,
                     Infrastructure.Constants.Diagnostics.Reasons.StreamSortNotHandled,
-                    "Use a provider-handled portable top-level order, or materialize the query explicitly.", batchSize);
+                    "Provider " + provider + " does not order " + declined + " itself, and a stream cannot " +
+                    "finish an ordering it never sees whole. Order by something this provider can apply, route " +
+                    "the Entity to one that can, or materialize the query and sort it explicitly.", batchSize);
+            }
             try
             {
                 QueryReceiptValidator.Validate(adapterPage, result);
@@ -154,22 +165,34 @@ internal static class QueryStreamCoordinator
     }
 
     /// <summary>
-    /// Whether one order key may carry a provider-paged stream.
+    /// Records which of the caller's order keys the store, rather than Koan, defines the ordering of.
     ///
-    /// <para>A plain column qualifies when its type is in the proven set. A key that reaches through a
-    /// collection qualifies on the same terms, because every adapter now computes that aggregate itself and
-    /// states where its null — an Entity whose collection is empty — belongs; a plain nullable column has no
-    /// such statement, which is why the two differ.</para>
+    /// <para>Every key here still produces a stable, complete stream on the store it runs against. What it
+    /// does not carry is a promise that the same key yields the same sequence somewhere else: a string orders
+    /// by collation, a nullable column by the provider's null placement. Koan explains that instead of
+    /// refusing it, so an application that genuinely needs cross-backend agreement can see which keys to
+    /// avoid, and one that does not gets to stream by the key it actually wanted.</para>
     /// </summary>
-    private static bool IsPortableStreamSort<TEntity, TKey>(SortSpec spec)
+    private static void RecordProviderDefinedOrder<TEntity, TKey>(
+        IKoanRuntimeFactRecorder? facts,
+        string provider,
+        IReadOnlyList<SortSpec> sort)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        if (IsEntityIdentifier<TEntity, TKey>(spec.Path)) return false;
-        if (!TypeClassification.IsPortableStreamSortScalar(spec.Path.ValueType)) return false;
-        return spec.Path.TraversesCollection
-            ? spec.Path.CollectionSegmentIndex >= 1
-            : spec.Path.Members.Count == 1;
+        if (facts is null) return;
+        var storeDefined = sort
+            .Where(static spec => !TypeClassification.IsPortableStreamSortScalar(spec.Path.ValueType))
+            .Select(static spec => spec.Path.DotPath)
+            .ToArray();
+        if (storeDefined.Length == 0) return;
+
+        Record<TEntity>(facts, provider, KoanFactState.Selected,
+            "Streaming " + typeof(TEntity).Name + " ordered by " + string.Join(", ", storeDefined) +
+            ", whose comparison " + provider + " defines rather than Koan.",
+            Infrastructure.Constants.Diagnostics.Reasons.StreamOrderIsProviderDefined,
+            "The sequence is stable and complete on this store. Order by a number, enum, date or time if the " +
+            "same sequence must hold on a different backend.");
     }
 
     private static QueryDefinition EnsureTotalOrder<TEntity, TKey>(QueryDefinition query)

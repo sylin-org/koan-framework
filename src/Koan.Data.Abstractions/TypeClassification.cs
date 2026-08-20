@@ -10,27 +10,33 @@ namespace Koan.Data.Abstractions;
 public static class TypeClassification
 {
     /// <summary>
-    /// Whether a CLR value has a <i>proven</i> ordering across every qualified document and relational adapter,
-    /// and may therefore carry a provider-paged stream.
+    /// Whether a CLR value's ordering is the <i>same on every</i> qualified adapter as it is in the framework's
+    /// own sorter.
     ///
-    /// <para>The list is evidence, not taste. Each type here is ordered identically by every adapter and by the
-    /// framework's own sorter, ascending and descending, under the cross-adapter oracle
-    /// <c>SortPushdownConvergence</c>. Widening it means extending that corpus first and watching it pass on
-    /// every store.</para>
+    /// <para>This does not gate anything. A stream orders by whatever the chosen provider can order, because
+    /// holding every provider to what the weakest one manages helps nobody: it refused a string order on stores
+    /// that order strings perfectly well, and offered "materialize the query" — load the whole set — in
+    /// exchange. What this predicate decides is whether Koan says anything about the ordering it just used: a
+    /// key outside this set is recorded as an order the store defines, so an application that needs the same
+    /// sequence on a different backend can find out which keys will not give it.</para>
     ///
-    /// <para>What stays out, and why it is not timidity:</para>
+    /// <para>The list is evidence. Each type here is ordered identically by every adapter, ascending and
+    /// descending, under the cross-adapter oracle <c>SortPushdownConvergence</c>. Widening it means extending
+    /// that corpus and watching it pass everywhere.</para>
+    ///
+    /// <para>What is outside it, and why:</para>
     /// <list type="bullet">
-    ///   <item><see cref="string"/> and <see cref="Guid"/> — collation, not values. The same two rows order
-    ///   differently under a different database collation, and a stream would silently mean something else.</item>
-    ///   <item><see cref="TimeSpan"/> — one adapter still stores it in .NET's default form and puts twenty-four
-    ///   hours before twenty-three. Proven divergent rather than merely unproven.</item>
-    ///   <item>Nullable values — provider null placement is not normalized for plain columns. A collection
-    ///   aggregate is admitted despite being null for an empty collection, because its placement <i>is</i>
-    ///   normalized where the dialect states it.</item>
+    ///   <item><see cref="string"/>, <see cref="char"/> and <see cref="Guid"/> — collation, not values.
+    ///   The same two rows can order differently under a different database collation.</item>
+    ///   <item><see cref="TimeSpan"/> — proven divergent rather than merely unproven: one adapter still
+    ///   stores it in .NET's default form, where twenty-four hours precedes twenty-three.</item>
+    ///   <item>Nullable values — provider null placement is not normalized for a plain column. A collection
+    ///   aggregate counts as its element type, because the dialect states where its null belongs.</item>
+    ///   <item><see cref="DateTime"/> — no offset, so its ordering depends on the kind each value carried
+    ///   when it was written.</item>
+    ///   <item><see cref="uint"/>, <see cref="ulong"/>, <see cref="float"/> — never put through the corpus.
+    ///   Absence of proof keeps them out; that is the rule working, not a judgement about the types.</item>
     /// </list>
-    ///
-    /// <para>The Entity identifier is admitted separately by the stream coordinator as a provider-stable
-    /// tie-break, not as a promise about CLR collation.</para>
     /// </summary>
     public static bool IsPortableStreamSortScalar(Type t)
     {

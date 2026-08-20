@@ -199,18 +199,22 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             .Should().Equal(nameof(StreamingRecord.BusinessId), nameof(StreamingRecord.Id));
     }
 
+    /// <summary>
+    /// Ordering by the Entity identifier reaches the provider. Koan's own key shape is a string, which every
+    /// qualified adapter orders deterministically, so the stream is stable and complete; what it is not is a
+    /// promise that two different stores agree on it, and that is recorded rather than refused.
+    /// </summary>
     [Fact]
-    public async Task Caller_requested_entity_id_order_rejects_before_provider_io()
+    public async Task Caller_requested_entity_id_order_reaches_the_provider()
     {
         _repository.Reset(Rows(1, 2, 3));
 
-        var exception = await Reject(StreamingRecord.AllStream(
+        var streamed = await Collect(StreamingRecord.AllStream(
             sort => sort.OrderBy(record => record.Id),
             batchSize: 2));
 
-        exception.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        _repository.QueryCalls.Should().BeEmpty();
-        _repository.CountCalls.Should().Be(0);
+        streamed.Should().HaveCount(3);
+        _repository.QueryCalls.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -243,47 +247,54 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         business.Members.Single().Name.Should().Be(nameof(StreamingRecord.BusinessId));
     }
 
+    /// <summary>
+    /// Whether a key can be ordered is the provider's answer, not a guess made from its CLR type. When the
+    /// provider declines, the refusal says which provider and which key, because "unsupported sort" sends the
+    /// reader hunting while "sqlite does not order Detail" does not.
+    /// </summary>
     [Fact]
-    public async Task Complex_top_level_sort_rejects_before_provider_io()
+    public async Task A_provider_that_cannot_order_the_key_is_named_in_the_refusal()
     {
-        _repository.Reset(Rows(1, 2, 3));
+        _repository.Reset(Rows(1, 2, 3), sortHandled: false);
 
         var exception = await Reject(StreamingRecord.AllStream(
             sort => sort.OrderBy(record => record.Detail),
             batchSize: 2));
 
-        exception.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        _repository.QueryCalls.Should().BeEmpty();
-        _repository.CountCalls.Should().Be(0);
+        exception.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.StreamSortNotHandled);
+        exception.Correction.Should().Contain(nameof(StreamingRecord.Detail))
+            .And.Contain("does not order");
+        exception.Provider.Should().NotBeNullOrWhiteSpace();
     }
 
     /// <summary>
-    /// What still cannot carry a stream, and why each one is a difference in meaning rather than caution.
-    /// A string and a Guid order by database collation, so the same two rows can come back in either order on
-    /// a different deployment of the same store. A nullable column orders by provider null placement, which is
-    /// not normalized. A <see cref="DateTime"/> carries no offset, so its ordering depends on the kind the
-    /// value happened to be written with.
+    /// An order whose meaning the store defines — a string by collation, a nullable column by the provider's
+    /// null placement, a DateTime by whatever kind it was written with — is streamed rather than refused.
+    ///
+    /// <para>Refusing them held every provider to what the weakest one could do, and the advice offered in
+    /// exchange was to materialize the query: to load the whole set, which is the one thing a stream exists to
+    /// avoid. The sequence such a key produces is stable and complete on the store it runs against; what it
+    /// does not carry is agreement with a different backend. Koan says so in its facts instead.</para>
     /// </summary>
     [Fact]
-    public async Task Orders_that_mean_different_things_per_backend_reject_before_provider_io()
+    public async Task Orders_the_store_defines_are_streamed_and_explained()
     {
         _repository.Reset(Rows(1, 2, 3));
+        var byTitle = await Collect(StreamingRecord.AllStream(
+            sort => sort.OrderBy(record => record.Title), batchSize: 2));
+        byTitle.Should().HaveCount(3, "a string orders by collation, which is still an order");
 
-        var dateTimeRejection = await Reject(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.ObservedAt),
-            batchSize: 2));
-        var stringRejection = await Reject(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.Title),
-            batchSize: 2));
-        var nullableRejection = await Reject(StreamingRecord.AllStream(
-            sort => sort.OrderBy(record => record.OptionalSequence),
-            batchSize: 2));
+        _repository.Reset(Rows(1, 2, 3));
+        var byNullable = await Collect(StreamingRecord.AllStream(
+            sort => sort.OrderBy(record => record.OptionalSequence), batchSize: 2));
+        byNullable.Should().HaveCount(3, "provider null placement is still a placement");
 
-        dateTimeRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        stringRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        nullableRejection.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.UnsupportedStreamSort);
-        _repository.QueryCalls.Should().BeEmpty();
-        _repository.CountCalls.Should().Be(0);
+        _repository.Reset(Rows(1, 2, 3));
+        var byDateTime = await Collect(StreamingRecord.AllStream(
+            sort => sort.OrderBy(record => record.ObservedAt), batchSize: 2));
+        byDateTime.Should().HaveCount(3);
+
+        _repository.QueryCalls.Should().NotBeEmpty();
     }
 
     /// <summary>

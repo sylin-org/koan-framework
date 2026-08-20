@@ -183,6 +183,21 @@ public static class SortPushdownConvergence
             streamed.Should().Equal(expected,
                 $"streaming by '{sort}' must yield the ordering the framework defines, page after page");
         }
+
+        // A key whose comparison the store defines rather than Koan - a string orders by collation - streams
+        // too. Koan cannot promise the same sequence on a different backend and does not assert one here; what
+        // it must deliver is the sequence this store itself produces, assembled from pages, complete and in
+        // order. Refusing this outright used to be the alternative, with "materialize the query" as the advice.
+        var storeOrder = (await Data<SortedWidget, string>.Page(1, 50, "Name"))
+            .Select(static widget => widget.Id).ToArray();
+        var storeStreamed = new List<string>();
+        await foreach (var widget in Data<SortedWidget, string>.AllStream("Name", 2))
+            storeStreamed.Add(widget.Id);
+
+        storeStreamed.Should().Equal(storeOrder,
+            "a stream must reproduce the order the store itself returns, however that store compares strings");
+        storeStreamed.Should().OnlyHaveUniqueItems().And.HaveCount(Corpus.Count,
+            "paging an order must lose nothing and repeat nothing");
     }
 
     /// <summary>Paging is only meaningful over an order the store applied; this proves the window is real.</summary>
