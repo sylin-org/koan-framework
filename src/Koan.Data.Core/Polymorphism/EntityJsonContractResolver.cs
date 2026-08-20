@@ -1,10 +1,14 @@
+using System.Reflection;
 using Koan.Data.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 
 namespace Koan.Data.Core.Polymorphism;
 
-/// <summary>Adds Koan's serialize-only Entity-family type hint without changing domain models.</summary>
+/// <summary>
+/// Shapes how Koan reads and writes an Entity without changing domain models: it adds the serialize-only
+/// Entity-family type hint, and it makes the round trip symmetric, so state Koan persists is state Koan restores.
+/// </summary>
 [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
 public class EntityJsonContractResolver : DefaultContractResolver
 {
@@ -20,6 +24,34 @@ public class EntityJsonContractResolver : DefaultContractResolver
         contract.ExtensionDataGetter = value =>
             RejectReservedExtensionData(objectType, extensionData(value) ?? []);
         return contract;
+    }
+
+    /// <summary>
+    /// Restores state whose setter is not public, so an Entity round-trips through storage as the same Entity.
+    ///
+    /// <para>Json.NET writes a property whenever it can read it, but refuses to fill one whose setter is not public.
+    /// That asymmetry is silent and lossy: the value reaches storage and is dropped on the way back, leaving a
+    /// default in its place long after the write was reported as successful. Encapsulation governs what domain code
+    /// may assign — a canonical id that only its own <c>Update</c> may set — and persistence restoring what
+    /// persistence itself wrote does not weaken it.</para>
+    ///
+    /// <para>A property with no setter at all stays unwritable. It is computed, so it needs no restoring.</para>
+    /// </summary>
+    protected override JsonProperty CreateProperty(
+        MemberInfo member,
+        MemberSerialization memberSerialization)
+    {
+        var property = base.CreateProperty(member, memberSerialization);
+        if (property.Writable ||
+            property.Ignored ||
+            member is not PropertyInfo declared ||
+            declared.GetSetMethod(nonPublic: true) is null)
+        {
+            return property;
+        }
+
+        property.Writable = true;
+        return property;
     }
 
     protected override IList<JsonProperty> CreateProperties(

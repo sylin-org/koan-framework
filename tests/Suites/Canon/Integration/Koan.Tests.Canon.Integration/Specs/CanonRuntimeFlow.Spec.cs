@@ -1,3 +1,5 @@
+using Koan.Data.Core.Polymorphism;
+
 namespace Koan.Tests.Canon.Integration.Specs;
 
 public sealed class CanonRuntimeFlowSpec
@@ -38,6 +40,33 @@ public sealed class CanonRuntimeFlowSpec
         var index = persistence.GetIndex(typeof(ContactCanon), indexKey);
         index.Should().NotBeNull();
         index!.CanonicalId.Should().Be(result.Canonical.Id);
+    }
+
+    [Fact(DisplayName = "a second arrival for a known key joins the record that already owns it")]
+    public async Task Second_arrival_converges_on_the_existing_canonical()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        ConfigureServices(services);
+        await using var sp = services.BuildServiceProvider();
+
+        using var scope = sp.CreateScope();
+        var runtime = scope.ServiceProvider.GetRequiredService<ICanonRuntime>();
+        var persistence = scope.ServiceProvider.GetRequiredService<ICanonPersistence>() as InMemoryCanonPersistence
+            ?? throw new InvalidOperationException("In-memory persistence not registered");
+
+        // Convergence is the pillar's promise, and it can only be tested across arrivals: everything Canon knows
+        // about who owns a key was written during the first one and has to be read back during the second.
+        var executionId = Guid.CreateVersion7();
+        var first = await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "integration");
+        var second = await ExecuteCanonization(runtime, executionId, CanonStageBehavior.Immediate, "integration");
+
+        second.Canonical.Id.Should().Be(first.Canonical.Id, "the aggregation key already had an owner");
+        persistence.CanonicalEntries.Should().ContainSingle("one key describes one canonical record");
+
+        var index = persistence.GetIndex(typeof(ContactCanon), $"Email={first.Canonical.Email}");
+        index.Should().NotBeNull();
+        index!.CanonicalId.Should().Be(first.Canonical.Id, "ownership has to survive storage, not just the write");
     }
 
     [Fact]
@@ -148,12 +177,25 @@ public sealed class CanonRuntimeFlowSpec
         return await runtime.Canonize(entity, options, CancellationToken.None).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Stands in for a store, and stores what a store stores: documents.
+    ///
+    /// <para>Holding the caller's own object instead would make this double strictly more capable than every real
+    /// adapter, since nothing an entity guards could ever be lost on the way back. That gap is not hypothetical —
+    /// it hid a defect where canonical ownership was written and then silently dropped on read, so a second arrival
+    /// for a known key minted a second canonical record. These specs passed throughout. Serializing here keeps the
+    /// double honest about the one property that separates storage from a dictionary.</para>
+    /// </summary>
     private sealed class InMemoryCanonPersistence : ICanonPersistence
     {
         private readonly object _gate = new();
-        private readonly Dictionary<string, CanonIndex> _indices = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, ContactCanon> _canonicals = new(StringComparer.OrdinalIgnoreCase);
-        private readonly List<CanonStage<ContactCanon>> _stages = new();
+        private readonly Dictionary<string, string> _indices = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _canonicals = new(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> _stages = new();
+
+        private static string Write(object entity) => EntityJsonSerialization.SerializeDocument(entity);
+
+        private static T Read<T>(string document) => (T)EntityJsonSerialization.DeserializeDocument(document, typeof(T));
 
         public IReadOnlyCollection<CanonStage<ContactCanon>> StageRecords
         {
@@ -161,7 +203,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 lock (_gate)
                 {
-                    return _stages.ToArray();
+                    return _stages.Select(Read<CanonStage<ContactCanon>>).ToArray();
                 }
             }
         }
@@ -172,7 +214,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 lock (_gate)
                 {
-                    return _canonicals.Values.ToArray();
+                    return _canonicals.Values.Select(Read<ContactCanon>).ToArray();
                 }
             }
         }
@@ -181,7 +223,7 @@ public sealed class CanonRuntimeFlowSpec
         {
             lock (_gate)
             {
-                return _canonicals.TryGetValue(id, out var value) ? Clone(value) : null;
+                return _canonicals.TryGetValue(id, out var value) ? Read<ContactCanon>(value) : null;
             }
         }
 
@@ -192,7 +234,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 if (typeof(TModel) == typeof(ContactCanon) && _canonicals.TryGetValue(canonicalId, out var value))
                 {
-                    return Task.FromResult<TModel?>((TModel)(object)Clone(value));
+                    return Task.FromResult<TModel?>((TModel)(object)Read<ContactCanon>(value));
                 }
 
                 return Task.FromResult<TModel?>(null);
@@ -204,7 +246,7 @@ public sealed class CanonRuntimeFlowSpec
             var entityType = type.FullName ?? type.Name;
             lock (_gate)
             {
-                return _indices.TryGetValue(MakeKey(entityType, key), out var index) ? index : null;
+                return _indices.TryGetValue(MakeKey(entityType, key), out var index) ? Read<CanonIndex>(index) : null;
             }
         }
 
@@ -215,7 +257,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 lock (_gate)
                 {
-                    _canonicals[entity.Id] = Clone(contact);
+                    _canonicals[entity.Id] = Write(contact);
                 }
             }
 
@@ -234,7 +276,7 @@ public sealed class CanonRuntimeFlowSpec
             {
                 lock (_gate)
                 {
-                    _stages.Add(contactStage);
+                    _stages.Add(Write(contactStage));
                 }
             }
 
@@ -245,8 +287,9 @@ public sealed class CanonRuntimeFlowSpec
         {
             lock (_gate)
             {
-                _indices.TryGetValue(MakeKey(entityType, key), out var index);
-                return Task.FromResult(index);
+                return Task.FromResult(_indices.TryGetValue(MakeKey(entityType, key), out var index)
+                    ? Read<CanonIndex>(index)
+                    : null);
             }
         }
 
@@ -259,7 +302,7 @@ public sealed class CanonRuntimeFlowSpec
 
             lock (_gate)
             {
-                _indices[MakeKey(index.EntityType, index.Key)] = index;
+                _indices[MakeKey(index.EntityType, index.Key)] = Write(index);
             }
 
             return Task.CompletedTask;
@@ -267,16 +310,6 @@ public sealed class CanonRuntimeFlowSpec
 
         private static string MakeKey(string entityType, string key)
             => $"{entityType}::{key}";
-
-        private static ContactCanon Clone(ContactCanon source)
-            => new()
-            {
-                Id = source.Id,
-                Email = source.Email,
-                PhoneNumber = source.PhoneNumber,
-                DisplayName = source.DisplayName,
-                Metadata = source.Metadata.Clone()
-            };
     }
 
     private sealed class NoopAuditSink : ICanonAuditSink
