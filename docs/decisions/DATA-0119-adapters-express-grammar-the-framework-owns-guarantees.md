@@ -188,8 +188,10 @@ the adapter did — the same failure DATA-0119 names, one layer up.
   when that is flipped back.
 - **Three adapters reported `TableExists = true` and `State = "Healthy"` as literals** — a health report
   structurally incapable of reporting ill health. All four now project the validation that actually ran.
-- **Only SQLite builds a declared `[Index]`.** PostgreSQL, SQL Server and MySQL have always ignored one.
-  That is now visible as an unproved claim rather than nothing at all, and is carried as PMC-041.
+- **Only SQLite built a declared `[Index]`.** PostgreSQL, CockroachDB, SQL Server and MySQL had always
+  ignored one, and nothing reported it. Adoption made it visible as an unproved claim, and PMC-041 then
+  closed it on all four plus Couchbase - each store proving its planner chooses what it built, which is
+  the half of the claim a created-index assertion cannot make.
 
 Rule 3 — a guarantee that can be declared can be required — is decided here and unimplemented. Nothing in
 the framework yet lets an Entity or source demand a guarantee and have composition negotiate or refuse.

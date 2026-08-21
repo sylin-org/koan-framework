@@ -39,6 +39,9 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 unproved.Add($"ExpressionIndex:{index.Name}");
             if (index.Ttl && !features.SupportsNativeTtl)
                 unproved.Add($"TTL:{index.Name}");
+            var keysSupported = index.Bindings.All(binding => features.CanIndexKey(binding.PhysicalType));
+            if (!index.Primary && !keysSupported)
+                unproved.Add($"IndexKey:{index.Name}");
             return new RelationalIndexDefinition(
                 index.Name,
                 index.Bindings.Select(static binding => new RelationalIndexPart(
@@ -46,7 +49,8 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 index.Unique,
                 index.Primary,
                 index.Ttl,
-                rewriteFree);
+                rewriteFree,
+                keysSupported);
         }).ToArray();
 
         var table = new RelationalTableDefinition(
@@ -188,6 +192,9 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
             {
                 if (index.Ttl && !features.SupportsNativeTtl) continue;
                 if (!index.RewriteFree && index.IsExpression) continue;
+                // Declared, and this store cannot key it. Plan already recorded the claim as unproved, so the
+                // application is told rather than quietly served an index that would break its writes.
+                if (!index.KeysSupported) continue;
                 await ddl.CreateIndex(plan.Table, index, ct).ConfigureAwait(false);
             }
         }

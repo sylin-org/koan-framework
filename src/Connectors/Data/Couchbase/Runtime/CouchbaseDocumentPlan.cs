@@ -99,7 +99,7 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
 
     internal string Field(FieldPath path, ResolvedField resolved, MappingConsumer consumer)
     {
-        if (resolved.IsManaged) return QuotePath([resolved.StorageName!]);
+        if (resolved.IsManaged) return CouchbasePath.Quote([resolved.StorageName!]);
         var logical = resolved.CanonicalPath ?? path;
         if (_mapping is not null)
         {
@@ -108,11 +108,43 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
                 ? use.Bindings[0]
                 : throw new NotSupportedException(
                     $"Couchbase cannot use multi-binding logical path '{path}' as one SQL++ value.");
-            return QuotePath([binding.PhysicalPath.Name, .. binding.PhysicalPath.Segments]);
+            return CouchbasePath.Quote([binding.PhysicalPath.Name, .. binding.PhysicalPath.Segments]);
         }
         if (logical.Segments.Count == 1 && string.Equals(logical.Leaf, _identityName, StringComparison.Ordinal))
-            return QuotePath([Infrastructure.Constants.Storage.Identity]);
-        return QuotePath(logical.Segments.Select(Camel));
+            return CouchbasePath.Quote([Infrastructure.Constants.Storage.Identity]);
+        return CouchbasePath.Quote(logical.Segments.Select(Camel));
+    }
+
+    /// <summary>
+    /// The indexes this entity declared, in the terms this store will build them from.
+    ///
+    /// <para>A compiled mapping gives the physical path directly. Without one, the same conventional spelling
+    /// filters use is applied, so the index covers the reads it exists for rather than a path nothing emits.
+    /// TTL is document expiry here rather than an index, so a TTL declaration is not turned into one.</para>
+    /// </summary>
+    internal IReadOnlyList<CouchbaseDeclaredIndex> DeclaredIndexes()
+    {
+        if (_mapping is not null)
+            return _mapping.Indexes
+                .Where(static index => !index.Primary && !index.Ttl)
+                .Select(index => new CouchbaseDeclaredIndex(
+                    index.Name,
+                    index.Bindings.Select(static binding => CouchbasePath.Quote(
+                        [binding.PhysicalPath.Name, .. binding.PhysicalPath.Segments])).ToArray(),
+                    index.Unique))
+                .ToArray();
+
+        return IndexMetadata.GetIndexes(typeof(TEntity))
+            .Where(static index => !index.IsPrimaryKey && !index.Ttl && !string.IsNullOrWhiteSpace(index.Name))
+            .Select(index => new CouchbaseDeclaredIndex(
+                index.Name!,
+                index.Properties.Select(property =>
+                {
+                    var path = FieldPath.Of(property.Name);
+                    return Field(path, FieldPathResolver.Resolve(typeof(TEntity), path), MappingConsumer.Index);
+                }).ToArray(),
+                index.Unique))
+            .ToArray();
     }
 
     /// <summary>
@@ -151,8 +183,8 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
         for (var index = boundary; index < path.Members.Count; index++)
             if (IsCollection(MemberValueType(path.Members[index]))) return null;
 
-        var collection = QuotePath(path.Members.Take(boundary).Select(static member => Camel(member.Name)));
-        var leaf = QuotePath(path.Members.Skip(boundary).Select(static member => Camel(member.Name)));
+        var collection = CouchbasePath.Quote(path.Members.Take(boundary).Select(static member => Camel(member.Name)));
+        var leaf = CouchbasePath.Quote(path.Members.Skip(boundary).Select(static member => Camel(member.Name)));
         return $"{function}(ARRAY {OrderElement}.{leaf} FOR {OrderElement} IN doc.{collection} END)";
     }
 
@@ -183,9 +215,6 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
         }
         return converted;
     }
-
-    internal static string QuotePath(IEnumerable<string> segments) =>
-        string.Join('.', segments.Select(static segment => "`" + segment.Replace("`", "``") + "`"));
 
     private static string Camel(string value) =>
         string.IsNullOrEmpty(value) || char.IsLower(value[0]) ? value : char.ToLowerInvariant(value[0]) + value[1..];

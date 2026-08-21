@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Relational.Orchestration;
 using Npgsql;
 
@@ -8,7 +9,7 @@ namespace Koan.Data.Relational.Npgsql.Runtime;
 /// to the schema orchestrator; this speaks over a connection the repository has already opened, for one schema
 /// operation. Connecting here creates nothing, so the repository can open before consent is settled.
 /// </summary>
-internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection) : IRelationalDdlExecutor
+internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDialect dialect) : IRelationalDdlExecutor
 {
     public async Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
     {
@@ -74,6 +75,24 @@ internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection) : IRelation
             $"ALTER TABLE {Qualify(table)} " +
             $"ADD COLUMN IF NOT EXISTS {NpgsqlDialect.Quote(column.Name)} {StoreType(column)}",
             ct);
+
+    public Task CreateIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default)
+    {
+        // The indexed term is the dialect's own read, so it is the expression queries emit. PostgreSQL uses an
+        // expression index only on an exact match, so a spelling of its own here would build an index the
+        // planner never chooses. Every cast this dialect produces - boolean, bigint, numeric - is immutable,
+        // which is what makes the expression indexable at all.
+        var terms = index.Parts.Select(part => part.Path.IsNested
+            ? $"({dialect.Read(part.Path, MappingValueShape.Scalar, part.PhysicalType)})"
+            : NpgsqlDialect.Quote(part.Path.Name));
+        return Execute(
+            $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS " +
+            $"{NpgsqlDialect.Quote(index.Name)} ON {Qualify(table)} ({string.Join(", ", terms)})",
+            ct);
+    }
 
     private async Task Execute(string sql, CancellationToken ct)
     {

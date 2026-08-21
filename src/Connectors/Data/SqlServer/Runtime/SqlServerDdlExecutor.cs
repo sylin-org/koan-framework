@@ -56,7 +56,7 @@ internal sealed class SqlServerDdlExecutor(SqlConnection connection, SqlServerDi
         return Execute(
             $"IF SCHEMA_ID(N'{Literal(table.Schema)}') IS NULL " +
             $"EXEC(N'CREATE SCHEMA {SqlServerDialect.Quote(table.Schema)}'); " +
-            $"IF OBJECT_ID(N'{Literal(table.Schema)}.{Literal(table.Name)}', N'U') IS NULL " +
+            $"IF OBJECT_ID(N'{Identifier(table)}', N'U') IS NULL " +
             $"CREATE TABLE {Qualify(table)} ({string.Join(", ", definitions)});",
             ct);
     }
@@ -84,6 +84,41 @@ internal sealed class SqlServerDdlExecutor(SqlConnection connection, SqlServerDi
                (column.IsIdentity ? "NOT NULL" : "NULL");
     }
 
+    /// <summary>
+    /// A declared index is built over the columns the store already computes, not over a repeated expression.
+    /// /// <para>SQL Server substitutes an indexed persisted computed column for the matching
+    /// <c>JSON_VALUE</c> expression on its own, so a query never names the index or the column.</para>
+    /// </summary>
+    public Task CreateIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default)
+    {
+        var columns = index.Parts.Select(part => Quoted(table, part));
+        return Execute(
+            $"IF NOT EXISTS (SELECT 1 FROM sys.indexes " +
+            $"WHERE name = N'{Literal(index.Name)}' AND object_id = OBJECT_ID(N'{Identifier(table)}')) " +
+            $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX {SqlServerDialect.Quote(index.Name)} " +
+            $"ON {Qualify(table)} ({string.Join(", ", columns)})",
+            ct);
+    }
+
+    /// <summary>
+    /// The column that holds an indexed value. A part that reads inside the structured root is served by the
+    /// projected column the store already computes for it, which is the column reads resolve through; anything
+    /// else is a physical column of its own.
+    /// </summary>
+    private static string Quoted(RelationalTableDefinition table, RelationalIndexPart part)
+    {
+        if (!part.Path.IsNested) return SqlServerDialect.Quote(part.Path.Name);
+        var projected = table.Columns.FirstOrDefault(column => column.IsProjected && column.ProjectedFrom == part.Path)
+            ?? throw new InvalidOperationException(
+                $"Index part '{part.Path}' for {table} has no projected column to index. A declared index reads a "
+                + "single scalar property, which this store always projects, so this is a mapping the schema owner "
+                + "and this executor disagree about.");
+        return SqlServerDialect.Quote(projected.Name);
+    }
+
     private async Task Execute(string sql, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();
@@ -95,6 +130,17 @@ internal sealed class SqlServerDdlExecutor(SqlConnection connection, SqlServerDi
         $"{SqlServerDialect.Quote(table.Schema)}.{SqlServerDialect.Quote(table.Name)}";
 
     private static string Literal(string value) => value.Replace("'", "''", StringComparison.Ordinal);
+
+    /// <summary>
+    /// The table as OBJECT_ID must be given it: bracketed, then escaped for the string literal that carries it.
+    ///
+    /// <para>Unbracketed, SQL Server reads the dots in a name like <c>dbo.Koan.Jobs.JobRecord</c> as parts of a
+    /// four-part identifier, resolves nothing, and returns NULL - so every guard written against it silently
+    /// answers "absent" and the statement it guards runs every time. Koan's default storage names are namespaced
+    /// and therefore full of dots, which is exactly the case this hits.</para>
+    /// </summary>
+    private static string Identifier(RelationalTableDefinition table) =>
+        Literal($"{SqlServerDialect.Quote(table.Schema)}.{SqlServerDialect.Quote(table.Name)}");
 
     private static string StoreType(RelationalColumnDefinition column)
     {

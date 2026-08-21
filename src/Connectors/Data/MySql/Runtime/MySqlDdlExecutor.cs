@@ -134,6 +134,55 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
                (column.IsIdentity ? "NOT NULL" : "NULL");
     }
 
+    /// <summary>
+    /// A declared index is built over the columns the store already computes, not over a repeated expression.
+    ///
+    /// <para>MySQL cannot index a JSON expression directly; a generated column is the supported route, and this
+    /// store already holds one per mapped scalar.</para>
+    /// </summary>
+    public async Task CreateIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default)
+    {
+        // MySQL has no CREATE INDEX IF NOT EXISTS and no procedural IF outside a routine, so existence is a
+        // question asked before the statement rather than a clause inside it.
+        await using (var probe = connection.CreateCommand())
+        {
+            probe.CommandText = """
+                SELECT 1 FROM information_schema.statistics
+                 WHERE table_schema = @database AND table_name = @table AND index_name = @name
+                 LIMIT 1
+                """;
+            probe.Parameters.AddWithValue("database", table.Schema);
+            probe.Parameters.AddWithValue("table", table.Name);
+            probe.Parameters.AddWithValue("name", index.Name);
+            if (await probe.ExecuteScalarAsync(ct).ConfigureAwait(false) is not null) return;
+        }
+
+        var columns = index.Parts.Select(part => Quoted(table, part));
+        await Execute(
+            $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX {MySqlDialect.Quote(index.Name)} " +
+            $"ON {Qualify(table)} ({string.Join(", ", columns)})",
+            ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The column that holds an indexed value. A part that reads inside the structured root is served by the
+    /// projected column the store already computes for it, which is the column reads resolve through; anything
+    /// else is a physical column of its own.
+    /// </summary>
+    private static string Quoted(RelationalTableDefinition table, RelationalIndexPart part)
+    {
+        if (!part.Path.IsNested) return MySqlDialect.Quote(part.Path.Name);
+        var projected = table.Columns.FirstOrDefault(column => column.IsProjected && column.ProjectedFrom == part.Path)
+            ?? throw new InvalidOperationException(
+                $"Index part '{part.Path}' for {table} has no projected column to index. A declared index reads a "
+                + "single scalar property, which this store always projects, so this is a mapping the schema owner "
+                + "and this executor disagree about.");
+        return MySqlDialect.Quote(projected.Name);
+    }
+
     private async Task Execute(string sql, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();

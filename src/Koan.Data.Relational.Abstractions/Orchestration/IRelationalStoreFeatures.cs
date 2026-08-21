@@ -32,4 +32,15 @@ public interface IRelationalStoreFeatures
 
     /// <summary>Whether the store expires rows itself, so a TTL index means something here.</summary>
     bool SupportsNativeTtl => false;
+
+    /// <summary>
+    /// Whether a value of this type can serve as an index key here.
+    ///
+    /// <para>Some stores cap what a key may hold. SQL Server reads a mapped scalar out of the document as
+    /// <c>nvarchar(4000)</c> and refuses an index entry over 1700 bytes, so indexing a text property produces an
+    /// index that accepts short rows and rejects long ones - a write that fails in production and never in a
+    /// test. A store that cannot key a value says so, the claim is recorded as unproved, and no index is built;
+    /// silently building one that breaks writes is the worse of the two failures.</para>
+    /// </summary>
+    bool CanIndexKey(Type physicalType) => true;
 }

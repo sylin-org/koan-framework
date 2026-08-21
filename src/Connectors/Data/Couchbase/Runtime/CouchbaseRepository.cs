@@ -50,7 +50,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
         _resources = resources;
         _entity = new CouchbaseDocumentPlan<TEntity, TKey>(services, route.Source, mapping);
         _queries = new CouchbaseQueryCompiler<TEntity, TKey>(_entity);
-        _schema = new CouchbaseSchema(route, resources);
+        _schema = new CouchbaseSchema(route, resources, _entity.DeclaredIndexes());
     }
 
     public Task EnsureReady(CancellationToken ct = default) =>

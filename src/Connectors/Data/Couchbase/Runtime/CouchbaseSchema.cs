@@ -6,7 +6,10 @@ using Koan.Data.Abstractions.Sources;
 
 namespace Koan.Data.Connector.Couchbase.Runtime;
 
-internal sealed class CouchbaseSchema(CouchbaseRoute route, CouchbaseResourcePool resources)
+internal sealed class CouchbaseSchema(
+    CouchbaseRoute route,
+    CouchbaseResourcePool resources,
+    IReadOnlyList<CouchbaseDeclaredIndex> declared)
 {
     private readonly object _gate = new();
     private readonly Dictionary<(CouchbaseContainer Container, bool Queryable), Lazy<Task>> _entries = new();
@@ -78,10 +81,37 @@ internal sealed class CouchbaseSchema(CouchbaseRoute route, CouchbaseResourcePoo
         route.Plan.Demand(DataOperationEffect.SchemaOrAdmin, "create Couchbase query index");
         var statement = $"CREATE PRIMARY INDEX IF NOT EXISTS ON {container.Qualified(route.Bucket)} USING GSI";
         await Index(target, statement, container, ct).ConfigureAwait(false);
+        await EnsureDeclaredIndexes(target, container, ct).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Creates the primary index, allowing for the query service not having seen the collection yet.
+    /// The secondary indexes the mapping declared.
+    ///
+    /// <para>A primary index makes a keyspace queryable; it does not make a query fast. Every predicate Koan
+    /// pushes down here reads a path inside the document, and without a matching GSI the query service scans the
+    /// primary index for all of them - which is why a declared <c>[Index]</c> that built nothing was invisible
+    /// in results and expensive in practice.</para>
+    ///
+    /// <para>The terms are resolved by the repository, in the same spelling filters use, so the index covers
+    /// the reads it exists for.</para>
+    /// </summary>
+    private async Task EnsureDeclaredIndexes(
+        CouchbaseTarget target,
+        CouchbaseContainer container,
+        CancellationToken ct)
+    {
+        foreach (var index in declared)
+        {
+            var statement =
+                $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS " +
+                $"{CouchbasePath.Quote(index.Name)} ON {container.Qualified(route.Bucket)} " +
+                $"({string.Join(", ", index.Terms)}) USING GSI";
+            await Index(target, statement, container, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Runs one index statement, allowing for the query service not having seen the collection yet.
     ///
     /// <para>Creating a collection is answered by the data service, while the statement below is answered by the
     /// query service, and the cluster map reaches the second a moment after the first. In that window the

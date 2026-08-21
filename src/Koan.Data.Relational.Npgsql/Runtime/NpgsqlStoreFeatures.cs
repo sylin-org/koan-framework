@@ -19,13 +19,14 @@ internal sealed class NpgsqlStoreFeatures(string providerName) : IRelationalStor
     /// </summary>
     public bool SupportsPersistedComputedColumns => false;
 
-    /// <summary>
-    /// Koan has never built a declared index on this store. Leaving it false is what makes an entity's
-    /// <c>[Index]</c> surface as unproved rather than disappear, which is how the gap became visible at all.
-    /// </summary>
-    public bool SupportsMappedIndexes => false;
+    public bool SupportsMappedIndexes => true;
 
-    public bool SupportsRewriteFreeExpressionIndexes => false;
+    /// <summary>
+    /// An index over <c>#&gt;&gt;</c> into the document column is chosen by the planner for reads that spell the
+    /// value the same way, without the query naming the index. Every cast the dialect emits is immutable, which
+    /// is the precondition for indexing the expression at all.
+    /// </summary>
+    public bool SupportsRewriteFreeExpressionIndexes => true;
 
     public bool SupportsNativeTtl => false;
 }

@@ -54,6 +54,43 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **A guard that resolves nothing answers "absent" and runs every time.** SQL Server's new index guard asked
+  `OBJECT_ID(N'dbo.Koan.Jobs.JobRecord')`, which it reads as a four-part identifier, resolves to nothing, and
+  returns NULL — so `object_id = NULL` was never true, the guard never fired, and the second boot failed with
+  "an index with that name already exists". Koan's default storage names are namespaced and therefore full of
+  dots, so any identifier passed to a name-parsing function has to be bracketed first. A guard that fails open
+  is invisible on the first run and only appears on the second — which is why it took a jobs suite, not a
+  connector suite, to find it. (2026-08-21)
+- **A wall-clock assertion measures the machine, not the code.** A jobs spec asserting a bulk save completes in
+  under ten seconds failed cold at 14.6s and passed warm, at a commit with none of the work under test in it.
+  It cost a full worktree bisect to clear. Where the claim is "one batched write", assert the count, not the
+  clock. (2026-08-21)
+
+- **Before adding a capability, ask what it does to the values it touches.** Building declared indexes was the
+  obvious half of the work. The half that mattered was asking what an index does to a text property: SQL Server
+  read a mapped string out of the document as `nvarchar(4000)`, indexed it happily, and then rejected the first
+  insert whose key exceeded 1700 bytes. Shipping that would have traded "the index does nothing" for "the index
+  breaks writes", which is strictly worse, and no existing spec covered it because every fixture writes short
+  strings. A new capability's failure mode is rarely where the capability is; it is in what the capability now
+  constrains. (2026-08-21)
+- **Sharing a runtime is not evidence.** CockroachDB speaks the PostgreSQL wire and runs the same executor, and
+  MongoDB and SQLite both build indexes from the same `[Index]` attribute — none of which says the planner on
+  the other engine will choose what was built. Where a claim is about a store's behaviour, prove it against that
+  store. The cheap form is one spec per engine asserting the index exists *and* appears in a plan. (2026-08-21)
+- **An index whose expression differs by a character from the query's is dead weight.** Every store here only
+  uses an expression or computed-column index when the read spells the value identically, so the index has to be
+  built from the dialect's own `Read` rather than from a spelling invented at the index site. On Couchbase this
+  forced the path grammar out of the generic document plan, because an index built for a container and a filter
+  compiled for an entity have to agree and could not while the grammar lived behind a type parameter. (2026-08-21)
+- **This repo builds every project into one shared path outside the working tree, so only one build may be in
+  flight at a time — and a worktree build clobbers the main tree's binaries.** Two false regressions came from
+  this in one session. First, load-bearing checks running in the foreground rebuilt the shared assemblies with a
+  fix deliberately disabled while a background regression was testing them: nine SQLite failures that did not
+  reproduce. Then a baseline worktree built at an older commit overwrote the same output, and the next
+  `--no-build` run tested a mixture of two trees. Rules that follow: never run a build or test while another is
+  in flight; after building any worktree, rebuild the main tree before trusting `--no-build`; and treat a
+  cluster of unrelated failures in one suite as a build-provenance question before a code question. (2026-08-21)
+
 - **A shared seam is only proven by adopting it, and adoption is where its lies surface.**
   `RelationalSchemaOrchestrator` was 746 lines, registered in DI, resolved by nobody, and looked complete.
   Moving four adapters onto it found: an entry point that compiled a *second* mapping by reflection, so any
