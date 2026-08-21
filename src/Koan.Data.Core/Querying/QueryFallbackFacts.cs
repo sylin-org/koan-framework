@@ -21,7 +21,7 @@ namespace Koan.Data.Core.Querying;
 /// </summary>
 internal static class QueryFallbackFacts
 {
-    public static void Record<TEntity>(bool filter, bool sort, bool pagination)
+    public static void Record<TEntity>(bool filter, bool sort, bool pagination, bool materialized)
     {
         var services = AppHost.Current;
         if (services?.GetService(typeof(IKoanRuntimeFactRecorder)) is not IKoanRuntimeFactRecorder facts) return;
@@ -30,19 +30,25 @@ internal static class QueryFallbackFacts
         if (filter) axes.Add("filter");
         if (sort) axes.Add("sort");
         if (pagination) axes.Add("pagination");
-        if (axes.Count == 0) return;
+        if (axes.Count == 0 && !materialized) return;
 
         var entity = typeof(TEntity).FullName ?? typeof(TEntity).Name;
-        var joined = string.Join(", ", axes);
+        // Name what the application lost, not which layer did the work. "Koan sorted this" is a fact about
+        // Koan; "this read was not bounded" is the fact the caller can act on.
+        var summary = axes.Count == 0
+            ? $"Reading {typeof(TEntity).Name} was not bounded: the provider holds no query engine, so every " +
+              "candidate was materialized to answer it."
+            : $"Reading {typeof(TEntity).Name} was not bounded: the whole candidate set was materialized so " +
+              $"Koan could finish {string.Join(", ", axes)} the provider did not.";
         facts.Record(new KoanFactDescriptor(
             Infrastructure.Constants.Diagnostics.Codes.QueryFallback,
             KoanFactKind.Capability,
             KoanFactState.Selected,
             $"query:{entity}",
-            $"Koan finished {joined} in memory for {typeof(TEntity).Name}; the provider did not.",
+            summary,
             Infrastructure.Constants.Diagnostics.Reasons.QueryFinishedInMemory,
-            "The whole candidate set was materialized to do it. Check that the adapter declares the capability " +
-            "it has, and that the query uses a shape it can push down.",
+            "Check that the adapter declares the capability it has and that the query uses a shape it can push " +
+            "down; where the provider has no query engine, route the Entity to one that does.",
             "Koan.Data.Core",
             entity));
     }

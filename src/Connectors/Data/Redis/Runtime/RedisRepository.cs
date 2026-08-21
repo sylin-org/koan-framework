@@ -347,7 +347,9 @@ internal sealed class RedisRepository<TEntity, TKey> :
             TotalCount = total,
             CountExecution = total is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = sortHandled,
-            PaginationHandled = query.HasPagination
+            PaginationHandled = query.HasPagination,
+            // Redis is a key-value store: the set is read whole and shaped here.
+            MaterializedAllCandidates = true
         };
     }
 

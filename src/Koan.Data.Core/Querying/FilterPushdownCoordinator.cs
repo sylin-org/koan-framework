@@ -116,8 +116,12 @@ public static class FilterPushdownCoordinator
 
         var paginationFallback = query.HasPagination && !adapter.PaginationHandled;
         var fellBack = residualApplied || sortFallback || paginationFallback;
-        if (fellBack)
-            QueryFallbackFacts.Record<TEntity>(residualApplied, sortFallback, paginationFallback);
+        // An adapter that answered by holding everything in memory reports the same thing a fallback does —
+        // this read was not bounded — even though no axis fell back, because it applied every axis itself.
+        // Reporting only the coordinator's own fallbacks left the floors invisible.
+        if (fellBack || adapter.MaterializedAllCandidates)
+            QueryFallbackFacts.Record<TEntity>(
+                residualApplied, sortFallback, paginationFallback, adapter.MaterializedAllCandidates);
         return new FinalizedQuery<TEntity>(page, total, isEstimate, fellBack);
     }
 }

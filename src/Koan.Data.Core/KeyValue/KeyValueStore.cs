@@ -184,6 +184,9 @@ public abstract class KeyValueStore<TEntity, TKey> :
             CountExecution = totalCount is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = sortHandled,
             PaginationHandled = paginationHandled,
+            // Every record was loaded to answer this: the axes above say who applied each part, this says
+            // what it cost.
+            MaterializedAllCandidates = true,
         };
     }
 
