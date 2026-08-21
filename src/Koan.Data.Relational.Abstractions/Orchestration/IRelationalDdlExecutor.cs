@@ -13,6 +13,22 @@ namespace Koan.Data.Relational.Orchestration;
 /// </summary>
 public interface IRelationalDdlExecutor
 {
+    /// <summary>
+    /// This store's own spelling for a column the mapping asked for — <c>TEXT</c>, <c>varchar(255) CHARACTER
+    /// SET utf8mb4</c> — or <see langword="null"/> when the store has no such notion.
+    ///
+    /// <para>It closes the loop that makes definition validation possible at all. The orchestrator knows what
+    /// the mapping <i>means</i>, in CLR terms; a store describes what it <i>holds</i>, in its own. Those cannot
+    /// be compared directly, and mapping a store type back to a CLR type is lossy — SQLite answers TEXT for a
+    /// string, a date, and a Guid alike, so every column would read as incompatible. Rendering the expectation
+    /// into the store's vocabulary compares like with like.</para>
+    ///
+    /// <para>Returning <see langword="null"/> is not a failure. It means definition validation falls back to
+    /// presence, which is exactly what <see cref="IRelationalStoreFeatures.SupportsDefinitionValidation"/>
+    /// already describes.</para>
+    /// </summary>
+    string? NativeTypeFor(RelationalColumnDefinition column) => null;
+
     Task<bool> TableExists(string schema, string table, CancellationToken ct = default);
 
     Task<bool> ColumnExists(string schema, string table, string column, CancellationToken ct = default);

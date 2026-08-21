@@ -108,8 +108,11 @@ internal sealed class RelationalSchemaOrchestrator :
                 unverified.Add($"ColumnDefinition:{expected.Name}");
                 continue;
             }
-            if (!DefinitionEquals(expected, actual))
-                incompatible.Add($"{expected.Name}: expected {Describe(expected)}; found {Describe(actual)}");
+            // Compare in the store's vocabulary where it has one: the expectation is expressed in CLR terms and
+            // the column in the store's, and only the store can translate between them.
+            var comparable = expected with { NativeType = ddl.NativeTypeFor(expected) };
+            if (!DefinitionEquals(comparable, actual))
+                incompatible.Add($"{expected.Name}: expected {Describe(comparable)}; found {Describe(actual)}");
         }
         return new RelationalSchemaValidation(
             plan,
@@ -292,8 +295,17 @@ internal sealed class RelationalSchemaOrchestrator :
         policy.Ddl == RelationalDdlPolicy.AutoCreate &&
         RelationalDdlGate.Allowed(policy.AllowProductionDdl);
 
+    /// <summary>
+    /// Compares what the mapping means, and — where both sides can spell it — what the store literally holds.
+    ///
+    /// <para>The native spelling is only compared when the expectation carries one. A store that describes its
+    /// columns neutrally is judged neutrally; one that can say <c>CHARACTER SET utf8mb4</c> keeps catching drift
+    /// a CLR type cannot see.</para>
+    /// </summary>
     private static bool DefinitionEquals(RelationalColumnDefinition expected, RelationalColumnDefinition actual) =>
-        expected.ClrType == actual.ClrType &&
+        (expected.NativeType is not null
+            ? string.Equals(expected.NativeType, actual.NativeType, StringComparison.OrdinalIgnoreCase)
+            : expected.ClrType == actual.ClrType) &&
         expected.Nullable == actual.Nullable &&
         expected.IsComputed == actual.IsComputed &&
         string.Equals(expected.JsonPath, actual.JsonPath, StringComparison.Ordinal) &&
@@ -303,7 +315,8 @@ internal sealed class RelationalSchemaOrchestrator :
 
     private static string Describe(RelationalColumnDefinition column) =>
         $"{column.Shape}/{column.ClrType.Name}/nullable={column.Nullable}/computed={column.IsComputed}/" +
-        $"path={column.JsonPath ?? "<none>"}/identity={column.IsIdentity}/generated={column.IsGenerated}";
+        $"path={column.JsonPath ?? "<none>"}/identity={column.IsIdentity}/generated={column.IsGenerated}" +
+        (column.NativeType is null ? string.Empty : $"/native={column.NativeType}");
 
     private static bool IsNullable(Type type) =>
         !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
