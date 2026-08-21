@@ -5,6 +5,17 @@
 - Deciders: framework architect
 - Related: ARCH-0084 (capability model / Reference=Intent), ARCH-0086 (KoanModule + source-gen discovery), the P1.1 composition lockfile, the `X-aot-substrate` single-file work (`8531bef6`), `S2.Sovereign-proof`
 
+> **Implementation update (PMC-050, 2026-08-21) — the proof is machine-re-run now.**
+> `scripts/aot-verify.ps1` publishes this sample under ILC and *runs* the binary, and
+> `.github/workflows/aot-verify.yml` runs the two container-free cells daily. It is a scheduled lane
+> rather than a leg of `scripts/green-ratchet.ps1` deliberately: the ratchet is a manual certification
+> boundary, and manual is the status this ADR's own proof had while it was decaying. Publish-and-run
+> rather than an ILC compile is also deliberate and measured — reintroducing the `MetadataToken` defect
+> produces a *successful publish* and a binary that dies on the first entity it maps, so a compile-only
+> gate would have gone green on the exact regression that invalidated this document. Each of the three
+> defects listed below has a cell proven against it, red then green. `docs/SURFACES.md` records which
+> cells run daily and which need Docker.
+
 > **Implementation update (PMC-049, 2026-08-21) — the substrate reaches the server adapters, and
 > §3's Dapper split is superseded.** Every relational backend now NativeAOT-publishes and runs against a
 > real store, measured rather than inferred: SQLite, MySQL 8.4 (`MySqlConnector` 2.6.1), PostgreSQL 17 and

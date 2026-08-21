@@ -1,0 +1,46 @@
+name: aot-verify
+
+# Publishes the AotRelational sample under NativeAOT and runs the binary, because a green solution
+# build and a green test run say nothing about whether an AOT-published application starts: ILC
+# forbids things the JIT allows. That gap has already cost five weeks. ARCH-0093 certified the single
+# binary on 2026-07-17, the mapping compiler began ordering properties by MemberInfo.MetadataToken on
+# 2026-08-06, and from that day every AOT-published Koan application died on the first entity it
+# mapped -- found only because an unrelated question sent someone to re-measure (PMC-049, PMC-050).
+#
+# It runs on a schedule rather than per-PR because a publish is minutes, and rather than in the
+# certification ratchet because that ratchet is a deliberate manual boundary -- which is exactly the
+# status the decayed proof already had. A guard nobody has to decide to run is the whole point.
+#
+# Only the two container-free cells run here. GitHub-hosted Windows runners cannot host the Linux
+# database containers the four server cells need, so those are run by the same script where Docker is
+# available -- `pwsh scripts/aot-verify.ps1 -Connectors All` -- on a developer machine or at a
+# certification boundary. docs/SURFACES.md records which cells are machine-guarded and which are not,
+# so the difference stays visible instead of being assumed away.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    # win-x64 is the RID the claim is measured on. Linux is deliberately a separate claim (PMC-051):
+    # ARCH-0093 argued the substrate was RID-agnostic in July, and that argument rested on a proof
+    # that expired three weeks later.
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Publish and run the NativeAOT cells
+        shell: pwsh
+        run: |
+          ./scripts/aot-verify.ps1 -Connectors Sqlite,SqlServerInvariant
+          if ($LASTEXITCODE -ne 0) { throw 'NativeAOT verification failed.' }

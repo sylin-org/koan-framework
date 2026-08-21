@@ -54,6 +54,32 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **A guard is not trusted until it has failed against the thing it exists to catch — and running that
+  trial is how you find the cells you are missing.** Three defects, three trials. Two were caught by the
+  obvious cell. The third — `Assembly.GetName()` on a satellite resource assembly in invariant mode — was
+  caught by *nothing*: SQLite ships no satellites, and the SQL Server build carries culture data because
+  SqlClient demands it, which makes its satellites nameable. Both cells went green with the bug present.
+  Reasoning about coverage would have concluded the lane was complete; breaking it on purpose is what
+  showed the hole, and a cell now exists that puts satellites and invariant mode in one process.
+  (2026-08-21)
+- **The cheap proxy for an expensive check is worth exactly what it catches, and that is measurable.**
+  PMC-050 first proposed an ILC compile instead of a publish-and-run, on cost. Reintroducing the
+  `MetadataToken` defect settled it: the publish **succeeded** and the binary exited 1 on the first entity
+  it mapped. The proxy would have gone green on the exact regression that invalidated an accepted ADR for
+  five weeks — worse than no check, because it would have reported a certified single binary that dies on
+  startup. Before accepting a proxy, run the real failure through it. (2026-08-21)
+- **A defect that fires only on a first run needs the guard to manufacture a first run.** The
+  reference-manifest bug appears only when the RID-specific intermediate directory does not yet exist, so
+  it reproduces on a fresh CI checkout and hides on any developer machine that has published once. The
+  same check would have been honest in CI and quietly meaningless locally. `aot-verify.ps1` deletes the
+  sample's `obj` before publishing, so both mean the same thing. Ask what state a check silently depends
+  on. (2026-08-21)
+- **Put the expensive proof on a schedule, not on a milestone.** ARCH-0093's AOT proof was a manual
+  certification activity, and that is precisely why five weeks passed with a false claim standing in an
+  accepted ADR. `skills-verify.yml` had already established the pattern here — cheap structural check
+  per-PR, the real thing on a cron — and the same shape fits any capability whose proof is slow: the
+  guard must not require a human to decide to run it. (2026-08-21)
+
 - **A proof nothing re-runs is a claim with a shelf life.** ARCH-0093 certified the NativeAOT single binary on
   2026-07-17. The mapping compiler began using `MemberInfo.MetadataToken` on 2026-08-06, which ILC does not
   keep, and from that day every AOT-published Koan application failed on the first entity it mapped. Five weeks

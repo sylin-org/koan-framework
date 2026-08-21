@@ -168,6 +168,17 @@ are AOT-clean: text is built by reflection over names + string ops, and `FullJso
 
 ## 6. Reproduce and verify
 
+The scripted form of everything in this section is:
+
+```powershell
+pwsh scripts/aot-verify.ps1                   # the container-free cells
+pwsh scripts/aot-verify.ps1 -Connectors All   # every backend, needs Docker
+```
+
+It publishes and runs, asserts the elected adapter by name so a fallback cannot pass, and runs daily in
+`.github/workflows/aot-verify.yml`. Prefer it over publishing by hand; the manual steps below are what it
+automates, and are here for when you need to look inside a failure.
+
 The boot report's `Registry`/`Inventory` blocks must list every discovered module — if the trim roots worked
 you'll see all of them. Then exercise a real business path end-to-end.
 

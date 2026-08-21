@@ -33,6 +33,11 @@
                     link/card resolution + catalog parity (now fatal — H10 complete).
     E.  Lockfile    scripts/compare-koan-lock.ps1 — composition-lockfile drift (P1.1): the build
                     regenerates each app's koan.lock.json; fail if one drifted uncommitted.
+  NOT in this gate: the NativeAOT claim. ILC forbids things the JIT allows, so no leg here can see a
+  binary that fails to publish or dies on startup. That is `scripts/aot-verify.ps1`, which publishes and
+  runs the AotRelational sample and is scheduled daily in aot-verify.yml rather than run from here --
+  a manual boundary is the status that let the previous AOT proof decay for five weeks (PMC-050).
+
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
 .PARAMETER Base
