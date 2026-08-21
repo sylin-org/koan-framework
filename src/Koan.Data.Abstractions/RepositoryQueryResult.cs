@@ -38,9 +38,6 @@ public sealed class RepositoryQueryResult<TEntity>
     /// <summary>True when the adapter applied pagination server-side.</summary>
     public bool PaginationHandled { get; init; }
 
-    /// <summary>True when the adapter applied the projection server-side (column selection).</summary>
-    public bool ProjectionHandled { get; init; }
-
     /// <summary>True when <see cref="SortHandled"/> covers every spec in the query.</summary>
     public bool SortFullyHandled(QueryDefinition query)
     {

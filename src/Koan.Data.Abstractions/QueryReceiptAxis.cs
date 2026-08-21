@@ -6,7 +6,6 @@ public enum QueryReceiptAxis
     Filter,
     Sort,
     Pagination,
-    Projection,
     Count,
     Bound
 }

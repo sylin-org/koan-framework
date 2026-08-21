@@ -22,10 +22,6 @@ internal static class QueryReceiptValidator
             throw Reject(QueryReceiptAxis.Bound,
                 "The adapter returned more records than the provider page it reported handling.");
 
-        if (!adapterQuery.HasProjection && result.ProjectionHandled)
-            throw Reject(QueryReceiptAxis.Projection,
-                "The adapter reported projection work for a definition that contained no projection.");
-
         foreach (var handled in result.SortHandled)
             if (!adapterQuery.Sort.Contains(handled))
                 throw Reject(QueryReceiptAxis.Sort,

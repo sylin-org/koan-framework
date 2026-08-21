@@ -43,10 +43,7 @@ public sealed class RelationalCommandPlanner
     public RelationalCommandPlan Query(QueryDefinition query)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var projection = query.Projection is null
-            ? Array.Empty<MappingPath>()
-            : query.Projection.Fields.Select(Parse).ToArray();
-        var reads = _mapping.Read(projection).Bindings.Select(Binding).ToArray();
+        var reads = _mapping.Read().Bindings.Select(Binding).ToArray();
         var filters = query.Filter is null
             ? Array.Empty<RelationalPathBinding>()
             : FilterPaths(query.Filter).SelectMany(path => _mapping.Use(path, MappingConsumer.Filter).Bindings)

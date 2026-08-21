@@ -98,8 +98,7 @@ internal sealed class CouchbaseRepository<TEntity, TKey> :
             SortHandled = plan.SortHandled,
             // Only when the plan actually applied the caller's ordering; otherwise Data owns both the sort
             // and the window, and claiming the page here would give it an arbitrary slice to order.
-            PaginationHandled = query.HasPagination && plan.Ordered,
-            ProjectionHandled = false
+            PaginationHandled = query.HasPagination && plan.Ordered
         };
     }
 

@@ -355,7 +355,6 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             CountExecution = query.CountStrategy is null ? CountExecutionKind.None : CountExecutionKind.Exact,
             SortHandled = handledSort,
             PaginationHandled = paged,
-            ProjectionHandled = false,
             IsEstimate = false
         };
     }

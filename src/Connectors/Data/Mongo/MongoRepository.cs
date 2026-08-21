@@ -169,8 +169,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
             TotalCount = total,
             CountExecution = plan.CountExecution,
             SortHandled = plan.SortHandled,
-            PaginationHandled = plan.PaginationHandled,
-            ProjectionHandled = false
+            PaginationHandled = plan.PaginationHandled
         };
     }
 

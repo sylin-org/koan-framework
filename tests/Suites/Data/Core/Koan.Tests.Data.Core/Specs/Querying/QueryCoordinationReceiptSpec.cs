@@ -56,27 +56,6 @@ public sealed class QueryCoordinationReceiptSpec
     }
 
     [Fact]
-    public void Projection_fallback_is_final_preserves_identity_and_does_not_mutate_source()
-    {
-        var query = QueryDefinition.All.WithProjection(Projection.Of(nameof(ProjectedEntity.Name)));
-        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(
-            query,
-            FilterSupport.None,
-            typeof(ProjectedEntity));
-        var source = new ProjectedEntity { Id = "one", Name = "kept", Secret = "clear" };
-        var result = new RepositoryQueryResult<ProjectedEntity> { Items = [source] };
-
-        var finalized = FilterPushdownCoordinator.Finalize(query, adapterQuery, residual, result);
-
-        finalized.Page.Should().ContainSingle();
-        finalized.Page[0].Should().NotBeSameAs(source);
-        finalized.Page[0].Id.Should().Be("one");
-        finalized.Page[0].Name.Should().Be("kept");
-        finalized.Page[0].Secret.Should().BeNull();
-        source.Secret.Should().Be("clear");
-    }
-
-    [Fact]
     public void Provider_paged_count_requires_an_unpaginated_total_receipt()
     {
         var query = QueryDefinition.All.WithPagination(1, 1).WithCountStrategy(CountStrategy.Exact);

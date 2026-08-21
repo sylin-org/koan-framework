@@ -29,23 +29,14 @@ public static class FilterPushdownCoordinator
     /// </summary>
     public static (QueryDefinition AdapterQuery, Filter? Residual) Plan(QueryDefinition query, FilterSupport caps, Type entityType)
     {
-        InMemoryEntityProjection.Validate(entityType, query.Projection);
-        if (query.Filter is null)
-        {
-            // Until a receipt proves provider sort handling, Data must retain the complete Entity shape
-            // required by its in-memory sort fallback. Projection is always the final semantic step.
-            return (query.HasSort && query.HasProjection ? query.WithProjection(null) : query, null);
-        }
+        if (query.Filter is null) return (query, null);
 
         var split = FilterSplitter.Split(query.Filter, caps, entityType);
         var adapterQuery = query.Where(split.Pushable);
         if (split.Residual is not null)
             adapterQuery = adapterQuery
                 .WithoutPagination()
-                .WithProjection(null)
                 .WithCountStrategy(null);
-        else if (query.HasSort && query.HasProjection)
-            adapterQuery = adapterQuery.WithProjection(null);
         return (adapterQuery, split.Residual);
     }
 
@@ -95,14 +86,10 @@ public static class FilterPushdownCoordinator
             page = items.Skip(skip).Take(pageSize).ToList();
         }
 
-        var projectionFallback = query.HasProjection && !adapter.ProjectionHandled;
-        if (projectionFallback)
-            page = InMemoryEntityProjection.Apply(page, query.Projection!);
-
         var paginationFallback = query.HasPagination && !adapter.PaginationHandled;
-        var fellBack = residualApplied || sortFallback || projectionFallback || paginationFallback;
+        var fellBack = residualApplied || sortFallback || paginationFallback;
         if (fellBack)
-            QueryFallbackFacts.Record<TEntity>(residualApplied, sortFallback, paginationFallback, projectionFallback);
+            QueryFallbackFacts.Record<TEntity>(residualApplied, sortFallback, paginationFallback);
         return new FinalizedQuery<TEntity>(page, total, isEstimate, fellBack);
     }
 }
