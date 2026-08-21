@@ -108,17 +108,39 @@ public sealed class RelationalOwnershipSpec
         public string ProviderName => provider;
     }
 
+    /// <summary>A store that only records the grammar it was asked to speak, so the spec can assert the decision.</summary>
     private sealed class ProbeDdl(bool tableExists = false) : IRelationalDdlExecutor
     {
         public int Mutations { get; private set; }
-        public bool TableExists(string schema, string table) => tableExists;
-        public bool ColumnExists(string schema, string table, string column)
-            => tableExists && column is "Id" or "Json";
-        public void CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json") => Mutations++;
-        public void CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns) => Mutations++;
-        public void AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted) => Mutations++;
-        public void AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable) => Mutations++;
-        public void CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique) => Mutations++;
-        public void CreateJsonExpressionIndex(string schema, string table, string indexName, IReadOnlyList<RelationalJsonIndexPart> parts, bool unique) => Mutations++;
+
+        public Task<bool> TableExists(string schema, string table, CancellationToken ct = default)
+            => Task.FromResult(tableExists);
+
+        public Task<bool> ColumnExists(string schema, string table, string column, CancellationToken ct = default)
+            => Task.FromResult(tableExists && column is "Id" or "Json");
+
+        public Task CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json", CancellationToken ct = default)
+            => Mutated();
+
+        public Task CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns, CancellationToken ct = default)
+            => Mutated();
+
+        public Task AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted, CancellationToken ct = default)
+            => Mutated();
+
+        public Task AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable, CancellationToken ct = default)
+            => Mutated();
+
+        public Task CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique, CancellationToken ct = default)
+            => Mutated();
+
+        public Task CreateJsonExpressionIndex(string schema, string table, string indexName, IReadOnlyList<RelationalJsonIndexPart> parts, bool unique, CancellationToken ct = default)
+            => Mutated();
+
+        private Task Mutated()
+        {
+            Mutations++;
+            return Task.CompletedTask;
+        }
     }
 }

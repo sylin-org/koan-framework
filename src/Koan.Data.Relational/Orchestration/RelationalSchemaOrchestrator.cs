@@ -71,7 +71,7 @@ internal sealed class RelationalSchemaOrchestrator :
         return plan;
     }
 
-    public Task<RelationalSchemaValidation> ValidateAsync(
+    public async Task<RelationalSchemaValidation> ValidateAsync(
         MappingPlan mapping,
         IRelationalDdlExecutor ddl,
         IRelationalStoreFeatures features,
@@ -80,24 +80,24 @@ internal sealed class RelationalSchemaOrchestrator :
     {
         ct.ThrowIfCancellationRequested();
         var plan = Plan(mapping, features, policy);
-        var exists = ddl.TableExists(plan.Schema, plan.Table);
+        var exists = await ddl.TableExists(plan.Schema, plan.Table, ct).ConfigureAwait(false);
         var missing = new List<string>();
         var incompatible = new List<string>();
         var unverified = new List<string>();
         if (!exists)
         {
             missing.AddRange(plan.Columns.Select(static column => column.Name));
-            return Task.FromResult(new RelationalSchemaValidation(
+            return new RelationalSchemaValidation(
                 plan,
                 tableExists: false,
                 missing,
                 incompatible,
-                unverified));
+                unverified);
         }
 
         foreach (var expected in plan.Columns)
         {
-            var actual = ddl.DescribeColumn(plan.Schema, plan.Table, expected.Name);
+            var actual = await ddl.DescribeColumn(plan.Schema, plan.Table, expected.Name, ct).ConfigureAwait(false);
             if (actual is null)
             {
                 missing.Add(expected.Name);
@@ -111,12 +111,12 @@ internal sealed class RelationalSchemaOrchestrator :
             if (!DefinitionEquals(expected, actual))
                 incompatible.Add($"{expected.Name}: expected {Describe(expected)}; found {Describe(actual)}");
         }
-        return Task.FromResult(new RelationalSchemaValidation(
+        return new RelationalSchemaValidation(
             plan,
             tableExists: true,
             missing,
             incompatible,
-            unverified));
+            unverified);
     }
 
     public async Task<RelationalSchemaValidation> EnsureCreatedAsync(
@@ -143,10 +143,11 @@ internal sealed class RelationalSchemaOrchestrator :
 
             if (!validation.TableExists)
             {
-                ddl.CreateTableWithColumns(
+                await ddl.CreateTableWithColumns(
                     validation.Plan.Schema,
                     validation.Plan.Table,
-                    validation.Plan.Columns);
+                    validation.Plan.Columns,
+                    ct).ConfigureAwait(false);
             }
             else
             {
@@ -155,16 +156,18 @@ internal sealed class RelationalSchemaOrchestrator :
                 {
                     if (column.IsComputed && column.JsonPath is not null)
                     {
-                        ddl.AddComputedColumnFromJson(
+                        await ddl.AddComputedColumnFromJson(
                             validation.Plan.Schema,
                             validation.Plan.Table,
                             column.Name,
                             column.JsonPath,
-                            features.SupportsPersistedComputedColumns);
+                            features.SupportsPersistedComputedColumns,
+                            ct).ConfigureAwait(false);
                     }
                     else
                     {
-                        ddl.AddMappedColumn(validation.Plan.Schema, validation.Plan.Table, column);
+                        await ddl.AddMappedColumn(validation.Plan.Schema, validation.Plan.Table, column, ct)
+                            .ConfigureAwait(false);
                     }
                 }
             }
@@ -176,7 +179,8 @@ internal sealed class RelationalSchemaOrchestrator :
             {
                 if (index.Ttl && !features.SupportsNativeTtl) continue;
                 if (!index.RewriteFree && index.Parts.Any(static part => part.IsNested)) continue;
-                ddl.CreateMappedIndex(validation.Plan.Schema, validation.Plan.Table, index);
+                await ddl.CreateMappedIndex(validation.Plan.Schema, validation.Plan.Table, index, ct)
+                    .ConfigureAwait(false);
             }
         }
 
