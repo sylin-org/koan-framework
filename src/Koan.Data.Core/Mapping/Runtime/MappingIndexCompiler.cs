@@ -49,7 +49,8 @@ internal static class MappingIndexCompiler
                     ?? $"IX_{plan.Container.Name}_{string.Join('_', paths.Select(static path => path.Leaf))}",
                 paths,
                 group.Any(static item => item.Attribute.Unique),
-                group.Any(static item => item.Attribute.Ttl)));
+                group.Any(static item => item.Attribute.Ttl),
+                group.Any(static item => item.Attribute.Required)));
         }
 
         foreach (var attribute in plan.EntityType.GetCustomAttributes<IndexAttribute>(inherit: true))
@@ -68,7 +69,8 @@ internal static class MappingIndexCompiler
                 attribute.Name ?? $"IX_{plan.Container.Name}_{string.Join('_', paths.Select(static path => path.Leaf))}",
                 paths,
                 attribute.Unique,
-                attribute.Ttl));
+                attribute.Ttl,
+                attribute.Required));
         }
 
         return indexes.ToArray();
@@ -79,12 +81,13 @@ internal static class MappingIndexCompiler
         string name,
         IEnumerable<MappingPath> paths,
         bool unique,
-        bool ttl)
+        bool ttl,
+        bool required = false)
     {
         var bindings = paths.SelectMany(path => plan.Use(path, MappingConsumer.Index).Bindings).ToArray();
         if (ttl && (bindings.Length != 1 || !IsTemporal(bindings[0].LogicalType)))
             throw new InvalidOperationException($"TTL index '{name}' requires one mapped temporal scalar.");
-        return new MappingIndexPlan(name, bindings, unique, primary: false, ttl, plan.Id);
+        return new MappingIndexPlan(name, bindings, unique, primary: false, ttl, plan.Id, required);
     }
 
     private static bool IsTemporal(Type type)

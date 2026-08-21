@@ -54,6 +54,39 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **Similarity metrics cannot answer "is this duplication".** Two attempts at scoring the four relational
+  repositories both misled: raw ratios put `GetMany` at 34% when the two bodies are the same code (the score
+  was eaten by `plan.` versus `_plan.` and four connection type names), and folding those differences away made
+  it worse, scoring `UpdateSet` at 3% through a distortion the normalizer introduced. A ratio understates
+  duplication wherever a mechanical difference repeats and overstates it wherever two stores spell different
+  logic alike. Where the question is whether two implementations are the same, read them. (2026-08-21)
+- **The odd one out may be the only one that is right.** Reading `Order` across four adapters to plan a
+  collapse: three were identical down to the comment, and MySQL differed. The tempting reading is that MySQL
+  drifted. The truth is that MySQL appends the identity to every ORDER BY as a tiebreaker and is the only store
+  whose paged reads are stable over a non-unique sort — a framework gap the other three inherit. A collapse
+  driven by majority rule would have deleted the fix and kept the bug. Explain the outlier before flattening
+  it. (2026-08-21)
+
+- **Check the premise of a deferred entry before believing its subject.** A register entry recorded MySQL's
+  filter corpus as unmeasurable because seeding threw. The corpus was not the subject: `JSON_UNQUOTE` renders a
+  JSON null as the string `null`, which is what a stored generated column is built from and what every filter
+  emits, so the adapter could not write an entity with a null nullable scalar at all. It had survived because
+  MySQL's suite was the smallest of the relational set and nothing in it wrote a null. A test-plumbing entry
+  was a data-loss-adjacent defect. (2026-08-21)
+- **When two stores fail the same way, check whether they fail for the same reason.** SQL Server and MySQL both
+  refused to index text, so I declined it on both for symmetry. MySQL has prefix indexes and a prefix key is
+  exact there — the engine seeks the prefix and rechecks the full column — so the symmetry was mine, not the
+  stores'. Symmetry across adapters is a hypothesis to test, not a design goal. (2026-08-21)
+- **A spec that claims exactness has to be given values that could break it.** The first prefix-index test
+  compared a 2000-character string against `"short"`; they differ at character zero, so it would have passed
+  against a truncating index. Two values sharing 2000 characters and differing only past the key is the case
+  the claim is about. Ask what input would make the assertion pass while the claim is false. (2026-08-21)
+- **Reuse a refusal record only where its axes are real.** DATA-0119 says new refusals adopt `KoanMagic`, but
+  that record carries a Risk, a Consent flag, and an environment boundary. A capability the store does not have
+  is refused in Development too and no consent unlocks it, so adopting the shape would have meant filling two
+  fields with fiction. What generalizes is the obligation — name the capability, the store, the remedy — not
+  the type. (2026-08-21)
+
 - **A guard that resolves nothing answers "absent" and runs every time.** SQL Server's new index guard asked
   `OBJECT_ID(N'dbo.Koan.Jobs.JobRecord')`, which it reads as a four-part identifier, resolves to nothing, and
   returns NULL — so `object_id = NULL` was never true, the guard never fired, and the second boot failed with

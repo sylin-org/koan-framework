@@ -193,8 +193,18 @@ the adapter did — the same failure DATA-0119 names, one layer up.
   closed it on all four plus Couchbase - each store proving its planner chooses what it built, which is
   the half of the claim a created-index assertion cannot make.
 
-Rule 3 — a guarantee that can be declared can be required — is decided here and unimplemented. Nothing in
-the framework yet lets an Entity or source demand a guarantee and have composition negotiate or refuse.
+Rule 3 — a guarantee that can be declared can be required — has its first client. `[Index(Required = true)]`
+says the application depends on that index existing natively; a store that cannot build it refuses the
+container by name instead of reporting a shortfall the application already said it could not absorb. The same
+missing index without `Required` still only degrades, which is what makes the flag mean something.
+
+It does **not** adopt `KoanMagic`, and the divergence is deliberate. `KoanMagic` is an environment gate: it
+carries a Risk, a Consent flag, and the law that Production is the boundary. A capability the store simply does
+not have is refused in Development too, has no risk axis, and no consent can unlock it. What was worth keeping
+from that shape is the obligation, not the record — a refusal names the capability, the store, and the remedy.
+
+The refusal lands at readiness rather than at `AddKoan()`, because mapping plans compile lazily per entity and
+source. Moving it to composition means compiling them eagerly, which is a separate decision about startup cost.
 
 ## Evidence
 

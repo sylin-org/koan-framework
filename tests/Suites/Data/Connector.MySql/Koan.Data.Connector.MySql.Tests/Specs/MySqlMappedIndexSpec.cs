@@ -41,11 +41,15 @@ public sealed class MySqlMappedIndexSpec(MySqlFixture fixture, ITestOutputHelper
             columns.Should().Be("Status,DueAt", "the index keys are the generated columns reads resolve through");
         }
 
+        // The predicate is transcribed rather than generated, so it pins the spelling the filter compiler emits
+        // from outside the connector. It has already earned that: changing how the dialect reads a JSON scalar
+        // stopped the optimizer substituting the generated column, and this assertion is what said so.
         await using var explain = verify.CreateCommand();
         explain.CommandText = """
             EXPLAIN SELECT `Id`
             FROM `KOAN_MAPPED_INDEX_PROBE`
-            WHERE CAST(JSON_UNQUOTE(JSON_EXTRACT(`Json`, '$."Status"')) AS SIGNED) = 1
+            WHERE CAST(CASE WHEN JSON_TYPE(JSON_EXTRACT(`Json`, '$."Status"')) = 'NULL' THEN NULL
+                            ELSE JSON_UNQUOTE(JSON_EXTRACT(`Json`, '$."Status"')) END AS SIGNED) = 1
             """;
         var used = new List<string>();
         await using (var reader = await explain.ExecuteReaderAsync(TestContext.Current.CancellationToken))
@@ -59,29 +63,40 @@ public sealed class MySqlMappedIndexSpec(MySqlFixture fixture, ITestOutputHelper
         used.Should().Contain(key => key.Contains("ix_mysql_probe_status_due", StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact(DisplayName = "MySQL: indexing a text property does not cap what that property can hold")]
-    public async Task A_declared_index_over_text_does_not_break_long_values()
+    [Fact(DisplayName = "MySQL: a text property is indexed by prefix without capping what it can hold")]
+    public async Task A_declared_index_over_text_is_built_and_exact()
     {
         RequireBackingStore();
         await using var host = await BootAsync();
 
-        // A mapped string is held as longtext, and MySQL refuses a key over TEXT without a prefix length. The
-        // failure is loud rather than silent here, but it would still stop a boot.
-        var text = new string('x', 2000);
+        // A mapped string is held as longtext, and MySQL refuses a key over TEXT without a prefix length. A
+        // prefix is not an approximation - the engine seeks it and rechecks the full column - so the property
+        // keeps accepting values far longer than the key, and equality on one of them still resolves exactly.
+        var shared = new string('x', 2000);
+        var text = shared + "-alpha";
         var write = () => new TextProbe { Id = "long", Label = text }.Save();
 
         await write.Should().NotThrowAsync("an index must never narrow what the property accepts");
         (await TextProbe.Get("long"))!.Label.Should().Be(text);
 
+        // The two labels are identical for their first two thousand characters and differ only past the key
+        // prefix, so anything that seeked the prefix and stopped there would return both.
+        await new TextProbe { Id = "twin", Label = shared + "-beta" }.Save();
+        var matched = await TextProbe.Query(probe => probe.Label == text);
+        matched.Should().ContainSingle().Which.Id.Should().Be("long",
+            "a prefix seek must be rechecked against the whole column");
+
         await using var verify = new MySqlConnection(Fixture.ConnectionString);
         await verify.OpenAsync(TestContext.Current.CancellationToken);
-        await using var probe = verify.CreateCommand();
-        probe.CommandText = """
-            SELECT COUNT(1) FROM information_schema.statistics
+        await using var definition = verify.CreateCommand();
+        definition.CommandText = """
+            SELECT sub_part FROM information_schema.statistics
              WHERE table_schema = DATABASE() AND index_name = @name
             """;
-        probe.Parameters.AddWithValue("name", "ix_mysql_probe_label");
-        Convert.ToInt32(await probe.ExecuteScalarAsync(TestContext.Current.CancellationToken)).Should().Be(0);
+        definition.Parameters.AddWithValue("name", "ix_mysql_probe_label");
+        var prefix = await definition.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+        prefix.Should().NotBeNull("the declared index over text must exist");
+        Convert.ToInt32(prefix).Should().Be(255, "a TEXT key is taken by prefix");
     }
 
     [Storage(Name = "KOAN_MAPPED_TEXT_PROBE")]

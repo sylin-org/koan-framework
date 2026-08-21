@@ -10,7 +10,8 @@ public sealed record RelationalIndexDefinition
         bool primary,
         bool ttl,
         bool rewriteFree,
-        bool keysSupported = true)
+        bool keysSupported = true,
+        bool required = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(parts);
@@ -22,6 +23,7 @@ public sealed record RelationalIndexDefinition
         Ttl = ttl;
         RewriteFree = rewriteFree;
         KeysSupported = keysSupported;
+        Required = required;
     }
 
     public string Name { get; }
@@ -33,6 +35,9 @@ public sealed record RelationalIndexDefinition
 
     /// <summary>Whether every part of this index is a value the store can use as a key.</summary>
     public bool KeysSupported { get; }
+
+    /// <summary>Whether the application declared that it depends on this index existing natively.</summary>
+    public bool Required { get; }
 
     /// <summary>Whether any part reads inside a structured value, which is what makes this an expression index.</summary>
     public bool IsExpression => Parts.Any(static part => part.Path.IsNested);

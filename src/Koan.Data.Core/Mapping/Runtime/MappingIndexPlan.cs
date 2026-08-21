@@ -11,7 +11,8 @@ public sealed class MappingIndexPlan
         bool unique,
         bool primary,
         bool ttl,
-        string planId)
+        string planId,
+        bool required = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var copy = bindings.ToArray();
@@ -21,6 +22,7 @@ public sealed class MappingIndexPlan
         Unique = unique;
         Primary = primary;
         Ttl = ttl;
+        Required = required;
         Receipt = new MappingReceipt(planId, MappingConsumer.Index, copy.Select(static binding => binding.Id), nativeProofRequired: true);
     }
 
@@ -29,5 +31,9 @@ public sealed class MappingIndexPlan
     public bool Unique { get; }
     public bool Primary { get; }
     public bool Ttl { get; }
+
+    /// <summary>Whether the application declared that it depends on this index existing natively.</summary>
+    public bool Required { get; }
+
     public MappingReceipt Receipt { get; }
 }

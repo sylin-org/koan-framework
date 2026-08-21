@@ -174,14 +174,30 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
     /// </summary>
     private static string Quoted(RelationalTableDefinition table, RelationalIndexPart part)
     {
-        if (!part.Path.IsNested) return MySqlDialect.Quote(part.Path.Name);
-        var projected = table.Columns.FirstOrDefault(column => column.IsProjected && column.ProjectedFrom == part.Path)
+        var column = (part.Path.IsNested
+                ? table.Columns.FirstOrDefault(value => value.IsProjected && value.ProjectedFrom == part.Path)
+                : table.Columns.FirstOrDefault(value =>
+                    string.Equals(value.Name, part.Path.Name, StringComparison.Ordinal)))
             ?? throw new InvalidOperationException(
-                $"Index part '{part.Path}' for {table} has no projected column to index. A declared index reads a "
-                + "single scalar property, which this store always projects, so this is a mapping the schema owner "
-                + "and this executor disagree about.");
-        return MySqlDialect.Quote(projected.Name);
+                $"Index part '{part.Path}' for {table} has no column to index. A declared index reads a single "
+                + "scalar property, which this store either holds physically or projects, so this is a mapping "
+                + "the schema owner and this executor disagree about.");
+
+        // MySQL refuses a key over TEXT or BLOB without a prefix length. A prefix is not an approximation: the
+        // engine seeks on it and then rechecks the full column, so results are exact and only selectivity
+        // changes. This is why text is indexable here and not on SQL Server, which has no prefix index.
+        var name = MySqlDialect.Quote(column.Name);
+        return StoreType(column) is "longtext" or "longblob" ? $"{name}({TextKeyPrefix})" : name;
     }
+
+    /// <summary>
+    /// Characters of a text column taken into an index key.
+    ///
+    /// <para>255 characters is 1020 bytes in utf8mb4, so up to three text parts fit InnoDB's 3072-byte key
+    /// limit on the default DYNAMIC row format. Wider than that and MySQL refuses the statement by name, which
+    /// is the right way for a declared index nobody can build to surface.</para>
+    /// </summary>
+    private const int TextKeyPrefix = 255;
 
     private async Task Execute(string sql, CancellationToken ct)
     {

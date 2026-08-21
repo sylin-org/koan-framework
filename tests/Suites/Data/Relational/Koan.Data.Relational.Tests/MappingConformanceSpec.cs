@@ -418,7 +418,8 @@ public sealed class MappingConformanceSpec
             mapping,
             schema.Table,
             schema.Indexes.Select(index => index == mappedIndex ? badIndex : index),
-            schema.UnprovedClaims);
+            schema.UnprovedClaims,
+            schema.RefusedRequirements);
         Action index = () => RelationalPlanGuard.Validate(mapping, badSchema);
         index.Should().Throw<MappingValueException>().WithMessage("*changed a compiled index*");
     }

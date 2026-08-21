@@ -26,15 +26,7 @@ internal sealed class MySqlStoreFeatures : IRelationalStoreFeatures
 
     public bool SupportsNativeTtl => false;
 
-    /// <summary>
-    /// A mapped scalar the dialect does not cast is held as <c>longtext</c>, and MySQL refuses a key over a
-    /// TEXT or BLOB column without a prefix length. Numbers, dates and Guids get bounded column types and index
-    /// cleanly; free text and binary do not, and are declined rather than turned into a prefix index whose
-    /// selectivity nobody asked for.
-    /// </summary>
-    public bool CanIndexKey(Type physicalType)
-    {
-        var value = Nullable.GetUnderlyingType(physicalType) ?? physicalType;
-        return value != typeof(string) && value != typeof(byte[]);
-    }
+    // Every mapped type can be a key here. Numbers, dates and Guids get bounded column types; text and binary
+    // are held as longtext or longblob and take a prefix, which MySQL answers by seeking the prefix and then
+    // rechecking the full column, so the index stays exact rather than approximate.
 }

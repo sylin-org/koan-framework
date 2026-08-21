@@ -38,6 +38,19 @@ public sealed class IndexAttribute : Attribute
     public bool Unique { get; init; }
 
     /// <summary>
+    /// Whether the application depends on this index existing natively.
+    ///
+    /// <para>By default a store that cannot build a declared index says so and carries on: the reads still
+    /// return the right rows, more slowly, and the shortfall is reported as unproved. Set this when slower is
+    /// not an acceptable answer — a hot path, a large container, a latency budget — and a store that cannot
+    /// build it will refuse the container outright, naming the capability and what to do instead, rather than
+    /// letting the application discover the shortfall under load (DATA-0119 rule 3).</para>
+    ///
+    /// <para>Not every store can build every index. SQL Server, for one, cannot key free text at all.</para>
+    /// </summary>
+    public bool Required { get; init; }
+
+    /// <summary>
     /// Marks this as a TTL (time-to-live) index on a single absolute-expiry timestamp property: the store deletes a row
     /// once that timestamp is in the past. Honored only by adapters that declare
     /// <see cref="Capabilities.DataCaps.Retention.TtlIndex"/> (e.g. Mongo, via <c>expireAfterSeconds = 0</c>); adapters

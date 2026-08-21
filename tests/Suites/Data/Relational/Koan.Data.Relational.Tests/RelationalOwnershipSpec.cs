@@ -1,6 +1,7 @@
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Connector.Cockroach;
 using Koan.Data.Core;
 using Koan.Data.Core.Options;
@@ -115,6 +116,42 @@ public sealed class RelationalOwnershipSpec
     }
 
     [Fact]
+    public async Task A_required_index_this_store_cannot_build_refuses_the_container()
+    {
+        using var provider = Host(source =>
+        {
+            source.Map<HotPath>(map => map.Container("hot")
+                .Key(order => order.Id).Name("ID")
+                .Property(order => order.Lookup).Name("Lookup"));
+            source.Map<ColdPath>(map => map.Container("cold")
+                .Key(order => order.Id).Name("ID")
+                .Property(order => order.Lookup).Name("Lookup"));
+        });
+        var orchestrator = new RelationalSchemaOrchestrator();
+        var features = new Features("sqlite");
+        var policy = new RelationalSchemaPolicy { DefaultSchema = "main" };
+        // This store answers SupportsMappedIndexes = false, so neither index can be built.
+        var ddl = new ProbeDdl(new RelationalTableShape(
+            new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = null,
+                ["Lookup"] = null
+            },
+            ["ID"]));
+
+        var required = await orchestrator.ValidateAsync(Mapping<HotPath>(provider), ddl, features, policy);
+        var optional = await orchestrator.ValidateAsync(Mapping<ColdPath>(provider), ddl, features, policy);
+
+        // The shortfall is identical. What differs is that one application said it cannot work around it.
+        optional.IsServiceable.Should().BeTrue("an index that cannot be built still leaves the reads correct");
+        optional.State.Should().Be("Degraded");
+
+        required.IsServiceable.Should().BeFalse();
+        required.Corrective.Should().ContainSingle(finding => finding.Subject == "RequiredIndex")
+            .Which.Detail.Should().Contain("ix_hot_lookup").And.Contain("sqlite");
+    }
+
+    [Fact]
     public void Functional_relational_module_is_the_single_orchestrator_owner()
     {
         var services = new ServiceCollection();
@@ -179,6 +216,22 @@ public sealed class RelationalOwnershipSpec
     public sealed class OrderB
     {
         public string Id { get; set; } = "b";
+    }
+
+    public sealed class HotPath
+    {
+        public string Id { get; set; } = "h";
+
+        [Index(Name = "ix_hot_lookup", Required = true)]
+        public string Lookup { get; set; } = "";
+    }
+
+    public sealed class ColdPath
+    {
+        public string Id { get; set; } = "c";
+
+        [Index(Name = "ix_cold_lookup")]
+        public string Lookup { get; set; } = "";
     }
 
     private sealed class Features(string provider) : IRelationalStoreFeatures

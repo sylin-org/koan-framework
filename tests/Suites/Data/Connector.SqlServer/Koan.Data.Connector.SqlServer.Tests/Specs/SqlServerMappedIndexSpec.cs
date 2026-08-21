@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Data.Relational.Orchestration;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -112,6 +113,31 @@ public sealed class SqlServerMappedIndexSpec(SqlServerFixture fixture, ITestOutp
         report["State"].Should().Be("Degraded", "a declared index this store cannot key is unproved, not absent");
         ((string[])report["Findings"]!).Should().Contain(finding =>
             finding.Contains("IndexKey:ix_sqlserver_probe_label", StringComparison.Ordinal));
+    }
+
+    [Fact(DisplayName = "SQL Server: an index declared as required refuses the container it cannot serve")]
+    public async Task A_required_index_this_store_cannot_build_refuses()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+
+        // Same shortfall as the probe above - this store cannot key free text. The difference is that this
+        // entity said it depends on the index, so the shortfall stops being a health note (DATA-0119 rule 3).
+        var write = () => new RequiredTextProbe { Id = "x", Label = "anything" }.Save();
+
+        var refusal = (await write.Should().ThrowAsync<SchemaMismatchException>()).Which;
+        // A refusal has to name what was refused, which store refused it, and what the author can do instead.
+        refusal.Message.Should().Contain("ix_sqlserver_required_label")
+            .And.Contain(Infrastructure.Constants.Provider)
+            .And.Contain("Drop Required");
+        refusal.Findings.Should().Contain(finding => finding.Subject == "RequiredIndex");
+    }
+
+    [Storage(Name = "KOAN_MAPPED_REQUIRED_PROBE")]
+    private sealed class RequiredTextProbe : Entity<RequiredTextProbe>
+    {
+        [Index(Name = "ix_sqlserver_required_label", Required = true)]
+        public string Label { get; set; } = "";
     }
 
     [Storage(Name = "KOAN_MAPPED_TEXT_PROBE")]

@@ -25,23 +25,29 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         columns.AddRange(CompileProjections(mapping, features, columns));
 
         var unproved = new List<string>();
+        var refused = new List<string>();
         var indexes = mapping.Indexes.Select(index =>
         {
             var nested = index.Bindings.Any(static binding => binding.PhysicalPath.IsNested);
             var derived = index.Bindings.Any(static binding =>
                 binding.Descriptor.Authority == MappingAuthority.Derived);
             var rewriteFree = !derived || features.SupportsRewriteFreeExpressionIndexes;
-            if (!index.Primary && !features.SupportsMappedIndexes)
-                unproved.Add($"Index:{index.Name}");
-            if (derived && !rewriteFree)
-                unproved.Add($"RewriteFree:{index.Name}");
-            if (nested && !features.SupportsRewriteFreeExpressionIndexes)
-                unproved.Add($"ExpressionIndex:{index.Name}");
-            if (index.Ttl && !features.SupportsNativeTtl)
-                unproved.Add($"TTL:{index.Name}");
             var keysSupported = index.Bindings.All(binding => features.CanIndexKey(binding.PhysicalType));
-            if (!index.Primary && !keysSupported)
-                unproved.Add($"IndexKey:{index.Name}");
+            var shortfalls = new List<string>();
+            if (!index.Primary && !features.SupportsMappedIndexes) shortfalls.Add($"Index:{index.Name}");
+            if (derived && !rewriteFree) shortfalls.Add($"RewriteFree:{index.Name}");
+            if (nested && !features.SupportsRewriteFreeExpressionIndexes)
+                shortfalls.Add($"ExpressionIndex:{index.Name}");
+            if (index.Ttl && !features.SupportsNativeTtl) shortfalls.Add($"TTL:{index.Name}");
+            if (!index.Primary && !keysSupported) shortfalls.Add($"IndexKey:{index.Name}");
+            unproved.AddRange(shortfalls);
+            // Declared as depended upon, and this store cannot build it. Reporting that as unproved would leave
+            // the application to discover under load what it already said it could not accept (DATA-0119 rule 3).
+            if (index.Required && shortfalls.Count != 0)
+                refused.Add(
+                    $"Index '{index.Name}' is required and {features.ProviderName} cannot build it " +
+                    $"({string.Join(", ", shortfalls)}). Drop Required to accept the reads resolving without it, " +
+                    "index a value this store can key, or select a store that can.");
             return new RelationalIndexDefinition(
                 index.Name,
                 index.Bindings.Select(static binding => new RelationalIndexPart(
@@ -50,7 +56,8 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 index.Primary,
                 index.Ttl,
                 rewriteFree,
-                keysSupported);
+                keysSupported,
+                index.Required);
         }).ToArray();
 
         var table = new RelationalTableDefinition(
@@ -60,7 +67,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
             mapping.Container.Name,
             columns,
             mapping.Identity.Parts.Select(static part => part.PhysicalPath.Name).ToArray());
-        var plan = new RelationalSchemaPlan(mapping, table, indexes, unproved);
+        var plan = new RelationalSchemaPlan(mapping, table, indexes, unproved, refused);
         RelationalPlanGuard.Validate(mapping, plan);
         return plan;
     }
@@ -83,12 +90,17 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 Corrective: false))
             .ToArray();
 
+        var refusals = plan.RefusedRequirements
+            .Select(static detail => new RelationalSchemaFinding(
+                "RequiredIndex", RelationalSchemaFindingKind.Drift, detail, Corrective: true))
+            .ToArray();
+
         var shape = await ddl.Describe(plan.Table, ct).ConfigureAwait(false);
         if (shape is null)
             return new RelationalSchemaValidation(
                 plan,
                 tableExists: false,
-                plan.Table.Columns.Select(column => Absent(column, policy)).Concat(unverified));
+                plan.Table.Columns.Select(column => Absent(column, policy)).Concat(refusals).Concat(unverified));
 
         var found = new List<RelationalSchemaFinding>();
         foreach (var expected in plan.Table.Columns)
@@ -129,7 +141,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
         found.AddRange(shape.Incompatible.Select(static detail => new RelationalSchemaFinding(
             "Container", RelationalSchemaFindingKind.Drift, detail, Corrective: true)));
 
-        return new RelationalSchemaValidation(plan, tableExists: true, found.Concat(unverified));
+        return new RelationalSchemaValidation(plan, tableExists: true, found.Concat(refusals).Concat(unverified));
     }
 
     public async Task<RelationalSchemaValidation> EnsureCreatedAsync(

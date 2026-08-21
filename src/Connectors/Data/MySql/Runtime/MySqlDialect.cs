@@ -11,7 +11,7 @@ internal sealed class MySqlDialect : IRelationalMappingDialect
         if (!path.IsNested) return root;
         var extracted = $"JSON_EXTRACT({root}, '{JsonPath(path.Segments)}')";
         if (shape == MappingValueShape.Object || IsCollection(physicalType)) return extracted;
-        return Cast($"JSON_UNQUOTE({extracted})", physicalType);
+        return Cast(Unquote(extracted), physicalType);
     }
 
     public string? JsonArrayOrderTerm(
@@ -21,8 +21,9 @@ internal sealed class MySqlDialect : IRelationalMappingDialect
         bool descending,
         Type elementValueType)
     {
-        var extracted = $"JSON_UNQUOTE(JSON_EXTRACT(koan_element.koan_value, '{JsonPath(elementSegments)}'))";
-        var value = Cast(extracted, elementValueType);
+        var value = Cast(
+            Unquote($"JSON_EXTRACT(koan_element.koan_value, '{JsonPath(elementSegments)}')"),
+            elementValueType);
         // JSON_TABLE refuses anything but an array, and a document may hold no array at that path at all, so
         // the type is checked rather than assumed. No rows means NULL, which sorts first — where the
         // in-memory sorter puts a widget with no sightings.
@@ -53,6 +54,18 @@ internal sealed class MySqlDialect : IRelationalMappingDialect
         return path.Replace("\\", "\\\\", StringComparison.Ordinal)
             .Replace("'", "''", StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// Reads a JSON scalar as SQL, keeping a JSON null a null.
+    ///
+    /// <para><c>JSON_UNQUOTE</c> renders a JSON null as the four-character string <c>null</c>. Cast to a number
+    /// that raises "Truncated incorrect INTEGER value: 'null'", which made this store unable to write an entity
+    /// whose nullable scalar was null - the value reaches a generated column on every insert - and unable to
+    /// filter or order across one. <c>JSON_TYPE</c> separates a JSON null from a string that happens to read
+    /// "null", so a real value spelled that way still round-trips (PMC-038).</para>
+    /// </summary>
+    internal static string Unquote(string extracted) =>
+        $"CASE WHEN JSON_TYPE({extracted}) = 'NULL' THEN NULL ELSE JSON_UNQUOTE({extracted}) END";
 
     internal static string Cast(string expression, Type type)
     {
