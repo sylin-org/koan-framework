@@ -1,16 +1,16 @@
 ---
 id: DATA-0120
-slug: one-relational-repository-three-drivers
+slug: one-relational-repository-four-drivers
 domain: DATA
 status: Proposed
 date: 2026-08-21
-title: One relational repository, three drivers
+title: One relational repository, four drivers
 related:
   - ARCH-0094
   - DATA-0119
 ---
 
-# DATA-0120: One relational repository, three drivers
+# DATA-0120: One relational repository, four drivers
 
 ## Precedence
 
@@ -65,22 +65,23 @@ copy is not a fix.
 *(Drafted; not yet accepted. The measurement is re-derived and current, and the reading below reshaped the
 proposal once already — the four-way collapse this record opened with is not available.)*
 
-**The collapse is over the three Dapper adapters. SQLite stays separate, by an accepted decision rather than
-by neglect.**
+**The collapse is over all four adapters. The constraint that would have excluded SQLite has been removed.**
 
-ARCH-0093 settled this and the reading found it rather than assuming it. Dapper's `GetTypeDeserializerImpl`
-emits IL at runtime, which NativeAOT forbids outright, so SQLite — the sovereign single-binary floor — is
-Dapper-free, and the NativeAOT proof that depends on it is shipped and measured on win-x64 and linux-x64. The
-other three are, in that record's words, "servers that never ship inside a single binary". A shared core built
-on Dapper therefore cannot include SQLite, and one built without Dapper would re-litigate a decided question.
-So:
+This record opened proposing four, narrowed to three on reading, and is back to four — and the round trip is
+the useful part. Dapper's `GetTypeDeserializerImpl` emits IL at runtime, which NativeAOT forbids, so SQLite was
+Dapper-free and a Dapper-based core could not have included it. Then reading the call sites showed the three
+server adapters never used the feature that constraint protects: every call was untyped or scalar, and each
+immediately cast the row to `IDictionary<string, object>` to hand a dictionary to `plan.Hydrate`. Dapper was a
+dictionary reader and a parameter bag, both already provided AOT-clean by `Koan.Data.Relational/Ado`.
 
-- **A core over SQL Server, MySQL and PostgreSQL/CockroachDB.** It owns the member set, the command sequence,
-  parameter binding, materialization, batch semantics, and the receipt every read returns.
+Removing it (PMC-047) dissolved the split rather than working around it. So:
+
+- **A core over all four adapters.** It owns the member set, the command sequence, parameter binding,
+  materialization, batch semantics, and the receipt every read returns.
 - **The dialect owns spelling**, as it already does, and the members that differ by one token become calls into
   it rather than copies.
-- **SQLite is out of scope**, and this record says so explicitly so the next reader does not file its
-  divergence as drift. Its raw-ADO path is what makes the single binary possible.
+- **Execution is `AdoCommands` and `SqlParameters`** — one surface, no runtime IL emit, so the core does not
+  reintroduce the constraint it just removed.
 
 **Not everything that looks like grammar is grammar.** `Count` reads as boilerplate and is not: SQL Server
 issues `COUNT_BIG(1)` where the others issue `COUNT(1)`, because `COUNT` returns an `int` and overflows past
@@ -93,11 +94,15 @@ one-line delegation to each store's own capability declaration — exactly the t
 
 ## Consequences
 
-- The server adapters stop holding three copies of the same execution. A fix lands once across them.
-- A test that exercises one of the three now exercises all three, which is the coverage gap behind this cycle's
-  pattern of defects being found by a suite downstream of the code that broke.
-- Those adapters shrink toward a driver and a dialect, which is the precondition ARCH-0094 needs. SQLite does
-  not, and keeps the extra weight that buys the single binary.
+- The four adapters stop holding four copies of the same execution. A fix lands once across all of them.
+- A test that exercises one adapter's shared path now exercises every adapter's, which is the coverage gap
+  behind this cycle's pattern of defects being found by a suite downstream of the code that broke.
+- Adapters shrink toward a driver and a dialect, which is the precondition ARCH-0094 needs.
+- **Unverified as of this writing:** removing Dapper removes the blocker ARCH-0093 *named*, but whether a
+  PostgreSQL, SQL Server or MySQL application actually publishes under NativeAOT depends on the provider
+  libraries — `Npgsql`, `Microsoft.Data.SqlClient`, `MySqlConnector` — which have not been examined. Nothing in
+  the relational tier emits IL any more; that is a fact. That the single-binary story now extends past SQLite
+  is a hypothesis, and is carried as PMC-049 rather than claimed here.
 - The risk is real and is why this is Proposed rather than Accepted: a collapse that flattens a genuine
   per-store difference converts correct implementations into one that is subtly wrong everywhere. `Count` is
   the worked example — `COUNT_BIG` reads as a spelling preference and is an overflow bound. The mitigation is
@@ -120,7 +125,7 @@ The member-by-member reading is under way. What it has established:
 | `Insert` | SQL Server and MySQL are identical apart from the quote. PostgreSQL is not: `jsonb` will not take a plain text parameter, so structured values bind as `CAST(@p AS jsonb)`, and its upsert is folded in as `ON CONFLICT` with managed-field guards. Collapsible only behind a dialect member for structured binding, and only once upsert is separated from it. |
 | `Upsert` | **A decision, not grammar.** Three idiomatic strategies with different semantics: `OUTPUT INSERTED` plus `IF @@ROWCOUNT` on SQL Server, `LAST_INSERT_ID()` and an explicit transaction for managed-field scope on MySQL, `RETURNING` with `ON CONFLICT` and an affected-rows cross-scope check on PostgreSQL. Stays adapter-owned. |
 | `Describe` | **Not collapsible.** A one-line delegation to each store's capability declaration, which is adapter-owned by design. An earlier draft of this record called it 94% identical; that was an artifact of a range-matching script running past the member's end. |
-| Data access | **The structural split, and out of scope.** SQLite uses raw ADO throughout (13 `CreateCommand()` calls, no Dapper reference in its csproj); the other three use Dapper exclusively. ARCH-0093 makes this a constraint. |
+| Data access | **Was the structural split; no longer is.** SQLite used raw ADO throughout while the other three used Dapper exclusively, which ARCH-0093 made a hard constraint. Reading the call sites showed the three never used Dapper's compiled materializer, so it was removed (PMC-047) and all four now execute through the same AOT-clean surface. |
 
 Two things the reading turned up that are not about the collapse:
 

@@ -13,8 +13,8 @@ namespace Koan.Data.Relational.Ado;
 /// </summary>
 /// <remarks>
 /// Names are stored without the <c>@</c> sigil and bound as <c>@name</c> (which Microsoft.Data.Sqlite and the
-/// other ADO providers match against the SQL token). Provider mechanisms may translate this model to their native command API.
-/// reuses this same model so a non-AOT adapter can swap executors without changing call sites.
+/// other ADO providers match against the SQL token). Provider mechanisms may translate this model to their
+/// native command API.
 /// </remarks>
 public sealed class SqlParameters
 {
@@ -53,6 +53,29 @@ public sealed class SqlParameters
         return new SqlParameters(list);
     }
 
+    /// <summary>
+    /// The raw-query escape hatch: whatever a caller handed to <c>QueryRaw</c>. A dictionary binds by key; any
+    /// other object binds by public property, which is what a caller passing an anonymous object expects.
+    ///
+    /// <para>Property reflection rather than emitted accessors, so this survives NativeAOT where Dapper's
+    /// anonymous-object binder does not. Each relational adapter used to carry its own copy of this.</para>
+    /// </summary>
+    public static SqlParameters? FromObject(object? values)
+    {
+        if (values is null) return null;
+        if (values is SqlParameters already) return already;
+        if (values is IReadOnlyDictionary<string, object?> readOnly) return FromDictionary(readOnly);
+        if (values is IDictionary<string, object?> dictionary)
+            return FromDictionary((IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(dictionary));
+
+        var parameters = new SqlParameters();
+        foreach (var property in values.GetType()
+                     .GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                     .Where(static property => property.GetMethod is not null && property.GetIndexParameters().Length == 0))
+            parameters.Add(property.Name, property.GetValue(values));
+        return parameters;
+    }
+
     private static string Normalize(string name) => name.StartsWith('@') ? name[1..] : name;
 
     /// <summary>Binds every parameter onto <paramref name="cmd"/>, applying IN-expansion, and returns the
@@ -75,8 +98,28 @@ public sealed class SqlParameters
     {
         var p = cmd.CreateParameter();
         p.ParameterName = "@" + name;
-        p.Value = value ?? DBNull.Value;
+        p.Value = Bindable(value);
         cmd.Parameters.Add(p);
+    }
+
+    /// <summary>
+    /// The value as a provider will accept it.
+    ///
+    /// <para>An enum is bound as its underlying number. Providers disagree about enums and one of them refuses
+    /// outright: Npgsql throws "Writing values of '...' is not supported for parameters having no NpgsqlDbType",
+    /// because it reserves enum binding for PostgreSQL enum types it has been told about, while SqlClient and
+    /// MySqlConnector convert silently. Unwrapping here is what the column expects anyway — every relational
+    /// store type map in this repository resolves an enum to <see cref="Enum.GetUnderlyingType"/> — and it makes
+    /// the three providers agree rather than leaving one of them to be discovered by a filter that happens to
+    /// mention an enum.</para>
+    /// </summary>
+    private static object Bindable(object? value)
+    {
+        if (value is null) return DBNull.Value;
+        var type = value.GetType();
+        return type.IsEnum
+            ? Convert.ChangeType(value, Enum.GetUnderlyingType(type), System.Globalization.CultureInfo.InvariantCulture)
+            : value;
     }
 
     private static string ExpandInClause(DbCommand cmd, string sql, string name, IEnumerable seq)

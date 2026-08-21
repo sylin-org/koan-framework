@@ -17,6 +17,5 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MySqlConnector" />
-    <PackageReference Include="Dapper" />
   </ItemGroup>
 </Project>

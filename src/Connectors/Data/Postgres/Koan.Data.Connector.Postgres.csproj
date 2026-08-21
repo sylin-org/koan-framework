@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Koan.Data.Connector.Postgres</AssemblyName>
     <RootNamespace>Koan.Data.Connector.Postgres</RootNamespace>
-    <Description>PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.</Description>
+    <Description>PostgreSQL provider for Koan relational data: raw-ADO SQL integration with guardrails and governance.</Description>
     <PackageTags>$(CommonPackageTags);data;postgres;relational;sql;dapper</PackageTags>
   </PropertyGroup>
   <ItemGroup>

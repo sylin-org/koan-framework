@@ -22,7 +22,6 @@
     <PackageVersion Include="Couchbase.Transactions" Version="3.9.0" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Cronos" Version="0.13.0" />
-    <PackageVersion Include="Dapper" Version="2.1.79" />
     <PackageVersion Include="FastBertTokenizer" Version="1.0.28" />
     <PackageVersion Include="Jint" Version="4.13.0" />
     <PackageVersion Include="MessagePack" Version="3.1.8" />

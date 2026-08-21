@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 using System.Linq.Expressions;
-using Dapper;
+using Koan.Data.Relational.Ado;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -83,15 +83,16 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (requested.Count == 0) return [];
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicates = new string[requested.Count];
         for (var index = 0; index < requested.Count; index++)
             predicates[index] = IdentityPredicate(plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(
+        var rows = await AdoCommands.QueryRowsAsync(
+            connection,
             $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}",
-            parameters, cancellationToken: ct)).ConfigureAwait(false);
-        var entities = rows.Cast<object>().Select(row => Materialize(plan, row)).ToDictionary(static entity => entity.Id);
+            parameters, null, ct).ConfigureAwait(false);
+        var entities = rows.Select(row => Materialize(plan, row)).ToDictionary(static entity => entity.Id);
         return requested.Select(id => entities.TryGetValue(id, out var entity) ? entity : null).ToArray();
     }
 
@@ -135,8 +136,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "delete all");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {Plan.QualifiedTable}", cancellationToken: ct)).ConfigureAwait(false);
+        return await AdoCommands.ExecuteAsync(
+            connection, $"DELETE FROM {Plan.QualifiedTable}", null, null, ct).ConfigureAwait(false);
     }
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -146,8 +147,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         {
             _options.SourcePlan.Demand(DataOperationEffect.SchemaOrAdmin, "fast remove");
             await using var connection = await Open(ct).ConfigureAwait(false);
-            await connection.ExecuteAsync(new CommandDefinition(
-                $"TRUNCATE TABLE {Plan.QualifiedTable}", cancellationToken: ct)).ConfigureAwait(false);
+            await AdoCommands.ExecuteAsync(
+                connection, $"TRUNCATE TABLE {Plan.QualifiedTable}", null, null, ct).ConfigureAwait(false);
             return -1;
         }
         var count = await Count(new QueryDefinition { CountStrategy = CountStrategy.Exact }, ct).ConfigureAwait(false);
@@ -169,8 +170,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                   (where is null ? string.Empty : $" WHERE {where}") + $" {order}" +
                   (paged ? $" OFFSET {query.EffectiveOffset()} ROWS FETCH NEXT {query.EffectivePageSize()} ROWS ONLY" : string.Empty);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, Parameters(parameters), cancellationToken: ct)).ConfigureAwait(false);
-        var items = rows.Cast<object>().Select(row => Materialize(plan, row)).ToArray();
+        var rows = await AdoCommands.QueryRowsAsync(
+            connection, sql, Parameters(parameters), null, ct).ConfigureAwait(false);
+        var items = rows.Select(row => Materialize(plan, row)).ToArray();
         long? total = null;
         if (query.CountStrategy is not null)
             total = paged ? await CountExact(connection, plan, where, parameters, ct).ConfigureAwait(false) : items.LongLength;
@@ -194,10 +196,11 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         if (query.CountStrategy == CountStrategy.Fast && where is null)
         {
-            var estimate = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+            var estimate = await AdoCommands.ExecuteScalarInt64Async(
+                connection,
                 "SELECT SUM(p.row_count) FROM sys.dm_db_partition_stats p " +
                 "WHERE p.object_id = OBJECT_ID(@table) AND p.index_id IN (0,1)",
-                new { table = plan.QualifiedTable }, cancellationToken: ct)).ConfigureAwait(false) ?? 0;
+                new SqlParameters().Add("table", plan.QualifiedTable), null, ct).ConfigureAwait(false);
             if (estimate == 0)
                 estimate = await CountExact(connection, plan, null, [], ct).ConfigureAwait(false);
             return CountResult.Estimate(estimate);
@@ -216,10 +219,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (paged && !full)
             sql += $" OFFSET {shaping.EffectiveOffset()} ROWS FETCH NEXT {shaping.EffectivePageSize()} ROWS ONLY";
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
         return new RepositoryQueryResult<TEntity>
         {
-            Items = rows.Cast<object>().Select(row => Materialize(plan, row)).ToArray(),
+            Items = rows.Select(row => Materialize(plan, row)).ToArray(),
             PaginationHandled = paged && !full,
             CountExecution = CountExecutionKind.None
         };
@@ -229,8 +232,9 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     {
         await Ready(ct).ConfigureAwait(false);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var count = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            $"SELECT COUNT_BIG(1) FROM {Plan.QualifiedTable} WHERE {query}", parameters, cancellationToken: ct)).ConfigureAwait(false);
+        var count = await AdoCommands.ExecuteScalarInt64Async(
+            connection, $"SELECT COUNT_BIG(1) FROM {Plan.QualifiedTable} WHERE {query}", SqlParameters.FromObject(parameters), null, ct)
+            .ConfigureAwait(false);
         return CountResult.Exact(count);
     }
 
@@ -241,16 +245,17 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional replace");
         var plan = Plan;
         var command = plan.Commands.Update(model);
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var set = UpdateSet(plan, command.Values, parameters, "set_");
         var identity = IdentityPredicate(command.Identity, "key_", parameters);
         var (condition, conditionValues) = Where(plan, LinqFilterCompiler.Compile(guard));
         Add(parameters, conditionValues, "p");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await connection.ExecuteAsync(new CommandDefinition(
+        return await AdoCommands.ExecuteAsync(
+            connection,
             $"UPDATE {plan.QualifiedTable} SET {set} WHERE {identity}" +
             (condition is null ? string.Empty : $" AND ({condition})"),
-            parameters, cancellationToken: ct)).ConfigureAwait(false) == 1;
+            parameters, null, ct).ConfigureAwait(false) == 1;
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -350,12 +355,13 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private async Task<TEntity?> Get(SqlConnection connection, SqlTransaction? transaction, TKey id, CancellationToken ct)
     {
         var plan = Plan;
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicate = IdentityPredicate(plan.Commands.Get(id).Identity, "key_", parameters);
-        var row = await connection.QuerySingleOrDefaultAsync(new CommandDefinition(
+        var rows = await AdoCommands.QueryRowsAsync(
+            connection,
             $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {predicate}",
-            parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
-        return row is null ? null : Materialize(plan, (object)row);
+            parameters, transaction, ct).ConfigureAwait(false);
+        return rows.Count == 0 ? null : Materialize(plan, rows[0]);
     }
 
     private async Task Upsert(SqlConnection connection, SqlTransaction? transaction, TEntity model, CancellationToken ct)
@@ -369,8 +375,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             var output = $" OUTPUT INSERTED.{SqlServerDialect.Quote(plan.IdentityRoots.Single())}";
             var index = insert.Sql.IndexOf(" VALUES", StringComparison.Ordinal);
             var sql = insert.Sql.Insert(index, output);
-            var key = await connection.ExecuteScalarAsync(new CommandDefinition(
-                sql, insert.Parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+            var key = await AdoCommands.ExecuteScalarAsync(
+                connection, sql, insert.Parameters, transaction, ct).ConfigureAwait(false);
             plan.AssignGenerated(model, key);
             return;
         }
@@ -385,8 +391,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                       "THROW 50001, 'cross-scope write', 1; " + insert.Sql + "; END";
         try
         {
-            await connection.ExecuteAsync(new CommandDefinition(
-                sqlText, parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+            await AdoCommands.ExecuteAsync(
+                connection, sqlText, parameters, transaction, ct).ConfigureAwait(false);
         }
         catch (SqlException error) when (error.Number == 50001)
         {
@@ -398,7 +404,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     {
         var groups = command.Identity.Concat(command.Values)
             .GroupBy(static value => value.Binding.PhysicalPath.Name, StringComparer.Ordinal).ToArray();
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var columns = new List<string>(groups.Length);
         var values = new List<string>(groups.Length);
         for (var index = 0; index < groups.Length; index++)
@@ -419,7 +425,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private static string UpdateSet(
         SqlServerEntityPlan<TEntity, TKey> plan,
         IReadOnlyList<RelationalValue> values,
-        DynamicParameters parameters,
+        SqlParameters parameters,
         string prefix)
     {
         var assignments = new List<string>();
@@ -452,7 +458,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         return string.Join(", ", assignments);
     }
 
-    private static string ManagedGuard(SqlServerEntityPlan<TEntity, TKey> plan, DynamicParameters parameters)
+    private static string ManagedGuard(SqlServerEntityPlan<TEntity, TKey> plan, SqlParameters parameters)
     {
         if (ManagedFieldWriteScope.Current is not { Count: > 0 } managed) return string.Empty;
         var guards = new List<string>(managed.Count);
@@ -470,13 +476,14 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         SqlConnection connection, SqlTransaction? transaction, IReadOnlyList<TKey> ids, CancellationToken ct)
     {
         var plan = Plan;
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicates = new string[ids.Count];
         for (var index = 0; index < ids.Count; index++)
             predicates[index] = IdentityPredicate(plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
-        return await connection.ExecuteAsync(new CommandDefinition(
+        return await AdoCommands.ExecuteAsync(
+            connection,
             $"DELETE FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}",
-            parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+            parameters, transaction, ct).ConfigureAwait(false);
     }
 
     private static (string? Sql, IReadOnlyList<object?> Parameters) Where(
@@ -540,12 +547,13 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         string? where,
         IReadOnlyList<object?> parameters,
         CancellationToken ct) =>
-        await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+        await AdoCommands.ExecuteScalarInt64Async(
+            connection,
             $"SELECT COUNT_BIG(1) FROM {plan.QualifiedTable}" + (where is null ? string.Empty : $" WHERE {where}"),
-            Parameters(parameters), cancellationToken: ct)).ConfigureAwait(false);
+            Parameters(parameters), null, ct).ConfigureAwait(false);
 
     private static string IdentityPredicate(
-        IEnumerable<RelationalValue> identity, string prefix, DynamicParameters parameters)
+        IEnumerable<RelationalValue> identity, string prefix, SqlParameters parameters)
     {
         var clauses = new List<string>();
         var index = 0;
@@ -559,18 +567,17 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         return "(" + string.Join(" AND ", clauses) + ")";
     }
 
-    private static TEntity Materialize(SqlServerEntityPlan<TEntity, TKey> plan, object row) => plan.Hydrate(
-        ((IDictionary<string, object>)row).ToDictionary(
-            static pair => pair.Key, static pair => (object?)pair.Value, StringComparer.Ordinal));
+    private static TEntity Materialize(
+        SqlServerEntityPlan<TEntity, TKey> plan, IReadOnlyDictionary<string, object?> row) => plan.Hydrate(row);
 
-    private static DynamicParameters Parameters(IReadOnlyList<object?> values)
+    private static SqlParameters Parameters(IReadOnlyList<object?> values)
     {
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         Add(parameters, values, "p");
         return parameters;
     }
 
-    private static void Add(DynamicParameters parameters, IReadOnlyList<object?> values, string prefix)
+    private static void Add(SqlParameters parameters, IReadOnlyList<object?> values, string prefix)
     {
         for (var index = 0; index < values.Count; index++) parameters.Add($"{prefix}{index}", values[index]);
     }
@@ -587,20 +594,19 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var sql = InstructionSql(instruction);
         var parameters = instruction.Parameters is null
             ? null
-            : new DynamicParameters(new Dictionary<string, object?>(instruction.Parameters));
+            : SqlParameters.FromDictionary(instruction.Parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
         if (instruction.Name == RelationalInstructions.SqlScalar)
         {
-            var value = await connection.ExecuteScalarAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
+            var value = await AdoCommands.ExecuteScalarAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
             if (value is null or DBNull) return default!;
             return (TResult)Convert.ChangeType(value, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture);
         }
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
-            return (TResult)(object)await connection.ExecuteAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
-        return (TResult)(object)rows.Cast<object>().Select(row =>
-            ((IDictionary<string, object>)row).ToDictionary(
-                static pair => pair.Key, static pair => (object?)pair.Value, StringComparer.OrdinalIgnoreCase)).ToArray();
+            return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct)
+                .ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+        return (TResult)(object)rows.ToArray();
     }
 
     private static string InstructionSql(Instruction instruction)
@@ -612,7 +618,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         throw new ArgumentException("Instruction payload is missing Sql.", nameof(instruction));
     }
 
-    private sealed record PreparedWrite(string Sql, DynamicParameters Parameters);
+    private sealed record PreparedWrite(string Sql, SqlParameters Parameters);
 
     private sealed class Batch(SqlServerRepository<TEntity, TKey> repository) : IBatchSet<TEntity, TKey>
     {

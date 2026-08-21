@@ -54,6 +54,32 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **Do not write a capability claim into a durable document ahead of its evidence — including your own.**
+  Removing Dapper removed the blocker ARCH-0093 named, and the consequence "NativeAOT stops being SQLite's
+  private property" went straight into DATA-0120. It is not established: whether a server adapter publishes
+  under NativeAOT depends on `Npgsql`, `Microsoft.Data.SqlClient` and `MySqlConnector`, none of which had been
+  looked at. The claim was demoted to a hypothesis and carried as PMC-049 the same day it was written. Four
+  register entries closed this session had been misfiled by earlier confident notes, two of them mine; an ADR
+  is a worse place to leave one than a register. (2026-08-21)
+- **A centralized seam pays for itself the first time a provider disagrees.** Moving three adapters onto one
+  parameter binder surfaced that Npgsql refuses to bind a CLR enum without an explicit type while SqlClient and
+  MySqlConnector convert silently. Before the collapse that would have been three separate discoveries, each
+  found by whichever store's suite happened to exercise an enum filter. After it, one fix in one method served
+  every adapter — which is the concrete form of "complexity centralized at one owner". (2026-08-21)
+
+- **Ask what a dependency is actually being used for before designing around it.** Dapper was treated as a
+  constraint that split the relational adapters in two — the AOT floor without it, the servers with it — and it
+  shaped an ADR. Reading the call sites showed every one of them was untyped or scalar, each immediately casting
+  the row to a dictionary: the compiled materializer that is Dapper's entire reason for existing, and the exact
+  thing NativeAOT forbids, was never called. The dependency was costing an architectural split and providing
+  nothing. The check took one grep of the call shapes. (2026-08-21)
+- **When a shared surface has no consumers, suspect the seam's altitude, not the idea.** ARCH-0093 built an
+  AOT-clean command surface and a Dapper twin of it; the twin was retired for having no consumer, and the
+  original then sat unused too. The instinct was right and the level was wrong: helper wrappers around
+  `connection.QueryAsync` own mechanism, and nothing reaches for a seam that owns no semantics. The surface
+  found its consumers the moment something above it — the repository execution path — actually needed one.
+  (2026-08-21)
+
 - **Read for the constraint before designing the collapse.** DATA-0120 opened proposing one relational core over
   four adapters. Reading found that SQLite uses raw ADO and references Dapper nowhere, because Dapper emits IL
   at runtime and NativeAOT forbids it — ARCH-0093's shipped single-binary proof depends on that. A Dapper-based

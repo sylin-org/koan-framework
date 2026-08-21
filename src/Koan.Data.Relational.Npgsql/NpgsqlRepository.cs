@@ -1,6 +1,6 @@
 using System.Collections.Frozen;
 using System.Linq.Expressions;
-using Dapper;
+using Koan.Data.Relational.Ado;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -127,14 +127,14 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         var requested = ids as IReadOnlyList<TKey> ?? ids.ToArray();
         if (requested.Count == 0) return [];
         await Ready(ct).ConfigureAwait(false);
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicates = new string[requested.Count];
         for (var index = 0; index < requested.Count; index++)
             predicates[index] = IdentityPredicate(_plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
         var sql = $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}";
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
-        var entities = rows.Cast<object>().Select(Materialize).ToDictionary(static entity => entity.Id);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+        var entities = rows.Select(Materialize).ToDictionary(static entity => entity.Id);
         return requested.Select(id => entities.TryGetValue(id, out var entity) ? entity : null).ToArray();
     }
 
@@ -179,8 +179,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "delete all");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {_plan.QualifiedTable}", cancellationToken: ct)).ConfigureAwait(false);
+        return await AdoCommands.ExecuteAsync(connection, $"DELETE FROM {_plan.QualifiedTable}", null, null, ct).ConfigureAwait(false);
     }
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -190,8 +189,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         {
             _options.SourcePlan.Demand(DataOperationEffect.SchemaOrAdmin, "fast remove");
             await using var connection = await Open(ct).ConfigureAwait(false);
-            await connection.ExecuteAsync(new CommandDefinition(
-                $"TRUNCATE TABLE {_plan.QualifiedTable}", cancellationToken: ct)).ConfigureAwait(false);
+            await AdoCommands.ExecuteAsync(connection, $"TRUNCATE TABLE {_plan.QualifiedTable}", null, null, ct).ConfigureAwait(false);
             return -1;
         }
         var count = await Count(new QueryDefinition { CountStrategy = CountStrategy.Exact }, ct).ConfigureAwait(false);
@@ -212,9 +210,8 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
                   (where is null ? string.Empty : $" WHERE {where}") + $" {order}" +
                   (paged ? $" LIMIT {query.EffectivePageSize()} OFFSET {query.EffectiveOffset()}" : string.Empty);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(
-            sql, Parameters(parameters), cancellationToken: ct)).ConfigureAwait(false);
-        var items = rows.Cast<object>().Select(Materialize).ToArray();
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, Parameters(parameters), null, ct).ConfigureAwait(false);
+        var items = rows.Select(Materialize).ToArray();
         long? total = null;
         if (query.CountStrategy is not null)
             total = paged ? await Count(connection, where, parameters, ct).ConfigureAwait(false) : items.LongLength;
@@ -251,10 +248,11 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             : $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {query} {StableOrder()}" +
               (paged ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}" : string.Empty);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(
+            connection, sql, SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
         return new RepositoryQueryResult<TEntity>
         {
-            Items = rows.Cast<object>().Select(Materialize).ToArray(),
+            Items = rows.Select(Materialize).ToArray(),
             PaginationHandled = paged,
             CountExecution = CountExecutionKind.None
         };
@@ -264,8 +262,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     {
         await Ready(ct).ConfigureAwait(false);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var count = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            $"SELECT COUNT(1) FROM {_plan.QualifiedTable} WHERE {query}", parameters, cancellationToken: ct)).ConfigureAwait(false);
+        var count = await AdoCommands.ExecuteScalarInt64Async(connection, $"SELECT COUNT(1) FROM {_plan.QualifiedTable} WHERE {query}", SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
         return CountResult.Exact(count);
     }
 
@@ -277,7 +274,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional replace");
         var command = _plan.Commands.Update(model);
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var set = UpdateSet(command.Values, parameters, "set_");
         var identity = IdentityPredicate(command.Identity, "key_", parameters);
         var (condition, conditionValues) = Where(LinqFilterCompiler.Compile(guard));
@@ -285,8 +282,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         var sql = $"UPDATE {_plan.QualifiedTable} SET {set} WHERE {identity}" +
                   (condition is null ? string.Empty : $" AND ({condition})");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            sql, parameters, cancellationToken: ct)).ConfigureAwait(false) == 1;
+        return await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false) == 1;
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -360,12 +356,13 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     private async Task<TEntity?> Get(NpgsqlConnection connection, NpgsqlTransaction? transaction, TKey id, CancellationToken ct)
     {
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicate = IdentityPredicate(_plan.Commands.Get(id).Identity, "key_", parameters);
-        var row = await connection.QuerySingleOrDefaultAsync(new CommandDefinition(
+        var rows = await AdoCommands.QueryRowsAsync(
+            connection,
             $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {predicate}",
-            parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
-        return row is null ? null : Materialize((object)row);
+            parameters, transaction, ct).ConfigureAwait(false);
+        return rows.Count == 0 ? null : Materialize(rows[0]);
     }
 
     private async Task Upsert(NpgsqlConnection connection, NpgsqlTransaction? transaction, TEntity model, CancellationToken ct)
@@ -375,14 +372,11 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         var prepared = Insert(command, includeConflict: !generated);
         if (generated)
         {
-            var key = await connection.ExecuteScalarAsync(new CommandDefinition(
-                prepared.Sql + $" RETURNING {NpgsqlDialect.Quote(_plan.IdentityRoots.Single())}",
-                prepared.Parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+            var key = await AdoCommands.ExecuteScalarAsync(connection, prepared.Sql + $" RETURNING {NpgsqlDialect.Quote(_plan.IdentityRoots.Single())}", prepared.Parameters, transaction, ct).ConfigureAwait(false);
             _plan.AssignGenerated(model, key);
             return;
         }
-        var affected = await connection.ExecuteAsync(new CommandDefinition(
-            prepared.Sql, prepared.Parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+        var affected = await AdoCommands.ExecuteAsync(connection, prepared.Sql, prepared.Parameters, transaction, ct).ConfigureAwait(false);
         if (affected == 0 && ManagedFieldWriteScope.Current is { Count: > 0 })
             throw new InvalidOperationException("The write was rejected as a cross-scope write.");
     }
@@ -391,7 +385,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     {
         var all = command.Identity.Concat(command.Values).ToArray();
         var groups = all.GroupBy(static value => value.Binding.PhysicalPath.Name, StringComparer.Ordinal).ToArray();
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var columns = new List<string>(groups.Length);
         var values = new List<string>(groups.Length);
         for (var index = 0; index < groups.Length; index++)
@@ -436,7 +430,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     private string UpdateSet(
         IReadOnlyList<RelationalValue> values,
-        DynamicParameters parameters,
+        SqlParameters parameters,
         string prefix,
         bool qualifyReadRoots = false)
     {
@@ -474,13 +468,11 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         IReadOnlyList<TKey> ids,
         CancellationToken ct)
     {
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         var predicates = new string[ids.Count];
         for (var index = 0; index < ids.Count; index++)
             predicates[index] = IdentityPredicate(_plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
-        return await connection.ExecuteAsync(new CommandDefinition(
-            $"DELETE FROM {_plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}",
-            parameters, transaction, cancellationToken: ct)).ConfigureAwait(false);
+        return await AdoCommands.ExecuteAsync(connection, $"DELETE FROM {_plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}", parameters, transaction, ct).ConfigureAwait(false);
     }
 
     private (string? Sql, IReadOnlyList<object?> Parameters) Where(Filter? filter)
@@ -542,14 +534,12 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         string? where,
         IReadOnlyList<object?> parameters,
         CancellationToken ct) =>
-        await connection.ExecuteScalarAsync<long>(new CommandDefinition(
-            $"SELECT COUNT(1) FROM {_plan.QualifiedTable}" + (where is null ? string.Empty : $" WHERE {where}"),
-            Parameters(parameters), cancellationToken: ct)).ConfigureAwait(false);
+        await AdoCommands.ExecuteScalarInt64Async(connection, $"SELECT COUNT(1) FROM {_plan.QualifiedTable}" + (where is null ? string.Empty : $" WHERE {where}"), Parameters(parameters), null, ct).ConfigureAwait(false);
 
     private static string IdentityPredicate(
         IEnumerable<RelationalValue> identity,
         string prefix,
-        DynamicParameters parameters)
+        SqlParameters parameters)
     {
         var clauses = new List<string>();
         var index = 0;
@@ -563,20 +553,16 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         return "(" + string.Join(" AND ", clauses) + ")";
     }
 
-    private TEntity Materialize(object row) => _plan.Hydrate(
-        ((IDictionary<string, object>)row).ToDictionary(
-            static pair => pair.Key,
-            static pair => (object?)pair.Value,
-            StringComparer.Ordinal));
+    private TEntity Materialize(IReadOnlyDictionary<string, object?> row) => _plan.Hydrate(row);
 
-    private static DynamicParameters Parameters(IReadOnlyList<object?> values)
+    private static SqlParameters Parameters(IReadOnlyList<object?> values)
     {
-        var parameters = new DynamicParameters();
+        var parameters = new SqlParameters();
         Add(parameters, values, "p");
         return parameters;
     }
 
-    private static void Add(DynamicParameters parameters, IReadOnlyList<object?> values, string prefix)
+    private static void Add(SqlParameters parameters, IReadOnlyList<object?> values, string prefix)
     {
         for (var index = 0; index < values.Count; index++) parameters.Add($"{prefix}{index}", values[index]);
     }
@@ -593,17 +579,17 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         var sql = InstructionSql(instruction);
         var parameters = instruction.Parameters is null
             ? null
-            : new DynamicParameters(new Dictionary<string, object?>(instruction.Parameters));
+            : SqlParameters.FromDictionary(instruction.Parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
         if (instruction.Name == RelationalInstructions.SqlScalar)
         {
-            var value = await connection.ExecuteScalarAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
+            var value = await AdoCommands.ExecuteScalarAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
             if (value is null or DBNull) return default!;
             return (TResult)Convert.ChangeType(value, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture);
         }
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
-            return (TResult)(object)await connection.ExecuteAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
-        var rows = await connection.QueryAsync(new CommandDefinition(sql, parameters, cancellationToken: ct)).ConfigureAwait(false);
+            return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
         return (TResult)(object)rows.Select(row => new Dictionary<string, object?>((IDictionary<string, object?>)row,
             StringComparer.OrdinalIgnoreCase)).ToArray();
     }
@@ -618,7 +604,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         throw new ArgumentException("Instruction payload is missing Sql.", nameof(instruction));
     }
 
-    private sealed record PreparedWrite(string Sql, DynamicParameters Parameters);
+    private sealed record PreparedWrite(string Sql, SqlParameters Parameters);
 
     private sealed class Batch(NpgsqlRepository<TEntity, TKey> repository) : IBatchSet<TEntity, TKey>
     {
