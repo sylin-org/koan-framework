@@ -5,6 +5,50 @@
 - Deciders: framework architect
 - Related: ARCH-0084 (capability model / Reference=Intent), ARCH-0086 (KoanModule + source-gen discovery), the P1.1 composition lockfile, the `X-aot-substrate` single-file work (`8531bef6`), `S2.Sovereign-proof`
 
+> **Implementation update (PMC-049, 2026-08-21) — the substrate reaches the server adapters, and
+> §3's Dapper split is superseded.** Every relational backend now NativeAOT-publishes and runs against a
+> real store, measured rather than inferred: SQLite, MySQL 8.4 (`MySqlConnector` 2.6.1), PostgreSQL 17 and
+> CockroachDB v24.3 (`Npgsql` 10.0.3), and SQL Server 2022 (`Microsoft.Data.SqlClient` 7.0.2), each writing
+> and reading one entity through `Entity<T>` with the row confirmed in the container afterwards.
+> `samples/fundamentals/AotRelational` is the reproduction and `docs/guides/nativeaot-howto.md` the recipe.
+> §3's "hand-roll for AOT adapters, a Dapper shim for the others" no longer describes the tree: PMC-047
+> found that every Dapper call site in the three server adapters was untyped or scalar — the compiled
+> materializer AOT forbids was never invoked — so Dapper and `Koan.Data.Relational.Dapper` are gone and all
+> four adapters execute through `Koan.Data.Relational/Ado`. The decision §3 recorded (do not emit IL on the
+> relational path) stands; the two-tier mechanism it chose is retired.
+>
+> **One provider constraint, and it belongs to the driver rather than to AOT.**
+> `Microsoft.Data.SqlClient` refuses globalization-invariant mode outright —
+> `System.NotSupportedException: Globalization Invariant Mode is not supported`, thrown from
+> `SqlConnection.TryOpen`. A SQL Server application therefore publishes with
+> `InvariantGlobalization=false` and carries culture data; the other four backends do not need it. The
+> refusal is unconditional driver policy, so it applies equally to a JIT build in invariant mode and no
+> amount of AOT work removes it. This qualifies §4's blanket "set `InvariantGlobalization=true`".
+>
+> **Three framework defects sat on the AOT path and had to be repaired to get this proof**, all in
+> `Koan.Core` or `Koan.Data.Core`, none in a provider:
+> - `WriteKoanReferenceManifest` wrote `koan.references.manifest` into the RID-specific intermediate
+>   directory without creating it, so the *first* `-r <rid>` publish of any Koan application failed with
+>   `DirectoryNotFoundException`. Only the first: a second publish succeeded on the directory the failed
+>   one left behind, which is why it had gone unnoticed.
+> - `MemberInfo.MetadataToken` — used at four sites to recover declaration order — does not exist under
+>   ILC and throws. The first entity mapped died with
+>   `MappingCompilationException: There is no metadata token available for the given member`. The four
+>   sites now share `Koan.Core.Reflection.DeclarationOrder`, which returns the token where the runtime has
+>   one and otherwise a constant, leaving LINQ's stable ordering to preserve reflection order. Behaviour on
+>   CoreCLR is unchanged.
+> - `AppBootstrapper.AddAsm` called `Assembly.GetName()` on every assembly. That materializes the culture,
+>   which a globalization-invariant process cannot construct, so the eleven satellite resource assemblies
+>   SqlClient ships aborted discovery with `CultureNotFoundException`. Satellites carry no code and are
+>   never Koan modules; they are now skipped on the same lenient terms as an unresolvable reference. **This
+>   presented as a SqlClient failure and was Koan's.**
+>
+> **The `MetadataToken` defect had also broken SQLite, which this ADR certified working.** The mapping
+> compiler landed 2026-08-06, three weeks after the 2026-07-17 proof below, and nothing re-published. The
+> single-binary claim was therefore false for the embedded floor as well as unproven for the servers, and
+> only running a publish revealed it — a standing argument for re-measuring a certified capability rather
+> than inheriting it.
+
 > **Implementation update (R10-01, 2026-07-17):** GardenCoop revalidated the win-x64 native path
 > and exposed two documentation/runtime gaps. `KoanFactJson` now uses its own source-generated
 > serialization context, so the public facts endpoint remains available when reflection serialization

@@ -4,6 +4,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Core.Reflection;
 
 namespace Koan.Data.Core.Mapping.Runtime;
 
@@ -54,7 +55,7 @@ internal sealed class StructuredValuePlan
             .Where(static property => property.GetCustomAttribute<NotMappedAttribute>(inherit: true) is null &&
                                       property.GetCustomAttribute<IgnoreStorageAttribute>(inherit: true) is null)
             .Where(property => excludedRootProperties is null || !excludedRootProperties.Contains(property.Name))
-            .OrderBy(static property => property.MetadataToken)
+            .OrderBy(static property => DeclarationOrder.Of(property))
             .Select(property => CompileProperty(property, active, depth + 1))
             .ToArray();
         active.Remove(effective);

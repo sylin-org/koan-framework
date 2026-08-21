@@ -6,7 +6,7 @@
     <AssemblyName>Koan.Data.Connector.Postgres</AssemblyName>
     <RootNamespace>Koan.Data.Connector.Postgres</RootNamespace>
     <Description>PostgreSQL provider for Koan relational data: raw-ADO SQL integration with guardrails and governance.</Description>
-    <PackageTags>$(CommonPackageTags);data;postgres;relational;sql;dapper</PackageTags>
+    <PackageTags>$(CommonPackageTags);data;postgres;relational;sql</PackageTags>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" />

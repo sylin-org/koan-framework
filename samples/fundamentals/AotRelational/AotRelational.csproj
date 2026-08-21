@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <StripSymbols>true</StripSymbols>
+    <!-- Which relational connector this build references. One app, four backends. -->
+    <Connector Condition="'$(Connector)' == ''">Sqlite</Connector>
+    <AssemblyName>AotRelational</AssemblyName>
+    <RootNamespace>AotRelational</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Connector)' == 'Sqlite'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Sqlite\Koan.Data.Connector.Sqlite.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'Postgres'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'SqlServer'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\SqlServer\Koan.Data.Connector.SqlServer.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'MySql'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\MySql\Koan.Data.Connector.MySql.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'Cockroach'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Cockroach\Koan.Data.Connector.Cockroach.csproj" />
+  </ItemGroup>
+
+  <!--
+    Microsoft.Data.SqlClient refuses to open a connection in globalization-invariant mode
+    ("NotSupportedException: Globalization Invariant Mode is not supported", from SqlConnection.TryOpen).
+    That is the driver's own refusal, not an AOT limit, so a SQL Server build carries culture data.
+    The other four backends do not need it and publish smaller without it.
+  -->
+  <PropertyGroup Condition="'$(Connector)' == 'SqlServer'">
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!-- AOT is opt-in so it never perturbs the ordinary solution build (ARCH-0093 §2). -->
+  <PropertyGroup Condition="'$(KoanAot)' == 'true'">
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+</Project>

@@ -289,6 +289,10 @@
             .ToArray();
         var lines = new[] { "schema|1" }.Concat(referenceLines).Concat(dependencyLines).ToArray();
         var content = string.Join(Environment.NewLine, lines) + Environment.NewLine;
+        // The manifest lands in the RID-specific intermediate path, which a first `-r <rid>` publish
+        // has not created yet — this target runs before the compiler makes it.
+        var manifestDirectory = Path.GetDirectoryName(OutputPath);
+        if (!string.IsNullOrEmpty(manifestDirectory)) Directory.CreateDirectory(manifestDirectory);
         var existing = File.Exists(OutputPath) ? File.ReadAllText(OutputPath) : null;
         if (!string.Equals(existing, content, StringComparison.Ordinal)) File.WriteAllText(OutputPath, content);
       ]]></Code>

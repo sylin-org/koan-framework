@@ -45,6 +45,9 @@ application learn something new without losing what already worked.
   reloads the work in a tiny console application.
 - [TaskGraph](fundamentals/TaskGraph/README.md) makes relationships readable across one Entity, a
   set, and a stream.
+- [AotRelational](fundamentals/AotRelational/README.md) writes and reads one entity against SQLite,
+  PostgreSQL, CockroachDB, MySQL or SQL Server — the same source each time — and publishes as a
+  NativeAOT binary that needs no installed .NET runtime.
 
 Run any sample from the repository root with the command on its page. On Windows, its `start.bat`
 does the same thing from any directory and forwards any application arguments.

@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Mapping.Runtime;
+using Koan.Core.Reflection;
 
 namespace Koan.Data.Core;
 
@@ -298,7 +299,7 @@ public static class MappingPlanCompiler
                      .Where(static property => property.GetIndexParameters().Length == 0 && property.GetMethod is not null)
                      .Where(static property => property.GetCustomAttribute<NotMappedAttribute>(inherit: true) is null &&
                                                property.GetCustomAttribute<IgnoreStorageAttribute>(inherit: true) is null)
-                     .OrderBy(static property => property.MetadataToken))
+                     .OrderBy(static property => DeclarationOrder.Of(property)))
         {
             var logical = logicalBase.Append(MappingPath.Of(property.Name));
             if (root && (logical.Equals(identity) || identity.IsPrefixOf(logical))) continue;

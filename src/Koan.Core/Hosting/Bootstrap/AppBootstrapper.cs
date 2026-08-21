@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using Koan.Core;
 using Koan.Core.Hosting.Modules;
 using Koan.Core.Hosting.Registry;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -102,7 +103,22 @@ public static class AppBootstrapper
 
         bool AddAsm(Assembly a, bool isDiscovery = false)
         {
-            var name = a.GetName().Name ?? "";
+            string name;
+            try
+            {
+                name = a.GetName().Name ?? "";
+            }
+            catch (CultureNotFoundException)
+            {
+                // Assembly.GetName() materializes the culture, and a globalization-invariant process
+                // cannot construct one for a satellite resource assembly (Microsoft.Data.SqlClient ships
+                // eleven). A satellite carries resources and no code, so it is never a Koan module —
+                // skip it on the same lenient terms as an unresolvable reference, rather than letting a
+                // localized dependency abort discovery for the whole application.
+                lenientAssemblySkips++;
+                return false;
+            }
+
             if (!set.ContainsKey(name))
             {
                 set[name] = a;

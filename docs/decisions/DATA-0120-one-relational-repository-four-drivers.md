@@ -98,11 +98,15 @@ one-line delegation to each store's own capability declaration — exactly the t
 - A test that exercises one adapter's shared path now exercises every adapter's, which is the coverage gap
   behind this cycle's pattern of defects being found by a suite downstream of the code that broke.
 - Adapters shrink toward a driver and a dialect, which is the precondition ARCH-0094 needs.
-- **Unverified as of this writing:** removing Dapper removes the blocker ARCH-0093 *named*, but whether a
-  PostgreSQL, SQL Server or MySQL application actually publishes under NativeAOT depends on the provider
-  libraries — `Npgsql`, `Microsoft.Data.SqlClient`, `MySqlConnector` — which have not been examined. Nothing in
-  the relational tier emits IL any more; that is a fact. That the single-binary story now extends past SQLite
-  is a hypothesis, and is carried as PMC-049 rather than claimed here.
+- **NativeAOT reaches the servers — measured 2026-08-21, PMC-049.** Removing Dapper removed the blocker
+  ARCH-0093 *named*; whether the provider libraries would then publish was a separate question, and it is now
+  answered by publishing rather than by argument. All four drivers produce a working native binary that
+  writes and reads through `Entity<T>` against a real server: `Npgsql` 10.0.3 on PostgreSQL 17 and on
+  CockroachDB v24.3, `MySqlConnector` 2.6.1 on MySQL 8.4, and `Microsoft.Data.SqlClient` 7.0.2 on SQL Server
+  2022. `samples/fundamentals/AotRelational` is the reproduction. One provider constraint attaches, and it is
+  the driver's rather than AOT's: SqlClient refuses globalization-invariant mode, so a SQL Server build carries
+  culture data. Three framework defects on the AOT path had to be repaired first — see ARCH-0093 — one of which
+  had silently broken SQLite's certified proof three weeks earlier.
 - The risk is real and is why this is Proposed rather than Accepted: a collapse that flattens a genuine
   per-store difference converts correct implementations into one that is subtly wrong everywhere. `Count` is
   the worked example — `COUNT_BIG` reads as a spelling preference and is an overflow bound. The mitigation is

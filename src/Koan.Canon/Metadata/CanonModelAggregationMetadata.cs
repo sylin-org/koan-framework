@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
 using Koan.Canon;
+using Koan.Core.Reflection;
 
 namespace Koan.Canon;
 
@@ -171,7 +172,7 @@ public sealed class CanonModelAggregationMetadata
 
         var keyProperties = orderedProperties
             .Where(static property => property.IsDefined(typeof(AggregationKeyAttribute), inherit: true))
-            .OrderBy(static property => property.MetadataToken)
+            .OrderBy(static property => DeclarationOrder.Of(property))
             .ToArray();
 
         if (keyProperties.Length == 0)

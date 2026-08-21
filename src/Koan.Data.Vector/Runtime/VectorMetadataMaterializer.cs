@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using Koan.Data.Abstractions;
 using Microsoft.Extensions.Options;
+using Koan.Core.Reflection;
 
 namespace Koan.Data.Vector;
 
@@ -95,7 +96,7 @@ internal sealed class VectorMetadataMaterializer
                     "Reduce metadata POCO shapes or increase VectorDefaults:MetadataShapeEntries.");
             var created = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(static property => property.CanRead && property.GetIndexParameters().Length == 0)
-                .OrderBy(static property => property.MetadataToken)
+                .OrderBy(static property => DeclarationOrder.Of(property))
                 .Select(CreateAccessor)
                 .ToArray();
             if (created.Length == 0)

@@ -54,6 +54,31 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **A certified capability decays silently; re-measure it before building on it.** ARCH-0093 certified a
+  SQLite NativeAOT binary on 2026-07-17. Three weeks later a mapping compiler landed that ordered properties by
+  `MemberInfo.MetadataToken` — which does not exist under ILC — and every AOT publish died on the first entity
+  mapped. Nobody re-published, so the ADR still read as proof and a guide still read as blocked, both wrong in
+  opposite directions. The question asked (do the *servers* publish?) could not be answered without first
+  discovering the *floor* had stopped publishing. Where a capability has no suite, its certification is a
+  timestamp, not a fact. (2026-08-21)
+- **"The provider doesn't support it" is a hypothesis about someone else's code; check your own first.** The
+  SQL Server AOT binary failed with `CultureNotFoundException`, which reads as a `Microsoft.Data.SqlClient`
+  limitation. It was Koan's: `AppBootstrapper` called `Assembly.GetName()` on every assembly, which materializes
+  the culture, and SqlClient merely happens to ship eleven satellite resource assemblies that an invariant
+  process cannot name. The genuine SqlClient constraint was a *different* error found after fixing ours — an
+  explicit `NotSupportedException` refusing invariant mode, which is driver policy and not about AOT at all.
+  Two failures wearing one provider's name, and only one belonged to it. (2026-08-21)
+- **A defect that only fires on the first run hides in a tree where everything has been built once.** The
+  reference-manifest writer never created its RID-specific intermediate directory, so the first `-r <rid>`
+  publish of any Koan application failed — and the second succeeded, on the directory the failure had left
+  behind. It survived because the samples had all been published before. A new project is the only thing that
+  tests a first run; reach for one when a build step looks unconditionally correct. (2026-08-21)
+- **Make the probe name who answered.** The AOT relational probe prints the elected adapter
+  (`adapter=NpgsqlRepository`2`) before it writes, and the row is then confirmed in the container from outside
+  the application. Without both, a connector that failed election and fell back to another store would produce a
+  perfectly green write-then-read — the proof would be of the fallback, not of the thing under test. An
+  end-to-end assertion that reads back what it just wrote is self-consistent by construction. (2026-08-21)
+
 - **Do not write a capability claim into a durable document ahead of its evidence — including your own.**
   Removing Dapper removed the blocker ARCH-0093 named, and the consequence "NativeAOT stops being SQLite's
   private property" went straight into DATA-0120. It is not established: whether a server adapter publishes

@@ -4,12 +4,12 @@ domain: orchestration
 title: "Publishing a Koan app with NativeAOT"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-20
-framework_version: v0.20.0
+last_updated: 2026-08-21
+framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-07-20
-  status: blocked
-  scope: GardenCoop Chapter 1 win-x64 publish currently stops inside the .NET 10.0.10 ILC analyzer
+  date_last_tested: 2026-08-21
+  status: verified
+  scope: win-x64 publish and run of GardenCoop Chapter 1 (SQLite + Web) and of AotRelational against SQLite, PostgreSQL, CockroachDB, MySQL and SQL Server containers
 related_guides:
   - composition-lockfile.md
   - ai-vector-howto.md
@@ -22,11 +22,13 @@ every capability it uses is AOT-compatible. The deployment is a directory: the n
 travel with application assets and connector-native libraries. The framework wiring for AOT is decided in
 [ARCH-0093](../decisions/ARCH-0093-nativeaot-substrate.md); this guide is the operational recipe.
 
-> **Current boundary:** NativeAOT is experimental and not part of Koan's 0.20 guarantee. With the pinned .NET
-> 10.0.302 SDK and 10.0.10 runtime packs, [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/)
-> stops inside the ILC analyzer with an `IndexOutOfRangeException` before emitting an executable. The configuration
-> below remains a reproducible diagnostic surface. Use self-contained or single-file JIT publication for the current
-> candidate.
+> **Current boundary:** NativeAOT is experimental and not part of Koan's 1.0 guarantee, but it publishes and runs.
+> Verified 2026-08-21 on the pinned .NET 10.0.302 SDK with 10.0.10 runtime packs:
+> [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/) (SQLite + Web) publishes to a native
+> win-x64 executable and serves its reminders endpoint with `/health/ready` green, and
+> [AotRelational](../../samples/fundamentals/AotRelational/) writes and reads through `Entity<T>` against **SQLite,
+> PostgreSQL, CockroachDB, MySQL and SQL Server** containers. An earlier revision of this guide recorded an ILC
+> `IndexOutOfRangeException` on the same toolchain; it does not reproduce.
 
 ## Diagnostic commands
 
@@ -119,16 +121,23 @@ sudo apt-get install -y clang zlib1g-dev binutils libicu-dev   # Debian/Ubuntu
   under AOT; Koan's canonical serializer is Newtonsoft, which falls back to late-bound reflection
   (no IL emit). Root your serialized entity types (step 2). MVC responses are serialized by
   Koan.Web's Newtonsoft pipeline.
-- **The SQLite adapter is Dapper-free.** Dapper emits IL at runtime (`PlatformNotSupportedException`
-  under AOT), so the SQLite read/write path uses the hand-rolled `Koan.Data.Relational.Ado` helpers.
-  The server relational adapters (Postgres, SQL Server) keep Dapper — they never ship in a single
-  binary; if you somehow AOT one, route it through the same `Koan.Data.Relational.Ado` helpers.
+- **The relational tier is Dapper-free — all of it.** Dapper emitted IL at runtime
+  (`PlatformNotSupportedException` under AOT), which once split the adapters into an AOT floor and a
+  server tier. It is gone: every relational adapter (SQLite, PostgreSQL/CockroachDB, SQL Server, MySQL)
+  reads and writes through the hand-rolled `Koan.Data.Relational.Ado` helpers, so nothing on this path
+  emits IL and every relational backend is publishable. See DATA-0120 and ARCH-0093.
+- **SQL Server needs globalization data.** `Microsoft.Data.SqlClient` refuses to open a connection in
+  globalization-invariant mode — `NotSupportedException: Globalization Invariant Mode is not supported`,
+  from `SqlConnection.TryOpen`. Publish a SQL Server application with `InvariantGlobalization=false`.
+  This is the driver's own refusal, not an AOT limit: it applies to a JIT build in invariant mode too,
+  and it is the one provider-specific constraint measured across the five relational backends.
 - **No `dynamic`.** The DLR can't bind under AOT. Koan's hot paths avoid it.
 - **Native dependencies are unverified for the candidate.** GardenCoop retains `e_sqlite3` packaging intent, but the
   current compiler failure occurs before the application can prove that deployment. Treat every native connector and
   RID as a separate publish-and-run claim.
 - **Globalization.** Set `<InvariantGlobalization>true</InvariantGlobalization>` in the app project
-  (the floor doesn't need culture data). Otherwise the AOT binary needs ICU present on the target.
+  (the floor doesn't need culture data) — **unless the app uses SQL Server**, which refuses that mode
+  outright (see above). Otherwise the AOT binary needs ICU present on the target.
   Note the **build/SDK** box still needs `libicu` regardless — `dotnet` itself fails fast without it.
 
 ## 4b. Ship the app's content beside the binary
@@ -157,26 +166,47 @@ Resolve such paths against `AppContext.BaseDirectory` (the exe's directory), nev
 (All four `[Embedding]` text strategies — `Template`, `Properties`/`AllStrings`, and `FullJson` —
 are AOT-clean: text is built by reflection over names + string ops, and `FullJson` uses Newtonsoft.)
 
-## 6. Reproduce and verify after the compiler blocker is removed
+## 6. Reproduce and verify
 
-The current command is expected to reproduce the ILC analyzer failure. After the pinned toolchain can publish it,
-the boot report's `Registry`/`Inventory` blocks must list every discovered module—if the trim roots worked
-you'll see all of them. Then exercise a real business path end-to-end; for the current sample:
+The boot report's `Registry`/`Inventory` blocks must list every discovered module — if the trim roots worked
+you'll see all of them. Then exercise a real business path end-to-end.
+
+**A web app on the embedded floor** (SQLite + Web), from a `vcvars64` prompt:
 
 ```powershell
 dotnet publish samples/journeys/GardenCoop/01-GardenJournal/GardenCoop.C01.csproj `
-  -c Release -r win-x64 --self-contained true -p:KoanAot=true
+  -c Release -r win-x64 -p:KoanAot=true -p:IlcUseEnvironmentalTools=true -o artifacts/aot/GardenCoopC01
 
-Set-Location samples/journeys/GardenCoop/01-GardenJournal/bin/Release/net10.0/win-x64/publish
-./GardenCoop.C01.exe --urls http://127.0.0.1:5000
-# In another terminal: Invoke-RestMethod http://127.0.0.1:5000/api/garden/reminders
+./artifacts/aot/GardenCoopC01/GardenCoop.C01.exe --urls http://127.0.0.1:5000
+# In another terminal:
+Invoke-RestMethod http://127.0.0.1:5000/api/garden/reminders   # returns the derived reminders
+Invoke-RestMethod http://127.0.0.1:5000/health/ready           # 200
 ```
+
+**A server database.** [AotRelational](../../samples/fundamentals/AotRelational/) is one console app whose
+source does not change across backends; `-p:Connector=` selects the driver, and it prints the adapter that
+took the call before it writes, so a fallback cannot pass as a proof:
+
+```powershell
+dotnet publish samples/fundamentals/AotRelational/AotRelational.csproj `
+  -c Release -r win-x64 -p:KoanAot=true -p:Connector=Postgres `
+  -p:IlcUseEnvironmentalTools=true -o artifacts/aot/Postgres
+
+$env:Koan__Data__Postgres__ConnectionString = "Host=localhost;Port=5432;Username=koan;Password=...;Database=koanaot"
+./artifacts/aot/Postgres/AotRelational.exe    # adapter=NpgsqlRepository`2 … OK
+```
+
+`Connector` accepts `Sqlite`, `Postgres`, `Cockroach`, `MySql` and `SqlServer`; the sample's README carries the
+connection-string variable for each. Verify the row landed in the store itself rather than trusting the read-back.
 
 ## 7. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
-| ILC analyzer throws `IndexOutOfRangeException` | Current .NET 10.0.10 compiler/runtime-pack blocker reproduced by GardenCoop Chapter 1. Do not claim native deployment success; use self-contained or single-file JIT and re-run this proof after the toolchain changes. |
+| `NotSupportedException: Globalization Invariant Mode is not supported` | `Microsoft.Data.SqlClient` refuses invariant mode. Publish the app with `-p:InvariantGlobalization=false` (§4). |
+| `DirectoryNotFoundException` on `koan.references.manifest` | Fixed 2026-08-21. The manifest writer did not create the RID-specific intermediate directory, so only the **first** `-r <rid>` publish of a project failed. Update `Sylin.Koan.Core.targets`, or publish twice. |
+| `MappingCompilationException: There is no metadata token available for the given member` | Fixed 2026-08-21. `MemberInfo.MetadataToken` does not exist under ILC; declaration order now goes through `Koan.Core.Reflection.DeclarationOrder`. |
+| `CultureNotFoundException` during boot, naming a two-letter culture | Fixed 2026-08-21. `Assembly.GetName()` materializes the culture, which an invariant process cannot construct for a satellite resource assembly. Discovery now skips satellites. |
 | `NETSDK1207` on a `Koan.*.Generators` project | A **global** `-p:PublishAot=true`. Use the `-p:KoanAot=true` gate (§1) so `PublishAot` is set only on the app. |
 | Windows link error mentioning `vswhere` / `link.exe` | Publish inside `vcvars64` with `-p:IlcUseEnvironmentalTools=true` (§3), or install the **Desktop development with C++** workload (MSVC `link.exe`). |
 | Boot throws missing-controller/entity `InvalidOperationException` | A reflection-reached type was trimmed — add it to `NativeAotRoots.xml` or `[DynamicDependency]` (§2). Koan modules are auto-rooted; this is for **your** types. |
