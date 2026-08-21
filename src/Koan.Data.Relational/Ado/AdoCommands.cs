@@ -8,8 +8,12 @@ namespace Koan.Data.Relational.Ado;
 /// single-binary floor). Deliberately Dapper-free: Dapper's <c>GetTypeDeserializerImpl</c> emits IL at runtime,
 /// which NativeAOT forbids (<see cref="PlatformNotSupportedException"/>: "Dynamic code generation is not supported").
 /// Koan entities persist as a single <c>(Id, Json)</c> row, so a hand-rolled reader is all that is needed — the
-/// richer object mapping stays in Newtonsoft over the <c>Json</c> value. The Dapper-backed twin with the same
-/// surface keeps the embedded relational path compatible with NativeAOT.
+/// richer object mapping stays in Newtonsoft over the <c>Json</c> value.
+///
+/// <para>Nothing calls this today. The Dapper-backed twin it was written alongside was retired (R11-02), and
+/// the SQLite adapter it was written for hand-rolls its commands instead. Whether it is adopted or retired
+/// in turn is PMC-047; until then it is documented as unused rather than left reading as though it were on
+/// a live path.</para>
 /// </summary>
 /// <remarks>
 /// Helpers accept <see cref="IDbConnection"/> (the SQLite adapter pools a wrapper) and obtain async ADO by casting

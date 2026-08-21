@@ -54,6 +54,17 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **Read for the constraint before designing the collapse.** DATA-0120 opened proposing one relational core over
+  four adapters. Reading found that SQLite uses raw ADO and references Dapper nowhere, because Dapper emits IL
+  at runtime and NativeAOT forbids it — ARCH-0093's shipped single-binary proof depends on that. A Dapper-based
+  core would have excluded SQLite; a Dapper-free one would have re-litigated a decided question. The constraint
+  was findable in ten minutes and would have invalidated weeks of work. (2026-08-21)
+- **"Obviously a decision" is as unreliable as "obviously duplication".** Of the members an inherited measurement
+  labelled genuine divergences, `Order` and `Query` both turned out to be grammar — `Query` differs only in
+  `OFFSET…FETCH` against `LIMIT…OFFSET`. Meanwhile `Upsert`, which looks like boilerplate, is three idiomatic
+  strategies with different transactional semantics, and `Count` hides an overflow bound in `COUNT_BIG`. The
+  label has to come from reading the member, in both directions. (2026-08-21)
+
 - **"Flaky" is a diagnosis, and it is usually the wrong one.** A Jobs spec failed in batch runs and passed
   alone, on one store and then another, and was filed as a test-isolation problem. It was a spec depending on an
   order nothing specified: two ledger rows seeded at the same instant, tied on the claim window's entire sort,

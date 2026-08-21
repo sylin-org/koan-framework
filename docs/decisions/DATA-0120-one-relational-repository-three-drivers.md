@@ -1,0 +1,143 @@
+---
+id: DATA-0120
+slug: one-relational-repository-three-drivers
+domain: DATA
+status: Proposed
+date: 2026-08-21
+title: One relational repository, three drivers
+related:
+  - ARCH-0094
+  - DATA-0119
+---
+
+# DATA-0120: One relational repository, three drivers
+
+## Precedence
+
+This record extends DATA-0119 from schema work to the read and write path. DATA-0119 established where a
+relational *decision* lives and what a result reports; it left four repositories each holding a private copy of
+the same execution. This record is authoritative for **what a relational adapter still owns** once that copy is
+gone.
+
+## Application contract
+
+Unchanged. Nothing here is visible to an application:
+
+```csharp
+var open = await Todo.Query(item => !item.Done);
+await todo.Save();
+```
+
+That is the point. This is a change to who holds the code behind those two lines, not to what they do.
+
+## Context
+
+Four relational repositories — SQLite (983 lines), MySQL (701), PostgreSQL/CockroachDB (659), SQL Server
+(653) — expose **the same 27 members under the same names** and implement most of them the same way.
+
+Measured on 2026-08-21 against the current tree. Three members are byte-identical across all four once
+whitespace is stripped: `InstructionSql`, the public `Delete` overload, and `CreateBatch`. `IdentityPredicate`
+differs in exactly one token — which dialect's `Quote` it calls — and every dialect already implements
+`IRelationalMappingDialect.QuoteIdent`. `Describe` differs only in the provider name and capability constants
+it reports.
+
+**A textual similarity ratio was computed across all 27 members and then rejected as evidence**, in both
+directions, and the reason is worth recording. `GetMany` scores 34% between SQL Server and Npgsql, yet the two
+bodies are the same code: the ratio is consumed by `plan.` versus `_plan.`, by the four different connection
+type names, and by one statement assigned to a local in one copy and inlined in the other. A ratio understates
+duplication wherever a mechanical difference repeats, and would overstate it wherever two stores happen to
+spell different logic similarly. The only evidence that settles a member is reading it.
+
+So the honest statement of the problem is not a percentage. It is that the member set is identical, the shapes
+rhyme throughout, and most differences sampled so far have been mechanical rather than semantic. `Query`,
+`StableOrder`, `ExecuteSql` and the `Batch` nested class are where divergence looks real and has not yet been
+explained. One sampled difference was neither mechanical nor a store decision: MySQL's `Order` carries a
+tiebreaker the other three lack, which is a framework gap the collapse would otherwise erase (PMC-046).
+
+This matters beyond tidiness for the reason DATA-0119 gave: grammar is generable and verifiable, decisions are
+not, and every decision left in adapter code is one a generated adapter can silently get wrong (ARCH-0094). It
+also matters for defect economics. Three defects this cycle were found by a suite downstream of the code that
+broke, because the same logic exists four times and any given test exercises one copy. A fix applied to one
+copy is not a fix.
+
+## Decision
+
+*(Drafted; not yet accepted. The measurement is re-derived and current, and the reading below reshaped the
+proposal once already — the four-way collapse this record opened with is not available.)*
+
+**The collapse is over the three Dapper adapters. SQLite stays separate, by an accepted decision rather than
+by neglect.**
+
+ARCH-0093 settled this and the reading found it rather than assuming it. Dapper's `GetTypeDeserializerImpl`
+emits IL at runtime, which NativeAOT forbids outright, so SQLite — the sovereign single-binary floor — is
+Dapper-free, and the NativeAOT proof that depends on it is shipped and measured on win-x64 and linux-x64. The
+other three are, in that record's words, "servers that never ship inside a single binary". A shared core built
+on Dapper therefore cannot include SQLite, and one built without Dapper would re-litigate a decided question.
+So:
+
+- **A core over SQL Server, MySQL and PostgreSQL/CockroachDB.** It owns the member set, the command sequence,
+  parameter binding, materialization, batch semantics, and the receipt every read returns.
+- **The dialect owns spelling**, as it already does, and the members that differ by one token become calls into
+  it rather than copies.
+- **SQLite is out of scope**, and this record says so explicitly so the next reader does not file its
+  divergence as drift. Its raw-ADO path is what makes the single binary possible.
+
+**Not everything that looks like grammar is grammar.** `Count` reads as boilerplate and is not: SQL Server
+issues `COUNT_BIG(1)` where the others issue `COUNT(1)`, because `COUNT` returns an `int` and overflows past
+two billion rows. Flattened to the majority spelling it would be silently wrong on the largest tables anyone
+runs. It belongs in the dialect.
+
+**`Describe` is not collapsible either**, and an earlier draft of this record said it was 94% identical. It is a
+one-line delegation to each store's own capability declaration — exactly the thing an adapter should keep. The
+94% was an artifact of a range-matching script that ran past the member's end.
+
+## Consequences
+
+- The server adapters stop holding three copies of the same execution. A fix lands once across them.
+- A test that exercises one of the three now exercises all three, which is the coverage gap behind this cycle's
+  pattern of defects being found by a suite downstream of the code that broke.
+- Those adapters shrink toward a driver and a dialect, which is the precondition ARCH-0094 needs. SQLite does
+  not, and keeps the extra weight that buys the single binary.
+- The risk is real and is why this is Proposed rather than Accepted: a collapse that flattens a genuine
+  per-store difference converts correct implementations into one that is subtly wrong everywhere. `Count` is
+  the worked example — `COUNT_BIG` reads as a spelling preference and is an overflow bound. The mitigation is
+  order: collapse the members already read and classified, prove the suites stay green at each step, and treat
+  every unread member as a decision until its difference is explained rather than assumed.
+
+## Evidence
+
+The member-by-member reading is under way. What it has established:
+
+| Member | Verdict |
+|---|---|
+| `InstructionSql`, `Delete`, `CreateBatch` | Byte-identical across all four. Collapsible as-is. |
+| `Order` | Logically identical across all four after PMC-046. Collapsible, and the first member ready. |
+| `IdentityPredicate` | Differs by one token — which dialect's `Quote` is called. Collapsible through `QuoteIdent`. |
+| `GetMany` | Same code; differs by `plan` versus `_plan`, connection type names, and one statement inlined rather than assigned. Collapsible. |
+| `StableOrder` | Differs only because SQLite aliases the row as `koan_row` and the others do not. Collapsible within the three. |
+| `Query` | Same logic in all three. The only difference is the page clause — `OFFSET n ROWS FETCH NEXT m ROWS ONLY` against `LIMIT m OFFSET n`. Collapsible behind one dialect member. |
+| `Count` / `CountExact` | Collapsible **only** behind a dialect member. SQL Server's `COUNT_BIG(1)` is an overflow bound, not a spelling preference: `COUNT` returns an `int`. |
+| `Insert` | SQL Server and MySQL are identical apart from the quote. PostgreSQL is not: `jsonb` will not take a plain text parameter, so structured values bind as `CAST(@p AS jsonb)`, and its upsert is folded in as `ON CONFLICT` with managed-field guards. Collapsible only behind a dialect member for structured binding, and only once upsert is separated from it. |
+| `Upsert` | **A decision, not grammar.** Three idiomatic strategies with different semantics: `OUTPUT INSERTED` plus `IF @@ROWCOUNT` on SQL Server, `LAST_INSERT_ID()` and an explicit transaction for managed-field scope on MySQL, `RETURNING` with `ON CONFLICT` and an affected-rows cross-scope check on PostgreSQL. Stays adapter-owned. |
+| `Describe` | **Not collapsible.** A one-line delegation to each store's capability declaration, which is adapter-owned by design. An earlier draft of this record called it 94% identical; that was an artifact of a range-matching script running past the member's end. |
+| Data access | **The structural split, and out of scope.** SQLite uses raw ADO throughout (13 `CreateCommand()` calls, no Dapper reference in its csproj); the other three use Dapper exclusively. ARCH-0093 makes this a constraint. |
+
+Two things the reading turned up that are not about the collapse:
+
+- **`Koan.Data.Relational/Ado` is dead.** `AdoCommands` and `SqlParameters` are tracked, AOT-clean, and used by
+  nobody — SQLite hand-rolls its commands instead of calling them. Their documentation still describes a
+  "Dapper-backed twin with the same surface" that was deliberately retired (R11-02), so the surface has
+  outlived both its twin and its only intended caller. `QueryIdJsonAsync` also pins the retired `(Id, Json)`
+  storage shape, which the mapping model has since outgrown. Carried as PMC-047.
+- **A textual similarity ratio was computed twice and rejected twice.** Raw ratios put `GetMany` at 34% while
+  the two bodies are the same code; folding the mechanical differences away made it worse, scoring `UpdateSet`
+  at 3% through a distortion the normalizer introduced. Where the question is whether two implementations are
+  the same, read them.
+
+Still required before this record is accepted:
+
+- The remaining unread members: `Batch`, `UpdateSet`, `ExecuteSql`, `QueryRaw`, `CountRaw`, `UpsertMany`,
+  `DeleteMany`, `DeleteAll`, `RemoveAll`, `ConditionalReplaceAsync`, `Open`, `Ready`, `Provision`, `Validate`,
+  `Materialize`, `Where`, `ExecuteAsync`. Two members already moved from "known divergence" to "collapsible"
+  once read — `Order` and `Query` — and one moved the other way, `Upsert`. Assume nothing about the rest.
+- A named collapse order, smallest and most certain first, with the suites green at each step.
