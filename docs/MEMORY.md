@@ -54,6 +54,18 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **A proof nothing re-runs is a claim with a shelf life.** ARCH-0093 certified the NativeAOT single binary on
+  2026-07-17. The mapping compiler began using `MemberInfo.MetadataToken` on 2026-08-06, which ILC does not
+  keep, and from that day every AOT-published Koan application failed on the first entity it mapped. Five weeks
+  passed with the claim standing in an accepted ADR, and it was found only because an unrelated question sent
+  someone to re-measure. The defect was not subtle; nothing was watching. When a capability is proven by a
+  manual procedure, the procedure is the capability — schedule it or expect it to expire. (2026-08-21)
+- **Do not cite a precedent without `git ls-files`.** A handoff prompt named
+  `samples/guides/g1c2.GardenCoopEmbedded` as the worked SQLite precedent, on the strength of a PROGRESS.md
+  entry describing it in detail. It does not exist in the tree. The prompt's own constraints told the reader to
+  treat `git ls-files` as the authority, which is the check its author had skipped. Secondary documents describe
+  the tree on the day they were written. (2026-08-21)
+
 - **A certified capability decays silently; re-measure it before building on it.** ARCH-0093 certified a
   SQLite NativeAOT binary on 2026-07-17. Three weeks later a mapping compiler landed that ordered properties by
   `MemberInfo.MetadataToken` — which does not exist under ILC — and every AOT publish died on the first entity
