@@ -54,6 +54,20 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **When a comparison is unreliable, stop comparing and start marking.** A stored generated column can go stale
+  without its type changing, and the obvious check — read the expression back and compare it — does not work,
+  because a store returns its own canonical rendering rather than the text it was given. That fragility is what
+  kept definition validation out of three relational adapters. Writing a fingerprint Koan controls, into a
+  column comment, and comparing it against one Koan computes turned an open-ended parsing problem into string
+  equality — and gave the absence of a marker a precise meaning: written by a version that did not know to
+  leave one, which is exactly the population that needs repair. (2026-08-21)
+- **A fix that only helps new installations is half a fix.** Correcting how MySQL reads a JSON null repaired
+  every table created afterwards and left every existing one broken — the defect surviving the upgrade, and the
+  declared indexes silently retiring because the optimizer no longer recognised the column. Neither showed up
+  in any suite, because suites build their tables fresh. When a change alters something a store persists, ask
+  what happens to the databases that already exist; the answer is rarely "nothing" and is never tested by
+  default. (2026-08-21)
+
 - **A guard is not trusted until it has failed against the thing it exists to catch — and running that
   trial is how you find the cells you are missing.** Three defects, three trials. Two were caught by the
   obvious cell. The third — `Assembly.GetName()` on a satellite resource assembly in invariant mode — was

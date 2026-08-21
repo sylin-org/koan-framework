@@ -33,7 +33,8 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT c.column_name, c.column_type, c.is_nullable,
-                   c.character_set_name, c.collation_name, c.extra, pk.ordinal_position
+                   c.character_set_name, c.collation_name, c.extra, pk.ordinal_position,
+                   c.column_comment
               FROM information_schema.columns AS c
               LEFT JOIN information_schema.key_column_usage AS pk
                 ON pk.table_schema = c.table_schema
@@ -62,7 +63,8 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
                     NativeType: Native(
                         reader.GetString(1),
                         reader.IsDBNull(3) ? null : reader.GetString(3),
-                        reader.IsDBNull(4) ? null : reader.GetString(4)));
+                        reader.IsDBNull(4) ? null : reader.GetString(4)),
+                    ProjectionStamp: Stamp(reader.IsDBNull(7) ? null : reader.GetString(7)));
                 if (!reader.IsDBNull(6)) key.Add((Convert.ToInt32(reader.GetValue(6)), name));
             }
         }
@@ -91,6 +93,8 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
         var (haveType, haveCharacterSet, haveCollation) = Split(actual.NativeType);
         // MySQL stores a boolean as tinyint(1) and reports it that way, so the expectation is read back the same.
         if (string.Equals(wantType, "boolean", StringComparison.OrdinalIgnoreCase)) wantType = "tinyint(1)";
+        if (expected.IsProjected && !string.Equals(actual.ProjectionStamp, ExpectedStamp(expected), StringComparison.Ordinal))
+            return false;
         return string.Equals(Normalize(haveType), Normalize(wantType), StringComparison.Ordinal) &&
                (wantCharacterSet is null ||
                 string.Equals(haveCharacterSet, wantCharacterSet, StringComparison.OrdinalIgnoreCase)) &&
@@ -123,8 +127,9 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
                     $"Projected column '{column.Name}' carries no source path to compute from.");
             // The generated expression is the dialect's own read, so the column holds exactly what a query
             // computing the same value would produce.
+            var expression = dialect.Read(source, MappingValueShape.Scalar, column.ClrType);
             return $"{MySqlDialect.Quote(column.Name)} {StoreType(column)} " +
-                   $"GENERATED ALWAYS AS ({dialect.Read(source, MappingValueShape.Scalar, column.ClrType)}) STORED";
+                   $"GENERATED ALWAYS AS ({expression}) STORED COMMENT '{StampPrefix}{Fingerprint(expression)}'";
         }
 
         var generated = column.IsIdentity && column.IsGenerated && IsInteger(column.ClrType)
@@ -208,6 +213,40 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
 
     private static string Qualify(RelationalTableDefinition table) =>
         $"{MySqlDialect.Quote(table.Schema)}.{MySqlDialect.Quote(table.Name)}";
+
+    private const string StampPrefix = "koan-gen:";
+
+    /// <summary>
+    /// The recipe marker written onto a generated column, and read back to tell a current one from a stale one.
+    ///
+    /// <para>A generated column can go stale without its type changing: the dialect changes how it reads a JSON
+    /// scalar, new tables get the new expression, and an existing table keeps the old one. That is not
+    /// cosmetic — the old expression is what broke writes of a null before it was fixed, and the optimizer only
+    /// substitutes a generated column for a query that spells the value the same way, so a stale column also
+    /// quietly stops serving the indexes built on it.</para>
+    ///
+    /// <para>Comparing the stored expression directly does not work: <c>information_schema</c> returns MySQL's
+    /// own canonical rendering, not the text it was given, so a comparison would be against the server's
+    /// formatter rather than against Koan. A fingerprint Koan wrote itself is compared against a fingerprint
+    /// Koan computes, which is exact. A column with no marker was written by a Koan that did not know to leave
+    /// one, which is precisely the population that needs rebuilding.</para>
+    /// </summary>
+    private string ExpectedStamp(RelationalColumnDefinition column)
+    {
+        var source = column.ProjectedFrom;
+        return source is null
+            ? string.Empty
+            : Fingerprint(dialect.Read(source, MappingValueShape.Scalar, column.ClrType));
+    }
+
+    private static string Fingerprint(string expression) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(expression)))[..12].ToLowerInvariant();
+
+    private static string? Stamp(string? comment) =>
+        comment is not null && comment.StartsWith(StampPrefix, StringComparison.Ordinal)
+            ? comment[StampPrefix.Length..]
+            : null;
 
     private static string Native(string columnType, string? characterSet, string? collation) =>
         characterSet is null
