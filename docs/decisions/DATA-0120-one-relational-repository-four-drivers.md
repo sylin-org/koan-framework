@@ -78,11 +78,12 @@ this record exists to review.)*
 **A decision stays with the adapter only when it is a decision** — and which members those are is not yet
 established. `Order` was carried into this draft as a known divergence on the strength of an earlier
 measurement, and reading it disproved that: SQLite, PostgreSQL and SQL Server implement it identically, comment
-included. MySQL alone differs, and its difference is not a store decision at all — it appends the identity
-columns to every ORDER BY as a tiebreaker, which is the framework's job and is now half-done there
-(`FilterPushdownCoordinator.EnsureOrderForPage` supplies an order only when the caller named none). That is a
-correctness gap, carried as PMC-046, and it has to be settled before `Order` is collapsed: collapsing onto the
-three-store majority would delete the only implementation that is currently right.
+included. MySQL alone differed, and its difference was not a store decision at all — it appended the identity
+columns to every ORDER BY as a tiebreaker, which is the framework's job and was only half-done there. Closing
+that gap (PMC-046) moved the tiebreaker into `EnsureOrderForPage` and removed MySQL's private copy, and `Order`
+is now logically identical across all four. It is the first member this record can name as ready to collapse,
+and it only became one because the outlier was explained rather than flattened: a majority-rule collapse would
+have deleted the only correct implementation and kept the bug on the other three.
 
 ## Consequences
 

@@ -538,9 +538,8 @@ internal sealed class MySqlRepository<TEntity, TKey> :
         MySqlEntityPlan<TEntity, TKey> plan, IReadOnlyList<SortSpec> sort)
     {
         if (sort.Count == 0) return (StableOrder(plan), RepositoryQueryResult<TEntity>.NoSortHandled);
-        var clauses = new List<string>();
-        var handled = new List<SortSpec>();
-        var orderedRoots = new HashSet<string>(StringComparer.Ordinal);
+        var clauses = new List<string>(sort.Count);
+        var handled = new List<SortSpec>(sort.Count);
         foreach (var item in sort)
         {
             // An order key that reaches through a collection is an aggregate over a nested array, so it has
@@ -564,13 +563,14 @@ internal sealed class MySqlRepository<TEntity, TKey> :
                 clauses.Add($"{plan.Dialect.Read(binding.PhysicalPath, binding.Shape, binding.PhysicalType)} " +
                             (item.Desc ? "DESC" : "ASC"));
                 handled.Add(item);
-                orderedRoots.Add(binding.PhysicalPath.Name);
             }
             catch (MappingValueException) { }
         }
-        foreach (var identity in plan.IdentityRoots.Where(identity => !orderedRoots.Contains(identity)))
-            clauses.Add(MySqlDialect.Quote(identity) + " ASC");
-        return handled.Count == 0
+        // This store used to append the identity to every ORDER BY itself, and was the only one whose paged
+        // reads were therefore stable over a non-unique key. The framework now supplies that tiebreaker for
+        // every adapter (FilterPushdownCoordinator.EnsureOrderForPage), so keeping a private copy would spell
+        // the same column twice.
+        return clauses.Count == 0
             ? (StableOrder(plan), RepositoryQueryResult<TEntity>.NoSortHandled)
             : ("ORDER BY " + string.Join(", ", clauses), handled.ToFrozenSet());
     }

@@ -34,6 +34,12 @@ public abstract class JobBehaviorSuite
         await using var host = await CreateHostAsync();
         var now = host.Clock.GetUtcNow();
         const string retiredJobId = "retired-work-type";
+        // Older than the work behind it, so the claim order is the one this spec is about rather than an
+        // accident. The subject is head-of-line blocking: a retired row the conveyor reaches first must be
+        // settled and stepped over, not left to stall the lane. Seeding it at the same instant as the valid
+        // job left the two tied on (VisibleAt, FirstSubmittedAt) and the winner unspecified, which is what
+        // made this spec fail on one store and then another as tie-breaking changed underneath it.
+        var earlier = now - TimeSpan.FromMinutes(1);
         await host.Ledger.Append(new JobRecord
         {
             Id = retiredJobId,
@@ -42,8 +48,8 @@ public abstract class JobBehaviorSuite
             Action = "run",
             Status = JobStatus.Queued,
             Lane = "default",
-            VisibleAt = now,
-            FirstSubmittedAt = now
+            VisibleAt = earlier,
+            FirstSubmittedAt = earlier
         }, TestContext.Current.CancellationToken);
 
         var valid = new GreetJob { Name = "still-runs" };

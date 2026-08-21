@@ -54,6 +54,30 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **"Flaky" is a diagnosis, and it is usually the wrong one.** A Jobs spec failed in batch runs and passed
+  alone, on one store and then another, and was filed as a test-isolation problem. It was a spec depending on an
+  order nothing specified: two ledger rows seeded at the same instant, tied on the claim window's entire sort,
+  and the conveyor's behaviour differs by which it reaches first. Load changed the arbitrary choice, which is
+  what produced the intermittency. An unrelated change then made the order deterministic and the failure
+  reproducible on three stores — which is how it finally became diagnosable. Before filing intermittency as
+  isolation, look for a tie the test is silently resolving. (2026-08-21)
+- **Making an order deterministic will break whatever was relying on it being arbitrary.** Appending an identity
+  tiebreaker to paginated reads was correct and well covered by the data suites; the failure landed two layers
+  away, in the jobs conveyor's claim window, where a spec's two rows were tied. Any change that turns an
+  unspecified order into a specified one needs its blast radius measured where orders are *consumed*, not only
+  where they are produced. (2026-08-21)
+
+- **A spec can encode the defect as the expected behaviour, and then nothing will ever catch it.**
+  `PageOrderOwnershipSpec` asserted that a paged query carrying a caller's sort reaches the adapter with
+  *exactly one* sort spec. That is precisely the bug — no tiebreaker — written down as the contract and kept
+  green. When a defect has survived a suite that looks like it covers the area, read what the spec asserts
+  before concluding the area is covered. (2026-08-21)
+- **Closing half a law leaves the other half looking closed.** DATA-0119 moved "the order a page is a window
+  onto" to the framework and closed the case where the caller named no order. Naming a sort is not naming a
+  total order, and the second case sat open for a cycle under a rule everyone believed was finished. When a
+  guarantee is stated as "X must always hold", enumerate the ways X can fail to hold, not the one that
+  prompted the work. (2026-08-21)
+
 - **Similarity metrics cannot answer "is this duplication".** Two attempts at scoring the four relational
   repositories both misled: raw ratios put `GetMany` at 34% when the two bodies are the same code (the score
   was eaten by `plan.` versus `_plan.` and four connection type names), and folding those differences away made
