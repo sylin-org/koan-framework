@@ -59,6 +59,16 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   passed while the pillar's central promise — messy arrivals converge — was broken for every real
   adapter. A double must be honest about the property that makes storage storage: serialization.
   Making it so gave an existing spec teeth it had never had. (2026-08-20)
+- **A seam that cannot represent the concept produces a lying implementation, however well built.** Sparse
+  projection blanked fields because `TEntity` had no vocabulary for *absent*, so `default` had to mean it — and
+  `0001-01-01` is not "absent", it is a date. Before asking who should own a decision, ask what the type can
+  *say*: a seam missing a word will be filled with a plausible wrong one. The relational schema seam needed two
+  additions for exactly this reason before any adapter could adopt it without losing validation. (2026-08-20)
+- **Assert the decision, not a sample of its effects.** A spec that paged an unsorted corpus and checked the
+  pages partitioned it passed with the guarantee removed — five rows come back from a small table in physical
+  order regardless. Where the change is "this decision now has one owner", assert that the owner made it; an
+  end-to-end sample can agree by luck and then be kept as false comfort. Check a new spec against a *disabled*
+  fix before trusting it. (2026-08-20)
 - **A capability question belongs to the provider, not to a static list.** Streaming refused an order key by
   its CLR type before any adapter was asked, which held every provider to what the weakest one manages — and
   the remedy it offered, "materialize the query", was the one thing streaming exists to avoid. The per-provider

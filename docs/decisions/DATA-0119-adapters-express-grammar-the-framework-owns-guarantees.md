@@ -135,6 +135,25 @@ lost — the read was unbounded, the whole collection was materialized — not a
 - Guarantee-shaped capabilities can be required, which moves a class of failure from the first
   exposing request to composition.
 
+## Implementation
+
+Landed on 2026-08-20, each commit green and standing alone:
+
+| | Change | Commit |
+|---|---|---|
+| Rule 1 | The order a page is a window onto moves to `FilterPushdownCoordinator`; `QueryReceiptValidator` rejects a provider page over an incomplete sort; `SqlServerSchema` and `NpgsqlSchema` consult `RelationalDdlGate` | `6526aa15f` |
+| Rule 2 | `RepositoryQueryResult.MaterializedAllCandidates`; the fallback fact names the loss and stops being blind to the key-value floors | `23a6c75e4` |
+| Rule 1 | `StableOrder` collapses to the identity on all four relational runtimes; `NpgsqlStableOrder` deleted | `ff0527d4e` |
+| — | `IRelationalDdlExecutor` made asynchronous, which is why no adapter could ever adopt it | `4be12be19` |
+| — | `RelationalColumnDefinition.NativeType` and `IRelationalDdlExecutor.NativeTypeFor`, so adoption costs no validation fidelity | `ed000e164` |
+
+**Not yet done: no adapter routes its schema work through the orchestrator.** The four hand-rolled
+`*Schema.cs` paths still exist, and consent is still reached by hand in each. The model is now complete
+enough that adoption loses nothing, which had to be true first. Carried as PMC-040.
+
+Rule 3 — a guarantee that can be declared can be required — is decided here and unimplemented. Nothing in
+the framework yet lets an Entity or source demand a guarantee and have composition negotiate or refuse.
+
 ## Evidence
 
 - Two successive unsorted pages over the same corpus partition it exactly — no repeats, no gaps — on
