@@ -17,6 +17,6 @@ public sealed class MongoFilterConvergenceSpec(MongoFixture fixture, ITestOutput
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await FilterConvergence.AssertConvergesAsync();
+        await FilterConvergence.AssertPushesDownAsync(host.Services);
     }
 }

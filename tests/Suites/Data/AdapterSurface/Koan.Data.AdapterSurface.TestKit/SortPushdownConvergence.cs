@@ -94,6 +94,37 @@ public static class SortPushdownConvergence
     public const string UnprovenScalar = "Duration";
 
     /// <summary>
+    /// Nothing the store was asked to do gets done in memory instead.
+    ///
+    /// <para>The rest of this oracle checks that orderings agree; this checks who performed them. The two are
+    /// independent: a query finished by the framework returns exactly the right rows, so an oracle comparing
+    /// rows stays green while the query reads the whole table to produce them. Koan records that decision where
+    /// it makes it, and this reads the same fact an operator would see at <c>/.well-known/Koan/facts</c>.</para>
+    ///
+    /// <para>The sweep is deliberately ordinary — every ordering, a page, a stream, an unfiltered read —
+    /// because the gap this catches is never in the exotic call. It is in the everyday one that quietly stopped
+    /// being pushed down. Filters answer for themselves inside <see cref="FilterConvergence"/>, which owns that
+    /// corpus.</para>
+    /// </summary>
+    public static async Task AssertNothingFallsBackAsync(IServiceProvider services)
+    {
+        await Seed();
+
+        await PushdownGuard.NothingFallsBack(services, "ordering, paging and streaming", async () =>
+        {
+            await Seed();
+            foreach (var field in PortableScalars.Concat(["Name", "Sightings.LastChangedAt"]))
+            {
+                _ = await Data<SortedWidget, string>.Page(1, 2, field);
+                _ = await Data<SortedWidget, string>.Page(1, 2, "-" + field);
+            }
+
+            await foreach (var _ in Data<SortedWidget, string>.AllStream("-ObservedAt", 2)) { }
+            _ = await SortedWidget.All();
+        });
+    }
+
+    /// <summary>
     /// Every scalar in <see cref="PortableScalars"/> orders on the store exactly as the framework's own sorter
     /// would order it, ascending and descending. This is what "proven portable" has to mean before a stream may
     /// page on that key: a caller reading page after page from the provider gets the sequence the CLR defines,

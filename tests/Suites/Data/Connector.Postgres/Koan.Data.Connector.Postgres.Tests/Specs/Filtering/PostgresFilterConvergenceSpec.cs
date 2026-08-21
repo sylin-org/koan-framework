@@ -15,6 +15,6 @@ public sealed class PostgresFilterConvergenceSpec(PostgresFixture fixture, ITest
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await FilterConvergence.AssertConvergesAsync();
+        await FilterConvergence.AssertPushesDownAsync(host.Services);
     }
 }

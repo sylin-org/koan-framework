@@ -16,6 +16,6 @@ public sealed class SqliteFilterConvergenceSpec(SqliteFixture fixture, ITestOutp
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await FilterConvergence.AssertConvergesAsync();
+        await FilterConvergence.AssertPushesDownAsync(host.Services);
     }
 }

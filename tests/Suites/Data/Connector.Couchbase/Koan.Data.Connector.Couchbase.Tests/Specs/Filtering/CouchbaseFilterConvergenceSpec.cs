@@ -26,6 +26,6 @@ public sealed class CouchbaseFilterConvergenceSpec(CouchbaseFixture fixture, ITe
         var partition = NewPartition("convergence");
         using var lease = Lease(partition);
 
-        await FilterConvergence.AssertConvergesAsync();
+        await FilterConvergence.AssertPushesDownAsync(host.Services);
     }
 }

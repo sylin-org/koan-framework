@@ -107,4 +107,19 @@ public static class FilterConvergence
         failures.Should().BeEmpty(
             "the adapter must converge with the in-memory oracle for every filter; divergences:\n" + string.Join("\n", failures));
     }
+
+    /// <summary>
+    /// The same corpus again, asking a different question: did the <i>store</i> answer it?
+    ///
+    /// <para>Convergence above compares id-sets, and an id-set is identical whether the provider applied the
+    /// filter or Koan evaluated it over every row afterwards. So a filter that silently stopped being pushed
+    /// down keeps this suite green while turning each query into a full read — which is how such a gap
+    /// survives long enough to be found in production rather than here.</para>
+    ///
+    /// <para>Where an adapter genuinely cannot express an operator the framework carries it by design, and the
+    /// residual is expected. That is a declared limit, so the adapter's FilterSupport is what must say so:
+    /// this fails when work lands in memory that the declaration implied the store would do.</para>
+    /// </summary>
+    public static Task AssertPushesDownAsync(IServiceProvider services)
+        => PushdownGuard.NothingFallsBack(services, "the shared filter corpus", AssertConvergesAsync);
 }

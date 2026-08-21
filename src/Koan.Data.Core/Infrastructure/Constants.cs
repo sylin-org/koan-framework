@@ -10,6 +10,7 @@ public static class Constants
             public const string AdapterRejected = "koan.data.adapter.rejected";
             public const string RelationshipExecution = "koan.data.relationship.execution";
             public const string StreamExecution = "koan.data.stream.execution";
+            public const string QueryFallback = "koan.data.query.fallback";
             public const string LifecycleSelected = "koan.data.lifecycle.selected";
             public const string SourcePlanSelected = "koan.data.source.plan.selected";
             public const string SourceClaimsSelected = "koan.data.source.claims.selected";
@@ -42,6 +43,7 @@ public static class Constants
             public const string PaginationNotHandled = "provider-pagination-not-handled";
             public const string StreamSortNotHandled = "provider-stream-sort-not-handled";
             public const string StreamOrderIsProviderDefined = "stream-order-is-provider-defined";
+            public const string QueryFinishedInMemory = "query-finished-in-memory";
             public const string StreamPageLimitExceeded = "provider-stream-page-limit-exceeded";
             public const string InvalidStreamReceipt = "provider-stream-receipt-invalid";
             public const string UnsupportedRegisteredOperation = "registered-operation-unsupported";

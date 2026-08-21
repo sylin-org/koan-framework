@@ -99,8 +99,10 @@ public static class FilterPushdownCoordinator
         if (projectionFallback)
             page = InMemoryEntityProjection.Apply(page, query.Projection!);
 
-        var fellBack = residualApplied || sortFallback || projectionFallback ||
-                       (query.HasPagination && !adapter.PaginationHandled);
+        var paginationFallback = query.HasPagination && !adapter.PaginationHandled;
+        var fellBack = residualApplied || sortFallback || projectionFallback || paginationFallback;
+        if (fellBack)
+            QueryFallbackFacts.Record<TEntity>(residualApplied, sortFallback, paginationFallback, projectionFallback);
         return new FinalizedQuery<TEntity>(page, total, isEstimate, fellBack);
     }
 }
