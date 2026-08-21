@@ -70,13 +70,17 @@ public sealed class PostgresCrudSpec(PostgresFixture fixture, ITestOutputHelper 
         var removed = await Person.Remove(saved.Id, partition);
         removed.Should().BeTrue();
 
-        var remainingIds = filtered.Select(p => p.Id).Skip(1).ToArray();
+        // Which row survives is decided here, not by the order the store happened to return: this named no
+        // order, so skipping the first of an unsorted result was asking the database to pick. It used to pick
+        // by physical tuple address, which PostgreSQL moves on update.
+        var survivor = filtered.OrderBy(p => p.Id, StringComparer.Ordinal).First();
+        var remainingIds = filtered.Where(p => p.Id != survivor.Id).Select(p => p.Id).ToArray();
         var removedMany = await Person.Remove(remainingIds);
         removedMany.Should().Be(2);
 
         var remaining = await Person.All(partition);
         remaining.Should().HaveCount(1);
-        remaining[0].Name.Should().Be("Grace");
+        remaining[0].Id.Should().Be(survivor.Id);
     }
 
     private sealed class Person : Entity<Person>

@@ -82,7 +82,6 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory, IDataSourceIn
             DdlPolicy = route.Options.DdlPolicy,
             SchemaMatching = route.Options.SchemaMatching,
             AllowProductionDdl = route.Options.AllowProductionDdl,
-            StableOrder = NpgsqlStableOrder.Identity,
             SourcePlan = route.Plan
         }, services.GetRequiredService<IStorageNameResolver>(), this);
     }

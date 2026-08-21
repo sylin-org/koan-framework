@@ -64,7 +64,9 @@ public sealed class SqlServerCrudAndQueryTests(SqlServerFixture fixture, ITestOu
 
 		var page = (await queryRepo.Query(new QueryDefinition { Filter = age20, Page = 1, PageSize = 5 }, default)).Items;
 		page.Should().HaveCount(5);
-		page.First().Name.Should().Be("P-2");
+		// A page with no requested order is taken in identity order, so this is defined rather than
+		// whatever the engine returned first. Ids are strings, so "12" precedes "2" (DATA-0119).
+		page.First().Name.Should().Be("P-12");
 
 		var countResult = await queryRepo.Count(new QueryDefinition { Filter = age20 });
 		countResult.IsEstimate.Should().BeFalse();

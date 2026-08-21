@@ -15,6 +15,5 @@ public sealed class NpgsqlRepositoryOptions
     public RelationalDdlPolicy DdlPolicy { get; init; } = RelationalDdlPolicy.AutoCreate;
     public RelationalSchemaMatchingMode SchemaMatching { get; init; } = RelationalSchemaMatchingMode.Relaxed;
     public bool AllowProductionDdl { get; init; }
-    public NpgsqlStableOrder StableOrder { get; init; } = NpgsqlStableOrder.PostgreSqlPhysicalTuple;
     public DataSourcePlan SourcePlan { get; init; } = DataSourcePlan.Default;
 }

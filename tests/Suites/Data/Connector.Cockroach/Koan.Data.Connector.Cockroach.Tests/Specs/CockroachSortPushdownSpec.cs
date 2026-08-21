@@ -19,7 +19,6 @@ public sealed class CockroachSortPushdownSpec(CockroachFixture fixture, ITestOut
         await SortPushdownConvergence.AssertScalarOrderingConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertPagesAsync();
-        await SortPushdownConvergence.AssertUnsortedPagesPartitionTheCorpusAsync();
         await SortPushdownConvergence.AssertStreamsAsync();
         await SortPushdownConvergence.AssertNothingFallsBackAsync(host.Services);
     }

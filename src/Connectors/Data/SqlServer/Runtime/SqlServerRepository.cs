@@ -490,7 +490,16 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             : ("ORDER BY " + string.Join(", ", clauses), handled.ToFrozenSet());
     }
 
-    private static string StableOrder(SqlServerEntityPlan<TEntity, TKey> plan) => "ORDER BY (SELECT NULL)";
+    /// <summary>
+    /// The order a page is taken in when the caller named none: the Entity identity.
+    ///
+    /// <para>This used to be <c>ORDER BY (SELECT NULL)</c>, which exists to satisfy SQL Server's rule that
+    /// OFFSET requires an ORDER BY and promises nothing about the rows. The string-query path below pages
+    /// against this, so two requests for successive pages could return overlapping rows. One question, one
+    /// answer, on every relational store (DATA-0119).</para>
+    /// </summary>
+    private static string StableOrder(SqlServerEntityPlan<TEntity, TKey> plan) =>
+        "ORDER BY " + string.Join(", ", plan.IdentityRoots.Select(SqlServerDialect.Quote));
 
     private static async Task<long> CountExact(
         SqlConnection connection,

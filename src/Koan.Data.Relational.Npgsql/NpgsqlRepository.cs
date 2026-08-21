@@ -503,12 +503,16 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             : ("ORDER BY " + string.Join(", ", clauses), handled.ToFrozenSet());
     }
 
-    private string StableOrder() => _options.StableOrder switch
-    {
-        NpgsqlStableOrder.PostgreSqlPhysicalTuple => "ORDER BY ctid",
-        NpgsqlStableOrder.Identity => "ORDER BY " + string.Join(", ", _plan.IdentityRoots.Select(NpgsqlDialect.Quote)),
-        _ => throw new ArgumentOutOfRangeException(nameof(_options.StableOrder), _options.StableOrder, null)
-    };
+    /// <summary>
+    /// The order a page is taken in when the caller named none: the Entity identity.
+    ///
+    /// <para>This was configurable, defaulting to <c>ORDER BY ctid</c> — the physical tuple address, which
+    /// PostgreSQL moves when a row is updated. The string-query path below pages against this, so a write
+    /// between two page requests could make them overlap or skip. CockroachDB already overrode the default
+    /// to the identity, which is the answer every other relational store gives (DATA-0119).</para>
+    /// </summary>
+    private string StableOrder() =>
+        "ORDER BY " + string.Join(", ", _plan.IdentityRoots.Select(NpgsqlDialect.Quote));
 
     private async Task<long> Count(
         NpgsqlConnection connection,
