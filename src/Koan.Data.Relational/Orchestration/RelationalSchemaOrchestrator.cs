@@ -1,16 +1,11 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
 
 namespace Koan.Data.Relational.Orchestration;
 
-internal sealed class RelationalSchemaOrchestrator :
-    IRelationalSchemaOrchestrator,
-    IRelationalMappingSchemaOrchestrator
+internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrator
 {
-    private readonly IServiceProvider _services;
-
-    public RelationalSchemaOrchestrator(IServiceProvider services) => _services = services;
-
     public RelationalSchemaPlan Plan(
         MappingPlan mapping,
         IRelationalStoreFeatures features,
@@ -23,14 +18,11 @@ internal sealed class RelationalSchemaOrchestrator :
         var identityIds = mapping.Identity.Parts
             .Select(static part => part.Id)
             .ToHashSet(StringComparer.Ordinal);
-        var indexRoots = mapping.Indexes
-            .SelectMany(static index => index.Bindings)
-            .Select(static binding => binding.PhysicalPath.Name)
-            .ToHashSet(StringComparer.Ordinal);
         var columns = mapping.Bindings
             .GroupBy(static binding => binding.PhysicalPath.Name, StringComparer.Ordinal)
-            .Select(group => CompileColumn(group, identityIds, indexRoots, features, policy))
-            .ToArray();
+            .Select(group => CompileColumn(group, identityIds))
+            .ToList();
+        columns.AddRange(CompileProjections(mapping, features, columns));
 
         var unproved = new List<string>();
         var indexes = mapping.Indexes.Select(index =>
@@ -49,24 +41,22 @@ internal sealed class RelationalSchemaOrchestrator :
                 unproved.Add($"TTL:{index.Name}");
             return new RelationalIndexDefinition(
                 index.Name,
-                index.Bindings.Select(static binding => binding.PhysicalPath),
-                index.Bindings.Select(EncodingId),
+                index.Bindings.Select(static binding => new RelationalIndexPart(
+                    binding.PhysicalPath, binding.PhysicalType, EncodingId(binding))),
                 index.Unique,
                 index.Primary,
                 index.Ttl,
                 rewriteFree);
         }).ToArray();
 
-        var schema = mapping.Container.Namespace.Count == 0
-            ? ResolveSchema(policy)
-            : string.Join('.', mapping.Container.Namespace);
-        var plan = new RelationalSchemaPlan(
-            mapping,
-            schema,
+        var table = new RelationalTableDefinition(
+            mapping.Container.Namespace.Count == 0
+                ? ResolveSchema(policy)
+                : string.Join('.', mapping.Container.Namespace),
             mapping.Container.Name,
             columns,
-            indexes,
-            unproved);
+            mapping.Identity.Parts.Select(static part => part.PhysicalPath.Name).ToArray());
+        var plan = new RelationalSchemaPlan(mapping, table, indexes, unproved);
         RelationalPlanGuard.Validate(mapping, plan);
         return plan;
     }
@@ -78,48 +68,64 @@ internal sealed class RelationalSchemaOrchestrator :
         RelationalSchemaPolicy policy,
         CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(ddl);
         ct.ThrowIfCancellationRequested();
         var plan = Plan(mapping, features, policy);
-        var exists = await ddl.TableExists(plan.Schema, plan.Table, ct).ConfigureAwait(false);
-        var missing = new List<string>();
-        var incompatible = new List<string>();
-        var unverified = new List<string>();
-        if (!exists)
-        {
-            missing.AddRange(plan.Columns.Select(static column => column.Name));
+        var unverified = plan.UnprovedClaims
+            .Select(static claim => new RelationalSchemaFinding(
+                claim,
+                RelationalSchemaFindingKind.Unverified,
+                $"Mapped intent {claim} has no proven native form on this store.",
+                Corrective: false))
+            .ToArray();
+
+        var shape = await ddl.Describe(plan.Table, ct).ConfigureAwait(false);
+        if (shape is null)
             return new RelationalSchemaValidation(
                 plan,
                 tableExists: false,
-                missing,
-                incompatible,
-                unverified);
-        }
+                plan.Table.Columns.Select(column => Absent(column, policy)).Concat(unverified));
 
-        foreach (var expected in plan.Columns)
+        var found = new List<RelationalSchemaFinding>();
+        foreach (var expected in plan.Table.Columns)
         {
-            var actual = await ddl.DescribeColumn(plan.Schema, plan.Table, expected.Name, ct).ConfigureAwait(false);
+            if (!shape.Columns.TryGetValue(expected.Name, out var actual))
+            {
+                found.Add(Absent(expected, policy));
+                continue;
+            }
             if (actual is null)
             {
-                missing.Add(expected.Name);
+                found.Add(new RelationalSchemaFinding(
+                    expected.Name,
+                    RelationalSchemaFindingKind.Unverified,
+                    $"Column {expected.Name} is present; this store cannot describe its definition.",
+                    Corrective: false));
                 continue;
             }
-            if (!features.SupportsDefinitionValidation)
-            {
-                unverified.Add($"ColumnDefinition:{expected.Name}");
-                continue;
-            }
-            // Compare in the store's vocabulary where it has one: the expectation is expressed in CLR terms and
-            // the column in the store's, and only the store can translate between them.
-            var comparable = expected with { NativeType = ddl.NativeTypeFor(expected) };
-            if (!DefinitionEquals(comparable, actual))
-                incompatible.Add($"{expected.Name}: expected {Describe(comparable)}; found {Describe(actual)}");
+            if (Matches(ddl, expected, actual)) continue;
+            found.Add(new RelationalSchemaFinding(
+                expected.Name,
+                RelationalSchemaFindingKind.Drift,
+                $"Column {expected.Name} must be {Describe(expected)}; found {actual}.",
+                Corrective: IsCorrective(expected, policy)));
         }
-        return new RelationalSchemaValidation(
-            plan,
-            tableExists: true,
-            missing,
-            incompatible,
-            unverified);
+
+        if (!plan.Table.Identity.SequenceEqual(shape.Identity, StringComparer.OrdinalIgnoreCase))
+            found.Add(new RelationalSchemaFinding(
+                "PrimaryKey",
+                RelationalSchemaFindingKind.Drift,
+                $"Primary key must be [{string.Join(", ", plan.Table.Identity)}]; " +
+                $"found [{string.Join(", ", shape.Identity)}].",
+                Corrective: true));
+
+        // A store-level concern the neutral column model cannot express — a storage engine, a collation default.
+        // It is reported in the store's own words and always stops the mapping, because a store that raises one
+        // has said this container cannot serve the shape at all.
+        found.AddRange(shape.Incompatible.Select(static detail => new RelationalSchemaFinding(
+            "Container", RelationalSchemaFindingKind.Drift, detail, Corrective: true)));
+
+        return new RelationalSchemaValidation(plan, tableExists: true, found.Concat(unverified));
     }
 
     public async Task<RelationalSchemaValidation> EnsureCreatedAsync(
@@ -130,142 +136,133 @@ internal sealed class RelationalSchemaOrchestrator :
         CancellationToken ct = default)
     {
         var validation = await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
-        if (!validation.IsCompatible)
-        {
-            EnsureDdlAllowed(policy, features, validation.Plan.Schema, validation.Plan.Table);
-            if (validation.Incompatible.Count != 0)
-            {
-                throw new SchemaMismatchException(
-                    mapping.EntityType.FullName ?? mapping.EntityType.Name,
-                    validation.Plan.Table,
-                    policy.Matching.ToString(),
-                    validation.Missing.Concat(validation.Incompatible).ToArray(),
-                    [],
-                    IsDdlAllowed(policy));
-            }
+        var plan = validation.Plan;
 
+        // Drift is not repairable by adding columns, so it is reported before consent is even considered:
+        // whether Koan may issue DDL has no bearing on a table that is already the wrong shape.
+        var drift = validation.Findings
+            .Where(static finding => finding.Kind == RelationalSchemaFindingKind.Drift && finding.Corrective)
+            .ToArray();
+        if (drift.Length != 0)
+            throw new SchemaMismatchException(
+                mapping.EntityType.FullName ?? mapping.EntityType.Name,
+                plan.Table,
+                policy.Matching,
+                drift,
+                IsDdlAllowed(policy));
+
+        var absent = validation.Absent
+            .Select(finding => plan.Table.Columns.First(column =>
+                string.Equals(column.Name, finding.Subject, StringComparison.Ordinal)))
+            .ToArray();
+
+        // No ALTER makes an existing table key on a column it does not have, so an absent identity column on a
+        // table that exists is a mismatch to report, not work to schedule.
+        if (validation.TableExists && absent.Any(static column => column.IsIdentity))
+            throw new SchemaMismatchException(
+                mapping.EntityType.FullName ?? mapping.EntityType.Name,
+                plan.Table,
+                policy.Matching,
+                validation.Absent.Where(finding => absent.Any(column =>
+                    column.IsIdentity && string.Equals(column.Name, finding.Subject, StringComparison.Ordinal)))
+                    .ToArray(),
+                IsDdlAllowed(policy));
+
+        if (!validation.TableExists || absent.Length != 0)
+        {
+            EnsureDdlAllowed(policy, features, plan.Table);
             if (!validation.TableExists)
             {
-                await ddl.CreateTableWithColumns(
-                    validation.Plan.Schema,
-                    validation.Plan.Table,
-                    validation.Plan.Columns,
-                    ct).ConfigureAwait(false);
+                await ddl.Create(plan.Table, ct).ConfigureAwait(false);
             }
             else
             {
-                foreach (var column in validation.Plan.Columns.Where(column =>
-                             validation.Missing.Contains(column.Name, StringComparer.Ordinal)))
-                {
-                    if (column.IsComputed && column.JsonPath is not null)
-                    {
-                        await ddl.AddComputedColumnFromJson(
-                            validation.Plan.Schema,
-                            validation.Plan.Table,
-                            column.Name,
-                            column.JsonPath,
-                            features.SupportsPersistedComputedColumns,
-                            ct).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await ddl.AddMappedColumn(validation.Plan.Schema, validation.Plan.Table, column, ct)
-                            .ConfigureAwait(false);
-                    }
-                }
+                foreach (var column in absent)
+                    await ddl.AddColumn(plan.Table, column, ct).ConfigureAwait(false);
             }
         }
 
         if (features.SupportsMappedIndexes && IsDdlAllowed(policy))
         {
-            foreach (var index in validation.Plan.Indexes.Where(static index => !index.Primary))
+            foreach (var index in plan.Indexes.Where(static index => !index.Primary))
             {
                 if (index.Ttl && !features.SupportsNativeTtl) continue;
-                if (!index.RewriteFree && index.Parts.Any(static part => part.IsNested)) continue;
-                await ddl.CreateMappedIndex(validation.Plan.Schema, validation.Plan.Table, index, ct)
-                    .ConfigureAwait(false);
+                if (!index.RewriteFree && index.IsExpression) continue;
+                await ddl.CreateIndex(plan.Table, index, ct).ConfigureAwait(false);
             }
         }
 
         return await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyDictionary<string, object?>> ValidateAsync<TEntity, TKey>(
-        IRelationalDdlExecutor ddl,
-        IRelationalStoreFeatures features,
-        string table,
-        RelationalSchemaPolicy policy,
-        CancellationToken ct = default)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var mapping = RelationalCompatibilityMapping.Compile<TEntity, TKey>(_services, table, policy);
-        var compatibleFeatures = RelationalCompatibilityMapping.Features(features, policy.Projections);
-        var validation = await ValidateAsync(mapping, ddl, compatibleFeatures, policy, ct).ConfigureAwait(false);
-        var state = validation.IsCompatible
-            ? validation.Unverified.Count == 0 ? "Healthy" : "Degraded"
-            : policy.Matching == RelationalSchemaMatchingMode.Strict ? "Unhealthy" : "Degraded";
-        return new Dictionary<string, object?>
-        {
-            ["Provider"] = features.ProviderName,
-            ["Schema"] = validation.Plan.Schema,
-            ["Table"] = validation.Plan.Table,
-            ["TableExists"] = validation.TableExists,
-            ["ProjectedColumns"] = validation.Plan.Columns.Select(static column => column.Name).ToArray(),
-            ["MissingColumns"] = validation.Missing.ToArray(),
-            ["Policy"] = policy.Projections.ToString(),
-            ["DdlAllowed"] = IsDdlAllowed(policy),
-            ["MatchingMode"] = policy.Matching.ToString(),
-            ["State"] = state
-        };
-    }
+    /// <summary>
+    /// A column the store does not hold.
+    ///
+    /// <para>A projected column exists so the planner can reach a mapped value directly; reads still resolve
+    /// through the structured root without it. Relaxed matching therefore tolerates its absence, which is the
+    /// one place MySQL's private validation was right to be lenient and the other three had no opinion.</para>
+    /// </summary>
+    private static RelationalSchemaFinding Absent(RelationalColumnDefinition column, RelationalSchemaPolicy policy) =>
+        new(column.Name,
+            RelationalSchemaFindingKind.Absent,
+            $"Column {column.Name} is missing.",
+            Corrective: policy.Matching == RelationalSchemaMatchingMode.Strict || !column.IsProjected);
 
-    public async Task EnsureCreatedAsync<TEntity, TKey>(
-        IRelationalDdlExecutor ddl,
-        IRelationalStoreFeatures features,
-        string table,
-        RelationalSchemaPolicy policy,
-        CancellationToken ct = default)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        var mapping = RelationalCompatibilityMapping.Compile<TEntity, TKey>(_services, table, policy);
-        var compatibleFeatures = RelationalCompatibilityMapping.Features(features, policy.Projections);
-        await EnsureCreatedAsync(mapping, ddl, compatibleFeatures, policy, ct).ConfigureAwait(false);
-    }
+    /// <summary>
+    /// Whether drift on this column stops the mapping. Identity and the structured document cannot drift on any
+    /// matching mode — one addresses rows and the other holds them — and Strict tolerates no drift at all.
+    /// </summary>
+    private static bool IsCorrective(RelationalColumnDefinition column, RelationalSchemaPolicy policy) =>
+        policy.Matching == RelationalSchemaMatchingMode.Strict ||
+        column.IsIdentity ||
+        column.Shape == RelationalStorageShape.Structured;
 
     private static RelationalColumnDefinition CompileColumn(
         IGrouping<string, MappingBindingPlan> group,
-        IReadOnlySet<string> identityIds,
-        IReadOnlySet<string> indexRoots,
-        IRelationalStoreFeatures features,
-        RelationalSchemaPolicy policy)
+        IReadOnlySet<string> identityIds)
     {
         var bindings = group.ToArray();
         var identity = bindings.All(binding => identityIds.Contains(binding.Id));
         var generated = bindings.All(static binding =>
             binding.Descriptor.Generation == MappingGeneration.Provider);
-        var computed = policy.Projections == RelationalProjectionMode.ComputedProjections &&
-                       features.SupportsJsonFunctions &&
-                       bindings.Length == 1 &&
-                       bindings[0].Descriptor.Authority == MappingAuthority.Derived &&
-                       !bindings[0].LogicalPath.IsRoot;
-        var structured = !computed && bindings.Any(static binding =>
+        var structured = bindings.Any(static binding =>
             binding.Shape == MappingValueShape.Object || binding.PhysicalPath.IsNested);
-        var nullable = !identity && (computed || bindings.All(binding => IsNullable(binding.LogicalType)));
-        var jsonPath = computed
-            ? "$." + string.Join('.', bindings[0].LogicalPath.Segments)
-            : null;
         return new RelationalColumnDefinition(
             group.Key,
-            computed ? typeof(string) : structured ? typeof(DataObject) : bindings[0].PhysicalType,
-            nullable,
-            IsComputed: computed,
-            JsonPath: jsonPath,
-            IsIndexed: indexRoots.Contains(group.Key),
+            structured ? typeof(DataObject) : bindings[0].PhysicalType,
             Shape: structured ? RelationalStorageShape.Structured : RelationalStorageShape.Scalar,
             IsIdentity: identity,
             IsGenerated: generated);
+    }
+
+    /// <summary>
+    /// Columns the store computes out of the structured root, so a filter or an order on a mapped value reaches
+    /// a materialized column instead of reading the document.
+    ///
+    /// <para>Two adapters built these and two did not, from private copies of one predicate, and the framework
+    /// could not see them at all. The decision is single — every scalar property that has no physical column of
+    /// its own — and a store answers only whether it can hold one.</para>
+    /// </summary>
+    private static IEnumerable<RelationalColumnDefinition> CompileProjections(
+        MappingPlan mapping,
+        IRelationalStoreFeatures features,
+        IReadOnlyList<RelationalColumnDefinition> physical)
+    {
+        if (!features.SupportsPersistedComputedColumns || !features.SupportsJsonFunctions) yield break;
+        if (!mapping.Bindings.Any(static binding =>
+                binding.Shape == MappingValueShape.Object && binding.LogicalPath.IsRoot)) yield break;
+
+        var taken = physical.Select(static column => column.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var binding in mapping.Bindings.Where(binding =>
+                     binding.Descriptor.Authority == MappingAuthority.Derived &&
+                     binding.Shape == MappingValueShape.Scalar &&
+                     binding.LogicalPath.Segments.Count == 1 &&
+                     !taken.Contains(binding.LogicalPath.Leaf)))
+            yield return new RelationalColumnDefinition(
+                binding.LogicalPath.Leaf,
+                binding.PhysicalType,
+                IsProjected: true,
+                ProjectedFrom: binding.PhysicalPath);
     }
 
     private static string EncodingId(MappingBindingPlan binding) =>
@@ -277,47 +274,43 @@ internal sealed class RelationalSchemaOrchestrator :
     private static void EnsureDdlAllowed(
         RelationalSchemaPolicy policy,
         IRelationalStoreFeatures features,
-        string schema,
-        string table)
+        RelationalTableDefinition table)
     {
         if (IsDdlAllowed(policy)) return;
-        var reason = policy.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.External
-            ? "StorageLifecycle=External forbids shape mutation."
-            : policy.Ddl != RelationalDdlPolicy.AutoCreate
-                ? $"DDL is disabled by policy '{policy.Ddl}'."
-                : RelationalDdlGate.Refusal;
+        var reason = policy.StorageLifecycle != StorageLifecycle.Managed
+            ? $"StorageLifecycle={policy.StorageLifecycle} forbids shape mutation."
+            : policy.Access != DataSourceAccess.ReadWrite
+                ? $"Access={policy.Access} forbids shape mutation."
+                : policy.Ddl != RelationalDdlPolicy.AutoCreate
+                    ? $"DDL is disabled by policy '{policy.Ddl}'."
+                    : RelationalDdlGate.Refusal;
         throw new InvalidOperationException(
-            $"Relational schema creation was rejected for {features.ProviderName}/{schema}/{table}. {reason}");
+            $"Relational schema creation was rejected for {features.ProviderName}/{table}. {reason}");
     }
 
     private static bool IsDdlAllowed(RelationalSchemaPolicy policy) =>
-        policy.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.Managed &&
+        policy.StorageLifecycle == StorageLifecycle.Managed &&
+        policy.Access == DataSourceAccess.ReadWrite &&
         policy.Ddl == RelationalDdlPolicy.AutoCreate &&
         RelationalDdlGate.Allowed(policy.AllowProductionDdl);
 
     /// <summary>
-    /// Compares what the mapping means, and — where both sides can spell it — what the store literally holds.
+    /// Three questions, each with one owner. Whether the column is the right one is the store's to judge, in its
+    /// own vocabulary; whether the store or the writer supplies the value is the mapping's, and every store
+    /// reports it the same way.
     ///
-    /// <para>The native spelling is only compared when the expectation carries one. A store that describes its
-    /// columns neutrally is judged neutrally; one that can say <c>CHARACTER SET utf8mb4</c> keeps catching drift
-    /// a CLR type cannot see.</para>
+    /// <para>Identity membership is not among them: the primary key is one ordered decision, checked once,
+    /// rather than a per-column opinion that reports the same difference several times over.</para>
     /// </summary>
-    private static bool DefinitionEquals(RelationalColumnDefinition expected, RelationalColumnDefinition actual) =>
-        (expected.NativeType is not null
-            ? string.Equals(expected.NativeType, actual.NativeType, StringComparison.OrdinalIgnoreCase)
-            : expected.ClrType == actual.ClrType) &&
-        expected.Nullable == actual.Nullable &&
-        expected.IsComputed == actual.IsComputed &&
-        string.Equals(expected.JsonPath, actual.JsonPath, StringComparison.Ordinal) &&
-        expected.Shape == actual.Shape &&
-        expected.IsIdentity == actual.IsIdentity &&
-        expected.IsGenerated == actual.IsGenerated;
+    private static bool Matches(
+        IRelationalDdlExecutor ddl,
+        RelationalColumnDefinition expected,
+        RelationalColumnState actual) =>
+        ddl.ColumnMatches(expected, actual) &&
+        expected.IsGenerated == actual.IsGenerated &&
+        expected.IsProjected == actual.IsProjected;
 
     private static string Describe(RelationalColumnDefinition column) =>
-        $"{column.Shape}/{column.ClrType.Name}/nullable={column.Nullable}/computed={column.IsComputed}/" +
-        $"path={column.JsonPath ?? "<none>"}/identity={column.IsIdentity}/generated={column.IsGenerated}" +
-        (column.NativeType is null ? string.Empty : $"/native={column.NativeType}");
-
-    private static bool IsNullable(Type type) =>
-        !type.IsValueType || Nullable.GetUnderlyingType(type) is not null;
+        $"{column.Shape}/{column.ClrType.Name}/" +
+        $"generated={column.IsGenerated}/projected={column.IsProjected}";
 }

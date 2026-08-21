@@ -331,10 +331,12 @@ public sealed class MappingConformanceSpec
             .Key(customer => customer.Id).Name("ID")
             .Property(customer => customer.Enabled).Name("IS_ENABLED")));
         var mapping = provider.GetRequiredService<IDataMappingPlans>().Require<FlaggedCustomer>("Legacy");
-        var orchestrator = new RelationalSchemaOrchestrator(provider);
+        var orchestrator = new RelationalSchemaOrchestrator();
         var ddl = new ShapeDdl(tableExists: true);
-        ddl.Columns["ID"] = new RelationalColumnDefinition("ID", typeof(string), false, IsIdentity: true);
-        ddl.Columns["IS_ENABLED"] = new RelationalColumnDefinition("IS_ENABLED", typeof(bool), false);
+        // The mapping keys on a long; the store keys on a string. Identity cannot drift on any matching mode.
+        ddl.Columns["ID"] = new RelationalColumnState("ID", Nullable: false, ClrType: typeof(string));
+        ddl.Columns["IS_ENABLED"] = new RelationalColumnState("IS_ENABLED", Nullable: true, ClrType: typeof(bool));
+        ddl.Identity.Add("ID");
         var features = new ShapeFeatures();
         var external = new RelationalSchemaPolicy
         {
@@ -345,7 +347,7 @@ public sealed class MappingConformanceSpec
 
         var validation = await orchestrator.ValidateAsync(mapping, ddl, features, external);
         validation.State.Should().Be("Unhealthy");
-        validation.Incompatible.Should().ContainSingle(item => item.StartsWith("ID:", StringComparison.Ordinal));
+        validation.Corrective.Should().ContainSingle(finding => finding.Subject == "ID");
         Func<Task> ensure = () => orchestrator.EnsureCreatedAsync(mapping, ddl, features, external);
         await ensure.Should().ThrowAsync<InvalidOperationException>();
         ddl.Mutations.Should().Be(0);
@@ -360,19 +362,23 @@ public sealed class MappingConformanceSpec
             new MappingConvention(StorageAddress.From("dbo", "EXPIRING"), "Id", "Json"));
         var ttl = mapping.Indexes.Single(index => index.Ttl);
         var logical = mapping.Use(MappingPath.Of("ExpiresAt"), MappingConsumer.Filter).Bindings[0];
-        var orchestrator = new RelationalSchemaOrchestrator(provider);
+        var orchestrator = new RelationalSchemaOrchestrator();
         var features = new ShapeFeatures();
         var policy = new RelationalSchemaPolicy { Ddl = RelationalDdlPolicy.AutoCreate };
         var schema = orchestrator.Plan(mapping, features, policy);
 
         ReferenceEquals(ttl.Bindings[0], logical).Should().BeTrue();
-        schema.Indexes.Single(index => index.Ttl).Parts.Should().Equal(new PhysicalPath("Json", "ExpiresAt"));
+        schema.Indexes.Single(index => index.Ttl).Parts.Select(static part => part.Path)
+            .Should().Equal(new PhysicalPath("Json", "ExpiresAt"));
         schema.UnprovedClaims.Should().Contain($"TTL:{ttl.Name}");
 
         var ddl = new ShapeDdl(tableExists: true);
-        foreach (var column in schema.Columns) ddl.Columns[column.Name] = column;
+        foreach (var column in schema.Table.Columns)
+            ddl.Columns[column.Name] = new RelationalColumnState(
+                column.Name, !column.IsIdentity, column.IsGenerated, column.IsProjected, ClrType: column.ClrType);
+        ddl.Identity.AddRange(schema.Table.Identity);
         var validation = await orchestrator.EnsureCreatedAsync(mapping, ddl, features, policy);
-        validation.IsCompatible.Should().BeTrue();
+        validation.IsComplete.Should().BeTrue();
         ddl.Mutations.Should().Be(0, "unsupported TTL metadata must not become an ordinary index");
     }
 
@@ -388,7 +394,7 @@ public sealed class MappingConformanceSpec
         var insert = planner.Insert(new FlaggedCustomer { Id = 1, Enabled = true });
         var query = planner.Query(QueryDefinition.All.Where(Filter.Eq("Enabled", true)));
         var features = new ShapeFeatures();
-        var schema = new RelationalSchemaOrchestrator(provider).Plan(mapping, features, new RelationalSchemaPolicy());
+        var schema = new RelationalSchemaOrchestrator().Plan(mapping, features, new RelationalSchemaPolicy());
 
         var badWriteBinding = insert.Values[0].Binding with { PhysicalPath = new PhysicalPath("WRONG_WRITE") };
         var badWrite = Copy(insert, values: [new RelationalValue(badWriteBinding, insert.Values[0].Value)]);
@@ -403,17 +409,14 @@ public sealed class MappingConformanceSpec
         var mappedIndex = schema.Indexes.Single(index => !index.Primary);
         var badIndex = new RelationalIndexDefinition(
             mappedIndex.Name,
-            [new PhysicalPath("WRONG_INDEX")],
-            mappedIndex.EncodingIds,
+            [mappedIndex.Parts[0] with { Path = new PhysicalPath("WRONG_INDEX") }],
             mappedIndex.Unique,
             mappedIndex.Primary,
             mappedIndex.Ttl,
             mappedIndex.RewriteFree);
         var badSchema = new RelationalSchemaPlan(
             mapping,
-            schema.Schema,
             schema.Table,
-            schema.Columns,
             schema.Indexes.Select(index => index == mappedIndex ? badIndex : index),
             schema.UnprovedClaims);
         Action index = () => RelationalPlanGuard.Validate(mapping, badSchema);
@@ -544,42 +547,26 @@ public sealed class MappingConformanceSpec
     {
         public bool SupportsJsonFunctions => true;
         public bool SupportsPersistedComputedColumns => true;
-        public bool SupportsIndexesOnComputedColumns => true;
         public string ProviderName => "shape-spy";
-        public bool SupportsDefinitionValidation => true;
         public bool SupportsMappedIndexes => true;
         public bool SupportsRewriteFreeExpressionIndexes => true;
     }
 
     private sealed class ShapeDdl(bool tableExists) : IRelationalDdlExecutor
     {
-        public Dictionary<string, RelationalColumnDefinition> Columns { get; } = new(StringComparer.Ordinal);
+        public Dictionary<string, RelationalColumnState?> Columns { get; } = new(StringComparer.Ordinal);
+        public List<string> Identity { get; } = [];
         public int Mutations { get; private set; }
-        public Task<bool> TableExists(string schema, string table, CancellationToken ct = default)
-            => Task.FromResult(tableExists);
 
-        public Task<bool> ColumnExists(string schema, string table, string column, CancellationToken ct = default)
-            => Task.FromResult(Columns.ContainsKey(column));
+        public Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
+            => Task.FromResult(tableExists ? new RelationalTableShape(Columns, Identity) : null);
 
-        public Task<RelationalColumnDefinition?> DescribeColumn(string schema, string table, string column, CancellationToken ct = default)
-            => Task.FromResult(Columns.GetValueOrDefault(column));
+        public Task Create(RelationalTableDefinition table, CancellationToken ct = default) => Mutated();
 
-        public Task CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json", CancellationToken ct = default)
+        public Task AddColumn(RelationalTableDefinition table, RelationalColumnDefinition column, CancellationToken ct = default)
             => Mutated();
 
-        public Task CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns, CancellationToken ct = default)
-            => Mutated();
-
-        public Task AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted, CancellationToken ct = default)
-            => Mutated();
-
-        public Task AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable, CancellationToken ct = default)
-            => Mutated();
-
-        public Task CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique, CancellationToken ct = default)
-            => Mutated();
-
-        public Task CreateJsonExpressionIndex(string schema, string table, string indexName, IReadOnlyList<RelationalJsonIndexPart> parts, bool unique, CancellationToken ct = default)
+        public Task CreateIndex(RelationalTableDefinition table, RelationalIndexDefinition index, CancellationToken ct = default)
             => Mutated();
 
         private Task Mutated()

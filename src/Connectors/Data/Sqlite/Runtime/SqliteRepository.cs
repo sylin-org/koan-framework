@@ -16,6 +16,7 @@ using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Mapping;
+using Koan.Data.Relational.Orchestration;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -40,6 +41,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly SqliteAdapterFactory _factory;
     private readonly SqliteConnections _connections;
     private readonly DataSourceReadinessCoordinator _readiness;
+    private readonly IRelationalSchemaOrchestrator _schema;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly DataSegmentationPlan _segmentation;
     private readonly MappingPlan? _declaredMapping;
     private readonly object _planGate = new();
@@ -52,6 +55,16 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         _factory = factory;
         _connections = services.GetRequiredService<SqliteConnections>();
         _readiness = services.GetRequiredService<DataSourceReadinessCoordinator>();
+        _schema = services.GetRequiredService<IRelationalSchemaOrchestrator>();
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Ddl = route.Options.DdlPolicy,
+            Matching = route.Options.SchemaMatching,
+            AllowProductionDdl = route.Options.AllowProductionDdl,
+            DefaultSchema = "main",
+            StorageLifecycle = route.Policy.StorageLifecycle,
+            Access = route.Policy.Access
+        };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(route.Source);
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
@@ -308,14 +321,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             case RelationalInstructions.SchemaClear:
                 return (TResult)(object)await DeleteAll(ct).ConfigureAwait(false);
             case RelationalInstructions.SchemaValidate:
+            {
                 await Ready(plan, ct).ConfigureAwait(false);
-                return (TResult)(object)new Dictionary<string, object?>
-                {
-                    ["Provider"] = Infrastructure.Constants.Provider,
-                    ["Table"] = plan.Table,
-                    ["TableExists"] = true,
-                    ["State"] = "Healthy"
-                };
+                await using var ddl = Ddl(plan);
+                var validation = await _schema.ValidateAsync(
+                    plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
+                return (TResult)(object)validation.Report(Infrastructure.Constants.Provider);
+            }
             case RelationalInstructions.SqlScalar:
             case RelationalInstructions.SqlNonQuery:
             case RelationalInstructions.SqlQuery:
@@ -367,17 +379,49 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             await _readiness.Provision(
                 _route.Policy,
                 target,
-                token => SqliteSchema.Provision(_route, _connections, plan, token),
-                token => SqliteSchema.Validate(_route, _connections, plan, token),
+                token => Provision(plan, token),
+                token => Validate(plan, token),
                 ct).ConfigureAwait(false);
             return;
         }
-        await _readiness.ValidateShape(
-            _route.Policy,
-            target,
-            token => SqliteSchema.Validate(_route, _connections, plan, token),
-            ct).ConfigureAwait(false);
+        await _readiness.ValidateShape(_route.Policy, target, token => Validate(plan, token), ct)
+            .ConfigureAwait(false);
     }
+
+    private async Task Provision(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
+    {
+        await using var ddl = Ddl(plan);
+        await _schema.EnsureCreatedAsync(
+            plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
+    }
+
+    private async Task Validate(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
+    {
+        await using var ddl = Ddl(plan);
+        var validation = await _schema.ValidateAsync(
+            plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
+        if (ddl.DatabaseUnreachable)
+            throw Mismatch(
+                validation.Plan.Table,
+                [new RelationalSchemaFinding(
+                    "Database",
+                    RelationalSchemaFindingKind.Absent,
+                    "The SQLite database is absent or cannot be opened without creating it.",
+                    Corrective: true)]);
+        if (!validation.IsServiceable) throw Mismatch(validation.Plan.Table, validation.Corrective);
+    }
+
+    private SqliteDdlExecutor Ddl(SqliteEntityPlan<TEntity, TKey> plan) =>
+        new(_route, _connections, plan.Dialect);
+
+    private SchemaMismatchException Mismatch(
+        RelationalTableDefinition table,
+        IReadOnlyList<RelationalSchemaFinding> findings) => new(
+        typeof(TEntity).FullName ?? typeof(TEntity).Name,
+        table,
+        _route.Options.SchemaMatching,
+        findings,
+        _route.Policy.UsesLegacyProvisioningReadiness);
 
     private SqliteEntityPlan<TEntity, TKey> Plan()
     {

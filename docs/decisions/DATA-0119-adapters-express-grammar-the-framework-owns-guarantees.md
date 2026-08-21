@@ -137,7 +137,7 @@ lost — the read was unbounded, the whole collection was materialized — not a
 
 ## Implementation
 
-Landed on 2026-08-20, each commit green and standing alone:
+Landed on 2026-08-20 and 2026-08-21, each commit green and standing alone:
 
 | | Change | Commit |
 |---|---|---|
@@ -145,21 +145,71 @@ Landed on 2026-08-20, each commit green and standing alone:
 | Rule 2 | `RepositoryQueryResult.MaterializedAllCandidates`; the fallback fact names the loss and stops being blind to the key-value floors | `23a6c75e4` |
 | Rule 1 | `StableOrder` collapses to the identity on all four relational runtimes; `NpgsqlStableOrder` deleted | `ff0527d4e` |
 | — | `IRelationalDdlExecutor` made asynchronous, which is why no adapter could ever adopt it | `4be12be19` |
-| — | `RelationalColumnDefinition.NativeType` and `IRelationalDdlExecutor.NativeTypeFor`, so adoption costs no validation fidelity | `ed000e164` |
+| — | `RelationalColumnDefinition.NativeType` and `IRelationalDdlExecutor.NativeTypeFor`, an attempt at lossless adoption that adoption then replaced | `ed000e164` |
+| Rule 1 | All four relational runtimes route schema work through one orchestrator; the four hand-rolled `*Schema.cs` are gone | this cycle |
 
-**Not yet done: no adapter routes its schema work through the orchestrator.** The four hand-rolled
-`*Schema.cs` paths still exist, and consent is still reached by hand in each. The model is now complete
-enough that adoption loses nothing, which had to be true first. Carried as PMC-040.
+### What adoption cost the seam, and why
+
+Adoption was blocked by more than the two things the previous pass removed. Each of the following was
+found by trying to move an adapter onto the contract and discovering the contract could not hold what
+the adapter did — the same failure DATA-0119 names, one layer up.
+
+- **The type-based entry point compiled a second mapping.** `IRelationalSchemaOrchestrator.ValidateAsync<TEntity, TKey>`
+  built an Id-plus-Json shape by reflection, unrelated to the `MappingPlan` the adapter's own commands use.
+  Any adapter calling it would have validated a table it neither reads nor writes. It and
+  `RelationalCompatibilityMapping` are deleted; the mapping-based entry is now the only one.
+- **The executor had nine members, four of which existed only as defaults feeding the others.** One
+  default rendered a JSON path as `$.a.b` for every store while each dialect spells it otherwise, so an
+  index built through it was one the planner would never choose. The contract is now four members plus two
+  defaulted ones, and the owner calls all of them. Index parts carry the physical path *and* type, so an
+  executor hands them to its own dialect and the index matches the reads it exists to serve.
+- **The plan could not express persisted computed columns**, which SQL Server and MySQL have always built
+  — one per mapped scalar, from private copies of one predicate. Adopting the plan as it stood would have
+  silently dropped them. The decision now lives in `Plan`; a store answers only whether it can hold one.
+- **Nullability was a neutral field no executor read.** SQLite constrains only its key, PostgreSQL
+  constrains everything, SQL Server and MySQL constrain nothing else. One answer could only be wrong for
+  three of four, and comparing against it invented drift on the one store that checks. It is gone from the
+  request; the store creates and compares it.
+- **Type comparison could not be the framework's.** A CLR type cannot see a character set, and a store
+  type cannot be mapped back — SQLite answers TEXT for a string, a date and a Guid alike. `ColumnMatches`
+  is the store's, so MySQL keeps catching collation drift and SQLite is judged on presence.
+- **What a store reports is not what a mapping asks for.** `RelationalColumnState` is a separate record,
+  and a null entry means "held, cannot describe" — a store admits what it does not know per column rather
+  than filling placeholders the framework then compares.
+- **A finding carries its own severity.** Whether a difference stops a boot is answered per column —
+  identity and the structured document on any matching mode, a projected column never under Relaxed,
+  everything under Strict — which four private validations had each answered differently.
+
+### What running it found
+
+- **SQLite materialized its database before the consent gate.** Opening a managed SQLite connection
+  creates the file, so validating first and gating second turned a refusal into a side effect. Reads now
+  open non-creating and only mutations open a connection that may create; the spec that proves it fails
+  when that is flipped back.
+- **Three adapters reported `TableExists = true` and `State = "Healthy"` as literals** — a health report
+  structurally incapable of reporting ill health. All four now project the validation that actually ran.
+- **Only SQLite builds a declared `[Index]`.** PostgreSQL, SQL Server and MySQL have always ignored one.
+  That is now visible as an unproved claim rather than nothing at all, and is carried as PMC-041.
 
 Rule 3 — a guarantee that can be declared can be required — is decided here and unimplemented. Nothing in
 the framework yet lets an Entity or source demand a guarantee and have composition negotiate or refuse.
 
 ## Evidence
 
+Measured on 2026-08-21 against real stores, not reasoned about:
+
 - Two successive unsorted pages over the same corpus partition it exactly — no repeats, no gaps — on
-  every adapter, including SQL Server. This test does not exist today.
+  every adapter, including SQL Server.
 - A receipt claiming provider pagination with an incomplete sort is rejected by the validator.
-- `SqlServerSchema` and `NpgsqlSchema` refuse automatic DDL in Production without consent, matching
-  SQLite and MySQL, and the refusal names the table.
-- The cross-adapter no-fallback sweep stays green, and the fallback fact reports what was lost.
-- The full data suite and the web adapter surfaces stay green throughout.
+- Automatic DDL consent is now one decision on one path, so it cannot be forgotten by an adapter rather
+  than refused. `EnvironmentGateSpec` pins the gate's own law, `Disabled_ddl_cannot_add_columns_to_an_existing_table`
+  pins the orchestrator's refusal and proves it mutates nothing, and SQLite exercises the whole chain from a
+  Production host through to a refusal that names the policy and the table. That last spec also proves no
+  database file is created while refusing, and it fails when the non-creating read is flipped back.
+- MySQL still rejects a table whose engine is not InnoDB, and still compares character set and collation
+  on a key column — the two checks a neutral column model could not have carried.
+- SQLite's mapped indexes still read `json_extract("Json", '$."Status"')` and `EXPLAIN QUERY PLAN` still
+  shows the planner choosing them, which is what proves an index part must carry its physical type.
+- Suites, all green: Relational 20, SQLite 49, PostgreSQL 27, SQL Server 34, MySQL 7, CockroachDB 18,
+  Data.Core 480, Web adapter surfaces 53 each on SQLite/PostgreSQL/SQL Server, Jobs 81/68 on
+  SQLite/SQL Server, Cache SQLite 5, SQLite-vec 63, pgvector 28. Solution builds at zero warnings.

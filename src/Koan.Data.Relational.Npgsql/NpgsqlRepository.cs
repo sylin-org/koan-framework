@@ -47,6 +47,9 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private readonly Dictionary<string, NpgsqlEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
     private readonly int _planLimit;
     private readonly DataSourceReadinessCoordinator _readiness;
+    private readonly IRelationalSchemaOrchestrator _schema;
+    private readonly IRelationalStoreFeatures _features;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
 
     private NpgsqlEntityPlan<TEntity, TKey> _plan => ResolvePlan();
 
@@ -64,6 +67,17 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         _services = services;
         _options = options;
         _readiness = services.GetRequiredService<DataSourceReadinessCoordinator>();
+        _schema = services.GetRequiredService<IRelationalSchemaOrchestrator>();
+        _features = new NpgsqlStoreFeatures(options.ProviderName);
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Ddl = options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = options.SearchPath,
+            StorageLifecycle = options.SourcePlan.StorageLifecycle,
+            Access = options.SourcePlan.Access
+        };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
         _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
@@ -287,14 +301,14 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             case RelationalInstructions.SchemaClear:
                 return (TResult)(object)await DeleteAll(ct).ConfigureAwait(false);
             case RelationalInstructions.SchemaValidate:
+            {
                 await Ready(ct).ConfigureAwait(false);
-                return (TResult)(object)new Dictionary<string, object?>
-                {
-                    ["Provider"] = _options.ProviderName,
-                    ["Table"] = _plan.QualifiedTable,
-                    ["TableExists"] = true,
-                    ["State"] = "Healthy"
-                };
+                await using var connection = await Open(ct).ConfigureAwait(false);
+                var validation = await _schema.ValidateAsync(
+                    _plan.Mapping, new NpgsqlDdlExecutor(connection), _features, _schemaPolicy, ct)
+                    .ConfigureAwait(false);
+                return (TResult)(object)validation.Report(_options.ProviderName);
+            }
             case RelationalInstructions.SqlScalar:
             case RelationalInstructions.SqlNonQuery:
             case RelationalInstructions.SqlQuery:
@@ -313,26 +327,33 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             await _readiness.Provision(
                 _options.SourcePlan,
                 target,
-                async token =>
-                {
-                    await using var connection = await Open(token).ConfigureAwait(false);
-                    await NpgsqlSchema.Provision(connection, _plan, _options, token).ConfigureAwait(false);
-                },
-                async token =>
-                {
-                    await using var connection = await Open(token).ConfigureAwait(false);
-                    await NpgsqlSchema.Validate(connection, _plan, _options, token).ConfigureAwait(false);
-                }, ct).ConfigureAwait(false);
+                token => Provision(token),
+                token => Validate(token), ct).ConfigureAwait(false);
             return;
         }
-        await _readiness.ValidateShape(
-            _options.SourcePlan,
-            target,
-            async token =>
-            {
-                await using var connection = await Open(token).ConfigureAwait(false);
-                await NpgsqlSchema.Validate(connection, _plan, _options, token).ConfigureAwait(false);
-            }, ct).ConfigureAwait(false);
+        await _readiness.ValidateShape(_options.SourcePlan, target, token => Validate(token), ct)
+            .ConfigureAwait(false);
+    }
+
+    private async Task Provision(CancellationToken ct)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await _schema.EnsureCreatedAsync(
+            _plan.Mapping, new NpgsqlDdlExecutor(connection), _features, _schemaPolicy, ct).ConfigureAwait(false);
+    }
+
+    private async Task Validate(CancellationToken ct)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        var validation = await _schema.ValidateAsync(
+            _plan.Mapping, new NpgsqlDdlExecutor(connection), _features, _schemaPolicy, ct).ConfigureAwait(false);
+        if (validation.IsServiceable) return;
+        throw new SchemaMismatchException(
+            typeof(TEntity).FullName ?? typeof(TEntity).Name,
+            validation.Plan.Table,
+            _options.SchemaMatching,
+            validation.Corrective,
+            _options.SourcePlan.UsesLegacyProvisioningReadiness);
     }
 
     private async Task<TEntity?> Get(NpgsqlConnection connection, NpgsqlTransaction? transaction, TKey id, CancellationToken ct)

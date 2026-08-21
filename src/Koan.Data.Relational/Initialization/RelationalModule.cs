@@ -13,8 +13,6 @@ public sealed class RelationalModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.TryAddSingleton<IRelationalSchemaOrchestrator, RelationalSchemaOrchestrator>();
-        services.TryAddSingleton<IRelationalMappingSchemaOrchestrator>(sp =>
-            (IRelationalMappingSchemaOrchestrator)sp.GetRequiredService<IRelationalSchemaOrchestrator>());
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

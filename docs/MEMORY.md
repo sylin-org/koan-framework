@@ -54,6 +54,34 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **A shared seam is only proven by adopting it, and adoption is where its lies surface.**
+  `RelationalSchemaOrchestrator` was 746 lines, registered in DI, resolved by nobody, and looked complete.
+  Moving four adapters onto it found: an entry point that compiled a *second* mapping by reflection, so any
+  caller would have validated a table it neither reads nor writes; four of nine members that existed only as
+  defaults feeding the others, one of which rendered a JSON path in a spelling no dialect uses; no way to
+  express the persisted computed columns two adapters have always built; and a neutral nullability field no
+  executor read, whose only effect was to invent drift on the one store that checks. None of that was visible
+  from reading the seam. Write the first consumer before believing the abstraction. (2026-08-21)
+- **When four implementations disagree, decide which kind of disagreement it is before unifying.** SQLite,
+  PostgreSQL, SQL Server and MySQL spelled nullability three different ways, validated to four different
+  depths, and built indexes on one store out of four. Only the second and third were *decisions* to move to
+  one owner. Nullability is a store convention, and forcing one neutral answer would have been wrong for
+  three of the four; column types cannot be compared by the framework at all, because a CLR type cannot see
+  a character set and a store type cannot be mapped back. Move the decision; leave the vocabulary. (2026-08-21)
+- **A validation that reports one severity for everything was written by someone who only had one case.**
+  Whether a schema difference stops a boot is a per-column answer — identity and the structured document on
+  any matching mode, a projected column never under Relaxed, everything under Strict — and four private
+  validations had each answered it differently and partially. Findings that carry their own severity replaced
+  four parallel string lists; the shape of the type is what made the rule statable at all. (2026-08-21)
+- **A hardcoded health answer is not a health answer.** Three relational adapters returned
+  `TableExists = true, State = "Healthy"` as literals after a readiness call, so the schema-validate
+  instruction was structurally incapable of reporting ill health, and no test noticed because the value was
+  never wrong in the cases anyone ran. (2026-08-21)
+- **Before attributing a red test to your change, run it against an unmodified worktree.** A Jobs/PostgreSQL
+  failure appeared in the middle of a large refactor and looked like fallout; it reproduced identically at
+  `HEAD` with none of the changes present. `git worktree add --detach <short-path> HEAD` is the cheapest
+  answer — keep the path short, because a scratchpad path can exceed Windows' filename limit mid-checkout
+  and leave a half-written tree. (2026-08-21)
 - **A test double that is more capable than production hides defects.** Canon's persistence double
   returned the object it was handed, so nothing could ever be lost in storage. Every Canon spec
   passed while the pillar's central promise — messy arrivals converge — was broken for every real

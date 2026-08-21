@@ -2,6 +2,8 @@ using AwesomeAssertions;
 using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Connector.Cockroach;
+using Koan.Data.Core;
+using Koan.Data.Core.Options;
 using Koan.Data.Relational.Initialization;
 using Koan.Data.Relational.Orchestration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,15 +14,20 @@ namespace Koan.Data.Relational.Tests;
 public sealed class RelationalOwnershipSpec
 {
     [Fact]
-    public async Task Schema_policy_and_resolved_table_remain_request_local()
+    public async Task Schema_and_resolved_table_remain_request_local()
     {
-        var orchestrator = new RelationalSchemaOrchestrator(new ServiceCollection().BuildServiceProvider());
+        using var provider = Host(source =>
+        {
+            source.Map<OrderA>(map => map.Container("orders_a").Key(order => order.Id).Name("ID"));
+            source.Map<OrderB>(map => map.Container("orders_b").Key(order => order.Id).Name("ID"));
+        });
+        var orchestrator = new RelationalSchemaOrchestrator();
         var ddl = new ProbeDdl();
 
-        var strict = await orchestrator.ValidateAsync<ProbeEntity, string>(
+        var strict = await orchestrator.ValidateAsync(
+            Mapping<OrderA>(provider),
             ddl,
             new Features("postgres"),
-            "orders_a",
             new RelationalSchemaPolicy
             {
                 DefaultSchema = "tenant_a",
@@ -28,10 +35,10 @@ public sealed class RelationalOwnershipSpec
                 Ddl = RelationalDdlPolicy.NoDdl
             });
 
-        var relaxed = await orchestrator.ValidateAsync<ProbeEntity, string>(
+        var relaxed = await orchestrator.ValidateAsync(
+            Mapping<OrderB>(provider),
             ddl,
             new Features("sqlite"),
-            "orders_b",
             new RelationalSchemaPolicy
             {
                 DefaultSchema = "main",
@@ -39,15 +46,72 @@ public sealed class RelationalOwnershipSpec
                 Ddl = RelationalDdlPolicy.AutoCreate
             });
 
-        strict["Provider"].Should().Be("postgres");
-        strict["Schema"].Should().Be("tenant_a");
-        strict["Table"].Should().Be("orders_a");
-        strict["State"].Should().Be("Unhealthy");
+        strict.Plan.Table.Schema.Should().Be("tenant_a");
+        strict.Plan.Table.Name.Should().Be("orders_a");
+        relaxed.Plan.Table.Schema.Should().Be("main");
+        relaxed.Plan.Table.Name.Should().Be("orders_b");
 
-        relaxed["Provider"].Should().Be("sqlite");
-        relaxed["Schema"].Should().Be("main");
-        relaxed["Table"].Should().Be("orders_b");
-        relaxed["State"].Should().Be("Degraded");
+        // An absent table is not serviceable on any matching mode. Relaxed tolerates drift, not absence.
+        strict.State.Should().Be("Unhealthy");
+        relaxed.State.Should().Be("Unhealthy");
+    }
+
+    [Fact]
+    public async Task Matching_mode_decides_whether_drift_stops_the_mapping()
+    {
+        using var provider = Host(source => source.Map<OrderA>(map => map
+            .Container("orders_a")
+            .Key(order => order.Id).Name("ID")
+            .Property(order => order.Reference).Name("REF")));
+        var orchestrator = new RelationalSchemaOrchestrator();
+        var mapping = Mapping<OrderA>(provider);
+        // The key is as declared; an ordinary scalar is not. Nothing about that stops a read or a write.
+        var ddl = new ProbeDdl(new RelationalTableShape(
+            new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = new("ID", Nullable: false, ClrType: typeof(string)),
+                ["REF"] = new("REF", Nullable: true, ClrType: typeof(int))
+            },
+            ["ID"]));
+
+        var relaxed = await orchestrator.ValidateAsync(
+            mapping, ddl, new Features("sqlite"), new RelationalSchemaPolicy { DefaultSchema = "main" });
+        var strict = await orchestrator.ValidateAsync(
+            mapping, ddl, new Features("sqlite"),
+            new RelationalSchemaPolicy { DefaultSchema = "main", Matching = RelationalSchemaMatchingMode.Strict });
+
+        relaxed.Findings.Should().ContainSingle(finding => finding.Subject == "REF");
+        relaxed.IsComplete.Should().BeFalse("the difference is reported either way");
+        relaxed.IsServiceable.Should().BeTrue("Relaxed matching tolerates drift outside identity");
+        relaxed.State.Should().Be("Degraded");
+
+        strict.IsServiceable.Should().BeFalse();
+        strict.Corrective.Should().ContainSingle(finding => finding.Subject == "REF");
+        strict.State.Should().Be("Unhealthy");
+    }
+
+    [Fact]
+    public async Task Identity_drift_stops_the_mapping_on_every_matching_mode()
+    {
+        using var provider = Host(source => source.Map<OrderA>(map => map
+            .Container("orders_a")
+            .Key(order => order.Id).Name("ID")));
+        var orchestrator = new RelationalSchemaOrchestrator();
+        // The store addresses rows by a different column than the mapping does, so no read or write is safe.
+        var ddl = new ProbeDdl(new RelationalTableShape(
+            new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["ID"] = new("ID", Nullable: false, ClrType: typeof(string)),
+                ["LEGACY_KEY"] = new("LEGACY_KEY", Nullable: false, ClrType: typeof(string))
+            },
+            ["LEGACY_KEY"]));
+
+        var validation = await orchestrator.ValidateAsync(
+            Mapping<OrderA>(provider), ddl, new Features("sqlite"),
+            new RelationalSchemaPolicy { DefaultSchema = "main" });
+
+        validation.IsServiceable.Should().BeFalse();
+        validation.Corrective.Should().ContainSingle(finding => finding.Subject == "PrimaryKey");
     }
 
     [Fact]
@@ -76,65 +140,66 @@ public sealed class RelationalOwnershipSpec
     [Fact]
     public async Task Disabled_ddl_cannot_add_columns_to_an_existing_table()
     {
-        var orchestrator = new RelationalSchemaOrchestrator(new ServiceCollection().BuildServiceProvider());
-        var ddl = new ProbeDdl(tableExists: true);
-        var policy = new RelationalSchemaPolicy
-        {
-            Projections = RelationalProjectionMode.PhysicalColumns,
-            Ddl = RelationalDdlPolicy.NoDdl
-        };
+        using var provider = Host(source => source.Map<OrderA>(map => map
+            .Container("orders_a")
+            .Key(order => order.Id).Name("ID")
+            .Property(order => order.Reference).Name("REF")));
+        var orchestrator = new RelationalSchemaOrchestrator();
+        var ddl = new ProbeDdl(new RelationalTableShape(
+            new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase) { ["ID"] = null },
+            ["ID"]));
 
-        var action = () => orchestrator.EnsureCreatedAsync<ProbeEntity, string>(
+        var action = () => orchestrator.EnsureCreatedAsync(
+            Mapping<OrderA>(provider),
             ddl,
             new Features("sqlite"),
-            "orders",
-            policy);
+            new RelationalSchemaPolicy { DefaultSchema = "main", Ddl = RelationalDdlPolicy.NoDdl });
 
         await action.Should().ThrowAsync<InvalidOperationException>();
         ddl.Mutations.Should().Be(0);
     }
 
-    private sealed class ProbeEntity : IEntity<string>
+    private static MappingPlan Mapping<TEntity>(IServiceProvider provider)
+        where TEntity : class =>
+        provider.GetRequiredService<IDataMappingPlans>().Require<TEntity>("Legacy");
+
+    private static ServiceProvider Host(Action<DataSourceBuilder> configure)
     {
-        public string Id { get; init; } = "probe";
-        public string Name { get; init; } = "Probe";
+        var services = new ServiceCollection();
+        services.AddKoan(koan => configure(koan.Data.Source("Legacy")));
+        return services.BuildServiceProvider();
+    }
+
+    public sealed class OrderA
+    {
+        public string Id { get; set; } = "a";
+        public string Reference { get; set; } = "";
+    }
+
+    public sealed class OrderB
+    {
+        public string Id { get; set; } = "b";
     }
 
     private sealed class Features(string provider) : IRelationalStoreFeatures
     {
         public bool SupportsJsonFunctions => false;
         public bool SupportsPersistedComputedColumns => false;
-        public bool SupportsIndexesOnComputedColumns => false;
         public string ProviderName => provider;
     }
 
-    /// <summary>A store that only records the grammar it was asked to speak, so the spec can assert the decision.</summary>
-    private sealed class ProbeDdl(bool tableExists = false) : IRelationalDdlExecutor
+    /// <summary>A store that reports one shape and records the grammar it was asked to speak, so the spec can
+    /// assert the decision rather than a sample of its effects.</summary>
+    private sealed class ProbeDdl(RelationalTableShape? shape = null) : IRelationalDdlExecutor
     {
         public int Mutations { get; private set; }
 
-        public Task<bool> TableExists(string schema, string table, CancellationToken ct = default)
-            => Task.FromResult(tableExists);
+        public Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
+            => Task.FromResult(shape);
 
-        public Task<bool> ColumnExists(string schema, string table, string column, CancellationToken ct = default)
-            => Task.FromResult(tableExists && column is "Id" or "Json");
+        public Task Create(RelationalTableDefinition table, CancellationToken ct = default) => Mutated();
 
-        public Task CreateTableIdJson(string schema, string table, string idColumn = "Id", string jsonColumn = "Json", CancellationToken ct = default)
-            => Mutated();
-
-        public Task CreateTableWithColumns(string schema, string table, IReadOnlyList<RelationalColumnDefinition> columns, CancellationToken ct = default)
-            => Mutated();
-
-        public Task AddComputedColumnFromJson(string schema, string table, string column, string jsonPath, bool persisted, CancellationToken ct = default)
-            => Mutated();
-
-        public Task AddPhysicalColumn(string schema, string table, string column, Type clrType, bool nullable, CancellationToken ct = default)
-            => Mutated();
-
-        public Task CreateIndex(string schema, string table, string indexName, IReadOnlyList<string> columns, bool unique, CancellationToken ct = default)
-            => Mutated();
-
-        public Task CreateJsonExpressionIndex(string schema, string table, string indexName, IReadOnlyList<RelationalJsonIndexPart> parts, bool unique, CancellationToken ct = default)
+        public Task AddColumn(RelationalTableDefinition table, RelationalColumnDefinition column, CancellationToken ct = default)
             => Mutated();
 
         private Task Mutated()

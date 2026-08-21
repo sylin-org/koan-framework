@@ -1,14 +1,11 @@
-using Koan.Data.Abstractions;
-
 namespace Koan.Data.Relational.Orchestration;
 
-/// <summary>An index definition resolved onto compiled physical paths and shared encoding identities.</summary>
+/// <summary>An index resolved onto compiled physical parts, each carrying its own shared encoding identity.</summary>
 public sealed record RelationalIndexDefinition
 {
     public RelationalIndexDefinition(
         string name,
-        IEnumerable<PhysicalPath> parts,
-        IEnumerable<string> encodingIds,
+        IEnumerable<RelationalIndexPart> parts,
         bool unique,
         bool primary,
         bool ttl,
@@ -16,12 +13,9 @@ public sealed record RelationalIndexDefinition
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(parts);
-        ArgumentNullException.ThrowIfNull(encodingIds);
         Name = name;
         Parts = Array.AsReadOnly(parts.ToArray());
-        EncodingIds = Array.AsReadOnly(encodingIds.ToArray());
-        if (Parts.Count == 0 || Parts.Count != EncodingIds.Count)
-            throw new ArgumentException("An index requires one encoding identity for each physical part.");
+        if (Parts.Count == 0) throw new ArgumentException("An index requires at least one physical part.", nameof(parts));
         Unique = unique;
         Primary = primary;
         Ttl = ttl;
@@ -29,10 +23,12 @@ public sealed record RelationalIndexDefinition
     }
 
     public string Name { get; }
-    public IReadOnlyList<PhysicalPath> Parts { get; }
-    public IReadOnlyList<string> EncodingIds { get; }
+    public IReadOnlyList<RelationalIndexPart> Parts { get; }
     public bool Unique { get; }
     public bool Primary { get; }
     public bool Ttl { get; }
     public bool RewriteFree { get; }
+
+    /// <summary>Whether any part reads inside a structured value, which is what makes this an expression index.</summary>
+    public bool IsExpression => Parts.Any(static part => part.Path.IsNested);
 }

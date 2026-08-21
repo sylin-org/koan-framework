@@ -30,11 +30,11 @@ route-local DDL and matching policy automatically on first meaningful use.
 
 ## What this package owns
 
-- the single functional registration for `IRelationalSchemaOrchestrator`;
+- `IRelationalSchemaOrchestrator`, the single owner of every relational schema decision - which columns a
+  mapping implies, which indexes are worth building, whether the environment consents to automatic DDL, and
+  whether a difference is fatal - working from the same `MappingPlan` the connector's own commands use;
 - `RelationalCommandPlanner`, which turns a `MappingPlan` into complete get/query/insert/update/delete/patch/CAS plans;
-- `IRelationalMappingSchemaOrchestrator`, which derives and validates complete column/index definitions from that map;
 - mapped filter translation that uses the same physical path and codec as writes and indexes;
-- provider-neutral schema validation and additive creation mechanics;
 - restricted filter-to-SQL translation shared by relational connectors;
 - comparable scalar JSON encoding and AOT-clean ADO command helpers.
 

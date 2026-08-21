@@ -76,9 +76,12 @@ public sealed class SqliteConfigurationTruthSpec
                 options.DdlPolicy.Should().Be(RelationalDdlPolicy.NoDdl);
                 options.AllowProductionDdl.Should().BeFalse();
 
-                await FluentActions.Invoking(() => new ExplicitSqliteRecord { Value = "rejected" }.Save())
-                    .Should().ThrowAsync<InvalidOperationException>()
-                    .WithMessage("*DdlPolicy is NoDdl*");
+                // A refusal has to name the policy that refused and the object it refused, so an operator can
+                // act on it. Which layer composed the sentence is not this spec's business.
+                var refusal = (await FluentActions.Invoking(() => new ExplicitSqliteRecord { Value = "rejected" }.Save())
+                    .Should().ThrowAsync<InvalidOperationException>()).Which;
+                refusal.Message.Should().Contain(nameof(RelationalDdlPolicy.NoDdl))
+                    .And.Contain(nameof(ExplicitSqliteRecord));
             }
             File.Exists(path).Should().BeFalse("NoDdl must fail before SQLite creates the database");
         }

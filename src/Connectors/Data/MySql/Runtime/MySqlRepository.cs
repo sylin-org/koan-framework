@@ -37,6 +37,8 @@ internal sealed class MySqlRepository<TEntity, TKey> :
     private readonly MappingPlan? _declaredMapping;
     private readonly DataSegmentationPlan _segmentation;
     private readonly DataSourceReadinessCoordinator _readiness;
+    private readonly IRelationalSchemaOrchestrator _schema;
+    private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly object _plansGate = new();
     private readonly Dictionary<string, MySqlEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
     private readonly int _planLimit;
@@ -48,6 +50,16 @@ internal sealed class MySqlRepository<TEntity, TKey> :
         _services = services;
         _options = options;
         _readiness = services.GetRequiredService<DataSourceReadinessCoordinator>();
+        _schema = services.GetRequiredService<IRelationalSchemaOrchestrator>();
+        _schemaPolicy = new RelationalSchemaPolicy
+        {
+            Ddl = options.DdlPolicy,
+            Matching = options.SchemaMatching,
+            AllowProductionDdl = options.AllowProductionDdl,
+            DefaultSchema = options.Database,
+            StorageLifecycle = options.SourcePlan.StorageLifecycle,
+            Access = options.SourcePlan.Access
+        };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
         _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(options.Source);
@@ -244,14 +256,12 @@ internal sealed class MySqlRepository<TEntity, TKey> :
             case RelationalInstructions.SchemaClear:
                 return (TResult)(object)await DeleteAll(ct).ConfigureAwait(false);
             case RelationalInstructions.SchemaValidate:
+            {
                 await Ready(ct).ConfigureAwait(false);
-                return (TResult)(object)new Dictionary<string, object?>
-                {
-                    ["Provider"] = Infrastructure.Constants.Provider,
-                    ["Table"] = Plan.QualifiedTable,
-                    ["TableExists"] = true,
-                    ["State"] = "Healthy"
-                };
+                await using var connection = await Open(ct).ConfigureAwait(false);
+                var validation = await Validation(connection, Plan, ct).ConfigureAwait(false);
+                return (TResult)(object)validation.Report(Infrastructure.Constants.Provider);
+            }
             case RelationalInstructions.SqlScalar:
             case RelationalInstructions.SqlNonQuery:
             case RelationalInstructions.SqlQuery:
@@ -286,24 +296,47 @@ internal sealed class MySqlRepository<TEntity, TKey> :
         if (_options.SourcePlan.UsesLegacyProvisioningReadiness)
         {
             await _readiness.Provision(_options.SourcePlan, target,
-                async token =>
-                {
-                    await using var connection = await Open(token).ConfigureAwait(false);
-                    await MySqlSchema.Provision(connection, plan, _options, token).ConfigureAwait(false);
-                },
-                async token =>
-                {
-                    await using var connection = await Open(token).ConfigureAwait(false);
-                    await MySqlSchema.Validate(connection, plan, _options, token).ConfigureAwait(false);
-                }, ct).ConfigureAwait(false);
+                token => Provision(plan, token),
+                token => Validate(plan, token), ct).ConfigureAwait(false);
             return;
         }
-        await _readiness.ValidateShape(_options.SourcePlan, target, async token =>
-        {
-            await using var connection = await Open(token).ConfigureAwait(false);
-            await MySqlSchema.Validate(connection, plan, _options, token).ConfigureAwait(false);
-        }, ct).ConfigureAwait(false);
+        await _readiness.ValidateShape(_options.SourcePlan, target, token => Validate(plan, token), ct)
+            .ConfigureAwait(false);
     }
+
+    private async Task Provision(MySqlEntityPlan<TEntity, TKey> plan, CancellationToken ct)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await _schema.EnsureCreatedAsync(
+            plan.Mapping,
+            new MySqlDdlExecutor(connection, plan.Dialect),
+            MySqlStoreFeatures.Instance,
+            _schemaPolicy,
+            ct).ConfigureAwait(false);
+    }
+
+    private async Task Validate(MySqlEntityPlan<TEntity, TKey> plan, CancellationToken ct)
+    {
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        var validation = await Validation(connection, plan, ct).ConfigureAwait(false);
+        if (validation.IsServiceable) return;
+        throw new SchemaMismatchException(
+            typeof(TEntity).FullName ?? typeof(TEntity).Name,
+            validation.Plan.Table,
+            _options.SchemaMatching,
+            validation.Corrective,
+            _options.SourcePlan.UsesLegacyProvisioningReadiness);
+    }
+
+    private Task<RelationalSchemaValidation> Validation(
+        MySqlConnection connection,
+        MySqlEntityPlan<TEntity, TKey> plan,
+        CancellationToken ct) => _schema.ValidateAsync(
+        plan.Mapping,
+        new MySqlDdlExecutor(connection, plan.Dialect),
+        MySqlStoreFeatures.Instance,
+        _schemaPolicy,
+        ct);
 
     private async Task<TEntity?> Get(MySqlConnection connection, MySqlTransaction? transaction, TKey id, CancellationToken ct)
     {

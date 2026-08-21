@@ -1,6 +1,7 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Relational.Mapping;
+using Koan.Data.Relational.Orchestration;
 
 namespace Koan.Data.Relational;
 
@@ -47,13 +48,13 @@ public static class RelationalPlanGuard
         {
             var expected = mapping.Indexes.SingleOrDefault(candidate => string.Equals(candidate.Name, index.Name, StringComparison.Ordinal))
                 ?? throw Error(mapping, index.Name, "The schema references an unknown mapped index.");
-            var paths = expected.Bindings.Select(static binding => binding.PhysicalPath).ToArray();
-            var encodings = expected.Bindings
-                .Select(binding => binding.Descriptor.Codec?.Id ?? $"clr:{binding.PhysicalType.AssemblyQualifiedName}")
-                .ToArray();
-            if (!paths.SequenceEqual(index.Parts) || !encodings.SequenceEqual(index.EncodingIds, StringComparer.Ordinal) ||
+            var parts = expected.Bindings.Select(static binding => new RelationalIndexPart(
+                binding.PhysicalPath,
+                binding.PhysicalType,
+                binding.Descriptor.Codec?.Id ?? $"clr:{binding.PhysicalType.AssemblyQualifiedName}")).ToArray();
+            if (!parts.SequenceEqual(index.Parts) ||
                 expected.Unique != index.Unique || expected.Primary != index.Primary || expected.Ttl != index.Ttl)
-                throw Error(mapping, index.Name, "The schema changed a compiled index path, encoding, uniqueness, primary, or TTL decision.");
+                throw Error(mapping, index.Name, "The schema changed a compiled index path, type, encoding, uniqueness, primary, or TTL decision.");
         }
     }
 
