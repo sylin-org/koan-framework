@@ -23,6 +23,14 @@ internal static class NpgsqlSchema
             throw new SchemaMismatchException(typeof(TEntity).FullName ?? typeof(TEntity).Name, plan.QualifiedTable,
                 options.SourcePlan.StorageLifecycle.ToString(), ["table"], [], ddlAllowed: false);
 
+        // Lifecycle and policy say whether this source may be provisioned at all; they say nothing about
+        // where. Automatic DDL issues CREATE against whatever the connection string resolves to, which in
+        // production is live data, so the environment is a separate question with a separate answer
+        // (DATA-0119, ARCH-0128). The consent value was carried this far all along and never read.
+        if (!RelationalDdlGate.Allowed(options.AllowProductionDdl))
+            throw new InvalidOperationException(
+                $"PostgreSQL cannot provision '{plan.QualifiedTable}'. {RelationalDdlGate.Refusal}");
+
         await using var command = connection.CreateCommand();
         command.CommandText = CreateSql(plan);
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);

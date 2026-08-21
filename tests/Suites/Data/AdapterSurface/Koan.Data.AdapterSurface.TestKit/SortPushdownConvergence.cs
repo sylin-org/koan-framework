@@ -231,6 +231,28 @@ public static class SortPushdownConvergence
             "paging an order must lose nothing and repeat nothing");
     }
 
+    /// <summary>
+    /// Successive pages of an <b>unsorted</b> query partition the corpus exactly — every row once, none twice.
+    ///
+    /// <para>This is the most ordinary read there is, and it was the one nobody checked. A caller who names no
+    /// order still gets pages, and each adapter decided privately what order those pages were windows onto. One
+    /// answered <c>ORDER BY (SELECT NULL)</c>, which satisfies SQL Server's requirement that OFFSET have an
+    /// ORDER BY and promises nothing, so page two could repeat rows from page one. The framework now supplies
+    /// the identity order before any adapter sees the query, and this is what that has to buy.</para>
+    /// </summary>
+    public static async Task AssertUnsortedPagesPartitionTheCorpusAsync()
+    {
+        await Seed();
+
+        var seen = new List<string>();
+        for (var page = 1; page <= 3; page++)
+            seen.AddRange((await Data<SortedWidget, string>.Page(page, 2)).Select(static widget => widget.Id));
+
+        seen.Should().OnlyHaveUniqueItems("a row must not appear on two pages of the same unsorted query");
+        seen.Should().BeEquivalentTo(Corpus.Select(static widget => widget.Id),
+            "paging an unsorted query must still reach every row exactly once");
+    }
+
     /// <summary>Paging is only meaningful over an order the store applied; this proves the window is real.</summary>
     public static async Task AssertPagesAsync()
     {

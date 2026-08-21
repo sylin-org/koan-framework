@@ -19,6 +19,7 @@ public sealed class PostgresSortPushdownSpec(PostgresFixture fixture, ITestOutpu
         await SortPushdownConvergence.AssertScalarOrderingConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertPagesAsync();
+        await SortPushdownConvergence.AssertUnsortedPagesPartitionTheCorpusAsync();
         await SortPushdownConvergence.AssertStreamsAsync();
         await SortPushdownConvergence.AssertNothingFallsBackAsync(host.Services);
     }

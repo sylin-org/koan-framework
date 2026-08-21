@@ -1,5 +1,6 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Sorting;
 using Koan.Data.Core.Sorting;
 
 namespace Koan.Data.Core.Querying;
@@ -29,6 +30,7 @@ public static class FilterPushdownCoordinator
     /// </summary>
     public static (QueryDefinition AdapterQuery, Filter? Residual) Plan(QueryDefinition query, FilterSupport caps, Type entityType)
     {
+        query = EnsureOrderForPage(query, entityType);
         if (query.Filter is null) return (query, null);
 
         var split = FilterSplitter.Split(query.Filter, caps, entityType);
@@ -38,6 +40,32 @@ public static class FilterPushdownCoordinator
                 .WithoutPagination()
                 .WithCountStrategy(null);
         return (adapterQuery, split.Residual);
+    }
+
+    /// <summary>
+    /// Supplies the order a page is taken against when the caller did not name one.
+    ///
+    /// <para>A page is a window onto an order, so paging without one is not a weaker query — it is a
+    /// meaningless one, and the store is free to return different rows for page two than the rows page one
+    /// implied. Each adapter used to answer this privately, and one of the answers was
+    /// <c>ORDER BY (SELECT NULL)</c>: enough to satisfy SQL Server's requirement that OFFSET have an ORDER BY,
+    /// and no ordering at all. Two successive pages could then repeat and skip rows, on the most ordinary
+    /// operation there is.</para>
+    ///
+    /// <para>So the decision moves here, where it is made once and every adapter inherits it. This is the same
+    /// rule <see cref="QueryStreamCoordinator"/> already applies to streams, for the same reason; a stream that
+    /// reached this point has applied it already and is left alone.</para>
+    ///
+    /// <para>Only paginated queries pay for it. An unpaged read has no window to be a window of, so it keeps
+    /// whatever order the store finds cheapest.</para>
+    /// </summary>
+    private static QueryDefinition EnsureOrderForPage(QueryDefinition query, Type entityType)
+    {
+        if (!query.HasPagination || query.HasSort) return query;
+        if (AggregateMetadata.GetIdSpec(entityType)?.Prop is not { } identity) return query;
+        return query.WithSort([new SortSpec(
+            new MemberPath(entityType, [identity], identity.PropertyType, traversesCollection: false, collectionSegmentIndex: -1),
+            Desc: false)]);
     }
 
     /// <summary>

@@ -18,6 +18,7 @@ public sealed class SqliteSortPushdownSpec(SqliteFixture fixture, ITestOutputHel
         await SortPushdownConvergence.AssertScalarOrderingConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertConvergesAsync(host.Services);
         await SortPushdownConvergence.AssertPagesAsync();
+        await SortPushdownConvergence.AssertUnsortedPagesPartitionTheCorpusAsync();
         await SortPushdownConvergence.AssertStreamsAsync();
         await SortPushdownConvergence.AssertNothingFallsBackAsync(host.Services);
     }

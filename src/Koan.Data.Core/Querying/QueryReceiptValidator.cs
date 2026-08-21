@@ -22,6 +22,16 @@ internal static class QueryReceiptValidator
             throw Reject(QueryReceiptAxis.Bound,
                 "The adapter returned more records than the provider page it reported handling.");
 
+        // A page is a window onto an order. An adapter that applied only part of the ordering and still took
+        // the page hands back an arbitrary window, and the coordinator then sorts that window and returns it as
+        // page one — right-looking rows in the wrong place, with nothing to notice. Couchbase did exactly this
+        // until 2026-08-20 and no test caught it, because a wrong page is still a plausible page. Every
+        // adapter's receipt passes through here, so the rule is asserted once instead of remembered six times.
+        if (adapterQuery.HasPagination && result.PaginationHandled && !result.SortFullyHandled(adapterQuery))
+            throw Reject(QueryReceiptAxis.Pagination,
+                "The adapter reported a provider-applied page over an ordering it did not fully apply. " +
+                "Take the page only when the whole sort was pushed down.");
+
         foreach (var handled in result.SortHandled)
             if (!adapterQuery.Sort.Contains(handled))
                 throw Reject(QueryReceiptAxis.Sort,
