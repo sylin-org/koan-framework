@@ -15,6 +15,13 @@
 > gate would have gone green on the exact regression that invalidated this document. Each of the three
 > defects listed below has a cell proven against it, red then green. `docs/SURFACES.md` records which
 > cells run daily and which need Docker.
+>
+> The static half runs per-PR: `scripts/aot-lint.ps1` is leg F of the ratchet and rejects `MetadataToken`
+> and `(dynamic)` in `src/`, so a reintroduction of either fails in the pull request that writes it
+> instead of in the next morning's lane. §4's observation that `grep "(dynamic)"` — and not the error
+> text — is the reliable tripwire is now enforced rather than merely recorded. It is a complement to the
+> publish-and-run, never a substitute: a grep cannot enumerate what ILC forbids, which is the same reason
+> a compile-only gate was rejected.
 
 > **Implementation update (PMC-049, 2026-08-21) — the substrate reaches the server adapters, and
 > §3's Dapper split is superseded.** Every relational backend now NativeAOT-publishes and runs against a

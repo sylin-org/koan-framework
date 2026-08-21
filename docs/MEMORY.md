@@ -67,7 +67,10 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   `MetadataToken` defect settled it: the publish **succeeded** and the binary exited 1 on the first entity
   it mapped. The proxy would have gone green on the exact regression that invalidated an accepted ADR for
   five weeks — worse than no check, because it would have reported a certified single binary that dies on
-  startup. Before accepting a proxy, run the real failure through it. (2026-08-21)
+  startup. Before accepting a proxy, run the real failure through it. The resolution is layering, not
+  choosing: the grep became ratchet leg F for the constructs already known to break a binary, and the
+  publish-and-run stayed the authority. A cheap check earns its place as a complement to the real one and
+  never as a replacement for it. (2026-08-21)
 - **A defect that fires only on a first run needs the guard to manufacture a first run.** The
   reference-manifest bug appears only when the RID-specific intermediate directory does not yet exist, so
   it reproduces on a fresh CI checkout and hides on any developer machine that has published once. The

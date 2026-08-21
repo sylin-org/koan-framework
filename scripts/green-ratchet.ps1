@@ -31,12 +31,17 @@
     D.  Skills lint scripts/skills-lint.ps1 -Strict — the DX-0048 skill contract:
                     dir==name, frontmatter (name/description), no version pins, and
                     link/card resolution + catalog parity (now fatal — H10 complete).
+    F.  AOT lint    scripts/aot-lint.ps1     -- rejects MetadataToken and (dynamic) in src/: two
+                    constructs that compile, pass every suite on the JIT, and break the published
+                    NativeAOT binary at runtime. A grep, not a proof -- the proof is aot-verify.ps1.
     E.  Lockfile    scripts/compare-koan-lock.ps1 — composition-lockfile drift (P1.1): the build
                     regenerates each app's koan.lock.json; fail if one drifted uncommitted.
-  NOT in this gate: the NativeAOT claim. ILC forbids things the JIT allows, so no leg here can see a
-  binary that fails to publish or dies on startup. That is `scripts/aot-verify.ps1`, which publishes and
-  runs the AotRelational sample and is scheduled daily in aot-verify.yml rather than run from here --
-  a manual boundary is the status that let the previous AOT proof decay for five weeks (PMC-050).
+  Only half the NativeAOT claim is in this gate. Leg F greps for the two constructs already known to
+  break an AOT binary, so a reintroduction fails in the pull request that writes it. But ILC forbids
+  things the JIT allows in ways no grep can enumerate, so no leg here can see a binary that fails to
+  publish or dies on startup. That is `scripts/aot-verify.ps1`, which publishes and runs the sample and
+  is scheduled daily in aot-verify.yml rather than run from here -- a manual boundary is the status that
+  let the previous AOT proof decay for five weeks (PMC-050).
 
   Exit code is 0 (GREEN) only when every run leg passes; otherwise 1 (RED).
 
@@ -281,6 +286,7 @@ try {
     # D. Skills lint (DX-0048) — skill contract: dir==name, frontmatter, version pins, link/card resolution.
     # -Strict (H10 complete): link/card resolution + catalog parity are now fatal, not warnings.
     Invoke-Leg 'D. skills-lint' { & "$root/scripts/skills-lint.ps1" -Strict }
+    Invoke-Leg 'F. aot-lint' { & "$root/scripts/aot-lint.ps1" }
 
     Write-Host "`n=== [ratchet] summary ===" -ForegroundColor Cyan
     $failed = @()

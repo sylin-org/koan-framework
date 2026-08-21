@@ -179,6 +179,11 @@ It publishes and runs, asserts the elected adapter by name so a fallback cannot 
 `.github/workflows/aot-verify.yml`. Prefer it over publishing by hand; the manual steps below are what it
 automates, and are here for when you need to look inside a failure.
 
+Two constructs are rejected earlier than that, in the pull request that writes them: `scripts/aot-lint.ps1`
+is leg F of the green ratchet and fails on `MetadataToken` or `(dynamic)` anywhere in `src/`. Both compile
+and pass every suite on the JIT, and both have broken a published binary here before (§7). The lint is a
+complement to the publish-and-run, not a substitute — a grep cannot enumerate what ILC forbids.
+
 The boot report's `Registry`/`Inventory` blocks must list every discovered module — if the trim roots worked
 you'll see all of them. Then exercise a real business path end-to-end.
 

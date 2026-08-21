@@ -88,6 +88,12 @@ promote it into the active backlog instead of waiting for this list.
   SQLite ships no satellites, and the SqlServer build carries culture data because SqlClient demands it,
   which makes its satellites nameable. `SqlServerInvariant` exists solely to put satellites and invariant
   mode in one process; it asserts the refusal it should get and the failure it must not.
+  **Same-PR half.** `scripts/aot-lint.ps1` runs as ratchet leg F, which the PR gate already invokes, and
+  rejects `MetadataToken` and `(dynamic)` in `src/` — the two constructs whose damage is documented. Both
+  rules were proven red-then-green, and the gate trial is the point: with `MetadataToken` reintroduced the
+  ratchet's **build leg passes** and only leg F fails, which is precisely the change that would otherwise
+  sit in `dev` until the next morning. It is a complement to the daily lane, not a substitute; a grep
+  cannot enumerate what ILC forbids, which is why compile-only was rejected in the first place.
   **Known residual:** the four server cells are not machine-guarded, so a `Npgsql`, `MySqlConnector` or
   `Microsoft.Data.SqlClient` version bump could break server AOT and go unnoticed until someone runs the
   matrix. `docs/SURFACES.md` carries that distinction with its date rather than leaving it in prose.
