@@ -54,6 +54,20 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 
 ## Durable learnings
 
+- **Eliminating causes is progress; inventing a fix for an unobserved mechanism is not.** A recurring SQLite
+  failure cluster resisted nine reproduction attempts. Rather than restructure the suite on a hunch, each
+  structural theory was tested and killed: parallelism was already disabled, the fixture path is a per-run
+  GUID, in-memory sources are per-instance with pooling off, and a deliberately failed spec holding a live host
+  against the shared store left the other 48 passing — so the suite has fault containment and a cluster is N
+  independent failures, not one cascading. What remains is a hypothesis about the machine. An architectural
+  change justified by none of that would have been a blind patch wearing a costume, and it would have made the
+  next investigation harder by moving the ground. Bounding a problem honestly is a deliverable. (2026-08-21)
+- **An intermittent that destroys its own evidence is two problems, and the second one is yours.** The same
+  cluster was seen three times through a summary filter that kept the assertion and discarded the exception, so
+  five hypotheses had to be eliminated by reading code instead of read off a stack trace in ten minutes. When
+  batching suites, preserve full output or the TRX — the run you throw away is always the one that mattered.
+  (2026-08-21)
+
 - **When a comparison is unreliable, stop comparing and start marking.** A stored generated column can go stale
   without its type changing, and the obvious check — read the expression back and compare it — does not work,
   because a store returns its own canonical rendering rather than the text it was given. That fragility is what
