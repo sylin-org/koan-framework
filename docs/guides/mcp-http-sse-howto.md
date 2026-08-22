@@ -18,18 +18,20 @@ related_guides:
 
 # MCP over HTTP
 
-## Contract
+Use this surface when an MCP client has to reach the application across a network. When a local client
+owns the server process and no HTTP boundary is involved, STDIO is the simpler answer and stays the
+default.
 
-- **Use this surface when** an MCP client reaches the application over a network. Use STDIO when a
-  local client owns the server process and does not need an HTTP security boundary.
-- **Inputs**: a Koan Web application, a reference to `Koan.Mcp`, at least one `[McpEntity]` or
-  `[McpTool]` surface, and `Koan:Mcp:EnableStreamableHttpTransport=true`.
-- **Outputs**: caller-specific tools and resources over one Streamable HTTP endpoint (`/mcp` by
-  default).
-- **Failure modes**: invalid protocol negotiation, missing/expired sessions, unsupported content
-  negotiation, unavailable tools, or denied caller authority.
-- **Success criteria**: the client initializes, receives a session id, discovers only usable tools,
-  invokes them through `POST /mcp`, and can inspect the same runtime facts as an operator.
+What it needs is small: a Koan Web application, a reference to `Koan.Mcp`, at least one `[McpEntity]`
+or `[McpTool]` surface, and `Koan:Mcp:EnableStreamableHttpTransport=true`. What it gives back is one
+Streamable HTTP endpoint -- `/mcp` unless you move it -- carrying the tools and resources *that
+caller* may use.
+
+A working exchange looks like this: the client initializes, receives a session id, discovers only the
+tools its identity can invoke, calls them through `POST /mcp`, and can read the same runtime facts an
+operator sees. Everything that goes wrong does so nameably -- a rejected protocol version, a missing or
+expired session, content negotiation the endpoint cannot satisfy, a tool that is not available, or a
+caller the gate denies.
 
 ## Shortest supported path
 

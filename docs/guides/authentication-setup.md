@@ -168,7 +168,7 @@ public sealed class Article : Entity<Article>
     public string Title { get; set; } = "";
 }
 
-public sealed class ArticlesController : EntityController<Article> { }
+public sealed class ArticlesController : EntityController<Article>;
 ```
 
 External roles map to `ClaimTypes.Role`; permissions from the local simulator map to `Koan.permission`. Row-level
