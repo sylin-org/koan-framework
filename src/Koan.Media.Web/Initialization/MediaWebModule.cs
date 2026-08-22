@@ -51,12 +51,17 @@ public sealed class MediaWebModule : KoanModule
         // default scan against the entry assembly's references.
         services.AddKoanControllersFrom<MediaController>();
 
-        // Default overlay resolver backed by IMediaSource. TryAdd so a
-        // caller can swap in a custom IOverlayResolver before AddKoan()
-        // (e.g. an in-process logo store for brand assets that aren't
-        // regular MediaEntity rows).
-        services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
         _sourceSelection = MediaSourceDiscovery.RegisterDefault(services);
+
+        // Default overlay resolver backed by IMediaSource. TryAdd so a caller can swap in a custom
+        // IOverlayResolver before AddKoan() (e.g. an in-process logo store for brand assets that aren't
+        // regular MediaEntity rows). Registered only once a source exists, because the resolver requires
+        // one: a bare reference with no MediaEntity must compose inertly, and an unsatisfiable descriptor
+        // fails container validation before any of it runs.
+        if (_sourceSelection.SourceRegistered)
+        {
+            services.TryAddSingleton<IOverlayResolver, DefaultOverlayResolver>();
+        }
     }
 
     public override Task Start(IServiceProvider services, CancellationToken ct)
