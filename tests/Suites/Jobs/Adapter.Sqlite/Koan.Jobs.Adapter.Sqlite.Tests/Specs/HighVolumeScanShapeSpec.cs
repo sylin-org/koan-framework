@@ -14,9 +14,12 @@ namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
 /// the orchestrator) so the assertions are about the read path alone. These ceilings are not latency SLAs.
 /// </summary>
 [Trait("category", "scale")]
-public sealed class HighVolumeScanShapeSpec
+public sealed class HighVolumeScanShapeSpec(ITestOutputHelper output)
 {
     private const string WorkType = "bulk-work";
+
+    /// <summary>Rows the per-row baseline writes one at a time, enough to average out a slow individual write.</summary>
+    private const int BaselineRows = 200;
 
     [Fact]
     public async Task dashboard_query_returns_only_matches_at_volume()
@@ -55,6 +58,18 @@ public sealed class HighVolumeScanShapeSpec
         sw.ElapsedMilliseconds.Should().BeLessThan(3000);
     }
 
+    /// <summary>
+    /// A bulk save must batch. The claim is about shape, not speed, so it is asserted as one: what a row costs
+    /// through the bulk path, against what the same row costs saved on its own, measured in the same run.
+    ///
+    /// <para>This used to assert a wall clock — under ten seconds — and failed on a cold run while passing on a
+    /// warm one, which reports a defect where there is none and costs whoever next reads a red suite (PMC-044).
+    /// A ratio has no such problem: JIT and page cache land on both measurements, so they cancel. Measured
+    /// 2026-08-21 on a loaded machine in Debug: 0.25ms per row batched against 7.43ms per row individually, a
+    /// factor of thirty. A bulk path that had degenerated into per-row writes would score about one, because it
+    /// would be doing the very thing the baseline does. The bar is five, which is six times below what a
+    /// working implementation measures and five times above a broken one.</para>
+    /// </summary>
     [Fact]
     public async Task bulk_save_of_a_large_batch_is_a_single_batched_write()
     {
@@ -64,14 +79,29 @@ public sealed class HighVolumeScanShapeSpec
             .Select(i => Make($"b{i}", JobStatus.Completed, now, now))
             .ToList();
 
-        var sw = Stopwatch.StartNew();
+        // Batched first, while the process is coldest, and the per-row baseline second, once it is warm. That
+        // is the hard direction for the comparison below: anything JIT or page cache contributes now counts
+        // against the batched path and for the baseline.
+        var batched = Stopwatch.StartNew();
         await records.Save();   // IEnumerable<T>.Save() → one UpsertMany → one batched transaction (not 50k fsyncs)
-        sw.Stop();
+        batched.Stop();
+
+        var perRow = Stopwatch.StartNew();
+        for (var i = 0; i < BaselineRows; i++) await Make($"s{i}", JobStatus.Completed, now, now).Save();
+        perRow.Stop();
 
         (await h.Ledger.Query(new JobQuery(WorkType: WorkType, Status: JobStatus.Completed), default))
-            .Should().HaveCount(50_000);
-        // Batched: 50k rows commit in one transaction (seconds). Per-row autocommit would be ~50k fsyncs (minutes).
-        sw.ElapsedMilliseconds.Should().BeLessThan(10_000);
+            .Should().HaveCount(50_000 + BaselineRows);
+
+        var batchedCost = batched.Elapsed.TotalMilliseconds / records.Count;
+        var perRowCost = perRow.Elapsed.TotalMilliseconds / BaselineRows;
+        output.WriteLine(
+            $"batched {batchedCost:F3}ms/row over {records.Count} rows; " +
+            $"individual {perRowCost:F3}ms/row over {BaselineRows} rows; ratio {perRowCost / batchedCost:F1}x");
+
+        (perRowCost / batchedCost).Should().BeGreaterThan(5,
+            "a batched write amortizes the commit across the batch, so a row costs a fraction of what it costs "
+            + "written on its own; a ratio near one is a bulk path that has degenerated into per-row writes");
     }
 
     private static Task SeedCompletedAsync(int count, DateTimeOffset baseTime, int idOffset = 0)
