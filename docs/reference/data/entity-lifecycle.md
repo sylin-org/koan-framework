@@ -14,9 +14,10 @@ validation:
 
 # Entity Lifecycle
 
-`Entity<T>.Lifecycle` is the host-owned policy boundary around persistence. It is deliberately not a
-domain-event bus: `BeforeUpsert` decides whether and how an entity may be stored; a future
-`order.Events.Raise<OrderApproved>()` expresses a business occurrence.
+`Entity<T>.Lifecycle` is the host-owned policy boundary around persistence, and it is deliberately not
+a domain-event bus. The two answer different questions: `BeforeUpsert` decides whether and how an
+entity may be stored, while `order.Events.Raise<OrderApproved>()` states that something happened to
+one that already was.
 
 ## Shortest path
 

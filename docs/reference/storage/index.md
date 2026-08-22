@@ -43,14 +43,14 @@ using Koan.Storage;
 using Koan.Storage.Model;
 
 [StorageBinding("main")]
-public sealed class Document : StorageEntity<Document> { }
+public sealed class Document : StorageEntity<Document>;
 
 var document = await Document.CreateTextFile("readme.txt", "Hello");
 var text = await document.ReadAllText();
 ```
 
 The application still boots through its existing `builder.Services.AddKoan()` call. The connector reference supplies
-both the provider and Storage runtime; do not add a second registration path.
+both the provider and the Storage runtime, so that reference is the whole registration.
 
 ## Entity operations
 
@@ -74,7 +74,7 @@ Tiering remains business-readable when the target is another bound model:
 
 ```csharp
 [StorageBinding("archive", "documents")]
-public sealed class ArchivedDocument : StorageEntity<ArchivedDocument> { }
+public sealed class ArchivedDocument : StorageEntity<ArchivedDocument>;
 
 var copy = await document.CopyTo<ArchivedDocument>();
 var moved = await document.MoveTo<ArchivedDocument>();

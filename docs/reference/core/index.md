@@ -17,7 +17,7 @@ validation:
 Use this pillar to understand what `AddKoan()` composes, how referenced packages become eligible,
 and where to inspect the provider and configuration decisions that result.
 
-## Contract
+## What `AddKoan()` composes
 
 `AddKoan()` is the complete default bootstrap. It compiles the generated module constitution for the
 application's referenced Koan assemblies, registers Core once, lets each retained module register
@@ -58,8 +58,8 @@ public sealed class BillingModule : KoanModule
 }
 ```
 
-Module identity derives from ordinary package/assembly identity. Do not add a parallel Koan ID or
-descriptor attribute. Shared cross-module vocabulary belongs in an isolated Core, Abstractions, or
+Module identity derives from ordinary package/assembly identity, so a module needs no Koan-specific
+id or descriptor of its own. Shared cross-module vocabulary belongs in an isolated Core, Abstractions, or
 Contracts assembly; referencing contracts must not activate functionality.
 
 `Register` owns DI composition. `Start` owns ordered one-time startup after DI is available. `Report`

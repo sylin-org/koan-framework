@@ -15,9 +15,9 @@ validation:
 # Persist and query business state
 
 Use Koan Data when an application needs to store, find, relate, page, or process business objects.
-Application code works with its own Entity types; the referenced connector owns the physical store.
-There is no repository, `DbContext`, provider-registration method, or schema bootstrap in the ordinary
-application path.
+Application code works with its own Entity types; the referenced connector owns the physical store,
+its schema, and its own registration. The ordinary application path carries no persistence plumbing
+at all.
 
 ## Smallest useful result
 
@@ -116,13 +116,10 @@ record; put fields on `Media` when they need portable set-wide query, index, seg
 or set-policy semantics. Record-local write stamps and field transforms still follow the record's
 runtime type.
 
-Koan generates `Media<TVariant>` from the root and writes its reserved `__koan_type` source hint for
-every record in a known family, including plain `Media`. Do not add attributes or infer the runtime type from `Kind`.
-Existing rows without
-that hint remain readable as `Media`; a typed point read such as `Anime.Get(id)` can supply the target
-for a known legacy row when the adapter materializes it on demand, but a mixed root query cannot safely
-recover legacy variant identity. Eager stores also hydrate before a point-read target exists. Migrate or
-backfill discriminator-free derived rows before depending on runtime variants in root results.
+Koan generates `Media<TVariant>` from the root and writes its reserved `__koan_type` hint on every
+record in the family, including plain `Media`. That hint is what lets a root query hand back an
+`Anime` for an anime row, which is why `Kind` above stays ordinary business data rather than a
+discriminator the application has to maintain.
 
 Use a generic shared base with separate `Entity<Self>` leaves instead when the types only reuse
 properties and should own independent tables or collections.
@@ -147,8 +144,8 @@ owns its setup and backend-specific limits.
 
 Search and vector stores solve different needs. Start from the [AI pillar](../ai/index.md) for
 embedding/vector retrieval and from each search connector's package documentation for indexed search.
-Do not infer that every Data connector has identical query, transaction, ordering, or consistency
-semantics merely because the Entity vocabulary is stable.
+Same syntax does not imply backend parity: query, transaction, ordering, and consistency semantics
+differ by connector even where the Entity vocabulary does not.
 
 ## Pin important routing
 

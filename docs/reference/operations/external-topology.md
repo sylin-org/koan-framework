@@ -14,13 +14,12 @@ validation:
 
 # Keep deployment topology external
 
-Koan does not publish a bespoke orchestration pillar, CLI, manifest generator, Compose renderer,
-Aspire package, or in-process container runtime. Applications keep their existing Docker, Compose,
-Aspire, Kubernetes, managed-service, and test-harness topology.
+Deployment topology stays where it already lives. Whatever runs your services today — Docker,
+Compose, Aspire, Kubernetes, a managed service, a test harness — keeps running them, unchanged.
 
-Koan connectors begin at the application boundary: they discover configuration, resolve connections,
-elect providers, report health, and expose redacted runtime facts. They do not provision or replace
-the service.
+Koan connectors begin at the application boundary. They discover configuration, resolve connections,
+elect providers, report health, and expose redacted runtime facts: everything from the connection
+string inward. Standing the service up on the other end belongs to whatever already does it.
 
 With Aspire, author ordinary AppHost code and reference the normal Koan connector in the application:
 
