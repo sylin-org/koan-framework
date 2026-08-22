@@ -198,3 +198,21 @@ Smallest and most certain first, suites green at each step. Every prefix leaves 
 6. **Needs 4 and 5.** `UpdateSet`, `Insert`, and `UpsertMany` for the three servers; SQLite's dispatch stays.
 7. **Never.** `Open`, `Upsert`, `Describe` — each is a store decision rather than a spelling, and this record
    says so with its reasons above.
+
+### What step 1 needs before it can be written
+
+Two facts settled on 2026-08-21, both of which keep the core's shape small:
+
+- **No connection type parameters.** `AdoCommands` and `SqlParameters` take `IDbConnection` and
+  `IDbTransaction`, and `DbConnection.BeginTransactionAsync` returns a `DbTransaction`. A core can therefore
+  declare `protected abstract Task<DbConnection> Open(CancellationToken)` and every adapter satisfies it by
+  returning its own connection. SQL Server's existing cast to `SqlTransaction` is the only place a concrete
+  transaction type is named, and it is inside `Upsert`, which stays adapter-owned.
+- **The plan wants a dialect-free base.** `RelationalEntityPlan<TEntity, TKey, TDialect>` carries the dialect
+  concretely so an adapter reaches its own members without a cast, which is right for the adapter and wrong for
+  the core: a core generic over the dialect as well grows a type parameter it never uses. Splitting the plan —
+  a `RelationalEntityPlan<TEntity, TKey>` holding everything the core touches (`Mapping`, `Commands`,
+  `QualifiedTable`, `Target`, `Select`, `Roots`, `IdentityRoots`, `Hydrate`, `Parameter`, `JsonParameter`,
+  `ManagedPath`, `IsStructuredRoot`, `AssignGenerated`), and the existing three-parameter form deriving from it
+  to add the typed `Dialect` — lets the core be `RelationalRepository<TEntity, TKey>` and nothing more. Do that
+  split first; it is mechanical, and doing it after step 1 means rewriting step 1.
