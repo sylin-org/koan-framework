@@ -1,124 +1,128 @@
-# Koan Background Services
+﻿# Koan Background Services
 
-Koan Background Services provides elegant background service development with auto-discovery, fluent APIs, and seamless integration with the Koan Framework ecosystem.
+Long-running work that belongs to the host rather than to a request: a poller, a scheduler, a warm-up
+step. Declare the class, and `AddKoan()` discovers, registers, and supervises it — including its health
+contribution and its shutdown.
 
-## Quick Start
+For retryable, schedulable *business* work with a durable ledger, use [Koan Jobs](../../Koan.Jobs/README.md)
+instead. These services are infrastructure; a job is an Entity.
 
-### 1. Create a Background Service
+## Choose a base
+
+| Base | For | You implement |
+| --- | --- | --- |
+| `KoanBackgroundServiceBase` | a continuous loop | `ExecuteCore` |
+| `KoanPokablePeriodicServiceBase` | work on an interval that can also be triggered on demand | `Period`, `ExecutePeriodic` |
+| `KoanStartupServiceBase` | one-time work during startup, ordered | `StartupOrder`, `ExecuteCore` |
+| `KoanFluentServiceBase` | a service exposing named actions and events | `ExecuteCore`, plus `[ServiceAction]` methods |
+
+Every base derives from `KoanBackgroundServiceBase`. `ExecuteCore(CancellationToken)` is the loop those
+bases run; the periodic base implements it for you and calls `ExecutePeriodic` on each tick. `ExecuteAsync`
+is sealed by the base and delegates inward, so overriding it steps outside this supervision.
+
+## A continuous service
 
 ```csharp
 [KoanBackgroundService]
-public class MyService : KoanBackgroundServiceBase
+public sealed class InventorySync : KoanBackgroundServiceBase
 {
-    public MyService(ILogger<MyService> logger, IConfiguration configuration)
+    public InventorySync(ILogger<InventorySync> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
+    public override async Task ExecuteCore(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
-            Logger.LogInformation("Service is running...");
-            // Your work here
+            Logger.LogInformation("Reconciling inventory");
         }
     }
 }
 ```
 
-### 2. Create a Periodic Service
+`Name`, `IsCritical`, `IsReady`, and `Check` are virtual. The base implements `IHealthContributor`, so
+a service that overrides `Check` reports into `/health/ready` with no further registration; marking it
+`IsCritical` makes an unhealthy result fail readiness.
+
+## A periodic service
 
 ```csharp
 [KoanPeriodicService(IntervalSeconds = 3600)]
-public class CleanupService : KoanPokablePeriodicServiceBase
+public sealed class Cleanup : KoanPokablePeriodicServiceBase
 {
-    public override TimeSpan Period => TimeSpan.FromHours(1);
-    
-    public CleanupService(ILogger<CleanupService> logger, IConfiguration configuration)
+    public Cleanup(ILogger<Cleanup> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
-    protected override async Task ExecutePeriodicAsync(CancellationToken cancellationToken)
+    public override TimeSpan Period => TimeSpan.FromHours(1);
+    public override bool RunOnStartup => true;
+
+    protected override async Task ExecutePeriodic(CancellationToken cancellationToken)
     {
-        Logger.LogInformation("Running cleanup...");
-        // Cleanup logic here
+        Logger.LogInformation("Running cleanup");
+        await Task.CompletedTask;
     }
 }
 ```
 
-### 3. Create a Fluent Service with Actions and Events
+`Period`, `InitialDelay`, and `RunOnStartup` shape the schedule. Because this base is also pokable, the
+same work can be demanded immediately through a `TriggerNowCommand` without waiting for the interval.
+
+## Actions and events
+
+`KoanFluentServiceBase` lets a service publish named actions and emit named events. Declare the events
+on the class and mark the actions on their methods:
 
 ```csharp
-[ServiceEvent("WorkCompleted")]
-[ServiceEvent("WorkFailed")]
-public class WorkerService : KoanFluentServiceBase
+[KoanBackgroundService]
+[ServiceEvent("WorkCompleted", EventArgsType = typeof(WorkCompletedArgs))]
+[ServiceEvent("WorkFailed", EventArgsType = typeof(WorkFailedArgs))]
+public sealed class WorkerService : KoanFluentServiceBase
 {
     public WorkerService(ILogger<WorkerService> logger, IConfiguration configuration)
         : base(logger, configuration) { }
 
     [ServiceAction("process-item")]
-    public async Task ProcessItemAsync(string itemId, CancellationToken cancellationToken)
+    public async Task ProcessItem(string itemId, CancellationToken cancellationToken)
     {
-        Logger.LogInformation("Processing item: {ItemId}", itemId);
-        
         try
         {
-            // Work processing logic
-            await Task.Delay(5000, cancellationToken);
-            
-            await EmitEventAsync("WorkCompleted", new { ItemId = itemId });
+            await DoWork(itemId, cancellationToken);
+            await EmitEvent("WorkCompleted", new WorkCompletedArgs(itemId));
         }
         catch (Exception ex)
         {
-            await EmitEventAsync("WorkFailed", new { ItemId = itemId, Error = ex.Message });
+            await EmitEvent("WorkFailed", new WorkFailedArgs(itemId, ex.Message));
             throw;
         }
     }
 
-    public override async Task ExecuteAsync(CancellationToken cancellationToken)
-    {
-        await Task.Delay(Timeout.Infinite, cancellationToken);
-    }
+    public override Task ExecuteCore(CancellationToken cancellationToken)
+        => Task.Delay(Timeout.Infinite, cancellationToken);
 }
 ```
 
-### 4. Use the Fluent API
+An action runs through `ExecuteAction(actionName, parameters, cancellationToken)`. A subscriber takes a
+handler and gets back an `IDisposable` that ends the subscription:
 
 ```csharp
-// Trigger service actions
-await KoanServices
-    .Do<WorkerService>("process-item", "item-123")
-    .WithPriority(10)
-    .ExecuteAsync();
-
-// Subscribe to events (chainable!)
-await KoanServices
-    .On<WorkerService>("WorkCompleted").Do<WorkCompletedArgs>(async args => 
-        Logger.LogInformation("Work completed: {ItemId}", args.ItemId))
-    .On("WorkFailed").Do<WorkFailedArgs>(async args => 
-        Logger.LogError("Work failed: {ItemId} - {Error}", args.ItemId, args.Error))
-    .SubscribeAsync();
+using var subscription = worker.SubscribeToEvent(
+    "WorkCompleted",
+    args => { Logger.LogInformation("Done: {Args}", args); return Task.CompletedTask; },
+    once: false);
 ```
 
-### 5. Registration (Automatic!)
+`SubscribeToEvent` also accepts a `filter`, so a subscriber can decline events it does not care about
+without waking its handler.
 
-Services are automatically discovered and registered when you call:
+## Registration and configuration
+
+Discovery is part of the ordinary bootstrap:
 
 ```csharp
-// Program.cs
-builder.Services.AddKoan(); // This discovers ALL background services automatically!
+builder.Services.AddKoan();
 ```
 
-## Features
-
-- ✅ **Auto-Discovery**: Services are automatically found and registered
-- ✅ **Fluent API**: Beautiful, chainable syntax for service communication
-- ✅ **Event-Driven**: Rich event subscription and emission patterns
-- ✅ **Health Checks**: Built-in integration with Koan's health system
-- ✅ **Pokeable Services**: Services can be triggered on-demand
-- ✅ **Multiple Patterns**: Startup, periodic, continuous, and event-driven services
-- ✅ **Configuration**: Attribute-based and appsettings.json configuration
-- ✅ **Type-Safe**: Full IntelliSense and compile-time checking
-
-## Configuration
+Configuration disables the whole set, bounds startup, or turns off one service by name:
 
 ```json
 {
@@ -127,18 +131,12 @@ builder.Services.AddKoan(); // This discovers ALL background services automatica
       "Enabled": true,
       "StartupTimeoutSeconds": 120,
       "Services": {
-        "WorkerService": {
-          "Enabled": true,
-          "Settings": {
-            "MaxConcurrentItems": 5
-          }
-        }
+        "WorkerService": { "Enabled": false }
       }
     }
   }
 }
 ```
 
-## More Examples
-
-See the `Examples/` folder for comprehensive examples of all service patterns and fluent API usage.
+Startup reporting names the services it discovered and started, so a service that never ran says so
+there rather than in silence.

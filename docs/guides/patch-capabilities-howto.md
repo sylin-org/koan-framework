@@ -309,428 +309,22 @@ Content-Type: application/json-patch+json
 ### Sample: C# client composing RFC 6902
 
 ```csharp
-using Microsoft.AspNetCore.JsonPatch;
-using Microsoft.AspNetCore.JsonPatch.Operations;
-
-public async Task UpdateTodoWithJsonPatch(string id)
-{
-    var patchDoc = new JsonPatchDocument<Todo>();
-    patchDoc.Replace(t => t.Title, "Buy oat milk");
-    patchDoc.Replace(t => t.Priority, 1);
-    patchDoc.Remove(t => t.Notes.Archived);
-
-    var json = JsonSerializer.Serialize(patchDoc);
-    var content = new StringContent(json, Encoding.UTF8, "application/json-patch+json");
-
-    await httpClient.PatchAsync($"/api/todos/{id}", content);
-}
-```
-
-### Usage Scenarios
-
-**Scenario 1: Atomic field swap**
-```json
-[
-  { "op": "move", "from": "/draftTitle", "path": "/title" },
-  { "op": "remove", "path": "/draftTitle" }
-]
-```
-**Why RFC 6902:** Move operation ensures atomic swap.
-
-**Scenario 2: Conditional priority escalation**
-```json
-[
-  { "op": "test", "path": "/isComplete", "value": false },
-  { "op": "test", "path": "/priority", "value": 3 },
-  { "op": "replace", "path": "/priority", "value": 1 }
-]
-```
-**Why RFC 6902:** Test operations prevent unwanted updates.
-
-**Scenario 3: Array element manipulation**
-```json
-[
-  { "op": "add", "path": "/tags/0", "value": "urgent" },
-  { "op": "remove", "path": "/tags/2" }
-]
-```
-**Why RFC 6902:** Precise array element control.
-
-**Pro tip:** Use `test` operations for optimistic locking when you don't have ETags yet. It's not as robust as proper concurrency control, but better than nothing.
-
----
-
-## 3. RFC 7386 (application/merge-patch+json)
-
-**When to use:** You want simple merge semantics—send a partial object, and null values mean "delete field."
-
-### Concepts
-
-Merge-patch is conceptually simpler than JSON Patch:
-- Send a partial object with fields to update
-- `null` means "delete this field"
-- Non-null values replace existing values
-- Arrays are replaced entirely (not merged element-wise)
-
-### Recipe: Basic merge
-
-```csharp
-// HTTP request
-PATCH /api/todos/123
-Content-Type: application/merge-patch+json
-
-{
-  "title": "Buy oat milk",
-  "priority": 1,
-  "notes": {
-    "archived": null
-  }
-}
-```
-
-**Normalization to canonical PatchOps:**
-- `replace /title "Buy oat milk"`
-- `replace /priority 1`
-- `remove /notes/archived` (null → remove)
-
-### Recipe: Null handling policies
-
-**Default behavior (configurable):**
-- For nullable fields: `null` sets to null
-- For non-nullable fields: `null` sets to `default(T)` (0, false, etc.)
-
-**Configure via KoanWebOptions:**
-```csharp
-builder.Services.Configure<KoanWebOptions>(opt =>
-{
-    opt.MergePatchNullsForNonNullable = MergePatchNullPolicy.Reject;
-    // Now sending null for non-nullable field returns 400
-});
-```
-
-**Per-request override:**
-```bash
-curl -X PATCH http://localhost:5000/api/todos/123?mergeNulls=reject \
-  -H "Content-Type: application/merge-patch+json" \
-  -d '{"priority": null}'
-# Returns 400 because priority is non-nullable
-```
-
-### Recipe: Nested object merge
-
-```csharp
-// Before:
-{
-  "title": "Old title",
-  "notes": {
-    "content": "Original notes",
-    "archived": false
-  }
-}
-
-// PATCH with:
-PATCH /api/todos/123
-Content-Type: application/merge-patch+json
-
-{
-  "title": "New title",
-  "notes": {
-    "archived": true
-  }
-}
-
-// After:
-{
-  "title": "New title",
-  "notes": {
-    "content": "Original notes",  // Preserved!
-    "archived": true              // Updated
-  }
-}
-```
-
-**Important:** Nested objects merge recursively. Arrays do not—they replace entirely.
-
-### Sample: TypeScript client
-
-```typescript
-async function updateTodo(id: string, changes: Partial<Todo>) {
-  const response = await fetch(`/api/todos/${id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/merge-patch+json'
-    },
-    body: JSON.stringify(changes)
-  });
-
-  return response.json();
-}
-
-// Usage
-await updateTodo('123', {
-  title: 'Buy oat milk',
-  notes: { archived: null } // Delete archived flag
-});
-```
-
-### Usage Scenarios
-
-**Scenario 1: User profile updates from web form**
-```typescript
-// User only filled in displayName and email
-const formData = {
-  displayName: 'Alice',
-  email: 'alice@example.com'
-};
-
-await patchUser(userId, formData); // Other fields unchanged
-```
-**Why merge-patch:** Natural mapping from form to HTTP request.
-
-**Scenario 2: Feature flag toggle**
-```json
-{
-  "features": {
-    "darkMode": true,
-    "notifications": null
-  }
-}
-```
-**Why merge-patch:** Null means "delete feature flag" (revert to default).
-
-**Scenario 3: GraphQL-style updates**
-```graphql
-mutation {
-  updateTodo(id: "123", input: {
-    title: "Buy oat milk"
-    priority: 1
-  })
-}
-```
-Map this to merge-patch for REST fallback.
-
-**Pro tip:** Merge-patch is perfect for web forms. Just serialize the changed fields and send—no need to construct operation arrays.
-
----
-
-## 4. Partial JSON (application/json)
-
-**When to use:** You want the simplest possible client code with full control over null behavior via policies.
-
-### Concepts
-
-Partial JSON is Koan's least-standard but most flexible format:
-- Send a partial object (like merge-patch)
-- Configure null behavior globally or per-request
-- No RFC spec to constrain you
-- Best for internal APIs where you control both client and server
-
-### Recipe: Basic usage
-
-```csharp
-// HTTP request (default policy: SetNull)
-PATCH /api/todos/123
-Content-Type: application/json
-
-{
-  "title": "Buy oat milk",
-  "priority": 1,
-  "notes": null
-}
-```
-
-**Normalization:**
-- `replace /title "Buy oat milk"`
-- `replace /priority 1`
-- `replace /notes null` (policy: SetNull)
-
-### Recipe: Null policy configurations
-
-**Global policy via KoanWebOptions:**
-```csharp
-builder.Services.Configure<KoanWebOptions>(opt =>
-{
-    opt.PartialJsonNulls = PartialJsonNullPolicy.Ignore;
-    // Now null values are ignored (field unchanged)
-});
-```
-
-**Per-request override:**
-```bash
-# Ignore nulls for this request
-curl -X PATCH http://localhost:5000/api/todos/123?partialNulls=ignore \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Buy oat milk", "priority": null}'
-# priority unchanged despite being in payload
-```
-
-**Available policies:**
-- `SetNull` (default) - Set field to null
-- `Ignore` - Skip null fields entirely
-- `Reject` - Return 400 if null encountered
-
-### Recipe: Policy selection guide
-
-```
-Use SetNull when:
-- You want null to clear values
-- Clients explicitly send null to delete
-- Example: clearing optional description field
-
-Use Ignore when:
-- Clients may send null accidentally (weak typing)
-- You want "only update non-null fields" semantics
-- Example: mobile apps with partial form state
-
-Use Reject when:
-- Null is always a client error for your API
-- You want strict validation
-- Example: critical configuration updates
-```
-
-### Sample: Generic HTTP client
-
-```csharp
-// No special PATCH libraries needed
-public async Task UpdateTodoSimple(string id, object changes)
-{
-    var json = JsonSerializer.Serialize(changes);
-    var content = new StringContent(json, Encoding.UTF8, "application/json");
-    await httpClient.PatchAsync($"/api/todos/{id}", content);
-}
-
-// Usage
-await UpdateTodoSimple("123", new
-{
-    title = "Buy oat milk",
-    priority = 1
-});
-```
-
-### Usage Scenarios
-
-**Scenario 1: Mobile app with intermittent connectivity**
-```csharp
-// App queues changes as partial objects
-var pendingChanges = new Queue<object>();
-pendingChanges.Enqueue(new { title = "Offline edit 1" });
-pendingChanges.Enqueue(new { priority = 2 });
-
-// Later, when online:
-foreach (var change in pendingChanges)
-{
-    await PatchWithPartialJson(todoId, change);
-}
-```
-**Why partial JSON:** Simplest serialization, configurable null handling.
-
-**Scenario 2: Admin panel with "Save Draft" button**
-```typescript
-// Save whatever user has filled in so far
-const draftData = {
-  title: formData.title || null,
-  priority: formData.priority || null,
-  notes: formData.notes || null
-};
-
-// Policy: Ignore nulls (only save filled fields)
-await fetch(`/api/todos/${id}?partialNulls=ignore`, {
-  method: 'PATCH',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(draftData)
-});
-```
-**Why partial JSON:** Policy override saves only filled fields.
-
-**Scenario 3: Internal microservice communication**
-```csharp
-// Service A notifies Service B of priority change
-await serviceBClient.PatchTodo(todoId, new { priority = 1 });
-```
-**Why partial JSON:** Both ends are C#, no need for RFC compliance.
-
-**Pro tip:** For public APIs, prefer RFC formats (better tooling, clearer semantics). For internal APIs, partial JSON is often the fastest path to shipping.
-
----
-
-## 5. In-Process Patching (No HTTP)
-
-**When to use:** You're inside a service, background job, or domain logic—no HTTP transport involved.
-
-### Concepts
-
-Koan's patch capabilities aren't limited to HTTP APIs. The canonical PatchOps model works in-process:
-- Use `Entity<T>` static methods for convenience
-- Use `Data<TEntity, TKey>.PatchAsync()` for full control
-- Provider pushdown still applies (Postgres, MongoDB, etc.)
-- Lifecycle hooks still run
-
-### Recipe: Entity-first convenience methods
-
-```csharp
-// Partial JSON style (simplest)
-await Todo.Patch(todoId, new
-{
-    Title = "Buy oat milk",
-    Priority = 1
-});
-
-// Merge-patch style (null → default for non-nullable)
-await Todo.PatchMerge(todoId, new
-{
-    Title = "Buy oat milk",
-    Priority = (int?)null  // Sets to 0 (default)
-});
-```
-
-**Behind the scenes:**
-1. Koan serializes the anonymous object
-2. Normalizes to canonical PatchOps
-3. Calls `Data<Todo, string>.PatchAsync(payload)`
-4. Provider attempts pushdown or falls back to in-process
-
-### Recipe: Canonical PatchOps (full control)
-
-```csharp
-using Koan.Data.Core.PatchOps;
-
-var payload = new PatchPayload<string>
-{
-    Id = todoId,
-    Ops =
-    [
-        new PatchOp("replace", "/title", value: "Buy oat milk"),
-        new PatchOp("replace", "/priority", value: 1),
-        new PatchOp("remove", "/notes/archived")
-    ],
-    Options = new PatchOptions
-    {
-        MergePatchNullPolicy = MergePatchNullPolicy.SetDefault,
-        PartialJsonNullPolicy = PartialJsonNullPolicy.Ignore,
-        ArrayBehavior = ArrayBehavior.Replace
-    }
-};
-
-await Data<Todo, string>.PatchAsync(payload, cancellationToken);
-```
-
-**Use canonical ops when:**
-- You need explicit operation types (add/remove/replace/move/copy/test)
-- Building operations programmatically
-- Forwarding operations from another system
-
-### Recipe: RFC 6902 in-process
-
-```csharp
+using Koan.Data.Abstractions.Instructions;
+using Koan.Web.PatchOps;
 using Microsoft.AspNetCore.JsonPatch;
 
 var patchDoc = new JsonPatchDocument<Todo>();
 patchDoc.Replace(t => t.Title, "Buy oat milk");
 patchDoc.Replace(t => t.Priority, 1);
-patchDoc.Remove(t => t.Notes.Archived);
 
-// Execute via Data layer
-await Data<Todo, string>.ApplyJsonPatch(todoId, patchDoc);
+// Normalize to the canonical payload, then apply it through the Data layer.
+var options = new PatchOptions(
+    MergePatchNullPolicy.SetDefault,
+    PartialJsonNullPolicy.SetNull,
+    ArrayBehavior.Replace);
+
+var payload = PatchNormalizer.NormalizeJsonPatch<Todo, string>(todoId, patchDoc, options);
+await Data<Todo, string>.Patch(payload, cancellationToken);
 ```
 
 ### Sample: Background job scenario
@@ -1057,7 +651,7 @@ public class NullPolicyDemo
             }
         };
 
-        await Data<Sample, string>.PatchAsync(payload);
+        await Data<Sample, string>.Patch(payload);
         // Result: 400 Bad Request (null rejected)
     }
 }
@@ -1102,38 +696,36 @@ curl -X PATCH http://localhost:5000/api/todos/123 \
 # Behind the scenes:
 # 1. Normalize to PatchOps
 # 2. Apply operations
-# 3. Call OnBeforeSave() ← timestamp updated, validation runs
+# 3. Run BeforeUpsert lifecycle handlers ← stamps, validation, cancellation
 # 4. Save to provider
-# 5. Call OnAfterSave()
+# 5. Run AfterUpsert lifecycle handlers
 ```
 
 ### Recipe: Audit logging
 
 ```csharp
-public class AuditedEntity<T> : Entity<T> where T : AuditedEntity<T>
-{
-    public List<AuditEntry> AuditLog { get; set; } = new();
-
-    protected override void OnBeforeSave(EntityLifecycleContext ctx)
-    {
-        if (ctx.IsUpdate)
-        {
-            AuditLog.Add(new AuditEntry
-            {
-                Timestamp = DateTime.UtcNow,
-                User = ctx.User?.Identity?.Name ?? "system",
-                ChangeType = "patch",
-                Changes = ctx.GetChangedFields()  // Framework provides this
-            });
-        }
-    }
-}
-
-public class Todo : AuditedEntity<Todo>
+public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
-    // Patches automatically logged
+    public List<AuditEntry> AuditLog { get; set; } = new();
 }
+
+// Program.cs -- lifecycle policy is declared with the composition, not inherited.
+builder.Services.AddKoan(() =>
+    Todo.Lifecycle.BeforeUpsert(context =>
+    {
+        if (context.Prior is { } prior)
+        {
+            context.Current.AuditLog.Add(new AuditEntry
+            {
+                Timestamp = DateTimeOffset.UtcNow,
+                ChangeType = "patch",
+                Changes = DescribeChanges(prior, context.Current)
+            });
+        }
+
+        return context.Proceed();
+    }));
 ```
 
 ### Recipe: Response transformers
@@ -1284,7 +876,7 @@ public async Task<IActionResult> BatchPatch(
                 Options = PatchOptions.Default
             };
 
-            await Data<Todo, string>.PatchAsync(payload);
+            await Data<Todo, string>.Patch(payload);
             results.Add(new { id = item.Id, status = "success" });
         }
         catch (Exception ex)

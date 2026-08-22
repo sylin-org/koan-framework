@@ -25,17 +25,12 @@ This directory contains **service discovery** and **orchestration utilities** fo
 ```csharp
 using Koan.Core.Orchestration;
 
-// Build a connection string
-var connStr = ConnectionStringParser.BuildPostgresConnectionString(
-    host: "localhost",
-    port: 5432,
-    database: "mydb",
-    username: "admin",
-    password: "secret"
-);
+// One parse and one build, told which provider's dialect to use
+var components = ConnectionStringParser.Parse(connectionString, "postgres");
+var rebuilt = ConnectionStringParser.Build(components with { Database = "reporting" }, "postgres");
 
-// Parse a connection string
-var (host, port, db, user, pwd) = ConnectionStringParser.ParsePostgresConnectionString(connStr);
+// Just the endpoint, for a health probe
+var (host, port) = ConnectionStringParser.ExtractEndpoint(connectionString, "postgres");
 ```
 
 #### Common Use Cases

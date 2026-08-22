@@ -28,36 +28,29 @@ using Koan.Core.Modules;
 // In your KoanModule
 public override void Register(IServiceCollection services)
 {
-    // Basic registration
-    services.AddKoanOptions<RedisOptions>("Koan:Redis");
+    // Bind and validate from a section
+    services.AddKoanOptions<RedisOptions>(RedisOptions.SectionPath);
 
-    // With validation
-    services.AddKoanOptionsWithValidation<PostgresOptions>(
-        configuration,
-        "Koan:Data:Postgres"
-    )
-    .Validate(opts => !string.IsNullOrEmpty(opts.Host), "Host is required");
+    // Add a rule of your own to the same builder
+    services.AddKoanOptions<PostgresOptions>(PostgresOptions.SectionPath)
+        .Validate(opts => !string.IsNullOrEmpty(opts.Host), "Host is required");
 
-    // With post-configuration
-    services.AddKoanOptions<MongoOptions>(
-        configuration,
-        "Koan:Data:Mongo",
-        opts => opts.DefaultDatabase ??= "default"
-    );
+    // Normalize what was bound
+    services.PostConfigure<MongoOptions>(opts => opts.DefaultDatabase ??= "default");
 }
 ```
 
 #### Available Methods
 
 ```csharp
-// Core registration
-AddKoanOptions<TOptions>(IConfiguration, string sectionName, Action<TOptions>? configure = null)
+// Bind a section, validate data annotations, validate at host start
+AddKoanOptions<TOptions>(string? configPath = null, bool validateOnStart = true)
 
-// With validation builder
-AddKoanOptionsWithValidation<TOptions>(IConfiguration, string sectionName)
+// The same, with a registered IConfigureOptions<TOptions> configurator
+AddKoanOptions<TOptions, TConfigurator>(string? configPath = null, bool validateOnStart = true, ...)
 
-// Post-configuration only
-ConfigureKoanOptions<TOptions>(Action<TOptions> configure)
+// The same, taking IConfiguration explicitly plus an optional post-configure step
+AddKoanOptions<TOptions>(IConfiguration cfg, string sectionPath, Action<TOptions>? postConfigure = null, ...)
 ```
 
 #### Common Use Cases
@@ -96,8 +89,8 @@ Each pillar owns a static manifest -- `CorePillarManifest`, `AiPillarManifest`, 
 | Scenario | Use This |
 |----------|----------|
 | Register options in a module | `services.AddKoanOptions<T>()` |
-| Options with validation rules | `services.AddKoanOptionsWithValidation<T>()` |
-| Modify options after registration | `services.ConfigureKoanOptions<T>()` |
+| Extra validation rules | chain `.Validate(...)` on the returned `OptionsBuilder<T>` |
+| Modify options after binding | `services.PostConfigure<T>()` |
 | Custom options registration | Use `IOptions<T>` pattern directly |
 
 ---

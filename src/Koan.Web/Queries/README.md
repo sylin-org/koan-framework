@@ -14,64 +14,45 @@ This directory contains **query string parsing and normalization** utilities for
 
 #### What It Provides
 
-- ✅ Parse filter expressions from query strings
-- ✅ Parse sort clauses (multi-field, ascending/descending)
-- ✅ Parse pagination parameters with validation
-- ✅ Parse field selection for partial responses
-- ✅ Consistent query syntax across all endpoints
-
-#### Quick Example
-
-```csharp
-using Koan.Web.Queries;
-
-[HttpGet]
-public async Task<IActionResult> GetTodos(
-    [FromQuery] string? filter,     // e.g., "status eq 'active' and priority gt 5"
-    [FromQuery] string? sort,       // e.g., "createdAt desc,title asc"
-    [FromQuery] int? page,          // e.g., 1
-    [FromQuery] int? pageSize,      // e.g., 20
-    [FromQuery] string? fields)     // e.g., "id,title,status"
-{
-    var filterClause = EntityQueryParser.ParseFilter(filter);
-    var sortClause = EntityQueryParser.ParseSort(sort);
-    var pagination = EntityQueryParser.ParsePagination(page, pageSize);
-    var fieldSelection = EntityQueryParser.ParseFields(fields);
-
-    var results = await _repository.QueryAsync(filterClause, sortClause, pagination);
-    return Ok(results.Select(fieldSelection.Project));
-}
-```
+One pass over an HTTP query collection, producing the `QueryOptions` the endpoint pipeline consumes:
+free-text `q`, paging, sort specs resolved against the entity, shape, view, and declared extras. The
+same parse backs every Entity endpoint, so the query grammar does not drift between surfaces.
 
 #### Available Methods
 
 ```csharp
-// Parse filter expressions (OData-like syntax)
-public static FilterClause? ParseFilter(string? filter)
+public static QueryOptions Parse<TEntity>(
+    IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false);
 
-// Parse sort clauses (comma-separated, asc/desc)
-public static SortClause? ParseSort(string? sort)
-
-// Parse and validate pagination (with defaults and limits)
-public static PaginationParams ParsePagination(
-    int? page,
-    int? pageSize,
-    int defaultPageSize = 20,
-    int maxPageSize = 100
-)
-
-// Parse field selection for sparse fieldsets
-public static FieldSelection ParseFields(string? fields)
+public static QueryOptions Parse(
+    Type entityType, IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false);
 ```
+
+One call reads the whole query string into `QueryOptions`: free-text `q`, page and page size, sort
+specs resolved against the entity, shape, view, and any extras the endpoint declared. There is no
+per-concern parse to assemble.
+
+Sort fields resolve against `TEntity`, so an unknown field throws `InvalidSortFieldException` --
+which `EntityController` turns into a `400` naming the field. Pass `lenient: true` where an unknown
+field should be dropped instead of refused.
+
+```csharp
+protected override QueryOptions BuildOptions()
+{
+    var options = base.BuildOptions();
+    options.PageSize = Math.Min(options.PageSize, 25);
+    return options;
+}
+```
+
+`EntityController.BuildOptions()` is this call, so overriding it is the supported way to adjust the
+parsed result before the query runs.
 
 #### Common Use Cases
 
-✅ Custom EntityController implementations
-✅ GraphQL resolvers translating to repository queries
-✅ API endpoints with flexible query capabilities
-✅ Admin panels with dynamic filtering/sorting
-
-**Full Documentation**: [Framework Utilities Guide](../../../docs/guides/framework-utilities.md#entityqueryparser)
+- A controller narrowing or extending what the parsed options say
+- A non-Entity surface that wants Koan's query grammar over its own store
+- Tests asserting how a query string resolves
 
 ---
 
