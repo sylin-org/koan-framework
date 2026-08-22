@@ -1,4 +1,4 @@
-# Sylin.Koan.Web.Extensions
+﻿# Sylin.Koan.Web.Extensions
 
 Add terse Entity REST exposure or explicit moderation and audit HTTP capabilities without writing
 framework hosting code.
@@ -9,7 +9,7 @@ framework hosting code.
 dotnet add package Sylin.Koan.Web.Extensions
 ```
 
-The package composes through the application's existing `AddKoan()` call. Do not add an Extensions-specific service
+The package composes through the application's existing `AddKoan()` call, which is the whole
 registration.
 
 ## Smallest meaningful result
