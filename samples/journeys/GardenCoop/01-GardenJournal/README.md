@@ -1,4 +1,4 @@
-# GardenCoop 01 — Garden Journal
+﻿# GardenCoop 01 — Garden Journal
 
 The first chapter receives sensor readings, binds them to garden beds, and keeps one watering reminder
 active while recent soil humidity is dry. SQLite, REST, OpenAPI, admin, development authentication,
@@ -31,10 +31,10 @@ Invoke-RestMethod http://localhost:5000/.well-known/Koan/facts
 binding and watering policy at the write boundary. `GardenCoopModule` composes that policy, seeds the first
 useful state, and explains it at startup.
 
-This chapter also retains Koan's experimental win-x64 NativeAOT configuration. With the pinned .NET 10.0.302 SDK
-and 10.0.10 runtime packs, native publication currently stops inside the ILC analyzer before producing an executable,
-so NativeAOT is not a 0.20 sample guarantee. The ordinary JIT journey above remains verified. See the
-[NativeAOT guide](../../../../docs/guides/nativeaot-howto.md) for the reproducible blocker and fallback.
+This chapter also carries Koan's win-x64 NativeAOT configuration. On the pinned .NET 10.0.302 SDK with
+10.0.10 runtime packs it publishes to a native executable and serves its reminders endpoint with
+`/health/ready` green. NativeAOT sits outside the 1.x guarantee; the
+[NativeAOT guide](../../../../docs/guides/nativeaot-howto.md) carries the recipe and its limits.
 
 Continue to [Chapter 2 — Local Discovery](../02-LocalDiscovery/README.md) to add local semantic search without
 losing any of this application.

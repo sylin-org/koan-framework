@@ -19,7 +19,7 @@ declared capability—while referenced providers own native protocol and model m
 provider topology and reports which providers and sources became active.
 
 > **Maturity:** The provider-neutral runtime/contracts and the Ollama, LM Studio, and ONNX providers are supported
-> on the 0.20 line within the capability and deployment boundaries below. Prompt persistence and the HTTP projection
+> within the capability and deployment boundaries below. Prompt persistence and the HTTP projection
 > remain separately demonstrated surfaces.
 
 ## Shortest path

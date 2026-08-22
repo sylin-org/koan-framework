@@ -88,7 +88,7 @@ Each profile accepts:
 |---|---|
 | `Container` | Required logical backend container/bucket. |
 | `Provider` | Optional exact provider identity. Exact means required. |
-| `Mode` | Optional topology requirement. The supported 0.20 greenfield path is `Local`; remote and replicated modes require an admitted remote provider. |
+| `Mode` | Optional topology requirement. The supported path is `Local`; remote and replicated modes require an admitted remote provider. |
 | `LocalCache` | Cache quota/watermark settings for a replicated route. |
 
 At the Storage root, `DefaultProfile` selects the implicit route when several profiles exist. A sole profile becomes
@@ -113,9 +113,9 @@ election and unified `StorageCaps` tokens.
 
 ## S3 boundary
 
-S3 is shelved and is not a supported 0.20 Storage choice. Do not select it for a greenfield application
-from this reference. The [product surface](../product-surface.md) remains the authority if that
-disposition changes; local Storage is the current supported path.
+The S3 connector carries no product claim, so this reference does not recommend it. The
+[product surface](../product-surface.md) is the authority on that disposition; local Storage is the
+supported path.
 
 ## Use the service boundary
 
@@ -138,8 +138,8 @@ require the provider's compiled capability; unsupported intent throws the standa
   paths. Tenant values never appear in general composition facts.
 - Cross-provider copy streams through the process. Same-provider copy uses the backend only when declared.
 - Whole-object text/byte helpers buffer. Local range reads buffer the requested range.
-- Local is single-node filesystem storage. Shared, remote, presigned, and replicated behavior is not
-  a supported 0.20 greenfield promise.
+- Local is single-node filesystem storage. Shared, remote, presigned, and replicated behavior carries
+  no supported promise.
 - Configuration is a host-composition input; live profile/provider reload is not a supported implicit contract.
 
 For provider-author contracts, reference `Sylin.Koan.Storage.Abstractions` and implement `IStorageProvider`, placement,

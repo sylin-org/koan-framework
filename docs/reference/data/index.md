@@ -292,7 +292,7 @@ contract for availability, participation, health, route identity, and redaction.
   restore, and purge behavior for opted-in Entities.
 
 The package owns its complete API and limitations in its README and technical companion. Data Backup
-is shelved and is not a greenfield 0.20 capability; it does not belong in the application path above.
+carries no product claim, so it does not belong in the application path above.
 
 ## Continue by task
 

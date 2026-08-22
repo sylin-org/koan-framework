@@ -39,8 +39,9 @@ or media behavior.
 - Package READMEs own provider-specific durability, consistency, streaming, range, and deployment
   limits.
 
-The supported 0.20 surface includes local Storage and Media. S3 and Data Backup are not supported 0.20
-claims; check the [generated product surface](../product-surface.md) before choosing them.
+Local Storage is a supported foundation and Media a supported extension. The S3 connector and Data
+Backup carry no product claim; check the [generated product surface](../product-surface.md) before
+choosing either.
 
 ## Deeper contracts
 

@@ -33,7 +33,7 @@ related_guides:
 
 ## Shortest supported path
 
-MCP belongs to the supported 0.20 extension surface. The repository verifies the same path from source and the
+MCP is a supported extension. The repository verifies the same path from source and the
 exact staged candidate; public-feed publication and observation remain release-phase work.
 
 Reference Koan MCP and Web in the application closure, then expose business data or workflows:

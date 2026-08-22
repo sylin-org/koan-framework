@@ -1,4 +1,4 @@
----
+﻿---
 type: GUIDE
 domain: orchestration
 title: "Publishing a Koan app with NativeAOT"
@@ -27,8 +27,7 @@ travel with application assets and connector-native libraries. The framework wir
 > [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/) (SQLite + Web) publishes to a native
 > win-x64 executable and serves its reminders endpoint with `/health/ready` green, and
 > [AotRelational](../../samples/fundamentals/AotRelational/) writes and reads through `Entity<T>` against **SQLite,
-> PostgreSQL, CockroachDB, MySQL and SQL Server** containers. An earlier revision of this guide recorded an ILC
-> `IndexOutOfRangeException` on the same toolchain; it does not reproduce.
+> PostgreSQL, CockroachDB, MySQL and SQL Server** containers.
 
 ## Diagnostic commands
 

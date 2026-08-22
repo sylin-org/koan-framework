@@ -33,7 +33,7 @@ Each section follows a gentle rhythm: **Concept** (what is this?), **Recipe** (h
 
 ## 0. Prerequisites
 
-Jobs belongs to the supported 0.20 extension surface. The package reference is the activation intent:
+Jobs is a supported extension. The package reference is the activation intent:
 
 ```xml
 <PackageReference Include="Sylin.Koan.Jobs" />

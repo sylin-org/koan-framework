@@ -18,13 +18,6 @@ related_guides:
 
 # Performance Optimization with Koan
 
-**Document Type**: GUIDE
-**Target Audience**: Developers, Architects
-**Last Updated**: 2026-07-15
-**Preview line**: 0.20
-
----
-
 ## Data Access Patterns
 
 ### Choose the Right API
