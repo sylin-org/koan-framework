@@ -39,75 +39,32 @@ capability negotiation, or provenance in ways a local copy will not be.
 
 ### ConnectionStringParser
 
-**Location**: `src/Koan.Core/Orchestration/ConnectionStringParser.cs`
-**Pattern**: Static utility class
-**ADR**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md) (P2.6)
+`src/Koan.Core/Orchestration/ConnectionStringParser.cs`
 
-**Purpose**: Parse and build connection strings for various database providers.
-
-#### Available Methods
+One parse and one build, both told which provider's dialect to use. Recognised provider types are
+`postgres`/`postgresql`, `sqlserver`/`mssql`, `sqlite`, `redis`, and `mongodb`/`mongo`; anything else
+falls back to generic key/value parsing rather than failing.
 
 ```csharp
-// PostgreSQL
-public static string BuildPostgresConnectionString(string host, int port, string database,
-    string? username = null, string? password = null, Dictionary<string, string>? additionalParams = null)
-
-public static (string Host, int Port, string Database, string? Username, string? Password)
-    ParsePostgresConnectionString(string connectionString)
-
-// SQL Server
-public static string BuildSqlServerConnectionString(string server, string database,
-    string? username = null, string? password = null, bool integratedSecurity = false,
-    Dictionary<string, string>? additionalParams = null)
-
-public static (string Server, string Database, string? Username, string? Password, bool IntegratedSecurity)
-    ParseSqlServerConnectionString(string connectionString)
-
-// MongoDB
-public static string BuildMongoConnectionString(string host, int port, string database,
-    string? username = null, string? password = null, Dictionary<string, string>? options = null)
-
-public static (string Host, int Port, string Database, string? Username, string? Password)
-    ParseMongoConnectionString(string connectionString)
-
-// Redis
-public static string BuildRedisConnectionString(string host, int port = 6379,
-    string? password = null, int database = 0, Dictionary<string, string>? options = null)
-
-public static (string Host, int Port, string? Password, int Database)
-    ParseRedisConnectionString(string connectionString)
-
-// SQLite
-public static string BuildSqliteConnectionString(string dataSource,
-    Dictionary<string, string>? additionalParams = null)
-
-public static string ParseSqliteConnectionString(string connectionString)
+public static ConnectionStringComponents Parse(string connectionString, string providerType);
+public static string Build(ConnectionStringComponents components, string providerType);
+public static (string Host, int Port) ExtractEndpoint(string connectionString, string providerType);
 ```
 
-#### Usage Example
+`ConnectionStringComponents` is a record of `Host`, `Port`, `Database`, `Username`, `Password`, and a
+`Parameters` dictionary for whatever else the string carried. An empty or whitespace connection string
+parses to `ConnectionStringComponents.Empty` rather than throwing.
 
 ```csharp
-// Building connection strings
-var pgConnStr = ConnectionStringParser.BuildPostgresConnectionString(
-    host: "localhost",
-    port: 5432,
-    database: "mydb",
-    username: "admin",
-    password: "secret"
-);
-// Result: "Host=localhost;Port=5432;Database=mydb;Username=admin;Password=secret"
+var components = ConnectionStringParser.Parse(
+    "Host=localhost;Port=5432;Database=mydb;Username=admin;Password=secret", "postgres");
 
-// Parsing connection strings
-var (host, port, db, user, pwd) = ConnectionStringParser.ParsePostgresConnectionString(
-    "Host=localhost;Port=5432;Database=mydb;Username=admin;Password=secret"
-);
+var (host, port) = ConnectionStringParser.ExtractEndpoint(connectionString, "postgres");
 ```
 
-#### When to Use
-- Discovery adapters building health check connection strings
-- Connector factories parsing configuration
-- Test fixtures generating connection strings
-- Any scenario requiring provider-specific connection string manipulation
+Use it in discovery adapters building a health probe, in connector factories reading configuration,
+and in test fixtures composing a connection string -- anywhere provider-specific string handling would
+otherwise be written twice.
 
 ---
 
@@ -359,194 +316,104 @@ public void Describe(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnv
 
 ### OptionsExtensions
 
-**Location**: `src/Koan.Core/Modules/OptionsExtensions.cs`
-**Pattern**: Static extension methods
-**ADR**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md) (New utility)
+`src/Koan.Core/Modules/OptionsExtensions.cs`
 
-**Purpose**: Centralize options configuration with validation and layering.
-
-#### Available Methods
+Binds an options type to a configuration section and validates it, so a module registers a family in
+one line. Validation is not a separate opt-in: every overload applies data-annotation validation and,
+by default, validates at host start rather than on first resolution.
 
 ```csharp
-// Core registration with validation
-public static IServiceCollection AddKoanOptions<TOptions>(
-    this IServiceCollection services,
-    IConfiguration configuration,
-    string sectionName,
-    Action<TOptions>? configure = null)
-    where TOptions : class
+public static OptionsBuilder<TOptions> AddKoanOptions<TOptions>(
+    this IServiceCollection services, string? configPath = null, bool validateOnStart = true);
 
-// Validation-enabled registration
-public static OptionsBuilder<TOptions> AddKoanOptionsWithValidation<TOptions>(
-    this IServiceCollection services,
-    IConfiguration configuration,
-    string sectionName)
-    where TOptions : class
+public static OptionsBuilder<TOptions> AddKoanOptions<TOptions, TConfigurator>(
+    this IServiceCollection services, string? configPath = null, bool validateOnStart = true,
+    ServiceLifetime configuratorLifetime = ServiceLifetime.Singleton);
 
-// Post-configuration
-public static IServiceCollection ConfigureKoanOptions<TOptions>(
-    this IServiceCollection services,
-    Action<TOptions> configure)
-    where TOptions : class
+public static OptionsBuilder<TOptions> AddKoanOptions<TOptions>(
+    this IServiceCollection services, IConfiguration cfg, string sectionPath,
+    Action<TOptions>? postConfigure = null, bool validateOnStart = true);
 ```
 
-#### Usage Example
+The one-argument form is the common path. Binding is deferred through `IConfigureOptions<T>`, so the
+call does not require `IConfiguration` to be present in DI; where it is absent, the type's defaults
+apply instead of failing.
 
 ```csharp
-// In the connector's KoanModule
-public void Register(IServiceCollection services, IConfiguration configuration)
+public sealed class BillingModule : KoanModule
 {
-    // Basic registration
-    services.AddKoanOptions<RedisOptions>("Koan:Redis");
-
-    // With validation
-    services.AddKoanOptionsWithValidation<PostgresOptions>(configuration, "Koan:Data:Postgres")
-        .Validate(opts => !string.IsNullOrEmpty(opts.Host), "PostgreSQL host is required");
-
-    // With post-configuration
-    services.AddKoanOptions<MongoOptions>(configuration, "Koan:Data:Mongo", opts =>
-    {
-        opts.DefaultDatabase ??= "default";
-    });
+    public override void Register(IServiceCollection services)
+        => services.AddKoanOptions<BillingOptions>(BillingOptions.SectionPath);
 }
 ```
 
-#### When to Use
-- `KoanModule.Register` implementations
-- Options configuration in any Koan component
-- Layered configuration scenarios (appsettings → environment → code)
+Give the options type a `SectionPath` constant, as `AuthorizeOptions`, `OriginOptions`, and
+`PaginationSafetyBounds` do, so the section name lives with the type it configures rather than at
+each call site. Reach for the `TConfigurator` overload when a family needs computed defaults, and for
+the `IConfiguration` overload when a post-configure step has to normalize what was bound.
 
 ---
 
-## Web API Utilities
-
 ### EntityQueryParser
 
-**Location**: `src/Koan.Web/Queries/EntityQueryParser.cs`
-**Pattern**: Static helper class
-**ADR**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md) (P1.10)
+`src/Koan.Web/Queries/EntityQueryParser.cs`
 
-**Purpose**: Parse query string parameters for entity queries (filtering, sorting, pagination).
-
-#### Available Methods
+Turns an HTTP query collection into the `QueryOptions` the endpoint pipeline consumes: paging, sort
+specs resolved against the entity, shape, view, and extras. One call reads the whole query string --
+there is no per-concern parse to assemble yourself.
 
 ```csharp
-public static FilterClause? ParseFilter(string? filter)
-public static SortClause? ParseSort(string? sort)
-public static PaginationParams ParsePagination(int? page, int? pageSize, int defaultPageSize = 20, int maxPageSize = 100)
-public static FieldSelection ParseFields(string? fields)
+public static QueryOptions Parse<TEntity>(
+    IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false);
+
+public static QueryOptions Parse(
+    Type entityType, IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false);
 ```
 
-#### Usage Example
+Sort fields resolve against `TEntity`, and an unresolvable field throws `InvalidSortFieldException`,
+which `EntityController` converts to `400`. Pass `lenient: true` where an unknown field should be
+dropped instead.
 
-```csharp
-// In EntityController
-[HttpGet]
-public async Task<IActionResult> GetEntities(
-    [FromQuery] string? filter,
-    [FromQuery] string? sort,
-    [FromQuery] int? page,
-    [FromQuery] int? pageSize)
-{
-    var filterClause = EntityQueryParser.ParseFilter(filter);
-    var sortClause = EntityQueryParser.ParseSort(sort);
-    var pagination = EntityQueryParser.ParsePagination(page, pageSize);
-
-    var results = await _repository.QueryAsync(filterClause, sortClause, pagination);
-    return Ok(results);
-}
-```
-
-#### When to Use
-- Custom EntityController implementations
-- API endpoints requiring flexible querying
-- GraphQL resolvers
-- Any scenario parsing user-supplied query expressions
+`EntityController.BuildOptions()` is this call, so overriding that method is the supported way to
+adjust the result before the query runs.
 
 ---
 
 ### PatchNormalizer
 
-**Location**: `src/Koan.Web/PatchOps/PatchNormalizer.cs`
-**Pattern**: Static helper class
-**ADR**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md) (P1.10)
+`src/Koan.Web/PatchOps/PatchNormalizer.cs`
 
-**Purpose**: Normalize and validate JSON Patch operations.
-
-#### Available Methods
+Normalizes each accepted PATCH media type into one canonical `PatchPayload<TKey>`, so the rest of the
+write path sees a single operation list regardless of what the client sent
+([DATA-0116](../decisions/DATA-0116-canonical-patch-operations.md)).
 
 ```csharp
-public static PatchOperation[] Normalize(JsonPatchDocument patchDocument)
-public static bool ValidatePath(string path, Type entityType)
-public static object? CoerceValue(object? value, Type targetType)
-public static PatchOperation[] RemoveNoOps(PatchOperation[] operations)
+public static PatchPayload<TKey> NormalizeJsonPatch<TEntity, TKey>(...);   // RFC 6902
+public static PatchPayload<TKey> NormalizeMergePatch<TKey>(...);           // RFC 7386
+public static PatchPayload<TKey> NormalizePartialJson<TKey>(...);          // partial application/json
 ```
 
-#### Usage Example
-
-```csharp
-// In EntityController PATCH endpoint
-[HttpPatch("{id}")]
-public async Task<IActionResult> PatchEntity(Guid id, [FromBody] JsonPatchDocument patchDoc)
-{
-    var operations = PatchNormalizer.Normalize(patchDoc);
-
-    if (operations.Any(op => !PatchNormalizer.ValidatePath(op.Path, typeof(TEntity))))
-    {
-        return BadRequest("Invalid patch path");
-    }
-
-    var entity = await _repository.GetAsync(id);
-    entity.ApplyPatch(operations);
-    await entity.SaveAsync();
-
-    return Ok(entity);
-}
-```
-
-#### When to Use
-- PATCH endpoints with JSON Patch support
-- Custom entity update logic
-- Partial update scenarios
-- Validation of user-supplied patch operations
+The [PATCH guide](patch-capabilities-howto.md) owns format selection, null and array policy, and the
+provider pushdown story.
 
 ---
 
 ### SampleApplicationExtensions
 
-**Location**: `src/Koan.Web/Hosting/SampleApplicationExtensions.cs`
-**Pattern**: Static extension methods
-**Purpose**: Common setup patterns for sample applications.
+`src/Koan.Web/Hosting/SampleApplicationExtensions.cs`
 
-#### Available Methods
+Setup that samples repeat, kept in one place so a sample's `Program.cs` stays about its own subject.
 
 ```csharp
-public static WebApplicationBuilder ConfigureSampleApp(this WebApplicationBuilder builder)
-public static WebApplication ConfigureSamplePipeline(this WebApplication app)
-public static WebApplicationBuilder AddDevCors(this WebApplicationBuilder builder)
+public static WebApplicationBuilder ConfigureSampleLogging(this WebApplicationBuilder builder);
+public static WebApplication ConfigureSampleLifecycle(...);
+public static void LaunchBrowser(ILogger logger, string url);
 ```
 
-#### Usage Example
-
-```csharp
-// In sample Program.cs
-var builder = WebApplication.CreateBuilder(args);
-builder.ConfigureSampleApp();  // Adds common services
-builder.AddDevCors();           // CORS for local development
-
-var app = builder.Build();
-app.ConfigureSamplePipeline();  // Standard middleware setup
-await app.RunAsync();
-```
-
-#### When to Use
-- Creating new sample applications
-- Standardizing sample project setup
-- Quick prototyping with Koan defaults
+These exist for the samples in this repository. An application uses the ordinary `AddKoan()` bootstrap
+and its own logging and lifecycle choices.
 
 ---
-
-## Data Access Helpers
 
 ### Entity Static Methods Pattern
 
@@ -711,46 +578,18 @@ Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
 ### Guard Clauses
 
-**Location**: `src/Koan.Core/Utilities/Guard/`
-**Pattern**: Static validation methods
+`src/Koan.Core/Utilities/Guard/`
 
-#### Available Guards
-
-```csharp
-Must.NotBeNull(value, nameof(value));
-Must.NotBeEmpty(collection, nameof(collection));
-Must.BeInRange(value, min, max, nameof(value));
-Must.BeOfType<T>(obj, nameof(obj));
-
-Be.Positive(value, nameof(value));
-Be.ValidEmail(email, nameof(email));
-Be.ValidUrl(url, nameof(url));
-
-NotBe.Negative(value, nameof(value));
-NotBe.Default(value, nameof(value));
-```
-
-#### Usage Example
+Fluent, zero-allocation parameter validation that captures the parameter name for you:
 
 ```csharp
-public class MongoRepository<T>
-{
-    public MongoRepository(string connectionString, string database)
-    {
-        Must.NotBeNull(connectionString, nameof(connectionString));
-        Must.NotBeEmpty(database, nameof(database));
-
-        _connectionString = connectionString;
-        _database = database;
-    }
-}
+var validTitle = title.Must().NotBe.Blank();
+var validPriority = priority.Must().Be.InRange(1, 5);
 ```
 
-#### When to Use
-- Constructor validation
-- Method parameter validation
-- Public API boundary enforcement
-- Defensive programming
+The [guard utilities reference](../reference/core/guard-utilities.md) is the complete surface --
+every `Be` and `NotBe` member, the `RangeType` options, and where guards stop and batch validation
+begins. It is the one place that contract is written down.
 
 ---
 
