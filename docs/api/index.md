@@ -5,7 +5,7 @@ title: "Generated API documentation"
 audience: [developers, maintainers]
 status: current
 last_updated: 2026-07-19
-framework_version: v0.20.0
+framework_version: v1.0.0
 ---
 
 # Koan Framework API documentation

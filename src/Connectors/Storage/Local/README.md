@@ -1,4 +1,4 @@
-# Sylin.Koan.Storage.Connector.Local
+﻿# Sylin.Koan.Storage.Connector.Local
 
 Local-filesystem provider for Koan Storage. Referencing it adds one Local placement candidate; `AddKoan()` activates
 the provider and the Storage runtime without a provider-specific registration call.
@@ -36,7 +36,7 @@ using Koan.Storage;
 using Koan.Storage.Model;
 
 [StorageBinding("main")]
-public sealed class Document : StorageEntity<Document> { }
+public sealed class Document : StorageEntity<Document>;
 
 var document = await Document.CreateTextFile("terms.txt", "Current terms");
 var text = await document.ReadAllText();

@@ -1,4 +1,4 @@
-# Configuration & Module Utilities
+﻿# Configuration & Module Utilities
 
 This directory contains **configuration**, **options**, and **module registration utilities** for Koan Framework.
 
@@ -126,7 +126,3 @@ The `AddKoanOptions` pattern:
 - Ensures consistent section naming
 - Supports validation out of the box
 - Easier to test
-
----
-
-**Last Updated**: 2025-11-03

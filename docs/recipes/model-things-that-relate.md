@@ -74,7 +74,7 @@ And cache what genuinely does not move:
 
 ```csharp
 [Cacheable(120)]
-public sealed class Category : Entity<Category> { }
+public sealed class Category : Entity<Category>;
 ```
 
 Depth: [read and stream Entities](../guides/data/entity-access-and-streaming.md) ·

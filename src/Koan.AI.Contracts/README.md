@@ -1,4 +1,4 @@
-# Sylin.Koan.AI.Contracts
+﻿# Sylin.Koan.AI.Contracts
 
 Inert vocabulary for building on Koan AI: provider adapters, capability identifiers, model-selection seams, routing
 registries, immutable prompt values/options, and multimodal request/result shapes. Referencing this package alone starts no runtime,
@@ -58,8 +58,8 @@ boundary.
 - An `AiCapability` value describes support; it does not guarantee that a model is installed, reachable, or healthy.
 - Adapter implementations are expected to be concurrency-safe and to honor cancellation, but those guarantees belong
   to the implementation selected at runtime.
-- Vendor option bags are intentionally provider-specific and currently use Newtonsoft JSON tokens on the legacy
-  prompt surface. Do not treat them as portable across providers.
+- Vendor option bags are intentionally provider-specific and carry Newtonsoft JSON tokens. They are not portable
+  across providers, and a bag written for one says nothing about another.
 - `Sylin.Koan.AI.Contracts.Shared` is a separate, dependency-free lifecycle vocabulary. It is not required for the
   core inference adapter boundary.
 

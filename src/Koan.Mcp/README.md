@@ -1,15 +1,11 @@
 ﻿# Sylin.Koan.Mcp
 
-## Contract
+Project the entities and business tools an application already governs to AI agents over the Model
+Context Protocol, under the access declarations that govern its HTTP surface.
 
-- **Purpose**: Project governed Koan entities, business tools, and runtime explanation to AI agents.
-- **Primary inputs**: referenced `Sylin.Koan.Mcp`, `[McpEntity]` entities, optional `[McpTool]`
-  workflows, and the application's existing access declarations.
-- **Outputs**: caller-specific MCP tools and resources over STDIO or Streamable HTTP.
-- **Failure modes**: no annotated surface, invalid JSON-RPC, unavailable tools, denied access, or an
-  unsupported transport request.
-- **Success criteria**: an agent discovers only usable capabilities, receives structured failures,
-  and can inspect the same runtime facts as an operator.
+Annotating an entity with `[McpEntity]` is the whole application-side change. Each caller then
+discovers the tools and resources *that caller* may use, over STDIO or Streamable HTTP, and can read
+the same runtime facts an operator sees.
 
 ## Install and shortest supported path
 

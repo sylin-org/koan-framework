@@ -5,7 +5,7 @@ title: "PATCH Formats and Normalization"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2025-10-09
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   status: verified
   date_last_tested: 2025-10-09
@@ -14,21 +14,18 @@ validation:
 
 # PATCH formats and normalization
 
-## Contract
+`EntityController<TEntity, TKey>` accepts PATCH in three media types — `application/json-patch+json`
+(RFC 6902), `application/merge-patch+json` (RFC 7386), and a partial `application/json` body — and
+normalizes all three to one canonical `PatchOps` list before applying null and array policy. A
+successful request returns the updated model, shaped by the same hooks and transformers as any other
+write.
 
-- Inputs:
-  - HTTP PATCH on `EntityController<TEntity, TKey>` accepting one of:
-    - application/json-patch+json (RFC 6902)
-    - application/merge-patch+json (RFC 7386)
-    - application/json (partial JSON)
-- Output: Updated entity model (subject to hooks and shaping) or appropriate error (404, 409, 400).
-- Error modes:
-  - Invalid JSON Pointer → 400
-  - Identity mutation attempt (/id) → 409
-  - Route/body id mismatch (when body contains id) → 400 `web.patch.idMismatch`
-  - Unsupported op for fallback executor (copy/move/test) → 400
-- Success criteria:
-  - Payload is normalized to canonical PatchOps; options (null/array policies) applied.
+| Condition | Status |
+|---|---|
+| Invalid JSON Pointer | `400` |
+| Attempt to mutate `/id` | `409` |
+| Route id and body id disagree | `400` `web.patch.idMismatch` |
+| `copy` / `move` / `test` under the fallback executor | `400` |
 
 ## Canonical normalization
 

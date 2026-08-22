@@ -1,4 +1,4 @@
-# Sylin.Koan.Cache.Adapter.Sqlite
+﻿# Sylin.Koan.Cache.Adapter.Sqlite
 
 Persistent Local Cache provider for Koan, backed by SQLite. Reference it and keep the normal `AddKoan()` boot;
 SQLite automatically wins Local election over the built-in memory floor.
@@ -13,10 +13,10 @@ dotnet add package Sylin.Koan.Cache.Adapter.Sqlite
 builder.Services.AddKoan();
 
 [Cacheable(300)]
-public sealed class Todo : Entity<Todo> { }
+public sealed class Todo : Entity<Todo>;
 ```
 
-No SQLite registration is required. The default database is `.Koan/cache/cache.db`.
+The reference is the registration. The default database is `.Koan/cache/cache.db`.
 
 ## Meaningful result
 

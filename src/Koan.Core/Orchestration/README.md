@@ -1,4 +1,4 @@
-# Orchestration Utilities
+﻿# Orchestration Utilities
 
 This directory contains **service discovery** and **orchestration utilities** for Koan Framework.
 
@@ -118,7 +118,3 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 | Building connection strings | `ConnectionStringParser` static methods |
 | Creating discovery adapter | Inherit `ServiceDiscoveryAdapterBase` |
 | Custom orchestration logic | Implement `IServiceDiscoveryAdapter` directly |
-
----
-
-**Last Updated**: 2025-11-03

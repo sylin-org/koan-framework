@@ -53,7 +53,7 @@ dotnet add package Sylin.Koan.Mcp
 
 ```csharp
 [McpEntity(Name = "Todo", Description = "Work the team intends to finish")]
-public sealed class Todo : Entity<Todo> { }
+public sealed class Todo : Entity<Todo>;
 ```
 
 The same model already exposed over HTTP becomes agent-visible; the governance travels with it.

@@ -51,7 +51,7 @@ await loaded.Remove();
 
 ```csharp
 [Route("api/[controller]")]
-public class TodosController : EntityController<Todo> { }
+public sealed class TodosController : EntityController<Todo>;
 ```
 
 ## Streaming & paging

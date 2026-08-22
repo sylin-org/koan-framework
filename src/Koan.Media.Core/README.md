@@ -1,4 +1,4 @@
-# Sylin.Koan.Media.Core
+﻿# Sylin.Koan.Media.Core
 
 The Koan media runtime: Entity-backed originals, content-addressed deduplication, recipe discovery and validation,
 lazy image pipelines, encoder selection, and inspectable startup facts.
@@ -17,7 +17,7 @@ Media Core; no media-specific registration call is required for Entity or direct
 ```csharp
 using Koan.Media;
 
-public sealed class Photo : MediaEntity<Photo> { }
+public sealed class Photo : MediaEntity<Photo>;
 
 var photo = await Photo.Upload(source, "original.jpg", "image/jpeg", ct: ct);
 await using var bytes = await Photo.OpenRead(photo.Key, ct);

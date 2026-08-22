@@ -1,4 +1,4 @@
-# Sylin.Koan.Data.Vector
+﻿# Sylin.Koan.Data.Vector
 
 Supported Entity-first vector persistence and search for Koan. The runtime elects one referenced provider per entity, memoizes
 repository resolution, applies Koan data isolation to vector operations and physical names, and reports which
@@ -45,7 +45,7 @@ Decorate an entity only when automatic provider election is not the intended pol
 using Koan.Data.Vector.Abstractions;
 
 [VectorAdapter("qdrant")]
-public sealed class Article : Entity<Article> { }
+public sealed class Article : Entity<Article>;
 ```
 
 The exact provider must be referenced and available; Koan does not silently fall back from an explicit request.

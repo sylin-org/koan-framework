@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Sources;
@@ -115,7 +115,7 @@ public sealed class DataService : IDataService
         var decorated = ApplyDecorators(typeof(TEntity), typeof(TKey), repo, binding, _sp);
 
         // Wrap once with the Data-owned semantic boundary: source policy, guards, isolation, transforms,
-        // write stamps and Lifecycle. The legacy provisioning-ready seam is used only for Managed + ReadWrite;
+        // write stamps and Lifecycle. The provisioning-ready seam is used only for Managed + ReadWrite;
         // constrained sources require adapter-earned non-creating readiness.
         var guards = _sp.GetServices<Pipeline.IStorageGuard>().ToArray();
         var readContributors = _sp.GetServices<Pipeline.IReadFilterContributor>().ToArray();

@@ -21,7 +21,7 @@ builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 
-public sealed class Photo : MediaEntity<Photo> { }
+public sealed class Photo : MediaEntity<Photo>;
 
 public static class PhotoRecipes
 {

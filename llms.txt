@@ -1,4 +1,4 @@
-# Koan Framework — agent retrieval map
+﻿# Koan Framework — agent retrieval map
 
 Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Application code
 states business intent; capability pillars own composition, provider negotiation, lifecycle, and
@@ -42,9 +42,9 @@ Entity operations:
 
 References make capabilities available. AddKoan() compiles referenced semantic modules once. A
 capability elects providers and rejects unsupported configured intent with a corrective explanation.
-Do not add provider registration, framework service locators, repositories around ordinary Entity
-operations, or manual endpoint mapping unless the owning capability explicitly documents an escape
-hatch.
+Provider registration, endpoint mapping, and the plumbing around ordinary Entity operations all
+belong to that compilation, so application code states business intent and nothing else. Where a
+capability genuinely needs an escape hatch, that capability documents it.
 
 ## Intent-to-document map
 

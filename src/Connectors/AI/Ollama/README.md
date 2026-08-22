@@ -1,4 +1,4 @@
-# Sylin.Koan.AI.Connector.Ollama
+﻿# Sylin.Koan.AI.Connector.Ollama
 
 Local and remote Ollama provider for Koan AI: chat, streaming, embeddings, vision, tools, and model operations.
 
@@ -61,7 +61,7 @@ when the functional Zen Garden engine is present and can satisfy the intent.
 ## Runtime contract
 
 - Endpoint order is preserved and duplicate endpoints are removed.
-- Provider configuration never creates a second legacy or `Default` source.
+- Provider configuration contributes to the source it names, and only that one.
 - Explicit configuration is intent: conflicting placement or an unresolved explicit Zen Garden URI fails startup
   with a corrective error.
 - No reachable auto-discovery candidate is normal inactivity; the application can still start and another provider

@@ -1,4 +1,4 @@
----
+﻿---
 uid: reference.modules.Koan.mcp
 title: Koan.Mcp - Technical Reference
 description: Model Context Protocol tools, resources, transports, and runtime inspection for Koan applications.
@@ -13,12 +13,12 @@ loader. Related-type visibility, backend negotiation, result/candidate limits, a
 rejections therefore match REST. The selected or rejected child-edge strategy is inspectable through
 `koan://facts`. Runtime facts are a latest-state snapshot, not an operation history.
 
-## Contract
+## What this package composes
 
-- Inputs: discovered MCP entities, custom tools, caller identity/grants, and host runtime facts.
-- Outputs: MCP tools, resources, JSON-RPC results, and transport health.
-- Error modes: invalid protocol envelopes, unavailable tools, denied grants, and transport failures.
-- Success criteria: each caller sees only its permitted tools/resources and receives structured results.
+Discovery supplies the surface -- `[McpEntity]` entities and `[McpTool]` workflows -- and the caller's
+identity and grants decide which of it exists for that session. What the caller receives back is MCP
+tools and resources, JSON-RPC results, and transport health, with a structured failure rather than a
+silent omission for an invalid envelope, an unavailable tool, a denied grant, or a transport fault.
 
 ## Runtime fact resource
 

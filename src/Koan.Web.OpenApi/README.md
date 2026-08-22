@@ -44,7 +44,7 @@ the document and UI.
 
 ## Guarantees and boundaries
 
-- One option family controls the document and UI; no legacy Swagger configuration or manual activation path exists.
+- One option family controls both the document and the UI.
 - Startup reporting states the effective document route, UI route, enablement, and authentication posture.
 - The OpenAPI schema describes Koan's REST wire; MCP-only exclusions do not silently change the REST contract.
 - The document endpoint itself is not an authorization boundary. Disable it or apply host/network policy when the API

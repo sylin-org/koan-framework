@@ -81,8 +81,8 @@ validation:
   connection identity, adapter settings, and route identity into one immutable host-owned `DataSourcePlan`.
   Runtime arguments may narrow that plan but cannot elevate it; the ordinary default is `Managed + ReadWrite`.
 - `RepositoryFacade` applies the plan's typed operation-effect gate before cancellation observation,
-  segmentation/guard callbacks, readiness, Entity lifecycle, or provider dispatch. Constrained sources do not
-  enter the legacy provisioning-ready seam.
+  segmentation/guard callbacks, readiness, Entity lifecycle, or provider dispatch. A constrained source never
+  enters the provisioning-ready seam, which serves `Managed + ReadWrite` alone.
 - Known build provenance admits directly referenced connectors plus the deliberate JSON floor. A transitive
   factory cannot become persistence accidentally. Low-level hosts without a generated manifest use a
   deterministic priority fallback explicitly reported as `unknown-provenance-priority`.

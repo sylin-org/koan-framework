@@ -1,4 +1,4 @@
-# Sylin.Koan.Storage
+﻿# Sylin.Koan.Storage
 
 Entity-first object-storage runtime for Koan. It compiles logical profiles and referenced providers once, applies
 active segmentation at the service chokepoint, and exposes one readable object lifecycle across local, remote, and
@@ -37,7 +37,7 @@ using Koan.Storage;
 using Koan.Storage.Model;
 
 [StorageBinding("main")]
-public sealed class Document : StorageEntity<Document> { }
+public sealed class Document : StorageEntity<Document>;
 
 var document = await Document.CreateTextFile("terms.txt", "Current terms");
 var text = await document.ReadAllText();

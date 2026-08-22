@@ -1,4 +1,4 @@
-# Web Query Parsing Utilities
+﻿# Web Query Parsing Utilities
 
 This directory contains **query string parsing and normalization** utilities for Koan Web APIs.
 
@@ -154,7 +154,3 @@ public static FieldSelection ParseFields(string? fields)
 | Validate pagination params | `EntityQueryParser.ParsePagination()` |
 | Parse field selection | `EntityQueryParser.ParseFields()` |
 | Custom query DSL | Implement your own parser |
-
----
-
-**Last Updated**: 2025-11-03

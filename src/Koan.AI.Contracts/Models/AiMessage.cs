@@ -1,13 +1,13 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Koan.AI.Contracts.Models;
 
 /// <summary>
 /// Represents a conversation message exchanged with an AI adapter.
-/// The legacy two-parameter constructor (<c>new AiMessage("role", "content")</c>) remains supported,
-/// while richer metadata (name, tool call identifiers, structured parts) may be supplied via object
-/// initializers. Providers that only understand plain text should fall back to the <see cref="Content"/>
-/// value; the builder and adapters translate structured parts where available.
+/// Role and content are the constructor; richer metadata (name, tool call identifiers, structured
+/// parts) is supplied through object initializers. A provider that understands only plain text reads
+/// <see cref="Content"/>, while the builder and adapters translate structured parts where the
+/// provider supports them.
 /// </summary>
 public record class AiMessage
 {
