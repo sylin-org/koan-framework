@@ -1,5 +1,6 @@
 ﻿using System;
 using Koan.Core.Modules.Pillars;
+using Koan.Core.Provenance;
 using AwesomeAssertions;
 using Xunit;
 
@@ -40,46 +41,27 @@ public class PillarCatalogSpec
     }
 
     /// <summary>
-    /// A pillar no manifest has declared gets a placeholder so a module reporting under it still has something
-    /// to be shown under. The declaration replaces the placeholder whenever it arrives, in either order.
+    /// Provenance needs something to show a module under when no manifest has declared its pillar, so it
+    /// describes one. It must not register that description.
     ///
-    /// <para>This is the defect behind three investigations of an "intermittent" SQLite suite. Provenance would
-    /// infer <c>data</c> with a placeholder colour and icon before <c>Koan.Data.Core</c> declared the real one;
-    /// the real registration was then refused as a conflicting one, its module threw during register, and every
-    /// host boot in that process failed from there — 48 of 49 specs in one run. Whether it happened at all
-    /// depended on which module reported provenance first, so it looked like flakiness and passed on re-run.</para>
+    /// <para>This is the defect behind three investigations of an "intermittent" SQLite suite. Provenance
+    /// registered an invented <c>data</c> pillar with a placeholder colour and icon; when
+    /// <c>Koan.Data.Core</c> declared the real one the catalog refused it as a conflicting registration, its
+    /// module threw during register, and every host boot in that process failed from there — 48 of 49 specs in
+    /// one run. Whether it happened depended on which module reported provenance first, so it looked like
+    /// flakiness and passed on re-run.</para>
+    ///
+    /// <para>The catalog's refusal was correct; writing a guess into it was not. This pins the cause.</para>
     /// </summary>
     [Fact]
-    public void An_inferred_pillar_gives_way_to_the_manifest_that_declares_it()
+    public void Provenance_for_an_undeclared_pillar_does_not_register_it()
     {
         var code = $"pillar-{Guid.NewGuid():N}";
-        var label = $"Ledger {code}";
-        KoanPillarCatalog.RegisterInferredDescriptor(
-            new KoanPillarCatalog.PillarDescriptor(code, label, "#2563eb", "📦", new[] { "Koan.Ledger." }));
 
-        KoanPillarCatalog.RegisterDescriptor(
-            new KoanPillarCatalog.PillarDescriptor(code, label, "#38bdf8", "🗄️"));
+        ProvenanceRegistry.Instance.GetOrCreateModule(code, $"Ledger.{code}");
 
-        KoanPillarCatalog.TryGetByCode(code, out var stored).Should().BeTrue();
-        stored!.ColorHex.Should().Be("#38bdf8");
-        stored.Icon.Should().Be("🗄️");
-        stored.NamespacePrefixes.Should().Contain(
-            "Koan.Ledger.", "namespaces the placeholder collected still resolve to the pillar");
-    }
-
-    [Fact]
-    public void A_manifest_is_not_displaced_by_a_guess_that_arrives_after_it()
-    {
-        var code = $"pillar-{Guid.NewGuid():N}";
-        var label = $"Ledger {code}";
-        KoanPillarCatalog.RegisterDescriptor(
-            new KoanPillarCatalog.PillarDescriptor(code, label, "#38bdf8", "🗄️"));
-
-        KoanPillarCatalog.RegisterInferredDescriptor(
-            new KoanPillarCatalog.PillarDescriptor(code, label, "#2563eb", "📦"));
-
-        KoanPillarCatalog.TryGetByCode(code, out var stored).Should().BeTrue();
-        stored!.Icon.Should().Be("🗄️", "a guess never outranks the module that owns the pillar");
+        KoanPillarCatalog.IsRegistered(code).Should().BeFalse(
+            "describing a pillar is not declaring it, and only a manifest declares");
     }
 
     [Fact]

@@ -76,11 +76,16 @@ promote it into the active backlog instead of waiting for this list.
   are properties of the suite, and the defect was in `Koan.Core`. Nothing about the suite could have led there.
   The reproduction is a batch — three container suites, then SQLite — and it now passes 49/49 where it produced
   48 failures immediately before the fix.
-  The fix separates a guess from a declaration. `KoanPillarCatalog.RegisterInferredDescriptor` marks a
-  placeholder; a declared descriptor replaces an inferred one whichever order they arrive in, inheriting the
-  namespaces the placeholder had collected. Two *declared* descriptions of one pillar that disagree is a real
-  contradiction and still refuses. Two dockerless specs pin both directions and both fail with the distinction
-  removed.
+  The fix went through two shapes, and the second is the one to remember. The first taught the catalog to tell
+  a guess from a declaration and let the declaration win. It worked, and it was more machinery than the problem
+  deserved: reading the consumers showed **nothing anywhere reads the catalog for a pillar nobody declared** —
+  `KoanPillarCatalog.All` has no readers at all, the admin status page matches by namespace prefix which a
+  guess never populates, and `ResolveDescriptor` runs once per pillar code because its caller caches the
+  result. The write achieved nothing except the collision. So it is gone: provenance describes an undeclared
+  pillar and does not register it, and the catalog is back to one kind of registration, refusing two manifests
+  that disagree — which is a genuine contradiction and reachable only from declarations now.
+  One dockerless spec pins the cause rather than the symptom: driving provenance for an undeclared pillar
+  leaves the catalog without it. Restoring the write fails that spec, and the reproduction batch stays green.
 
 - **PMC-055 — a pinned map silently ignored an ambient partition on three stores.** Opened and closed on
   2026-08-21, found while measuring whether the four relational repositories could share a base class.

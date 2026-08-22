@@ -208,22 +208,14 @@ namespace Koan.Core.Provenance
             _ => char.ToUpperInvariant(pillarCode[0]) + pillarCode[1..]
         };
 
-        var fallback = new KoanPillarCatalog.PillarDescriptor(pillarCode ?? CorePillarManifest.PillarCode, label, "#2563eb", "📦");
-        try
-        {
-            KoanPillarCatalog.RegisterInferredDescriptor(fallback);
-        }
-        catch
-        {
-            // Ignore registration failures (e.g., concurrent registration).
-        }
-
-        if (KoanPillarCatalog.TryGetByCode(pillarCode, out var registered))
-        {
-            return registered;
-        }
-
-        return fallback;
+        // Nothing has declared this pillar. Provenance still needs something to show the module under, so it
+        // describes one — and does not register it. Describing is not declaring, and the catalog holds
+        // declarations: a description invented here once took the `data` code, and the real manifest arriving
+        // afterwards was refused as a conflicting registration, failing every host boot in the process.
+        // Nothing reads the catalog for pillars nobody declared, and this method runs once per pillar code
+        // because the caller caches the result, so registering it achieved nothing but the collision.
+        return new KoanPillarCatalog.PillarDescriptor(
+            pillarCode ?? CorePillarManifest.PillarCode, label, "#2563eb", "📦");
     }
 
     internal sealed class PillarState
