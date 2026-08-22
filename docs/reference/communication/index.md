@@ -131,12 +131,15 @@ external providers may not.
 Defaults are sufficient for normal first use. The capacity applies independently to each local lane;
 the payload limit covers an Entity snapshot plus Event details when present:
 
-```csharp
-builder.Services.Configure<CommunicationOptions>(options =>
+```json
 {
-    options.InProcessCapacity = 512;
-    options.MaxPayloadBytes = 8 * 1024 * 1024;
-});
+  "Koan": {
+    "Communication": {
+      "InProcessCapacity": 512,
+      "MaxPayloadBytes": 8388608
+    }
+  }
+}
 ```
 
 Invalid values fail during host startup. Oversized or unserializable values fail with a typed lane

@@ -14,13 +14,6 @@ validation:
 
 # Guard Utilities Reference
 
-**Document Type**: REF
-**Target Audience**: Developers, Architects
-**Last Updated**: 2025-10-12
-**Framework Version**: v0.6.3
-
----
-
 ## Overview
 
 Koan's fluent guard pattern provides expressive, zero-allocation parameter validation with automatic parameter name capture. Guards follow natural language syntax (`value.Must().NotBe.Blank()`) and are built on C# `ref struct` types for optimal performance.
@@ -745,7 +738,3 @@ public void CreateTodo_WithValidInputs_Succeeds()
 6. Comprehensive type coverage: strings, numbers, collections, enums
 7. Integrates with `Entity<T>`, `EntityController<T>`, and Jobs pipelines
 
----
-
-**Last Validation**: 2025-10-12
-**Framework Version Tested**: v0.6.3
