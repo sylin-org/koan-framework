@@ -373,7 +373,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     private async Task Ready(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
-        var target = $"{plan.Table}/{plan.Mapping.Id}";
+        var target = plan.Target;
         if (_route.Policy.UsesLegacyProvisioningReadiness)
         {
             await _readiness.Provision(

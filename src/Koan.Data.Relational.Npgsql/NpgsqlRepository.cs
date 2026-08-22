@@ -317,7 +317,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     private async Task Ready(CancellationToken ct)
     {
-        var target = $"{_plan.Schema}/{_plan.Table}/{_plan.Mapping.Id}";
+        var target = _plan.Target;
         if (_options.SourcePlan.UsesLegacyProvisioningReadiness)
         {
             await _readiness.Provision(

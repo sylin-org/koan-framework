@@ -285,7 +285,7 @@ internal sealed class MySqlRepository<TEntity, TKey> :
     private async Task Ready(CancellationToken ct)
     {
         var plan = Plan;
-        var target = $"{plan.Database}/{plan.Table}/{plan.Mapping.Id}";
+        var target = plan.Target;
         if (_options.SourcePlan.UsesLegacyProvisioningReadiness)
         {
             await _readiness.Provision(_options.SourcePlan, target,
