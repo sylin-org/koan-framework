@@ -94,8 +94,20 @@ public sealed class TodosController : EntityController<Todo>
 }
 ```
 
-- Collection requests accept `page`, `pageSize` (or legacy `size`), sort, filter, shape, set, and
-  relationship options subject to endpoint policy.
+- Collection requests accept `page`, `pageSize` (`size` is accepted as an alias), sort, filter,
+  shape, set, and relationship options subject to endpoint policy.
+
+`filter` is URL-encoded JSON and `q` is a separate free-text slot:
+
+```bash
+curl --get   --data-urlencode 'filter={"status":"Pending"}'   http://localhost:5000/api/todos
+```
+
+Koan parses that into one filter tree. Each adapter receives only the nodes it declares it can
+execute, and Koan evaluates the remainder before sorting and pagination — so the HTTP contract
+returns the same result across query-capable adapters without claiming they all push the same work
+down, or at the same cost. A malformed filter, an unknown field, or unsupported input returns
+`400 Bad Request`; none of them is treated as an unfiltered request.
 - When count metadata is enabled, collection responses include `X-Total-Count`; paged responses can
   also include RFC-style `Link` navigation headers.
 - `POST /query` accepts the provider-agnostic JSON filter shape. It is not an `IQueryable` endpoint.

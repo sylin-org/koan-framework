@@ -56,7 +56,6 @@ If the task touches specific areas, add the relevant ADR or guide, for example:
 - docs/decisions/DATA-0107-provider-bounded-entity-streams.md
 - docs/decisions/WEB-0035-entitycontroller-transformers.md
 - docs/guides/data/entity-access-and-streaming.md
-- docs/reference/web/http-api.md
 
 For each file read, state in one sentence what it establishes and whether it is relevant.
 

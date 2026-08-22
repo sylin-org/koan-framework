@@ -100,8 +100,6 @@
       href: reference/product-surface.md
     - name: Package quality
       href: reference/package-quality.md
-    - name: HTTP API
-      href: reference/web/http-api.md
     - name: .NET API
       href: api/index.md
     - name: PATCH behavior

@@ -55,7 +55,7 @@ The same access declaration can govern what HTTP callers and agents are allowed 
 ## Teach it to understand meaning
 
 Chat, stream responses, or create embeddings through one application-facing client when an active
-provider supports the operation. Koan 1.0 works locally with Ollama, LM Studio, and in-process ONNX
+provider supports the operation. Koan works locally with Ollama, LM Studio, and in-process ONNX
 within their model and runtime limits.
 
 Use Koan's Entity vector API for semantic search. Begin in memory or with embedded `sqlite-vec`;
@@ -106,9 +106,9 @@ Koan 1.x is the .NET 10 stabilization train. It does not provision production in
 general cross-provider transactions or transparent failover, or manage backups and disaster recovery.
 Provider-specific consistency, query, durability, and deployment limits still matter.
 
-NativeAOT is supported and measured rather than assumed — see the
-[deployment boundary](operations/native-aot.md) for what publishes natively and what a provider
-constrains.
+NativeAOT publishes and runs, and is measured rather than assumed, though it sits outside the 1.x
+guarantee — see the [deployment boundary](operations/native-aot.md) for what has been proven, what a
+provider costs, and which platforms nobody has measured.
 
 This page is the human map. For exact package ownership, maturity, evidence, and support status, use
 the generated [Koan product surface](product-surface.md).

@@ -140,13 +140,13 @@ snapshot.
 **Lane** — A named concurrency pool for job actions. Each job action runs in a lane
 (defaulting to the action name, so each action is its own pool), and a lane's
 `MaxConcurrency` caps how many of its work-items run at once; the dispatcher skips a job
-whose lane is saturated. Defined by `JobActionAttribute.Lane` in
-[`JobAttributes`](../../src/Koan.Jobs/JobAttributes.cs).
+whose lane is saturated. Defined by
+[`JobActionAttribute`](../../src/Koan.Jobs/JobAttributes.cs).
 
 **Gate (jobs)** — A shared-resource lock a job declares so the orchestrator can check
 contention *at dispatch, without running the handler*. The attribute names a work-item
-property whose value becomes the gate key; only one job per gate key runs at a time. Defined
-by `JobGateAttribute` in [`JobAttributes`](../../src/Koan.Jobs/JobAttributes.cs).
+property whose value becomes the gate key; only one job per gate key runs at a time. Defined by
+[`JobGateAttribute`](../../src/Koan.Jobs/JobAttributes.cs).
 
 **Ledger** — The single source of truth and single writer for jobs: the ledger *is* the
 queue. Dispatch claims the next ready row by atomic compare-and-set (claim, never a move);
