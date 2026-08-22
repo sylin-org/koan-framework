@@ -1,5 +1,4 @@
-﻿
-namespace Koan.Core.Modules.Pillars;
+﻿namespace Koan.Core.Modules.Pillars;
 
 public static class CorePillarManifest
 {
