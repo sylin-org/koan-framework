@@ -103,6 +103,7 @@ promote it into the active backlog instead of waiting for this list.
   sight: a duplicated claim leaves nothing queued and counts high, a lost claim leaves rows queued and counts
   low, and they have nothing to do with each other. Verified on all four durable tiers — SQL Server 68,
   SQLite 81, PostgreSQL 68, Mongo 73.
+  Decided in [DATA-0122](../../decisions/DATA-0122-adapters-classify-failures-the-framework-decides.md).
   Third time this cycle that "intermittent, did not reproduce" meant a real defect, after PMC-042 and PMC-053.
   The pattern is not that these suites are flaky; it is that a failure read through a summary filter has had
   its evidence thrown away, and the mechanism was in the output every time.
@@ -138,6 +139,7 @@ promote it into the active backlog instead of waiting for this list.
   result. The write achieved nothing except the collision. So it is gone: provenance describes an undeclared
   pillar and does not register it, and the catalog is back to one kind of registration, refusing two manifests
   that disagree — which is a genuine contradiction and reachable only from declarations now.
+  Decided in [ARCH-0132](../../decisions/ARCH-0132-a-registry-separates-declaration-from-inference.md).
   One dockerless spec pins the cause rather than the symptom: driving provenance for an undeclared pillar
   leaves the catalog without it. Restoring the write fails that spec, and the reproduction batch stays green.
 
@@ -252,6 +254,7 @@ promote it into the active backlog instead of waiting for this list.
   from booting on upgrade with no remedy but manual DDL. **Repairing it automatically under DDL consent is the
   natural next step and is not done** — `EnsureCreatedAsync` adds absent columns but treats all drift as
   something to report or refuse, never to correct. That is carried as PMC-052.
+  Decided in [DATA-0121](../../decisions/DATA-0121-repairable-schema-drift.md).
   `RelationalColumnState.ProjectionStamp` is the one shared addition; everything else is MySQL-local, because
   MySQL remains the only store that compares definitions at all.
 

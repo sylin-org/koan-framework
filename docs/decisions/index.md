@@ -71,6 +71,10 @@ Storage, variant routing, transform pipeline, and the recipe-based rendering sur
 | ARCH-0127 | [Connector fleet strategy — capability without infrastructure](ARCH-0127-connector-fleet-strategy.md) | Accepted | Connectors ranked by capability added per unit of infrastructure imposed; a connector without an existing conformance oracle is not delegable |
 | ARCH-0128 | [Environment posture is a named decision, not a boolean read](ARCH-0128-environment-posture-is-a-named-decision.md) | Accepted | Capabilities gate on a named decision (`KoanEnv.Gate`), not on `IsDevelopment`/`IsProduction`; Production is the gate and consent is the unlock, except where nothing may unlock |
 | DATA-0113 | [Bulk reads use the strongest strategy the provider supports](DATA-0113-bulk-reads-use-the-strongest-strategy.md) | Accepted | Bulk-consumer source reads have one owner; amends only the consumer-inheritance clauses of DATA-0107 and DATA-0108 |
+| ARCH-0132 | [A registry separates a declaration from an inference](ARCH-0132-a-registry-separates-declaration-from-inference.md) | Accepted | A guess is returned, never registered; the derivation taxonomy for process-global state |
+| DATA-0121 | [Which schema drift the framework repairs](DATA-0121-repairable-schema-drift.md) | Accepted | A projected column, and only a projected column, is rebuilt under existing DDL consent |
+| DATA-0122 | [Adapters classify a failure, the framework decides what it earns](DATA-0122-adapters-classify-failures-the-framework-decides.md) | Accepted | Classification by code never message; commit outcome gates retry; the caller asserts idempotency |
+| BUILD-0073 | [Compatibility posture before announcement](BUILD-0073-compatibility-posture-before-announcement.md) | Accepted | 1.x is the stabilization line; baseline validation off until announcement, with a named reversal |
 
 ## Authoring Principles
 

@@ -134,8 +134,8 @@
       href: ARCH-0063-docs-ia-realignment-and-retrieval-improvements.md
     - name: ARCH-0065 AddKoan bootstrap lives in Koan.Core
       href: ARCH-0065-addkoan-bootstrap-rehome.md
-    - name: ARCH-0066 Boot report hub and Moss TXT record completeness
-      href: ARCH-0066-boot-report-hub-and-moss-txt-record-completeness.md
+    - name: ARCH-0066 Boot report hub and handles
+      href: ARCH-0066-boot-report-hub-and-handles.md
     - name: ARCH-0067 Service organizational structure
       href: ARCH-0067-service-organizational-structure.md
     - name: ARCH-0068 Refactoring strategy — static vs DI
@@ -196,6 +196,14 @@
       href: ARCH-0126-process-global-resource-ownership.md
     - name: ARCH-0127 Connector fleet strategy — capability without infrastructure
       href: ARCH-0127-connector-fleet-strategy.md
+    - name: ARCH-0128 Environment posture is a named decision, not a boolean read
+      href: ARCH-0128-environment-posture-is-a-named-decision.md
+    - name: ARCH-0130 Moss TXT record completeness
+      href: ARCH-0130-moss-txt-record-completeness.md
+    - name: ARCH-0131 The document-store family — catalogue and golden-Mongo rebuild spec
+      href: ARCH-0131-document-store-catalogue.md
+    - name: ARCH-0132 A registry separates a declaration from an inference
+      href: ARCH-0132-a-registry-separates-declaration-from-inference.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
@@ -316,6 +324,18 @@
       href: DATA-0112-json-individual-files.md
     - name: DATA-0113 Bulk reads use the strongest strategy the provider supports
       href: DATA-0113-bulk-reads-use-the-strongest-strategy.md
+    - name: DATA-0117 Vector Database Export Capabilities - Provider-Agnostic Batch Export
+      href: DATA-0117-vector-export-capabilities.md
+    - name: DATA-0118 Vector Table Name Collision Prevention via "_vector" Suffix
+      href: DATA-0118-vector-table-name-collision-prevention.md
+    - name: DATA-0119 Adapters express grammar; the framework owns guarantees
+      href: DATA-0119-adapters-express-grammar-the-framework-owns-guarantees.md
+    - name: DATA-0120 One relational repository, four drivers
+      href: DATA-0120-one-relational-repository-four-drivers.md
+    - name: DATA-0121 Which schema drift the framework repairs
+      href: DATA-0121-repairable-schema-drift.md
+    - name: DATA-0122 Adapters classify a failure, the framework decides what it earns
+      href: DATA-0122-adapters-classify-failures-the-framework-decides.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -432,6 +452,8 @@
   items:
     - name: BUILD-0072 Script-owned versioning (superseded)
       href: BUILD-0072-script-owned-versioning.md
+    - name: BUILD-0073 Compatibility posture before announcement
+      href: BUILD-0073-compatibility-posture-before-announcement.md
 - name: Operations (OPS)
   items:
     - name: OPS-0014 Samples port allocation
