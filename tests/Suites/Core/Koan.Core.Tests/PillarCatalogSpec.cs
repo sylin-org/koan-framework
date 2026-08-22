@@ -64,6 +64,65 @@ public class PillarCatalogSpec
             "describing a pillar is not declaring it, and only a manifest declares");
     }
 
+    /// <summary>
+    /// A namespace root has to claim two spellings, because matching is longest-prefix <c>StartsWith</c>:
+    /// <c>Koan.Data.</c> claims everything beneath it, and <c>Koan.Data</c> claims the assembly carrying the
+    /// root's own name. Six manifests each authored both by hand and nothing checked either.
+    /// </summary>
+    [Fact]
+    public void A_manifest_claims_both_its_namespace_and_the_assembly_of_the_same_name()
+    {
+        var code = $"pillar-{Guid.NewGuid():N}";
+        var root = $"Koan.Ledger{Guid.NewGuid():N}";
+        var manifest = new PillarManifest(code, $"Ledger {code}", "#123456", "📒", root);
+
+        manifest.EnsureRegistered();
+
+        manifest.Descriptor.ColorHex.Should().Be("#123456");
+        manifest.Descriptor.Icon.Should().Be("📒");
+
+        KoanPillarCatalog.TryMatchByModuleName($"{root}.Core", out var nested).Should().BeTrue();
+        nested!.Code.Should().Be(code);
+        KoanPillarCatalog.TryMatchByModuleName(root, out var exact).Should().BeTrue("the assembly named for the root belongs to the pillar too");
+        exact!.Code.Should().Be(code);
+    }
+
+    /// <summary>
+    /// Where one pillar's root sits inside another's, the longer root owns what is beneath it. This is the
+    /// live arrangement between <c>Koan.Web</c> and <c>Koan.Web.Auth</c>, and it is what makes the second,
+    /// dotted spelling every manifest used to register unnecessary.
+    /// </summary>
+    [Fact]
+    public void The_longer_root_owns_what_sits_beneath_it()
+    {
+        var outer = $"pillar-{Guid.NewGuid():N}";
+        var inner = $"pillar-{Guid.NewGuid():N}";
+        var root = $"Koan.Ledger{Guid.NewGuid():N}";
+
+        new PillarManifest(outer, $"Outer {outer}", "#111111", "O", root).EnsureRegistered();
+        new PillarManifest(inner, $"Inner {inner}", "#222222", "I", root + ".Auth").EnsureRegistered();
+
+        KoanPillarCatalog.TryMatchByModuleName($"{root}.Auth.Server", out var beneath).Should().BeTrue();
+        beneath!.Code.Should().Be(inner);
+        KoanPillarCatalog.TryMatchByModuleName($"{root}.Core", out var elsewhere).Should().BeTrue();
+        elsewhere!.Code.Should().Be(outer);
+    }
+
+    [Fact]
+    public void The_core_pillar_declares_itself_and_claims_its_namespace()
+    {
+        CorePillarManifest.EnsureRegistered();
+
+        var descriptor = CorePillarManifest.Descriptor;
+        descriptor.Code.Should().Be("core");
+        descriptor.Label.Should().Be("Core");
+        descriptor.ColorHex.Should().Be("#64748b");
+        descriptor.Icon.Should().Be("⚙️");
+
+        KoanPillarCatalog.TryMatchByModuleName("Koan.Core.Hosting", out var matched).Should().BeTrue();
+        matched!.Code.Should().Be("core");
+    }
+
     [Fact]
     public void AssociateNamespace_ForUnknownPillar_Throws()
     {

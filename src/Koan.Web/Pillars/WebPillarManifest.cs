@@ -1,6 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Threading;
-using Koan.Core.Modules.Pillars;
+﻿using Koan.Core.Modules.Pillars;
+
 
 namespace Koan.Web.Pillars;
 
@@ -10,58 +9,15 @@ public static class WebPillarManifest
     public const string PillarLabel = "Web";
     public const string PillarColorHex = "#8b5cf6";
     public const string PillarIcon = "🌐";
-    private static int _registered;
-    private static readonly object Sync = new();
 
-    public static void EnsureRegistered()
-    {
-        if (Volatile.Read(ref _registered) == 1)
-        {
-            return;
-        }
+    private static readonly PillarManifest Pillar = new(
+        PillarCode, PillarLabel, PillarColorHex, PillarIcon,
+        "Koan.Web",
+        "Koan.AspNetCore");
 
-        lock (Sync)
-        {
-            if (_registered == 1)
-            {
-                return;
-            }
+    public static void EnsureRegistered() => Pillar.EnsureRegistered();
 
-            var descriptor = new KoanPillarCatalog.PillarDescriptor(PillarCode, PillarLabel, PillarColorHex, PillarIcon);
-            KoanPillarCatalog.RegisterDescriptor(descriptor);
+    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
 
-            foreach (var prefix in DefaultNamespaces)
-            {
-                KoanPillarCatalog.AssociateNamespace(PillarCode, prefix);
-            }
-
-            Volatile.Write(ref _registered, 1);
-        }
-    }
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor
-    {
-        get
-        {
-            EnsureRegistered();
-            return KoanPillarCatalog.RequireByCode(PillarCode);
-        }
-    }
-
-    public static void AssociateNamespace(string namespacePrefix)
-    {
-        EnsureRegistered();
-        KoanPillarCatalog.AssociateNamespace(PillarCode, namespacePrefix);
-    }
-
-    private static IEnumerable<string> DefaultNamespaces
-    {
-        get
-        {
-            yield return "Koan.Web.";
-            yield return "Koan.Web";
-            yield return "Koan.AspNetCore.";
-            yield return "Koan.AspNetCore";
-        }
-    }
+    public static void AssociateNamespace(string namespacePrefix) => Pillar.AssociateNamespace(namespacePrefix);
 }

@@ -270,6 +270,12 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   built from the dialect's own `Read` rather than from a spelling invented at the index site. On Couchbase this
   forced the path grammar out of the generic document plan, because an index built for a container and a filter
   compiled for an entity have to agree and could not while the grammar lived behind a type parameter. (2026-08-21)
+- **`dotnet build --no-incremental` is unsafe in this repo.** It rebuilds every project at once into the one
+  shared output path, and the projects clobber each other: a run produced 91 errors that a normal build did not
+  have, and another left the test assemblies in a state where `dotnet test --no-build` exited 0 having run
+  nothing. Warnings still surface reliably — but only on the build that actually recompiles the changed
+  project, so read them from the build immediately after an edit rather than from a repeat build, which
+  recompiles nothing and honestly reports zero. (2026-08-21)
 - **Process-global registries are safe when one derivation owns a key, and dangerous when two do.** A sweep of
   every static registry in the tree after the pillar-catalog defect found only one shape that can go wrong:
   the same key written from two *different* derivations, one authoritative and one invented. Everything else is
