@@ -20,12 +20,30 @@ public static class KoanPillarCatalog
         => !string.IsNullOrWhiteSpace(pillarCode) && PillarsByCode.ContainsKey(pillarCode);
 
     public static PillarDescriptor RegisterDescriptor(PillarDescriptor descriptor)
+        => Register(descriptor, inferred: false);
+
+    /// <summary>
+    /// Registers a placeholder for a pillar no manifest has declared, so a module reporting under an unknown
+    /// pillar code still has something to be shown under.
+    ///
+    /// <para>A guess must never outrank the module that owns the pillar. Registering one as though it were
+    /// declared is what poisoned this catalog: provenance would invent <c>data</c> with a placeholder colour and
+    /// icon, and the real <c>DataPillarManifest</c> arriving afterwards was rejected as a conflicting
+    /// registration — failing every host boot in the process from that point on. Whether it happened at all
+    /// depended on which module reported provenance first, so it presented as an intermittent test failure and
+    /// was investigated three times as one.</para>
+    /// </summary>
+    public static PillarDescriptor RegisterInferredDescriptor(PillarDescriptor descriptor)
+        => Register(descriptor, inferred: true);
+
+    private static PillarDescriptor Register(PillarDescriptor descriptor, bool inferred)
     {
         if (descriptor is null)
         {
             throw new ArgumentNullException(nameof(descriptor));
         }
 
+        descriptor.IsInferred = inferred;
         var stored = PillarsByCode.AddOrUpdate(
             descriptor.Code,
             static (_, incoming) => incoming,
@@ -156,7 +174,22 @@ public static class KoanPillarCatalog
     {
         if (!existing.SemanticallyEquals(incoming))
         {
-            throw new InvalidOperationException($"Pillar '{existing.Code}' is already registered with different metadata.");
+            // One of the two is a placeholder for a pillar nobody had declared yet. The declared one wins,
+            // whichever order they arrived in, and keeps every namespace the placeholder had collected. Two
+            // *declared* descriptions of one pillar that disagree is a real contradiction and still refuses.
+            if (existing.IsInferred == incoming.IsInferred)
+            {
+                throw new InvalidOperationException($"Pillar '{existing.Code}' is already registered with different metadata.");
+            }
+
+            var declared = existing.IsInferred ? incoming : existing;
+            var guessed = existing.IsInferred ? existing : incoming;
+            foreach (var prefix in guessed.NamespacePrefixes)
+            {
+                declared.AddNamespacePrefix(prefix);
+            }
+
+            return declared;
         }
 
         foreach (var prefix in incoming.NamespacePrefixes)
@@ -265,6 +298,12 @@ public static class KoanPillarCatalog
             hash.Add(Icon, StringComparer.Ordinal);
             return hash.ToHashCode();
         }
+
+        /// <summary>
+        /// Whether this description was guessed for a pillar no manifest had declared, rather than declared by
+        /// the module that owns it. A guess gives way to a declaration; see <see cref="RegisterInferredDescriptor"/>.
+        /// </summary>
+        internal bool IsInferred { get; set; }
 
         internal bool SemanticallyEquals(PillarDescriptor other) => Equals(other);
 

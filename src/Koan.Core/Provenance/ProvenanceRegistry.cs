@@ -211,7 +211,7 @@ namespace Koan.Core.Provenance
         var fallback = new KoanPillarCatalog.PillarDescriptor(pillarCode ?? CorePillarManifest.PillarCode, label, "#2563eb", "📦");
         try
         {
-            KoanPillarCatalog.RegisterDescriptor(fallback);
+            KoanPillarCatalog.RegisterInferredDescriptor(fallback);
         }
         catch
         {

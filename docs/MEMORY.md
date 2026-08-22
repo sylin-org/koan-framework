@@ -270,6 +270,28 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   built from the dialect's own `Read` rather than from a spelling invented at the index site. On Couchbase this
   forced the path grammar out of the generic document plan, because an index built for a container and a filter
   compiled for an entity have to agree and could not while the grammar lived behind a type parameter. (2026-08-21)
+- **A summary filter over a test run turns a deterministic defect into a folklore flake.** The SQLite connector
+  suite reported a failure cluster four times across two days and passed on immediate re-run every time. Three
+  investigations concluded "environment", eliminating parallelism, fixture paths, connection pooling and fault
+  containment — all sound, all beside the point, because the defect was in `Koan.Core` and nothing about the
+  suite could have led there. Every one of those runs was read through a `grep` that kept the pass/fail tally
+  and discarded the exception. The run that was captured to a file named the cause in one line, and the fix
+  landed the same hour. A cluster of unrelated failures is a question about *what was thrown*, and no amount of
+  reasoning about the suite substitutes for reading it. Capture full output or the TRX before forming a
+  hypothesis. (2026-08-21)
+- **Process-global state that accepts a guess as authoritative will eventually refuse the truth.**
+  `KoanPillarCatalog` let `ProvenanceRegistry` register an invented placeholder for a pillar no manifest had
+  declared. When the real manifest arrived its colour and icon differed, the merge refused it, the owning module
+  threw during register, and every `AddKoan()` in that process failed afterwards — the whole cascade decided by
+  which module happened to report provenance first. A registry that holds both inferred and declared facts has
+  to know which is which; the fix was one flag and a merge rule, and the absence of it cost four red runs
+  diagnosed as flakiness. (2026-08-21)
+- **A capability one adapter refuses and three ignore is a defect in the three.** SQLite and Redis refused an
+  explicit map under an ambient partition — a declared map pins one container and cannot honour a request for a
+  different one. MySQL, SQL Server and PostgreSQL served the pinned container silently, so a caller who asked
+  for isolation got none and no signal. When adapters disagree about whether something is supported, the loud
+  one is usually right: answering an impossible request with silence is worse than a wrong answer, because the
+  caller's next step is to trust it. (2026-08-21)
 - **This repo builds every project into one shared path outside the working tree, so only one build may be in
   flight at a time — and a worktree build clobbers the main tree's binaries.** Two false regressions came from
   this in one session. First, load-bearing checks running in the foreground rebuilt the shared assemblies with a
