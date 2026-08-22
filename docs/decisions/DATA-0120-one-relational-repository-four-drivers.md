@@ -136,6 +136,15 @@ The member-by-member reading is under way. What it has established:
 | `Materialize` | Byte-identical where it exists (MySQL, SQL Server). Collapsible. |
 | `DeleteAll` | Same code in all four. Collapsible. |
 | `RemoveAll` | Same code in all four. `Fast` truncates on the three servers and deletes on SQLite, which has no `TRUNCATE`. Collapsible behind one dialect member for that spelling. |
+| `QueryRaw` | Same logic in all four. Differs only by the page clause — the dialect member `Query` already requires. Collapsible. |
+| `CountRaw` | Same. Differs only by `COUNT(1)` against `COUNT_BIG(1)` — the dialect member `Count` already requires. Collapsible. |
+| `DeleteMany` | Byte-identical across the three servers. Collapsible. |
+| `ConditionalReplaceAsync` | Same code across the three servers. Collapsible. |
+| `ExecuteSql` | Same code. The two row-copy expressions differ in spelling and not in result. Collapsible. |
+| `ExecuteAsync` | Identical dispatch; differs only in the provider name in one unsupported-instruction message. Collapsible behind a provider-name member. |
+| `Batch` | Byte-identical between MySQL and PostgreSQL, including the nested class in full. Collapsible. |
+| `UpdateSet` | Collapsible **only** behind a dialect member for how a nested value enters the document: SQL Server splices a raw encoded scalar through `JSON_MODIFY`, while the other three pass JSON text through `json()`, `CAST(... AS JSON)` and `jsonb_set`. |
+| `UpsertMany` | Collapsible across the three servers, which loop inside one transaction. **SQLite is genuinely different and is not a copy to be flattened:** it budgets a multi-row dispatch against the store's parameter ceiling (`MaximumParameters / parametersPerItem`). That is a store limit expressed as a strategy, and it is why a bulk save on SQLite costs 0.246 ms per row against 7.43 ms written individually (PMC-044). Read the right way round, the three servers lack an optimization rather than SQLite carrying a divergence. |
 | Data access | **Was the structural split; no longer is.** SQLite used raw ADO throughout while the other three used Dapper exclusively, which ARCH-0093 made a hard constraint. Reading the call sites showed the three never used Dapper's compiled materializer, so it was removed (PMC-047) and all four now execute through the same AOT-clean surface. |
 
 Two things the reading turned up that are not about the collapse:
@@ -160,13 +169,32 @@ dominate the text of members that are the same code. `DeleteAll` scores as diffe
 same seven lines. **A ratio, a diff count and a normalized-token comparison have now each been tried and each
 been rejected.** The member set is settled by reading it, and by nothing else.
 
-Still required before this record is accepted:
+**The member-by-member reading is complete as of 2026-08-21.** Every member named in the earlier draft has
+been read. Of the seventeen read in the closing pass, fifteen are collapsible, one is not (`Open`, which
+yielded a defect instead), and one — `UpsertMany` — is collapsible across the three servers while SQLite keeps
+a strategy its parameter ceiling requires.
 
-- The remaining unread members: `Batch`, `UpdateSet`, `ExecuteSql`, `QueryRaw`, `CountRaw`, `UpsertMany`,
-  `DeleteMany`, `ConditionalReplaceAsync`, `ExecuteAsync`. Eight more were read on 2026-08-21 and are in the
-  table above; of those, seven are collapsible and one — `Open` — is not, having instead yielded a defect.
-  Two members had already moved from "known divergence" to "collapsible" once read, and one moved the other
-  way. Assume nothing about the rest.
-- Two dialect members the reading has already established are needed: how a store spells "empty this table"
-  (`TRUNCATE TABLE` against `DELETE FROM`), and MySQL's `ESCAPE` backslash doubling.
-- A named collapse order, smallest and most certain first, with the suites green at each step.
+### Dialect members the reading establishes
+
+The collapse needs exactly these, and no others were found:
+
+1. The page clause — `LIMIT m OFFSET n` against `OFFSET n ROWS FETCH NEXT m ROWS ONLY`.
+2. The count expression — `COUNT(1)` against SQL Server's `COUNT_BIG(1)`, which is an overflow bound.
+3. Emptying a table — `TRUNCATE TABLE` against SQLite's `DELETE FROM`.
+4. How a nested value enters the document — a raw scalar through `JSON_MODIFY`, or JSON text.
+5. How a structured value binds — PostgreSQL's `CAST(@p AS jsonb)`.
+6. MySQL's `ESCAPE` backslash doubling, which is applied outside the dialect today.
+7. The provider name, for the one unsupported-instruction message that carries it.
+
+### Collapse order
+
+Smallest and most certain first, suites green at each step. Every prefix leaves a coherent tree.
+
+1. **Pure moves.** `Materialize`, `DeleteMany`, `Batch`, `CreateBatch`, `InstructionSql`, `Delete` — byte-identical; nothing to decide.
+2. **One token each.** `IdentityPredicate`, `StableOrder`, `Order`, `Where` — each resolves through `QuoteIdent` or dialect member 6.
+3. **Same code, needs 3 and 7.** `DeleteAll`, `RemoveAll`, `ExecuteSql`, `ExecuteAsync`, `ConditionalReplaceAsync`.
+4. **Needs 1 and 2.** `Query`, `QueryRaw`, `GetMany`, `Count`, `CountRaw`.
+5. **Needs the adapter to supply plan, source plan, DDL executor and features.** `Ready`, `Provision`, `Validate`.
+6. **Needs 4 and 5.** `UpdateSet`, `Insert`, and `UpsertMany` for the three servers; SQLite's dispatch stays.
+7. **Never.** `Open`, `Upsert`, `Describe` — each is a store decision rather than a spelling, and this record
+   says so with its reasons above.
