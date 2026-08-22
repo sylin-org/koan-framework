@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
@@ -35,6 +35,11 @@ public sealed class WebModule : KoanModule
         // SEC-0004 origin dimension: the declared trusted-internal networks (fail-closed when unset). The request
         // builder stamps the server-trusted koan:origin claim from these + the connection's remote IP.
         services.AddKoanOptions<OriginOptions>(OriginOptions.SectionPath);
+
+        // Pagination safety bounds are a ceiling over every EntityController, so they bind with the
+        // reference rather than waiting on an application call, and normalize after binding.
+        services.AddKoanOptions<PaginationSafetyBounds>(PaginationSafetyBounds.SectionPath);
+        services.PostConfigure<PaginationSafetyBounds>(bounds => bounds.Normalize());
 
         // SEC-0004 Slice B: discover EntityAccess<T> realizations once (the same discovery authority every Koan
         // contract uses). The gate cache reads each realization's principal-FREE gate; the endpoint resolves the
