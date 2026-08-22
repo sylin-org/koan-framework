@@ -128,10 +128,10 @@ foreach ($file in $files) {
 
 $issues = New-Object System.Collections.Generic.List[object]
 
-$allowedTypes = @("REF", "GUIDE", "ARCH", "DEV", "SUPPORT", "ARCHITECTURE", "REFERENCE", "ENGINEERING", "DESIGN", "SPEC", "RECIPE")
-$allowedDomains = @("core", "data", "web", "ai", "flow", "messaging", "storage", "media", "orchestration", "scheduling", "jobs", "mcp", "observability", "identity", "framework", "architecture", "engineering", "performance", "troubleshooting", "platform", "canon")
+$allowedTypes = @("REF", "GUIDE", "ARCH", "DEV", "SUPPORT", "ARCHITECTURE", "REFERENCE", "ENGINEERING", "DESIGN", "SPEC", "RECIPE", "RFC", "PLAN", "ANALYSIS")
+$allowedDomains = @("core", "data", "web", "ai", "flow", "messaging", "storage", "media", "orchestration", "scheduling", "jobs", "mcp", "observability", "identity", "framework", "architecture", "engineering", "performance", "troubleshooting", "platform", "canon", "operations", "cache", "tenancy", "communication", "testing", "security")
 $allowedStatuses = @("current", "draft", "deprecated", "archived", "superseded", "proposed", "open-for-review", "active", "resolved")
-$allowedAudience = @("developers", "architects", "ai-agents", "maintainers", "contributors", "release-engineers", "support-engineers", "security-engineers", "technical-leads", "ai-engineers")
+$allowedAudience = @("developers", "architects", "ai-agents", "maintainers", "contributors", "release-engineers", "support-engineers", "security-engineers", "technical-leads", "ai-engineers", "operators", "module-authors", "framework-authors", "implementers", "external-architects", "frontier-models")
 
 function Add-Issue {
     param(

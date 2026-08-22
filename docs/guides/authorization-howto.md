@@ -1,3 +1,16 @@
+﻿---
+type: GUIDE
+domain: security
+audience: [developers, architects]
+status: current
+last_updated: 2026-07-18
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-18
+  status: reviewed
+  scope: front matter added; links to SEC-0002 and SEC-0004 resolve
+---
+
 # Authorization How-To
 
 Koan answers one question — *may this subject perform this action on this resource?* — through a single

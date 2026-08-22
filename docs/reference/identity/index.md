@@ -1,11 +1,11 @@
----
+﻿---
 type: REFERENCE
 domain: identity
 title: "Identity and isolation"
 audience: [developers, operators, architects, ai-agents]
 status: current
 last_updated: 2026-07-22
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-22
   status: verified

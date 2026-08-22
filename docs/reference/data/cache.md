@@ -1,3 +1,16 @@
+﻿---
+type: REF
+domain: cache
+audience: [developers, architects]
+status: current
+last_updated: 2026-08-06
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-06
+  status: reviewed
+  scope: front matter added; links to ARCH-0075 resolve
+---
+
 # Koan Cache reference
 
 **Status:** current development generation

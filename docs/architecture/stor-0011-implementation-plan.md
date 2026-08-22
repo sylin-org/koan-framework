@@ -1,10 +1,15 @@
----
+﻿---
 type: ARCHITECTURE
 domain: storage
 title: "STOR-0011 implementation plan (v2) — delegation prompts"
 audience: [ai-agents, implementers]
 status: active
 last_updated: 2026-06-24
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-18
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # STOR-0011 implementation plan (v2) — delegation prompts

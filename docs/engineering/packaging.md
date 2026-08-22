@@ -1,4 +1,4 @@
----
+﻿---
 type: ENGINEERING
 domain: engineering
 title: "NuGet packaging policy"
@@ -6,6 +6,10 @@ audience: [developers, maintainers, ai-agents]
 status: current
 last_updated: 2026-08-14
 framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-17
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # NuGet packaging policy

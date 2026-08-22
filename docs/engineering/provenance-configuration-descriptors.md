@@ -5,7 +5,7 @@ title: "Descriptor-Driven Configuration Provenance"
 audience: [developers, maintainers, ai-agents]
 status: draft
 last_updated: 2025-10-15
-framework_version: v0.2.18+
+framework_version: v1.0.0
 validation:
     date_last_tested: 2025-10-16
   status: manual

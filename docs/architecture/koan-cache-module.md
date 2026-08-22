@@ -1,3 +1,16 @@
+﻿---
+type: ARCH
+domain: cache
+audience: [architects, maintainers]
+status: current
+last_updated: 2026-07-17
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-17
+  status: reviewed
+  scope: front matter added; boundary prose not re-verified
+---
+
 # Koan Cache architecture
 
 ## Boundary

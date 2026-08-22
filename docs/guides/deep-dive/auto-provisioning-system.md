@@ -1,11 +1,11 @@
----
+﻿---
 type: GUIDE
 domain: data
 title: "Data Schema Provisioning and Adapter Readiness"
 audience: [developers, module-authors, operators, ai-agents]
 status: current
 last_updated: 2026-07-17
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-17
   status: verified

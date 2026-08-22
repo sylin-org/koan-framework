@@ -1,10 +1,15 @@
----
+﻿---
 type: ARCHITECTURE
 domain: core
 title: "Redesign Completion Ledger — the grand autonomous run"
 audience: [architects, ai-agents]
 status: active
 last_updated: 2026-06-22
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-22
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Redesign Completion Ledger

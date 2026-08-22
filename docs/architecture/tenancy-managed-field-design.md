@@ -1,4 +1,4 @@
----
+﻿---
 type: ARCHITECTURE
 domain: data
 title: "The managed-field seam — generic storage mechanism for ambient axes (tenant, classification)"
@@ -9,6 +9,11 @@ re_derives:
   - "DATA-0105 §2/§8 — the 'sibling column' write premise (errata filed; see §8)"
   - "tenancy-design.md §12 — 'a column alongside id' (errata filed; see §8)"
 review: "adversarial 4-lens review (wf_d547d3d1-0fe) — ship-after-blocking-fixes; all 6 blockers folded below"
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-06-22
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # The managed-field seam

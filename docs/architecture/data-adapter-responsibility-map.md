@@ -1,11 +1,15 @@
----
+﻿---
 type: REFERENCE
 domain: data
 title: "Data Adapter Responsibility Map"
 audience: [architects, maintainers, developers, ai-agents]
 status: current
 last_updated: 2026-07-27
-framework_version: v0.20.0
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-06
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Data adapter responsibility map

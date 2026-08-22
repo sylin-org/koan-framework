@@ -1,3 +1,16 @@
+﻿---
+type: GUIDE
+domain: web
+audience: [developers]
+status: current
+last_updated: 2026-07-18
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-18
+  status: reviewed
+  scope: front matter added; prose not re-verified
+---
+
 # OpenGraph social cards
 
 Give a Koan SPA per-route social cards (and a per-route `<title>` and canonical link)

@@ -1,10 +1,15 @@
----
+﻿---
 type: ARCHITECTURE
 domain: core
 title: "The Adapter Forge (strategic brief)"
 audience: [architects, ai-agents]
 status: draft
 last_updated: 2026-06-21
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-06-21
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # The Adapter Forge (strategic brief)

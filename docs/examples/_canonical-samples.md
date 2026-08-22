@@ -1,7 +1,14 @@
 ﻿---
 status: draft
 last_updated: 2025-10-09
-framework_version: v0.6.3
+framework_version: v1.0.0
+type: GUIDE
+domain: framework
+audience: [developers, architects, maintainers]
+validation:
+  date_last_tested: 2026-06-18
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Canonical Code Samples

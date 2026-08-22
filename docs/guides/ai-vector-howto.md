@@ -1,11 +1,11 @@
----
+﻿---
 type: GUIDE
 domain: ai
 title: "AI & Vector Search How-To"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-19
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   status: not-yet-tested
   scope: docs/guides/ai-vector-howto.md

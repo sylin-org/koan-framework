@@ -1,11 +1,15 @@
----
+﻿---
 type: DEV
 domain: framework
 title: "Operational workbook template"
 audience: [maintainers, contributors]
 status: current
 last_updated: 2026-07-19
-framework_version: v0.20.0
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-20
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # [Workbook title — what task this covers, in plain English]

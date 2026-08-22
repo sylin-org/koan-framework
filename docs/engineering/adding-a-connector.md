@@ -1,4 +1,4 @@
----
+﻿---
 type: DEV
 domain: framework
 title: "Adding a connector"
@@ -6,6 +6,10 @@ audience: [maintainers, contributors]
 status: current
 last_updated: 2026-08-14
 framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-17
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Adding a connector

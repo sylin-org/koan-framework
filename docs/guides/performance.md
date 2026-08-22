@@ -1,11 +1,11 @@
----
+﻿---
 type: GUIDE
 domain: performance
 title: "Performance Optimization with Koan"
 audience: [developers, architects, ai-agents]
 status: current
 last_updated: 2026-07-15
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   status: not-yet-tested
   scope: docs/guides/performance.md

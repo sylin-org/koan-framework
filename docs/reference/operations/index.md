@@ -1,11 +1,11 @@
----
+﻿---
 type: REFERENCE
 domain: operations
 title: "Testing and operations"
 audience: [developers, operators, support-engineers, ai-agents]
 status: current
 last_updated: 2026-07-22
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-22
   status: verified

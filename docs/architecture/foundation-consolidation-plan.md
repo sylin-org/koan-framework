@@ -1,10 +1,18 @@
----
+﻿---
 title: "Foundation Consolidation Plan — fewer but more meaningful parts"
 type: PLAN
 status: active
 date: 2026-06-01
 owner: leonaquitaine
 theme: cross-cutting kernel consolidation
+domain: architecture
+audience: [developers, architects, maintainers]
+last_updated: 2026-07-17
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-17
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Foundation Consolidation Plan — *fewer but more meaningful parts*

@@ -5,7 +5,7 @@ title: "MCP Code Mode Preflight"
 audience: [developers]
 status: draft
 last_updated: 2025-10-09
-framework_version: v0.6.3
+framework_version: v1.0.0
 validation:
   status: not-yet-tested
   scope: docs/guides/mcp-code-mode-preflight.md

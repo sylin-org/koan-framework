@@ -1,11 +1,11 @@
----
+﻿---
 type: GUIDE
 domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
 last_updated: 2026-07-24
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   status: not-yet-tested
   scope: docs/guides/entity-capabilities-howto.md

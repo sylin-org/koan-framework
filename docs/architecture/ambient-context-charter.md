@@ -1,11 +1,11 @@
----
+﻿---
 type: ARCHITECTURE
 domain: core
 title: "Ambient Context — Design Charter & Truth-Test (Facet 3)"
 audience: [architects, developers, ai-agents]
 status: draft
 last_updated: 2026-06-21
-framework_version: v0.17.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-06-21
   status: verified

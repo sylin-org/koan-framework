@@ -1,4 +1,4 @@
----
+﻿---
 type: DEV
 domain: framework
 title: "Release playbook"
@@ -6,6 +6,10 @@ audience: [maintainers, release-engineers, ai-agents]
 status: current
 last_updated: 2026-08-17
 framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-08-22
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Release playbook

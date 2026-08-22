@@ -1,11 +1,11 @@
----
+﻿---
 type: GUIDE
 domain: web
 title: "Authentication Setup with Koan"
 audience: [developers, security-engineers, ai-agents]
 status: current
 last_updated: 2026-07-18
-framework_version: v0.20.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-18
   status: verified

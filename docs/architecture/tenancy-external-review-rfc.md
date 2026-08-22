@@ -1,10 +1,15 @@
----
+﻿---
 type: RFC
 domain: core
 title: "Koan Multi-Tenancy — Request for External Design Review"
 audience: [frontier-models, external-architects]
 status: open-for-review
 last_updated: 2026-06-21
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-07-18
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Koan Multi-Tenancy — Request for External Design Review

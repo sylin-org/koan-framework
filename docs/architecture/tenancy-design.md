@@ -1,11 +1,11 @@
----
+﻿---
 type: ARCHITECTURE
 domain: core
 title: "Koan Tenancy — Design (Facet 3 flagship slice)"
 audience: [architects, developers, ai-agents]
 status: draft
 last_updated: 2026-06-21
-framework_version: v0.17.0
+framework_version: v1.0.0
 validation:
   date_last_tested: 2026-06-21
   status: design-only

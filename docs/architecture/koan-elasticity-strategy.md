@@ -5,7 +5,7 @@ title: "Koan Elasticity Strategy"
 audience: [architects, technical-leads]
 status: draft
 last_updated: 2025-10-06
-framework_version: v0.6.2
+framework_version: v1.0.0
 validation:
   status: not-yet-tested
   scope: docs/architecture/koan-elasticity-strategy.md

@@ -1,6 +1,6 @@
----
+﻿---
 type: DESIGN
-domain: jobs / testing
+domain: jobs
 title: "Jobs: Mongo cross-tier suite flakiness — root cause & fix"
 status: resolved
 last_updated: 2026-06-10
@@ -8,6 +8,12 @@ related:
   - decisions/JOBS-0005-job-orchestrator-rebuild.md (§7, §19)
   - src/Koan.Jobs/JobOrchestrator.cs (DrainAsync)
   - tests/Suites/Jobs/Koan.Jobs.TestKit/JobBehaviorSuite.cs
+audience: [developers, architects, maintainers]
+framework_version: v1.0.0
+validation:
+  date_last_tested: 2026-06-14
+  status: reviewed
+  scope: front matter normalized against the docs lint; prose not re-verified
 ---
 
 # Jobs: Mongo cross-tier suite flakiness — root cause & fix

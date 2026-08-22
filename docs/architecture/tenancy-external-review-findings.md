@@ -1,4 +1,4 @@
----
+﻿---
 type: ARCHITECTURE
 domain: core
 title: "Koan Tenancy — External Review Findings & Negotiation"
@@ -8,6 +8,7 @@ last_updated: 2026-06-21
 validation:
   status: design-only
   scope: docs/architecture/tenancy-external-review-findings.md
+framework_version: v1.0.0
 ---
 
 # Koan Tenancy — External Review Findings & Negotiation
