@@ -180,8 +180,8 @@ bounded egress, wire validation, lifecycle, ingress, health, and facts.
 | `Disabled` | Cache sends and applies no peer invalidations. |
 
 There is no catch-up/replay claim, multi-channel duplicate publication, generic coherence SPI, or automatic
-retry. Those mechanisms were removed because no current provider proved them. A future durable provider must
-materialize a real use case and semantics before the surface grows.
+retry. A provider that needs one materializes a real use case and its semantics first; the surface grows to
+meet a proven need rather than in anticipation of one.
 
 ## Startup, health, and agent inspection
 

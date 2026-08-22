@@ -50,7 +50,6 @@ Start with:
 - docs/architecture/principles.md
 - docs/toc.yml
 - README.md
-- samples/CATALOG.md
 
 If the task touches specific areas, add the relevant ADR or guide, for example:
 

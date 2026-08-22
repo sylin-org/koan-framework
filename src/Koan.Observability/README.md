@@ -1,4 +1,4 @@
-# Sylin.Koan.Observability
+﻿# Sylin.Koan.Observability
 
 Reference `Sylin.Koan.Observability` when a Koan application should expose its framework traces and metrics through
 OpenTelemetry.
@@ -9,8 +9,8 @@ OpenTelemetry.
 dotnet add package Sylin.Koan.Observability
 ```
 
-The package composes through the application's existing `AddKoan()` call. There is no
-`AddKoanObservability()` call: the package reference is the activation decision.
+The package composes through the application's existing `AddKoan()` call. The package reference is
+the activation decision.
 
 Outside Production, the reference creates one OpenTelemetry trace and metric pipeline with sensible development
 defaults. In Production, configure an OTLP destination to activate it:

@@ -30,8 +30,8 @@ flags what is designed-but-not-yet-built at the end.
 ## 0. Prerequisites
 
 Tenancy is **Reference = Intent**. Add the package; its `KoanModule` contributes the discriminator,
-fail-closed guard, read-filter, blob-key particle, cache-key segment, and async-hop carrier. No
-`AddTenancy()` or activation middleware is required.
+fail-closed guard, read-filter, blob-key particle, cache-key segment, and async-hop carrier, and
+`AddKoan()` compiles them.
 
 ```xml
 <ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />  <!-- or the Sylin.Koan.Tenancy package -->

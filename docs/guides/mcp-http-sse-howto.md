@@ -78,8 +78,8 @@ Enable the network transport:
 }
 ```
 
-The package reference is the registration. Do not add `AddKoanMcp()`, map MCP endpoints manually,
-or assign `AppHost.Current` in application code.
+The package reference is the registration: `AddKoan()` maps the protocol routes and owns the host
+handle. Application code declares entities and leaves the wiring to the module.
 
 ## Streamable HTTP sequence
 

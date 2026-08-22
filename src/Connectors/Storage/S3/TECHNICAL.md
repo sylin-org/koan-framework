@@ -1,4 +1,4 @@
-# Sylin.Koan.Storage.Connector.S3 technical contract
+﻿# Sylin.Koan.Storage.Connector.S3 technical contract
 
 ## Activation and dependency boundary
 
@@ -28,8 +28,8 @@ readiness is reported through configuration, failures, and future health—not b
 
 Uploads stream through the MinIO SDK. Full reads and ranged reads buffer into `MemoryStream`; this makes returned
 streams seekable but bounds practical object/range size by process memory. Listing is recursive and backend-consistent
-only to the degree the service guarantees. `Exists` returns false for missing buckets/objects but no longer converts
-arbitrary connectivity or authorization failures into false.
+only to the degree the service guarantees. `Exists` returns false for a missing bucket or object, and surfaces a
+connectivity or authorization failure rather than reporting it as absence.
 
 ## Presign and resources
 

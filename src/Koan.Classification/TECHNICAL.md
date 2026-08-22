@@ -1,13 +1,13 @@
-# Sylin.Koan.Classification technical contract
+﻿# Sylin.Koan.Classification technical contract
 
 ## Composition owner
 
 `ClassificationModule` registers one cipher, a durable local-file key provider as the floor, and one
 `IFieldTransformContributor`. Data Core owns the contributor contract and compiles one immutable, type-memoized
-transform plan per host. Classification does not mutate a process-static registry and the hot path does not resolve
-services through `AppHost.Current`.
+transform plan per host. Classification holds no process-static registry, and the hot path resolves nothing
+through a service locator.
 
-The package reference is intent. `AddKoan()` discovers the module; there is no `AddClassification()` call.
+The package reference is intent: `AddKoan()` discovers the module and compiles it.
 
 ## Write and read chokepoints
 

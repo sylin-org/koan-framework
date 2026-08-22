@@ -1,4 +1,4 @@
----
+﻿---
 uid: reference.modules.Koan.data.core
 title: Koan.Data.Core - Technical Reference
 description: Contracts, options, design and operations for the Koan data core.
@@ -70,8 +70,8 @@ validation:
 ## Aggregate configuration ownership
 
 - One immutable `DataProviderCatalog` per host owns canonical IDs, aliases, direct-reference evidence,
-  collision rejection, and memoized priority metadata. Provider factories no longer implement a second
-  `CanHandle` identity authority.
+  collision rejection, and memoized priority metadata. A provider factory carries no second `CanHandle`
+  identity authority.
 - `DataDefaultProviderPlan` compiles the default choice once. Repository construction, aggregate metadata,
   vector role correlation, diagnostics, startup facts, and the resolved lock consume that same provider ID
   or receipt; they do not independently rank DI registrations.

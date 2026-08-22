@@ -37,13 +37,13 @@ A Koan app projects itself to an agent as `project(model × grant)` — **one pr
 | 8 Govern | `AgentGrant` · `[Audit]` · `[Door]` | lent access, an audit trail, and signposted locks |
 
 **Reference = Intent.** Referencing `Koan.Mcp` contributes its `KoanModule`; `AddKoan()` compiles and
-activates that module and hosts the STDIO server. Ordinary applications never call `AddKoanMcp()`.
-Everything below is a declaration on entities you already have.
+activates that module and hosts the STDIO server. Everything below is a declaration on entities you
+already have.
 
 ```csharp
 // Program.cs — the whole bootstrap for a local (STDIO) MCP server.
 var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddKoan();   // referencing Koan.Mcp → the STDIO MCP server is hosted (no AddKoanMcp() to call)
+builder.Services.AddKoan();   // referencing Koan.Mcp → the STDIO MCP server is hosted
 await builder.Build().RunAsync();
 ```
 

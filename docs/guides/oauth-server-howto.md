@@ -48,7 +48,7 @@ The AS is an opt-in leaf. Reference it; that is the whole wiring:
 ```
 
 ```csharp
-// Program.cs — the ONLY bootstrap. No AddKoanMcp(), no UseAuthentication(), no MapKoanMcpEndpoints().
+// Program.cs — the whole bootstrap.
 builder.Services.AddKoan();
 ```
 

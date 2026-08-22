@@ -168,7 +168,7 @@ dotnet add package Sylin.Koan.AI.Web
 
 Keep the same `AddKoan()` bootstrap. The reference exposes `/ai/health`, `/ai/adapters`, `/ai/models`,
 `/ai/capabilities`, `/ai/chat`, `/ai/chat/stream`, `/ai/embeddings`, `/ai/ocr`, and explicit provider model-management
-routes. No `AddKoanAiWeb()` call exists.
+routes.
 
 The projection adds no authorization, quotas, retry policy, CORS policy, or universal error translation. Compose
 those through their owning Koan/ASP.NET Core concerns before exposing AI routes outside a trusted boundary.

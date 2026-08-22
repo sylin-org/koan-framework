@@ -1,4 +1,4 @@
-# Sylin.Koan.Mcp
+﻿# Sylin.Koan.Mcp
 
 ## Contract
 
@@ -45,8 +45,8 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-The package reference is the registration. Do not add `AddKoanMcp()`, manually map protocol
-endpoints, or assign `AppHost.Current` in application code.
+The package reference is the registration: `AddKoan()` maps the protocol endpoints and owns the
+host handle.
 
 STDIO is enabled by default. To add the HTTP transport in an application that also references
 Koan Web, declare the intent in configuration:

@@ -140,15 +140,15 @@ L2 TTL is the staleness bound.
 `CoherenceMode.Required` rejects a layered topology whose elected route is only process-local. Direct/explicit
 external provider startup failure also fails boot; Koan does not pretend local reach is distributed reach.
 
-## Removed mechanisms
+## What the surface excludes
 
-The previous design exposed `ICoherenceChannel<T>`, `ICacheCoherenceChannel`, channel priorities, multiple-channel
-publication, no-op catch-up cursors, a timer-based coalescer, a process-static InMemory package, and a legacy
-Messaging bridge. None had a second valid consumer or a provider-backed durable replay contract. The multi-channel
-coordinator also contradicted its own “winner” documentation.
+There is no coherence SPI, no channel priority or multiple-channel publication, no catch-up cursor, no
+timer-based coalescer, and no Messaging bridge. Cache publishes one invalidation over the elected route and
+applies what it receives; that is the whole contract, and it is small because a broadcast with one honest
+consumer needs nothing more.
 
-These surfaces are deleted. Future replay, coalescing, or alternate topology must enter through a concrete use case,
-declared Communication capability, owned lifecycle, and executable provider proof.
+Replay, coalescing, or an alternate topology enters through a concrete use case, a declared Communication
+capability, an owned lifecycle, and executable provider proof.
 
 ## Inspection
 

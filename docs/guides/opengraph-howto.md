@@ -123,8 +123,8 @@ block should land; if the marker is absent, the block is inserted before `</head
 
 ## 4. Keep the application fallback
 
-The package inserts its middleware automatically at Koan's `BeforeRouting` boundary. The application continues to own
-its normal static-file and SPA fallback behavior; no `UseOpenGraphCards()` call is supported or required.
+The package inserts its middleware at Koan's `BeforeRouting` boundary. The application continues to own its
+normal static-file and SPA fallback behavior.
 
 On a `GET` navigation (Accept includes `text/html`) the middleware injects the card
 and short-circuits. Asset paths, `/api` paths, non-html requests, and the disabled

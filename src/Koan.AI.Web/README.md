@@ -1,4 +1,4 @@
-# Sylin.Koan.AI.Web
+﻿# Sylin.Koan.AI.Web
 
 Provider-neutral HTTP projection for Koan AI. A package reference exposes chat, streaming, embeddings, OCR, provider
 inspection, model inventory, and model-management operations through the same compiled AI runtime used in-process.
@@ -20,8 +20,7 @@ var app = builder.Build();
 await app.RunAsync();
 ```
 
-No `AddKoanAiWeb()` call is required. The referenced module registers its controllers with Koan Web during
-`AddKoan()`.
+The referenced module registers its controllers with Koan Web during `AddKoan()`.
 
 ## HTTP surface
 

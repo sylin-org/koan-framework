@@ -1,4 +1,4 @@
-# Sylin.Koan.Tenancy
+﻿# Sylin.Koan.Tenancy
 
 Tenant isolation as a referenced application capability: ordinary Entities become tenant-scoped while application
 code keeps the same business shape.
@@ -15,7 +15,8 @@ Keep the ordinary Koan bootstrap:
 builder.Services.AddKoan();
 ```
 
-No `AddTenancy()`, repository wrapper, tenant property, or per-pillar registration is required.
+`AddKoan()` compiles the module: the discriminator, guards, and per-pillar contributions come with the
+reference. Entities and repositories stay as they are.
 
 ## Meaningful use
 
