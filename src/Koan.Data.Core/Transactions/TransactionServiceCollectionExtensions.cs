@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using Koan.Core.Modules;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Transactions;
@@ -19,14 +20,12 @@ public static class TransactionServiceCollectionExtensions
         if (services == null)
             throw new ArgumentNullException(nameof(services));
 
-        // Register options
+        // Bind from configuration first, so a deployment can set the timeout and thresholds
+        // without code. An explicit configure callback runs afterwards and therefore wins.
+        services.AddKoanOptions<TransactionOptions>(TransactionOptions.SectionPath);
         if (configure != null)
         {
             services.Configure(configure);
-        }
-        else
-        {
-            services.Configure<TransactionOptions>(options => { });
         }
 
         // Register factory

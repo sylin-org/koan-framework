@@ -873,6 +873,101 @@ Koan's ambient transaction support coordinates entity operations across multiple
 
 **Recipe**
 
+Transaction support composes with `Koan.Data.Core`, so there is nothing to register. Settings bind
+from `Koan:Data:Transactions`:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Transactions": {
+        "DefaultTimeout": "00:02:00",
+        "LongRunningTransactionWarning": "00:00:30",
+        "MaxTrackedOperations": 10000,
+        "AutoCommitOnDispose": false
+      }
+    }
+  }
+}
+```
+
+**Sample**
+
+**Disposing does not commit.** Pending work persists only on an explicit `Commit`, which is what makes
+an exception escaping the block safe: the scope disposes, nothing was committed, and the writes are
+discarded. This matches `TransactionScope` in .NET.
+
+```csharp
+using (EntityContext.Transaction("create-project"))
+{
+    var project = new Project { Name = "My Project" };
+    await project.Save(ct);
+
+    var task1 = new Task { ProjectId = project.Id, Title = "Setup" };
+    var task2 = new Task { ProjectId = project.Id, Title = "Configure" };
+
+    await task1.Save(ct);
+    await task2.Save(ct);
+
+    await EntityContext.Commit(ct);   // without this, the block discards all three
+}
+```
+
+Set `AutoCommitOnDispose` to `true` where a scope that exits cleanly should commit itself. It is off by
+default because the failure it prevents -- losing writes -- is louder than the one it introduces.
+
+**Rolling back on a validation failure:**
+
+```csharp
+using (EntityContext.Transaction("batch-import"))
+{
+    var imported = new List<Product>();
+
+    foreach (var item in importData)
+    {
+        var product = new Product { Name = item.Name, Price = item.Price };
+        await product.Save(ct);
+        imported.Add(product);
+    }
+
+    var duplicates = imported.GroupBy(p => p.Name).Where(g => g.Count() > 1);
+    if (duplicates.Any())
+    {
+        await EntityContext.Rollback(ct);
+        throw new InvalidOperationException("Duplicate product names detected");
+    }
+
+    await EntityContext.Commit(ct);
+}
+```
+
+**Cross-adapter coordination:**
+
+```csharp
+using (EntityContext.Transaction("sync-cache-and-db"))
+{
+    await userData.Save(ct);
+
+    using (EntityContext.Source("Cache"))
+    {
+        await userCache.Save(ct);
+    }
+
+    await EntityContext.Commit(ct);
+}
+```
+
+**Checking transaction status:**
+
+```csharp
+if (EntityContext.InTransaction && EntityContext.CurrentTransaction is { } transaction)
+{
+    logger.LogInformation(
+        "Transaction tracking {Count} operations",
+        transaction.TrackedOperationCount);
+}
+```
+
 Add transaction support in `Program.cs`:
 
 ```csharp

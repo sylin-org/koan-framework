@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace Koan.Data.Core.Transactions;
 
@@ -7,6 +7,11 @@ namespace Koan.Data.Core.Transactions;
 /// </summary>
 public sealed class TransactionOptions
 {
+    /// <summary>
+    /// Where these settings bind from, alongside every other Koan option family.
+    /// </summary>
+    public const string SectionPath = "Koan:Data:Transactions";
+
     /// <summary>
     /// Default timeout for transactions. Default: 2 minutes.
     /// </summary>
