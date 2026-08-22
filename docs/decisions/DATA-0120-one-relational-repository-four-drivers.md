@@ -129,6 +129,13 @@ The member-by-member reading is under way. What it has established:
 | `Insert` | SQL Server and MySQL are identical apart from the quote. PostgreSQL is not: `jsonb` will not take a plain text parameter, so structured values bind as `CAST(@p AS jsonb)`, and its upsert is folded in as `ON CONFLICT` with managed-field guards. Collapsible only behind a dialect member for structured binding, and only once upsert is separated from it. |
 | `Upsert` | **A decision, not grammar.** Three idiomatic strategies with different semantics: `OUTPUT INSERTED` plus `IF @@ROWCOUNT` on SQL Server, `LAST_INSERT_ID()` and an explicit transaction for managed-field scope on MySQL, `RETURNING` with `ON CONFLICT` and an affected-rows cross-scope check on PostgreSQL. Stays adapter-owned. |
 | `Describe` | **Not collapsible.** A one-line delegation to each store's capability declaration, which is adapter-owned by design. An earlier draft of this record called it 94% identical; that was an artifact of a range-matching script running past the member's end. |
+| `Open` | **Not collapsible, and two of the four were wrong.** Each store constructs its own connection type and SQLite takes one from a pool, so this stays adapter-owned. Reading it found SQL Server and PostgreSQL returning without disposing a connection whose `OpenAsync` threw, where MySQL and SQLite always had — one leaked connection per failed attempt against a store that is refusing them. Fixed 2026-08-21. |
+| `Ready` | Same algorithm in all four. Differs only in how the plan and the source plan are reached: a `Plan` property, a `_plan` field, or a parameter; `_options.SourcePlan` or `_route.Policy`. Collapsible behind two members the adapter supplies. |
+| `Provision` / `Validate` | Identical bodies — open a connection, call the schema orchestrator with this store's DDL executor and features. Collapsible once the executor and the features are members the adapter supplies. |
+| `Where` | Identical in all four **except MySQL**, which post-processes the translator's output to double the backslash in `ESCAPE ''`. That is real MySQL grammar applied outside the dialect that owns spelling. Collapsible once it moves into `MySqlDialect`. |
+| `Materialize` | Byte-identical where it exists (MySQL, SQL Server). Collapsible. |
+| `DeleteAll` | Same code in all four. Collapsible. |
+| `RemoveAll` | Same code in all four. `Fast` truncates on the three servers and deletes on SQLite, which has no `TRUNCATE`. Collapsible behind one dialect member for that spelling. |
 | Data access | **Was the structural split; no longer is.** SQLite used raw ADO throughout while the other three used Dapper exclusively, which ARCH-0093 made a hard constraint. Reading the call sites showed the three never used Dapper's compiled materializer, so it was removed (PMC-047) and all four now execute through the same AOT-clean surface. |
 
 Two things the reading turned up that are not about the collapse:
@@ -143,10 +150,23 @@ Two things the reading turned up that are not about the collapse:
   at 3% through a distortion the normalizer introduced. Where the question is whether two implementations are
   the same, read them.
 
+**A measurement that contradicted this record was taken and then discarded, and the reason belongs here.** On
+2026-08-21 a member-level classifier compared all four repositories with whitespace stripped and reported that
+only two members were identical across all four, that eighteen differed in every adapter, and therefore that
+roughly 127 lines were shared and a base class would cost more than it saved. That conclusion is wrong, and it
+is wrong in precisely the way this record already warned about two sections above: it measured text, and the
+mechanical differences — `plan` against `_plan`, four connection type names, one call wrapped across lines —
+dominate the text of members that are the same code. `DeleteAll` scores as differing in all four and is the
+same seven lines. **A ratio, a diff count and a normalized-token comparison have now each been tried and each
+been rejected.** The member set is settled by reading it, and by nothing else.
+
 Still required before this record is accepted:
 
 - The remaining unread members: `Batch`, `UpdateSet`, `ExecuteSql`, `QueryRaw`, `CountRaw`, `UpsertMany`,
-  `DeleteMany`, `DeleteAll`, `RemoveAll`, `ConditionalReplaceAsync`, `Open`, `Ready`, `Provision`, `Validate`,
-  `Materialize`, `Where`, `ExecuteAsync`. Two members already moved from "known divergence" to "collapsible"
-  once read — `Order` and `Query` — and one moved the other way, `Upsert`. Assume nothing about the rest.
+  `DeleteMany`, `ConditionalReplaceAsync`, `ExecuteAsync`. Eight more were read on 2026-08-21 and are in the
+  table above; of those, seven are collapsible and one — `Open` — is not, having instead yielded a defect.
+  Two members had already moved from "known divergence" to "collapsible" once read, and one moved the other
+  way. Assume nothing about the rest.
+- Two dialect members the reading has already established are needed: how a store spells "empty this table"
+  (`TRUNCATE TABLE` against `DELETE FROM`), and MySQL's `ESCAPE` backslash doubling.
 - A named collapse order, smallest and most certain first, with the suites green at each step.

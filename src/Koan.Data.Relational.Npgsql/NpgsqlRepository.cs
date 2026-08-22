@@ -577,8 +577,18 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private async Task<NpgsqlConnection> Open(CancellationToken ct)
     {
         var connection = new NpgsqlConnection(_options.ConnectionString);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
-        return connection;
+        try
+        {
+            await connection.OpenAsync(ct).ConfigureAwait(false);
+            return connection;
+        }
+        catch
+        {
+            // The caller never receives this connection, so nothing else can dispose it. MySQL and SQLite have
+            // always done this; these two did not, and a store refusing connections leaked one per attempt.
+            await connection.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     private async Task<TResult> ExecuteSql<TResult>(Instruction instruction, CancellationToken ct)
