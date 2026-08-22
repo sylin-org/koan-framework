@@ -77,7 +77,7 @@ ConfigureKoanOptions<TOptions>(Action<TOptions> configure)
 
 **Purpose**: Central registry of framework pillars (Data, AI, Cache, Web, etc.)
 
-Framework pillars self-register via `KoanPillarManifest` attributes and are discovered at boot time.
+Each pillar owns a static manifest -- `CorePillarManifest`, `AiPillarManifest`, and so on -- holding its code, label, colour, and icon. A pillar's module calls `EnsureRegistered()` during `Register`, and the shared `PillarManifest` latches the declaration so repeated calls are idempotent.
 
 **When to Use**: Creating a new framework pillar
 

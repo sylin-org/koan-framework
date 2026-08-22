@@ -42,7 +42,7 @@ permission to create scaffolding.
 
 - PowerShell 7+, .NET 10 SDK, Docker (for integration tests)
 - You know which **pillar** your connector belongs to (Data, Cache, etc.)
-- You know which **abstraction interfaces** you need to implement (e.g., `IVectorAdapterFactory`, `IDataAdapterFactory`, `IMessageProvider`)
+- You know which **abstraction interfaces** you need to implement (e.g., `IVectorAdapterFactory`, `IDataAdapterFactory`, `ICommunicationAdapter`)
 - You have a working example connection to the external system (you've talked to it manually)
 
 ---
@@ -346,7 +346,7 @@ dotnet build <consumer.csproj> -c Release
 ls <consumer>/bin/Release/net10.0/ | grep Koan.Data.Vector.Connector.Acme
 ```
 
-If the assembly is present but discovery still misses it, check the boot report (run a small console app that calls `services.AddKoan()` and inspect the resolved `IBootReport`). Your module should appear in the published modules list.
+If the assembly is present but discovery still misses it, read what the host actually composed: run a small console app that calls `services.AddKoan()` and resolve `IKoanRuntimeFacts`, or read the same envelope from `/.well-known/Koan/facts` in a web host. Your module should appear among the composed modules.
 
 ### Symptom: local infrastructure is not running
 
