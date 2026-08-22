@@ -236,6 +236,18 @@ application and say what each would cost, rather than naming a package.
 
 [Open the recipe](search-by-meaning.md)
 
+## Give the application a web frontend
+
+**Gets you** — A real UI for your API - embedded static pages, a self-opening local executable, or a detached frontend project - with the asset strategy chosen deliberately instead of improvised.
+
+**Works if** — The application needs pixels in a browser: a tool page, an admin surface, a gallery, a dashboard.
+
+**Costs** — Embedded static files cost nothing. A client build adds a node toolchain to every build and CI. CDN scripts add a runtime network dependency and third-party script running on your origin.
+
+**Needs** — the web layer this UI talks to · entity-owned files behind upload UIs (optional)
+
+[Open the recipe](serve-a-web-frontend.md)
+
 ## Ship it as one self-contained executable
 
 **Gets you** — A native executable that starts fast, needs no .NET installed, and has no service to run beside it.
