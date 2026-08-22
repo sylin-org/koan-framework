@@ -18,6 +18,8 @@ ingredients:
   - "one | an embedded store | Sylin.Koan.Data.Connector.Sqlite"
   - "optional | in-process embeddings, no model server | Sylin.Koan.AI.Connector.Onnx"
   - "optional | durable local vector index | Sylin.Koan.Data.Vector.Connector.SqliteVec"
+absent:
+  - "a verified Linux or arm64 build | only win-x64 has been published and run here | publish and test your own target; the cross-compilation toolchain differs enough that the win-x64 result does not carry over"
 ---
 
 # Ship it as one self-contained executable
@@ -42,7 +44,7 @@ Ask before promising it:
 
 - **Which capabilities are in play, and does each have an in-process form?** Answer this first; it
   decides feasibility.
-- **How many platforms?** A native binary is per-architecture. Three targets is three builds.
+- **How many platforms?** A native binary is per-architecture, so three targets is three builds -- and only win-x64 has been published and run in this repository. Treat another target as work you are measuring.
 - **Does anything rely on reflection?** Controllers, models, and anything discovered at runtime need to
   be rooted for the trimmer, or they vanish in a way that only shows up at runtime.
 

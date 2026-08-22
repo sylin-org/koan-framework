@@ -1,10 +1,10 @@
-﻿---
+---
 type: REFERENCE
 domain: framework
 title: "Koan recipes"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-22
 framework_version: v1.0.0
 validation:
   status: generated
@@ -245,6 +245,8 @@ application and say what each would cost, rather than naming a package.
 **Costs** — Longer publish times, per-platform builds, and reflection-dependent code needs trim roots declared.
 
 **Needs** — any Koan application · an embedded store · in-process embeddings, no model server (optional) · durable local vector index (optional)
+
+**Not yet** — a verified Linux or arm64 build: only win-x64 has been published and run here
 
 [Open the recipe](ship-a-single-binary.md)
 
