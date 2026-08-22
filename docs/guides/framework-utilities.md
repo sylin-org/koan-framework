@@ -121,10 +121,12 @@ internal sealed class PostgresDiscoveryAdapter : ServiceDiscoveryAdapterBase
 
     protected override async Task<bool> ValidateServiceHealth(string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        var connectionString = ConnectionStringParser.BuildPostgresConnectionString(
-            serviceUrl,
-            context.Parameters.GetValueOrDefault("database", "postgres")
-        );
+        var components = ConnectionStringParser.Parse(serviceUrl, "postgres") with
+        {
+            Database = context.Parameters.GetValueOrDefault("database", "postgres")
+        };
+
+        var connectionString = ConnectionStringParser.Build(components, "postgres");
 
         using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);

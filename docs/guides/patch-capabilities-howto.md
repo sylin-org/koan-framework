@@ -224,7 +224,7 @@ curl -X PATCH http://localhost:5000/api/todos/123 \
 **What just happened?**
 - All three formats updated the same fields
 - Koan normalized them to canonical PatchOps internally
-- Entity lifecycle hooks ran (OnBeforeSave, OnAfterSave)
+- Entity lifecycle handlers ran (`BeforeUpsert`, `AfterUpsert`)
 - Provider pushed down the operations when possible
 
 **Pro tip:** Start with partial JSON for simplest client code. Add RFC formats when you need their specific capabilities.
@@ -663,29 +663,29 @@ public class NullPolicyDemo
 
 ## 8. Lifecycle Hooks and Transformers
 
-**Concept:** Patches run through the same lifecycle hooks as saves. You can intercept, validate, or transform patch operations before and after execution.
+**Concept:** a patch reaches the same repository boundary as a save, so the same lifecycle handlers see it. Declare them once and they cover both.
 
-### Recipe: OnBeforeSave hook
+### Recipe: a BeforeUpsert handler
 
 ```csharp
-public class Todo : Entity<Todo>
+public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public int Priority { get; set; }
     public DateTime UpdatedAt { get; set; }
-
-    protected override void OnBeforeSave(EntityLifecycleContext ctx)
-    {
-        // Always update timestamp on patch
-        UpdatedAt = DateTime.UtcNow;
-
-        // Validate priority range
-        if (Priority < 1 || Priority > 5)
-        {
-            throw new ValidationException("Priority must be 1-5");
-        }
-    }
 }
+
+// Program.cs -- one handler covers saves and patches alike, because both arrive
+// at the same repository boundary.
+builder.Services.AddKoan(() =>
+    Todo.Lifecycle.BeforeUpsert(context =>
+    {
+        context.Current.UpdatedAt = DateTime.UtcNow;
+
+        return context.Current.Priority is < 1 or > 5
+            ? context.Cancel("Priority must be 1-5", "todo.priority")
+            : context.Proceed();
+    }));
 ```
 
 **What happens on PATCH:**
@@ -749,7 +749,7 @@ public class TodosController : EntityController<Todo>
 }
 ```
 
-**Pro tip:** Hooks run after operations are normalized but before provider execution. Use `OnBeforeSave` for validation, timestamps, and computed fields. Use `OnAfterSave` for side effects like sending notifications.
+**Pro tip:** handlers run after operations are normalized and before the provider executes. Use `BeforeUpsert` for validation, timestamps, and computed fields; it can also cancel the write. Use `AfterUpsert` for effects that must follow a committed write -- it is deferred until a surrounding Koan transaction commits, so a rolled-back write never emits one.
 
 ---
 
@@ -903,30 +903,31 @@ public class PatchItem
 ### Pattern: Patch with side effects
 
 ```csharp
-public class Todo : Entity<Todo>
+public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
     public bool IsComplete { get; set; }
     public DateTime? CompletedAt { get; set; }
-
-    protected override void OnBeforeSave(EntityLifecycleContext ctx)
-    {
-        // Detect completion transition
-        if (IsComplete && !ctx.OriginalValues.GetValueOrDefault<bool>("IsComplete"))
-        {
-            // Just completed
-            CompletedAt = DateTime.UtcNow;
-
-            // Trigger event (use your event bus)
-            // Events.Publish(new TodoCompleted(Id));
-        }
-        else if (!IsComplete && ctx.OriginalValues.GetValueOrDefault<bool>("IsComplete"))
-        {
-            // Reopened
-            CompletedAt = null;
-        }
-    }
 }
+
+// Program.cs -- `Prior` is the persisted predecessor, which is what makes a
+// transition visible. It is null on create.
+builder.Services.AddKoan(() =>
+    Todo.Lifecycle.BeforeUpsert(context =>
+    {
+        var wasComplete = context.Prior?.IsComplete ?? false;
+
+        if (context.Current.IsComplete && !wasComplete)
+        {
+            context.Current.CompletedAt = DateTime.UtcNow;
+        }
+        else if (!context.Current.IsComplete && wasComplete)
+        {
+            context.Current.CompletedAt = null;
+        }
+
+        return context.Proceed();
+    }));
 
 // Now patching IsComplete triggers side effects automatically:
 await Todo.Patch(id, new { IsComplete = true });
@@ -936,21 +937,25 @@ await Todo.Patch(id, new { IsComplete = true });
 ### Pattern: Patch with computed fields
 
 ```csharp
-public class Invoice : Entity<Invoice>
+public sealed class Invoice : Entity<Invoice>
 {
     public List<LineItem> Items { get; set; } = new();
-    public decimal Subtotal { get; private set; }  // Computed
-    public decimal Tax { get; private set; }       // Computed
-    public decimal Total { get; private set; }     // Computed
-
-    protected override void OnBeforeSave(EntityLifecycleContext ctx)
-    {
-        // Recompute whenever items change
-        Subtotal = Items.Sum(i => i.Quantity * i.UnitPrice);
-        Tax = Subtotal * 0.08m;
-        Total = Subtotal + Tax;
-    }
+    public decimal Subtotal { get; set; }
+    public decimal Tax { get; set; }
+    public decimal Total { get; set; }
 }
+
+// Program.cs -- recompute before every write, whatever shape the write arrived in.
+builder.Services.AddKoan(() =>
+    Invoice.Lifecycle.BeforeUpsert(context =>
+    {
+        var invoice = context.Current;
+        invoice.Subtotal = invoice.Items.Sum(item => item.Quantity * item.UnitPrice);
+        invoice.Tax = invoice.Subtotal * 0.08m;
+        invoice.Total = invoice.Subtotal + invoice.Tax;
+
+        return context.Proceed();
+    }));
 
 // Patch line items, totals recompute automatically:
 await Invoice.Patch(invoiceId, new
@@ -1327,7 +1332,7 @@ You've now seen Koan's full patch capabilities—from quick HTTP PATCH endpoints
 1. **Three formats, one normalization** - RFC 6902, RFC 7386, partial JSON all normalize to canonical PatchOps
 2. **Provider pushdown matters** - MongoDB/PostgreSQL are 4-6x faster than fallback
 3. **Null policies are configurable** - Global defaults + per-request overrides
-4. **Lifecycle hooks apply** - OnBeforeSave/OnAfterSave run for patches too
+4. **Lifecycle handlers apply** - `BeforeUpsert`/`AfterUpsert` run for patches too
 5. **EntityController<T> handles it all** - Minimal code, maximum capability
 
 **Choosing Your Format:**
