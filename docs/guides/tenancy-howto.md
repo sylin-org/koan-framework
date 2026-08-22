@@ -33,9 +33,11 @@ Tenancy is **Reference = Intent**. Add the package; its `KoanModule` contributes
 fail-closed guard, read-filter, blob-key particle, cache-key segment, and async-hop carrier, and
 `AddKoan()` compiles them.
 
-```xml
-<ProjectReference Include="..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />  <!-- or the Sylin.Koan.Tenancy package -->
+```powershell
+dotnet add package Sylin.Koan.Tenancy
 ```
+
+Repository samples use the equivalent project reference; application code is identical either way.
 
 Tenancy needs a backing store that **announces isolation** (`DataCaps.Isolation.RowScoped`) — SQLite, PostgreSQL,
 SQL Server, Mongo. A non-isolating store (the JSON file adapter) **fails closed** for a tenant-scoped op rather than
