@@ -13,6 +13,7 @@ using Koan.Data.Core.Semantics;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
 
 namespace Koan.Data.Connector.Couchbase.Runtime;
 
@@ -20,6 +21,26 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    /// <summary>
+    /// Couchbase's own document settings: the framework's, plus DATA-0100's canonical encodings.
+    ///
+    /// <para>This store orders and filters by reading back what it wrote, so the stored form has to be the
+    /// comparable one. Without it a <see cref="TimeSpan"/> is written as .NET spells it, and N1QL then orders
+    /// <c>"1.00:00:00"</c> before <c>"23:00:00"</c> — a day ahead of twenty-three hours, which is the exact
+    /// inversion the contract exists to close.</para>
+    ///
+    /// <para>The settings are Couchbase's rather than the framework's shared document settings because those
+    /// are also the on-disk form for the Json and Redis stores, backup archives and cutover evidence. The
+    /// contract governs a store that compares what it stored; changing it for stores that do not would rewrite
+    /// files nobody asked to migrate.</para>
+    /// </summary>
+    private static readonly JsonSerializerSettings DocumentSettings =
+        EntityJsonSerialization.Apply(ComparableScalarEncoding.ApplyConverters(new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+            NullValueHandling = NullValueHandling.Include
+        }));
+
     private readonly MappingPlan? _mapping;
     private readonly string _identityName;
 
@@ -45,7 +66,7 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
         ArgumentNullException.ThrowIfNull(entity);
         if (_mapping is null)
         {
-            var document = JObject.Parse(EntityJsonSerialization.SerializeDocument(entity));
+            var document = JObject.Parse(JsonConvert.SerializeObject(entity, entity.GetType(), DocumentSettings));
             ManagedFieldJsonInjector.InjectManaged(document, ManagedFieldWriteScope.Effective);
             return document;
         }
@@ -67,9 +88,10 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
     {
         ArgumentNullException.ThrowIfNull(document);
         if (_mapping is null)
-            return (TEntity)EntityJsonSerialization.DeserializeDocument(
-                document.ToString(Formatting.None),
-                typeof(TEntity));
+            return (TEntity)(JsonConvert.DeserializeObject(
+                document.ToString(Formatting.None), typeof(TEntity), DocumentSettings)
+                ?? throw new InvalidDataException(
+                    $"Entity JSON could not materialize '{typeof(TEntity).FullName}'."));
 
         var values = new List<MappedValue>(_mapping.Bindings.Count);
         foreach (var binding in _mapping.Bindings)
@@ -213,7 +235,9 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
                 .Bindings.Single();
             if (!resolved.TargetsCollection) converted = binding.Encode(converted);
         }
-        return converted;
+        // The comparand has to be spelled the way the document spells it, or the comparison is between two
+        // different encodings of the same value.
+        return ComparableScalarEncoding.EncodeComparand(converted);
     }
 
     private static string Camel(string value) =>
@@ -251,7 +275,10 @@ internal sealed class CouchbaseDocumentPlan<TEntity, TKey>
             new JProperty(property.Name, ToJson(property.Value)))),
         DataArray data => new JArray(data.Items.Select(ToJson)),
         byte[] bytes => new JValue(Convert.ToBase64String(bytes)),
-        _ => JToken.FromObject(value)
+        // A mapped write reaches here after its binding has encoded the value. EncodeComparand transforms only
+        // the four types DATA-0100 governs, so a binding that already produced the canonical form passes
+        // through untouched and one that left the CLR value is corrected here.
+        _ => JToken.FromObject(ComparableScalarEncoding.EncodeComparand(value)!)
     };
 
     private static object? ToNeutral(JToken value) => CouchbaseNeutralReader.Neutral(value);

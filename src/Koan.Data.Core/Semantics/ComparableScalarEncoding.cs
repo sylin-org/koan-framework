@@ -1,17 +1,15 @@
 using System.Globalization;
-using Koan.Data.Core;
 using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Semantics;
 using Newtonsoft.Json;
 
-namespace Koan.Data.Relational;
+namespace Koan.Data.Core;
 
 /// <summary>
 /// Canonical, order-preserving encodings for the composite scalars governed by the comparable-encoding
-/// contract (DATA-0100), for relational adapters that persist an entity as a JSON document and resolve a
-/// filter by extracting JSON text/number. BOTH the write path (the <see cref="JsonConverters"/> here)
-/// and the filter comparand (<see cref="EncodeComparand"/>, called by
-/// <see cref="Linq.SqlFilterTranslator"/>) use the SAME canonical form, so a pushed comparison compares
+/// contract (DATA-0100), for any adapter that persists an entity as a JSON document and resolves a filter by
+/// extracting JSON text/number. BOTH the write path (the <see cref="JsonConverters"/> here) and the filter
+/// comparand (<see cref="EncodeComparand"/>) use the SAME canonical form, so a pushed comparison compares
 /// like-for-like:
 /// <list type="bullet">
 ///   <item><see cref="DateTimeOffset"/> → UTC-normalised fixed-width ISO-8601 TEXT (<c>…Z</c>). The
@@ -64,12 +62,17 @@ public static class ComparableScalarEncoding
     /// <summary>The shared canonical converters relational adapters add to their JSON settings.</summary>
     public static JsonConverter[] JsonConverters() => new[] { _dateTimeOffset, _timeSpan, _dateOnly, _timeOnly };
 
-    /// <summary>Registers the canonical converters onto an adapter's <see cref="JsonSerializerSettings"/>
-    /// (used for both serialize and deserialize), leaving the naming strategy and other settings intact.</summary>
-    public static JsonSerializerSettings Apply(
-        JsonSerializerSettings settings,
-        IEnumerable<DataSegmentationField>? segmentationFields = null)
+    /// <summary>
+    /// The canonical encoding and nothing else: the converters, and the parsing posture they need.
+    ///
+    /// <para>This is what a store needs to write and read the contract's form. <see cref="Apply"/> adds the
+    /// managed-field wiring a store with its own mapping plan also needs; a store that stamps managed fields
+    /// onto the document itself takes this entry point instead, so that neither rule is written twice.</para>
+    /// </summary>
+    public static JsonSerializerSettings ApplyConverters(JsonSerializerSettings settings)
     {
+        ArgumentNullException.ThrowIfNull(settings);
+
         // Stop Newtonsoft from pre-parsing ISO strings to DateTime BEFORE our converters run. Its default
         // (DateParseHandling.DateTime) would (a) make DateTimeOffset round-trip depend on the ambient
         // DateTimeZoneHandling rather than on our explicit UTC parse, and (b) silently coerce string-typed
@@ -80,6 +83,16 @@ public static class ComparableScalarEncoding
         settings.Converters.Add(_timeSpan);
         settings.Converters.Add(_dateOnly);
         settings.Converters.Add(_timeOnly);
+        return settings;
+    }
+
+    /// <summary>Registers the canonical converters onto an adapter's <see cref="JsonSerializerSettings"/>
+    /// (used for both serialize and deserialize), leaving the naming strategy and other settings intact.</summary>
+    public static JsonSerializerSettings Apply(
+        JsonSerializerSettings settings,
+        IEnumerable<DataSegmentationField>? segmentationFields = null)
+    {
+        ApplyConverters(settings);
 
         // Serialize-stage managed-field hook (DATA-0105 §3b, Seam 2). Wrap the adapter's existing contract
         // resolver in the shared ManagedFieldJsonInjector (Koan.Data.Core, ARCH-0103 §9 — lifted here so the JSON-text

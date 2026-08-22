@@ -28,8 +28,6 @@ public static class TypeClassification
     /// <list type="bullet">
     ///   <item><see cref="string"/>, <see cref="char"/> and <see cref="Guid"/> — collation, not values.
     ///   The same two rows can order differently under a different database collation.</item>
-    ///   <item><see cref="TimeSpan"/> — proven divergent rather than merely unproven: one adapter still
-    ///   stores it in .NET's default form, where twenty-four hours precedes twenty-three.</item>
     ///   <item>Nullable values — provider null placement is not normalized for a plain column. A collection
     ///   aggregate counts as its element type, because the dialect states where its null belongs.</item>
     ///   <item><see cref="DateTime"/> — no offset, so its ordering depends on the kind each value carried
@@ -53,7 +51,8 @@ public static class TypeClassification
                t == typeof(double) ||
                t == typeof(DateTimeOffset) ||
                t == typeof(DateOnly) ||
-               t == typeof(TimeOnly);
+               t == typeof(TimeOnly) ||
+               t == typeof(TimeSpan);
     }
 
     public static bool IsSimple(Type t)

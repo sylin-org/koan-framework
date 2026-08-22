@@ -81,17 +81,12 @@ public static class SortPushdownConvergence
     /// where its convergence has been proven rather than assumed, so this list is the evidence that decides
     /// what <c>TypeClassification.IsPortableStreamSortScalar</c> may contain.
     /// </summary>
+    /// <para><c>Duration</c> joined this list on 2026-08-21 (PMC-037). It was held out because Couchbase was
+    /// the one adapter DATA-0100's comparable encoding never reached: it stored a TimeSpan in .NET's default
+    /// form and ordered <c>1.00:00:00</c> before <c>23:00:00</c>, a day ahead of twenty-three hours. Couchbase
+    /// now writes ticks like every other store, so the order is proven here rather than assumed.</para>
     public static IReadOnlyList<string> PortableScalars { get; } =
-        ["Sequence", "Amount", "Ratio", "ObservedAt", "Day", "Tod", "Tier"];
-
-    /// <summary>
-    /// <c>Duration</c> is in the corpus and deliberately not in the list above. Couchbase is the one adapter
-    /// DATA-0100's comparable encoding never reached, so it stores a TimeSpan in .NET's default form and orders
-    /// <c>1.00:00:00</c> before <c>23:00:00</c> — twenty-four hours ahead of twenty-three. The value still
-    /// round-trips and every other store orders it correctly, so this is not a reason to hold the type back
-    /// everywhere; it is a reason not to promise a portable order for it until that gap closes (PMC-037).
-    /// </summary>
-    public const string UnprovenScalar = "Duration";
+        ["Sequence", "Amount", "Ratio", "ObservedAt", "Day", "Tod", "Tier", "Duration"];
 
     /// <summary>
     /// Nothing the store was asked to do gets done in memory instead.
