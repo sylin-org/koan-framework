@@ -60,78 +60,64 @@ parsed result before the query runs.
 
 - **ADR**: [ARCH-0068 - Refactoring Strategy](../../../docs/decisions/ARCH-0068-refactoring-strategy-static-vs-di.md) (P1.10)
 - **Controller**: See `src/Koan.Web/Controllers/EntityController.cs` for usage
-- **Query Syntax**: OData-inspired filtering (eq, ne, gt, lt, and, or, etc.)
+- **Query syntax**: URL-encoded JSON filters, `-`/`+` sort prefixes -- see below
 
 ---
 
-## 💡 Query Syntax Examples
+## 💡 Query syntax
 
-### Filter Expressions
+The parser reads `q`, `page`, `pageSize` (or `size`), `sort`, `dir`, `view`, `output`, and
+`ignoreUnknownSort`. `filter` is read by the controller and passed alongside.
 
-```
-# Simple equality
-?filter=status eq 'active'
+### Filtering
 
-# Comparison operators
-?filter=priority gt 5
-?filter=createdAt ge '2024-01-01'
+`filter` carries URL-encoded **JSON**, not an expression language:
 
-# Logical operators
-?filter=status eq 'active' and priority gt 5
-?filter=category eq 'work' or category eq 'personal'
-
-# String operations
-?filter=title contains 'meeting'
-?filter=email endswith '@example.com'
+```bash
+curl --get --data-urlencode 'filter={"status":"Pending"}' http://localhost:5000/api/todos
 ```
 
-### Sort Clauses
+`q` is a separate free-text slot, and the two compose. A malformed filter, an unknown field, or an
+operator the adapter cannot execute answers `400` -- none of them degrades into an unfiltered read.
+
+### Sorting
+
+Comma-separated fields; `-` for descending, `+` or nothing for ascending:
 
 ```
-# Single field ascending (default)
 ?sort=createdAt
-
-# Single field descending
-?sort=createdAt desc
-
-# Multiple fields
-?sort=priority desc,createdAt asc
-
-# Explicit ascending
-?sort=title asc
+?sort=-createdAt
+?sort=-priority,createdAt
 ```
 
-### Pagination
+Fields resolve against the entity, so an unknown one answers `400` naming the field. Pass
+`?ignoreUnknownSort=true` to drop it instead; the skipped names come back in the options' extras.
+
+### Paging
 
 ```
-# Page 1, default page size (20)
-?page=1
-
-# Page 2, custom page size
-?page=2&pageSize=50
-
-# Max page size enforced (defaults to 100)
-?page=1&pageSize=999  # capped at 100
+?page=2
+?page=2&pageSize=100
+?page=2&size=100        # size is the accepted alias, and what Link headers carry
 ```
 
-### Field Selection
+Page size defaults to **50** and is capped at **200** unless the controller's `[Pagination]` or the
+deployment's `Koan:Web:Pagination` bounds say otherwise. A request above the ceiling is clamped, not
+refused. See the [pagination reference](../../../docs/reference/web/pagination.md).
 
-```
-# Select specific fields
-?fields=id,title,status
+### Shaping
 
-# Reduce payload size
-?fields=id,name  # returns only id and name
-```
+`?view=` selects a declared view and `?output=` the output shape; both are validated against what the
+endpoint allows. There is no field-projection parameter -- shape the payload with a view or a
+transformer rather than a per-request field list.
 
 ---
 
-## ❓ When to Use What
+## ❓ When to use what
 
-| Scenario | Use This |
+| Scenario | Use this |
 |----------|----------|
-| Parse filter from query string | `EntityQueryParser.ParseFilter()` |
-| Parse sort from query string | `EntityQueryParser.ParseSort()` |
-| Validate pagination params | `EntityQueryParser.ParsePagination()` |
-| Parse field selection | `EntityQueryParser.ParseFields()` |
-| Custom query DSL | Implement your own parser |
+| Read a whole query string into options | `EntityQueryParser.Parse<TEntity>(query, defaults)` |
+| Adjust the parsed options for one controller | override `EntityController.BuildOptions()` |
+| Accept an unknown sort field instead of refusing | `Parse(..., lenient: true)` or `?ignoreUnknownSort=true` |
+| Give a surface its own grammar | parse it yourself and fill `QueryOptions` |
