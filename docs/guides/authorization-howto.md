@@ -73,14 +73,21 @@ The rest of this guide is the **seam beneath** the entity model — use it for c
 
 The decision is always an `AuthorizeDecision`: `Allow` · `Forbid(reason)` · `Challenge`.
 
-## Turn it on
+## Where the seam comes from
+
+Referencing `Koan.Web` registers `IAuthorize` and the entity-floor rung, so `[Authorize]`, `[Access]`, and
+`EntityAccess<T>` are enforced from the ordinary `AddKoan()` bootstrap. With no rung granting or denying,
+the ladder falls through to `AuthorizeOptions.DefaultDecision` — `Allow`, the open default the `Project`
+half above is the counterweight to.
+
+Declaring capability policy is what adds the RBAC and named-policy rungs on top:
 
 ```csharp
-services.AddKoanAuthorization(); // registers the seam + RBAC floor + policy provider + the capability gates
+services.AddKoanAuthorization(configureCapabilities: caps => { /* mapped below */ });
 ```
 
-`AddCapabilityAuthorization(...)` also registers the seam, so the capability controllers enforce whenever
-capability authz is configured.
+Call it where the application has policy to state. `AddCapabilityAuthorization(...)` registers the same
+rungs, so the capability controllers enforce whichever of the two declared the policy.
 
 ## Capability gates (moderation / audit)
 
