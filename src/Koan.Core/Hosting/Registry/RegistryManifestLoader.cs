@@ -131,12 +131,20 @@ internal static class RegistryManifestLoader
                     implementers.Add(type);
                 }
             }
-            catch
+            catch (Exception ex) when (
+                ex is TypeLoadException or FileNotFoundException or FileLoadException or BadImageFormatException)
             {
                 // Defensive: a single type with unloadable references shouldn't kill the whole
                 // assembly's scan. The interface checks above can trip TypeLoadException /
                 // FileNotFoundException when a transitive dependency is missing — we silently
                 // skip the offending type and keep going.
+                //
+                // Only those. This used to catch everything, which swallowed the one deliberate
+                // contradiction RegisterSemanticModule raises — a single KoanModule registered under two
+                // identities, whose message tells the author to keep one activation owner per assembly.
+                // A guard that cannot reach anyone is not a guard, and the two writers here (the source
+                // generator and this reflection scan) derive that identity separately, which is exactly
+                // the disagreement it exists to catch.
             }
         }
 

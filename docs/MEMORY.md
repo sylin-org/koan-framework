@@ -270,6 +270,19 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   built from the dialect's own `Read` rather than from a spelling invented at the index site. On Couchbase this
   forced the path grammar out of the generic document plan, because an index built for a container and a filter
   compiled for an entity have to agree and could not while the grammar lived behind a type parameter. (2026-08-21)
+- **Process-global registries are safe when one derivation owns a key, and dangerous when two do.** A sweep of
+  every static registry in the tree after the pillar-catalog defect found only one shape that can go wrong:
+  the same key written from two *different* derivations, one authoritative and one invented. Everything else is
+  safe by construction — `ProviderMetadata` and `EntityTypeCatalog` derive the value from the key itself,
+  `ManagedFieldRegistry` and the naming/write contributor registries take a union of contributions, and the
+  rest have one writer. When adding process-global state, ask which derivations can reach a key: one is fine,
+  two needs a rule about which wins. (2026-08-21)
+- **A defensive catch that is wider than its comment will eventually swallow a deliberate guard.**
+  `RegistryManifestLoader` caught every exception per type, documented as protecting the scan from types with
+  unloadable references. It also silently discarded `RegisterSemanticModule`'s contradiction — one `KoanModule`
+  registered under two identities — whose whole purpose is to tell an author to keep one activation owner per
+  assembly. Catch the exceptions the comment names, not everything, or the guard next to it stops existing.
+  (2026-08-21)
 - **A summary filter over a test run turns a deterministic defect into a folklore flake.** The SQLite connector
   suite reported a failure cluster four times across two days and passed on immediate re-run every time. Three
   investigations concluded "environment", eliminating parallelism, fixture paths, connection pooling and fault
