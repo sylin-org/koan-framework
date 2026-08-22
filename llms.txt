@@ -4,11 +4,12 @@ Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applicati
 states business intent; capability pillars own composition, provider negotiation, lifecycle, and
 explanation.
 
-Current line: stable 1.0. Every active packable project ships in one train. Use the generated product surface at
+Current line: 1.x, the stabilization train. Every active packable project ships on it and advances its own
+version within it. Use the generated product surface at
 docs/reference/product-surface.md for the evaluated inventory, capability maturity, and evidence.
 
-Paths in this file are repository-relative. Resolve them against the revision this file was fetched
-from; for the stable train that is https://github.com/sylin-org/koan-framework/blob/v1.0.0/.
+Paths in this file are repository-relative. Resolve them against `main`, which is the published state:
+https://github.com/sylin-org/koan-framework/blob/main/. A pinned tag hides everything shipped since it.
 
 ## Canonical application grammar
 

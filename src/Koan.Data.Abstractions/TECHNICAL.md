@@ -149,7 +149,7 @@ validation:
 
 ## References
 
-- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [DATA-0096 — unified filter pipeline](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0096-unified-filter-pipeline.md)
-- [ARCH-0084 — unified capability model](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0084-unified-capability-model.md)
-- [ARCH-0040 — configuration and constants naming](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0040-config-and-constants-naming.md)
+- [DATA-0107 — provider-bounded Entity streams](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [DATA-0096 — unified filter pipeline](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/DATA-0096-unified-filter-pipeline.md)
+- [ARCH-0084 — unified capability model](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0084-unified-capability-model.md)
+- [ARCH-0040 — configuration and constants naming](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0040-config-and-constants-naming.md)

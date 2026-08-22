@@ -1,4 +1,4 @@
----
+﻿---
 type: REFERENCE
 domain: framework
 title: "Koan Product Surface"
@@ -18,7 +18,7 @@ validation:
 
 All inventoried active packages ship together on release train `1.0`.
 
-Every package carries the stable train's 1.x compatibility contract. Claims below state the strength of each behavioral guarantee; packages without a claim are explicitly unassessed.
+Every package ships on the 1.x stabilization train. Claims below state the strength of each behavioral guarantee; packages without a claim are explicitly unassessed.
 
 ## Maturity vocabulary
 

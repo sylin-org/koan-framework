@@ -78,7 +78,7 @@ public sealed class Category : Entity<Category> { }
 ```
 
 Depth: [read and stream Entities](../guides/data/entity-access-and-streaming.md) ·
-[entity capabilities](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/entity-capabilities-howto.md).
+[entity capabilities](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/entity-capabilities-howto.md).
 
 ## Prove it
 

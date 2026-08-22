@@ -1,4 +1,4 @@
----
+﻿---
 type: GUIDE
 domain: core
 title: "Build your first Koan application"
@@ -98,7 +98,7 @@ without replacing what already works.
 
 ## Start small. Know the edges.
 
-Koan 1.0 is the stable .NET 10 train. The template uses compatible `1.*` packages and durable embedded
+Koan 1.x is the .NET 10 stabilization train. The template uses compatible `1.*` packages and durable embedded
 SQLite storage, which is a great fit for local and single-node applications—not a promise of
 remote-database or multi-node-write behavior.
 

@@ -45,7 +45,7 @@ concept is exposed.
 
 **Docs read:**
 
-- `docs/engineering/index.md` establishes the repository guardrails; relevant because it previously
+- `docs/engineering/README.md` establishes the repository guardrails; relevant because it previously
   required the release compiler.
 - `docs/architecture/principles.md` requires standard .NET concepts and fewer owners; directly
   supports deleting the parallel release state machine.

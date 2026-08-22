@@ -79,5 +79,5 @@ code. Keep credentials in the platform secret store.
 
 ## Reference
 
-- [Technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Connectors/Data/OpenSearch/TECHNICAL.md)
-- [Vector runtime](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Vector/README.md)
+- [Technical reference](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/OpenSearch/TECHNICAL.md)
+- [Vector runtime](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Vector/README.md)

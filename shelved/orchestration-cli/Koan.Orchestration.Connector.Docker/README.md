@@ -54,5 +54,5 @@ if (availability.Ok)
 
 - [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – commands using this provider.
 - [`Koan.Orchestration.Connector.Podman`](../Koan.Orchestration.Connector.Podman/README.md) – sibling provider for Podman engines.
-- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design principles.
+- `/docs/engineering/README.md`, `/docs/architecture/principles.md` – orchestration design principles.
 

@@ -81,10 +81,11 @@ Events mean something happened to the Entity. Transport distributes an isolated 
 Entity state. Persistence knows neither. Both terminals are local-first and lift pointwise over
 finite Entity collections and lazy streams.
 
-## Stable boundary
+## Compatibility boundary
 
-Koan 1.0 is the stable compatibility train. Every active packable project sits on that train and owns
-its own version, so a package advances only when its own sources — or a shared build input — change.
+Koan 1.x is the stabilization train. Every active packable project sits on it and owns its own
+version, so a package advances only when its own sources — or a shared build input — change. Public
+surface may still be removed inside the train while the framework is unannounced (BUILD-0073).
 Bounded dependency ranges, not matching version numbers, keep a package mix coherent. The generated
 `docs/reference/product-surface.md` projects that inventory and remains the authority for capability
 maturity and evidence; maturity labels do not select package publication.

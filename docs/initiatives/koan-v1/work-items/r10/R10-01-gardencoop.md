@@ -60,7 +60,7 @@ contracts. A NativeAOT or auth/admin incompatibility fails its focused gate and 
 
 ### Docs read
 
-- `docs/engineering/index.md` — requires Entity-first access, controller-owned HTTP, strict project hygiene, and
+- `docs/engineering/README.md` — requires Entity-first access, controller-owned HTTP, strict project hygiene, and
   current companion evidence.
 - `docs/architecture/principles.md` — establishes parameterless `AddKoan()`, Reference = Intent, one canonical
   expression, self-reporting infrastructure, and application modules only for real application policy.

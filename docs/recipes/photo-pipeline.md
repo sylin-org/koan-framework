@@ -24,7 +24,7 @@ ingredients:
 
 # Let people upload photos and find them by what's in them
 
-This is the compound that [SnapVault](https://github.com/sylin-org/koan-framework/blob/v1.0.0/samples/applications/SnapVault/README.md)
+This is the compound that [SnapVault](https://github.com/sylin-org/koan-framework/blob/main/samples/applications/SnapVault/README.md)
 runs: one upload becomes a stored original, several derivatives, a described set of contents, and a
 searchable vector. Everything here is taken from that application, which compiles.
 

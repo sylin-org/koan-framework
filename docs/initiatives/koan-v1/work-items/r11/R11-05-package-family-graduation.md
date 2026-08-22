@@ -291,7 +291,7 @@ bounded stale-read window; host-wide provider pins express infrastructure intent
 guarantees. Per-policy provider pins, `CacheConsistencyMode`, manual `AddKoanCache`, a mutable store registry, and a
 Cache-specific DI registration helper/analyzer do not create a real business guarantee and will not survive.
 
-**Docs read:** `docs/engineering/index.md` establishes Entity/controller/constants/package guardrails;
+**Docs read:** `docs/engineering/README.md` establishes Entity/controller/constants/package guardrails;
 `docs/architecture/principles.md` requires one compiled pillar plan and standard .NET before custom machinery;
 `docs/architecture/koan-cache-module.md` assigns topology/policy/coherence meaning to Cache and physical storage to
 adapters; `docs/architecture/cache-scope-key-convergence.md` requires repository and explicit eviction to share one
@@ -532,7 +532,7 @@ placement; provider-local `DdlPolicy` expresses whether Koan may validate/create
 store features, and Npgsql repository options are module-author mechanics, not application decisions. The unused
 Dapper helper package and the unproved Entity storage-shape decoration do not earn separate concepts.
 
-**Docs read:** `docs/engineering/index.md` requires Entity-first access, project-scoped constants/options, package
+**Docs read:** `docs/engineering/README.md` requires Entity-first access, project-scoped constants/options, package
 companions, and focused validation; `docs/architecture/principles.md` requires contracts to be inert, pillars to own
 meaning, adapters to stay thin, and composition to compile once; `docs/engineering/adding-a-connector.md` establishes
 reference-driven modules, real integration evidence, and shared-backend ownership but still contains one stale
@@ -658,7 +658,7 @@ already-eligible direct candidates; it does not by itself create fallback eligib
 participation diagnostics, repository caching, semantic guards, and naming composition; adapters own only their
 storage mechanics and naming constraints.
 
-**Docs read:** `docs/engineering/index.md`, `docs/architecture/principles.md`, `docs/reference/data/index.md`, and
+**Docs read:** `docs/engineering/README.md`, `docs/architecture/principles.md`, `docs/reference/data/index.md`, and
 `docs/guides/data/entity-access-and-streaming.md` establish Entity-first expression, reference-driven availability,
 deterministic provider selection, and honest streaming limits. Both connector README/TECHNICAL companions were read
 in full. Current InMemory prose incorrectly calls priority `-100` a fallback and disagrees with current public evidence
@@ -755,7 +755,7 @@ consumer-owned corrective refusal.
 `PaginationAttribute`/Web endpoint options express HTTP policy; vector `DefaultTopK`/`MaxTopK` remain vector-search
 candidate semantics and are not row pagination. `IAdapterOptions` carries readiness only.
 
-**Docs read:** `docs/engineering/index.md` requires Entity-first access and explicit paging/qualified streams for large
+**Docs read:** `docs/engineering/README.md` requires Entity-first access and explicit paging/qualified streams for large
 sets; `docs/architecture/principles.md` assigns application intent to the application and backend mechanics to adapters;
 `docs/reference/data/index.md` names `All`, `Page`, and streams as distinct cost choices;
 `docs/guides/data/entity-access-and-streaming.md` explicitly defines `Product.All()` as the full set;
@@ -842,7 +842,7 @@ semantics; query timeout bounds provider work; naming overrides change physical 
 existing explicitly provider-specific escape hatch. Provider factories, connection providers, fixed options monitors,
 BSON conventions, N1QL definition carriers, and identifier sanitizers are module-author/runtime mechanics.
 
-**Docs read:** `docs/engineering/index.md` requires Entity-first access, one constants owner, typed effective options,
+**Docs read:** `docs/engineering/README.md` requires Entity-first access, one constants owner, typed effective options,
 package companions, and focused validation; `docs/architecture/principles.md` requires one compiled route, thin hot
 paths, participation-owned defaults, and visible corrective failures; `docs/reference/data/index.md` defines exact
 selection order and denies universal provider parity; `docs/engineering/adding-a-connector.md` requires reference-driven
@@ -1844,7 +1844,7 @@ stream factory; `SseResult` bridges ASP.NET MVC and framework transport executio
   transformer, and error contract that this slice must not disturb.
 - `docs/decisions/WEB-0035-entitycontroller-transformers.md` establishes that OpenAPI must describe actual negotiated
   REST media types without duplicating controller behavior.
-- `docs/engineering/index.md` requires controller routes, typed options/constants, per-package README/TECHNICAL pages,
+- `docs/engineering/README.md` requires controller routes, typed options/constants, per-package README/TECHNICAL pages,
   and focused validation.
 - `src/Koan.Web.Extensions/README.md` is relevant but materially inaccurate: it names nonexistent configuration and
   public types and does not state installation or honest boundaries.
@@ -1975,7 +1975,7 @@ guarantee.
 
 - `docs/architecture/principles.md` requires reference-as-availability, host-owned composition, business-to-code
   mapping, startup explanation, and semantic honesty; it is binding for both retained projections.
-- `docs/engineering/index.md` requires controller-owned routes, typed options/constants, focused tests, and owned
+- `docs/engineering/README.md` requires controller-owned routes, typed options/constants, focused tests, and owned
   package companions; it is binding for implementation and graduation.
 - `docs/reference/media/index.md` establishes one source, Entity-layer access/tenant gating, recipe negotiation, and
   durable derivations; it currently overstates the need for manual registration in the one-Entity case.
@@ -2126,7 +2126,7 @@ business decisions and will not survive.
 
 - `docs/architecture/principles.md` requires Reference = Intent, inert cross-module contracts, one host-owned compiled
   decision, corrective failures, and one runtime explanation; it is binding for the cut.
-- `docs/engineering/index.md` requires controller-owned HTTP, typed options/constants, package companions, and focused
+- `docs/engineering/README.md` requires controller-owned HTTP, typed options/constants, package companions, and focused
   evidence; the Test connector and later OAuth Server slices must remove endpoint-mapping exceptions.
 - `docs/architecture/koan-identity-design.md` explains the person/sign-in/tenancy composition thesis but is explicitly
   superseded and cannot be used as current capability truth.
@@ -2532,7 +2532,7 @@ deployment decisions. `ApiToken`, `ApiTokenService`, and `Group` do not survive:
 consumer and duplicates the OAuth Server's token concern, while the latter contributes nothing to access despite
 claiming bulk-role semantics. `Identity.Epoch` also does not survive because no verifier consumes it.
 
-**Docs read:** `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, typed options/constants,
+**Docs read:** `docs/engineering/README.md` requires Entity-first data, controller-only HTTP, typed options/constants,
 and package companions; `docs/architecture/principles.md` requires one business expression, reference intent, standard
 .NET reuse, semantic honesty, and one current path; `SEC-0007` supplies the accepted durable-person and layering
 decisions but remains dated ADR evidence; `authentication-setup.md` establishes the current Web Auth expression and
@@ -2660,7 +2660,7 @@ composition does not produce a supported authentication result. A future build s
 isolated contracts assembly, keep factor storage/mechanics in opt-in leaves, and let Web Auth alone own the ceremony,
 continuation, cookie issuance, corrective failures, and HTTP security posture.
 
-**Docs read:** `docs/engineering/index.md` requires controller-owned HTTP, Entity-first data, typed options/constants,
+**Docs read:** `docs/engineering/README.md` requires controller-owned HTTP, Entity-first data, typed options/constants,
 and package companions; `docs/architecture/principles.md` requires one business expression, semantic honesty, standard
 .NET reuse, compile-once composition, and one current path; `SEC-0007` records the dated factor design and remains as
 ADR history; `src/Koan.Identity/README.md` defines the current durable-person/authentication boundary; R11-02 requires
@@ -2767,7 +2767,7 @@ record. `InviteAcceptanceService` does not survive this slice: the current check
 accepting identity per invite under multi-node contention, and deterministic membership IDs only prevent duplicate
 seats for the same person.
 
-**Docs read:** `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, typed options/constants,
+**Docs read:** `docs/engineering/README.md` requires Entity-first data, controller-only HTTP, typed options/constants,
 and owned package companions; `docs/architecture/principles.md` requires reference intent, standard .NET reuse,
 semantic honesty, and one business expression; Identity's current README establishes durable-person/session boundaries;
 the Tenancy and Identity ADRs remain historical evidence and will not be edited.
@@ -2901,7 +2901,7 @@ control plane; `TenancyConsoleOptions` separates forgeable exposure from authori
 owner. `Invite`, `InviteStatus`, `TenantStatus`, `TenantBootstrap`, `TenantBootstrapPolicy`, `TenantOperation`, and the
 current lifecycle service do not survive: today they imply ceremonies or effects the framework does not complete.
 
-**Docs read:** `docs/engineering/index.md` establishes Entity-first access, controller-owned HTTP, standard typed
+**Docs read:** `docs/engineering/README.md` establishes Entity-first access, controller-owned HTTP, standard typed
 options/constants, and owned package companions; `docs/architecture/principles.md` requires business-to-code intent,
 one composition owner, local-first behavior, semantic honesty, and standard .NET reuse; the root `README.md` defines
 references plus `AddKoan()` and Entity semantics as the product grammar; `samples/CATALOG.md` redirects to the current
@@ -3041,7 +3041,7 @@ contract vocabulary; `ClassificationIntegrityException` is the corrective applic
 tampered stored envelopes. AES mechanics, envelope format, segmentation-key encoding, field-transform construction,
 and provider-plan compilation remain internal.
 
-**Docs read:** `docs/engineering/index.md` requires Entity statics, owned package docs, standard options/constants, and
+**Docs read:** `docs/engineering/README.md` requires Entity statics, owned package docs, standard options/constants, and
 focused validation; `docs/architecture/principles.md` requires business-to-code intent, host-owned compiled plans,
 semantic honesty, local-first defaults, and isolated cross-module contracts; the root README establishes references +
 `AddKoan()` + Entity decorations as the public grammar; ARCH-0098 preserves the accepted field-transform/clone/read-
@@ -3226,7 +3226,7 @@ within-phase last-event-wins rule and the legacy process-global `FlowPillarManif
 ownership defects. None is a pre-R10 sample-registration or failure-persistence defect.
 
 **Docs read:** `CLAUDE.md` establishes references + `AddKoan()` + Entity as the golden grammar and requires genuine
-contract isolation; `docs/engineering/index.md` requires Entity-first data, controller-only HTTP, standard
+contract isolation; `docs/engineering/README.md` requires Entity-first data, controller-only HTTP, standard
 constants/options, package companions, and focused proof; `docs/architecture/principles.md` requires one host-owned
 compiled authority and corrective semantic honesty; the root README states the four-line host and unified runtime
 facts contract; `docs/toc.yml` shows Canon is not currently in the public navigation set; `samples/CATALOG.md` defers
@@ -3448,7 +3448,7 @@ exchange, routing-key, handler-registration, or arbitrary-message API.
 
 - `CLAUDE.md` — requires reference-as-intent, Entity Communication vocabulary, one host composition, adapter-owned
   mechanics, and focused evidence; directly governing.
-- `docs/engineering/index.md` — requires typed options, centralized constants, package companions, and focused package
+- `docs/engineering/README.md` — requires typed options, centralized constants, package companions, and focused package
   validation; directly governing.
 - `docs/architecture/principles.md` — places semantic route/election policy in Communication and backend realization
   in the adapter; directly governing.
@@ -3672,7 +3672,7 @@ not earn a global fail-open switch.
 
 - `CLAUDE.md` — requires Entity-first language, reference-as-intent, module-owned composition, axis-neutral Data, and
   focused evidence; directly governing.
-- `docs/engineering/index.md` — requires Entity statics, centralized constants/options, package companions, and
+- `docs/engineering/README.md` — requires Entity statics, centralized constants/options, package companions, and
   focused package validation; directly governing.
 - `docs/architecture/principles.md` — assigns cross-cutting meaning to its functional capability, generic predicate
   law to Data/Core, and application grant resolution to the application; directly governing.
@@ -3917,7 +3917,7 @@ concepts.
 
 - `CLAUDE.md` — requires reference-as-intent, Entity-first code, framework-owned chokepoints, and capability meaning
   to live at the narrowest honest owner; directly governing.
-- `docs/engineering/index.md` — requires standard .NET concepts first, centralized constants, focused proof, and
+- `docs/engineering/README.md` — requires standard .NET concepts first, centralized constants, focused proof, and
   package docs only for packages that survive; directly governing.
 - `docs/architecture/principles.md` — requires few coherent concepts, isolated cross-module contracts, and composition
   by meaning rather than historic namespace; directly governing.
@@ -4313,7 +4313,7 @@ policy.
 - `IJobLedger` remains the advanced mechanical/conformance seam; built-in ledger, scheduler, registry, selector, and
   orchestrator implementations are not application concepts and should no longer be public merely for compatibility.
 
-**Docs read:** `docs/engineering/index.md` establishes Entity-first, controller-only, package-owned documentation and
+**Docs read:** `docs/engineering/README.md` establishes Entity-first, controller-only, package-owned documentation and
 focused validation; `docs/architecture/principles.md` establishes business-language APIs, one owner and standard .NET
 composition; the root README and `docs/toc.yml` establish Jobs as a first-class capability; `src/Koan.Jobs/README.md`
 and `TECHNICAL.md` state the current package/result and runtime boundary; `docs/guides/jobs-howto.md` and the Jobs
@@ -4518,7 +4518,7 @@ the functional package to avoid a dependency cycle. Standard `ActivitySource`, `
 configuration, hosting, DI, and configuration remain .NET/OpenTelemetry concepts. No Koan telemetry contributor,
 source registry, public plan, custom exporter, or second package is required.
 
-**Docs read:** `docs/engineering/index.md` requires package-owned README/TECHNICAL, standard placement, and focused
+**Docs read:** `docs/engineering/README.md` requires package-owned README/TECHNICAL, standard placement, and focused
 artifact proof; `docs/architecture/principles.md` requires reference intent, compile-once plans, standard .NET before
 Koan ceremony, and truthful failure; root `CLAUDE.md` establishes the same business-first and self-explaining laws;
 ARCH-0088 earns the opt-in leaf and deliberately leaves the inert options contract in Core; ARCH-0033 is the
@@ -4847,7 +4847,7 @@ contributor remains the request-pipeline owner. `IAsymmetricIssuer`, `SharedKeyI
 public default secret, and `AddKoanBearer` are not independent business decisions and leave the public model.
 
 **Docs read:** `CLAUDE.md` establishes current source/guides/tests over dated ADR prose and permits this task-owned
-decision update; `docs/engineering/index.md` requires standard options/DI, companion docs, and structural decision
+decision update; `docs/engineering/README.md` requires standard options/DI, companion docs, and structural decision
 documentation; `docs/architecture/principles.md` requires one readable application decision and one lifecycle owner;
 `docs/architecture/capability-map.md` places Trust below Web Auth/Auth Server/MCP without establishing fleet behavior;
 `docs/toc.yml` establishes the current public curriculum; `SEC-0001`, `SEC-0003`, and `SEC-0006` establish the dated

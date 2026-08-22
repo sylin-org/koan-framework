@@ -59,7 +59,7 @@ new concepts—they are standard NuGet/MSBuild facts projected verbatim.
 
 ### Docs read
 
-- `docs/engineering/index.md` — packable projects own README/TECHNICAL documentation and central conventions.
+- `docs/engineering/README.md` — packable projects own README/TECHNICAL documentation and central conventions.
 - `docs/architecture/principles.md` — standard .NET first, one canonical path, fail-loud correction, and no
   duplicate identity metadata are binding.
 - `docs/initiatives/koan-v1/CAPABILITIES.md` — supplies the conservative maturity vocabulary and existing assessed

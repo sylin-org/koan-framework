@@ -1,4 +1,4 @@
-# Koan
+﻿# Koan
 
 ## Write with intent. Koan makes it real.
 
@@ -77,4 +77,4 @@ one. Want to look behind the magic? Koan tells you what it chose and why.
 - [Understand the architecture](docs/architecture/index.md)
 - [See what works today](docs/reference/what-works.md)
 
-> Koan 1.0 is the stable .NET 10 release train.
+> Koan 1.x is the .NET 10 stabilization train. Every active package ships on it.

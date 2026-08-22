@@ -102,7 +102,7 @@ No global sample number remains because unrelated applications have no stable or
 
 ## Docs read
 
-- `docs/engineering/index.md` — requires Entity-first access, controller-owned HTTP, centralized constants/options,
+- `docs/engineering/README.md` — requires Entity-first access, controller-owned HTTP, centralized constants/options,
   project hygiene, and focused validation; directly governs retained applications.
 - `docs/architecture/principles.md` — makes business intent the API, references the availability declaration, and
   requires compiled composition plus one current path; directly governs the reorganization.

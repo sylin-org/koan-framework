@@ -152,7 +152,7 @@ compose service before selecting a non-local target.
 
 **Docs read:**
 
-- `docs/engineering/index.md` requires Entity-first data, controller-owned HTTP, centralized constants, and focused
+- `docs/engineering/README.md` requires Entity-first data, controller-owned HTTP, centralized constants, and focused
   validation; it directly governs every replacement file.
 - `docs/architecture/principles.md` requires business-to-code mapping, one composition, domain-owned meaning, thin
   runtime paths, and corrective semantic honesty; it rejects the current benchmark/provider-switch machinery.

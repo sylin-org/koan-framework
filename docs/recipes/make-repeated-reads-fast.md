@@ -55,7 +55,7 @@ Add an adapter only for the reason that earns it: durability across restarts, or
 nodes. Configure the tier, TTL, and invalidation posture explicitly rather than accepting whatever a
 default gives you.
 
-Depth: [cache reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/data/cache.md).
+Depth: [cache reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/data/cache.md).
 
 ## Prove it
 

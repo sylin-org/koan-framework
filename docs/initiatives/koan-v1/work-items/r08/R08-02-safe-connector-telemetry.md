@@ -56,7 +56,7 @@ rather than guessing.
 
 ### Docs read
 
-- `docs/engineering/index.md` — requires centralized conventions, focused validation, and release-safe
+- `docs/engineering/README.md` — requires centralized conventions, focused validation, and release-safe
   package metadata; directly relevant.
 - `docs/architecture/principles.md` — makes reference-as-intent, fail-loud behavior, one canonical path, and
   fewer decision owners binding; directly relevant.

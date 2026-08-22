@@ -24,7 +24,7 @@ Koan’s documentation was a mix of conceptual references, engineering guidance,
   - Keep Strict docs builds as a gate; broken links to removed content must be eliminated before merge.
 - Centralize adapter capabilities in a single YAML source and generate the matrix at build time; link to it from relevant references instead of duplicating.
 - Keep “front doors” prominent and canonical:
-  - Engineering: `docs/engineering/index.md`
+  - Engineering: `docs/engineering/README.md`
   - Architecture principles: `docs/architecture/principles.md`
   - Copilot instructions: `.github/copilot-instructions.md`
 
@@ -56,7 +56,7 @@ Koan’s documentation was a mix of conceptual references, engineering guidance,
 
 ## References
 
-- Engineering front door: `docs/engineering/index.md`
+- Engineering front door: `docs/engineering/README.md`
 - Architecture principles: `docs/architecture/principles.md`
 - Copilot entrypoint: `.github/copilot-instructions.md`
 - DocFX config: `docs/api/docfx.json`

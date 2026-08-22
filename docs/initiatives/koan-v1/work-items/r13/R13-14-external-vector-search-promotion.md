@@ -64,7 +64,7 @@ concept is required.
 
 **Docs read:**
 
-- `docs/engineering/index.md` — requires focused owner evidence, package hygiene, centralized stable
+- `docs/engineering/README.md` — requires focused owner evidence, package hygiene, centralized stable
   identifiers, and proportionate validation; governing.
 - `docs/architecture/principles.md` — makes package reference availability, Vector-owned election,
   adapter-owned mechanics, and corrective failure the public model; governing.

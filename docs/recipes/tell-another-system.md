@@ -59,7 +59,7 @@ await order.Transport.Send(ct);
 The event carries meaning; the transport carries state. Add a broker connector only when a second
 process must receive it — the calls above do not change when you do.
 
-Depth: [communication reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/communication/index.md).
+Depth: [communication reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/communication/index.md).
 
 ## Prove it
 

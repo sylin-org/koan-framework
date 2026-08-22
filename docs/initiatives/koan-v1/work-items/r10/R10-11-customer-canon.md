@@ -88,7 +88,7 @@ declares convergence identity. Registration mechanics are not application concep
 
 ### Documentation
 
-- `docs/engineering/index.md` requires Entity-first data, controller-owned HTTP, standard host composition,
+- `docs/engineering/README.md` requires Entity-first data, controller-owned HTTP, standard host composition,
   centralized constants/options, and focused evidence; it rejects the current unbounded custom tier endpoint.
 - `docs/architecture/principles.md` requires contract assemblies to be inert, functional assemblies to own one module,
   structural composition to compile once, and `AddKoan()` to be sufficient for referenced capabilities.

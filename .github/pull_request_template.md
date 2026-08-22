@@ -25,6 +25,6 @@ Validation notes
 - Tests: scripts/test-*.ps1 or test tasks
 
 References
-- Engineering: docs/engineering/index.md
+- Engineering: docs/engineering/README.md
 - Architecture principles: docs/architecture/principles.md
 - Decision: docs/decisions/ARCH-0042-per-project-companion-docs.md

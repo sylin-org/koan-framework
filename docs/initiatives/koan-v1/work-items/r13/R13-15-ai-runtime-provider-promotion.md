@@ -70,7 +70,7 @@ themselves. No new public concept is required.
 
 **Docs read:**
 
-- `docs/engineering/index.md` — requires focused owner evidence, package hygiene, centralized stable
+- `docs/engineering/README.md` — requires focused owner evidence, package hygiene, centralized stable
   identifiers, and proportionate validation; governing.
 - `docs/architecture/principles.md` — assigns composition law to Core, AI meaning/routing to the pillar,
   protocol mechanics to adapters, and business operations to the application; governing.

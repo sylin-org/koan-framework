@@ -104,7 +104,7 @@ PR hygiene
 
 ## References
 
-- Engineering guardrails: `docs/engineering/index.md`
+- Engineering guardrails: `docs/engineering/README.md`
 - Docs posture - instructions over tutorials: `docs/decisions/ARCH-0041-docs-posture-instructions-over-tutorials.md`
 - Config and constants naming: `docs/decisions/ARCH-0040-config-and-constants-naming.md`
 - Data access semantics (paging/streaming): `docs/decisions/DATA-0061-data-access-pagination-and-streaming.md`

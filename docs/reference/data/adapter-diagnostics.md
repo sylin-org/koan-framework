@@ -13,7 +13,7 @@ validation:
 links:
   related:
     - reference/data/index
-    - reference/cards/orchestration
+    - reference/operations/external-topology
     - engineering/runtime-facts
 ---
 

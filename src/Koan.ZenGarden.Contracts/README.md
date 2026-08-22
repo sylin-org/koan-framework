@@ -46,5 +46,5 @@ offering identity parsing so connectors and the runtime do not invent competing 
 
 ## Technical reference
 
-See the [technical contract](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.ZenGarden.Contracts/TECHNICAL.md)
+See the [technical contract](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.ZenGarden.Contracts/TECHNICAL.md)
 for assembly ownership and layered activation rules.

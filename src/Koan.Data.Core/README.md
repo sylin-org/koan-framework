@@ -203,11 +203,11 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 ## Customization
 
 - Configuration and advanced usage are documented in
-  [TECHNICAL.md](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Core/TECHNICAL.md).
+  [TECHNICAL.md](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Core/TECHNICAL.md).
 
 ## References
 
-- [Data access patterns](https://github.com/sylin-org/Koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
-- [Provider-bounded Entity streams](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
-- [Engineering guardrails](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/index.md)
-- Repo: https://github.com/sylin-org/Koan-framework
+- [Data access patterns](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-access-and-streaming.md)
+- [Provider-bounded Entity streams](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
+- [Engineering guardrails](https://github.com/sylin-org/koan-framework/blob/main/docs/engineering/README.md)
+- Repo: https://github.com/sylin-org/koan-framework

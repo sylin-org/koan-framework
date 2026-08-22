@@ -95,7 +95,7 @@ compiler evaluates ordinary MSBuild/NuGet project identity and Git history.
 **Public concepts:** None. This removes a conflicting internal heuristic and preserves the existing
 Git, MSBuild project, NuGet package ID, and owner-path vocabulary.
 
-**Docs read:** `docs/engineering/index.md` requires a disposable clone for controlled release
+**Docs read:** `docs/engineering/README.md` requires a disposable clone for controlled release
 rehearsals; `docs/architecture/principles.md` requires standard .NET identity and one decision owner;
 `docs/engineering/packaging.md` defines deletion plus a new identity/path as retirement and creation;
 ARCH-0110 makes evaluated package lineage authoritative; this card owns the exact local proof and
@@ -191,7 +191,7 @@ exchange are not part of this process.
 **Public concepts:** No application concept is added. The only operator-facing credential concept is
 the conventional repository Actions secret `NUGET_API_KEY`.
 
-**Docs read:** `docs/engineering/index.md` keeps controlled release proof local until explicit remote
+**Docs read:** `docs/engineering/README.md` keeps controlled release proof local until explicit remote
 authorization; `docs/architecture/principles.md` favors standard platform concepts and one current
 path; `docs/engineering/packaging.md`, `docs/engineering/nuget-publishing.md`, ARCH-0110, and this card
 own the release and trust contract.

@@ -4,8 +4,9 @@ Koan is an opinionated .NET 10 meta-framework for agentic, Entity-centered appli
 the developer's business sentence inward: application code states intent while framework pillars own
 composition, provider negotiation, lifecycle, correction, and explanation.
 
-Koan 1.0 is the stable compatibility train. Every active packable project sits on that train and owns
-its own version, so a package advances only when its own sources — or a shared build input — change.
+Koan 1.x is the stabilization train. Every active packable project sits on it and owns its own
+version, so a package advances only when its own sources — or a shared build input — change. Public
+surface may still be removed inside the train while the framework is unannounced (BUILD-0073).
 Never hand-edit a version; releasing is the [release playbook](../docs/engineering/nuget-publishing.md).
 Read `docs/reference/product-surface.md` for the evaluated inventory and capability evidence before
 strengthening a public promise.

@@ -67,5 +67,5 @@ must never be interpreted as implicit success.
 - Core's generic provider/readiness mechanisms do not own concern policy. Data owns schema recovery, Communication
   owns lane guarantees, and each pillar owns its selection and failure semantics.
 
-See [TECHNICAL.md](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Core/TECHNICAL.md) for lifecycle,
+See [TECHNICAL.md](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Core/TECHNICAL.md) for lifecycle,
 context, facts, provider-catalog, and build-target contracts.

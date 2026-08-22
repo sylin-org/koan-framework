@@ -1,4 +1,4 @@
----
+﻿---
 type: REFERENCE
 domain: framework
 title: "What you can make with Koan today"
@@ -102,10 +102,13 @@ box.
 
 ## The honest edges
 
-Koan 1.0 is the stable .NET 10 train. It does not provision production infrastructure, promise general
-cross-provider transactions or transparent failover, manage backups and disaster recovery, or
-support NativeAOT. Provider-specific consistency, query, durability, and deployment limits still
-matter.
+Koan 1.x is the .NET 10 stabilization train. It does not provision production infrastructure, promise
+general cross-provider transactions or transparent failover, or manage backups and disaster recovery.
+Provider-specific consistency, query, durability, and deployment limits still matter.
+
+NativeAOT is supported and measured rather than assumed — see the
+[deployment boundary](operations/native-aot.md) for what publishes natively and what a provider
+constrains.
 
 This page is the human map. For exact package ownership, maturity, evidence, and support status, use
 the generated [Koan product surface](product-surface.md).

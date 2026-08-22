@@ -1,4 +1,4 @@
-# Contributing to Koan
+﻿# Contributing to Koan
 
 Koan’s public promise is simple: application code reads as the business, while referenced capabilities own
 composition, safe defaults, infrastructure negotiation, runtime explanation, and corrective failure. Contributions
@@ -40,7 +40,7 @@ and expected corrective failure. Run the repository’s relevant lint/example ch
 
 ## Keep one public story
 
-- Current guidance starts at the stable 1.0 train, `AddKoan()`, the four-line host, and `Entity<T>`.
+- Current guidance starts at the 1.x stabilization train, `AddKoan()`, the four-line host, and `Entity<T>`.
 - The [generated product surface](docs/reference/product-surface.md) projects the active package inventory and capability maturity.
 - Link to one canonical explanation instead of copying another current guide.
 - Keep ADRs, initiatives, assessments, and superseded plans as dated evidence—not required user instructions.
@@ -68,4 +68,4 @@ Signed-off-by: Your Name <your.email@example.com>
 ```
 
 Use `git commit -s` to add it automatically; the full certificate is in `DCO`. Code is Apache-2.0 licensed and
-documentation uses [CC BY 4.0](docs/LICENSE-DOCS.md).
+documentation uses [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

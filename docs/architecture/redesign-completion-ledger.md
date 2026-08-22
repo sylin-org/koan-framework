@@ -591,7 +591,7 @@ implemented and its tests pass on real stores.
   token `v1:id:acme` as a path segment → fixed to read `ManagedFieldRegistry.All` clean values). Tenancy suite 96/96.
   **SnapVault dogfood:** the MediaEntity proof exercises PhotoAsset's exact surface; full SnapVault runtime-wiring deferred
   (needs Docker + background-worker tenant-threading) and documented in the tenancy how-to instead. **Tenancy promoted to a
-  first-class PILLAR (`9d7296de`):** card `reference/cards/tenancy.md` + how-to `guides/tenancy-howto.md` + skill
+  first-class PILLAR (`9d7296de`):** card `reference/identity/index.md` + how-to `guides/tenancy-howto.md` + skill
   `koan-tenancy` (compile-gated) + CLAUDE.md/skills-README/SURFACES registration. **0.3 vector** = the remaining sibling
   (needs Docker/Weaviate; axis-generic with ARCH-0098). NEXT = fold `wf_03ef19e6-88c` → mark STOR-0011 Accepted; then 0.3 vector.
 - ◐ **ARCH-0102 — THE ACCESS OVERLAY DEFINITION BLOCK (AODB): PHASES 1 + 2 SHIPPED (2026-06-25, `dev`, unpushed).**

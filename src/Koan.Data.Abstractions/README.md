@@ -89,5 +89,5 @@ MCP, or another projection must normalize its protocol into that operation befor
 - Native exception evidence remains adapter-owned and restricted. Data owns the stable public failure kind,
   commit outcome, retry disposition, replay disposition, and safe corrective facts.
 
-See [TECHNICAL.md](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Data.Abstractions/TECHNICAL.md)
+See [TECHNICAL.md](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Abstractions/TECHNICAL.md)
 for query ownership, capability semantics, and adapter compatibility rules.

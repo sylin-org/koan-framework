@@ -87,7 +87,7 @@ Framework pillars self-register via `KoanPillarManifest` attributes and are disc
 
 - **ADR**: [ARCH-0068 - Refactoring Strategy](../../../docs/decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)
 - **Examples**: See the domain-named `*Module` classes in `src/Connectors/**/Initialization/`
-- **Pattern**: [Reference = Intent](../../../docs/decisions/ARCH-0001-reference-equals-intent.md)
+- **Pattern**: [Reference = Intent](../../../docs/decisions/ARCH-0114-layered-capability-activation.md)
 
 ---
 

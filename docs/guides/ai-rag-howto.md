@@ -119,7 +119,7 @@ check the connector's README before assuming either.
 The builder is immutable, so these compose without surprising each other. `Parse<T>()` turns output
 into a typed object; `Classify`, `Rerank`, `Compress`, and `Moderate` are steps; `WithTools(...)`,
 `WithMemory(...)`, and `Scope(...)` are explicit choices; streaming yields `ChainChunk`. The
-[package README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Orchestration/README.md)
+[package README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Orchestration/README.md)
 owns the full step vocabulary.
 
 ## What this does not do

@@ -146,5 +146,5 @@ not remote settlement, retries, deduplication, dead letters, replay, Events, or 
 Jobs wake and Cache peer invalidation both reuse Communication while retaining their different delivery topology.
 No arbitrary-object messaging surface is implemented underneath this API.
 
-See the [Communication reference](https://github.com/sylin-org/Koan-framework/blob/main/docs/reference/communication/index.md)
-and [ARCH-0113](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/ARCH-0113-entity-capability-communication.md).
+See the [Communication reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/communication/index.md)
+and [ARCH-0113](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/ARCH-0113-entity-capability-communication.md).

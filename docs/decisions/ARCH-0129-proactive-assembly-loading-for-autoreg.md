@@ -31,7 +31,7 @@ Koan.Core's AppBootstrapper will proactively load all referenced Koan.* assembli
 - If an adapter assembly is present but not referenced, it will still be loaded, but will not affect DI unless its registrar is present.
 
 ## References
-- /docs/engineering/index.md
+- /docs/engineering/README.md
 - /docs/guides/data/all-query-streaming-and-pager.md
 - /docs/decisions/DATA-0061-data-access-pagination-and-streaming.md
 - /docs/decisions/ARCH-0040-config-and-constants-naming.md

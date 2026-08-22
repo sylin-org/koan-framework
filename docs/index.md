@@ -1,4 +1,4 @@
----
+﻿---
 type: GUIDE
 domain: framework
 title: "Koan documentation"
@@ -58,4 +58,4 @@ Add what the application asks for. The domain code should remain the easiest par
 - [Troubleshoot a running application](support/troubleshooting.md).
 - [Orient a coding agent](../llms.txt).
 
-> Koan 1.0 is the stable .NET 10 release train.
+> Koan 1.x is the .NET 10 stabilization train. Every active package ships on it.

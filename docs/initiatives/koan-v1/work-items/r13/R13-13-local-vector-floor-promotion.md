@@ -63,7 +63,7 @@ from the still-experimental AI runtime so support does not leak across unrelated
 
 **Docs read:**
 
-- `docs/engineering/index.md` — requires Entity-first use, focused owner evidence, package hygiene,
+- `docs/engineering/README.md` — requires Entity-first use, focused owner evidence, package hygiene,
   centralized identifiers, and proportionate validation; directly applicable.
 - `docs/architecture/principles.md` — makes package reference the availability declaration and the
   Vector pillar the decision owner; directly applicable.

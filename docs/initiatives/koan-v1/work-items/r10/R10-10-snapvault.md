@@ -111,7 +111,7 @@ interfaces and the historical phase vocabulary are candidates for deletion durin
 
 ### Documentation
 
-- `docs/engineering/index.md` requires Entity-first data, controller-owned HTTP, centralized constants/options,
+- `docs/engineering/README.md` requires Entity-first data, controller-owned HTTP, centralized constants/options,
   focused tests, and current companion docs; it governs the graduation edits.
 - `docs/architecture/principles.md` establishes business-to-code mapping, local-first defaults, provider honesty,
   one compiled composition, and thin hot paths; it rejects the current external-first default.

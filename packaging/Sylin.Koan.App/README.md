@@ -82,5 +82,5 @@ source or Entity routing still wins when the application states a narrower inten
 - This package contains no runtime assembly of its own and intentionally emits no symbol package.
 
 Use `Sylin.Koan.Templates` for the same path as an ordinary `dotnet new` project, or read the
-[FirstUse sample](https://github.com/sylin-org/Koan-framework/tree/main/samples/FirstUse) for the stable 1.0
+[FirstUse sample](https://github.com/sylin-org/koan-framework/tree/main/samples/FirstUse) for the full
 experience with SQLite, MCP, and shared operator/agent facts.

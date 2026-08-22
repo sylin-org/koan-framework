@@ -560,7 +560,7 @@ projection while multiple sources must share the same chokepoint. One typed cata
 endpoint, paging, retry, and cache placement are deployment tunables. A cache manifest is durable source evidence,
 not a second application database.
 
-**Docs read:** `docs/engineering/index.md` establishes controller/entity/constants/options and focused-validation
+**Docs read:** `docs/engineering/README.md` establishes controller/entity/constants/options and focused-validation
 guardrails; `docs/architecture/principles.md` establishes business-first code, provider election, thin adapters, and
 standard-.NET ownership; `docs/toc.yml`, root `README.md`, and `samples/CATALOG.md` establish the current public front
 doors; the product constitution establishes honest topology commitments and golden-sample evidence; the current Jobs

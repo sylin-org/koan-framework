@@ -2,7 +2,7 @@
 
 Natural language parameter validation for Koan Framework.
 
-**📘 Full Documentation**: [docs/reference/core/guard-utilities.md](../../../../../docs/reference/core/guard-utilities.md)
+**📘 Full Documentation**: [docs/reference/core/guard-utilities.md](../../../../docs/reference/core/guard-utilities.md)
 
 ## Overview
 
@@ -262,7 +262,7 @@ public IActionResult CreateTodo([FromBody] CreateTodoRequest request)
 | `Defined<TEnum>()` | `enum` | Validates enum is defined |
 | `Where(predicate, message)` | Any | Throws if predicate returns false |
 
-**See the [full documentation](../../../../../docs/reference/core/guard-utilities.md) for detailed examples and usage patterns.**
+**See the [full documentation](../../../../docs/reference/core/guard-utilities.md) for detailed examples and usage patterns.**
 
 ## Extensibility
 
@@ -390,6 +390,6 @@ dotnet test tests/Suites/Core/Koan.Core.Tests
 
 ## See Also
 
-- [Proposal: Fluent Guard Pattern](../../../../docs/proposals/PROP-fluent-guard-pattern.md)
+- [Proposal: Fluent Guard Pattern](../../../../docs/archive/proposals/complete/PROP-fluent-guard-pattern.md)
 - [Koan Framework Entity Modeling Guide](../../../../docs/guides/)
 - [.NET CallerArgumentExpression](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/attributes/caller-information)

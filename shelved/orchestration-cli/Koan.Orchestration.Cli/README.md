@@ -243,5 +243,5 @@ koan-orchestrate export compose
 
 See also
 
-- Docs: /docs/engineering/index.md, /docs/architecture/principles.md
+- Docs: /docs/engineering/README.md, /docs/architecture/principles.md
 - Decisions: /docs/decisions/WEB-0035-entitycontroller-transformers.md, /docs/decisions/DATA-0061-data-access-pagination-and-streaming.md

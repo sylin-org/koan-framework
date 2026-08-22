@@ -100,10 +100,10 @@ last_updated: 2026-07-18
 
 ## References
 
-- [Web API](https://github.com/sylin-org/Koan-framework/blob/main/docs/api/web-http-api.md)
-- [WEB-0035 — EntityController transformers](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/WEB-0035-entitycontroller-transformers.md)
-- [Engineering guardrails](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/index.md)
-- [Runtime facts](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/runtime-facts.md)
+- [Web API](https://github.com/sylin-org/koan-framework/blob/main/docs/api/web-http-api.md)
+- [WEB-0035 — EntityController transformers](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0035-entitycontroller-transformers.md)
+- [Engineering guardrails](https://github.com/sylin-org/koan-framework/blob/main/docs/engineering/README.md)
+- [Runtime facts](https://github.com/sylin-org/koan-framework/blob/main/docs/engineering/runtime-facts.md)
 
 ## Relationship expansion safety
 

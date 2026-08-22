@@ -67,7 +67,7 @@ Add `Sylin.Koan.Testing.Containers` when a claim needs the real backing service,
 `Sylin.Koan.Observability` when traces have a destination.
 
 Depth: [testing your app](../guides/testing-your-app.md) ·
-[operations](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/operations/index.md).
+[operations](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/operations/index.md).
 
 ## Prove it
 

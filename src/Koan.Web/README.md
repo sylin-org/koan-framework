@@ -72,7 +72,7 @@ surface. Static-file wiring stays dormant in API-only hosts that have no real we
 
 ## Technical reference
 
-- [Koan.Web technical reference](https://github.com/sylin-org/Koan-framework/blob/main/src/Koan.Web/TECHNICAL.md)
-- [Web API conventions](https://github.com/sylin-org/Koan-framework/blob/main/docs/api/web-http-api.md)
-- [WEB-0035 — EntityController transformers](https://github.com/sylin-org/Koan-framework/blob/main/docs/decisions/WEB-0035-entitycontroller-transformers.md)
-- [Engineering guardrails](https://github.com/sylin-org/Koan-framework/blob/main/docs/engineering/index.md)
+- [Koan.Web technical reference](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/TECHNICAL.md)
+- [Web API conventions](https://github.com/sylin-org/koan-framework/blob/main/docs/api/web-http-api.md)
+- [WEB-0035 — EntityController transformers](https://github.com/sylin-org/koan-framework/blob/main/docs/decisions/WEB-0035-entitycontroller-transformers.md)
+- [Engineering guardrails](https://github.com/sylin-org/koan-framework/blob/main/docs/engineering/README.md)

@@ -98,5 +98,5 @@ See TECHNICAL.md for contracts, options, and pushdown notes.
 
 - [DATA-0107 provider-bounded Entity streams](../../../../docs/decisions/DATA-0107-provider-bounded-entity-streams.md)
 - [Entity access and streaming](../../../../docs/guides/data/entity-access-and-streaming.md)
-- Engineering front door: `~/engineering/index.md`
+- Engineering front door: `~/engineering/README.md`
 

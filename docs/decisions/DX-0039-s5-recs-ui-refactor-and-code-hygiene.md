@@ -100,7 +100,7 @@ Operational
 
 ## References
 
-- Engineering front door: `/docs/engineering/index.md`
+- Engineering front door: `/docs/engineering/README.md`
 - Architecture principles: `/docs/architecture/principles.md`
 - Decisions:
   - `ARCH-0040-config-and-constants-naming.md`

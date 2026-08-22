@@ -1,15 +1,15 @@
----
+﻿---
 type: REF
 domain: core
 title: "Guard Utilities Reference"
 audience: [developers, architects]
-status: archived
-last_updated: 2025-10-12
-framework_version: v0.20.0
+status: current
+last_updated: 2026-08-22
+framework_version: v1.0.0
 validation:
-  date_last_tested: 2025-10-12
+  date_last_tested: 2026-08-22
   status: verified
-  scope: docs/reference/core/guard-utilities.md
+  scope: every member documented here resolves in src/Koan.Core/Utilities/Guard; prose and examples not re-run
 ---
 
 # Guard Utilities Reference

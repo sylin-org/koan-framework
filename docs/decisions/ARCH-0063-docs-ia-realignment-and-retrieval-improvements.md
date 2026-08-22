@@ -113,4 +113,4 @@ Phase 5 – Polish (mid)
 
 - ARCH-0041 – Docs posture: instructions over tutorials
 - DATA-0061 – Data access semantics (All/Query/Stream/Page)
-- Engineering guardrails: docs/engineering/index.md
+- Engineering guardrails: docs/engineering/README.md

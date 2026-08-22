@@ -46,7 +46,7 @@ Minimize distinct concepts and cognitive branches, not physical lines or tokens;
 Open and read the 3-5 most relevant documentation files and entry points.
 Start with:
 
-- docs/engineering/index.md
+- docs/engineering/README.md
 - docs/architecture/principles.md
 - docs/toc.yml
 - README.md

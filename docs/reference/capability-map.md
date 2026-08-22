@@ -59,9 +59,9 @@ Every package identifier begins `Sylin.Koan.`. Namespaces remain `Koan.*`; the p
 namespace deliberately differ.
 
 The complete capability-to-package authority is
-[product surface](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/product-surface.md).
+[product surface](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/product-surface.md).
 Runnable end-to-end examples are in
-[samples](https://github.com/sylin-org/koan-framework/blob/v1.0.0/samples/README.md).
+[samples](https://github.com/sylin-org/koan-framework/blob/main/samples/README.md).
 
 ## Assessment
 
@@ -79,7 +79,7 @@ without one — they are installable and documented, but nothing has been promis
 
 Recommend one only when the outcome needs it, and say plainly that it is not assessed. The complete
 picture is in the
-[product surface](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/product-surface.md).
+[product surface](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/product-surface.md).
 
 A reference declares availability. It does not prove provider parity, external infrastructure, or a
 particular operation. State an evidence gap plainly and offer the nearest honest seam.
@@ -92,8 +92,8 @@ particular operation. State an evidence gap plainly and offer the nearest honest
 | Web application bundle | `Sylin.Koan.App` |
 | Foundation bundle (no Web) | `Sylin.Koan` |
 
-[Quickstart](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/getting-started/quickstart.md)
-· [Adopt an existing app](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/getting-started/adopt-existing-app.md)
+[Quickstart](https://github.com/sylin-org/koan-framework/blob/main/docs/getting-started/quickstart.md)
+· [Adopt an existing app](https://github.com/sylin-org/koan-framework/blob/main/docs/getting-started/adopt-existing-app.md)
 
 ## Data
 
@@ -101,76 +101,76 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 
 | Store | Package | Also needs | Recipe |
 |---|---|---|---|
-| JSON (file-backed) | `Sylin.Koan.Data.Connector.Json` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Json/README.md) |
-| InMemory | `Sylin.Koan.Data.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/InMemory/README.md) |
-| SQLite | `Sylin.Koan.Data.Connector.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Sqlite/README.md) |
-| MongoDB | `Sylin.Koan.Data.Connector.Mongo` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Mongo/README.md) |
-| PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Postgres/README.md) |
-| MySQL | `Sylin.Koan.Data.Connector.MySql` — **not assessed** | **a reachable MySQL server** | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/MySql/README.md) |
-| SQL Server | `Sylin.Koan.Data.Connector.SqlServer` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/SqlServer/README.md) |
-| Redis | `Sylin.Koan.Data.Connector.Redis` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Redis/README.md) |
-| Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Couchbase/README.md) |
-| CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Cockroach/README.md) |
+| JSON (file-backed) | `Sylin.Koan.Data.Connector.Json` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Json/README.md) |
+| InMemory | `Sylin.Koan.Data.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/InMemory/README.md) |
+| SQLite | `Sylin.Koan.Data.Connector.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Sqlite/README.md) |
+| MongoDB | `Sylin.Koan.Data.Connector.Mongo` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Mongo/README.md) |
+| PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Postgres/README.md) |
+| MySQL | `Sylin.Koan.Data.Connector.MySql` — **not assessed** | **a reachable MySQL server** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/MySql/README.md) |
+| SQL Server | `Sylin.Koan.Data.Connector.SqlServer` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/SqlServer/README.md) |
+| Redis | `Sylin.Koan.Data.Connector.Redis` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Redis/README.md) |
+| Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Couchbase/README.md) |
+| CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Cockroach/README.md) |
 
 Additive data behavior:
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Recoverable deletion (restore removed Entities) | `Sylin.Koan.Data.SoftDelete` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Data.SoftDelete/README.md) |
-| Move the active default store, verifiably | `Sylin.Koan.Data.Cutover` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Data.Cutover/README.md) · [Guide](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/data/default-route-cutover.md) |
+| Recoverable deletion (restore removed Entities) | `Sylin.Koan.Data.SoftDelete` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.SoftDelete/README.md) |
+| Move the active default store, verifiably | `Sylin.Koan.Data.Cutover` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Cutover/README.md) · [Guide](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/default-route-cutover.md) |
 
 Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the owning package exists.
 
-[Entity recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/entity-capabilities-howto.md)
-· [Data reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/data/index.md)
+[Entity recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/entity-capabilities-howto.md)
+· [Data reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/data/index.md)
 
 ## Web
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/web/index.md) |
-| Shaping, hooks, and projection add-ons | `Sylin.Koan.Web.Extensions` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Web.Extensions/README.md) |
-| OpenAPI description | `Sylin.Koan.Web.OpenApi` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Web.Extensions/README.md) |
-| Server-sent events | `Sylin.Koan.Web.Sse` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Web.Extensions/README.md) |
-| Social/link preview cards | `Sylin.Koan.Web.OpenGraph` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Web.OpenGraph/README.md) |
-| Authenticated development diagnostics | `Sylin.Koan.Web.Admin` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Web.Admin/README.md) |
+| HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
+| Shaping, hooks, and projection add-ons | `Sylin.Koan.Web.Extensions` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
+| OpenAPI description | `Sylin.Koan.Web.OpenApi` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
+| Server-sent events | `Sylin.Koan.Web.Sse` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
+| Social/link preview cards | `Sylin.Koan.Web.OpenGraph` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.OpenGraph/README.md) |
+| Authenticated development diagnostics | `Sylin.Koan.Web.Admin` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Admin/README.md) |
 
 ## Trust and isolation
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Authentication and authorization | `Sylin.Koan.Web.Auth` | **a provider** — a sign-in connector below, or a configuration-only OIDC/OAuth2 provider (no connector package needed) | [Auth recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/auth-howto.md) · [Authorization recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/authorization-howto.md) |
-| Google sign-in | `Sylin.Koan.Web.Auth.Connector.Google` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Web/Auth/Google/README.md) |
-| Microsoft sign-in | `Sylin.Koan.Web.Auth.Connector.Microsoft` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Web/Auth/Microsoft/README.md) |
-| Discord sign-in | `Sylin.Koan.Web.Auth.Connector.Discord` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Web/Auth/Discord/README.md) |
-| Deterministic sign-in for tests | `Sylin.Koan.Web.Auth.Connector.Test` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Web/Auth/Test/README.md) |
-| Issue tokens from this application | `Sylin.Koan.Web.Auth.Server` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/identity/index.md) |
-| Durable person identity | `Sylin.Koan.Identity` · `Sylin.Koan.Identity.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/identity/index.md) |
-| Inbound token trust | `Sylin.Koan.Security.Trust` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/identity/index.md) |
-| Tenant isolation | `Sylin.Koan.Tenancy` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/tenancy-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Tenancy/README.md) |
-| Tenant operator console | `Sylin.Koan.Tenancy.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Tenancy.Web/README.md) |
-| Identity-bound tenancy | `Sylin.Koan.Identity.Tenancy` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Identity.Tenancy/README.md) |
-| Field-at-rest classification | `Sylin.Koan.Classification` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Classification/README.md) |
+| Authentication and authorization | `Sylin.Koan.Web.Auth` | **a provider** — a sign-in connector below, or a configuration-only OIDC/OAuth2 provider (no connector package needed) | [Auth recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/auth-howto.md) · [Authorization recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/authorization-howto.md) |
+| Google sign-in | `Sylin.Koan.Web.Auth.Connector.Google` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Web/Auth/Google/README.md) |
+| Microsoft sign-in | `Sylin.Koan.Web.Auth.Connector.Microsoft` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Web/Auth/Microsoft/README.md) |
+| Discord sign-in | `Sylin.Koan.Web.Auth.Connector.Discord` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Web/Auth/Discord/README.md) |
+| Deterministic sign-in for tests | `Sylin.Koan.Web.Auth.Connector.Test` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Web/Auth/Test/README.md) |
+| Issue tokens from this application | `Sylin.Koan.Web.Auth.Server` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/identity/index.md) |
+| Durable person identity | `Sylin.Koan.Identity` · `Sylin.Koan.Identity.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/identity/index.md) |
+| Inbound token trust | `Sylin.Koan.Security.Trust` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/identity/index.md) |
+| Tenant isolation | `Sylin.Koan.Tenancy` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/tenancy-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Tenancy/README.md) |
+| Tenant operator console | `Sylin.Koan.Tenancy.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Tenancy.Web/README.md) |
+| Identity-bound tenancy | `Sylin.Koan.Identity.Tenancy` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Identity.Tenancy/README.md) |
+| Field-at-rest classification | `Sylin.Koan.Classification` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Classification/README.md) |
 
 ## Work and integration
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Durable and scheduled work | `Sylin.Koan.Jobs` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/jobs-howto.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/jobs/index.md) |
-| Deterministic Job tests | `Sylin.Koan.Jobs.Testing` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/jobs/index.md) |
-| Entity events and snapshot transport | `Sylin.Koan.Communication` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Communication/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/communication/index.md) |
-| RabbitMQ carriage | `Sylin.Koan.Communication.Connector.RabbitMq` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Communication/RabbitMq/README.md) |
+| Durable and scheduled work | `Sylin.Koan.Jobs` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/jobs-howto.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/jobs/index.md) |
+| Deterministic Job tests | `Sylin.Koan.Jobs.Testing` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/jobs/index.md) |
+| Entity events and snapshot transport | `Sylin.Koan.Communication` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Communication/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/communication/index.md) |
+| RabbitMQ carriage | `Sylin.Koan.Communication.Connector.RabbitMq` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Communication/RabbitMq/README.md) |
 
 ## State and content
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Cache and derived state | `Sylin.Koan.Cache` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Cache/README.md) |
-| Durable local cache | `Sylin.Koan.Cache.Adapter.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Cache.Adapter.Sqlite/README.md) |
-| Shared Redis cache | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Cache.Adapter.Redis/README.md) |
-| Entity-owned files | `Sylin.Koan.Storage` · `Sylin.Koan.Storage.Connector.Local` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Storage/Local/README.md) |
-| Remote object storage | `Sylin.Koan.Storage.Connector.S3` — **not assessed** (shelved) | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Storage/S3/README.md) |
-| Media recipes and derivatives | `Sylin.Koan.Media.Core` · `Sylin.Koan.Media.Web` | **a Storage connector** — Storage itself arrives with Media, but the bytes still need somewhere to live | [Recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/media-recipes-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Media.Core/README.md) |
+| Cache and derived state | `Sylin.Koan.Cache` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Cache/README.md) |
+| Durable local cache | `Sylin.Koan.Cache.Adapter.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Cache.Adapter.Sqlite/README.md) |
+| Shared Redis cache | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Cache.Adapter.Redis/README.md) |
+| Entity-owned files | `Sylin.Koan.Storage` · `Sylin.Koan.Storage.Connector.Local` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Storage/Local/README.md) |
+| Remote object storage | `Sylin.Koan.Storage.Connector.S3` — **not assessed** (shelved) | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Storage/S3/README.md) |
+| Media recipes and derivatives | `Sylin.Koan.Media.Core` · `Sylin.Koan.Media.Web` | **a Storage connector** — Storage itself arrives with Media, but the bytes still need somewhere to live | [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/media-recipes-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Media.Core/README.md) |
 
 Prefer the local Storage path and the durable local cache. S3 is shelved and neither it nor the Redis
 cache adapter is assessed; recommend either only when the developer asks, and say so plainly.
@@ -184,63 +184,63 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Model operations | `Sylin.Koan.AI` | **one AI connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Contracts/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/ai/index.md) |
-| Ollama | `Sylin.Koan.AI.Connector.Ollama` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/AI/Ollama/README.md) |
-| LM Studio | `Sylin.Koan.AI.Connector.LMStudio` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/AI/LMStudio/README.md) |
-| ONNX (in-process) | `Sylin.Koan.AI.Connector.Onnx` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/AI/Onnx/README.md) |
-| Hugging Face | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/AI/HuggingFace/README.md) |
-| Inspectable prompts and HTTP projection | `Sylin.Koan.AI.Prompt` · `Sylin.Koan.AI.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Prompt/README.md) |
-| Answer from your own Entities (RAG), branch, parse to a type, stream | `Sylin.Koan.AI.Orchestration` — **not assessed** | **a chat provider**; retrieval steps also need the Entity's embedding and vector path | [RAG recipe](../guides/ai-rag-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Orchestration/README.md) |
-| Bounded agents whose tools are generated from `Entity<T>` | `Sylin.Koan.AI.Agents` — **not assessed** | **a chat provider**, plus the Data providers behind the Entity tools; `WithSearch<T>()` also needs the embedding and vector path | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Agents/README.md) |
-| Acquire, convert, deploy, and version model artifacts | `Sylin.Koan.AI.Models` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Models/README.md) |
-| Human approve/reject/edit queues over AI output | `Sylin.Koan.AI.Review` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Review/README.md) |
-| Measure results, gate on metrics, detect drift | `Sylin.Koan.AI.Eval` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.AI.Eval/README.md) |
-| `[Embedding]` on an Entity, and `EntityAi` operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Data.AI/README.md) |
-| Entity vector semantics | `Sylin.Koan.Data.Vector` | **one vector connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Data.Vector.Abstractions/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/ai/vector.md) |
-| In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/InMemory/README.md) |
-| Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/SqliteVec/README.md) |
-| pgvector | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | **Postgres with the `vector` extension** | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/PgVector/README.md) |
-| Redis vectors | `Sylin.Koan.Data.Vector.Connector.RedisVector` — **not assessed** | **a Redis deployment with Search/vector support**; plain Redis is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/RedisVector/README.md) |
-| Mongo Atlas vectors | `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | **an Atlas deployment with Vector Search**; ordinary MongoDB is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/MongoAtlasVector/README.md) |
-| Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Qdrant/README.md) |
-| Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Weaviate/README.md) |
-| Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/Vector/Milvus/README.md) |
-| Elasticsearch vectors | `Sylin.Koan.Data.Connector.ElasticSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/ElasticSearch/README.md) |
-| OpenSearch vectors | `Sylin.Koan.Data.Connector.OpenSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Connectors/Data/OpenSearch/README.md) |
+| Model operations | `Sylin.Koan.AI` | **one AI connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Contracts/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/ai/index.md) |
+| Ollama | `Sylin.Koan.AI.Connector.Ollama` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) |
+| LM Studio | `Sylin.Koan.AI.Connector.LMStudio` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/LMStudio/README.md) |
+| ONNX (in-process) | `Sylin.Koan.AI.Connector.Onnx` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Onnx/README.md) |
+| Hugging Face | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/HuggingFace/README.md) |
+| Inspectable prompts and HTTP projection | `Sylin.Koan.AI.Prompt` · `Sylin.Koan.AI.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Prompt/README.md) |
+| Answer from your own Entities (RAG), branch, parse to a type, stream | `Sylin.Koan.AI.Orchestration` — **not assessed** | **a chat provider**; retrieval steps also need the Entity's embedding and vector path | [RAG recipe](../guides/ai-rag-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Orchestration/README.md) |
+| Bounded agents whose tools are generated from `Entity<T>` | `Sylin.Koan.AI.Agents` — **not assessed** | **a chat provider**, plus the Data providers behind the Entity tools; `WithSearch<T>()` also needs the embedding and vector path | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Agents/README.md) |
+| Acquire, convert, deploy, and version model artifacts | `Sylin.Koan.AI.Models` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Models/README.md) |
+| Human approve/reject/edit queues over AI output | `Sylin.Koan.AI.Review` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Review/README.md) |
+| Measure results, gate on metrics, detect drift | `Sylin.Koan.AI.Eval` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Eval/README.md) |
+| `[Embedding]` on an Entity, and `EntityAi` operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.AI/README.md) |
+| Entity vector semantics | `Sylin.Koan.Data.Vector` | **one vector connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Vector.Abstractions/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/ai/vector.md) |
+| In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/InMemory/README.md) |
+| Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/SqliteVec/README.md) |
+| pgvector | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | **Postgres with the `vector` extension** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/PgVector/README.md) |
+| Redis vectors | `Sylin.Koan.Data.Vector.Connector.RedisVector` — **not assessed** | **a Redis deployment with Search/vector support**; plain Redis is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/RedisVector/README.md) |
+| Mongo Atlas vectors | `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | **an Atlas deployment with Vector Search**; ordinary MongoDB is insufficient | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/MongoAtlasVector/README.md) |
+| Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Qdrant/README.md) |
+| Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Weaviate/README.md) |
+| Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Milvus/README.md) |
+| Elasticsearch vectors | `Sylin.Koan.Data.Connector.ElasticSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/ElasticSearch/README.md) |
+| OpenSearch vectors | `Sylin.Koan.Data.Connector.OpenSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/OpenSearch/README.md) |
 
 `[Embedding]` and `EntityAi` live in `Sylin.Koan.Data.AI`, and nothing else brings it in. Reference it
 explicitly whenever an Entity save should produce a vector — the AI connector and the vector store do
 not supply it on their own.
 
-[AI and vector recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/ai-vector-howto.md)
+[AI and vector recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/ai-vector-howto.md)
 
 ## Agent surfaces
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| MCP tools and resources over Entities | `Sylin.Koan.Mcp` | — | [Agent-native recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/mcp-agent-native-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Mcp/README.md) |
-| Remote HTTP/SSE transport | `Sylin.Koan.Mcp` | — | [HTTP/SSE recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/mcp-http-sse-howto.md) |
-| Human MCP console | `Sylin.Koan.Mcp.Explorer` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/agents/index.md) |
-| Operational agent tools | `Sylin.Koan.Mcp.Operations` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/agents/index.md) |
+| MCP tools and resources over Entities | `Sylin.Koan.Mcp` | — | [Agent-native recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-agent-native-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Mcp/README.md) |
+| Remote HTTP/SSE transport | `Sylin.Koan.Mcp` | — | [HTTP/SSE recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-http-sse-howto.md) |
+| Human MCP console | `Sylin.Koan.Mcp.Explorer` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
+| Operational agent tools | `Sylin.Koan.Mcp.Operations` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
 
 ## Trusted records
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Reconcile imperfect arrivals | `Sylin.Koan.Canon` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/canon-capabilities-howto.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/canon/index.md) |
-| Review and commit over HTTP | `Sylin.Koan.Canon.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/canon/index.md) |
+| Reconcile imperfect arrivals | `Sylin.Koan.Canon` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/canon-capabilities-howto.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/canon/index.md) |
+| Review and commit over HTTP | `Sylin.Koan.Canon.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/canon/index.md) |
 
 ## Proof and operations
 
 | Outcome | Package | Also needs | Recipe |
 |---|---|---|---|
-| Application tests through a real host | `Sylin.Koan.Testing` · `Sylin.Koan.Testing.Hosting` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/guides/testing-your-app.md) |
-| Real backing services in tests | `Sylin.Koan.Testing.Containers` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Testing.Containers/README.md) |
-| OpenTelemetry export | `Sylin.Koan.Observability` | — | [README](https://github.com/sylin-org/koan-framework/blob/v1.0.0/src/Koan.Observability/README.md) |
+| Application tests through a real host | `Sylin.Koan.Testing` · `Sylin.Koan.Testing.Hosting` | — | [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/testing-your-app.md) |
+| Real backing services in tests | `Sylin.Koan.Testing.Containers` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Testing.Containers/README.md) |
+| OpenTelemetry export | `Sylin.Koan.Observability` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Observability/README.md) |
 
 Facts, health, and composition evidence need no package — they arrive with the foundation. See the
 main skill for their addresses, and
-[operations](https://github.com/sylin-org/koan-framework/blob/v1.0.0/docs/reference/operations/index.md).
+[operations](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/operations/index.md).
 
 ## Choosing a data store
 

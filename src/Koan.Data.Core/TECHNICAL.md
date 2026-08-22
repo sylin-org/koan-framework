@@ -331,5 +331,5 @@ validation:
 - ADR DATA-0096 - unified filter pipeline: `/docs/decisions/DATA-0096-unified-filter-pipeline.md`
 - ADR DATA-0107 - provider-bounded Entity streams: `/docs/decisions/DATA-0107-provider-bounded-entity-streams.md`
 - ADR ARCH-0084 - unified capability model: `/docs/decisions/ARCH-0084-unified-capability-model.md`
-- Engineering guardrails: `/docs/engineering/index.md`
+- Engineering guardrails: `/docs/engineering/README.md`
 

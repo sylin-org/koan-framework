@@ -49,5 +49,5 @@ await exporter.GenerateAsync(plan, Profile.Local, ".Koan/compose.yml");
 
 - [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – CLI front-end invoking the exporter.
 - [`Koan.Orchestration.Connector.Docker`](../Koan.Orchestration.Connector.Docker/README.md), [`Koan.Orchestration.Connector.Podman`](../Koan.Orchestration.Connector.Podman/README.md) – providers consuming the generated Compose files.
-- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design principles.
+- `/docs/engineering/README.md`, `/docs/architecture/principles.md` – orchestration design principles.
 

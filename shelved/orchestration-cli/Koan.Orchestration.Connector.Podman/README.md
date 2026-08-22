@@ -57,5 +57,5 @@ if (availability.Ok)
 
 - [`Koan.Orchestration.Cli`](../Koan.Orchestration.Cli/README.md) – caller of this provider.
 - [`Koan.Orchestration.Connector.Docker`](../Koan.Orchestration.Connector.Docker/README.md) – sibling provider for Docker parity testing.
-- `/docs/engineering/index.md`, `/docs/architecture/principles.md` – orchestration design tenets.
+- `/docs/engineering/README.md`, `/docs/architecture/principles.md` – orchestration design tenets.
 

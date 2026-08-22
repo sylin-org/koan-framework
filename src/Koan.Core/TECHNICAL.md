@@ -118,7 +118,7 @@ source: src/Koan.Core/
 ## References
 
 - ARCH-0040 config and constants: `/docs/decisions/ARCH-0040-config-and-constants-naming.md`
-- Engineering guardrails: `/docs/engineering/index.md`
+- Engineering guardrails: `/docs/engineering/README.md`
 - Runtime facts: `/docs/engineering/runtime-facts.md`
 - ARCH-0111: `/docs/decisions/ARCH-0111-unified-runtime-facts.md`
 - ARCH-0113: `/docs/decisions/ARCH-0113-entity-capability-communication.md`
