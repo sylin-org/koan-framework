@@ -118,6 +118,16 @@ internal sealed class MySqlDdlExecutor(MySqlConnection connection, MySqlDialect 
     public Task AddColumn(RelationalTableDefinition table, RelationalColumnDefinition column, CancellationToken ct = default) =>
         Execute($"ALTER TABLE {Qualify(table)} ADD COLUMN {Definition(column)}", ct);
 
+    /// <summary>
+    /// One statement: MySQL restates a generated column in place and rebuilds every index over it, so the
+    /// indexes the old expression had quietly retired come back with it.
+    /// </summary>
+    public Task RebuildProjection(
+        RelationalTableDefinition table,
+        RelationalColumnDefinition column,
+        CancellationToken ct = default) =>
+        Execute($"ALTER TABLE {Qualify(table)} MODIFY COLUMN {Definition(column)}", ct);
+
     private string Definition(RelationalColumnDefinition column)
     {
         if (column.IsProjected)

@@ -29,8 +29,8 @@ public sealed class MySqlProjectionDriftSpec(MySqlFixture fixture, ITestOutputHe
         report["State"].Should().Be("Healthy", "Koan wrote this column and its recipe is the current one");
     }
 
-    [Fact(DisplayName = "MySQL: a generated column built by an older Koan is reported, not ignored")]
-    public async Task A_stale_projection_is_reported()
+    [Fact(DisplayName = "MySQL: a generated column built by an older Koan is rebuilt on the boot that notices")]
+    public async Task A_stale_projection_is_rebuilt()
     {
         RequireBackingStore();
         string table;
@@ -52,16 +52,37 @@ public sealed class MySqlProjectionDriftSpec(MySqlFixture fixture, ITestOutputHe
             await alter.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 
-        // A second host so the readiness cache is not answering for the shape as it was.
+        (await Comment(table)).Should().BeEmpty("this is the column an upgraded database actually holds");
+
+        // A second host so the readiness cache is not answering for the shape as it was. Booting provisions,
+        // and provisioning is where a projection that drifted is rebuilt.
         await using var upgraded = await BootAsync();
         var report = await Report(upgraded);
-        var findings = (string[])report["Findings"]!;
 
-        Output.WriteLine(string.Join(" | ", findings));
-        findings.Should().Contain(finding => finding.Contains("Rank", StringComparison.Ordinal),
-            "the column that needs rebuilding has to be named");
-        report["State"].Should().Be("Degraded",
-            "a stale projection still answers reads, so it is reported rather than made fatal");
+        Output.WriteLine(string.Join(" | ", (string[])report["Findings"]!));
+        report["State"].Should().Be("Healthy", "the boot that noticed the stale column is the boot that fixed it");
+
+        // Asserting the report alone would pass if validation had merely stopped looking. The recipe marker is
+        // written by the ALTER and by nothing else, so its presence is the statement having run.
+        (await Comment(table)).Should().StartWith("koan-gen:",
+            "the rebuilt column carries the recipe it was built from");
+
+        // The rebuilt column computes the current expression, so a null round-trips (PMC-038) where the old one
+        // wrote the string "null".
+        await new DriftProbe { Id = "after", Rank = 7 }.Save();
+        (await DriftProbe.Get("after"))!.Rank.Should().Be(7);
+    }
+
+    private async Task<string> Comment(string table)
+    {
+        await using var connection = new MySqlConnection(Fixture.ConnectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var read = connection.CreateCommand();
+        read.CommandText =
+            "SELECT column_comment FROM information_schema.columns " +
+            "WHERE table_schema = DATABASE() AND table_name = @table AND column_name = 'Rank'";
+        read.Parameters.AddWithValue("table", table);
+        return (string?)await read.ExecuteScalarAsync(TestContext.Current.CancellationToken) ?? string.Empty;
     }
 
     private static async Task<IReadOnlyDictionary<string, object?>> Report(BoundHost host) =>

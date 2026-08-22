@@ -196,6 +196,80 @@ public sealed class RelationalOwnershipSpec
         ddl.Mutations.Should().Be(0);
     }
 
+    [Fact]
+    public async Task A_stale_projection_is_rebuilt_under_the_consent_that_would_have_created_it()
+    {
+        using var provider = Host(_ => { });
+        var orchestrator = new RelationalSchemaOrchestrator();
+        // The store holds the column and says it is not the one the mapping asked for — a generated column built
+        // from an expression an older Koan wrote. Nothing about its type says so, which is why the store judges.
+        var ddl = new ProbeDdl(DocumentShape(), mismatched: ["Rank"]);
+
+        var validation = await orchestrator.EnsureCreatedAsync(
+            Document<Reading>(provider),
+            ddl,
+            new Features("mysql", projects: true),
+            new RelationalSchemaPolicy { DefaultSchema = "main", Ddl = RelationalDdlPolicy.AutoCreate });
+
+        ddl.Rebuilds.Should().Equal("Rank");
+        validation.State.Should().Be("Healthy", "the boot that noticed the drift is the boot that repaired it");
+    }
+
+    [Fact]
+    public async Task A_stale_projection_is_reported_rather_than_rebuilt_without_ddl_consent()
+    {
+        using var provider = Host(_ => { });
+        var orchestrator = new RelationalSchemaOrchestrator();
+        var ddl = new ProbeDdl(DocumentShape(), mismatched: ["Rank"]);
+
+        var validation = await orchestrator.EnsureCreatedAsync(
+            Document<Reading>(provider),
+            ddl,
+            new Features("mysql", projects: true),
+            new RelationalSchemaPolicy { DefaultSchema = "main", Ddl = RelationalDdlPolicy.NoDdl });
+
+        // Repair is a mutation, so it needs the consent every other mutation needs. Without it the difference is
+        // still named, and reads still resolve through the document.
+        ddl.Rebuilds.Should().BeEmpty();
+        ddl.Mutations.Should().Be(0);
+        validation.State.Should().Be("Degraded");
+        validation.Findings.Should().Contain(finding => finding.Subject == "Rank");
+    }
+
+    [Fact]
+    public async Task Drift_on_a_column_that_holds_its_own_value_is_refused_rather_than_rebuilt()
+    {
+        using var provider = Host(_ => { });
+        var orchestrator = new RelationalSchemaOrchestrator();
+        // The structured root is where the entity lives. Rebuilding it would not recompute anything; it would
+        // destroy the rows. Repair stops at columns the store derives.
+        var ddl = new ProbeDdl(DocumentShape(), mismatched: ["Json"]);
+
+        var action = () => orchestrator.EnsureCreatedAsync(
+            Document<Reading>(provider),
+            ddl,
+            new Features("mysql", projects: true),
+            new RelationalSchemaPolicy { DefaultSchema = "main", Ddl = RelationalDdlPolicy.AutoCreate });
+
+        await action.Should().ThrowAsync<SchemaMismatchException>();
+        ddl.Rebuilds.Should().BeEmpty();
+    }
+
+    /// <summary>The document shape every relational store compiles for an Entity: a key, the document, and the
+    /// scalar columns the store projects out of it.</summary>
+    private static MappingPlan Document<TEntity>(IServiceProvider provider) =>
+        provider.GetRequiredService<IDataMappingPlans>().GetOrAdd<TEntity>(
+            "Legacy", new MappingConvention(StorageAddress.From("main", "READING"), "Id", "Json"));
+
+    private static RelationalTableShape DocumentShape() => new(
+        new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Id"] = new("Id", Nullable: false),
+            ["Json"] = new("Json", Nullable: true),
+            ["Rank"] = new("Rank", Nullable: true, IsProjected: true)
+        },
+        ["Id"]);
+
     private static MappingPlan Mapping<TEntity>(IServiceProvider provider)
         where TEntity : class =>
         provider.GetRequiredService<IDataMappingPlans>().Require<TEntity>("Legacy");
@@ -234,21 +308,54 @@ public sealed class RelationalOwnershipSpec
         public string Lookup { get; set; } = "";
     }
 
-    private sealed class Features(string provider) : IRelationalStoreFeatures
+    public sealed class Reading
     {
-        public bool SupportsJsonFunctions => false;
-        public bool SupportsPersistedComputedColumns => false;
+        public string Id { get; set; } = "r";
+        public int Rank { get; set; }
+    }
+
+    private sealed class Features(string provider, bool projects = false) : IRelationalStoreFeatures
+    {
+        public bool SupportsJsonFunctions => projects;
+        public bool SupportsPersistedComputedColumns => projects;
         public string ProviderName => provider;
     }
 
     /// <summary>A store that reports one shape and records the grammar it was asked to speak, so the spec can
     /// assert the decision rather than a sample of its effects.</summary>
-    private sealed class ProbeDdl(RelationalTableShape? shape = null) : IRelationalDdlExecutor
+    private sealed class ProbeDdl(RelationalTableShape? shape = null, params string[] mismatched)
+        : IRelationalDdlExecutor
     {
+        private readonly HashSet<string> _mismatched = new(mismatched, StringComparer.Ordinal);
+        private readonly List<string> _rebuilds = [];
+
         public int Mutations { get; private set; }
+
+        /// <summary>Columns this store was asked to restate, in order.</summary>
+        public IReadOnlyList<string> Rebuilds => _rebuilds;
+
+        /// <summary>
+        /// The store's own judgment. A named column is the one this store can see is stale — a recipe no type
+        /// comparison could catch. Everything else keeps the default reading: compare CLR types where the store
+        /// reported one, and accept the column where it did not.
+        /// </summary>
+        public bool ColumnMatches(RelationalColumnDefinition expected, RelationalColumnState actual)
+            => !_mismatched.Contains(expected.Name) &&
+               (actual.ClrType is null || expected.ClrType == actual.ClrType);
 
         public Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
             => Task.FromResult(shape);
+
+        public Task RebuildProjection(
+            RelationalTableDefinition table,
+            RelationalColumnDefinition column,
+            CancellationToken ct = default)
+        {
+            _rebuilds.Add(column.Name);
+            // The column now computes what the mapping asked for, so the re-validation that follows sees it.
+            _mismatched.Remove(column.Name);
+            return Mutated();
+        }
 
         public Task Create(RelationalTableDefinition table, CancellationToken ct = default) => Mutated();
 

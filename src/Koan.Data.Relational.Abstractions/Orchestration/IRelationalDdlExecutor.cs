@@ -65,4 +65,23 @@ public interface IRelationalDdlExecutor
     Task CreateIndex(RelationalTableDefinition table, RelationalIndexDefinition index, CancellationToken ct = default) =>
         throw new NotSupportedException(
             $"{GetType().Name} declares mapped-index support but cannot spell index '{index.Name}' for {table}.");
+
+    /// <summary>
+    /// Rebuilds a projected column the store already holds, so that it computes what the mapping now says.
+    ///
+    /// <para>This is the one column an existing table can be corrected into rather than merely told about. A
+    /// projected column holds no value of its own — the store recomputes it from the structured root — so
+    /// replacing one loses nothing, whatever it had drifted into. The orchestrator decides when that applies;
+    /// this only spells it.</para>
+    ///
+    /// <para>The default refuses, on the same reasoning as <see cref="CreateIndex"/>: the orchestrator asks
+    /// only a store that answered <see cref="IRelationalStoreFeatures.SupportsPersistedComputedColumns"/>, and
+    /// a store that computes a column it cannot restate is a contradiction worth hearing about.</para>
+    /// </summary>
+    Task RebuildProjection(
+        RelationalTableDefinition table,
+        RelationalColumnDefinition column,
+        CancellationToken ct = default) =>
+        throw new NotSupportedException(
+            $"{GetType().Name} computes projected columns but cannot restate '{column.Name}' for {table}.");
 }

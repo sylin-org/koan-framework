@@ -198,6 +198,18 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
             }
         }
 
+        // The one drift an existing table is corrected into rather than merely told about. A projected column
+        // holds no value of its own — the store recomputes it from the document — so rebuilding one loses
+        // nothing whatever it had drifted into, and an upgraded database repairs itself on the boot that
+        // notices, under the same consent that would have created the column. Nothing else is repaired: replacing
+        // a column that holds its own value is how a framework destroys data by being wrong about what it sees.
+        // Rebuilding precedes index creation so an index is never built over an expression about to change.
+        if (IsDdlAllowed(policy))
+        {
+            foreach (var column in RepairableProjections(validation))
+                await ddl.RebuildProjection(plan.Table, column, ct).ConfigureAwait(false);
+        }
+
         if (features.SupportsMappedIndexes && IsDdlAllowed(policy))
         {
             foreach (var index in plan.Indexes.Where(static index => !index.Primary))
@@ -213,6 +225,21 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
 
         return await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Drift the framework can correct: a projected column, and only a projected column.
+    ///
+    /// <para>Corrective drift has already stopped the boot by the time this is reached, so what remains is the
+    /// drift a store can serve around. Of that, a projection is the repairable case, because the store derives
+    /// it and can derive it again.</para>
+    /// </summary>
+    private static IEnumerable<RelationalColumnDefinition> RepairableProjections(
+        RelationalSchemaValidation validation) =>
+        validation.Findings
+            .Where(static finding => finding.Kind == RelationalSchemaFindingKind.Drift)
+            .Select(finding => validation.Plan.Table.Columns.FirstOrDefault(column =>
+                column.IsProjected && string.Equals(column.Name, finding.Subject, StringComparison.Ordinal)))
+            .OfType<RelationalColumnDefinition>();
 
     /// <summary>
     /// A column the store does not hold.
