@@ -82,6 +82,42 @@ sibling and set `versionHeightOffset` to `0` so it starts at the train's `.0`. T
 rejects a packable project that inherits an ancestor `version.json`, so this cannot be missed
 silently.
 
+## Breaking something inside 1.x
+
+**Koan 1.x is the stabilization line.** A public surface may still be removed or reshaped inside it, and the
+rule is that the break is *recorded* rather than prevented.
+
+Package validation compares every packable assembly against its published baseline —
+`KoanTrainBaselineVersion`, currently `1.0.0` — and fails on `CP0001` (a type is gone) or `CP0002` (a member
+is gone). **It runs at pack time only.** `dotnet build` cannot see it, so removing a public member leaves the
+solution green and the package unshippable, and nothing says so until a release is attempted. Before deleting
+any public surface, pack its project:
+
+```powershell
+dotnet pack src/<Project>/<Project>.csproj -c Debug
+```
+
+When the break is intended, record it:
+
+```powershell
+dotnet pack Koan.sln -c Debug -p:ApiCompatGenerateSuppressionFile=true
+```
+
+That writes a `CompatibilitySuppressions.xml` next to each affected project. Commit it with the change that
+caused it, never separately — a suppression whose cause is a different commit is a break nobody can explain
+later.
+
+A suppression is a record of debt, not permission to take more. Two things follow. A removal that is merely
+tidying is rarely worth spending compatibility on, because the entry outlives the tidying. And when the line
+moves, these files are **deleted** rather than carried forward: the new baseline already contains the new
+shape.
+
+One case needs no suppression at all. A type that moves between assemblies keeps its name with
+`[assembly: TypeForwardedTo(...)]`, so nothing compiled against the old package stops resolving — see
+`src/Koan.Data.Relational/AssemblyInfo.cs`. Local validation cannot always confirm it, because ApiCompat
+follows a forward only when it can resolve the target assembly and a sibling prerelease is on no feed; the
+forwarder is still the correct thing to ship.
+
 ## Moving the compatibility line
 
 This is the **only** time a human edits a version. Moving `1.0` to `1.1` (additive line) or `2.0`

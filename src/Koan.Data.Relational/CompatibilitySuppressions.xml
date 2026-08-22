@@ -1,0 +1,126 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- https://learn.microsoft.com/dotnet/fundamentals/package-validation/diagnostic-ids -->
+<!--
+  Recorded breaks against the published 1.0.0 baseline. Koan 1.x is the STABILIZATION line: a break inside it is
+  expected, and the rule is that it must be written down rather than prevented. Everything here is a public
+  surface this cycle removed or reshaped deliberately — the schema orchestrator becoming a single owner, the
+  vector adapter surface, and one type that moved assemblies so a document store could reach the contract that
+  governs it.
+
+  A suppression is a record of debt, not permission to take more. Before adding one, check the removal is
+  actually intended; when the line moves to 1.1 or 2.0, this file is deleted rather than carried, and
+  KoanTrainBaselineVersion in Directory.Build.targets advances to the last fully published version.
+
+  Regenerate after an intended break:
+      dotnet pack Koan.sln -c Debug -p:ApiCompatGenerateSuppressionFile=true
+
+  The gate runs at pack time only — `dotnet build` cannot see it — so a removed public member leaves a green
+  solution and an unshippable package. See docs/engineering/nuget-publishing.md.
+-->
+<Suppressions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Koan.Data.Relational.ComparableScalarEncoding</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0001</DiagnosticId>
+    <Target>T:Koan.Data.Relational.IRelationalMappingSchemaOrchestrator</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.Orchestration.SchemaMismatchException.#ctor(System.String,System.String,System.String,System.String[],System.String[],System.Boolean)</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.Orchestration.SchemaMismatchException.get_Extra</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.Orchestration.SchemaMismatchException.get_Missing</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.Orchestration.SchemaMismatchException.get_Policy</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.Orchestration.SchemaMismatchException.get_Table</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaPlan.get_Columns</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaPlan.get_Schema</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaPlan.get_Table</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaValidation.#ctor(Koan.Data.Relational.RelationalSchemaPlan,System.Boolean,System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String})</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaValidation.get_Incompatible</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaValidation.get_IsCompatible</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaValidation.get_Missing</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+  <Suppression>
+    <DiagnosticId>CP0002</DiagnosticId>
+    <Target>M:Koan.Data.Relational.RelationalSchemaValidation.get_Unverified</Target>
+    <Left>lib/net10.0/Koan.Data.Relational.dll</Left>
+    <Right>lib/net10.0/Koan.Data.Relational.dll</Right>
+    <IsBaselineSuppression>true</IsBaselineSuppression>
+  </Suppression>
+</Suppressions>

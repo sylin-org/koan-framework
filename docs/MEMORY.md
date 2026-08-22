@@ -289,7 +289,14 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   registered under two identities — whose whole purpose is to tell an author to keep one activation owner per
   assembly. Catch the exceptions the comment names, not everything, or the guard next to it stops existing.
   (2026-08-21)
-- **The 1.0 compatibility train is mechanically enforced at pack time, and a normal build cannot see it.**
+- **Koan 1.x is the stabilization line: a public break inside it is recorded, not prevented.** Decided
+  2026-08-22. `CompatibilitySuppressions.xml` next to a project is the record, generated with
+  `dotnet pack Koan.sln -c Debug -p:ApiCompatGenerateSuppressionFile=true` and committed with the change that
+  caused it. A suppression is debt, not permission — tidying is rarely worth an entry that outlives it — and
+  the files are deleted when the line moves rather than carried. A type that merely changed assemblies needs
+  no entry: `[assembly: TypeForwardedTo(...)]` keeps the name resolving. See
+  `docs/engineering/nuget-publishing.md`.
+- **The compatibility gate is mechanically enforced at pack time, and a normal build cannot see it.**
   `Directory.Build.targets` sets `PackageValidationBaselineVersion` to 1.0.0, so `dotnet pack` compares every
   packable assembly against its published baseline in the NuGet cache and fails on `CP0001` (type removed) or
   `CP0002` (member removed). `dotnet build` does none of this. Removing a public member therefore leaves a
