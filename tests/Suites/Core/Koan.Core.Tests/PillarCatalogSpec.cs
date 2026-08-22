@@ -113,8 +113,8 @@ public class PillarCatalogSpec
     {
         CorePillarManifest.EnsureRegistered();
 
-        var descriptor = CorePillarManifest.Descriptor;
-        descriptor.Code.Should().Be("core");
+        KoanPillarCatalog.TryGetByCode(CorePillarManifest.PillarCode, out var descriptor).Should().BeTrue();
+        descriptor!.Code.Should().Be("core");
         descriptor.Label.Should().Be("Core");
         descriptor.ColorHex.Should().Be("#64748b");
         descriptor.Icon.Should().Be("⚙️");

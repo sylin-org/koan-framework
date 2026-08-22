@@ -13,6 +13,4 @@ public static class CorePillarManifest
         "Koan.Core");
 
     public static void EnsureRegistered() => Pillar.EnsureRegistered();
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
 }

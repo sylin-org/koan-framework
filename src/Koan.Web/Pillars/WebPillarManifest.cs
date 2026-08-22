@@ -1,6 +1,5 @@
 ﻿using Koan.Core.Modules.Pillars;
 
-
 namespace Koan.Web.Pillars;
 
 public static class WebPillarManifest
@@ -16,8 +15,4 @@ public static class WebPillarManifest
         "Koan.AspNetCore");
 
     public static void EnsureRegistered() => Pillar.EnsureRegistered();
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
-
-    public static void AssociateNamespace(string namespacePrefix) => Pillar.AssociateNamespace(namespacePrefix);
 }

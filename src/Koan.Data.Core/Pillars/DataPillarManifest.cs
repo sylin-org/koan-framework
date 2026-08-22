@@ -1,6 +1,5 @@
 ﻿using Koan.Core.Modules.Pillars;
 
-
 namespace Koan.Data.Core.Pillars;
 
 public static class DataPillarManifest
@@ -17,8 +16,4 @@ public static class DataPillarManifest
         "Koan.Storage");
 
     public static void EnsureRegistered() => Pillar.EnsureRegistered();
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
-
-    public static void AssociateNamespace(string namespacePrefix) => Pillar.AssociateNamespace(namespacePrefix);
 }

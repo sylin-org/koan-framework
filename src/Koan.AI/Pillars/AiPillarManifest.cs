@@ -1,6 +1,5 @@
 ﻿using Koan.Core.Modules.Pillars;
 
-
 namespace Koan.AI.Pillars;
 
 public static class AiPillarManifest
@@ -16,8 +15,4 @@ public static class AiPillarManifest
         "Koan.Vector");
 
     public static void EnsureRegistered() => Pillar.EnsureRegistered();
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
-
-    public static void AssociateNamespace(string namespacePrefix) => Pillar.AssociateNamespace(namespacePrefix);
 }
