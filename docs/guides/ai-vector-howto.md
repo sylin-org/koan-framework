@@ -213,15 +213,12 @@ var query = "heartwarming slice of life anime";
 var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Semantic search
-var results = await Vector<Media>.Search(
-    vector: queryEmbedding,
-    topK: 20
-);
+var results = await Vector<Media>.Search(queryEmbedding, search => search.Top(20));
 
-foreach (var match in results.Matches)
+foreach (var match in results.Items)
 {
     var media = await Media.Get(match.Id);
-    Console.WriteLine($"{media.Title} - Score: {match.Score:F2}");
+    Console.WriteLine($"{media.Title} - Similarity: {match.Similarity:F2}");
 }
 ```
 
@@ -272,40 +269,32 @@ var query = "Watashi no Kokoro wa Oji-san de Aru";
 var queryEmbedding = await Koan.AI.Client.Embed(query, ct);
 
 // Hybrid search: semantic + keyword
-var results = await Vector<Media>.Search(
-    vector: queryEmbedding,
-    text: query,        // Enables BM25 keyword matching
-    alpha: 0.5,         // 50% semantic, 50% keyword
-    topK: 10
-);
+var results = await Vector<Media>.Search(queryEmbedding, search => search
+    .Top(10)
+    .Text(query)              // enables BM25 keyword matching
+    .SemanticWeight(0.5));    // 0.5 = even blend of semantic and keyword
 ```
 
 **Alpha tuning guide**
 
 ```csharp
 // Exact title searches - favor keywords
-var exactResults = await Vector<Media>.Search(
-    vector: embedding,
-    text: "Attack on Titan",
-    alpha: 0.3,  // 70% keyword, 30% semantic
-    topK: 10
-);
+var exactResults = await Vector<Media>.Search(embedding, search => search
+    .Top(10)
+    .Text("Attack on Titan")
+    .SemanticWeight(0.3));    // 70% keyword, 30% semantic
 
 // Conceptual searches - favor semantics
-var conceptResults = await Vector<Media>.Search(
-    vector: embedding,
-    text: "dark fantasy with magic",
-    alpha: 0.8,  // 80% semantic, 20% keyword
-    topK: 10
-);
+var conceptResults = await Vector<Media>.Search(embedding, search => search
+    .Top(10)
+    .Text("dark fantasy with magic")
+    .SemanticWeight(0.8));    // 80% semantic, 20% keyword
 
 // Balanced - default
-var balancedResults = await Vector<Media>.Search(
-    vector: embedding,
-    text: searchQuery,
-    alpha: 0.5,  // 50/50 blend
-    topK: 10
-);
+var balancedResults = await Vector<Media>.Search(embedding, search => search
+    .Top(10)
+    .Text(searchQuery)
+    .SemanticWeight(0.5));    // 50/50 blend
 ```
 
 **Usage scenarios & benefits**
@@ -386,12 +375,10 @@ var searchVector = await Koan.AI.Client.Embed("magic school anime", ct);
 var blended = BlendVectors(searchVector, userPrefVector, weight: 0.66);
 
 // Personalized hybrid search
-var results = await Vector<Media>.Search(
-    vector: blended,
-    text: "magic school anime",
-    alpha: 0.5,
-    topK: 50
-);
+var results = await Vector<Media>.Search(blended, search => search
+    .Top(50)
+    .Text("magic school anime")
+    .SemanticWeight(0.5));
 
 // Helper: Blend two vectors with normalization
 float[] BlendVectors(float[] vec1, float[] vec2, double weight1)
@@ -787,14 +774,12 @@ public async Task<List<Media>> Search(string query, double alpha, int topK)
         try
         {
             var embedding = await Koan.AI.Client.Embed(query);
-            var results = await Vector<Media>.Search(
-                vector: embedding,
-                text: query,
-                alpha: alpha,
-                topK: topK
-            );
+            var results = await Vector<Media>.Search(embedding, search => search
+                .Top(topK)
+                .Text(query)
+                .SemanticWeight(alpha));
 
-            return await LoadEntities(results.Matches);
+            return await LoadEntities(results.Items);
         }
         catch (Exception ex)
         {
@@ -846,8 +831,8 @@ var englishQuery = await Koan.AI.Client.Embed("cute magical girls");
 var japaneseQuery = await Koan.AI.Client.Embed("かわいい魔法少女");
 
 // Both queries find similar results semantically
-var englishResults = await Vector<Media>.Search(vector: englishQuery, topK: 10);
-var japaneseResults = await Vector<Media>.Search(vector: japaneseQuery, topK: 10);
+var englishResults = await Vector<Media>.Search(englishQuery, search => search.Top(10));
+var japaneseResults = await Vector<Media>.Search(japaneseQuery, search => search.Top(10));
 
 // Results overlap significantly due to semantic similarity
 ```

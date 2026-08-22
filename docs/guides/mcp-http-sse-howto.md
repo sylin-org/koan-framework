@@ -35,8 +35,8 @@ caller the gate denies.
 
 ## Shortest supported path
 
-MCP is a supported extension. The repository verifies the same path from source and the
-exact staged candidate; public-feed publication and observation remain release-phase work.
+MCP is a supported extension, and the repository verifies this path from source and from the packaged
+candidate alike.
 
 Reference Koan MCP and Web in the application closure, then expose business data or workflows:
 

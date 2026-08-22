@@ -39,8 +39,8 @@ Jobs is a supported extension. The package reference is the activation intent:
 <PackageReference Include="Sylin.Koan.Jobs" />
 ```
 
-Public-feed publication follows the final package-only proof. From a source checkout, repository samples use the
-equivalent project reference without changing application code.
+Repository samples use the equivalent project reference from a source checkout; application code is
+identical either way.
 
 That's all the wiring there is. **Reference = Intent**: adding Jobs and implementing the job interface is enough—`AddKoan()` activates your jobs and starts the orchestrator automatically.
 
