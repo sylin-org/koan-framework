@@ -12,6 +12,9 @@
     <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Koan.Data.Connector.SqlServer.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>

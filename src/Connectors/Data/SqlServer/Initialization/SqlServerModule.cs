@@ -4,6 +4,7 @@ using Koan.Core.Modules;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Core.Provenance;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Core;
 using Koan.Data.Core.Configuration;
@@ -25,6 +26,8 @@ public sealed class SqlServerModule : KoanModule
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<SqlServerAdapterFactory>());
         services.AddSingleton<IDataSourceIntegrationFactory>(static provider => provider.GetRequiredService<SqlServerAdapterFactory>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqlServerHealthContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IDataFailureClassifier, Runtime.SqlServerFailureClassifier>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, SqlServerDiscoveryAdapter>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataProviderConnectionFactory, SqlServerConnectionFactory>());
     }

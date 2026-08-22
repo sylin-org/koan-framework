@@ -1,6 +1,9 @@
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Failures;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
+using Koan.Data.Core.Failures;
 using Koan.Data.Core.Sorting;
 using Microsoft.Extensions.Options;
 
@@ -25,12 +28,22 @@ internal sealed class DataJobLedger : IJobLedger
     // (the JobMetric pattern), never a per-claim shared write.
     private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
     private readonly Func<string, double> _weight;
+    private readonly IReadOnlyList<IDataFailureClassifier> _classifiers;
 
-    public DataJobLedger(IOptions<JobsOptions> options, JobTypeRegistry registry)
+    /// <summary>Attempts one claim gets when the store reports a transient conflict. Two is enough for a
+    /// deadlock — the winner has committed by the time the victim rolls back — and the third is headroom for a
+    /// second collision under contention rather than a policy of grinding.</summary>
+    private const int ClaimAttempts = 3;
+
+    public DataJobLedger(
+        IOptions<JobsOptions> options,
+        JobTypeRegistry registry,
+        IEnumerable<IDataFailureClassifier>? classifiers = null)
     {
         _options = options.Value;
         _registry = registry;
         _weight = lane => _options.LaneWeights.GetValueOrDefault(lane, 1.0);
+        _classifiers = classifiers?.ToArray() ?? [];
     }
 
     public Task Append(JobRecord record, CancellationToken ct) => JobRecord.Upsert(record, ct);
@@ -48,7 +61,49 @@ internal sealed class DataJobLedger : IJobLedger
         return hits.FirstOrDefault();
     }
 
+    /// <summary>
+    /// Claims one job, retrying a claim the store refused for a transient conflict.
+    ///
+    /// <para>A claim is idempotent by construction: it ends in a conditional write that either wins or reports
+    /// that another owner did, so running it again after a rolled-back failure cannot hand one job to two
+    /// owners. That property is what makes a retry safe, and it is why this asks
+    /// <see cref="DataFailurePolicy.MayRetryIdempotent"/> instead of catching a provider's exception type —
+    /// which store errors mean "try again" is the adapter's knowledge, not this ledger's.</para>
+    ///
+    /// <para>Measured on SQL Server: eight concurrent claimers deadlock about one full suite run in five, and
+    /// the victim's exception used to end the drain outright, because nothing above it catches (PMC-056).</para>
+    /// </summary>
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
+        IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
+        IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                return await ClaimOnce(owner, now, leaseUntil, saturatedLanes, ct, pools).ConfigureAwait(false);
+            }
+            catch (Exception failure) when (
+                attempt < ClaimAttempts &&
+                DataFailurePolicy.MayRetryIdempotent(failure, ClaimFailureContext(), _classifiers))
+            {
+                // Nothing committed and the store permits another attempt. Fall through and re-read: the job
+                // this claimer wanted may now belong to whoever won the deadlock, which is a normal outcome.
+            }
+        }
+    }
+
+    /// <summary>What a failed claim can truthfully say about itself at the boundary.</summary>
+    private static DataFailureContext ClaimFailureContext() => new(
+        Data<JobRecord, string>.Capabilities.Owner ?? string.Empty,
+        EntityContext.Current?.Source ?? string.Empty,
+        "job.claim",
+        DataOperationEffect.Write,
+        Dispatched: true,
+        CommitBoundaryCrossed: true);
+
+    private async Task<JobRecord?> ClaimOnce(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
         IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {

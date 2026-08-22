@@ -341,6 +341,7 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     [InlineData(typeof(DateTimeOffset), true)]
     [InlineData(typeof(DateOnly), true)]
     [InlineData(typeof(TimeOnly), true)]
+    [InlineData(typeof(TimeSpan), true)]
     [InlineData(typeof(StreamSortTier), true)]
     // Nullable: provider null placement is not normalized for a plain column.
     [InlineData(typeof(int?), false)]
@@ -348,8 +349,6 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     [InlineData(typeof(string), false)]
     [InlineData(typeof(char), false)]
     [InlineData(typeof(Guid), false)]
-    // Proven divergent: one adapter still stores a TimeSpan in .NET's default form, where 24h precedes 23h.
-    [InlineData(typeof(TimeSpan), false)]
     // No offset, so the ordering depends on the kind each value was written with.
     [InlineData(typeof(DateTime), false)]
     // Never put through the cross-adapter corpus; the list is evidence, so absence of proof keeps them out.
