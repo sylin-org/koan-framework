@@ -267,6 +267,13 @@ internal sealed class MySqlRepository<TEntity, TKey> :
 
     private MySqlEntityPlan<TEntity, TKey> ResolvePlan()
     {
+        // A declared map names one physical container. An ambient partition asks for a different one, and this
+        // store has no way to honour both — so it says so rather than serving the pinned container and leaving
+        // the caller to believe the partition took effect. SQLite and Redis have always refused this; these three
+        // read the pinned table instead, which is the same request answered with silence.
+        if (_declaredMapping is not null && !string.IsNullOrWhiteSpace(EntityContext.Current?.Partition))
+            throw new NotSupportedException(
+                $"Explicit MySQL map '{_declaredMapping.Id}' pins one physical container and cannot accept an ambient partition.");
         var table = _declaredMapping?.Container.Name ?? Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_services);
         var key = _declaredMapping?.Id ?? $"{_options.Database}/{table}";
         lock (_plansGate)

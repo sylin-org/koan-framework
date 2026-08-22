@@ -9,6 +9,33 @@ namespace Koan.Data.Connector.SqlServer.Tests.Specs;
 
 public sealed class SqlServerLegacyMappingSpec(SqlServerFixture fixture)
 {
+    /// <summary>
+    /// A declared map pins one physical container, so an ambient partition — which asks for a different one —
+    /// cannot be honoured. Until 2026-08-21 this store answered by serving the pinned container, so a caller who
+    /// asked for a partition got unpartitioned data and no indication of it. SQLite and Redis had always refused.
+    /// </summary>
+    [Fact]
+    public async Task An_explicit_map_refuses_an_ambient_partition()
+    {
+        await SeedCustomer();
+        await using var host = await Boot("Legacy", StorageLifecycle.External, DataSourceAccess.ReadWrite, koan =>
+            koan.Data.Source("Legacy").Map<LegacyCustomer>(map => map
+                .Container("CUSTOMER")
+                .Key(customer => customer.Id).Name("CUSTOMER_NO")
+                .Property(customer => customer.DisplayName).Name("DISPLAY_NM")
+                .Property(customer => customer.Profile).Object("PROFILE_JSON")));
+
+        using (EntityContext.Source("Legacy"))
+        {
+            (await LegacyCustomer.Get(7))!.DisplayName.Should().Be("Ada Lovelace");
+
+            using (EntityContext.Partition("must-not-alias"))
+                (await FluentActions.Invoking(() => LegacyCustomer.Get(7))
+                    .Should().ThrowAsync<NotSupportedException>())
+                    .Which.Message.Should().Contain("ambient partition");
+        }
+    }
+
     [Fact]
     public async Task Compact_map_reads_queries_and_updates_an_external_table()
     {
