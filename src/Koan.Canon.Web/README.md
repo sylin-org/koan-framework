@@ -1,7 +1,8 @@
-# Sylin.Koan.Canon.Web
+﻿# Sylin.Koan.Canon.Web
 
 Automatic HTTP projection for the Canon models already composed by `Sylin.Koan.Canon`. Reference the
-package, call `AddKoan().AsWebApi()`, and each concrete `CanonEntity<T>` receives Canon-aware routes.
+package and each concrete `CanonEntity<T>` receives Canon-aware routes from the ordinary `AddKoan()`
+composition.
 
 ```powershell
 dotnet add package Sylin.Koan.Canon.Web
@@ -12,10 +13,9 @@ dotnet add package Sylin.Koan.Canon.Web
 ```csharp
 using Koan.Canon;
 using Koan.Core;
-using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 

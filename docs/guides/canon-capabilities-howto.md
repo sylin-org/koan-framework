@@ -33,7 +33,7 @@ The ordinary host remains ordinary:
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 ```

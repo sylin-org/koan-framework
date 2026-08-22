@@ -1,4 +1,4 @@
-# Sylin.Koan.Media.Web
+﻿# Sylin.Koan.Media.Web
 
 Serve an application's `MediaEntity<T>` originals and named recipes through controller-owned HTTP routes. The
 reference supplies discovery, conditional/cache headers, bounded request parsing, format negotiation, and optional
@@ -14,10 +14,9 @@ dotnet add package Sylin.Koan.Media.Web
 using Koan.Core;
 using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
-using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();
@@ -41,11 +40,12 @@ When the application has several media Entity types, select the one that owns th
 
 ```csharp
 builder.Services.AddMediaSource<Photo>();
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 ```
 
-A custom `IMediaSource` is the equivalent override for a non-Entity source. Zero or several candidates without an
-override reject host startup with that correction.
+A custom `IMediaSource` is the equivalent override for a non-Entity source. Several candidates without an override
+reject host startup with that correction. No candidates at all is not one: Media Web composes inertly and the routes
+simply have no source until a `MediaEntity<T>` exists.
 
 ## Routes
 

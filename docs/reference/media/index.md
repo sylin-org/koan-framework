@@ -30,15 +30,14 @@ dotnet add package Sylin.Koan.Media.Web
 using Koan.Core;
 using Koan.Media;
 using Koan.Media.Abstractions.Recipes;
-using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 
 var app = builder.Build();
 await app.RunAsync();
 
-public sealed class Photo : MediaEntity<Photo> { }
+public sealed class Photo : MediaEntity<Photo>;
 
 public static class PhotoRecipes
 {

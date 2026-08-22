@@ -35,10 +35,9 @@ Reference `Sylin.Koan.Canon.Web`, `Sylin.Koan.Data.Connector.Json`, and the usua
 ```csharp
 using Koan.Canon;
 using Koan.Core;
-using Koan.Web.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan().AsWebApi();
+builder.Services.AddKoan();
 var app = builder.Build();
 await app.RunAsync();
 
