@@ -22,8 +22,10 @@ every capability it uses is AOT-compatible. The deployment is a directory: the n
 travel with application assets and connector-native libraries. The framework wiring for AOT is decided in
 [ARCH-0093](../decisions/ARCH-0093-nativeaot-substrate.md); this guide is the operational recipe.
 
-> **Current boundary:** NativeAOT is experimental and not part of Koan's 1.0 guarantee, but it publishes and runs.
-> Verified 2026-08-21 on the pinned .NET 10.0.302 SDK with 10.0.10 runtime packs:
+> **Current boundary:** NativeAOT sits outside Koan's 1.x compatibility guarantee, and what it does deliver is
+> measured rather than assumed. `.github/workflows/aot-verify.yml` republishes and re-runs the proof nightly, so
+> the claim below decays loudly rather than quietly.
+> Verified 2026-08-21 on the pinned .NET 10.0.302 SDK with 10.0.10 runtime packs, on **win-x64 only**:
 > [GardenCoop Chapter 1](../../samples/journeys/GardenCoop/01-GardenJournal/) (SQLite + Web) publishes to a native
 > win-x64 executable and serves its reminders endpoint with `/health/ready` green, and
 > [AotRelational](../../samples/fundamentals/AotRelational/) writes and reads through `Entity<T>` against **SQLite,
@@ -35,6 +37,10 @@ travel with application assets and connector-native libraries. The framework wir
 # Linux (x64/arm64) — clang is the linker, found on PATH:
 dotnet publish path/to/App.csproj -c Release -r linux-x64 -p:KoanAot=true
 ```
+
+The Linux form is the toolchain shape, not a verified result: nothing in this repository has published or run a
+Linux or arm64 native build, and the cross-compilation toolchain differs enough that the win-x64 proof does not
+carry over by inference. Treat a Linux publish as work you are measuring, not work someone measured for you.
 
 ```cmd
 :: Windows (x64) — publish inside the VC dev environment:
