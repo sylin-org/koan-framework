@@ -21,18 +21,20 @@ new default. Ordinary Entity calls do not change.
 This is a maintenance operation for one active host. It is not rolling multi-host migration,
 continuous replication, merge, schema transformation, or automatic rollback.
 
-## Contract
+**Before anything else, you are asserting that nothing else is writing.** Every other host, and every
+writer that does not go through this host's Koan Data path, must be stopped or externally quiesced.
+Koan cannot verify that claim, and the copy is only as correct as it is.
 
-- **Input:** one active default route and one physically distinct, empty, `Managed + ReadWrite`
-  configured target source.
-- **Operator assertion:** every other host and every writer outside this host's Koan Data operation
-  path is stopped or externally quiesced.
-- **Success:** all included Entity roots are copied in bounded pages, reread by exact identity,
-  canonically verified, and activated through one durable route revision.
-- **Safe rejection:** `Plan()` reports blockers and corrections without treating an unsupported or
-  unsafe topology as migratable.
-- **Failure:** the old route remains active before commit; a target that may contain partial data is
-  quarantined until it is emptied or reprovisioned and a later verified run succeeds.
+Given that, the operation needs one active default route and one physically distinct target source
+that is empty and configured `Managed + ReadWrite`. It copies every included Entity root in bounded
+pages, rereads each by exact identity, verifies the result canonically, and activates the new route as
+one durable revision.
+
+It is built to refuse rather than improvise. `Plan()` reports blockers and their corrections instead
+of treating an unsupported topology as migratable. Before the commit the old route is still the live
+one, so failing there costs nothing. After a failure that may have left partial data the target is
+quarantined until it is emptied or reprovisioned: there is no automatic rollback, and a half-copied
+database is never silently reused.
 
 ## 1. Reference the operation and both providers
 

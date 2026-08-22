@@ -14,21 +14,21 @@ validation:
 
 # Entity access and streaming
 
-## Contract
+Koan gives one Entity three ways to leave the store, and they are not interchangeable: materialize the
+set, iterate it, or ask for a numbered page. Choosing among them is choosing how much memory the call
+may take and how consistent the result has to be, so the shape you write is the shape you meant.
 
-- Inputs: Entity models using `Entity<T>` statics; provider adapters installed.
-- Outputs: Explicit materialization, capability-qualified async iteration, and numbered pages.
-- Error modes: OOM from large materialization; corrective stream rejection; offset-paging drift under writes.
-- Success criteria: The code shape communicates its memory and consistency intent.
+Three properties decide most of it.
 
-### Edge Cases
+- **Streaming is earned, not assumed.** Only an adapter that advertises provider-bounded paging can
+  serve an Entity stream; the rest refuse before yielding rather than quietly buffering the set.
+- **Order is completed for you.** Koan validates the portable order you asked for and appends the
+  Entity identifier as a provider-stable tie-breaker, so pages do not shuffle between reads. Ordering
+  by that identifier yourself is not portable.
+- **Offset pages drift under concurrent writes.** A row inserted between page 1 and page 2 shifts
+  everything after it, so a set that changes under you is a set to stream.
 
-- Provider caps: Entity streaming is available only when the selected adapter earns provider-bounded paging.
-- Ordering: Koan validates the caller's portable order, then appends the exact Entity identifier as a
-  separate provider-stable page tie-breaker. Explicit Entity-identifier ordering is not portable.
-- Cancellation: Always pass `CancellationToken` to data operations.
-
----
+Pass a `CancellationToken` to every one of them.
 
 ## Materialize everything (explicit)
 

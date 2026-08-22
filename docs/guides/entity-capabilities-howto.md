@@ -1286,15 +1286,6 @@ an unbounded fallback.
 **Prevention:** Use `Root<Self>` for a shared polymorphic set. Use `Entity<Self>` or a generic shared
 base only when each type should own a separate set.
 
-### Symptom: A legacy derived row loads as the root type
-
-**Cause:** The stored row predates Koan's `__koan_type` source hint. A mixed root read cannot safely
-infer the CLR variant from a domain field or payload shape.
-**Solution:** Use a typed point read such as `Anime.Get(id)` when the expected variant is known, then
-migrate or backfill legacy rows before depending on variant identity in `Media` queries.
-**Prevention:** Save new records through their typed variant; Koan writes the source hint
-automatically.
-
 ---
 
 ## Write-If-Changed Upserts

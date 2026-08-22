@@ -27,42 +27,27 @@ related_guides:
 
 Think of this guide as a conversation with a colleague who's implemented partial updates across dozens of APIs. We'll explore when and how to use Koan's three PATCH formats—each with different strengths—and how to choose the right one for your scenario.
 
-## Contract
+Three PATCH formats reach an `EntityController<TEntity>`, and all three mean the same thing to Koan.
+A client sends `application/json-patch+json` (RFC 6902), `application/merge-patch+json` (RFC 7386), or
+a partial `application/json` body; each normalizes to one canonical operation list
+([DATA-0116](../decisions/DATA-0116-canonical-patch-operations.md)) before anything reaches the store.
+In-process patching builds that same list, so both paths run identical lifecycle hooks, transformers,
+and null/array policy.
 
-**What this guide provides:**
-- How to accept and normalize three PATCH formats (RFC 6902, RFC 7386, partial JSON)
-- When to use HTTP PATCH vs in-process patching
-- Provider pushdown capabilities and fallback strategies
-- Policy controls for null handling and array behavior
-- Real-world decision trees for format selection
+Whether those operations are pushed into the provider or applied in-process is negotiated rather than
+assumed: an adapter that can execute them natively does, and the rest fall back without changing the
+result.
 
-**Inputs:**
-- ASP.NET Core app with `builder.Services.AddKoan()` and `EntityController<TEntity>` wired
-- Clients issuing HTTP PATCH with one of:
-  - `application/json-patch+json` (RFC 6902)
-  - `application/merge-patch+json` (RFC 7386)
-  - `application/json` (partial JSON)
-- Optional: in-process patch via Data layer using canonical PatchOps model
+A malformed request fails on its own terms instead of applying partially.
 
-**Outputs:**
-- Updated entity state with lifecycle hooks and transformers applied
-- Normalized operations that work across all three formats
-- Provider-optimal execution (pushdown when available, fallback otherwise)
+| Condition | Status |
+|---|---|
+| Invalid JSON Pointer | `400` |
+| Attempt to mutate `/id` | `409` |
+| `copy` / `move` / `test` under the in-process executor | `400` |
+| Provider refuses a pushdown it cannot perform | `501` or `409`, by adapter |
 
-**Error modes:**
-- Invalid JSON Pointer → 400
-- Attempt to mutate `/id` → 409
-- Unsupported ops when falling back to in-process executor (copy/move/test) → 400
-- Provider rejects patch when pushdown not supported → 501/409 depending on adapter
-
-**Success criteria:**
-- Requests normalize to canonical PatchOps (ADR DATA-0077)
-- Null and array policies applied per options
-- Provider pushdown used when available; otherwise in-process fallback applies
-
-**See also:**
-- Canonical model: [DATA-0077: Canonical Patch Operations](../decisions/DATA-0116-canonical-patch-operations.md)
-- Web API details: [PATCH formats and normalization](../api/patch-normalization.md)
+The wire-level detail lives in [PATCH formats and normalization](../api/patch-normalization.md).
 
 ---
 
@@ -1780,11 +1765,11 @@ You've now seen Koan's full patch capabilities—from quick HTTP PATCH endpoints
 5. **Read related guides:**
    - [Entity Capabilities](entity-capabilities-howto.md) - Entity-first patterns
    - [Canon Capabilities](canon-capabilities-howto.md) - Versioning and migrations
-   - [DATA-0077](../decisions/DATA-0116-canonical-patch-operations.md) - Canonical model deep dive
+   - [DATA-0116](../decisions/DATA-0116-canonical-patch-operations.md) - Canonical model deep dive
 
 **Questions or Issues?**
 - Check [Troubleshooting](#12-troubleshooting) section above
-- Review [DATA-0077](../decisions/DATA-0116-canonical-patch-operations.md) for canonical model details
+- Review [DATA-0116](../decisions/DATA-0116-canonical-patch-operations.md) for canonical model details
 - See [entity-capabilities-howto.md](entity-capabilities-howto.md) for Entity<T> static method patterns
 
 Remember: PATCH is about describing *what changed*, not *how to change it*. Let Koan handle normalization, provider optimization, and lifecycle hooks—you focus on business logic.

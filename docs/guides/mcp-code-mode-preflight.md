@@ -18,12 +18,13 @@ title: "MCP Code Mode Preflight Patterns"
 
 Short, instruction-first patterns for reducing failed executions and wasted quota when using Koan MCP Code Mode.
 
-## Contract Block
-- Inputs: JavaScript source (string)
-- Outputs: Validation result `{ valid: boolean, error?: string }`
-- Error Modes: None (validation tool always returns `Success=true` envelope)
-- Side Effects: No entity calls, no mutations, no quota counters incremented
-- Success Criteria: Agents only submit `koan.code.execute` when `valid=true`
+Preflight answers one question about a candidate script -- will this parse? -- and answers it for free.
+It takes JavaScript source and returns `{ valid: boolean, error?: string }`. It runs no entity calls,
+mutates nothing, and spends no execution quota, so an agent can check a draft as often as it likes.
+
+Invalid source is not an error here: the tool still returns a success envelope, with `valid=false` and
+the parse message. The point is that `koan.code.execute` is only ever called with source already known
+to parse.
 
 ## Tools
 | Tool | Purpose | When to Use |

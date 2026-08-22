@@ -273,54 +273,56 @@ public async Task<Product[]> SearchProducts(string query, CancellationToken ct =
 
 ### Entity-Level Caching
 
+Declare the policy on the Entity and keep the ordinary verbs. Reads fill and serve the elected cache
+topology; writes maintain it.
+
 ```csharp
-// ✅ Cache frequently accessed entities
-public class ProductService
+// ✅ Reference Sylin.Koan.Cache, then declare the intent
+[Cacheable(300)]
+public sealed class Product : Entity<Product>
 {
-    private readonly IMemoryCache _cache;
-
-    public async Task<Product?> GetProductAsync(string id)
-    {
-        var cacheKey = $"product:{id}";
-
-        if (_cache.TryGetValue(cacheKey, out Product? cached))
-            return cached;
-
-    var product = await Product.Get(id);
-        if (product != null)
-        {
-            _cache.Set(cacheKey, product, TimeSpan.FromMinutes(5));
-        }
-
-        return product;
-    }
+    public string Category { get; set; } = "";
+    public bool IsFeatured { get; set; }
 }
+
+var product = await Product.Get(id);   // miss fills, hit serves
+product.IsFeatured = true;
+await product.Save();                  // cache state follows the write
 ```
+
+A hand-rolled dictionary around `Product.Get` looks equivalent and is not: nothing invalidates it when
+something else saves that product, so it serves a stale row until its TTL expires. Cache policy sits on
+the Entity precisely so the write path can be the thing that maintains it.
 
 ### Query Result Caching
 
+A computed result is not an Entity, so it uses the direct entry surface instead of `[Cacheable]`.
+
 ```csharp
 // ✅ Cache expensive queries
-public class CategoryService
+public sealed class CategoryService
 {
-    private readonly IMemoryCache _cache;
-
-    public async Task<Product[]> GetFeaturedProducts(string category)
+    public async Task<Product[]> GetFeaturedProducts(string category, CancellationToken ct)
     {
-        var cacheKey = $"featured:{category}";
+        var featured = await Cache.WithJson<Product[]>($"featured:{category}")
+            .WithAbsoluteTtl(TimeSpan.FromMinutes(10))
+            .GetOrAdd(async token =>
+            {
+                var matches = await Product.Query(
+                    p => p.Category == category && p.IsFeatured,
+                    sort: s => s.OrderByDescending(p => p.Rating),
+                    token);
 
-        if (_cache.TryGetValue(cacheKey, out Product[]? cached))
-            return cached;
+                return matches.Take(20).ToArray();
+            }, ct);
 
-        var products = (await Product.Query(
-            p => p.Category == category && p.IsFeatured,
-            sort: s => s.OrderByDescending(p => p.Rating))).Take(20).ToArray();
-
-        _cache.Set(cacheKey, products, TimeSpan.FromMinutes(10));
-        return products;
+        return featured ?? [];
     }
 }
 ```
+
+`GetOrAdd` runs the factory only on a miss, and the entry lands in whichever tier the host elected —
+process memory alone, or a shared L2 with peer invalidation — without this method changing.
 
 ## Multi-Provider Performance
 
@@ -342,7 +344,8 @@ public class ReportService
             .Select(g => new { Date = g.Key, Total = g.Sum(o => o.Total) });
 
         // Vector search - vector providers only
-        var similar = await Product.SimilarTo("smartphone");
+        var embedding = await Client.Embed("smartphone");
+        var similar = await Vector<Product>.Search(embedding, query => query.Top(10));
 
         return new AnalyticsReport(users.Length, revenue, similar);
     }

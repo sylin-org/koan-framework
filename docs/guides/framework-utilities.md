@@ -19,12 +19,9 @@ related_guides:
 
 # Framework Utilities Guide
 
-**Purpose**: Centralized catalog of reusable utilities, helpers, and patterns within Koan Framework.
-**Audience**: Framework contributors, connector developers, and application developers extending Koan.
-
-**When to Use**: Before writing new helper methods, check this guide to avoid duplicating existing functionality.
-
----
+A catalog of what Koan already provides. Read it before writing a helper: the odds are good that the
+thing you are about to write exists, and that the existing one is wired into startup reporting,
+capability negotiation, or provenance in ways a local copy will not be.
 
 ## Table of Contents
 
@@ -562,7 +559,7 @@ await app.RunAsync();
 ```csharp
 // Retrieve by ID
 var todo = await Todo.Get(id);
-var todos = await Todo.GetAll();
+var todos = await Todo.All();
 var results = await Todo.Query(x => x.IsComplete == false);
 
 // Create
@@ -893,8 +890,5 @@ See [ARCH-0068: Refactoring Strategy](../decisions/ARCH-0068-refactoring-strateg
 When a new utility would establish durable framework law, record that law in an ADR. Do not use an
 implementation ledger as current API guidance.
 
----
-
-**Last Updated**: 2026-03-26
-**Maintained By**: Koan Framework Core Team
-**Related**: [ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md)
+The reasoning behind static-versus-injected placement is recorded in
+[ARCH-0068](../decisions/ARCH-0068-refactoring-strategy-static-vs-di.md).

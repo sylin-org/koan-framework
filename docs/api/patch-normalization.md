@@ -48,7 +48,7 @@ Per-request overrides (querystring):
 - or granular: `mergeNulls=default|reject`, `partialNulls=null|ignore|reject`
 See `Koan.Web.Infrastructure.KoanWebConstants.Query`.
 
-See ADR DATA-0077 for the canonical model.
+See [DATA-0116](../decisions/DATA-0116-canonical-patch-operations.md) for the canonical model.
 
 ## Samples
 

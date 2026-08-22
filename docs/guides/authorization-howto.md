@@ -29,7 +29,7 @@ The everyday path. One model authorizes an `Entity<T>` identically on REST **and
 | `[Access(...)]` on the entity | a coarse per-action RBAC **gate** |
 | an `EntityAccess<T>` realization (`Owner` + `Constrain`) | fine-grained, resource-aware **rows** (+ create-stamp, mass-delete bound) |
 
-**Gate** — *who may touch this entity at all, per action.* A token bag per action; allow-by-default (an unspecified action is open). Legacy `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` lower into the same gate as sugar.
+**Gate** — *who may touch this entity at all, per action.* A token bag per action; allow-by-default (an unspecified action is open). `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` are the declarative form of the same thing: they lower into this gate, so one model enforces whichever you write.
 
 ```csharp
 // read open, write needs sign-in, remove needs the admin role. Tokens: anyone | authenticated | is:role |

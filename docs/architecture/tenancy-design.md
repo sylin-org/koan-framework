@@ -45,11 +45,11 @@ validation:
 > honesty corrections, the negotiation, and the round-by-round deltas — lives in
 > [tenancy-external-review-findings.md](./tenancy-external-review-findings.md) (the source of truth this
 > spec folds in). It depends on the ambient carrier (the charter) and on
-> [SEC-0004](../decisions/) (capability authz floor),
+> [SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md) (capability authz floor),
 > [DATA-0104](../decisions/DATA-0104-generic-entity-storage-naming.md) (storage-name grammar),
-> [DATA-0077](../decisions/) (`PartitionNameValidator` identifier alphabet),
-> [JOBS-0005](../decisions/) (durable jobs), the [WEB-0068](../decisions/) read-path predicate machinery,
-> [ARCH-0079](../../tests/README.md) (integration tests as canon), the [ARCH-0084](../decisions/)
+> [DATA-0077](../decisions/DATA-0077-entity-context-source-adapter-partition-routing.md) (`PartitionNameValidator` identifier alphabet),
+> [JOBS-0005](../decisions/JOBS-0005-job-orchestrator-rebuild.md) (durable jobs), the [WEB-0068](../decisions/WEB-0068-query-options-predicates.md) read-path predicate machinery,
+> [ARCH-0079](../../tests/README.md) (integration tests as canon), the [ARCH-0084](../decisions/ARCH-0084-unified-capability-model.md)
 > capability model, and [ARCH-0094](../decisions/ARCH-0094-adapter-forge.md) (the Adapter Forge — the
 > companion to the external-infra delegation seam).
 >
@@ -432,7 +432,7 @@ which is independently placeable.
    resolved through the credential seam (§6c). The registry can be queried/exported/MCP-exposed without
    surfacing a connection string or key.
 3. **Membership is host-stored, tenant-filtered.** The operator reads it unfiltered; a *tenant*-admin
-   reading "my members" gets the same entity, tenant-filtered by the [WEB-0068](../decisions/) read-path
+   reading "my members" gets the same entity, tenant-filtered by the [WEB-0068](../decisions/WEB-0068-query-options-predicates.md) read-path
    predicate machinery. The control plane reuses the data plane's enforcement — no parallel admin model.
 4. **Operator-view vs tenant-view is field projection.** One row, two faces (composes the SEC-0004
    `can:[]` projection).

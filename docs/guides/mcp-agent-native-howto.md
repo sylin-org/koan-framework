@@ -122,7 +122,7 @@ public sealed class Note : Entity<Note> { public string Title { get; set; } = ""
 
 **What happens** — the gate is the **same authority on REST and MCP** (one seam, no per-transport copy). If an agent calls a verb it can't see, the data-layer gate denies it and the denial rides back as `meta.shortCircuit` — the MCP mirror of a REST `403`/`401`. The catalog never advertises what a call would deny.
 
-> Legacy `[Authorize]` / `[RequireScope]` on the entity still work — they *lower* into this gate as sugar. Full model: [SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md).
+> `[Authorize]` / `[RequireScope]` on the entity lower into this same gate, so a declaration written for HTTP governs the agent surface too. Full model: [SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md).
 
 ---
 
