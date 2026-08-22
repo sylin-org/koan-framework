@@ -1,9 +1,9 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Koan.Web.Attributes;
 using Koan.Web.Controllers;
 
 namespace TaskGraph;
 
 [Route("api/categories")]
-[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[Pagination(Mode = PaginationMode.Required, DefaultSize = 10, MaxSize = 200)]
 public sealed class CategoryController : EntityController<Category>;

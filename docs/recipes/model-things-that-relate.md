@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: model-things-that-relate
 title: "Model things that belong to other things"
@@ -66,7 +66,7 @@ Bound the reads at the projection rather than trusting callers:
 
 ```csharp
 [Route("api/categories")]
-[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[Pagination(Mode = PaginationMode.Required, DefaultSize = 10, MaxSize = 200)]
 public sealed class CategoryController : EntityController<Category>;
 ```
 

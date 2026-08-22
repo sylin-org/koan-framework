@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -8,7 +8,7 @@ using Koan.Web.Controllers;
 namespace TaskGraph;
 
 [Route("api/todos")]
-[KoanDataBehavior(MustPaginate = true, DefaultPageSize = 10, MaxPageSize = 200)]
+[Pagination(Mode = PaginationMode.Required, DefaultSize = 10, MaxSize = 200)]
 public sealed class TodoController : EntityController<Todo>
 {
     [HttpPost("reset-demo")]

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
@@ -130,18 +130,6 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
                 return controllerAttr;
             }
 
-            var legacy = GetType().GetCustomAttribute<KoanDataBehaviorAttribute>();
-            if (legacy is not null)
-            {
-                return new PaginationAttribute
-                {
-                    Mode = legacy.MustPaginate ? PaginationMode.Required : PaginationMode.On,
-                    DefaultSize = legacy.DefaultPageSize,
-                    MaxSize = legacy.MaxPageSize,
-                    IncludeCount = true
-                };
-            }
-
             return null;
         }
 
@@ -199,9 +187,9 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         {
             requestedSize = parsedSize;
         }
-        else if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var legacySize))
+        else if (query.TryGetValue("size", out var vs) && int.TryParse(vs, out var aliasSize))
         {
-            requestedSize = legacySize;
+            requestedSize = aliasSize;
         }
 
         if (requestedSize < 1)
