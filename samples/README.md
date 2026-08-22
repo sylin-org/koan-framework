@@ -1,4 +1,4 @@
-# Pick an idea. Make it run.
+﻿# Pick an idea. Make it run.
 
 Choose the result that sounds fun. Every sample starts as an ordinary .NET application, runs locally,
 and keeps the interesting code about the thing being built.
@@ -52,7 +52,7 @@ application learn something new without losing what already worked.
 Run any sample from the repository root with the command on its page. On Windows, its `start.bat`
 does the same thing from any directory and forwards any application arguments.
 
-These applications target the stable Koan 1.0 train. See [what works today](../docs/reference/what-works.md)
+These applications target the Koan 1.x train. See [what works today](../docs/reference/what-works.md)
 when deciding what to add to your own application.
 
 Want to see Koan inside a standalone product? Explore

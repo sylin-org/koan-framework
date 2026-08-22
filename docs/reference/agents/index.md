@@ -1,4 +1,4 @@
----
+﻿---
 type: REFERENCE
 domain: mcp
 title: "Agents"
@@ -91,4 +91,4 @@ An agent does not have to guess what it connected to:
 
 - [Build an agent-native workflow](../../guides/mcp-agent-native-howto.md)
 - [Reach Koan over MCP HTTP](../../guides/mcp-http-sse-howto.md)
-- [See what works in Koan 1.0](../what-works.md)
+- [See what works today](../what-works.md)

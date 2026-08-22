@@ -1,4 +1,4 @@
-# Sylin.Koan.Web.OpenApi
+﻿# Sylin.Koan.Web.OpenApi
 
 Publish a wire-faithful OpenAPI 3.1 document and a governed interactive UI from a Koan web application.
 
@@ -8,8 +8,8 @@ Publish a wire-faithful OpenAPI 3.1 document and a governed interactive UI from 
 dotnet add package Sylin.Koan.Web.OpenApi
 ```
 
-The reference composes through the application's existing `AddKoan()` call. No `AddOpenApi`, `MapOpenApi`, Swagger,
-or application-pipeline call is required.
+The reference composes through the application's existing `AddKoan()` call, which maps the document and
+its UI.
 
 ## Smallest meaningful result
 

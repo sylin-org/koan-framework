@@ -196,10 +196,9 @@ the adapters, authentication setup, safety limits, and topology used by each app
 
 ## References
 
-- [HTTP API](http-api.md)
 - [PATCH normalization](../../api/patch-normalization.md)
-- [Pagination attributes](pagination-attribute.md)
-- [OpenAPI generation](openapi-generation.md)
+- [Pagination](pagination.md)
+- [OpenAPI package](../../../src/Koan.Web.OpenApi/README.md)
 - [WEB-0035 — EntityController transformers](../../decisions/WEB-0035-entitycontroller-transformers.md)
 - [ARCH-0092 — Entity exposure surfaces](../../decisions/ARCH-0092-entity-exposure-surfaces.md)
 - [ARCH-0112 — bounded relationship negotiation](../../decisions/ARCH-0112-bounded-relationship-negotiation.md)

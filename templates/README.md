@@ -1,4 +1,4 @@
-# Sylin.Koan.Templates
+﻿# Sylin.Koan.Templates
 
 Two `dotnet new` paths to a persisted Koan Entity application. The templates choose a proved package family; the
 generated application contains business code and ordinary .NET structure, not framework scaffolding.
@@ -9,7 +9,7 @@ generated application contains business code and ordinary .NET structure, not fr
 dotnet new install Sylin.Koan.Templates
 ```
 
-This is the canonical stable Koan 1.0 entry. The generated
+This is the canonical entry point. The generated
 [product surface](../docs/reference/product-surface.md) shows the active package inventory and capability maturity.
 
 ## First result
