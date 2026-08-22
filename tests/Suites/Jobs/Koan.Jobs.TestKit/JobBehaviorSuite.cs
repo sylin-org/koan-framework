@@ -870,6 +870,14 @@ public abstract class JobBehaviorSuite
                 claimed.Add(rec.Id);
         })));
 
+        // Checked first, because it separates the two ways the counts below can be wrong. A claim handed to two
+        // owners leaves nothing queued and shows up as MORE than jobCount — measured at 104 of 24 with the
+        // conditional write removed. A claim nobody took leaves rows queued and shows up as fewer: a claimer
+        // treats a CAS loss as "no work available" and stops for good, so a shortfall is the drive loop giving
+        // up, not the ledger handing a job out twice. Same assertion, opposite directions, unrelated causes.
+        (await host.Ledger.Query(new JobQuery(WorkType: wt, Status: JobStatus.Queued), default))
+            .Should().BeEmpty("every seeded job was claimable and no claimer should have stopped early");
+
         claimed.Should().HaveCount(jobCount);                // every job claimed
         claimed.Distinct().Should().HaveCount(jobCount);     // each claimed exactly once — no double-claim
     }

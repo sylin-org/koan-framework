@@ -289,6 +289,19 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   registered under two identities — whose whole purpose is to tell an author to keep one activation owner per
   assembly. Catch the exceptions the comment names, not everything, or the guard next to it stops existing.
   (2026-08-21)
+- **Prove a correctness spec by removing the guarantee, not by watching it pass.** A one-off failure of the
+  jobs double-claim spec was suspected to be a real double claim. Reading settled that it could not be — the
+  claim is one `UPDATE ... WHERE identity AND guard` succeeding on `rowcount == 1`, which no isolation level
+  lets two callers win — but a green suite proves nothing on its own about a race. Disabling the conditional
+  write turned the spec red at 104 claims where 24 were seeded, which is what makes its passing evidence.
+  Do this for any spec guarding a concurrency property: the interesting question is not whether it passes, it
+  is whether it can fail. (2026-08-22)
+- **Three "intermittent" failures this cycle were all deterministic defects, and every one had its evidence
+  discarded by a summary filter.** PMC-042 was a tie-order bug, PMC-053 was boot-order poisoning of a global
+  catalog, PMC-048 turned out to be a SQL Server deadlock. None reproduced in isolation; all three reproduced
+  under the batch shape that first produced them, and named themselves in one line once the output was kept.
+  Treat "did not reproduce" as "was not captured" until the run has been repeated with the full log or TRX
+  preserved. (2026-08-22)
 - **A summary filter over a test run turns a deterministic defect into a folklore flake.** The SQLite connector
   suite reported a failure cluster four times across two days and passed on immediate re-run every time. Three
   investigations concluded "environment", eliminating parallelism, fixture paths, connection pooling and fault
