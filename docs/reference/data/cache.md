@@ -13,9 +13,6 @@ validation:
 
 # Koan Cache reference
 
-**Status:** current development generation
-**Architecture:** [ARCH-0075](../../decisions/ARCH-0075-koan-cache-pillar.md)
-
 Koan Cache keeps application code business-shaped: annotate an Entity, then keep using normal Entity verbs.
 Storage topology, policy materialization, peer invalidation, health, and startup facts are framework concerns.
 
@@ -40,7 +37,7 @@ at compile time.
 ## Shortest path
 
 Reference `Sylin.Koan.Cache`, call the normal application-level `AddKoan()`, and add `[Cacheable]` to an
-Entity. No cache registration belongs in `Program.cs`.
+Entity. That reference is the whole registration.
 
 | Reference | Result |
 |---|---|
@@ -59,13 +56,13 @@ Koan does not silently select a different store or weaken network reach.
 
 ```csharp
 [Cacheable(300)]
-public sealed class Todo : Entity<Todo> { }
+public sealed class Todo : Entity<Todo>;
 
 [Cacheable(600, L1TtlSeconds = 60)]
-public sealed class Product : Entity<Product> { }
+public sealed class Product : Entity<Product>;
 
 [Cacheable(60, AllowStaleForSeconds = 10)]
-public sealed class HotKey : Entity<HotKey> { }
+public sealed class HotKey : Entity<HotKey>;
 ```
 
 The default policy is layered, read-through, partition-aware, tagged by Entity type, and configured to
@@ -121,8 +118,27 @@ using (EntityContext.WithCacheBehavior(CacheBehavior.ReadOnly))
 }
 ```
 
-`Koan.Web` can project cache-control headers into these same request-scoped behaviors through
-`app.UseKoanCacheControl()`.
+With `Koan.Web` referenced, a request's own headers reach these same scopes: `Cache-Control: no-cache`
+becomes a refresh, `no-store` a bypass, and `X-Koan-Cache: refresh|bypass|readonly` overrides both.
+The middleware is composed for you, before routing, so the scope is in place by the time an Entity
+call runs.
+
+Whether it *honours* those headers is an environment decision, because they hand callers a lever on
+server-side caching -- anyone can send `no-store` and force an expensive query to miss. Development,
+Staging, Test, and CI honour them. Production waits for consent:
+
+```json
+{
+  "Koan": {
+    "Web": {
+      "CacheControl": { "HonorClientHeaders": true }
+    }
+  }
+}
+```
+
+Without it, production logs which capability it skipped and what would turn it on, and serves normally
+([ARCH-0133](../../decisions/ARCH-0133-client-steered-cache-is-a-gate-not-a-pipeline-call.md)).
 
 ## Explicit inspection and eviction
 

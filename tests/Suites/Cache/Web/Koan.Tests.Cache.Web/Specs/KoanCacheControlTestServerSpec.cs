@@ -1,150 +1,135 @@
+using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Core;
 using Koan.Data.Core;
-using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Tests.Cache.Web.Specs;
 
 /// <summary>
-/// End-to-end ASP.NET Core integration test for <c>UseKoanCacheControl</c>. Unlike the
-/// unit-level <c>KoanCacheControlMiddlewareSpec</c> which exercises the middleware in
-/// isolation, this spec wires the middleware into a real <see cref="TestServer"/> request
-/// pipeline and verifies the ambient <see cref="EntityContext.CacheBehavior"/> is visible
-/// to a downstream endpoint handler the way it would be in production.
+/// The composed contract: a `Koan.Web` reference mounts the cache-control middleware itself, and
+/// `KoanEnv.Gate` decides whether it honours anything. The application writes no pipeline call, so these
+/// specs build a host whose own `Configure` adds nothing but the observing terminal.
+/// <para>
+/// <see cref="KoanCacheControlMiddlewareSpec"/> covers the header-to-behaviour mapping in isolation;
+/// this spec covers whether the middleware is there at all.
+/// </para>
 /// </summary>
 public sealed class KoanCacheControlTestServerSpec
 {
-    private static async Task<TestServer> BuildServer()
+    private static async Task<IHost> StartHost(string environment, bool? consent = null)
     {
-        var hostBuilder = new HostBuilder()
-            .ConfigureWebHost(webHost =>
+        var settings = new Dictionary<string, string?>
+        {
+            ["Koan:Environment"] = environment,
+            ["Koan:BackgroundServices:Enabled"] = "false",
+            ["Logging:LogLevel:Default"] = "Warning"
+        };
+        if (consent is not null)
+        {
+            settings["Koan:Web:CacheControl:HonorClientHeaders"] = consent.Value ? "true" : "false";
+        }
+
+        var host = Host.CreateDefaultBuilder()
+            .ConfigureLogging(logging => logging.ClearProviders())
+            .ConfigureWebHost(web =>
             {
-                webHost.UseTestServer();
-                webHost.Configure(app =>
+                web.UseTestServer();
+                web.UseContentRoot(AppContext.BaseDirectory);
+                web.UseEnvironment(environment);
+                web.ConfigureAppConfiguration((_, cfg) => cfg.AddInMemoryCollection(settings));
+                web.ConfigureServices(services => services.AddKoan());
+
+                // The application contributes no cache-control middleware of its own.
+                web.Configure(app => app.Run(async ctx =>
                 {
-                    app.UseKoanCacheControl();
-                    app.Run(async ctx =>
-                    {
-                        // Mirror the active CacheBehavior back to the client as a response
-                        // header. If null (no override), report "default" explicitly.
-                        var behavior = EntityContext.Current?.CacheBehavior;
-                        ctx.Response.Headers["X-Observed-Behavior"] = behavior?.ToString() ?? "default";
-                        await ctx.Response.WriteAsync("ok");
-                    });
-                });
-            });
+                    var behavior = EntityContext.Current?.CacheBehavior;
+                    ctx.Response.Headers["X-Observed-Behavior"] = behavior?.ToString() ?? "default";
+                    await ctx.Response.WriteAsync("ok");
+                }));
+            })
+            .Build();
 
-        var host = await hostBuilder.StartAsync();
-        return host.GetTestServer();
+        await host.StartAsync(TestContext.Current.CancellationToken);
+        return host;
     }
 
-    [Fact]
-    public async Task Cache_Control_no_cache_header_pushes_Refresh_into_request_scope()
+    private static async Task<string> ObserveBehavior(IHost host, string headerName, string headerValue)
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var client = host.GetTestServer().CreateClient();
+        client.BaseAddress = new Uri("http://localhost");
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/");
+        request.Headers.TryAddWithoutValidation(headerName, headerValue);
 
-        var response = await client.SendAsync(request);
-
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be(CacheBehavior.Refresh.ToString());
+        return response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle().Subject;
     }
 
     [Fact]
-    public async Task Cache_Control_no_store_header_pushes_Bypass_into_request_scope()
+    public async Task Development_honours_client_cache_headers_without_an_application_pipeline_call()
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var host = await StartHost("Development");
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.TryAddWithoutValidation("Cache-Control", "no-store");
+        var observed = await ObserveBehavior(host, "Cache-Control", "no-cache");
 
-        var response = await client.SendAsync(request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be(CacheBehavior.Bypass.ToString());
+        observed.Should().Be(CacheBehavior.Refresh.ToString());
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task X_Koan_Cache_header_overrides_Cache_Control()
+    public async Task Development_maps_no_store_to_Bypass()
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var host = await StartHost("Development");
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-        request.Headers.TryAddWithoutValidation("X-Koan-Cache", "bypass");
+        var observed = await ObserveBehavior(host, "Cache-Control", "no-store");
 
-        var response = await client.SendAsync(request);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be(CacheBehavior.Bypass.ToString());
+        observed.Should().Be(CacheBehavior.Bypass.ToString());
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task X_Koan_Cache_readonly_maps_to_ReadOnly_behavior()
+    public async Task Production_ignores_client_cache_headers_until_an_operator_consents()
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var host = await StartHost("Production");
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/");
-        request.Headers.TryAddWithoutValidation("X-Koan-Cache", "readonly");
+        var observed = await ObserveBehavior(host, "Cache-Control", "no-store");
 
-        var response = await client.SendAsync(request);
-
-        response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be(CacheBehavior.ReadOnly.ToString());
+        observed.Should().Be("default");
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task Request_with_no_cache_headers_yields_default_behavior()
+    public async Task Production_honours_client_cache_headers_once_consent_is_configured()
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var host = await StartHost("Production", consent: true);
 
-        var response = await client.GetAsync("/");
+        var observed = await ObserveBehavior(host, "Cache-Control", "no-store");
 
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        response.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be("default");
+        observed.Should().Be(CacheBehavior.Bypass.ToString());
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
-    public async Task Scope_does_not_leak_across_concurrent_requests()
+    public async Task The_Koan_header_overrides_Cache_Control()
     {
-        using var server = await BuildServer();
-        using var client = server.CreateClient();
+        using var host = await StartHost("Development");
 
-        var bypassRequest = new HttpRequestMessage(HttpMethod.Get, "/");
-        bypassRequest.Headers.TryAddWithoutValidation("X-Koan-Cache", "bypass");
+        var observed = await ObserveBehavior(host, "X-Koan-Cache", "readonly");
 
-        var defaultRequest = new HttpRequestMessage(HttpMethod.Get, "/");
-
-        // Fire concurrently; AsyncLocal scoping must keep each request isolated.
-        var bypassTask = client.SendAsync(bypassRequest);
-        var defaultTask = client.SendAsync(defaultRequest);
-
-        var bypassResponse = await bypassTask;
-        var defaultResponse = await defaultTask;
-
-        bypassResponse.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be(CacheBehavior.Bypass.ToString());
-
-        defaultResponse.Headers.GetValues("X-Observed-Behavior").Should().ContainSingle()
-            .Which.Should().Be("default");
+        observed.Should().Be(CacheBehavior.ReadOnly.ToString());
+        await host.StopAsync(TestContext.Current.CancellationToken);
     }
 }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Koan.Cache.Abstractions.Policies;
 using Koan.Data.Core;
@@ -22,8 +22,9 @@ namespace Koan.Web.Middleware;
 /// </list>
 /// </para>
 /// <para>
-/// Opt-in via <c>app.UseKoanCacheControl()</c>. The scope is disposed in a finally block so
-/// no AsyncLocal leak occurs even if downstream middleware throws.
+/// Mounted by <see cref="CacheControlPipelineContributor"/> when the environment and consent allow it.
+/// The scope is disposed in a finally block so no AsyncLocal leak occurs even if downstream middleware
+/// throws.
 /// </para>
 /// </remarks>
 public sealed class KoanCacheControlMiddleware

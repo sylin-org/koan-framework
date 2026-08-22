@@ -41,6 +41,11 @@ public sealed class WebModule : KoanModule
         services.AddKoanOptions<PaginationSafetyBounds>(PaginationSafetyBounds.SectionPath);
         services.PostConfigure<PaginationSafetyBounds>(bounds => bounds.Normalize());
 
+        // Cache-control headers steer server-side caching, so the posture is a gate decision rather than a
+        // pipeline call the application has to place correctly. See ARCH-0133.
+        services.AddKoanOptions<KoanCacheControlOptions>(KoanCacheControlOptions.SectionPath);
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Hosting.IKoanWebPipelineContributor, Middleware.CacheControlPipelineContributor>());
+
         // SEC-0004 Slice B: discover EntityAccess<T> realizations once (the same discovery authority every Koan
         // contract uses). The gate cache reads each realization's principal-FREE gate; the endpoint resolves the
         // SCOPED realization for Constrain; and an open-generic read hook rides the WEB-0068 predicate rail. A type
