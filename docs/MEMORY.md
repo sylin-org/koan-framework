@@ -289,6 +289,19 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   registered under two identities — whose whole purpose is to tell an author to keep one activation owner per
   assembly. Catch the exceptions the comment names, not everything, or the guard next to it stops existing.
   (2026-08-21)
+- **The 1.0 compatibility train is mechanically enforced at pack time, and a normal build cannot see it.**
+  `Directory.Build.targets` sets `PackageValidationBaselineVersion` to 1.0.0, so `dotnet pack` compares every
+  packable assembly against its published baseline in the NuGet cache and fails on `CP0001` (type removed) or
+  `CP0002` (member removed). `dotnet build` does none of this. Removing a public member therefore leaves a
+  green solution and a package that cannot ship — caught here only because `Koan.Packaging.Tests` packs
+  `Koan.Core` as part of a different assertion. **Before deleting any public member, pack its project.** There
+  are no suppression files in the tree, so a deliberate break has nowhere to be declared yet. (2026-08-22)
+- **Choose the verification set from what the change touches, not from habit.** This repo has 102 test
+  projects; a comfortable rotation of about twenty covers the adapters and misses their abstractions.
+  Promoting `TimeSpan` in `TypeClassification` (`Koan.Data.Abstractions`) was verified against nine connector
+  suites and left `Koan.Tests.Data.Core` — 487 tests, the closest consumer of the type that changed — red on
+  `dev` for a day. The rule that would have caught it: run the suite that owns the project you edited, before
+  the suites that merely use it. (2026-08-22)
 - **Prove a correctness spec by removing the guarantee, not by watching it pass.** A one-off failure of the
   jobs double-claim spec was suspected to be a real double claim. Reading settled that it could not be — the
   claim is one `UPDATE ... WHERE identity AND guard` succeeding on `rowcount == 1`, which no isolation level

@@ -74,4 +74,11 @@ public sealed class PillarManifest
             return KoanPillarCatalog.RequireByCode(Code);
         }
     }
+
+    /// <summary>Claims one more namespace for this pillar, beyond the roots it was declared with.</summary>
+    public void AssociateNamespace(string namespacePrefix)
+    {
+        EnsureRegistered();
+        KoanPillarCatalog.AssociateNamespace(Code, namespacePrefix);
+    }
 }
