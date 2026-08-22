@@ -35,8 +35,8 @@ public sealed class AnimeConformance : EntityConformanceSpecs<Anime>
 
 | Battery | What it pins | Gated on |
 |---|---|---|
-| `RoundTrip` | a saved entity reads back by id | always |
-| `Paging` | paging returns every row exactly once | always |
+| `RoundTrip_persists_and_reads_back_by_id` | a saved entity reads back by id | always |
+| `Paging_returns_every_row_exactly_once` | paging returns every row exactly once | always |
 | `QueryPushdown_agrees_with_reference_evaluator` | the adapter's filter results match the shipped in-memory oracle (the bug is always the adapter, never the oracle) | `query.filter` capability |
 | `Partition_isolates_writes` | a write in one partition is invisible in another | always |
 | `Cacheable_invalidates_on_delete` | a delete is never served from a stale cache | `[Cacheable]` |

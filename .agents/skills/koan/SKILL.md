@@ -1,4 +1,4 @@
----
+﻿---
 name: koan
 description: Build, extend, repair, and prove greenfield or current Koan applications. Use when turning a business outcome into an Entity-centered app; choosing or composing data providers, Web, identity, tenancy, classification, Jobs, Communication, cache, storage, media, AI, vectors, MCP, Canon, testing, or operational capabilities; replacing a provider; or fixing behavior or composition. For read-only explanation use koan-explain. For framework migration or removed Koan APIs use koan-upgrade.
 ---
@@ -45,7 +45,7 @@ public sealed class KnowledgeItem : Entity<KnowledgeItem>
 }
 
 [Route("api/knowledge")]
-public sealed class KnowledgeController : EntityController<KnowledgeItem> { }
+public sealed class KnowledgeController : EntityController<KnowledgeItem>;
 
 var answer = await Client.Chat("Summarize today's knowledge.", ct);
 var meaning = await Client.Embed("provider-neutral composition", ct);
