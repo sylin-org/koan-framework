@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: reconcile-messy-arrivals
 title: "Turn inconsistent arrivals into one trusted record"

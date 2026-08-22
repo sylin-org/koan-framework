@@ -1,4 +1,4 @@
----
+﻿---
 type: GUIDE
 domain: core
 title: "Adopt Koan in an existing application"

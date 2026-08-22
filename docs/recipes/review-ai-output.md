@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: review-ai-output
 title: "Review AI output before it ships"

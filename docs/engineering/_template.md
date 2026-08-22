@@ -1,5 +1,5 @@
 ﻿---
-type: DEV
+type: ENGINEERING
 domain: framework
 title: "Operational workbook template"
 audience: [maintainers, contributors]

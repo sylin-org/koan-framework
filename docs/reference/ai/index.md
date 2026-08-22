@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: ai
 title: "Add model-powered operations"
 audience: [developers, architects, ai-agents]

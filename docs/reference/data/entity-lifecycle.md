@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: data
 title: "Entity Lifecycle"
 audience: [developers, architects, ai-agents]

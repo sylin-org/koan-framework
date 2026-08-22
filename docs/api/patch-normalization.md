@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: web
 title: "PATCH Formats and Normalization"
 audience: [developers, architects, ai-agents]

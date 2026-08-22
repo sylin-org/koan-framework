@@ -77,7 +77,8 @@ Koan assemblies only.
 }
 ```
 
-Versions are **major.minor** — the pre-1.0 breaking tier ([ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)).
+Versions are recorded as **major.minor**, the tier at which composition can actually change
+([ARCH-0085](../decisions/ARCH-0085-versioning-compatibility-and-automation.md)).
 This keeps a checked-in file **byte-stable across commits** (NBGV's per-commit patch height would
 otherwise churn it on every build) so a diff means a *real* composition change, not noise.
 

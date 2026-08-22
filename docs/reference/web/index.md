@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: web
 title: "Expose Entities through HTTP"
 audience: [developers, architects, ai-agents]
@@ -17,16 +17,14 @@ validation:
 Use Koan Web when the same Entity model needs a conventional HTTP API with governed CRUD, query,
 paging, hooks, and inspectable correction paths.
 
-## Contract
+An Entity model and an attribute-routed controller are the whole application side. Koan supplies the
+CRUD and query endpoints behind them, and each one runs through the same
+`IEntityEndpointService<TEntity, TKey>` — the seam that owns authorization, hooks, data access,
+relationship expansion, and emission.
 
-- **Input:** an ASP.NET Core application composed with `AddKoan()`, an Entity model, and an
-  attribute-routed MVC controller.
-- **Output:** conventional Entity CRUD/query endpoints backed by the shared
-  `IEntityEndpointService<TEntity, TKey>` policy and execution seam.
-- **Errors:** invalid filters/sorts/paging, authorization denial, adapter limitations, safety bounds,
-  transformer failures, and relationship negotiation failures become explicit HTTP results.
-- **Success:** the application declares business models and routes while Koan owns routine parsing,
-  persistence orchestration, pagination metadata, hooks, shaping, and inspectability.
+One seam owning those decisions is what makes a failure an HTTP result rather than a surprise. An
+invalid filter, sort, or page answers `400`; a relationship expansion no adapter can serve fails
+closed with `422`; a response past the safety cap answers `413`.
 
 ## Shortest supported shape
 
@@ -38,9 +36,7 @@ public sealed class Todo : Entity<Todo>
 }
 
 [Route("api/todos")]
-public sealed class TodosController : EntityController<Todo>
-{
-}
+public sealed class TodosController : EntityController<Todo>;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
@@ -66,14 +62,31 @@ application only owns explicit pipeline mapping when it disables that default.
   and explicit envelopes for both MVC and framework transports; replay and heartbeat are not implied.
 
 See the package-owned contracts for [Web Extensions](../../../src/Koan.Web.Extensions/README.md),
-[OpenAPI](../../../src/Koan.Web.OpenApi/README.md), and [SSE](../../../src/Koan.Web.Sse/README.md). No package-specific
-`Add` or `Use` ceremony belongs in the common path.
+[OpenAPI](../../../src/Koan.Web.OpenApi/README.md), and [SSE](../../../src/Koan.Web.Sse/README.md). Each composes
+through the same `AddKoan()` the application already calls.
 
 ## EntityController behavior
 
-`EntityController<TEntity, TKey>` provides collection, query, get-new, get-by-id, single/bulk upsert,
-single/bulk/query/all delete, and patch actions. `EntityController<TEntity>` is its string-key alias.
-See the HTTP API reference for the exact verbs, bodies, headers, and status codes.
+`EntityController<TEntity>` is the string-key alias for `EntityController<TEntity, TKey>`. Inheriting
+from it and giving it a route is the whole declaration; these endpoints follow, relative to that
+route.
+
+| Route | Purpose |
+| --- | --- |
+| `GET /` | the collection, paged and filtered |
+| `POST /query` | the same read with the filter in the body |
+| `GET /new` | an unsaved instance carrying the model's defaults |
+| `GET /{id}` | one entity |
+| `POST /` | create or replace one |
+| `POST /bulk` | create or replace many |
+| `PATCH /{id}` | apply a JSON Patch document |
+| `DELETE /{id}` | remove one |
+| `DELETE /bulk` | remove the listed ids |
+| `DELETE /?q=` | remove what the query matches |
+| `DELETE /all` | remove every entity in the set |
+
+Each is `virtual`. Override one to add business behavior around it, and call `base` to keep the
+governed pipeline underneath.
 
 The controller parses request syntax and translates HTTP. `IEntityEndpointService` owns the shared
 authorization, hooks, data access, relationship, and emission pipeline so other Entity surfaces do
@@ -89,9 +102,7 @@ not need to duplicate those decisions.
     MaxSize = 200,
     IncludeCount = true,
     DefaultSort = "-createdAt")]
-public sealed class TodosController : EntityController<Todo>
-{
-}
+public sealed class TodosController : EntityController<Todo>;
 ```
 
 - Collection requests accept `page`, `pageSize` (`size` is accepted as an alias), sort, filter,
@@ -169,9 +180,9 @@ translation in Web.
 
 ## Authorization and relationships
 
-- Base Entity operations use the shared authorization seam; declare standard
-  `[Authorize]`/`[AllowAnonymous]` and Koan scope requirements on the entity or applicable surface.
-  Do not add REST-only `CanRead`/`CanWrite` overrides.
+- Base Entity operations use the shared authorization seam. Declare standard
+  `[Authorize]`/`[AllowAnonymous]` and Koan scope requirements on the entity or applicable surface,
+  and the same decision holds wherever that entity is read — REST and MCP alike.
 - `?access=true` opts a REST collection into the per-row capability sidecar when configured.
 - `?with=...` expands declared direct relationships through the governed relationship executor.
   Native or resident execution is accepted by default; bounded fallback requires an explicit finite
@@ -187,12 +198,15 @@ translation in Web.
 - Startup reporting and runtime facts explain discovered modules and important selections; package
   presence alone is not proof that an optional adapter capability was elected.
 
-## Maturity boundary
+## Where this surface stops
 
-Koan is pre-1.0. The sources above support a concise MVC/Entity path, shared endpoint policies,
-hooks, transforms, health, and facts. They do not provide blanket production certification, automatic
-security-provider configuration, universal streaming, or unlimited relationship expansion. Validate
-the adapters, authentication setup, safety limits, and topology used by each application.
+Koan.Web owns the Entity path over HTTP: the endpoints above, the shared policy behind them, hooks,
+transforms, health, and facts. Three things stay with the application by design.
+
+- **Which authentication provider, configured how.** Koan enforces the decision; it does not pick one.
+- **What its own data may return at once.** The safety bounds have defaults, not knowledge of your rows.
+- **Which adapters and topology it deploys on.** Streaming and relationship expansion are bounded by
+  what the elected adapter advertises, and the boundary is reported at startup rather than assumed.
 
 ## References
 

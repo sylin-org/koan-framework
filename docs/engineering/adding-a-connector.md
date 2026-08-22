@@ -1,5 +1,5 @@
 ﻿---
-type: DEV
+type: ENGINEERING
 domain: framework
 title: "Adding a connector"
 audience: [maintainers, contributors]

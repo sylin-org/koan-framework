@@ -1,5 +1,5 @@
 ﻿---
-type: DEV
+type: ENGINEERING
 domain: framework
 title: "Koan operational workbooks"
 audience: [maintainers, contributors]

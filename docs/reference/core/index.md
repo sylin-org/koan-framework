@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: core
 title: "Compose and inspect an application"
 audience: [developers, architects, ai-agents]

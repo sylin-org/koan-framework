@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: framework
 title: "Generated API documentation"
 audience: [developers, maintainers]

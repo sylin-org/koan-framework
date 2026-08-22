@@ -1,4 +1,4 @@
----
+﻿---
 type: ARCHITECTURE
 domain: framework
 title: "Small code. Serious architecture."

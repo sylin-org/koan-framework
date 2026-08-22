@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: framework
 title: "Glossary"
 audience: [developers, architects, ai-agents]

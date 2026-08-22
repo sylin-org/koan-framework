@@ -469,10 +469,11 @@ Every module contributing Entity language must add compilation and runtime evide
     and later settlement observation are asserted for lifted side effects; and
 11. XML documentation and agent schema describe the same effects and limits.
 
-## Pre-1.0 change policy
+## Change policy inside 1.x
 
-Koan is pre-1.0. A current API, package, sample, or document is evidence to assess, not a compatibility
-anchor. When it conflicts with the coherent contract, the owning work item classifies it as:
+Koan 1.x is the stabilization line ([BUILD-0073](../decisions/BUILD-0073-compatibility-posture-before-announcement.md)).
+A current API, package, sample, or document is evidence to assess, not a compatibility anchor. When
+it conflicts with the coherent contract, the owning work item classifies it as:
 
 - keep and harden in place;
 - move behind the correct facet or layer;

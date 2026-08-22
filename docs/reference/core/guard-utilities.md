@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: core
 title: "Guard Utilities Reference"
 audience: [developers, architects]

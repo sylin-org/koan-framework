@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: data
 title: "Persist and query business state"
 audience: [developers, architects, ai-agents]

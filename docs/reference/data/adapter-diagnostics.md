@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: data
 title: "Data adapter diagnostics and readiness"
 audience: [developers, architects, ai-agents]
@@ -19,16 +19,14 @@ links:
 
 # Data adapter diagnostics and readiness
 
-## Contract
+Referencing a Data connector makes it *available*. Winning election, serving an Entity route, or
+answering a direct source request makes it *participate* — and only a participating provider is a
+readiness dependency. This page draws that line, and describes the startup provenance, health, and
+facts that report where each provider fell.
 
-- Inputs: referenced Data adapters, provider/source election, runtime repository/direct-source use, and provider-owned
-  discovery/configuration.
-- Outputs: immutable startup provenance plus runtime participation, health, and facts that describe the same route
-  decisions with secrets redacted.
-- Error modes: an unused provider made critical, health probing a different route than Entity operations, mutable boot
-  entries treated as runtime truth, or a connection opened merely because a package is referenced.
-- Success criteria: operators can distinguish available, elected, participating, ready, degraded, and failed providers;
-  every active probe follows the factory route used by Data.
+The distinction has teeth in both directions. An available-but-unused provider that opens a socket
+turns a package reference into an outage. A health probe that resolves a different route than the
+factory reports green on a connection nothing uses.
 
 ## Availability is not participation
 
@@ -49,8 +47,9 @@ resolution, including exact connection, database/bucket, credentials, and source
 by Data per Entity/key/provider/source route; expensive native clients are pooled by the connector at physical-source
 scope.
 
-Do not re-run provider election from an operation path to compute a storage name. Retain the already selected naming
-provider and bind only the current operation's ambient partition.
+Storage naming uses the provider already selected for the route, and an operation binds only its own ambient
+partition. Re-electing from an operation path can name storage for a different provider than the one serving the
+call.
 
 ## Startup provenance
 
@@ -86,9 +85,9 @@ For a Data provider:
 5. report stable configuration through `ProvenanceModuleWriter`; and
 6. test available-but-unused, elected, and runtime-participating states separately.
 
-Use standard `IOptions<T>`, `IOptionsMonitor<T>`, DI lifetimes, `IHealthContributor`, and .NET logging. Do not introduce a
-parallel mutable snapshot/augmenter system when startup provenance plus runtime Data participation already express the
-two different lifecycles.
+Use standard `IOptions<T>`, `IOptionsMonitor<T>`, DI lifetimes, `IHealthContributor`, and .NET logging. Startup
+provenance and runtime Data participation already carry the two lifecycles a connector has to explain — what was
+composed, and what has actually been used — so a connector reports through those rather than a snapshot of its own.
 
 ## Pagination and streaming
 

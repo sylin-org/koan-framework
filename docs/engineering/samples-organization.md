@@ -1,5 +1,5 @@
 ﻿---
-type: DEV
+type: ENGINEERING
 domain: framework
 title: "Sample portfolio standard"
 audience: [maintainers, contributors]

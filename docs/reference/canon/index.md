@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: canon
 title: "Reconcile arrivals into trusted Entities"
 audience: [developers, architects, ai-agents]

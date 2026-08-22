@@ -40,8 +40,7 @@ SQLite file without changing Entity code.
 ```
 
 The provider supports exact case-insensitive tags, binary payloads, bounded stale serving, durable persistence, and
-real sliding expiration. Existing pre-1.0 databases are upgraded in place: the sliding-expiry column and normalized
-tag index are added, and legacy comma-delimited tags are migrated.
+real sliding expiration. An existing cache file is brought to the current schema when the store opens it.
 
 ## Guarantees and limits
 

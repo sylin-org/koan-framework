@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: publish-to-a-named-channel
 title: "Publish approved records to a separate store"

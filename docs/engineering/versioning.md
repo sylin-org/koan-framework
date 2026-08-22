@@ -1,5 +1,5 @@
 ﻿---
-type: DEV
+type: ENGINEERING
 domain: framework
 title: "Package versioning"
 audience: [maintainers, release-engineers]

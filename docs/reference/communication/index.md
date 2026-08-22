@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: communication
 title: "Raise occurrences and send Entity snapshots"
 audience: [developers, architects, operators, ai-agents]

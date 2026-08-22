@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: run-work-in-background
 title: "Return quickly and finish the work reliably"

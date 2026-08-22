@@ -1,5 +1,5 @@
----
-type: REF
+﻿---
+type: REFERENCE
 domain: web
 title: "Pagination"
 audience: [developers, architects]

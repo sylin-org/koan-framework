@@ -1,5 +1,5 @@
 ﻿---
-type: ARCH
+type: ARCHITECTURE
 domain: framework
 title: "Adapter registration and external topology"
 audience: [developers, architects, maintainers]

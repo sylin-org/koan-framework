@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: make-repeated-reads-fast
 title: "Make repeated reads fast"

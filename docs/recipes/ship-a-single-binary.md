@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: ship-a-single-binary
 title: "Ship it as one self-contained executable"

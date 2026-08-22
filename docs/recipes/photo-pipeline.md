@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: photo-pipeline
 title: "Let people upload photos and find them by what's in them"

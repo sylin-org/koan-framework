@@ -1,5 +1,5 @@
 ﻿---
-type: ARCH
+type: ARCHITECTURE
 domain: cache
 audience: [architects, maintainers]
 status: current

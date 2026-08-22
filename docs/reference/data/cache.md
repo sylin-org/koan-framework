@@ -1,5 +1,5 @@
 ﻿---
-type: REF
+type: REFERENCE
 domain: cache
 audience: [developers, architects]
 status: current
