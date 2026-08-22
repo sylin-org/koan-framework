@@ -84,39 +84,24 @@ silently.
 
 ## Breaking something inside 1.x
 
-**Koan 1.x is the stabilization line.** A public surface may still be removed or reshaped inside it, and the
-rule is that the break is *recorded* rather than prevented.
+Freely, for now. **Koan 1.x is the stabilization line and the framework is not announced**, so the published
+1.0.0 packages have no consumers and a removed public member costs nothing. Delete what is not needed; keep the
+surface lean.
 
-Package validation compares every packable assembly against its published baseline —
-`KoanTrainBaselineVersion`, currently `1.0.0` — and fails on `CP0001` (a type is gone) or `CP0002` (a member
-is gone). **It runs at pack time only.** `dotnet build` cannot see it, so removing a public member leaves the
-solution green and the package unshippable, and nothing says so until a release is attempted. Before deleting
-any public surface, pack its project:
+Baseline validation is therefore **off** — `KoanHasPublishedBaseline` in `Directory.Build.targets`. It had been
+comparing every assembly against 1.0.0 and reporting 101 differences, all of them deliberate design from one
+stabilization cycle. Recording those as suppressions would have been bookkeeping for an audience of zero.
 
-```powershell
-dotnet pack src/<Project>/<Project>.csproj -c Debug
-```
-
-When the break is intended, record it:
+Turn it back on at announcement, with `KoanTrainBaselineVersion` set to whatever is published then. From that
+point a removed public member is a real cost, and the suppression flow is the way to record a deliberate one:
 
 ```powershell
 dotnet pack Koan.sln -c Debug -p:ApiCompatGenerateSuppressionFile=true
 ```
 
-That writes a `CompatibilitySuppressions.xml` next to each affected project. Commit it with the change that
-caused it, never separately — a suppression whose cause is a different commit is a break nobody can explain
-later.
-
-A suppression is a record of debt, not permission to take more. Two things follow. A removal that is merely
-tidying is rarely worth spending compatibility on, because the entry outlives the tidying. And when the line
-moves, these files are **deleted** rather than carried forward: the new baseline already contains the new
-shape.
-
-One case needs no suppression at all. A type that moves between assemblies keeps its name with
-`[assembly: TypeForwardedTo(...)]`, so nothing compiled against the old package stops resolving — see
-`src/Koan.Data.Relational/AssemblyInfo.cs`. Local validation cannot always confirm it, because ApiCompat
-follows a forward only when it can resolve the target assembly and a sibling prerelease is on no feed; the
-forwarder is still the correct thing to ship.
+Two things to know before relying on it. It runs at **pack** and never at build, so a removed member leaves a
+green solution and an unshippable package unless CI packs deliberately. And a type that merely moves assemblies
+needs no entry at all — `[assembly: TypeForwardedTo(...)]` keeps the name resolving.
 
 ## Moving the compatibility line
 

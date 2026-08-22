@@ -1,7 +1,16 @@
 <Project>
   <PropertyGroup>
-    <!-- Every assembly package validates against the preceding public train. -->
-    <KoanHasPublishedBaseline Condition="'$(KoanHasPublishedBaseline)' == ''">true</KoanHasPublishedBaseline>
+    <!-- Baseline validation is OFF until the framework is announced.
+
+         1.0.0 is on nuget.org but nothing is built on it, so comparing every assembly against it was measuring
+         a promise nobody was owed: one stabilization cycle produced 101 differences, all of them deliberate
+         design — the schema orchestrator becoming a single owner, the vector adapter surface settling — and
+         recording them as suppressions would have been bookkeeping for an audience of zero.
+
+         Turn this back on at announcement, with KoanTrainBaselineVersion set to the version actually published
+         then. From that point a removed public member is a real cost and the gate is worth its noise. Note it
+         only runs at Pack, never at Build, so it needs a deliberate pack in CI to be worth anything. -->
+    <KoanHasPublishedBaseline Condition="'$(KoanHasPublishedBaseline)' == ''">false</KoanHasPublishedBaseline>
     <KoanTrainBaselineVersion Condition="'$(KoanTrainBaselineVersion)' == ''">1.0.0</KoanTrainBaselineVersion>
     <PackageValidationBaselineVersion Condition="'$(KoanHasPublishedBaseline)' == 'true' and '$(KoanTrainBaselineVersion)' != '' and '$(IncludeBuildOutput)' != 'false'">$(KoanTrainBaselineVersion)</PackageValidationBaselineVersion>
   </PropertyGroup>

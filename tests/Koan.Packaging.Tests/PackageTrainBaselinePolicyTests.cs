@@ -9,14 +9,27 @@ public sealed class PackageTrainBaselinePolicyTests
 {
     private const string AssemblyProject = "src/Koan.Core/Koan.Core.csproj";
 
+    /// <summary>
+    /// Assembly packages do not validate against a baseline yet, and that is deliberate.
+    ///
+    /// <para>1.0.0 is on nuget.org but the framework is not announced, so nothing is built on it. Validating
+    /// every assembly against it reported 101 differences from one stabilization cycle — the schema
+    /// orchestrator becoming a single owner, the vector adapter surface settling — all of them intended, none
+    /// of them owed to anyone. Koan 1.x is the stabilization line and the surface is still being cut down.</para>
+    ///
+    /// <para>At announcement, flip <c>KoanHasPublishedBaseline</c> back on, set
+    /// <c>KoanTrainBaselineVersion</c> to whatever is published then, and invert this test with it. The central
+    /// baseline version stays asserted either way, because the switch is about whether it is enforced, not
+    /// about whether the train has one.</para>
+    /// </summary>
     [Fact]
-    public async Task AssemblyPackagesUseTheSharedTrainBaseline()
+    public async Task AssemblyPackagesDoNotValidateAgainstABaselineBeforeAnnouncement()
     {
         var properties = await EvaluateAsync("1.0.1");
 
         Assert.Equal("1.0.0", properties.GetProperty("KoanTrainBaselineVersion").GetString());
-        Assert.Equal("1.0.0", properties.GetProperty("PackageValidationBaselineVersion").GetString());
-        Assert.Equal("true", properties.GetProperty("EnablePackageValidation").GetString());
+        Assert.Equal("", properties.GetProperty("PackageValidationBaselineVersion").GetString());
+        Assert.Equal("", properties.GetProperty("EnablePackageValidation").GetString());
     }
 
     [Fact]

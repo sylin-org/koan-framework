@@ -16,8 +16,4 @@ public static class DataPillarManifest
         "Koan.Storage");
 
     public static void EnsureRegistered() => Pillar.EnsureRegistered();
-
-    public static KoanPillarCatalog.PillarDescriptor Descriptor => Pillar.Descriptor;
-
-    public static void AssociateNamespace(string namespacePrefix) => Pillar.AssociateNamespace(namespacePrefix);
 }
