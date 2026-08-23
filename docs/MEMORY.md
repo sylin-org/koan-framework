@@ -417,3 +417,37 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   defect found by running a sample end-to-end was invisible to the in-memory suites.
 - **A deferred entry records the tree on the day it was written.** Verify the premise before working
   one; the register's own contract says why.
+
+- **Fail-fast beats heroic: forbid the workaround before praising the workaround.** The first cold run of the
+  POC recipe spent fifty minutes inventing a seeder, vector wiring, and namespaces, and returned a 9/9 "pass"
+  with a minefield under it. The same journey under stop-at-first-blocker rules produced three sub-eight-minute
+  iterations, each carrying exactly one defect and one fix, and ended in a clean pass. An agent that pushes
+  through ambiguity hides the defect behind a workaround; an agent that stops at it hands you the defect. Write
+  the stop rules down - agents default to heroism because their training rewards task completion, and "the
+  blocker report is the deliverable" changes behavior in one iteration. (2026-08-23)
+- **Teach against the feed, not the source.** A recipe written against dev source failed on nuget.org's 1.0.2:
+  `Dimensions` did not exist there, and the derived vector space did not either, so attribute-only saves threw
+  "no declared space" while the docs promised they would just work. The code was right and the documentation was
+  still wrong - repo-ahead-of-feed skew is a documentation defect even when the code is correct. State the
+  package set a page was verified against, and when the feed lags the source, say which incantation works today.
+  (2026-08-23)
+- **What an agent builds while struggling is a diff of what the docs failed to say.** A cancelled evaluation left
+  no report, but its final file states confessed everything: an invented HostedService seeder mapped to
+  unspecified seeding, an explicit vector-space lambda mapped to unstated zero-wiring, three discovered usings
+  mapped to a fragment instead of a whole file. Read the artifacts of a struggle as forensic evidence before
+  asking for a summary. (2026-08-23)
+- **Documentation that is not routed to at the moment of failure is indistinguishable from missing
+  documentation.** The Onnx README always said "downloads nothing at runtime", and an agent still burned half an
+  hour on a model acquisition that does not exist - because the error it saw ("No source found with capability
+  Embedding") pointed nowhere. Fixing the content was not enough; the recipe now links the connector README, the
+  README carries the acquisition block, and the deeper fix - the error message itself naming the correction - is
+  queued. Route first, then write. (2026-08-23)
+- **Verified exemplars beat instructions.** "Copy ProduceSearchController" resolved in seconds what paragraphs of
+  explanation could not, and every ladder recipe now opens its moves with a copy-from-here table whose paths are
+  lint-checked against the tree. Compiled samples cannot drift from the framework, which makes them the only
+  instruction material that is simultaneously current and proven. (2026-08-23)
+- **A property defined in Build.props is empty inside Packages.props.** The tmp/ scratch exemption referenced
+  `$(_KoanScratchRoot)` from Directory.Packages.props; the property lives in Directory.Build.props, so it evaluated
+  empty, `StartsWith('')` matched every project, and central package management switched off for the entire
+  repository - surfacing as NU1015 storms in unrelated test projects. Define the root property in the file that
+  consumes it, and treat "unrelated projects broke" as a props-scoping question first. (2026-08-23)
