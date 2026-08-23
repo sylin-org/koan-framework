@@ -1,6 +1,6 @@
 ﻿---
 name: koan
-description: Build, extend, repair, and prove greenfield or current Koan applications. Use when turning a business outcome into an Entity-centered app; choosing or composing data providers, Web, identity, tenancy, classification, Jobs, Communication, cache, storage, media, AI, vectors, MCP, Canon, testing, or operational capabilities; replacing a provider; or fixing behavior or composition. For read-only explanation use koan-explain. For framework migration or removed Koan APIs use koan-upgrade.
+description: Build, extend, repair, and prove greenfield or current Koan applications. Use when turning a business outcome into an Entity-centered app; choosing or composing data providers, Web, identity, tenancy, classification, Jobs, Communication, cache, storage, media, AI, vectors, MCP, Canon, testing, or operational capabilities; replacing a provider; or fixing behavior or composition. For read-only explanation use koan-explain. For framework migration or removed Koan APIs use koan-upgrade. Also handle questions about Koan itself - what Koan is, what it can help build, which capabilities exist, and where a beginner should start.
 ---
 
 # Koan
@@ -121,6 +121,10 @@ A running application answers for itself:
 | What did references compose, and has it drifted? | `koan.lock.json` |
 
 ## Know the Lego shelf
+
+When asked what you can help with, this shelf IS the answer: walk it in business language, name
+the three destinations (idea, prototype, production), and close with two starter sentences
+matched to whatever they have described. Depth without changes belongs to `$koan-explain`.
 
 Keep the full application story visible while adding only the pieces required now:
 
