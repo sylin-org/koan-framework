@@ -28,7 +28,7 @@ without further wiring. Warnings do not fail unless `-FailOnWarning` is passed.
 What it checks:
 
 - **FrontMatter** -- required keys and their allowed values.
-- **Links** -- every `[text](target)` resolves, and heading anchors exist in markdown targets.
+- **Links** -- every markdown link resolves, and heading anchors exist in markdown targets.
 - **Paths** -- repository paths cited in backticks resolve. The Links check cannot see these, which is
   how three dead references survived a full documentation pass; records that describe the tree as it
   was (decisions, initiatives, archives, ledgers, implementation plans, templates) are exempt.
