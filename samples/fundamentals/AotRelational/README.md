@@ -61,3 +61,5 @@ The project therefore sets `InvariantGlobalization=false` for `-p:Connector=SqlS
 `true` for the other four, which do not need culture data and publish smaller without it. Nothing extra
 is required on the command line; the difference is recorded in the project file so the publish command
 stays the same for every backend.
+
+**Working with a coding agent?** [AGENTS.md](../../../AGENTS.md) at the repository root orients any agent on the Koan conventions this sample follows.

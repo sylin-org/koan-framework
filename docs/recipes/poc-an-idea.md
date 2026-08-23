@@ -114,7 +114,7 @@ none and needs none):
 
 As environment variables that is `Koan__Ai__Onnx__ModelPath=...` (double underscores), or set
 them in code. The artifacts ship in the Koan checkout
-([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)) and are also on
+([`assets/models/all-MiniLM-L6-v2/`](../../assets/models/all-MiniLM-L6-v2/)) and are also on
 GitHub for NuGet-only users
 ([assets/models/all-MiniLM-L6-v2/](https://github.com/sylin-org/koan-framework/tree/main/assets/models/all-MiniLM-L6-v2));
 GardenCoop chapter 2 is a working consumer.
@@ -140,10 +140,10 @@ open them before writing anything:
 
 | Pattern | Where it already works |
 |---|---|
-| An entity that indexes meaning (`[Embedding]`) | [GardenCoop ch. 2 - `Models/Produce.cs`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/Models/Produce.cs) |
-| Seeding through ordinary saves (reset-by-rerun) | [LocalChecklist - `Program.cs`](../../../samples/fundamentals/LocalChecklist/Program.cs) |
-| The local search UI over the same origin | [GardenCoop ch. 2 - `wwwroot/index.html`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/wwwroot/index.html) |
-| A semantic search controller (`Embed` + `Vector<T>.Search`) | [GardenCoop ch. 2 - `Controllers/ProduceSearchController.cs`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/Controllers/ProduceSearchController.cs) |
+| An entity that indexes meaning (`[Embedding]`) | [GardenCoop ch. 2 - `Models/Produce.cs`](../../samples/journeys/GardenCoop/02-LocalDiscovery/Models/Produce.cs) |
+| Seeding through ordinary saves (reset-by-rerun) | [LocalChecklist - `Program.cs`](../../samples/fundamentals/LocalChecklist/Program.cs) |
+| The local search UI over the same origin | [GardenCoop ch. 2 - `wwwroot/index.html`](../../samples/journeys/GardenCoop/02-LocalDiscovery/wwwroot/index.html) |
+| A semantic search controller (`Embed` + `Vector<T>.Search`) | [GardenCoop ch. 2 - `Controllers/ProduceSearchController.cs`](../../samples/journeys/GardenCoop/02-LocalDiscovery/Controllers/ProduceSearchController.cs) |
 
 ## When the idea survives contact
 

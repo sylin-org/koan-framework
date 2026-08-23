@@ -59,7 +59,9 @@ try {
     # Channel documents answer "what exists now", so pinning them would hide everything shipped since
     # the tag. They track the release branch and are therefore verified against the local tree -- they
     # must exist here and ship -- rather than against an immutable revision.
-    $channelDocs = @($shelfPath, $recipeIndexPath, $connectorMatrixPath)
+    $channelDocs = @($shelfPath, $recipeIndexPath, $connectorMatrixPath,
+    'docs/capabilities/index.md', 'docs/capabilities/ai.md',
+    'docs/capabilities/ai/semantic-search.md', 'docs/capabilities/ai/embedding/portable.md')
     $channelPrefix = 'https://github.com/sylin-org/koan-framework/blob/main/'
     $capabilityMapUrl = "$channelPrefix$shelfPath"
     function Test-ChannelLink([string]$Url, [ref]$Reason) {

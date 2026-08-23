@@ -31,7 +31,7 @@ application you already have, in an explicit order.
 | Pattern | Where it already works / is taught |
 |---|---|
 | The cutover envelope, blockers and recovery | [default-route-cutover how-to](../guides/data/default-route-cutover.md) · cross-provider proof in [Koan.Data.Cutover.CrossProvider.Tests](../../tests/Suites/Data/Cutover/Koan.Data.Cutover.CrossProvider.Tests/) |
-| NativeAOT publish properties that survive | [AotRelational - `AotRelational.csproj`](../../../samples/fundamentals/AotRelational/AotRelational.csproj) |
+| NativeAOT publish properties that survive | [AotRelational - `AotRelational.csproj`](../../samples/fundamentals/AotRelational/AotRelational.csproj) |
 | Conformance specs against a real engine | [Entity conformance kit](../../src/Koan.Testing/EntityConformanceSpecs.cs) subclassed per connector under `tests/Suites/Data/` |
 
 ## Graduate the store deliberately

@@ -58,7 +58,7 @@ Read both at their current revision rather than a pinned one; a frozen copy hide
 since. For architecture, operations, and migration, the agent retrieval map indexes the whole
 documentation set:
 
-<https://github.com/sylin-org/koan-framework/blob/main/llms.txt>
+<https://github.com/sylin-org/koan-framework/blob/v1.0.0/llms.txt>
 
 Paths inside it are repository-relative; resolve them against that same pinned base.
 

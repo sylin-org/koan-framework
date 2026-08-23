@@ -61,7 +61,7 @@ are emitted once.
 
 | Pattern | Where it already works / is taught |
 |---|---|
-| A multi-page static UI over the same-origin API | [SnapVault - `wwwroot/`](../../../samples/applications/SnapVault/wwwroot/) |
+| A multi-page static UI over the same-origin API | [SnapVault - `wwwroot/`](../../samples/applications/SnapVault/wwwroot/) |
 | Sign-in wiring and provider swap | [authentication-setup guide](../guides/authentication-setup.md) |
 | `[Access]` declarations and row rules | [authorization-howto](../guides/authorization-howto.md) - sample adoption is pending; treat the guide as canonical |
 

@@ -14,7 +14,7 @@
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanArchivedSamplesRoot)'))">false</ManagePackageVersionsCentrally>
   <!-- tmp/ holds throwaway scaffolds (recipe evaluations, scratch apps) that must restore
        against the public feed like a user's project, not against this repo's CPM. -->
-  <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanScratchRoot)'))">false</ManagePackageVersionsCentrally>
+  <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanTmpRoot)'))">false</ManagePackageVersionsCentrally>
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanCaseStudiesRoot)'))">false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
