@@ -43,12 +43,34 @@ dotnet new koan-web -o KitchenPrep
 
 Three files, two references. Entities become classes, flows become controller methods or agent
 sentences, and storage starts as local SQLite. If the idea leans on meaning rather than keywords,
-add the search trio now - one attribute makes saves index themselves:
+add the search trio now - one attribute makes saves index themselves.
 
-```diff
-+ [Embedding(Template = "{Title}. {Notes}")]
-  public sealed class PrepTask : Entity<PrepTask>;
+> **Owned flow:** vector spaces have a dedicated authority -
+> [search-by-meaning](search-by-meaning.md). Read it before inventing any wiring; if saves ever
+> report "no declared space", that page owns the fix.
+
+The entity file, complete - usings included, because symbol origins are where time goes missing:
+
+```csharp
+using Koan.Data.AI.Attributes;
+using Koan.Data.Abstractions;
+using Koan.Data.Core.Model;
+
+namespace KitchenPrep;
+
+// saves index themselves - vectors land beside the SQLite file
+[Embedding(Template = "{Title}. {Notes}")]
+public sealed class PrepTask : Entity<PrepTask>
+{
+    public string Title { get; set; } = "";
+    public string Notes { get; set; } = "";
+}
 ```
+
+Seed before `RunAsync`, exactly the way LocalChecklist's `Program.cs` does: one
+`RemoveAll(RemoveStrategy.Safe)` then an array save, so every boot starts from a known,
+lived-in state. First search downloads the all-MiniLM-L6-v2 ONNX model once and caches it for
+offline runs afterwards.
 
 ## Let the data shape argue back
 
