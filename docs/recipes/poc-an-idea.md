@@ -67,10 +67,34 @@ public sealed class PrepTask : Entity<PrepTask>
 }
 ```
 
-Seed before `RunAsync`, exactly the way LocalChecklist's `Program.cs` does: one
-`RemoveAll(RemoveStrategy.Safe)` then an array save, so every boot starts from a known,
-lived-in state. First search downloads the all-MiniLM-L6-v2 ONNX model once and caches it for
-offline runs afterwards.
+Seed before serving - but a web host needs its composition live first, and the intuitive shape
+crashes. This is the working bridge (starting the module host twice is the trap: `RunAsync` after
+`StartAsync` throws "AI adapter registry is already compiled"):
+
+```csharp
+await app.StartAsync();                    // composition live: providers elected
+using (AppHost.PushScope(app.Services))    // ambient scope for entity calls
+{
+    PrepTask.RemoveAll(RemoveStrategy.Safe);          // reset-by-rerun, LocalChecklist-style
+    await new[] { /* lived-in PrepTasks */ }.Save();
+}
+await app.WaitForShutdownAsync();
+```
+
+**Give the embedder its model.** The ONNX connector is air-gap friendly and downloads nothing:
+side-load the MiniLM artifacts once and point configuration at them. The Koan checkout ships both
+([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)); GardenCoop
+chapter 2 is a working consumer.
+
+```json
+{ "Koan": { "Ai": { "Onnx": {
+  "ModelPath": "models/all-MiniLM-L6-v2/model_quantized.onnx",
+  "VocabPath": "models/all-MiniLM-L6-v2/vocab.txt",
+  "ModelName": "all-MiniLM-L6-v2" } } } }
+```
+
+Relative paths resolve against the build output, so copy them into the project and let the SDK
+carry them: `<Content Include="models\**" CopyToOutputDirectory="PreserveNewest" />`.
 
 ## Let the data shape argue back
 
@@ -80,7 +104,7 @@ document column in that same relational shell instead of reaching for a second e
 capability map carries this guidance as a table; cite it, choose once, move on.
 
 Seed a handful of realistic records through ordinary saves so the first look shows a lived-in
-application rather than an empty grid, then read `/well-known` facts together: which store was
+application rather than an empty grid, then read `/.well-known/Koan/facts` together: which store was
 elected, which embedder joined, what the composition locked in.
 
 ## Copy, do not invent
@@ -93,6 +117,7 @@ open them before writing anything:
 | An entity that indexes meaning (`[Embedding]`) | [GardenCoop ch. 2 - `Models/Produce.cs`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/Models/Produce.cs) |
 | Seeding through ordinary saves (reset-by-rerun) | [LocalChecklist - `Program.cs`](../../../samples/fundamentals/LocalChecklist/Program.cs) |
 | The local search UI over the same origin | [GardenCoop ch. 2 - `wwwroot/index.html`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/wwwroot/index.html) |
+| A semantic search controller (`Embed` + `Vector<T>.Search`) | [GardenCoop ch. 2 - `Controllers/ProduceSearchController.cs`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/Controllers/ProduceSearchController.cs) |
 
 ## When the idea survives contact
 

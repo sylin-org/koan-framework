@@ -7,10 +7,14 @@
     <_KoanAtticRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)attic'))</_KoanAtticRoot>
     <_KoanShelvedRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)shelved'))</_KoanShelvedRoot>
     <_KoanArchivedSamplesRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)samples/archive'))</_KoanArchivedSamplesRoot>
+  <_KoanTmpRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)tmp'))</_KoanTmpRoot>
     <_KoanCaseStudiesRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)docs/case-studies'))</_KoanCaseStudiesRoot>
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanAtticRoot)'))">false</ManagePackageVersionsCentrally>
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanShelvedRoot)'))">false</ManagePackageVersionsCentrally>
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanArchivedSamplesRoot)'))">false</ManagePackageVersionsCentrally>
+  <!-- tmp/ holds throwaway scaffolds (recipe evaluations, scratch apps) that must restore
+       against the public feed like a user's project, not against this repo's CPM. -->
+  <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanScratchRoot)'))">false</ManagePackageVersionsCentrally>
     <ManagePackageVersionsCentrally Condition="$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanCaseStudiesRoot)'))">false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
