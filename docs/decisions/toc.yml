@@ -204,6 +204,10 @@
       href: ARCH-0131-document-store-catalogue.md
     - name: ARCH-0132 A registry separates a declaration from an inference
       href: ARCH-0132-a-registry-separates-declaration-from-inference.md
+    - name: ARCH-0133 Client-steered cache is a gate decision, not a pipeline call
+      href: ARCH-0133-client-steered-cache-is-a-gate-not-a-pipeline-call.md
+    - name: ARCH-0134 A capabilities tree routes agent knowledge by intent
+      href: ARCH-0134-a-capabilities-tree-routes-agent-knowledge-by-intent.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
