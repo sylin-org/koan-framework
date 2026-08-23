@@ -25,28 +25,34 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
+$generatedRoot = '.agents/skills/koan/references/generated'
 $targets = @(
-    @{ Source = 'docs/reference/capability-map.md';  Destination = '.agents/skills/koan/references/generated/capability-map.md' },
-    @{ Source = 'docs/reference/connector-matrix.md'; Destination = '.agents/skills/koan/references/generated/connector-matrix.md' }
+    @{ Source = 'docs/reference/capability-map.md';  Destination = "$generatedRoot/capability-map.md" },
+    @{ Source = 'docs/reference/connector-matrix.md'; Destination = "$generatedRoot/connector-matrix.md" },
+    @{ Source = 'docs/capabilities/index.md'; Destination = "$generatedRoot/capabilities/index.md" },
+    @{ Source = 'docs/capabilities/ai.md'; Destination = "$generatedRoot/capabilities/ai.md" },
+    @{ Source = 'docs/capabilities/ai/semantic-search.md'; Destination = "$generatedRoot/capabilities/ai/semantic-search.md" },
+    @{ Source = 'docs/capabilities/ai/embedding/portable.md'; Destination = "$generatedRoot/capabilities/ai/embedding/portable.md" }
 )
 
 $metaPath = Join-Path $repoRoot '.agents/skills/koan/references/generated/SNAPSHOT.meta.json'
 
-function Get-Fresh([string]$relative) {
-    $source = Join-Path $repoRoot ($relative -replace '/', [IO.Path]::DirectorySeparatorChar)
-    if (-not (Test-Path -LiteralPath $source)) { throw "missing source: $relative" }
+function Get-Fresh([string]$source, [string]$destination) {
+    $sourcePath = Join-Path $repoRoot ($source -replace '/', [IO.Path]::DirectorySeparatorChar)
+    if (-not (Test-Path -LiteralPath $sourcePath)) { throw "missing source: $source" }
     [pscustomobject]@{
-        Relative = $relative
-        Content  = [IO.File]::ReadAllBytes($source)
+        Source      = $source
+        Destination = $destination
+        Content     = [IO.File]::ReadAllBytes($sourcePath)
     }
 }
 
-$fresh = foreach ($t in $targets) { Get-Fresh $t.Source }
+$fresh = foreach ($t in $targets) { Get-Fresh $t.Source $t.Destination }
 
 if ($Check) {
     $failed = $false
     foreach ($item in $fresh) {
-        $destination = Join-Path $repoRoot ($item.Relative -replace 'docs/reference/', '.agents/skills/koan/references/generated/')
+        $destination = Join-Path $repoRoot ($item.Destination -replace '/', [IO.Path]::DirectorySeparatorChar)
         if (-not (Test-Path -LiteralPath $destination)) {
             Write-Error "snapshot missing: $destination - run: pwsh scripts/update-agent-skills.ps1"
             $failed = $true
@@ -68,7 +74,7 @@ try { $commit = (git -C $repoRoot rev-parse HEAD).Trim() } catch { $commit = 'un
 $generatedUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
 
 foreach ($item in $fresh) {
-    $destination = Join-Path $repoRoot ($item.Relative -replace 'docs/reference/', '.agents/skills/koan/references/generated/')
+    $destination = Join-Path $repoRoot ($item.Destination -replace '/', [IO.Path]::DirectorySeparatorChar)
     New-Item -ItemType Directory -Force -Path (Split-Path $destination) | Out-Null
     [IO.File]::WriteAllBytes($destination, $item.Content)
 }

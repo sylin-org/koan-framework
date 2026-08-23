@@ -1,4 +1,4 @@
-﻿---
+---
 name: koan
 description: Build, extend, repair, and prove greenfield or current Koan applications. Use when turning a business outcome into an Entity-centered app; choosing or composing data providers, Web, identity, tenancy, classification, Jobs, Communication, cache, storage, media, AI, vectors, MCP, Canon, testing, or operational capabilities; replacing a provider; or fixing behavior or composition. For read-only explanation use koan-explain. For framework migration or removed Koan APIs use koan-upgrade. Also handle questions about Koan itself - what Koan is, what it can help build, which capabilities exist, and where a beginner should start.
 ---
@@ -77,7 +77,7 @@ public sealed class Review : Entity<Review>, IKoanJob<Review>
 
 ## The real shape
 
-Every Koan package identifier begins `Sylin.Koan.` while namespaces stay `Koan.*`. Identifiers are exact and are not derivable from a product name — copy them from [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md); never construct them.
+Every Koan package identifier begins `Sylin.Koan.` while namespaces stay `Koan.*`. Identifiers are exact and are not derivable from a product name — copy them from the capabilities tree: fetch [docs/capabilities/index.md](https://github.com/sylin-org/koan-framework/blob/main/docs/capabilities/index.md) and follow its links (each node carries decision guidance and constraints; leaves link the working recipes). The flat [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md) remains the one-screen summary. Never construct them.
 
 A new application starts from the template rather than a reconstructed host:
 
@@ -138,7 +138,7 @@ Keep the full application story visible while adding only the pieces required no
 - **Trusted records:** Canon for reconciling imperfect arrivals into explainable Entities.
 - **Proof and operations:** local test infrastructure, facts, health, diagnostics, telemetry, and topology evidence.
 
-Load the [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md) when the request already names a piece; it carries the exact package identifier and recipe link for each one, and flags the one piece that is shelved. Load [stacks.md](references/stacks.md) to show a developer the version that *runs* — it maps outcomes to compiled samples, which cannot drift from the framework.
+Load the [capability map](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/capability-map.md) when the request already names a piece; it carries the exact package identifier and recipe link for each one, and flags the one piece that is shelved. For outcome routing, prefer the capabilities tree above — its domain and capability nodes carry the constraints. Load [stacks.md](references/stacks.md) to show a developer the version that *runs* — it maps outcomes to compiled samples, which cannot drift from the framework.
 
 To answer only "does Koan support X?", fetch the [connector matrix](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/connector-matrix.md) — every shipped provider by family, on one screen, and far cheaper than the capability map.
 

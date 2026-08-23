@@ -1,10 +1,14 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-08-23T00:24:00Z",
-  "sourceCommit": "9e604987493f76f09fe6605430936b83b1d5fbe4",
+  "generatedUtc": "2026-08-23T23:04:13Z",
+  "sourceCommit": "24bfe0a1b19fda2e0ae5da175a2ec3cc906ee2e6",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [
     ".agents/skills/koan/references/generated/capability-map.md",
-    ".agents/skills/koan/references/generated/connector-matrix.md"
+    ".agents/skills/koan/references/generated/connector-matrix.md",
+    ".agents/skills/koan/references/generated/capabilities/index.md",
+    ".agents/skills/koan/references/generated/capabilities/ai.md",
+    ".agents/skills/koan/references/generated/capabilities/ai/semantic-search.md",
+    ".agents/skills/koan/references/generated/capabilities/ai/embedding/portable.md"
   ]
 }
