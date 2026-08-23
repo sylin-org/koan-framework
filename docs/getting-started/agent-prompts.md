@@ -1,6 +1,6 @@
 ---
 type: GUIDE
-domain: agents
+domain: core
 title: "Get started with Koan agent prompts"
 audience: [developers, ai-agents]
 status: current

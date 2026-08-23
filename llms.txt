@@ -1,4 +1,9 @@
-﻿# Koan Framework — agent retrieval map
+# Koan Framework — agent retrieval map
+workflows into public artifacts. Convert observations into anonymous repository-owned reproductions.
+
+> Koan 1.0 is the stable .NET 10 release train.
+
+# Koan Framework — agent retrieval map
 
 Koan is an opinionated .NET 10 meta-framework for agentic, data-driven applications. Application code
 states business intent; capability pillars own composition, provider negotiation, lifecycle, and
@@ -53,6 +58,7 @@ capability genuinely needs an escape hatch, that capability documents it.
 - Does Koan connect to X? (one screen, every provider): docs/reference/connector-matrix.md
 - Start or orient: README.md, docs/getting-started/quickstart.md, docs/index.md
 - Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
+- Drive Koan through your coding agent: docs/getting-started/agent-prompts.md
 - Choose a coding skill: docs/guides/agent-skills.md (`koan` to build, extend, repair, or prove;
   `koan-explain` for read-only explanation; `koan-upgrade` for framework migration)
 - Engineer or migrate an application with an agent: docs/guides/agent-application-engineering.md
