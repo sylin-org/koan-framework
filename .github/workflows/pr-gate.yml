@@ -41,6 +41,9 @@ jobs:
 
       - name: Compile product surface and reject generated drift
         run: dotnet run --project tools/Koan.Packaging -- product-surface --check
+      - name: Verify agent skill doc snapshots
+        run: pwsh scripts/update-agent-skills.ps1 -Check
+
 
       - name: Repository coherence (build + lockfile + docs/tooling lint; no tests)
         shell: pwsh

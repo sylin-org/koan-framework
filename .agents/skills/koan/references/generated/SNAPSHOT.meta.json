@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "generatedUtc": "2026-08-23T00:24:00Z",
+  "sourceCommit": "9e604987493f76f09fe6605430936b83b1d5fbe4",
+  "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
+  "files": [
+    ".agents/skills/koan/references/generated/capability-map.md",
+    ".agents/skills/koan/references/generated/connector-matrix.md"
+  ]
+}

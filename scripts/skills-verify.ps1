@@ -171,7 +171,10 @@ try {
 
     # --- links ---------------------------------------------------------------------------------
     $pinnedPrefix = "https://github.com/sylin-org/koan-framework/blob/$pinnedTag/"
-    foreach ($file in @(Get-ChildItem -LiteralPath $skillsRoot -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue)) {
+    foreach ($file in @(Get-ChildItem -LiteralPath $skillsRoot -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue | Where-Object { ($_.FullName -replace '\\', '/') -notmatch '/references/generated/' })) {
+        # references/generated/ holds verbatim doc snapshots (see scripts/update-agent-skills.ps1).
+        # Their links are repo-relative text from the source document's location and are linted
+        # there; re-linting the copy here would only flag path shifts the snapshot intentionally carries.
         $content = Get-Content -Raw -LiteralPath $file.FullName
         if ($null -eq $content) { continue }
         $rel = [IO.Path]::GetRelativePath($repoRoot, $file.FullName).Replace('\', '/')

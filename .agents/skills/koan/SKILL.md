@@ -150,7 +150,7 @@ These hold for every domain, and they are the part no index can carry:
 - **Ask at most a couple of questions, and only ones that change the answer.** If the repository settles it, state your assumption and move. An interrogation is not a conversation.
 - **Offer the thing they need but did not ask for** — human review in front of model output, isolation before there is data — once, plainly, without insisting.
 
-Open the linked recipe before writing code against a piece this application has not used yet — it owns the install command, configuration keys, working code, and provider limits that this skill deliberately does not duplicate. When a link cannot be retrieved, say so and proceed only on what the skill states.
+Open the linked recipe before writing code against a piece this application has not used yet — it owns the install command, configuration keys, working code, and provider limits that this skill deliberately does not duplicate. When a link cannot be retrieved, say so, use the bundled snapshots under `references/generated/` for package identifiers and limits (state which snapshot date you relied on), and beyond them proceed only on what the skill states.
 
 Load only the focused aid the work needs: [build.md](references/build.md) for a first slice, [extend.md](references/extend.md) for a capability boundary, [fix.md](references/fix.md) for composition diagnosis, [test.md](references/test.md) for a proof matrix, [ship.md](references/ship.md) for runtime readiness, or [research.md](references/research.md) for a changing external seam. Never ask the developer to choose a route.
 
