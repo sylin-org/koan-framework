@@ -1,10 +1,9 @@
-# Sylin.Koan.Data.AI
+﻿# Sylin.Koan.Data.AI
 
 Data-layer AI integration for Koan: embeddings lifecycle, media analysis, and semantic search — all driven by convention, with attribute opt-in for automatic processing.
 
 - Target framework: net10.0
 - License: Apache-2.0
-- Version: 0.6.3
 
 ## Install
 
@@ -141,6 +140,6 @@ if (meta is not null)
 ## Reference
 
 - **ADR**: `docs/decisions/AI-0021-category-driven-ai-with-convention-defaults.md`
-- **Guide**: `docs/guides/ai-integration.md`
+- **Guides**: [`docs/guides/ai-rag-howto.md`](../../docs/guides/ai-rag-howto.md) for retrieval over your own Entities, [`docs/guides/ai-vector-howto.md`](../../docs/guides/ai-vector-howto.md) for the vector surface underneath
 - **Maturity**: consult the generated product surface before relying on this unassessed package in a preview application
 - **Related**: `Koan.Data.Vector` for raw vector storage, `Koan.AI` for the chat/embed facade

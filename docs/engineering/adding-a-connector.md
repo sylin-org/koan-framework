@@ -103,8 +103,8 @@ mkdir src/Connectors/Data/Vector/Acme
 </Project>
 ```
 
-The parent `src/Connectors/Directory.Build.props` imports the root, so the project receives the `Sylin.*` PackageId
-prefix and SourceLink configuration.
+MSBuild walks up for `Directory.Build.props`, so the project reaches the repository root one and receives the
+`Sylin.*` PackageId prefix and SourceLink configuration from there.
 
 ### Step 2 — Implement the adapter factory with `[KoanService]`
 
@@ -358,9 +358,12 @@ resource integration and `WithReference` so the AppHost injects configuration au
 
 ### Symptom: pack succeeds but the package ID is `Koan.Data.Vector.Connector.Acme` not `Sylin.Koan.Data.Vector.Connector.Acme`
 
-**Why it happens:** the `Sylin.` prefix comes from the root `Directory.Build.props`. The `src/Connectors/Directory.Build.props` imports the root explicitly; if your csproj somehow bypassed both (rare), the prefix never applies.
+**Why it happens:** the `Sylin.` prefix comes from the repository root `Directory.Build.props`, which sets
+`PackageId` to `Sylin.$(MSBuildProjectName)` when the project is packable and names no id of its own. A csproj that
+sets its own `PackageId`, or that sits outside the tree the root props govern, never receives it.
 
-**Recovery:** confirm `src/Connectors/Directory.Build.props` still has `<Import Project="..\..\Directory.Build.props" />` near the top. If it does, your csproj inherits correctly — re-pack and re-check.
+**Recovery:** check whether your csproj declares `PackageId` itself, and that nothing between it and the repository
+root introduces another `Directory.Build.props` that stops the walk. Then re-pack and re-check.
 
 ### Symptom: integration tests can't connect to the container
 

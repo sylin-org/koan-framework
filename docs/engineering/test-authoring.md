@@ -92,7 +92,7 @@ deliberately infrastructure-free local run. A missing native prerequisite is nev
 - Give every execution an isolated partition, database, port, or temporary root as appropriate.
 - Assert the user-visible contract and the failure message, not private implementation structure.
 - Keep environment-dependent facts explicit. Unknown or unavailable is not success.
-- When a test changes composition or startup behavior, update `docs/SURFACES.md` with its guard.
+- When a test guards composition or startup behavior, say so in its name and failure message, so the guard is legible from a red run rather than only from the source.
 - Do not weaken a suite to accommodate a connector. State and test the connector's capability boundary.
 
 ## Run it
