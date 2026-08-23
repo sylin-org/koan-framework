@@ -1,4 +1,4 @@
----
+﻿---
 uid: reference.modules.Koan.web
 title: Koan.Web - Technical Reference
 description: Contracts, configuration, and architecture for Koan’s ASP.NET Core integration.
@@ -7,18 +7,18 @@ source: src/Koan.Web/
 last_updated: 2026-07-18
 ---
 
-## Contract
+## What the reference composes
 
-- Inputs/Outputs
-  - ASP.NET Core MVC controllers, attribute routing, action results
-  - EntityController<T,TKey> for entity-backed REST
-- Options
-  - Health endpoints/OpenAPI wiring (opt-in)
-  - Conventions for well-known endpoints
-- Error modes
-  - Standard ASP.NET Core pipeline behaviors; 4xx/5xx as appropriate
-- Success criteria
-  - Controller-first routing; discoverable, testable endpoints
+Koan Web is controller-first: attribute-routed MVC controllers and ordinary action results, with
+`EntityController<TEntity, TKey>` supplying the governed Entity CRUD and query surface.
+
+`WebModule` registers unconditionally on reference. Health endpoints and the well-known facts route
+arrive with the package -- they are not an option to switch on -- and `AutoMapControllers` maps
+controllers through the startup filter unless an application disables it. OpenAPI is separate: it
+arrives by referencing `Sylin.Koan.Web.OpenApi`, not by toggling a setting here.
+
+Failures stay ASP.NET Core failures. Invalid filters, sorts and paging answer `400`; a relationship
+expansion no adapter can serve fails closed with `422`; a response past the safety cap answers `413`.
 
 ## Key types and surfaces
 
@@ -29,7 +29,7 @@ last_updated: 2026-07-18
 
 ## Configuration
 
-- Use typed Options for feature toggles (health, OpenAPI, transformers)
+- `KoanWebOptions` and `WebPipelineOptions` bind under `Koan:Web`; they shape the pipeline that already composed, rather than switching capabilities on
 - Runtime facts are exposed automatically in Development. Set
   `Koan:Web:ExposeObservabilitySnapshot=true` for an intentional non-Development exposure.
 - Avoid inline endpoints; keep routing in controllers

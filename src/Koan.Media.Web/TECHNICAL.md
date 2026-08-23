@@ -1,11 +1,14 @@
-# Sylin.Koan.Media.Web — technical contract
+﻿# Sylin.Koan.Media.Web — technical contract
 
 ## Composition
 
 Reference activates controller discovery and compiles one source choice. Exactly one concrete `MediaEntity<T>` is the
 automatic default. An already registered `IMediaSource` dominates discovery; `AddMediaSource<T>()` replaces the
-automatic choice regardless of module order. Zero or several candidates without an override fail host startup with a
-corrective error. `MediaController` consumes the Core recipe registry, the selected source, Web options, and optional
+automatic choice regardless of module order. Several candidates without an override fail host startup with a
+corrective error; none at all does not, because a reference expresses intent to serve media once there is some --
+discovery returns an inert selection and the routes have no source until a `MediaEntity<T>` exists.
+
+`MediaController` consumes the Core recipe registry, the selected source, Web options, and optional
 overlay/font services.
 
 ## Request flow
