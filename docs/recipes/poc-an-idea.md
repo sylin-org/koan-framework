@@ -8,8 +8,9 @@ last_updated: 2026-08-22
 audience: [developers, ai-agents]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/poc-an-idea.md
+  date_last_tested: 2026-08-23
+  status: passed
+  scope: cold-executed end-to-end per evals/koan/recipe-runs/poc-an-idea.md (iteration 4) - scaffold, search trio, seeded bridge, ONNX side-load via environment config, ranked semantic search (9/9 evidence), reset-by-rerun proven
 gets_you: "A running, seeded application built from an idea described in plain language - entities named as nouns, one flow chosen to feel great, the first slice alive before the coffee cools."
 works_if: "You can say who uses it and what it should do. Code can come later; the conversation comes first."
 costs: "Nothing beyond the local floor: SQLite, embedded vectors, in-process ONNX. No accounts, no services, everything stays on your machine."
@@ -42,8 +43,18 @@ dotnet new koan-web -o KitchenPrep
 ```
 
 Three code files, two references. Entities become classes, flows become controller methods or agent
-sentences, and storage starts as local SQLite. If the idea leans on meaning rather than keywords,
-add the search trio now - one attribute makes saves index themselves.
+sentences, and storage starts as local SQLite. Koan provisions on demand: on first run the SQLite
+adapter creates `.koan/data/Koan.sqlite` with the schema for every entity - there is no database
+setup in this recipe because none is needed. Saves index themselves; embedding width is measured
+from the first document. The one deliberate exception is the ONNX model artifacts further down.
+
+If the idea leans on meaning rather than keywords, add the search trio now:
+
+```powershell
+dotnet add package Sylin.Koan.AI.Connector.Onnx          # embeddings, in-process
+dotnet add package Sylin.Koan.Data.Vector.Connector.SqliteVec
+dotnet add package Sylin.Koan.Data.AI                    # owns [Embedding]
+```
 
 > **Owned flow:** vector spaces have a dedicated authority -
 > [search-by-meaning](search-by-meaning.md). Read it before inventing any wiring; if saves ever
@@ -103,8 +114,10 @@ none and needs none):
 
 As environment variables that is `Koan__Ai__Onnx__ModelPath=...` (double underscores), or set
 them in code. The artifacts ship in the Koan checkout
-([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)); GardenCoop
-chapter 2 is a working consumer.
+([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)) and are also on
+GitHub for NuGet-only users
+([assets/models/all-MiniLM-L6-v2/](https://github.com/sylin-org/koan-framework/tree/main/assets/models/all-MiniLM-L6-v2));
+GardenCoop chapter 2 is a working consumer.
 
 Relative paths resolve against the build output, so copy them into the project and let the SDK
 carry them: `<Content Include="models\**" CopyToOutputDirectory="PreserveNewest" />`.

@@ -4,7 +4,7 @@ domain: framework
 title: "Koan recipes"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-22
+last_updated: 2026-08-23
 framework_version: v1.0.0
 validation:
   status: generated
