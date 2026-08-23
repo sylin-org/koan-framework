@@ -247,10 +247,14 @@ validation:
   or storage family.
 - `batchSize` bounds the Koan-visible candidate page, not opaque driver buffers. Consumer pace controls
   later page requests; cancellation and early disposal stop later work.
-- Every user stream sort component must be a single-member, top-level, non-nullable `bool`, `byte`,
-  `sbyte`, `short`, `ushort`, or `int`. Nullable, enum, string/char, wide numeric, floating/decimal,
-  temporal, `Guid`, binary, nested, complex, collection, and explicit Entity-identifier sorts reject
-  before provider I/O.
+- A sort key that `TypeClassification.IsPortableStreamSortScalar` admits -- an enum, or `bool`, `byte`,
+  `sbyte`, `short`, `ushort`, `int`, `long`, `decimal`, `double`, `DateTimeOffset`, `DateOnly`,
+  `TimeOnly`, `TimeSpan` -- compares identically on every qualified adapter. Any other key still
+  streams; `RecordProviderDefinedOrder` emits a fact naming the keys whose comparison the store defines
+  rather than Koan, so the difference is discoverable instead of fatal.
+- The one stream-sort rejection is an Entity-identifier sort whose key type is not the provider-stable
+  `string`: that throws `QueryStreamRejectedException` before I/O, because the tie-break it would
+  replace has no proven shape.
 - After validating caller ordering, Koan appends the actual Entity identifier. The usual string key is
   an opaque provider-stable tie-break, not a CLR/cross-provider collation promise. A
   different business member named `id` does not suppress it, but models declaring both `Id` and `id`

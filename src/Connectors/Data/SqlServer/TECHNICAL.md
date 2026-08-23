@@ -1,4 +1,4 @@
----
+﻿---
 uid: reference.modules.Koan.data.sqlserver
 title: Koan.Data.Connector.SqlServer - Technical Reference
 description: SQL Server adapter for Koan data.
@@ -44,10 +44,11 @@ fallback. The connector does not currently expose provider-specific retry or com
 
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
 - Paging uses `OFFSET`/`FETCH`. Every caller-requested provider-bounded stream sort component must be a
-  top-level, non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other
-  caller sort, including an explicit Entity identifier sort, rejects before provider I/O. Data.Core
-  appends the usual string Entity identifier only as an opaque provider-stable tie-breaker; that is not
-  a CLR or cross-provider collation promise.
+  portable scalar -- an enum, or an integral, decimal, floating, or temporal type -- for its comparison
+  to hold on every qualified adapter. Any other key still streams here; Data.Core records a fact naming
+  the keys this store, rather than Koan, defines the order of. The one rejection is an Entity-identifier
+  sort whose key type is not the provider-stable `string`. Data.Core appends that identifier as an
+  opaque tie-breaker, which is not a CLR or cross-provider collation promise.
 
 ## Provider-bounded streaming
 

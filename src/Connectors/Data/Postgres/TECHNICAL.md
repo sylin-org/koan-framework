@@ -1,4 +1,4 @@
----
+﻿---
 uid: reference.modules.Koan.data.postgres
 title: Koan.Data.Connector.Postgres - Technical Reference
 description: PostgreSQL adapter for Koan data.
@@ -44,10 +44,11 @@ Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets 
 - String contains/starts/ends use `LIKE` or `ILIKE` depending on collation/case needs.
 - JSON fields: when mapped to `jsonb`, limited containment queries may be pushed down; otherwise filter in memory.
 - Paging uses `OFFSET`/`LIMIT`. Every caller-requested provider-bounded stream sort component must be a
-  top-level, non-nullable `bool`, `byte`, `sbyte`, `short`, `ushort`, or `int` member. Every other
-  caller sort, including an explicit Entity identifier sort, rejects before provider I/O. Data.Core
-  appends the usual string Entity identifier only as an opaque provider-stable tie-breaker; that is not
-  a CLR or cross-provider collation promise.
+  portable scalar -- an enum, or an integral, decimal, floating, or temporal type -- for its comparison
+  to hold on every qualified adapter. Any other key still streams here; Data.Core records a fact naming
+  the keys this store, rather than Koan, defines the order of. The one rejection is an Entity-identifier
+  sort whose key type is not the provider-stable `string`. Data.Core appends that identifier as an
+  opaque tie-breaker, which is not a CLR or cross-provider collation promise.
 
 ## Provider-bounded streaming
 
