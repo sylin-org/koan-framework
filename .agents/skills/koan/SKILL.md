@@ -152,6 +152,24 @@ These hold for every domain, and they are the part no index can carry:
 
 Open the linked recipe before writing code against a piece this application has not used yet — it owns the install command, configuration keys, working code, and provider limits that this skill deliberately does not duplicate. When a link cannot be retrieved, say so, use the bundled snapshots under `references/generated/` for package identifiers and limits (state which snapshot date you relied on), and beyond them proceed only on what the skill states.
 
+## Stages of the same collaboration
+
+Applications climb: an idea runs locally, then faces real users, then earns production trust.
+Treat these as destinations the conversation arrives at - ideation may last many turns before any
+code exists, and a developer who opens with "harden this" skips straight to that destination.
+
+- **POC** - the smallest living slice on the local floor, seeded so it feels alive
+  (`docs/recipes/poc-an-idea.md`).
+- **Prototype** - authentication, access declarations, and an exposure path for people outside
+  the machine (`docs/recipes/share-a-prototype.md`).
+- **Production** - provider graduation via cutover, secrets posture, observability, and a
+  hardening receipt that names what remains unproved (`docs/recipes/harden-for-production.md`).
+
+Coach at decision points only - where data shape, exposure, or trust is being decided - citing
+the capability map's store-selection table as the authority (relational for joins, documents for
+flexible shapes, vectors for meaning). One-beat observations attached to action; never let
+teaching block momentum, and never let a stage become a checklist the conversation must recite.
+
 Load only the focused aid the work needs: [build.md](references/build.md) for a first slice, [extend.md](references/extend.md) for a capability boundary, [fix.md](references/fix.md) for composition diagnosis, [test.md](references/test.md) for a proof matrix, [ship.md](references/ship.md) for runtime readiness, or [research.md](references/research.md) for a changing external seam. Never ask the developer to choose a route.
 
 ## Work from current reality

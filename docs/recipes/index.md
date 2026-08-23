@@ -62,6 +62,18 @@ application and say what each would cost, rather than naming a package.
 
 [Open the recipe](control-who-can-do-what.md)
 
+## Harden for production and scale
+
+**Gets you** — Graduated providers with verified migration, a declared secrets posture, observability export, protection for sensitive fields - and a hardening receipt that names what is proved and what is not.
+
+**Works if** — The prototype earned trust: real usage, data worth keeping, and someone accountable when it is down.
+
+**Costs** — Production asks for evidence at every step: container-backed conformance runs, a maintenance window for cutover, credentials for telemetry endpoints. Time shifts from writing code to proving it.
+
+**Needs** — a networked database once SQLite stops fitting · the verified move itself · observability export · field-at-rest protection for sensitive strings (optional) · recoverable deletion (optional)
+
+[Open the recipe](harden-for-production.md)
+
 ## Keep customers from seeing each other's data
 
 **Gets you** — Every read and write scoped to one customer, by construction rather than by remembering a filter.
@@ -160,6 +172,18 @@ application and say what each would cost, rather than naming a package.
 
 [Open the recipe](photo-pipeline.md)
 
+## Turn an idea into a running application
+
+**Gets you** — A running, seeded application built from an idea described in plain language - entities named as nouns, one flow chosen to feel great, the first slice alive before the coffee cools.
+
+**Works if** — You can say who uses it and what it should do. Code can come later; the conversation comes first.
+
+**Costs** — Nothing beyond the local floor: SQLite, embedded vectors, in-process ONNX. No accounts, no services, everything stays on your machine.
+
+**Needs** — the application bundle and a local database · meaning-based search from day one (optional)
+
+[Open the recipe](poc-an-idea.md)
+
 ## Publish approved records to a separate store
 
 **Gets you** — A second, named store that only receives what you approved — without a second model or a copy job.
@@ -247,6 +271,18 @@ application and say what each would cost, rather than naming a package.
 **Needs** — the web layer this UI talks to · entity-owned files behind upload UIs (optional)
 
 [Open the recipe](serve-a-web-frontend.md)
+
+## Let people outside your machine test it
+
+**Gets you** — Real sign-in, deliberate access rules, and a URL other people can click - without standing up production infrastructure.
+
+**Works if** — The idea survived contact: you are using it daily, and someone else wants in.
+
+**Costs** — Authentication adds one sign-in decision and an access rule per exposed operation. Exposure adds a process the internet (or your circle) can reach - patch it and mind it like any server from then on.
+
+**Needs** — sign-in, starting development-friendly · access rules on exposed entities · real identity providers when testers arrive (optional) · tenant isolation when circles must not overlap (optional)
+
+[Open the recipe](share-a-prototype.md)
 
 ## Ship it as one self-contained executable
 
