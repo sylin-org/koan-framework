@@ -71,11 +71,16 @@ bounded candidate page; the provider must still own the page bound and complete 
 Unsupported execution throws `QueryStreamRejectedException` with the Entity, provider, stable reason,
 and corrective action. Koan does not silently materialize a full source as a fallback.
 
-Every user stream sort component must be a single-member, top-level, non-nullable `bool`, `byte`,
-`sbyte`, `short`, `ushort`, or `int`. Nullable, enum, string/char, wide numeric, floating/decimal,
-temporal, `Guid`, binary, nested, complex, and collection sorts reject before provider I/O. This is an
-intentionally narrow first semantic floor; types return only after the shared six-adapter matrix proves
-their complete value and null-order contract.
+A sort key whose type is a portable scalar -- an enum, or `bool`, `byte`, `sbyte`, `short`, `ushort`,
+`int`, `long`, `decimal`, `double`, `DateTimeOffset`, `DateOnly`, `TimeOnly`, `TimeSpan` -- compares
+the same way on every backend, because the shared adapter matrix proves that value and null-order
+contract.
+
+Any other key still streams, stably and completely, on the store it runs against. What it does not
+carry is agreement *across* backends: a string orders by collation, a nullable column by the
+provider's null placement. Koan records that as a runtime fact naming the keys involved rather than
+refusing the query -- an application that needs cross-backend agreement can see which keys to avoid,
+and one that does not gets the order it actually asked for.
 
 Koan separately adds the exact Entity identifier after validating caller ordering. The usual string
 key is an opaque provider-stable tie-break, not a CLR or cross-provider collation promise, so an

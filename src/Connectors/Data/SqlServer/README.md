@@ -1,4 +1,4 @@
-# Sylin.Koan.Data.Connector.SqlServer
+﻿# Sylin.Koan.Data.Connector.SqlServer
 
 SQL Server provider for Koan relational data with safe defaults, pushdowns, and schema helpers.
 
@@ -84,10 +84,11 @@ for (var pageNumber = 1; ; pageNumber++)
 
 `AllStream` and `QueryStream` request one numbered SQL Server page at a time. `batchSize` caps the
 Koan-visible candidate page; it does not claim a bound for opaque provider-driver buffers. Streaming
-accepts only DATA-0107's first proved user-sort floor: top-level, non-nullable `bool`, `byte`, `sbyte`,
-`short`, `ushort`, or `int`. Other user sorts reject before provider I/O. Data.Core separately appends
-the usual string Entity identifier as an opaque provider-stable tie-break, not a cross-provider
-collation promise.
+orders by a portable scalar -- an enum, or an integral, decimal, floating, or temporal type -- with a
+comparison that holds on any backend. Any other key still streams stably here, but SQL Server defines its
+comparison rather than Koan, which records that as a runtime fact instead of refusing the query.
+Data.Core separately appends the usual string Entity identifier as an opaque provider-stable
+tie-break, not a cross-provider collation promise.
 
 These streams do not provide snapshot consistency, mutation-safe traversal, resumability, or a public
 cursor. Concurrent writes can therefore cause skips or duplicates during offset-based traversal.
