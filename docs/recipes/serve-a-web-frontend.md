@@ -1,4 +1,4 @@
----
+﻿---
 type: RECIPE
 recipe: serve-a-web-frontend
 title: "Give the application a web frontend"
@@ -58,7 +58,7 @@ middleware during startup - see `KoanWebStartupFilter`. Same origin means cookie
 Events, and `[Access]` authorization apply to UI calls with no CORS decision ever made.
 
 SnapVault demonstrates the whole story with hand-authored multi-page HTML and design-token CSS -
-no package.json anywhere: [samples/applications/SnapVault](../../../samples/applications/SnapVault/).
+no package.json anywhere: [samples/applications/SnapVault](../../samples/applications/SnapVault/).
 GardenCoop and TaskGraph carry smaller versions of the same shape.
 
 For a compiled SPA, keep `wwwroot` as the build output and let MSBuild drive the client build:
