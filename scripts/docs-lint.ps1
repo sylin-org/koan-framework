@@ -356,6 +356,28 @@ foreach ($entry in $docEntries) {
         }
     }
 
+    # Repository paths cited in backticks rather than as markdown links. The Links check above
+    # only sees [text](target); a path written as `docs/guides/x.md` is invisible to it, which is
+    # how three dead references survived every sweep. Records that describe the tree as it was --
+    # decisions, initiatives, assessments, archives -- are exempt by design.
+    $isHistoricalRecord = ($relativePath -match '^docs/(decisions|initiatives|assessment|epic-assessment|archive|proposals|migration)/') -or
+        # A ledger records where things went, a plan proposes where they will go, and a
+        # template ships a placeholder. All three name paths that do not resolve today.
+        ($relativePath -match '(-ledger|-implementation-plan)\.md$') -or
+        ([System.IO.Path]::GetFileName($relativePath) -like '_*')
+    if (-not $isHistoricalRecord) {
+        $citedPaths = [regex]::Matches(
+            $entry.Content,
+            '`((?:docs|src|samples|tests|scripts|templates|packaging|tools)/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+)`')
+        foreach ($match in $citedPaths) {
+            $cited = $match.Groups[1].Value
+            # A glob or placeholder segment is illustrative, not a citation.
+            if ($cited -match '[*{]') { continue }
+            if (Test-Path (Join-Path $repoRoot $cited)) { continue }
+            Add-Issue -Path $relativePath -Severity "Error" -Check "Paths" -Message "Cited path '$cited' does not exist"
+        }
+    }
+
     # Term map enforcement
     if ((@($termMap.Keys)).Count -gt 0) {
         foreach ($preferred in $termMap.Keys) {

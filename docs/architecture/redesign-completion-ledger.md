@@ -350,7 +350,7 @@ implemented and its tests pass on real stores.
     minimal endpoints] + `Hosting/*StartupFilter` + `wwwroot/`). Then **2c-2** (caller-identity resolver + Owner
     authz gate + read endpoints), **2c-3** (mutation endpoints w/ authz), **step 3** (the site page, model
     `src/Connectors/Web/Auth/Test/wwwroot/testprovider-login.html`). Web tests = TestServer/WAF (ARCH-0091).
-  - **PRIOR-ART SWEEP DONE** (`wf_25fb6f0c-992`, 29 frameworks → `docs/architecture/tenancy-prior-art-findings.md`).
+  - **PRIOR-ART SWEEP DONE** (`wf_25fb6f0c-992`, 29 frameworks → `docs/archive/architecture/tenancy-prior-art-findings.md`).
     Verdict: §6/§7 validated (plane split = AWS/Nile/Neon canon; role-on-membership = unanimous B2B; fail-closed =
     "most defensible in the field"); **§7's lockable per-tenant config primitive is genuinely novel** (nobody ships
     it). Keystone: **Windows Group Policy** = the 1:1 ancestor of the lock + a checklist of 3 gaps. **§7 RESHAPED to
@@ -361,7 +361,7 @@ implemented and its tests pass on real stores.
     revocation contract · time-boxed bootstrap credential · intent-scoped portal links. Additive, not a redesign.
 - ◐ **ENTITLEMENTS/TIERS (§8) + DELIGHT + SNAPVAULT DOGFOOD — DESIGN CAPTURED, build pending.**
   - **Two more prior-art sweeps** (61 platforms): tier/quota CORE (`wf_7c331efc-09c`, 25) + entitlement DIMENSIONS
-    (`wf_9c953f4e-e6c`, 36) → `docs/architecture/tenancy-entitlements-findings.md`. Verdict: add the tier as ONE more
+    (`wf_9c953f4e-e6c`, 36) → `docs/archive/architecture/tenancy-entitlements-findings.md`. Verdict: add the tier as ONE more
     resolution layer (ABP Edition, "not a new subsystem"); the **moat** = Koan owns resolution (§7) AND enforcement
     (§1b), the billing/auth incumbents punt on numeric-quota enforcement.
   - **ARCH-0099 §8 authored** (entitlements & tiers): 8a tier-as-layer (`solution→tier→tenant→user`, tier-as-data,
@@ -371,14 +371,14 @@ implemented and its tests pass on real stores.
     observe-mode, hard-backstop) · 8f over-limit FREEZE-not-delete + never-lock-remediation · 8g deferred/single-
     pending/RSoP-visible plan-change · 8h billing-decoupled (one grantor, gate-on-status) · 8i capacity≠quota +
     seat/resource aggregation · 8j RSoP+audit extension.
-  - **5-persona DELIGHT harvest** (`wf_0d56fd46-7ae`) → `docs/architecture/tenancy-delight-synthesis.md`. Unanimous
+  - **5-persona DELIGHT harvest** (`wf_0d56fd46-7ae`) → `docs/archive/architecture/tenancy-delight-synthesis.md`. Unanimous
     flagship = "the cross-tenant leak you literally cannot write" (BUILT). The moat (4/5). **Honesty layer:** the
     two highest-leverage delights (quota enforcement + erasure certificate) are DESIGNED-not-built; the **async-hop/
     durable-carrier hole most threatens the flagship**. Delight-killer: never ship a proof artifact before its
     fan-out is exhaustive.
   - **SnapVault dogfood** — studied `samples/applications/SnapVault` (photo SaaS, single-tenant, no auth) →
-    `docs/architecture/snapvault-tenancy-proposal.md` (its domain IS the tier example; "add nothing to the
-    entities") + `docs/architecture/snapvault-conversion-plan.md` (the **break-and-rebuild** plan: dogfood +
+    `docs/archive/architecture/snapvault-tenancy-proposal.md` (its domain IS the tier example; "add nothing to the
+    entities") + `docs/archive/architecture/snapvault-conversion-plan.md` (the **break-and-rebuild** plan: dogfood +
     framework-first-per-feature; the big break = in-memory worker → `Koan.Jobs` to close the async-hop hole).
     SnapVault exposes 3 real framework gaps: vector(Weaviate) tenant-isolation, storage blob per-tenant prefix, the
     async-hop carrier. **The conversion is the pull that orders the remaining tenancy build.**
@@ -602,7 +602,7 @@ implemented and its tests pass on real stores.
 - ◐ **ARCH-0102 — THE ACCESS OVERLAY DEFINITION BLOCK (AODB): PHASES 1 + 2 SHIPPED (2026-06-25, `dev`, unpushed).**
   The generalization of ARCH-0101: isolation intent composed once into an inspectable `Aodb` + pushed down + adapter-realized;
   the break-and-rebuild collapse of the per-plane scoping forks onto ONE composer. ADR `docs/decisions/ARCH-0102-...md`
-  (decision + Addendum I corrections + Addendum II the delight inversion) + plan `docs/architecture/aodb-implementation-plan.md`.
+  (decision + Addendum I corrections + Addendum II the delight inversion) + plan `docs/archive/architecture/aodb-implementation-plan.md`.
   **Phase 0 `a391e4d9`** — `OverlayNamingRule` (framework-owned, adapter-declared, override-only) closes the CONFIRMED
   Weaviate vector leak (GraphQL reserves `__`; Weaviate declares `__`→`koan_`; the framework renames write-stamp + read-filter
   from the one declaration; live RED→GREEN `WeaviateOverlayIsolationSpec`). **Phase 1a `b9bf3792`** — `[Flags] FieldProvenance`

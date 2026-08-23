@@ -313,7 +313,7 @@ and set `se.Key = logicalKey ?? obj.Key;`. Every WRITE op passes the caller's lo
 Leave the `Head(key)` fallback `Query(e => ((IStorageObject)e).Key == key, ...)` keyed on the LOGICAL `key`. Leave
 `Get(string key, ...)` (sets logical `.Key`) unchanged.
 
-**2b. `src/Koan.Media.Abstractions/Model/MediaEntity.cs`** — the `new`-shadowing static `OpenRead(string key)` (and
+**2b. `src/Koan.Media.Core/Model/MediaEntity.cs`** — the `new`-shadowing static `OpenRead(string key)` (and
 any other `new`/shadowing static, e.g. via `MediaEntityExtensions`): either DELETE the override so it inherits the
 base (preferred), or wrap its `svc.Read(...)` in `using StorageScope.For(typeof(TEntity))`. Audit
 `src/Koan.Media.Core/Extensions/MediaEntityExtensions.cs` for `Url`/presign/`Store` paths that call `IStorageService`

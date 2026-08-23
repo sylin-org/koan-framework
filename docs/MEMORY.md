@@ -1,4 +1,4 @@
----
+﻿---
 type: GUIDE
 domain: framework
 title: "Koan durable working memory"
@@ -118,7 +118,7 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   someone to re-measure. The defect was not subtle; nothing was watching. When a capability is proven by a
   manual procedure, the procedure is the capability — schedule it or expect it to expire. (2026-08-21)
 - **Do not cite a precedent without `git ls-files`.** A handoff prompt named
-  `samples/guides/g1c2.GardenCoopEmbedded` as the worked SQLite precedent, on the strength of a PROGRESS.md
+  "samples/guides/g1c2.GardenCoopEmbedded" as the worked SQLite precedent, on the strength of a PROGRESS.md
   entry describing it in detail. It does not exist in the tree. The prompt's own constraints told the reader to
   treat `git ls-files` as the authority, which is the check its author had skipped. Secondary documents describe
   the tree on the day they were written. (2026-08-21)

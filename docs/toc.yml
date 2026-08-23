@@ -7,6 +7,8 @@
       href: getting-started/quickstart.md
     - name: Bring Koan into an existing app
       href: getting-started/adopt-existing-app.md
+    - name: Drive Koan through agent prompts
+      href: getting-started/agent-prompts.md
 - name: Recipes
   href: recipes/index.md
 - name: Build
