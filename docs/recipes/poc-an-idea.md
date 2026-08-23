@@ -61,6 +61,17 @@ Seed a handful of realistic records through ordinary saves so the first look sho
 application rather than an empty grid, then read `/well-known` facts together: which store was
 elected, which embedder joined, what the composition locked in.
 
+## Copy, do not invent
+
+Agents lose hours rebuilding solved structure. These shipped files are the canonical shape -
+open them before writing anything:
+
+| Pattern | Where it already works |
+|---|---|
+| An entity that indexes meaning (`[Embedding]`) | [GardenCoop ch. 2 - `Models/Produce.cs`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/Models/Produce.cs) |
+| Seeding through ordinary saves (reset-by-rerun) | [LocalChecklist - `Program.cs`](../../../samples/fundamentals/LocalChecklist/Program.cs) |
+| The local search UI over the same origin | [GardenCoop ch. 2 - `wwwroot/index.html`](../../../samples/journeys/GardenCoop/02-LocalDiscovery/wwwroot/index.html) |
+
 ## When the idea survives contact
 
 Someone besides you wants to click it. That is the next destination - see

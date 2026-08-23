@@ -26,6 +26,14 @@ ingredients:
 The third destination. Nothing here is new architecture - it is evidence gathered around the
 application you already have, in an explicit order.
 
+## Copy, do not invent
+
+| Pattern | Where it already works / is taught |
+|---|---|
+| The cutover envelope, blockers and recovery | [default-route-cutover how-to](../guides/data/default-route-cutover.md) · cross-provider proof in [Koan.Data.Cutover.CrossProvider.Tests](../../tests/Suites/Data/Cutover/Koan.Data.Cutover.CrossProvider.Tests/) |
+| NativeAOT publish properties that survive | [AotRelational - `AotRelational.csproj`](../../../samples/fundamentals/AotRelational/AotRelational.csproj) |
+| Conformance specs against a real engine | [Entity conformance kit](../../src/Koan.Testing/EntityConformanceSpecs.cs) subclassed per connector under `tests/Suites/Data/` |
+
 ## Graduate the store deliberately
 
 Cutover copies the active default database into an empty configured target, verifies exact
