@@ -72,10 +72,16 @@ crashes. This is the working bridge (starting the module host twice is the trap:
 `StartAsync` throws "AI adapter registry is already compiled"):
 
 ```csharp
+using Koan.Core;                 // template default
+using Koan.Core.Hosting.App;     // AppHost
+using Koan.Data.Core;            // array .Save()
+
+// ...top of Program.cs, before the bridge:
+
 await app.StartAsync();                    // composition live: providers elected
 using (AppHost.PushScope(app.Services))    // ambient scope for entity calls
 {
-    PrepTask.RemoveAll(RemoveStrategy.Safe);          // reset-by-rerun, LocalChecklist-style
+    await PrepTask.RemoveAll(RemoveStrategy.Safe);    // reset-by-rerun, LocalChecklist-style
     await new[] { /* lived-in PrepTasks */ }.Save();
 }
 await app.WaitForShutdownAsync();
