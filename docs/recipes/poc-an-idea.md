@@ -41,7 +41,7 @@ dotnet new install Sylin.Koan.Templates
 dotnet new koan-web -o KitchenPrep
 ```
 
-Three files, two references. Entities become classes, flows become controller methods or agent
+Three code files, two references. Entities become classes, flows become controller methods or agent
 sentences, and storage starts as local SQLite. If the idea leans on meaning rather than keywords,
 add the search trio now - one attribute makes saves index themselves.
 
@@ -72,9 +72,11 @@ crashes. This is the working bridge (starting the module host twice is the trap:
 `StartAsync` throws "AI adapter registry is already compiled"):
 
 ```csharp
-using Koan.Core;                 // template default
-using Koan.Core.Hosting.App;     // AppHost
-using Koan.Data.Core;            // array .Save()
+using KitchenPrep;              // your entities
+using Koan.Core;                // template default
+using Koan.Core.Hosting.App;    // AppHost
+using Koan.Data.Abstractions;   // RemoveStrategy
+using Koan.Data.Core;           // array .Save()
 
 // ...top of Program.cs, before the bridge:
 
@@ -88,9 +90,9 @@ await app.WaitForShutdownAsync();
 ```
 
 **Give the embedder its model.** The ONNX connector is air-gap friendly and downloads nothing:
-side-load the MiniLM artifacts once and point configuration at them. The Koan checkout ships both
-([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)); GardenCoop
-chapter 2 is a working consumer.
+side-load the MiniLM artifacts once and point three configuration keys at them. Koan requires no
+config file - set these from any .NET configuration source you like (the generated template ships
+none and needs none):
 
 ```json
 { "Koan": { "Ai": { "Onnx": {
@@ -98,6 +100,11 @@ chapter 2 is a working consumer.
   "VocabPath": "models/all-MiniLM-L6-v2/vocab.txt",
   "ModelName": "all-MiniLM-L6-v2" } } } }
 ```
+
+As environment variables that is `Koan__Ai__Onnx__ModelPath=...` (double underscores), or set
+them in code. The artifacts ship in the Koan checkout
+([`assets/models/all-MiniLM-L6-v2/`](../../../assets/models/all-MiniLM-L6-v2/)); GardenCoop
+chapter 2 is a working consumer.
 
 Relative paths resolve against the build output, so copy them into the project and let the SDK
 carry them: `<Content Include="models\**" CopyToOutputDirectory="PreserveNewest" />`.
