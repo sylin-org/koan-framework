@@ -1,4 +1,9 @@
 # Koan contribution instructions
+guidance changes.
+
+> Koan 1.0 is the stable .NET 10 release train.
+
+# Koan contribution instructions
 
 Koan is an opinionated .NET 10 meta-framework for agentic, Entity-centered applications. Design from
 the developer's business sentence inward: application code states intent while framework pillars own

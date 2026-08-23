@@ -1,4 +1,4 @@
-﻿---
+---
 type: RECIPE
 recipe: serve-a-web-frontend
 title: "Give the application a web frontend"
@@ -95,7 +95,7 @@ app.Lifetime.ApplicationStarted.Register(() =>
     Process.Start(new ProcessStartInfo(uiUrl) { UseShellExecute = true });
 });
 
-app.Run();
+await app.RunAsync();
 ```
 
 Bind a predictable port for the shortcut (`--urls`, a launch profile, or configuration), publish

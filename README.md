@@ -1,4 +1,9 @@
-﻿# Koan
+# Koan
+> Koan 1.x is the .NET 10 stabilization train. Every active package ships on it.
+
+> Koan 1.0 is the stable .NET 10 release train.
+
+# Koan
 
 ## Write with intent. Koan makes it real.
 

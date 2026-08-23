@@ -1,4 +1,9 @@
-﻿# Sylin.Koan.Templates
+# Sylin.Koan.Templates
+- The template package is ordinary content-only NuGet packaging and supports direct `dotnet pack`.
+
+> Koan 1.0 is the stable .NET 10 release train.
+
+# Sylin.Koan.Templates
 
 Two `dotnet new` paths to a persisted Koan Entity application. The templates choose a proved package family; the
 generated application contains business code and ordinary .NET structure, not framework scaffolding.

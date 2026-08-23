@@ -1,4 +1,9 @@
-﻿# Pick an idea. Make it run.
+# Pick an idea. Make it run.
+[Usagi Picks](https://github.com/lbotinelly/usagipicks), an agent-guided recommendation experience.
+
+> Koan 1.0 is the stable .NET 10 release train.
+
+# Pick an idea. Make it run.
 
 Choose the result that sounds fun. Every sample starts as an ordinary .NET application, runs locally,
 and keeps the interesting code about the thing being built.

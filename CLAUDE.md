@@ -83,6 +83,8 @@ finite Entity collections and lazy streams.
 
 ## Compatibility boundary
 
+Koan 1.0 is the stable .NET 10 release train.
+
 Koan 1.x is the stabilization train. Every active packable project sits on it and owns its own
 version, so a package advances only when its own sources — or a shared build input — change. Public
 surface may still be removed inside the train while the framework is unannounced (BUILD-0073).

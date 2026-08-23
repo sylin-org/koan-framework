@@ -14,6 +14,8 @@ validation:
 
 # One Entity. A lot of places to go.
 
+Koan 1.0 is the stable release train behind every claim below.
+
 Start with the idea:
 
 ```csharp
