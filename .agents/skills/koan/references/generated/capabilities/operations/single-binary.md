@@ -1,0 +1,58 @@
+---
+type: REFERENCE
+domain: operations
+title: "Runtime-self-contained publish"
+audience: [ai-agents, developers]
+status: current
+last_updated: 2026-08-23
+framework_version: v1.0.0
+validation:
+  status: not-yet-tested
+  scope: docs/capabilities/operations/single-binary.md
+---
+
+# Runtime-self-contained publish
+
+Publish a native artifact that starts without an installed .NET runtime and needs no service beside
+it for the capabilities the application promises to run locally. It is one executable only when the
+composition has no required content files; in-process ONNX adds model and vocabulary sidecars, making
+the result an offline self-contained bundle instead.
+
+## You need
+
+| Piece | Package | Note |
+|---|---|---|
+| Koan web application | `Sylin.Koan.App` | references remain visible to composition and trimming |
+| Embedded Entity store | `Sylin.Koan.Data.Connector.Sqlite` | durable local state with no database service |
+| In-process embeddings (optional) | `Sylin.Koan.AI.Connector.Onnx` | model artifacts travel with the application |
+| Durable local vector index (optional) | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | semantic retrieval without a vector service |
+
+## The constraint box
+
+> **The constraint:** Artifact eligibility belongs to the entire composition, not a publish flag.
+> Every required capability needs an in-process form, every required content file must travel with
+> the artifact, reflection-discovered application types need trim roots, and each operating-system
+> and architecture target needs its own published-and-run proof. Do not call a directory containing
+> ONNX model files “one file.”
+
+## Audit the composition before publishing
+
+| Capability shape | Effect on the promise |
+|---|---|
+| Embedded store and no required content files | can preserve a one-executable claim |
+| In-process ONNX model and vocabulary files | preserves offline/no-service operation as a bundle, not one file |
+| Application-owned local data or uploaded files | runtime state lives outside the executable and needs its own lifecycle |
+| Networked database, model server, broker, or vector service | binary may publish, but it still needs that service |
+| Runtime-only reflection with no trim root | may compile and disappear only in the published artifact |
+| New OS or architecture target | a separate native build and runtime journey |
+
+## Leaves
+
+- **Build and decision guide:** [ship a runtime-self-contained artifact](../../recipes/ship-a-single-binary.md)
+- **Publish contract:** [NativeAOT guide](../../guides/nativeaot-howto.md)
+- **Runnable exemplar:**
+  [AOT relational sample](https://github.com/sylin-org/koan-framework/blob/main/samples/fundamentals/AotRelational/AotRelational.csproj)
+- **Offline bundle variant:** [portable embeddings](../ai/embedding/portable.md)
+
+Run the published executable in CI and exercise a real Entity journey. A project property nobody
+published is not a capability.

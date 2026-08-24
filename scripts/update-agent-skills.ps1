@@ -1,14 +1,18 @@
 <#
 .SYNOPSIS
-  Bundles dated snapshots of the capability map and connector matrix into the koan skill,
-  so agents on restricted or offline networks still have package identifiers.
+  Bundles dated snapshots of the capability map, connector matrix, and the whole
+  docs/capabilities tree into the koan skill, so agents on restricted or offline networks
+  still have package identifiers and the routed capability nodes.
 
 .DESCRIPTION
   Copies docs/reference/{capability-map,connector-matrix}.md verbatim into
-  .agents/skills/koan/references/generated/ and writes SNAPSHOT.meta.json recording the
-  source commit and time. Verbatim copies keep the markdown (frontmatter, tables) intact;
-  relative links inside a snapshot may resolve against docs/reference and can 404 from the
-  new location - recorded in the meta file as a known limitation.
+  .agents/skills/koan/references/generated/ and bundles every .md file under
+  docs/capabilities/ to generated/capabilities/<relative path> - enumerated at run time,
+  so a node added to the tree cannot be forgotten here; -Check fails until its snapshot is
+  committed. Writes SNAPSHOT.meta.json recording the source commit and time. Verbatim copies
+  keep the markdown (frontmatter, tables) intact; relative links inside a snapshot may
+  resolve against docs/ and can 404 from the new location - recorded in the meta file as a
+  known limitation.
 
   With -Check: verifies the committed snapshots are byte-identical to the current docs.
   Exit 1 with instructions on drift. Deterministic: identical inputs produce identical
@@ -28,12 +32,17 @@ $repoRoot = Split-Path $PSScriptRoot -Parent
 $generatedRoot = '.agents/skills/koan/references/generated'
 $targets = @(
     @{ Source = 'docs/reference/capability-map.md';  Destination = "$generatedRoot/capability-map.md" },
-    @{ Source = 'docs/reference/connector-matrix.md'; Destination = "$generatedRoot/connector-matrix.md" },
-    @{ Source = 'docs/capabilities/index.md'; Destination = "$generatedRoot/capabilities/index.md" },
-    @{ Source = 'docs/capabilities/ai.md'; Destination = "$generatedRoot/capabilities/ai.md" },
-    @{ Source = 'docs/capabilities/ai/semantic-search.md'; Destination = "$generatedRoot/capabilities/ai/semantic-search.md" },
-    @{ Source = 'docs/capabilities/ai/embedding/portable.md'; Destination = "$generatedRoot/capabilities/ai/embedding/portable.md" }
+    @{ Source = 'docs/reference/connector-matrix.md'; Destination = "$generatedRoot/connector-matrix.md" }
 )
+
+$capabilitiesSourceRoot = Join-Path $repoRoot 'docs/capabilities'
+$capabilityTargets = Get-ChildItem -LiteralPath $capabilitiesSourceRoot -Recurse -File -Filter '*.md' |
+    Sort-Object -Property FullName |
+    ForEach-Object {
+        $relative = [IO.Path]::GetRelativePath($capabilitiesSourceRoot, $_.FullName) -replace '\\', '/'
+        @{ Source = "docs/capabilities/$relative"; Destination = "$generatedRoot/capabilities/$relative" }
+    }
+$targets = @($targets) + @($capabilityTargets)
 
 $metaPath = Join-Path $repoRoot '.agents/skills/koan/references/generated/SNAPSHOT.meta.json'
 
