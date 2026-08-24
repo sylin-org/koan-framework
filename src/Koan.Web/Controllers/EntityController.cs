@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Http;
@@ -576,7 +576,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         // Take only the media type portion (strip ;charset=...).
         var mediaType = contentType.Split(';', 2)[0].Trim();
 
-        Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload;
+        object patch;
+        var kind = EntityPatchKind.PartialJson;
         try
         {
             if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationJsonPatch, StringComparison.OrdinalIgnoreCase))
@@ -585,18 +586,26 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
                     ? new JsonPatchDocument<TEntity>()
                     : JsonConvert.DeserializeObject<JsonPatchDocument<TEntity>>(raw)
                         ?? new JsonPatchDocument<TEntity>();
-                payload = NormalizeFromJsonPatch(id, doc);
-            }
-            else if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch, StringComparison.OrdinalIgnoreCase))
-            {
-                var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
-                payload = NormalizeFromMergePatch(id, token);
+                patch = doc;
+                kind = EntityPatchKind.JsonPatch6902;
             }
             else
             {
-                // Default + application/json: partial-JSON semantics.
                 var token = string.IsNullOrWhiteSpace(raw) ? JValue.CreateNull() : JToken.Parse(raw);
-                payload = NormalizeFromPartialJson(id, token);
+
+                // Defense-in-depth: an id inside the payload must agree with the route.
+                if (token["id"] is not null)
+                {
+                    var payloadId = token["id"]!.ToObject<TKey>();
+                    if (payloadId is not null && !Equals(payloadId, id))
+                    {
+                        return BadRequest(new { code = Infrastructure.KoanWebConstants.Codes.Patch.IdMismatch, message = "Route id does not match payload id." });
+                    }
+                }
+
+                patch = token!;
+                if (string.Equals(mediaType, Infrastructure.KoanWebConstants.ContentTypes.ApplicationMergePatch, StringComparison.OrdinalIgnoreCase))
+                    kind = EntityPatchKind.MergePatch7386;
             }
         }
         catch (Exception ex)
@@ -604,10 +613,13 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             return BadRequest(new { error = $"Invalid PATCH body for content type '{mediaType}': {ex.Message}" });
         }
 
-        return await PatchNormalized(id, payload, ct);
+        // SEC-0004: route through the governed choke point - gate, row-scope constrain, stamps, hooks and
+        // audit all live there. The data-layer Patch instruction bypasses every one of those and must never
+        // be called directly from a public surface.
+        return await PatchNormalized(id, patch, kind, ct);
     }
 
-    private async Task<IActionResult> PatchNormalized(TKey id, Koan.Data.Abstractions.Instructions.PatchPayload<TKey> payload, CancellationToken ct)
+    private async Task<IActionResult> PatchNormalized(TKey id, object patch, EntityPatchKind kind, CancellationToken ct)
     {
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
@@ -615,31 +627,18 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         var set = query.TryGetValue(Koan.Web.Infrastructure.KoanWebConstants.Query.Set, out var setVal) ? setVal.ToString() : null;
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(set) ? null : set);
 
-        // Validate route id vs payload id (defense-in-depth if future clients send id in payload)
-        if (payload.Id is not null && !Equals(payload.Id, id))
-        {
-            return BadRequest(new { code = Koan.Web.Infrastructure.KoanWebConstants.Codes.Patch.IdMismatch, message = "Route id does not match payload id." });
-        }
-
-        // Apply per-request null policy overrides via querystring (optional DX sugar)
-        // ?nulls=default|null|ignore|reject or granular: ?mergeNulls=default|reject, ?partialNulls=null|ignore|reject
-        var optsOverride = TryBuildPatchOptionsOverride(query);
-        if (optsOverride is not null)
-        {
-            payload = payload with { Options = optsOverride };
-        }
-
-        var updated = await Koan.Data.Core.Data<TEntity, TKey>.Patch(payload, ct);
-        if (updated is null) return NotFound();
-
-        var request = new EntityGetByIdRequest<TKey>
+        var request = new EntityPatchRequest<TEntity, TKey>
         {
             Context = context,
             Id = id,
+            Patch = patch,
+            Kind = kind,
             Set = set,
-            Accept = HttpContext.Request.Headers["Accept"].ToString()
+            Accept = HttpContext.Request.Headers["Accept"].ToString(),
+            Options = TryBuildPatchOptionsOverride(query) ?? BuildPatchOptions(),
         };
-        var result = await EndpointService.GetById(request);
+
+        var result = await EndpointService.Patch(request);
         ApplyResponseMetadata(result);
         if (result.IsShortCircuited) return ResolveShortCircuit(result);
         return PrepareResponse(result.Payload ?? result.Model);

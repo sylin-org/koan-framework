@@ -868,8 +868,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         else if (request.Patch is Newtonsoft.Json.Linq.JToken jt)
         {
             var opts = context.HttpContext?.RequestServices.GetService(typeof(Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>)) as Microsoft.Extensions.Options.IOptions<Koan.Web.Options.KoanWebOptions>;
-            var mergePolicy = opts?.Value.MergePatchNullsForNonNullable ?? MergePatchNullPolicy.SetDefault;
-            var partialPolicy = opts?.Value.PartialJsonNulls ?? PartialJsonNullPolicy.SetNull;
+            var mergePolicy = request.Options?.MergeNulls
+                              ?? opts?.Value.MergePatchNullsForNonNullable
+                              ?? MergePatchNullPolicy.SetDefault;
+            var partialPolicy = request.Options?.PartialNulls
+                                ?? opts?.Value.PartialJsonNulls
+                                ?? PartialJsonNullPolicy.SetNull;
             if (request.Kind == EntityPatchKind.MergePatch7386)
             {
                 new Koan.Data.Core.Patch.MergePatchApplicator<TEntity>(jt, mergePolicy).Apply(working);

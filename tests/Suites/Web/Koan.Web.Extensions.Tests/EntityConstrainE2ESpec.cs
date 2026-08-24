@@ -89,6 +89,21 @@ public sealed class EntityConstrainE2ESpec
         Owner(await Obj(ok)).Should().Be(alice, "ownership is frozen — a payload cannot reassign the owner");
     }
 
+    // ── PATCH of another's row is 404 and applies nothing ────────────────────────────────────────────────────────
+    [Fact]
+    public async Task Patch_of_anothers_row_is_404_and_applies_nothing()
+    {
+        const string alice = "patch-alice", bob = "patch-bob";
+        var aliceId = await Create(alice, "mine");
+
+        var res = await Send(HttpMethod.Patch, $"/api/memo/{aliceId}", bob, "{\"text\":\"hacked\"}");
+        res.StatusCode.Should().Be(HttpStatusCode.NotFound, "out of scope is indistinguishable from missing");
+
+        // and nothing was applied: a 404 that mutates the row is a silent cross-owner write
+        var row = await Obj(await Send(HttpMethod.Get, $"/api/memo/{aliceId}", alice));
+        Text(row).Should().Be("mine", "a PATCH that returned 404 must not modify the row");
+    }
+
     [Fact]
     public async Task Delete_of_anothers_row_is_404()
     {

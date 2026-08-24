@@ -118,5 +118,7 @@ public sealed class EntityPatchRequest<TEntity, TKey> where TEntity : class
     public string? Set { get; init; }
     public string? Accept { get; init; }
     public bool DryRun { get; init; }
+    // Request-scoped null-policy override; when absent the governed path falls back to IOptions<KoanWebOptions>.
+    public Koan.Data.Abstractions.Instructions.PatchOptions? Options { get; init; }
 }
 
