@@ -4,12 +4,17 @@ recipe: let-an-agent-act
 title: "Let an agent act on my data"
 domain: ai
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/let-an-agent-act.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/let-an-agent-act.md - cold-executed on the Ollama path (qwen3:8b): read-only
+    agent dispatched its generated search tool and answered with a title quoted verbatim from tool
+    output (steps=2, Completed). Write legs not exercised - write stays a deliberate authority
+    decision. Verified against a source pin; packages published before this cycle's agent fixes do
+    not carry the corrected behavior (pending next package release).
 gets_you: "A model that can look things up in the application — and, if you allow it, change them."
 works_if: "The application has Entity types the model should be allowed to reach."
 costs: "Runs offline with a local chat model. Each request may cost several model calls, not one."

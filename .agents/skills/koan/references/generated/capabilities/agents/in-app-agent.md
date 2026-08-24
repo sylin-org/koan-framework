@@ -4,11 +4,16 @@ domain: mcp
 title: "In-application Entity agent"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/agents/in-app-agent.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/agents/in-app-agent.md - cold-executed on the Ollama path (qwen3:8b):
+    agent dispatched a generated Entity search tool and answered with the title quoted verbatim from
+    tool output; tool dispatch and completion logged. Verified against a source pin - structured
+    system prompt, source/model separation, and pure-vector search defaults landed this cycle;
+    packages published before those fixes do not carry them (pending next package release).
 ---
 
 # In-application Entity agent
