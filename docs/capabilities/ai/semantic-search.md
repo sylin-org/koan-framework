@@ -36,7 +36,7 @@ finds the right chores without a keyword in common.
 | Scale | Variant | What it means |
 |---|---|---|
 | Portable offline bundle | [embedding/portable](embedding/portable.md) | in-process ONNX; model and vocabulary sidecars ride with the app; air-gap friendly |
-| Local with a model server | Ollama connector | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) - Koan discovers the local service; keep the served embedding model consistent |
+| Local with a model server | Ollama connector | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) - Koan discovers a local Ollama automatically, but discovery has a short readiness timeout: if the service answers slowly, configure the endpoint explicitly (`Koan:Ai:Ollama:Endpoints`, per the README) and keep the served embedding model consistent |
 | Hosted / remote | **does not ship** | Koan AI is local-first; hosted frontier-model connectors are deliberately absent. An OpenAI-spec-compatible gateway is unassessed territory, not a supported path |
 
 ## Do not, at this level

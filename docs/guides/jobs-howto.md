@@ -45,6 +45,8 @@ identical either way.
 That's all the wiring there is. **Reference = Intent**: adding Jobs and implementing the job interface is enough—`AddKoan()` activates your jobs and starts the orchestrator automatically.
 
 ```csharp
+using Koan.Core;   // AddKoan() lives here - without this using, the call does not resolve
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();   // discovers your jobs, starts the worker
 var app = builder.Build();
