@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: security
 audience: [developers, architects]
@@ -41,9 +41,11 @@ public sealed class Ledger : Entity<Ledger> { public string Entry { get; set; } 
 **Constrain** — *which rows, per action* (the query transform: the rule that authorizes one row IS the filter that scopes the collection). Declare `Owner` once; the same `Constrain` filters the list, 404s an out-of-scope fetch, bounds a mass delete, and **stamps** the owner on create (server-truth — a forged owner id cannot escalate).
 
 ```csharp
+using Koan.Web.Authorization;   // EntityAccess<T>, AccessAction - the usings every snippet below assumes
+
 public sealed class MemoAccess : EntityAccess<Memo>
 {
-    protected override Expression<Func<Memo, bool>>? Owner => m => m.OwnerId == CurrentUserId;
+    protected override Expression<Func<Memo, bool>>? Owner => m => m.OwnerId == CurrentUserId   // CurrentUserId is inherited from EntityAccess<T> - no need to declare it;
 
     public override IAccessFilter<Memo> Constrain(IAccessFilter<Memo> q, AccessAction action) => action switch
     {
