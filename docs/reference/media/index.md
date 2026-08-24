@@ -82,6 +82,9 @@ await using var original = await Photo.OpenRead(uploaded.Key, ct);
 ## Recipes
 
 A recipe method must be static, parameterless, and return `MediaRecipe` or `MediaRecipeBuilder`.
+The two terminals are equivalent: `MediaRecipeBuilder` carries an implicit conversion to
+`MediaRecipe` that calls `Build()`, so a method that omits `.Build()` materializes the same recipe —
+fingerprints included. Pick one spelling per codebase.
 
 ```csharp
 [MediaRecipe(

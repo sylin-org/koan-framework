@@ -4,12 +4,15 @@ recipe: accept-and-serve-files
 title: "Let people upload files and serve them back"
 domain: media
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/accept-and-serve-files.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/accept-and-serve-files.md - cold-executed on the local path (profile
+    configuration, upload, named derivative over HTTP); the profile block and symbol origins in this
+    revision came out of that run
 gets_you: "Files owned by an Entity, stored once, and served back — including resized or converted versions."
 works_if: "Users need to send you a file, or the application produces one worth keeping."
 costs: "The local path needs disk you must back up. Derivatives cost CPU on first request or on ingest."
@@ -60,9 +63,29 @@ Storage needs a connector; without one it has nowhere to put anything. Media bri
 transitively, so adding media does *not* remove the need to choose where bytes live.
 
 Configure one profile and the provider's physical settings. A sole profile is the implicit default.
+Without at least one profile the first upload fails with "Koan Storage has no profiles":
+
+```json
+{
+  "Koan": {
+    "Storage": {
+      "Profiles": {
+        "cold": { "Provider": "local", "Container": "photos" }
+      }
+    }
+  }
+}
+```
+
+The local provider needs nothing else — bytes land under `.koan/storage` unless
+`Koan:Storage:Providers:Local:BasePath` says otherwise.
+
 An Entity that owns files derives from `MediaEntity<T>` and names where its bytes belong:
 
 ```csharp
+using Koan.Data.Core;
+using Koan.Storage;
+
 [StorageBinding(Profile = "cold", Container = "photos")]
 public class PhotoAsset : MediaEntity<PhotoAsset>
 {

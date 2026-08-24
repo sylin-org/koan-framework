@@ -4,11 +4,14 @@ domain: storage
 title: "Media derivatives"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/state/media-derivatives.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/state/media-derivatives.md - cold-executed via accept-and-serve-files on
+    the local path: upload, named derivative served twice from equivalent recipe terminals with
+    matching fingerprints; recipe gaps found in the run were fixed the same day
 ---
 
 # Media derivatives
