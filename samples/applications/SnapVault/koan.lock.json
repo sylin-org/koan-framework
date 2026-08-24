@@ -15,6 +15,10 @@
       "version": "1.0"
     },
     {
+      "id": "Koan.AI.Contracts.Shared",
+      "version": "1.0"
+    },
+    {
       "id": "Koan.Cache.Abstractions",
       "version": "1.0"
     },

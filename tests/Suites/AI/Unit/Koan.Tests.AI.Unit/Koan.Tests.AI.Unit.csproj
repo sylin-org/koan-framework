@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI\Koan.AI.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.AI.Eval\Koan.AI.Eval.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\AI\LMStudio\Koan.AI.Connector.LMStudio.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\AI\Ollama\Koan.AI.Connector.Ollama.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />

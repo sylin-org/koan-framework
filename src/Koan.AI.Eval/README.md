@@ -31,13 +31,21 @@ await Eval.Gate(
     ct: cancellationToken);
 ```
 
+These calls need an adapter that computes metrics (see Guarantees). Without one they fail with a
+correction naming the missing piece - they do not return zero scores.
+
 ## Guarantees and limitations
 
 - Reference plus `AddKoan()` registers `IEvalService` automatically.
-- Measurement requires an active AI adapter that advertises `MetricCompute`; otherwise the operation fails with that
-  exact correction. Dataset storage and metric implementation belong to the selected adapter.
-- `Gate` throws `GateFailedException` with violations. `Regress` returns a failed `EvalResult`; `Compare` ranks by
-  average requested score; `Drift` compares shared scores already present in two results.
+- Measurement requires an active AI adapter that declares the `MetricCompute` capability **and** implements
+  `IMetricAdapter`; computation is delegated to it. An adapter declaring the capability without the interface,
+  or a host with no capable adapter at all, fails with a correction naming the remedy - measurement never
+  answers placeholder values.
+- `Gate` throws `GateFailedException` with violations. A standalone `NoRegression` condition, or one without a
+  baseline to compare against, is refused instead of passing vacuously. `Regress` returns a failed `EvalResult`;
+  `Compare` ranks by average requested score; `Drift` compares shared scores already present in two results.
+- No connector shipped in-tree computes metrics yet; referencing this package alone means evaluation calls fail
+  correctively until a metric-capable adapter is present.
 - The package does not capture prompts/responses, create datasets, train models, deploy gates, schedule monitoring, or
   claim statistical significance. Applications own dataset provenance and the decision that follows a gate.
 

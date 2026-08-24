@@ -1,3 +1,4 @@
+using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Routing;
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Resolution;
@@ -45,6 +46,23 @@ internal sealed class EvalService(IAiAdapterRegistry registry) : IEvalService
             .Distinct()
             .ToArray();
 
+        // A standalone NoRegression gate names no metrics, so nothing would be measured and the
+        // gate would pass without looking at anything. Refuse that shape instead of vacuous green.
+        var hasNoRegression = conditions.Any(c => c.IsNoRegression);
+        if (hasNoRegression && metricNames.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "A NoRegression gate requires at least one Metric(...) condition naming the metrics " +
+                "to compare; on its own it would measure nothing and pass unconditionally.");
+        }
+
+        if (hasNoRegression && baseline is null)
+        {
+            throw new InvalidOperationException(
+                "A NoRegression gate requires a baseline model; without one there is nothing to " +
+                "compare against and the gate would pass unconditionally.");
+        }
+
         // Measure the model.
         var modelScores = new Dictionary<string, double>();
         foreach (var metric in metricNames)
@@ -54,7 +72,6 @@ internal sealed class EvalService(IAiAdapterRegistry registry) : IEvalService
 
         // Measure the baseline if needed for no-regression checks.
         Dictionary<string, double>? baselineScores = null;
-        var hasNoRegression = conditions.Any(c => c.IsNoRegression);
         if (hasNoRegression && baseline is not null)
         {
             baselineScores = new Dictionary<string, double>();
@@ -240,22 +257,20 @@ internal sealed class EvalService(IAiAdapterRegistry registry) : IEvalService
         }
     }
 
-    private Task<double> ComputeMetric(
+    private async Task<double> ComputeMetric(
         ModelRef model, DatasetRef data, string metric, CancellationToken ct)
     {
-        // Resolve adapter with MetricCompute capability
+        // Capability is structural: an adapter that declares MetricCompute must implement
+        // IMetricAdapter, or the declaration is a lie and fails correctively here.
         var adapter = AdapterResolver.Resolve(registry, AiCapability.MetricCompute);
+        if (adapter is not IMetricAdapter computation)
+        {
+            throw new InvalidOperationException(
+                $"AI adapter '{adapter.Id}' declares '{AiCapability.MetricCompute}' but does not implement " +
+                $"{nameof(IMetricAdapter)}. Implement IMetricAdapter on the adapter (or remove the capability " +
+                "declaration) so metric requests are served instead of silently answered.");
+        }
 
-        // Metric computation is delegated to the adapter infrastructure.
-        // For LLM-judge metrics (coherence, relevance), a Chat-capable adapter
-        // would also be resolved: AdapterResolver.Resolve(registry, AiCapability.Chat)
-        // The actual computation is adapter-specific. For now, return a placeholder
-        // that will be filled when concrete metric adapters are implemented.
-        _ = adapter; // Resolved to validate capability exists
-        _ = model;
-        _ = data;
-        _ = metric;
-
-        return Task.FromResult(0.0);
+        return await computation.ComputeMetricAsync(model, data, metric, ct).ConfigureAwait(false);
     }
 }

@@ -8,9 +8,17 @@ host. `ModelRef`, `DatasetRef`, scores, and job vocabulary come from the inert s
 ## Capability and behavior
 
 Every adapter-backed measurement resolves `AiCapability.MetricCompute`; no compatible adapter is a corrective
-failure. `Measure` computes each requested metric. `Gate` evaluates min/max and optional baseline-regression
-conditions and throws typed violations. `Compare` measures each model and orders by average score. `Regress` converts
-gate violations into `Passed=false`. `Drift` is an in-process comparison of shared metric values.
+failure. The capability is structural: an adapter that declares it must also implement
+`IMetricAdapter` (in `Sylin.Koan.AI.Contracts`), and one that declares the flag without the interface fails
+correctively at measurement time naming both facts. `Measure` computes each requested metric through that
+adapter. `Gate` evaluates min/max and baseline-regression conditions and throws typed violations; a standalone
+`NoRegression` condition (no `Metric(...)` named) or a regression condition without a baseline is refused with a
+correction instead of passing vacuously. `Compare` measures each model and orders by average score. `Regress`
+converts gate violations into `Passed=false`. `Drift` is an in-process comparison of shared metric values.
+
+No connector shipped in-tree implements `IMetricAdapter` today: until you reference or write one, every
+measurement call fails with the correction above. That is deliberate - metric computation without a real
+implementation must not answer zero.
 
 ## Limits
 

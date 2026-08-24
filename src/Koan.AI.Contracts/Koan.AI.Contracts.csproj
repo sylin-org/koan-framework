@@ -9,4 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.AI.Contracts.Shared\Koan.AI.Contracts.Shared.csproj" />
+  </ItemGroup>
 </Project>
