@@ -76,6 +76,25 @@
     <TrimmerRootDescriptor Include="$(_KoanTrimRootsFile)" />
   </ItemGroup>
 
+  <!--
+    NativeAOT publishes fold ASP.NET Core feature switches into constants at ILC time; no runtime
+    override can change them afterwards. Sdk.Web seeds MvcEnhancedModelMetadataSupport=false when still
+    empty (ProjectSystem targets), and the publish-generated runtime configuration carries that into
+    ILC as Microsoft.AspNetCore.Mvc.ApiExplorer.IsEnhancedModelMetadataSupported=false. In that mode
+    stock SimpleTypeModelBinderProvider reads ModelMetadata.IsConvertibleType, whose guard throws when
+    uninitialized - every parameterized controller action fails on first request (EntityController<T>
+    actions all carry parameters). MVC controllers are officially unsupported under NativeAOT ("happy
+    accident", dotnet/aspnetcore#58926), and Koan applications are all-controllers, so we hold the
+    property on Microsoft's own sanctioned opt-in. This file imports after Sdk.Server.targets (whose
+    conditional emission saw an empty value and added nothing) and before both the ProjectSystem seed
+    and publish-time configuration generation, making "true" the value every later stage observes.
+    True matches the natural JIT default, so plain builds are unaffected. An application can still opt
+    out with $(KoanEnhancedModelMetadata)=false, or set MvcEnhancedModelMetadataSupport itself.
+  -->
+  <PropertyGroup Condition="'$(KoanEnhancedModelMetadata)' != 'false'">
+    <MvcEnhancedModelMetadataSupport>true</MvcEnhancedModelMetadataSupport>
+  </PropertyGroup>
+
   <UsingTask TaskName="WriteKoanLockfile"
              TaskFactory="RoslynCodeTaskFactory"
              AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
