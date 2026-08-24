@@ -203,3 +203,5 @@ Ladder per pillar: **cold-run the floor → climb to the delight rungs → grow 
 3. **Agents domain coverage**: `AI.Agents` rung doubles as the missing agents-domain validation; `records/canon.md` still needs its cold-run.
 4. **Triage the unmapped families** before anyone teaches them; either give them reference indexes + map rows or mark them explicitly internal.
 5. **Long tail**: remaining `not-yet-tested` nodes per domain, prioritized by route traffic.
+
+Validation methodology for any row above: [evals/koan/capability-runs/PROTOCOL.md](../../evals/koan/capability-runs/PROTOCOL.md) - dev-source probe, feed proof, timed independent consumer.
