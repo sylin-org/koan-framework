@@ -40,6 +40,10 @@ Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.
 > stored vectors and every query. The width is measured from your first indexed document; mixing
 > models between indexing and search invalidates results silently. Pick from the table, then stay
 > with it until you are ready to re-index.
+>
+> A *dimension* mismatch on a durable store is caught loudly at first write — SqliteVec validates
+> the space shape and refuses with the expected dimensions and metric. The silent case is the
+> nastier one: a different model with the **same width**. Switching models means re-indexing, always.
 
 ## Choose by scale
 

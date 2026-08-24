@@ -43,7 +43,7 @@ files - see [Get the model artifacts](#get-the-model-artifacts)):
   "Koan": {
     "Ai": {
       "Onnx": {
-        "ModelPath": "Models/all-MiniLM-L6-v2/model.onnx",
+        "ModelPath": "models/all-MiniLM-L6-v2/model_quantized.onnx",
         "VocabPath": "Models/all-MiniLM-L6-v2/vocab.txt",
         "ModelName": "all-MiniLM-L6-v2"
       }
@@ -73,3 +73,4 @@ download, convert, quantize, update, or judge the semantic quality of the model.
 fail explicitly.
 
 See [TECHNICAL.md](./TECHNICAL.md) for model assumptions and pooling behavior.
+

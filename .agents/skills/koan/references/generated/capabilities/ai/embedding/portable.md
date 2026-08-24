@@ -4,11 +4,15 @@ domain: ai
 title: "Embedding variant: portable offline bundle"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/ai/embedding/portable.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/ai/embedding/portable.md - cold-executed against published packages:
+    side-loaded all-MiniLM-L6-v2 quantized (~22 MB), save→embed→search over HTTP with decisive
+    ranking, absent-artifact startup warning naming path and remedy, dimension-mismatch correction
+    on a stale index observed and honored
 ---
 
 # Embedding variant: portable offline bundle
