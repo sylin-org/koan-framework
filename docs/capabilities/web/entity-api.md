@@ -4,11 +4,13 @@ domain: web
 title: "Entity HTTP API"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/web/entity-api.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/web/entity-api.md - cold-executed via store-and-expose on SQLite: CRUD,
+    filtered query, page/pageSize windows with X-Total-Count, removal to 404
 ---
 
 # Entity HTTP API

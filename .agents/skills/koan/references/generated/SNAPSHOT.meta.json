@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-08-24T15:37:32Z",
-  "sourceCommit": "ba0ef45e5a3f0526c3b3bd98c6de682e64cd44a2",
+  "generatedUtc": "2026-08-24T15:47:10Z",
+  "sourceCommit": "c1b88caebea3a494b04f027245e1d63f1dfe5244",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [
     ".agents/skills/koan/references/generated/capability-map.md",
