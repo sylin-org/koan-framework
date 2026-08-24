@@ -112,8 +112,8 @@ Expose a bounded search by embedding the query with that same configured model, 
 vector space, and loading the matching Entities:
 
 ```csharp
-using Koan.AI;
-using Koan.Data.Vector;
+using Koan.AI;           // Client.Embed lives here
+using Koan.Data.Vector;  // Vector<T>.Search lives here
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]

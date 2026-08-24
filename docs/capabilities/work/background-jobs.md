@@ -24,6 +24,8 @@ remain inspectable.
 | Deterministic execution in tests (optional) | `Sylin.Koan.Jobs.Testing` | drives the production engine without waiting on wall time |
 | Durable restart survival | an eligible durable Data connector | the in-memory floor alone cannot survive process loss |
 
+Verified against: `Sylin.Koan.Jobs` 1.0.5 or newer, durable ledger via `Sylin.Koan.Data.Connector.Sqlite` 1.0.10 or newer (patch releases compatible).
+
 ## The constraint box
 
 > **The constraint:** Jobs are at-least-once. The handler must be idempotent or detect duplicates;

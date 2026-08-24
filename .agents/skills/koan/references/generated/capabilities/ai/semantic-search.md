@@ -24,6 +24,8 @@ finds the right chores without a keyword in common.
 | One embedding-capable adapter | scale table below | in-process, no service |
 | One vector store | scale table below | pairs with your data store's engine where possible |
 
+Verified against: `Sylin.Koan.Data.AI` 1.0.9 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.6 or newer (patch releases compatible).
+
 ## The constraint box
 
 > **One model, everywhere.** The same embedding model and its dimensions must serve both the
@@ -36,7 +38,7 @@ finds the right chores without a keyword in common.
 | Scale | Variant | What it means |
 |---|---|---|
 | Portable offline bundle | [embedding/portable](embedding/portable.md) | in-process ONNX; model and vocabulary sidecars ride with the app; air-gap friendly |
-| Local with a model server | Ollama connector | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) - Koan discovers the local service; keep the served embedding model consistent |
+| Local with a model server | Ollama connector | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) - Koan discovers a local Ollama automatically, but discovery has a short readiness timeout: if the service answers slowly, configure the endpoint explicitly (`Koan:Ai:Ollama:Endpoints`, per the README) and keep the served embedding model consistent |
 | Hosted / remote | **does not ship** | Koan AI is local-first; hosted frontier-model connectors are deliberately absent. An OpenAI-spec-compatible gateway is unassessed territory, not a supported path |
 
 ## Do not, at this level

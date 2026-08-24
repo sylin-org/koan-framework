@@ -24,6 +24,8 @@ finds the right chores without a keyword in common.
 | One embedding-capable adapter | scale table below | in-process, no service |
 | One vector store | scale table below | pairs with your data store's engine where possible |
 
+Verified against: `Sylin.Koan.Data.AI` 1.0.9 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.6 or newer (patch releases compatible).
+
 ## The constraint box
 
 > **One model, everywhere.** The same embedding model and its dimensions must serve both the
