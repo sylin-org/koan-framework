@@ -5,6 +5,7 @@ using System.Text.Json;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Orchestration;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.AI.Agents;
 
@@ -16,6 +17,13 @@ namespace Koan.AI.Agents;
 /// </summary>
 internal sealed class AgentExecutor : IAgentExecutor
 {
+    private readonly ILogger<AgentExecutor> _logger;
+
+    public AgentExecutor(ILogger<AgentExecutor> logger)
+    {
+        _logger = logger;
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -52,9 +60,11 @@ internal sealed class AgentExecutor : IAgentExecutor
                 };
             }
 
-            var options = BuildChatOptions(definition, toolRegistry);
+            var system = messages.FirstOrDefault(m => m.Role == "system")?.Content;
+            var options = BuildChatOptions(definition, toolRegistry, system);
+
             var chatResult = await Koan.AI.Client.ChatResult(
-                BuildUserMessage(messages), ct);
+                BuildUserMessage(messages), options, ct);
 
             var tokensUsed = chatResult.TokensUsed ?? 0;
             totalTokens += tokensUsed;
@@ -66,7 +76,14 @@ internal sealed class AgentExecutor : IAgentExecutor
 
             if (toolCalls.Count == 0)
             {
-                // No tool calls — this is the final answer
+                // No tool calls — this is the final answer. When tools were offered but never
+                // used across the whole run, say so at Warning: the most common small-model
+                // failure is answering from priors instead of calling a tool.
+                if (toolRegistry.Count > 0 && steps.Count(s => s.ToolCall is not null) == 0)
+                    _logger.LogWarning(
+                        "Agent completed after {Iterations} iteration(s) WITHOUT calling any of the {ToolCount} offered tool(s); the answer may be ungrounded.",
+                        iterations, toolRegistry.Count);
+
                 steps.Add(new AgentStep
                 {
                     Reasoning = responseText,
@@ -76,6 +93,11 @@ internal sealed class AgentExecutor : IAgentExecutor
                 messages.Add(new AiMessage("assistant", responseText));
 
                 sw.Stop();
+                var toolsCalled = steps.Count(s => s.ToolCall is not null);
+                _logger.LogInformation(
+                    "Agent completed: status={Status} iterations={Iterations} steps={Steps} toolsCalled={ToolsCalled} tokens={Tokens} duration={Duration}",
+                    AgentStatus.Completed, iterations, steps.Count, toolsCalled, totalTokens, sw.Elapsed);
+
                 return new AgentResult
                 {
                     Text = responseText,
@@ -92,7 +114,15 @@ internal sealed class AgentExecutor : IAgentExecutor
 
             foreach (var toolCall in toolCalls)
             {
+                _logger.LogInformation(
+                    "Agent dispatching tool '{Tool}' (iteration {Iteration}, args={Arguments})",
+                    toolCall.Name, iterations,
+                    System.Text.Json.JsonSerializer.Serialize(toolCall.Arguments, JsonOptions));
+
                 var observation = await ExecuteTool(toolCall, toolRegistry, ct);
+                _logger.LogDebug(
+                    "Tool '{Tool}' returned {Length} chars",
+                    toolCall.Name, observation.Length);
 
                 // Truncate observation if it exceeds the limit
                 var truncatedObservation = TruncateToTokenLimit(
@@ -304,13 +334,15 @@ internal sealed class AgentExecutor : IAgentExecutor
     }
 
     private static ChatOptions BuildChatOptions(
-        AgentDefinition definition, Dictionary<string, GeneratedTool> toolRegistry)
+        AgentDefinition definition, Dictionary<string, GeneratedTool> toolRegistry, string? systemPrompt)
     {
+        _ = toolRegistry;
         return new ChatOptions
         {
             Model = definition.ChatModel,
-            Source = definition.ChatModel,
-            Temperature = 0.1  // Low temperature for reasoning
+            Source = definition.ChatSource,
+            Temperature = definition.Temperature ?? 0.1,  // Low temperature for reasoning
+            SystemPrompt = systemPrompt
         };
     }
 
@@ -477,3 +509,5 @@ internal sealed class AgentExecutor : IAgentExecutor
         return text[..maxChars] + "\n... [truncated]";
     }
 }
+
+

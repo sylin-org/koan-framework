@@ -14,15 +14,17 @@ public sealed class AgentBuilder
     private readonly IReadOnlyList<Tool> _tools;
     private readonly string? _systemMessage;
     private readonly string? _chatModel;
+    private readonly string? _chatSource;
     private readonly string? _embedModel;
     private readonly AgentMemory? _memory;
     private readonly PlanStrategy _strategy;
     private readonly int _maxIterations;
     private readonly int _maxTokens;
     private readonly int _maxToolResultTokens;
+    private readonly double? _temperature;
 
     internal AgentBuilder()
-        : this([], [], [], null, null, null, null, PlanStrategy.ReAct, 10, 100_000, 4_000) { }
+        : this([], [], [], null, null, null, null, null, PlanStrategy.ReAct, 10, 100_000, 4_000, null) { }
 
     private AgentBuilder(
         IReadOnlyList<EntityBinding> entities,
@@ -30,37 +32,41 @@ public sealed class AgentBuilder
         IReadOnlyList<Tool> tools,
         string? systemMessage,
         string? chatModel,
+        string? chatSource,
         string? embedModel,
         AgentMemory? memory,
         PlanStrategy strategy,
         int maxIterations,
         int maxTokens,
-        int maxToolResultTokens)
+        int maxToolResultTokens,
+        double? temperature)
     {
         _entities = entities;
         _searchEntities = searchEntities;
         _tools = tools;
         _systemMessage = systemMessage;
         _chatModel = chatModel;
+        _chatSource = chatSource;
         _embedModel = embedModel;
         _memory = memory;
         _strategy = strategy;
         _maxIterations = maxIterations;
         _maxTokens = maxTokens;
         _maxToolResultTokens = maxToolResultTokens;
+        _temperature = temperature;
     }
 
     /// <summary>Set the system prompt from a string.</summary>
     public AgentBuilder System(string message) =>
-        new(_entities, _searchEntities, _tools, message, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, message, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Set the system prompt from a Prompt instance.</summary>
     public AgentBuilder System(Koan.AI.Prompt.Prompt prompt) =>
-        new(_entities, _searchEntities, _tools, prompt.Raw, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, prompt.Raw, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Load a named prompt from the prompt store.</summary>
     public AgentBuilder WithPrompt(string promptName) =>
-        new(_entities, _searchEntities, _tools, promptName, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, promptName, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Grant the agent access to entity CRUD operations.</summary>
     public AgentBuilder WithEntities<T>(bool write = false) =>
@@ -86,35 +92,35 @@ public sealed class AgentBuilder
 
     /// <summary>Grant the agent vector search capability over an entity type.</summary>
     public AgentBuilder WithSearch<T>() =>
-        new(_entities, new List<Type>(_searchEntities) { typeof(T) }.AsReadOnly(), _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, new List<Type>(_searchEntities) { typeof(T) }.AsReadOnly(), _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Attach additional tools for function calling.</summary>
     public AgentBuilder WithTools(params Tool[] tools) =>
-        new(_entities, _searchEntities, new List<Tool>([.. _tools, .. tools]).AsReadOnly(), _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, new List<Tool>([.. _tools, .. tools]).AsReadOnly(), _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Attach conversational memory to the agent.</summary>
     public AgentBuilder WithMemory(AgentMemory memory) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Set the planning/reasoning strategy.</summary>
     public AgentBuilder WithPlanning(PlanStrategy strategy = PlanStrategy.ReAct) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Set the maximum number of reasoning iterations.</summary>
     public AgentBuilder WithMaxIterations(int maxIterations = 10) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Set the maximum total tokens budget.</summary>
     public AgentBuilder WithMaxTokens(int maxTokens = 100_000) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Set the maximum tokens per tool result.</summary>
     public AgentBuilder WithMaxToolResultTokens(int maxToolResultTokens = 4_000) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, maxToolResultTokens, _temperature);
 
-    /// <summary>Scope the agent to specific AI providers.</summary>
+    /// <summary>Scope the agent to specific AI sources. Scoping no longer overwrites the model.</summary>
     public AgentBuilder Scope(string? chat = null, string? embed = null) =>
-        new(_entities, _searchEntities, _tools, _systemMessage, chat ?? _chatModel, embed ?? _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, chat ?? _chatSource, embed ?? _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     /// <summary>Execute the agent with a goal and optional context.</summary>
     public async Task<AgentResult> Run(
@@ -143,11 +149,11 @@ public sealed class AgentBuilder
     private AgentBuilder AddEntity(EntityBinding binding)
     {
         var newEntities = new List<EntityBinding>(_entities) { binding };
-        return new AgentBuilder(newEntities.AsReadOnly(), _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        return new AgentBuilder(newEntities.AsReadOnly(), _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
     }
 
     internal AgentDefinition Build() =>
-        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens);
+        new(_entities, _searchEntities, _tools, _systemMessage, _chatModel, _chatSource, _embedModel, _memory, _strategy, _maxIterations, _maxTokens, _maxToolResultTokens, _temperature);
 
     private static IAgentExecutor ResolveExecutor()
     {
@@ -171,12 +177,14 @@ public sealed record AgentDefinition(
     IReadOnlyList<Tool> Tools,
     string? SystemMessage,
     string? ChatModel,
+    string? ChatSource,
     string? EmbedModel,
     AgentMemory? Memory,
     PlanStrategy Strategy,
     int MaxIterations,
     int MaxTokens,
-    int MaxToolResultTokens);
+    int MaxToolResultTokens,
+    double? Temperature = null);
 
 /// <summary>
 /// Internal interface for agent execution. Resolved via DI.
@@ -186,3 +194,8 @@ public interface IAgentExecutor
     Task<AgentResult> Execute(AgentDefinition definition, string goal, object? context, CancellationToken ct);
     IAsyncEnumerable<AgentStep> Stream(AgentDefinition definition, string goal, CancellationToken ct);
 }
+
+
+
+
+

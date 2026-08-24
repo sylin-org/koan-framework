@@ -400,9 +400,12 @@ internal static class EntityToolGenerator
             if (searchMethod is null)
                 return JsonSerializer.Serialize(new { error = "Vector.Search method not found" });
 
+            // Pure-vector by default: a non-null Text requests HYBRID retrieval, which most local
+            // vector stores do not support (same rule as ChainExecutor's Retrieve step). Only pass
+            // the lexical side when the caller explicitly chose an alpha.
             var options = new Koan.Data.Vector.VectorRetrieveOptions
             {
-                Text = text,
+                Text = alpha is null ? null : text,
                 Alpha = alpha,
                 TopK = topK,
                 Filter = filter
