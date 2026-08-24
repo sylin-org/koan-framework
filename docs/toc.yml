@@ -108,6 +108,15 @@
       href: api/patch-normalization.md
     - name: Glossary
       href: reference/glossary.md
+- name: Engineering
+  href: engineering/capability-directory.md
+  items:
+    - name: Capability directory
+      href: engineering/capability-directory.md
+    - name: MSBuild/NuGet/AOT debugging notes
+      href: engineering/msbuild-nuget-debugging-notes.md
+    - name: NuGet publishing playbook
+      href: engineering/nuget-publishing.md
 - name: Stories you can run
   href: ../samples/README.md
 - name: Help when something breaks

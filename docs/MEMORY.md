@@ -30,7 +30,7 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 |---|---|
 | What may I change, and by what law? | [CLAUDE.md](../CLAUDE.md) |
 | Which agent surface am I in? | [AGENTS.md](../AGENTS.md) |
-| What does the framework offer today, and how proven is it? | [docs/reference/product-surface.md](reference/product-surface.md) (generated) |
+| What does the framework offer today, and how proven is it? | [docs/reference/product-surface.md](reference/product-surface.md) (generated) · verb-level inventory + shaping backlog: [capability directory](engineering/capability-directory.md) |
 | Why is it this way? | [docs/decisions/](decisions/) — ADRs are dated records; a later one supersedes or amends, never edits |
 | What is deliberately deferred? | [docs/initiatives/koan-v1/POST-CYCLE-TODO.md](initiatives/koan-v1/POST-CYCLE-TODO.md) |
 | How does a release happen? | [docs/engineering/nuget-publishing.md](engineering/nuget-publishing.md) |
