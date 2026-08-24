@@ -7,8 +7,9 @@ status: current
 last_updated: 2026-08-23
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/work/background-jobs.md
+  date_last_tested: 2026-08-23
+  status: passed
+  scope: docs/capabilities/work/background-jobs.md - route table cold-verified twice against the run-work-in-background leaf, including restart-survival
 ---
 
 # Background jobs

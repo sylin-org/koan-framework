@@ -8,8 +8,9 @@ last_updated: 2026-08-19
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/run-work-in-background.md
+  date_last_tested: 2026-08-23
+  status: passed
+  scope: docs/recipes/run-work-in-background.md - cold-executed twice (upload -> background processing -> restart-survival proof); durable ledger reclaim verified
 gets_you: "Slow work moved off the request, surviving restarts, with progress and failure you can see."
 works_if: "Something takes long enough that a caller should not wait for it."
 costs: "Adds no service on the local path. Adds a second thing to operate and observe."
@@ -76,8 +77,19 @@ public sealed class PhotoProcessingJob : Entity<PhotoProcessingJob>, IKoanJob<Ph
 }
 ```
 
-When a job consumes staged input, **delete the staging only after success** — a retry must be able to
+The caller side needs its own usings - the two that are easy to miss:
+
+```csharp
+using Koan.Data.Core;   // array .Save() and the Entity statics
+using Koan.Jobs;        // .Job.Submit() and .Job.Status() are extension members
+```
+
+When a job consumes staged input, **delete the staging only after success** - a retry must be able to
 reread the original bytes. Cleaning up in a `finally` is the version that loses work.
+
+If the submission endpoint accepts multipart uploads, ASP.NET Core's antiforgery filter applies to
+it by default - disable antiforgery on that minimal API or POST a valid token, or the request
+fails before your handler runs.
 
 Depth: [jobs how-to](../guides/jobs-howto.md).
 
