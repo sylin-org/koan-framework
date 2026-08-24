@@ -190,7 +190,7 @@ Friction signals → shaping candidates (ranked):
 7. **Lineage setters `protected internal`** force duplicated stamp shims per entity subclass.
 8. **SVG is a pipeline cliff** — sniff-and-bypass with custom validator/rasterizer. → safe-SVG story or explicit rejection correction.
 
-Their engineering register (MEDIA-0004/0006/0007/0008) tracks several of these upstream already — cross-link rather than duplicate.
+Their engineering register (MEDIA-0004/0006/0007/0008) tracks several of these upstream already — cross-link rather than duplicate. Each candidate's current tree state and owner cross-links live in the [media & storage shaping register](media-shaping-register.md).
 
 ---
 

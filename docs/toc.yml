@@ -113,6 +113,8 @@
   items:
     - name: Capability directory
       href: engineering/capability-directory.md
+    - name: Media & storage shaping register
+      href: engineering/media-shaping-register.md
     - name: MSBuild/NuGet/AOT debugging notes
       href: engineering/msbuild-nuget-debugging-notes.md
     - name: NuGet publishing playbook
