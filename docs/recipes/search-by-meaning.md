@@ -4,12 +4,15 @@ recipe: search-by-meaning
 title: "Search by meaning"
 domain: ai
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/search-by-meaning.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/search-by-meaning.md - cold-executed on the Ollama path against published
+    packages: attribute-only save→embed→SqliteVec index, ranked search over HTTP both directions,
+    composition via facts, corrective failure on unknown embedding model
 gets_you: "Find Entities similar to a phrase, not a keyword."
 works_if: "The application has Entity types carrying text worth matching on."
 costs: "Runs entirely offline on the local path. The durable local index adds no service to operate."
@@ -64,12 +67,23 @@ dotnet add package Sylin.Koan.Data.Vector.Connector.SqliteVec
 **not assessed**.
 
 ```csharp
+using Koan.Data.AI.Attributes;   // [Embedding] lives here
+using Koan.Data.Core.Model;
+
 [Embedding(Template = "{Title}. {Body}")]
 public sealed class Article : Entity<Article>
 {
     public string Title { get; set; } = "";
     public string Body { get; set; } = "";
 }
+```
+
+To exercise the flow over HTTP while prototyping, expose ordinary CRUD with one line — saves trigger
+embedding automatically, no extra wiring:
+
+```csharp
+[Route("api/articles")]
+public sealed class ArticlesController : EntityController<Article>;
 ```
 
 The template *is* the retrieval contract: it decides what "similar" means. Choose the fields a reader

@@ -4,11 +4,14 @@ domain: ai
 title: "Semantic search"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/ai/semantic-search.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/ai/semantic-search.md - cold-executed on the Ollama path against published
+    packages (feed probe): attribute-only save→embed→SqliteVec, ranked search over HTTP both
+    directions with clear separation, composition via facts, corrective failure naming a missing model
 ---
 
 # Semantic search
@@ -24,7 +27,12 @@ finds the right chores without a keyword in common.
 | One embedding-capable adapter | scale table below | in-process, no service |
 | One vector store | scale table below | pairs with your data store's engine where possible |
 
-Verified against: `Sylin.Koan.Data.AI` 1.0.9 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.6 or newer (patch releases compatible).
+Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.6 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.8 or newer (patch releases compatible).
+
+> **Discovery fails soft at boot, hard at first save.** If the model runtime is unreachable during
+> startup, composition logs a warning and continues; the wall appears at your first Entity save as
+> "No AI sources available". When in doubt — slow host, IPv6-only resolution, container networking —
+> set `Koan:Ai:Ollama:Endpoints` explicitly and keep serving the same embedding model.
 
 ## The constraint box
 
