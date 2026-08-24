@@ -1,7 +1,7 @@
 ﻿---
 type: RECIPE
 recipe: ship-a-single-binary
-title: "Ship it as one self-contained executable"
+title: "Ship a runtime-self-contained artifact"
 domain: platform
 status: current
 last_updated: 2026-08-19
@@ -10,7 +10,7 @@ framework_version: v1.0.0
 validation:
   status: source-verified
   scope: snippets copied from samples/journeys/GardenCoop/01-GardenJournal, which compiles and publishes AOT
-gets_you: "A native executable that starts fast, needs no .NET installed, and has no service to run beside it."
+gets_you: "A native artifact that starts fast, needs no .NET installed, and has no service to run beside it - one executable when no capability needs content sidecars, otherwise an offline bundle."
 works_if: "Every capability the application uses can run in-process — embedded store, in-process AI, local files."
 costs: "Longer publish times, per-platform builds, and reflection-dependent code needs trim roots declared."
 ingredients:
@@ -22,16 +22,19 @@ absent:
   - "a verified Linux or arm64 build | only win-x64 has been published and run here | publish and test your own target; the cross-compilation toolchain differs enough that the win-x64 result does not carry over"
 ---
 
-# Ship it as one self-contained executable
+# Ship a runtime-self-contained artifact
 
 Koan composes from references, and references are what a trimmer can see. If every capability resolves
-to something in-process, the whole application publishes as a native binary.
+to something in-process, the application can publish as a native artifact with no adjacent service.
+That is not automatically one file: ONNX models, vocabularies, application content, and runtime data
+remain separate unless their owner explicitly supports embedding them.
 
 ## When this is the answer
 
-"I want to hand someone a file and have it work." Edge and on-premise deployments, CLI-shaped tools,
-demos that must survive a conference network, and anything where "install .NET first" is a real
-obstacle.
+"I want to hand someone an artifact and have it work offline." Edge and on-premise deployments,
+CLI-shaped tools, demos that must survive a conference network, and anything where "install .NET
+first" is a real obstacle. If the requirement literally says *one file*, audit content sidecars before
+promising it.
 
 **The constraint is the composition, not the flag.** AOT is not something you turn on at the end — it
 is something an application stays eligible for. Every referenced capability must have an in-process
@@ -44,6 +47,8 @@ Ask before promising it:
 
 - **Which capabilities are in play, and does each have an in-process form?** Answer this first; it
   decides feasibility.
+- **Does any capability need content beside the executable?** ONNX model and vocabulary files make
+  the deliverable an offline bundle even though no model service is required.
 - **How many platforms?** A native binary is per-architecture, so three targets is three builds -- and only win-x64 has been published and run in this repository. Treat another target as work you are measuring.
 - **Does anything rely on reflection?** Controllers, models, and anything discovered at runtime need to
   be rooted for the trimmer, or they vanish in a way that only shows up at runtime.
@@ -98,16 +103,22 @@ Depth: [NativeAOT how-to](../guides/nativeaot-howto.md).
 3. **Correction** — assert a controller or model reachable only by reflection still resolves. If it
    404s in the published binary but works in development, a trim root is missing.
 
+When the composition includes content files, prove the *published directory* from a clean location,
+then remove one required sidecar and assert the startup or first-use error names the missing artifact.
+
 Run the published artifact in CI. An AOT configuration nobody published is a setting, not a capability.
 
 ## Boundaries
 
 - AOT does not make a networked dependency local. It removes the runtime, not the architecture.
+- NativeAOT does not embed arbitrary application content. A no-service bundle and a one-file artifact
+  are different claims.
 - Not every library is trim-safe; a dependency doing dynamic work may need roots or may not work at all.
 - Binaries are per-platform, and publish is materially slower than an ordinary build.
 
 ## Interacts with
 
 **Search by meaning.** The in-process ONNX connector plus a durable local vector index is what makes
-semantic search possible inside a single binary — GardenCoop ships the embedding model as content
-alongside the app, so it works with no Docker, no API key, and no vector server.
+semantic search possible inside an offline bundle — GardenCoop ships the embedding model as content
+alongside the executable, so it works with no Docker, no API key, and no vector server. Because those
+model files are sidecars, this variant is not literally one file.

@@ -284,9 +284,9 @@ application and say what each would cost, rather than naming a package.
 
 [Open the recipe](share-a-prototype.md)
 
-## Ship it as one self-contained executable
+## Ship a runtime-self-contained artifact
 
-**Gets you** — A native executable that starts fast, needs no .NET installed, and has no service to run beside it.
+**Gets you** — A native artifact that starts fast, needs no .NET installed, and has no service to run beside it - one executable when no capability needs content sidecars, otherwise an offline bundle.
 
 **Works if** — Every capability the application uses can run in-process — embedded store, in-process AI, local files.
 
