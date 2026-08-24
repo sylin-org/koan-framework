@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": [ "Koan", "Web", "WebAPI", "AI", "Search" ],
+  "identity": "Sylin.Koan.SemanticSearch.CSharp",
+  "name": "Koan Semantic Search API",
+  "description": "A Koan web API with semantic search: [Embedding] on an Entity, save-time vector indexing into SqliteVec, and a ranked /api/articles/search endpoint over a local Ollama embedding model. Ready to run.",
+  "shortName": "koan-semsearch",
+  "defaultName": "KoanSemSearchApp",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "KoanSemSearchApp",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    { "path": "KoanSemSearchApp.csproj" }
+  ],
+  "postActions": [
+    {
+      "id": "nextSteps",
+      "description": "Next steps",
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true,
+      "manualInstructions": [
+        {
+          "text": "Prerequisite: Ollama running locally with an embedding model, e.g.:\n  ollama pull nomic-embed-text\n\nRun it:\n  dotnet run\n\nThen save two articles and search by meaning:\n  Invoke-RestMethod -Method Post -Uri http://localhost:5000/api/articles -ContentType application/json -Body '{\"title\":\"Sourdough feeding\",\"body\":\"daily flour and water\"}'\n  Invoke-RestMethod 'http://localhost:5000/api/articles/search?q=bread%20baking%20routine'\n\nWorking with a coding agent:\n  AGENTS.md orients any agent to this application and to Koan's capability map."
+        }
+      ]
+    }
+  ]
+}

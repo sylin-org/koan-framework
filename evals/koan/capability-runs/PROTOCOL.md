@@ -47,6 +47,12 @@ silent provisioning step. Repeat until the subagent passes within budget twice c
 The subagent's transcript is itself harvest: read its final state and dead ends as forensic
 evidence of what the docs failed to say, even on a passing run.
 
+Template-pack mechanics: `dotnet new install` refuses a version the consumer already has (exit 106,
+stale entry under `%USERPROFILE%\.templateengine\packages`). A locally packed template at the same
+version as the published feed therefore burns the consumer's clock fighting the cache — pack Stage-3
+artifacts at a version distinct from any published one, or uninstall first, and say which you did in
+the evidence.
+
 ## Cold-evaluator rules
 
 All stop rules, mindsets, and blocker-report formats from

@@ -9,7 +9,7 @@
     <PackageId>Sylin.Koan.Templates</PackageId>
     <Title>Koan project templates</Title>
     <Authors>Sylin Labs</Authors>
-    <Description>`dotnet new` templates for the Koan Framework: koan-web (minimal Entity + EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.</Description>
+    <Description>`dotnet new` templates for the Koan Framework: koan-web (minimal Entity + EntityController web API), koan-semsearch (semantic search over your Entities via [Embedding] + SqliteVec + Ollama), and koan-console (Entity CRUD console app), all ready to run.</Description>
     <PackageTags>koan;dotnet;framework;dotnet-new;templates;project-template</PackageTags>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/sylin-org/Koan-framework</PackageProjectUrl>
@@ -30,7 +30,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="koan-web\**\*;koan-console\**\*"
+    <Content Include="koan-web\**\*;koan-console\**\*;koan-semsearch\**\*"
              Exclude="**\bin\**;**\obj\**" />
     <Compile Remove="**\*" />
     <None Include="README.md" Pack="true" PackagePath="\" />
