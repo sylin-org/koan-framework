@@ -4,11 +4,17 @@ domain: ai
 title: "Answer from your own Entities (RAG)"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/guides/ai-rag-howto.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/guides/ai-rag-howto.md - cold-executed on the Ollama path (qwen3:8b chat,
+    nomic-embed-text embeddings, SqliteVec index): grounded cited answers over HTTP, composition via
+    facts, unlowerable-filter correction observed as VectorFilterUnsupportedException naming the
+    operator and remedy. Citation fidelity (real similarity + rendered excerpts) verified against a
+    source pin - packages published before that fix render type-name excerpts (fixed in the same
+    cycle; see repository history).
 related_guides:
   - ai-vector-howto.md
   - entity-capabilities-howto.md
