@@ -181,6 +181,95 @@ public sealed class OllamaAdapterSpec
             .Contain("resident models");
     }
 
+    [Fact]
+    public async Task Chat_with_tools_posts_to_chat_endpoint_and_surfaces_native_tool_calls()
+    {
+        var handler = new RecordingHandler((request, body) =>
+        {
+            request.RequestUri!.AbsolutePath.Should().Be("/api/chat");
+            var payload = JObject.Parse(body!);
+            payload.Value<string>("model").Should().Be("qwen3");
+            payload.Value<bool>("stream").Should().BeFalse();
+            var messages = payload.Value<JArray>("messages")!;
+            messages.Should().HaveCount(2);
+            messages[0].Value<string>("role").Should().Be("system");
+            messages[0].Value<string>("content").Should().Be("Use the catalog.");
+            messages[1].Value<string>("role").Should().Be("user");
+            var tools = payload.Value<JArray>("tools")!;
+            tools.Should().HaveCount(1);
+            tools[0].Value<string>("type").Should().Be("function");
+            var function = tools[0].Value<JObject>("function")!;
+            function.Value<string>("name").Should().Be("product_search");
+            function.Value<string>("description").Should().Be("Find products");
+            function.Value<JObject>("parameters")!.Value<string>("type").Should().Be("object");
+            return JsonResponse(
+                """{"model":"qwen3","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"product_search","arguments":{"query":"studio lamp"}}}]},"done":true,"done_reason":"stop"}""");
+        });
+        using var adapter = CreateAdapter(handler, "qwen3");
+
+        var response = await adapter.Chat(new AiChatRequest
+        {
+            Messages = [new AiMessage("system", "Use the catalog."), new AiMessage("user", "Need lighting.")],
+            Tools = [new AiToolDefinition("product_search", "Find products",
+                """{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}""")]
+        });
+
+        response.Model.Should().Be("qwen3");
+        response.FinishReason.Should().Be("stop");
+        var call = response.ToolCalls.Should().ContainSingle().Subject;
+        call.Name.Should().Be("product_search");
+        call.ArgumentsJson.Should().Be("""{"query":"studio lamp"}""");
+        handler.Requests.Select(request => request.Uri.AbsolutePath).Should().Equal("/api/chat");
+    }
+
+    [Fact]
+    public async Task Native_tool_call_arguments_accept_the_string_form_older_servers_send()
+    {
+        var handler = new RecordingHandler((_, _) => JsonResponse(
+            """{"model":"qwen3","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"product_search","arguments":"{\"query\":\"lamp\"}"}}]},"done":true,"done_reason":"stop"}"""));
+        using var adapter = CreateAdapter(handler, "qwen3");
+
+        var response = await adapter.Chat(new AiChatRequest
+        {
+            Messages = [new AiMessage("user", "Need lighting.")],
+            Tools = [new AiToolDefinition("product_search", "Find products", "{}")]
+        });
+
+        response.ToolCalls.Should().ContainSingle();
+        response.ToolCalls![0].ArgumentsJson.Should().Be("""{"query":"lamp"}""");
+    }
+
+    [Fact]
+    public async Task Chat_with_tools_falls_back_to_flat_prompt_when_chat_endpoint_refuses()
+    {
+        var handler = new RecordingHandler((request, body) =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/api/chat")
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent("""{"error":"does not support tools"}""")
+                };
+            }
+
+            request.RequestUri.AbsolutePath.Should().Be("/api/generate");
+            // Roles are flattened into the prompt, which still carries the system text.
+            JObject.Parse(body!).Value<string>("prompt").Should().StartWith("[system]");
+            return JsonResponse("""{"model":"phi3","response":"Answer from priors.","done":true,"done_reason":"stop"}""");
+        });
+        using var adapter = CreateAdapter(handler);
+
+        var response = await adapter.Chat(new AiChatRequest
+        {
+            Messages = [new AiMessage("system", "Text protocol instructions."), new AiMessage("user", "Need lighting.")],
+            Tools = [new AiToolDefinition("product_search", "Find products", "{}")]
+        });
+
+        response.Text.Should().Be("Answer from priors.");
+        response.ToolCalls.Should().BeNull();
+        handler.Requests.Select(request => request.Uri.AbsolutePath).Should().Equal("/api/chat", "/api/generate");
+    }
+
     private static OllamaAdapter CreateAdapter(RecordingHandler handler, string model = "phi3")
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:11434") };

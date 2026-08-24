@@ -71,8 +71,9 @@ internal sealed class AgentExecutor : IAgentExecutor
 
             var responseText = chatResult.Text;
 
-            // Try to parse tool calls from the response
-            var toolCalls = ParseToolCalls(responseText);
+            // Native tool calls first; models without provider support answer through the
+            // text protocol instead, so keep scraping as the fallback.
+            var toolCalls = ResolveToolCalls(chatResult, iterations);
 
             if (toolCalls.Count == 0)
             {
@@ -336,14 +337,79 @@ internal sealed class AgentExecutor : IAgentExecutor
     private static ChatOptions BuildChatOptions(
         AgentDefinition definition, Dictionary<string, GeneratedTool> toolRegistry, string? systemPrompt)
     {
-        _ = toolRegistry;
+        IReadOnlyList<AiToolDefinition>? tools = null;
+        if (toolRegistry.Count > 0)
+        {
+            tools = toolRegistry.Values
+                .Select(t => new AiToolDefinition(t.Name, t.Description, t.ParametersSchema))
+                .ToArray();
+        }
+
         return new ChatOptions
         {
             Model = definition.ChatModel,
             Source = definition.ChatSource,
             Temperature = definition.Temperature ?? 0.1,  // Low temperature for reasoning
-            SystemPrompt = systemPrompt
+            SystemPrompt = systemPrompt,
+            Tools = tools
         };
+    }
+
+    /// <summary>
+    /// Prefers native <c>message.tool_calls</c> from the provider; falls back to the text protocol
+    /// when the response carries none, which keeps models without native support working.
+    /// </summary>
+    private List<ToolCall> ResolveToolCalls(ChatResult chatResult, int iteration)
+    {
+        if (chatResult.ToolCalls is { Count: > 0 })
+        {
+            var native = chatResult.ToolCalls.Select(ToToolCall).ToList();
+            _logger.LogInformation(
+                "Agent turn {Iteration}: {Count} tool call(s) resolved via native function calling",
+                iteration, native.Count);
+            return native;
+        }
+
+        var scraped = ParseToolCalls(chatResult.Text);
+        if (scraped.Count > 0)
+        {
+            _logger.LogInformation(
+                "Agent turn {Iteration}: {Count} tool call(s) resolved via the text protocol (provider returned no native tool calls)",
+                iteration, scraped.Count);
+        }
+
+        return scraped;
+    }
+
+    private static ToolCall ToToolCall(AiToolCall call)
+    {
+        var arguments = new Dictionary<string, object?>();
+        try
+        {
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(call.ArgumentsJson) ? "{}" : call.ArgumentsJson);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    arguments[prop.Name] = prop.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => prop.Value.GetString(),
+                        JsonValueKind.Number => prop.Value.Clone(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Null => null,
+                        _ => prop.Value.Clone()
+                    };
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed provider argument JSON: hand empty arguments to the tool so its own
+            // validation produces an observation the model can react to.
+        }
+
+        return new ToolCall(call.Name, arguments);
     }
 
     /// <summary>

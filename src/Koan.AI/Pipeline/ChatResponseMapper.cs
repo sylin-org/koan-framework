@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using Koan.AI.Contracts.Models;
 using Microsoft.Extensions.AI;
 
@@ -9,6 +10,17 @@ internal static class ChatResponseMapper
 {
     public static AiChatResponse ToAiChatResponse(ChatResponse response)
     {
+        var toolCalls = response.Messages
+            .SelectMany(m => m.Contents)
+            .OfType<FunctionCallContent>()
+            .Select(c => new AiToolCall
+            {
+                Name = c.Name,
+                ArgumentsJson = JsonSerializer.Serialize(c.Arguments ?? EmptyArguments),
+                Id = c.CallId
+            })
+            .ToList();
+
         return new AiChatResponse
         {
             Text = response.Text,
@@ -17,17 +29,50 @@ internal static class ChatResponseMapper
             TokensOut = (int?)(response.Usage?.OutputTokenCount),
             Model = response.ModelId,
             AdapterId = response.ResponseId,
+            ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
         };
     }
 
     public static ChatResponse FromAiChatResponse(AiChatResponse response)
     {
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, response.Text ?? ""))
+        var message = new ChatMessage(ChatRole.Assistant, response.Text ?? "");
+        if (response.ToolCalls is { Count: > 0 })
+        {
+            foreach (var call in response.ToolCalls)
+            {
+                message.Contents.Add(new FunctionCallContent(
+                    call.Name,
+                    call.Id ?? call.Name,
+                    ParseArguments(call.ArgumentsJson)));
+            }
+        }
+
+        return new ChatResponse(message)
         {
             FinishReason = MapFinishReason(response.FinishReason),
             ModelId = response.Model,
             Usage = CreateUsage(response.TokensIn, response.TokensOut),
         };
+    }
+
+    private static readonly IDictionary<string, object?> EmptyArguments =
+        new Dictionary<string, object?>();
+
+    private static IDictionary<string, object?> ParseArguments(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson))
+        {
+            return EmptyArguments;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, object?>>(argumentsJson) ?? EmptyArguments;
+        }
+        catch (JsonException)
+        {
+            return EmptyArguments;
+        }
     }
 
     /// <summary>

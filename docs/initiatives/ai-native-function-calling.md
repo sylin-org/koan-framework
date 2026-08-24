@@ -3,13 +3,14 @@ type: PLAN
 domain: ai
 title: "Native provider function-calling for Koan.AI"
 audience: [maintainers, framework-authors]
-status: proposed
+status: current
 last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-24
   status: reviewed
-  scope: design grounded in the agents-rung dogfood (2026-08-24) and current Ollama adapter shape
+  scope: design grounded in the agents-rung dogfood (2026-08-24) and current Ollama adapter shape;
+    slices 1-2 implemented and verified live the same day - see Implementation state below
 ---
 
 # Native function calling — implementation plan
@@ -43,3 +44,23 @@ the adherence problem entirely for capable models and makes non-use detectable.
 ## Non-goals
 
 - Streaming tool calls; multi-provider parity certification; changing `ParseToolCalls` semantics.
+
+## Implementation state (2026-08-24)
+
+Slices 1, 2, and 4 landed; 3 remains open as follow-up rows.
+
+- **Contract hop added**: `AiChatRequest.Tools` and `AiChatResponse.ToolCalls`, mapped by
+  `Client.BuildChatRequest` and both `Client.ChatResult` overloads.
+- **Adapter**: `OllamaAdapter.Chat` routes requests carrying tools through `/api/chat`
+  (role-preserving messages, `tools` mapped from definitions, `message.tool_calls` parsed — argument
+  object *and* string forms accepted); an HTTP refusal falls back to the legacy flat generate prompt,
+  where the system text already carries any text-protocol instructions.
+- **Second defect found during verification**: tool calls survived the adapter but died at the two
+  Microsoft.Extensions.AI bridge hops — `ChatResponseMapper.FromAiChatResponse` /
+  `ToAiChatResponse`. Both now translate between `AiToolCall` and `FunctionCallContent`.
+- **Executor**: `BuildChatOptions` attaches registry definitions; `ResolveToolCalls` prefers native
+  calls, logs which path fired per turn, and falls back to text scraping.
+- **Verified live** via project-reference probe on qwen3:8b: five consecutive turns resolved via
+  native function calling, grounded verbatim-title answer; dolphin-llama3:8b (refuses tools, HTTP
+  400) completed through the fallback with the same journey. Unit specs pin the adapter wire shapes
+  in `Koan.Tests.AI.Unit` (`OllamaAdapterSpec`).

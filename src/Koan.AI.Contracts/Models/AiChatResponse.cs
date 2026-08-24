@@ -8,4 +8,7 @@ public record AiChatResponse
     public int? TokensOut { get; init; }
     public string? Model { get; init; }
     public string? AdapterId { get; init; }
+
+    /// <summary>Tool invocations requested by the model via native function calling, when any.</summary>
+    public IReadOnlyList<AiToolCall>? ToolCalls { get; init; }
 }

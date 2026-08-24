@@ -78,7 +78,8 @@ public static class Client
             TokensUsed = (response.TokensIn ?? 0) + (response.TokensOut ?? 0),
             Latency = sw.Elapsed,
             AdapterId = response.AdapterId,
-            FinishReason = response.FinishReason
+            FinishReason = response.FinishReason,
+            ToolCalls = response.ToolCalls
         };
     }
 
@@ -100,7 +101,8 @@ public static class Client
             TokensUsed = (response.TokensIn ?? 0) + (response.TokensOut ?? 0),
             Latency = sw.Elapsed,
             AdapterId = response.AdapterId,
-            FinishReason = response.FinishReason
+            FinishReason = response.FinishReason,
+            ToolCalls = response.ToolCalls
         };
     }
 
@@ -1523,6 +1525,7 @@ public static class Client
             Messages = messages,
             Model = model,
             Options = promptOpts,
+            Tools = options?.Tools is { Count: > 0 } ? options.Tools : null,
             Route = scopeSource is not null
                 ? new AiRouteHints { Source = scopeSource }
                 : null

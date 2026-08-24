@@ -23,5 +23,8 @@ internal static class Constants
     public static class Adapter
     {
         public const string Type = "ollama";
+        public const string GeneratePath = "/api/generate";
+        public const string ChatPath = "/api/chat";
+        public const string EmbeddingsPath = "/api/embeddings";
     }
 }

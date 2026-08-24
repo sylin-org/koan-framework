@@ -90,6 +90,23 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
             throw new InvalidOperationException("Ollama adapter requires a model name.");
         }
 
+        // Native tool calling rides /api/chat, which preserves message roles and carries tool
+        // definitions. When the endpoint or the model refuses tools, fall through to the flat
+        // prompt: the caller's system text already carries any text-protocol instructions.
+        if (request.Tools is { Count: > 0 })
+        {
+            var native = await ChatViaEndpoint(http, request, model, ct).ConfigureAwait(false);
+            if (native is not null)
+            {
+                return native;
+            }
+
+            _logger.LogWarning(
+                "Ollama: native tool calling refused for {Model} ({Endpoint}); falling back to the flat generate prompt",
+                model,
+                http.BaseAddress);
+        }
+
         var (prompt, imageBase64List) = BuildPromptWithImages(request);
         var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
@@ -115,7 +132,7 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
         }
 
         var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
-        using var resp = await http.PostAsync("/api/generate", new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
+        using var resp = await http.PostAsync(Infrastructure.Constants.Adapter.GeneratePath, new StringContent(payload, Encoding.UTF8, "application/json"), ct).ConfigureAwait(false);
 
         if (!resp.IsSuccessStatusCode)
         {
@@ -133,6 +150,126 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
             Text = doc.response ?? "",
             FinishReason = doc.done_reason,
             Model = doc.model
+        };
+    }
+
+    /// <summary>
+    /// Posts to <c>/api/chat</c> with role-preserving messages and mapped tool definitions.
+    /// Returns <c>null</c> when the endpoint or model refuses the request (HTTP failure), which
+    /// lets the caller fall back to the flat prompt; a successful response without tool calls is
+    /// a real answer, not a refusal.
+    /// </summary>
+    private async Task<AiChatResponse?> ChatViaEndpoint(HttpClient http, AiChatRequest request, string model, CancellationToken ct)
+    {
+        var body = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["model"] = model,
+            ["messages"] = MapChatMessages(request.Messages),
+            ["stream"] = false,
+            ["options"] = MapOptions(request.Options),
+            ["tools"] = MapToolDefinitions(request.Tools!)
+        };
+
+        if (request.Options?.Think is bool thinkFlag)
+        {
+            body["think"] = thinkFlag;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Options?.ResponseFormat))
+        {
+            body["format"] = request.Options.ResponseFormat;
+        }
+
+        var payload = JsonConvert.SerializeObject(body, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
+        using var resp = await http.PostAsync(
+            Infrastructure.Constants.Adapter.ChatPath,
+            new StringContent(payload, Encoding.UTF8, "application/json"),
+            ct).ConfigureAwait(false);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            var text = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            _logger.LogWarning(
+                "Ollama: chat with tools failed ({Status}) body={Body}",
+                (int)resp.StatusCode,
+                text);
+            return null;
+        }
+
+        var json = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        var doc = JsonConvert.DeserializeObject<OllamaChatResponse>(json)
+                  ?? throw new InvalidOperationException("Empty response from Ollama.");
+        var message = doc.message;
+
+        return new AiChatResponse
+        {
+            Text = message?.content ?? "",
+            FinishReason = doc.done_reason,
+            Model = doc.model,
+            ToolCalls = message?.tool_calls is { Count: > 0 }
+                ? message.tool_calls.Select(MapNativeToolCall).ToArray()
+                : null
+        };
+    }
+
+    private static List<Dictionary<string, object?>> MapChatMessages(IReadOnlyList<AiMessage> messages)
+    {
+        var mapped = new List<Dictionary<string, object?>>(messages.Count);
+        foreach (var m in messages)
+        {
+            var (content, images) = ResolveMessageContentWithImages(m);
+            var entry = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["role"] = m.Role,
+                ["content"] = content
+            };
+
+            if (images.Count > 0)
+            {
+                entry["images"] = images;
+            }
+
+            mapped.Add(entry);
+        }
+
+        return mapped;
+    }
+
+    private static List<Dictionary<string, object?>> MapToolDefinitions(IReadOnlyList<AiToolDefinition> tools)
+        => tools.Select(t => new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["type"] = "function",
+            ["function"] = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["name"] = t.Name,
+                ["description"] = t.Description,
+                ["parameters"] = ParseSchemaObject(t.ParametersSchema)
+            }
+        }).ToList();
+
+    private static JToken ParseSchemaObject(string? schema)
+    {
+        // The schema string comes from framework-generated JSON; an empty schema means the tool
+        // takes no arguments. Malformed JSON throws here on purpose - it is a defect in the
+        // definition source and must surface at the boundary that produced it.
+        return string.IsNullOrWhiteSpace(schema) ? new JObject() : JToken.Parse(schema);
+    }
+
+    private static AiToolCall MapNativeToolCall(OllamaToolCall call)
+    {
+        var function = call.function;
+        var argumentsJson = function?.arguments switch
+        {
+            null => "{}",
+            JObject obj => obj.ToString(Newtonsoft.Json.Formatting.None),
+            JToken token when token.Type == JTokenType.String => token.Value<string>() ?? "{}",
+            JToken token => token.ToString(Newtonsoft.Json.Formatting.None)
+        };
+
+        return new AiToolCall
+        {
+            Name = function?.name ?? "",
+            ArgumentsJson = argumentsJson
         };
     }
 
@@ -630,6 +767,34 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
         public string? response { get; set; }
         public bool done { get; set; }
         public string? done_reason { get; set; }
+    }
+
+    private sealed class OllamaChatResponse
+    {
+        public string? model { get; set; }
+        public OllamaChatMessage? message { get; set; }
+        public bool done { get; set; }
+        public string? done_reason { get; set; }
+    }
+
+    private sealed class OllamaChatMessage
+    {
+        public string? role { get; set; }
+        public string? content { get; set; }
+        public List<OllamaToolCall>? tool_calls { get; set; }
+    }
+
+    private sealed class OllamaToolCall
+    {
+        public OllamaToolCallFunction? function { get; set; }
+    }
+
+    private sealed class OllamaToolCallFunction
+    {
+        public string? name { get; set; }
+
+        /// <summary>Object form on current servers; string form on some older versions.</summary>
+        public JToken? arguments { get; set; }
     }
 
     private sealed class OllamaEmbeddingsResponse

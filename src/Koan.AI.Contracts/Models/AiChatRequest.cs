@@ -5,6 +5,13 @@ public record AiChatRequest
     public List<AiMessage> Messages { get; init; } = new();
     public string? Model { get; init; }
     public AiPromptOptions? Options { get; init; }
+
+    /// <summary>
+    /// Functions the model may call natively. Adapters whose provider supports tool calling translate
+    /// them to the wire format and surface requested invocations on <see cref="AiChatResponse.ToolCalls"/>;
+    /// adapters without support ignore this member, leaving any text-protocol fallback to the caller.
+    /// </summary>
+    public IReadOnlyList<AiToolDefinition>? Tools { get; init; }
     public AiRouteHints? Route { get; init; }
     public AiConversationContext? Context { get; init; }
     public List<AiAugmentationInvocation> Augmentations { get; init; } = new();
