@@ -28,6 +28,10 @@ public sealed record ChatResult
     /// <summary>Adapter that handled the request.</summary>
     public string? AdapterId { get; init; }
 
-    /// <summary>Reason generation stopped (e.g., "stop", "length").</summary>
+    /// <summary>Reason generation stopped (e.g., "stop", "length", "tool_calls").</summary>
     public string? FinishReason { get; init; }
+
+    /// <summary>Tool calls requested by the model via native function calling, when any.</summary>
+    public IReadOnlyList<AiToolCall>? ToolCalls { get; init; }
 }
+

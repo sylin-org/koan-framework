@@ -64,4 +64,8 @@ public sealed record ChatOptions
 
     /// <summary>Vendor-specific options (forwarded to adapter as-is).</summary>
     public IDictionary<string, object>? VendorOptions { get; init; }
+
+    /// <summary>Functions the model may call natively. Providers without native tool support ignore this; callers must keep a text-protocol fallback.</summary>
+    public IReadOnlyList<AiToolDefinition>? Tools { get; init; }
 }
+
