@@ -4,12 +4,14 @@ recipe: store-and-expose
 title: "Store my things and expose them over HTTP"
 domain: data
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/store-and-expose.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/store-and-expose.md - cold-executed on the SQLite path (template scaffold,
+    save/query over HTTP, restart survival, election evidence, adapter-refusal correction)
 gets_you: "A persisted, queryable HTTP API over a model you wrote, with no plumbing in between."
 works_if: "Always. This is where most applications start."
 costs: "Nothing to operate on the embedded path. A server-backed store adds a process to run."
@@ -77,8 +79,10 @@ endpoint and credentials configured under `Koan:Data:Sources`; an embedded one n
 1. **Behavior** — create, read back, query, and restart the process; assert the data survived.
 2. **Composition** — assert the store you intended actually won, via `/.well-known/Koan/facts` or
    `koan.lock.json`. An API that works proves *a* store answered.
-3. **Correction** — point it at an unreachable endpoint and assert startup explains the failure
-   rather than silently falling back.
+3. **Correction** — set `Koan:Data:Sources:Default:Adapter` to an adapter whose connector package
+   you did *not* reference (for example `postgres` while only SQLite is referenced) and start the
+   app; startup must fail fast with `AdapterResolutionException` naming the config key, the
+   remedy, and the available providers — never a silent fallback to the referenced store.
 
 ## Boundaries
 

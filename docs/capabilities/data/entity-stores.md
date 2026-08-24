@@ -4,17 +4,23 @@ domain: data
 title: "Entity stores"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/entity-stores.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/data/entity-stores.md - cold-executed via store-and-expose on the
+    SQLite path: template scaffold, save/query over HTTP, restart survival, sqlite election in
+    banner + lockfile + facts, and fail-closed refusal of an unreferenced adapter
 ---
 
 # Entity stores
 
 Persist business state as an `Entity<T>` and keep using the same Entity verbs as the application
 moves from a local file to a service-backed store.
+
+Verified against: `Sylin.Koan.App` 1.0.7 or newer, `Sylin.Koan.Data.Connector.Sqlite` 1.0.12 or
+newer, `Sylin.Koan.Templates` 1.0.13 or newer (patch releases compatible).
 
 Persistence is only the floor. For relationships, lifecycle, contexts, HTTP, Jobs, Events, AI,
 storage, and agent projections that attach to the same type, start at
@@ -34,6 +40,12 @@ storage, and agent projections that attach to the same type, start at
 > ordering, streaming, transactions, counts, and isolation vary by store. Verify every operation
 > the application promises against the selected provider; a working `Save` proves only that a
 > store answered.
+>
+> The store provisions on first use. On the very first boot of a fresh deployment,
+> `/health/ready` reports the elected source Unhealthy ("An active Data source is unavailable")
+> until the first Entity operation creates it - an orchestrator that gates traffic on readiness
+> waits forever. Warm the store at startup or tolerate the window; every later boot is ready
+> immediately.
 
 ## Choose by topology
 
