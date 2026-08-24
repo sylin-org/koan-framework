@@ -10,7 +10,7 @@ framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-23
   status: passed
-  scope: docs/recipes/share-a-prototype.md - cold-executed (sign-in flow, per-user row visibility, remove gates, logout revocation). One framework defect found and escalated during the run: PATCH on another user's row applies the write while returning 404 (cross-owner update path does not enforce row scope) - tracked separately; read/list/create/delete enforce correctly.
+  scope: docs/recipes/share-a-prototype.md - cold-executed (sign-in flow, per-user row visibility, remove gates, logout revocation). One framework defect found and escalated during the run: PATCH on another user's row applies the write while returning 404 (cross-owner update path does not enforce row scope) - tracked as sylin-org/koan-framework#137; read/list/create/delete enforce correctly.
 gets_you: "Real sign-in, deliberate access rules, and a URL other people can click - without standing up production infrastructure."
 works_if: "The idea survived contact: you are using it daily, and someone else wants in."
 costs: "Authentication adds one sign-in decision and an access rule per exposed operation. Exposure adds a process the internet (or your circle) can reach - patch it and mind it like any server from then on."
