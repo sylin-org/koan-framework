@@ -1,13 +1,13 @@
-﻿---
+---
 type: GUIDE
 domain: orchestration
 title: "Publishing a Koan app with NativeAOT"
 audience: [developers, architects]
 status: current
-last_updated: 2026-08-21
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-21
+  date_last_tested: 2026-08-24
   status: verified
   scope: win-x64 publish and run of GardenCoop Chapter 1 (SQLite + Web) and of AotRelational against SQLite, PostgreSQL, CockroachDB, MySQL and SQL Server containers
 related_guides:
@@ -97,6 +97,24 @@ Newtonsoft can serialize them via late-bound reflection):
 For a single reflection-reached type you can root it inline instead, with
 `[DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(MyEntity))]` on a method that runs at
 startup — equivalent to a descriptor entry, kept next to the code that needs it.
+
+Referencing `Sylin.Koan.Core` also pins **MVC's model-metadata feature switch** for the publish.
+NativeAOT folds ASP.NET Core feature switches into constants at link time, and the SDK default turns
+enhanced model metadata off — in that mode ASP.NET Core's own simple-type binder throws on every
+parameterized controller action, which under Koan means every `EntityController<T>` route. MVC
+controllers are not an officially supported NativeAOT surface ("minimal APIs are"; controller support
+survived as a happy accident), so `Sylin.Koan.Core.targets` holds
+`MvcEnhancedModelMetadataSupport=true` for every consuming application: with your entity/controller
+trim roots declared above, the published binary serves the full Entity journey. If your
+`Sylin.Koan.Core` package predates this pin, opt in yourself:
+
+```xml
+<PropertyGroup>
+  <MvcEnhancedModelMetadataSupport>true</MvcEnhancedModelMetadataSupport>
+</PropertyGroup>
+```
+
+Applications that prefer the SDK default can restore it with `<KoanEnhancedModelMetadata>false</KoanEnhancedModelMetadata>`.
 
 ## 3. Prerequisites
 
@@ -231,9 +249,12 @@ connection-string variable for each. Verify the row landed in the store itself r
 | `NETSDK1207` on a `Koan.*.Generators` project | A **global** `-p:PublishAot=true`. Use the `-p:KoanAot=true` gate (§1) so `PublishAot` is set only on the app. |
 | Windows link error mentioning `vswhere` / `link.exe` | Publish inside `vcvars64` with `-p:IlcUseEnvironmentalTools=true` (§3), or install the **Desktop development with C++** workload (MSVC `link.exe`). |
 | Boot throws missing-controller/entity `InvalidOperationException` | A reflection-reached type was trimmed — add it to `NativeAotRoots.xml` or `[DynamicDependency]` (§2). Koan modules are auto-rooted; this is for **your** types. |
+| Every Entity request 500s in the published binary with `IsConvertibleType is not initialized ... IsEnhancedModelMetadataSupported ... false` | The MVC model-metadata pin is missing - your `Sylin.Koan.Core` predates it. Set `<MvcEnhancedModelMetadataSupport>true</MvcEnhancedModelMetadataSupport>` and republish (2). |
 | `DllNotFoundException: e_sqlite3` | The native library was not published beside the executable. AOT is self-contained by default—do not force `--no-self-contained`; the connector's native bits travel with it. |
 | `Reflection-based serialization has been disabled` | Something serialized via `System.Text.Json`. The floor is Newtonsoft (§4); for an MVC app ensure Koan.Web's Newtonsoft pipeline is active. |
 | Need a stack trace from the native binary | Publish with `-p:StripSymbols=false` (or `-p:IlcGenerateCompleteDebugInfo=true`) to keep symbols. |
 
 Expect `IL2026`/`IL3050` trim/AOT warnings from ASP.NET Core MVC, Newtonsoft, and the reflection-based
 relationship/config paths. Those warnings remain separate from the current fatal ILC analyzer exception.
+
+

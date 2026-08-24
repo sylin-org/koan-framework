@@ -4,11 +4,14 @@ domain: operations
 title: "Runtime-self-contained publish"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/operations/single-binary.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/operations/single-binary.md - win-x64 publish-and-run of a template web
+    application (trim roots + model-metadata pin): full Entity journey over HTTP, sqlite election in
+    banner and facts; console exemplar remains the certified cross-check
 ---
 
 # Runtime-self-contained publish
@@ -35,13 +38,12 @@ the result an offline self-contained bundle instead.
 > and architecture target needs its own published-and-run proof. Do not call a directory containing
 > ONNX model files “one file.”
 >
-> Known limit (2026-08-24): the certified published-and-run proof is the console journey
-> ([AotRelational sample](https://github.com/sylin-org/koan-framework/blob/main/samples/fundamentals/AotRelational/AotRelational.csproj)).
-> A template web application with trim roots declared per [ship a runtime-self-contained artifact](../../recipes/ship-a-single-binary.md)
-> resolves Entity routes in the artifact but every Entity request fails with
-> `NotSupportedException: IsConvertibleType is not initialized when
-> Microsoft.AspNetCore.Mvc.ApiExplorer.IsEnhancedModelMetadataSupported is false`. Web + NativeAOT
-> is not proven until that signature is fixed and a fresh publish-and-run passes.
+> The web path is held open by a build-time pin: NativeAOT compiles ASP.NET Core's model-metadata
+> switch off, and in that mode every parameterized controller action throws on first request.
+> `Sylin.Koan.Core` build assets pin `MvcEnhancedModelMetadataSupport=true` for consuming apps;
+> packages predating that pin need it declared manually (see [ship a runtime-self-contained artifact](../../recipes/ship-a-single-binary.md)
+> and the [NativeAOT how-to](../../guides/nativeaot-howto.md)). Each OS/architecture target still owes
+> its own published-and-run proof; win-x64 is the one this repository has run.
 
 ## Audit the composition before publishing
 

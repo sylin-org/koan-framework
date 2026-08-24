@@ -459,3 +459,8 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   always the same: symbol origins and environment facts (a missing using, an unstated namespace, a persona
   cookie, a template without a wwwroot). Routing, constraints, and honest absences all held. The corrective
   errors taught, too - the fail-closed tenancy message named its own fix. (2026-08-23)
+- **MSBuild/NuGet/NativeAOT plumbing traps have their own page now.** Feature-switch folding at ILC time,
+  SDK-seeded escape-hatch properties, NuGet's conventional-asset-name-only import rule, generated packaging
+  output owning `<PackageId>.props`, and the diagnostic trio (`-preprocess`, `-getProperty`, `ilc.rsp`) are
+  written once at [docs/engineering/msbuild-nuget-debugging-notes.md](engineering/msbuild-nuget-debugging-notes.md);
+  consult it before debugging anything that lives between a package and the compiler. (2026-08-24)

@@ -90,7 +90,11 @@ Declare what the trimmer must keep:
 ```
 
 Koan emits a trim-root descriptor for its own composition when a trimming or AOT publish is configured,
-so what you declare here is your application's reflection surface, not the framework's.
+so what you declare here is your application's reflection surface, not the framework's. The same build
+assets pin MVC's model-metadata switch for the publish — without it, ASP.NET Core's binder throws on
+every parameterized controller action inside the artifact (see the NativeAOT how-to). On current
+`Sylin.Koan.Core` packages this is automatic; older ones need
+`<MvcEnhancedModelMetadataSupport>true</MvcEnhancedModelMetadataSupport>` declared alongside `PublishAot`.
 
 Depth: [NativeAOT how-to](../guides/nativeaot-howto.md).
 
