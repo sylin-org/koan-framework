@@ -4,7 +4,7 @@ domain: framework
 title: "Koan recipes"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
   status: generated
@@ -82,7 +82,7 @@ application and say what each would cost, rather than naming a package.
 
 **Costs** — Adds no service. Adds a boundary that every new surface must respect — retrofitting it later is the expensive path.
 
-**Needs** — tenant isolation · authentication, to know whose request this is · bind tenancy to a durable person (optional) · operator console for tenant lifecycle (optional) · protect specific fields at rest (optional)
+**Needs** — tenant isolation · authentication, to know whose request this is · resolve the tenant from an HTTP request - without this there is no way at all to scope HTTP callers to a tenant · operator console for tenant lifecycle (optional) · protect specific fields at rest (optional)
 
 [Open the recipe](isolate-tenants.md)
 
