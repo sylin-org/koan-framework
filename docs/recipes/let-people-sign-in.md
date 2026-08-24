@@ -4,12 +4,16 @@ recipe: let-people-sign-in
 title: "Let people sign in"
 domain: identity
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/let-people-sign-in.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/let-people-sign-in.md - cold-executed on the Test connector path: provider
+    eligibility via /.well-known/auth/providers, full code flow over HTTP (persona cookie), anonymous
+    401 behind [Access], logout revocation, and fail-closed startup on an incomplete provider
+      intent
 gets_you: "Real users authenticated through a provider they already have an account with."
 works_if: "The application serves HTTP."
 costs: "Adds a credential to hold and rotate per provider, and a callback URL per environment."
@@ -65,8 +69,10 @@ Depth: [auth how-to](../guides/auth-howto.md) · [authorization how-to](../guide
 
 1. **Behavior** — an anonymous request is refused; a signed-in request succeeds; sign-out revokes.
 2. **Composition** — assert the intended provider is the elected one, not a development fallback.
-3. **Correction** — remove a credential and assert the provider reports ineligible with a useful
-   reason, rather than the application appearing healthy with no way to log in.
+3. **Correction** — declare a provider intent with missing credentials and assert the host refuses
+    to start, naming the config key and both remedies ("Set the missing values under
+    `Koan:Web:Auth:Providers:{id}` or disable/remove that provider intent"), rather than the
+    application appearing healthy with no way to log in.
 
 ## Boundaries
 

@@ -4,11 +4,14 @@ domain: security
 title: "Sign-in"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/trust/sign-in.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/trust/sign-in.md - cold-executed via let-people-sign-in on the Test
+    connector path: eligibility evidence, code flow over HTTP, anonymous 401 behind [Access],
+    logout revocation, fail-closed startup on an incomplete provider intent
 ---
 
 # Sign-in
