@@ -451,3 +451,11 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   empty, `StartsWith('')` matched every project, and central package management switched off for the entire
   repository - surfacing as NU1015 storms in unrelated test projects. Define the root property in the file that
   consumes it, and treat "unrelated projects broke" as a props-scoping question first. (2026-08-23)
+- **Blind cold-runs of the capabilities tree: four domains, zero routing failures - the leaves leaked, not the
+  map.** Four parallel evaluators, each handed only a user sentence and `docs/capabilities/index.md`, routed to
+  working code in every domain: ranked semantic search through a live Ollama, media derivatives with a
+  recipe-hash fingerprint matching the served header, Acme/Globex isolation proven against IDOR and forged
+  carriers, and background jobs surviving a mid-flight kill. Every failure was a leaf gap, and the class was
+  always the same: symbol origins and environment facts (a missing using, an unstated namespace, a persona
+  cookie, a template without a wwwroot). Routing, constraints, and honest absences all held. The corrective
+  errors taught, too - the fail-closed tenancy message named its own fix. (2026-08-23)

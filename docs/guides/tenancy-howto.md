@@ -255,7 +255,7 @@ write-takeover · scoped delete · cache-key · async-hop) for any value-isolati
 **Sample.**
 
 ```csharp
-await DataAxis.AssertNoLeak<Invoice, string>(Tenant.Use, "acme", "globex");   // returns if isolated; throws on a leak
+await Koan.Data.Core.Axes.DataAxis.AssertNoLeak<Invoice, string>(Tenant.Use, "acme", "globex");   // returns if isolated; throws on a leak
 ```
 
 **When to use it.** For every tenant-scoped entity family you ship — it is the regression tripwire that a future

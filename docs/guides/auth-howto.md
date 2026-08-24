@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: web
 title: "Authentication & Identity How-To"
@@ -62,7 +62,7 @@ and the maintained OIDC callback establishes a real signed session; `GET /me` no
 
 ## 1. Who am I? `Identity.Current`
 
-`Identity.Current` is the ambient identity for the current request—available in a controller, a service, or a background job, with no `HttpContext` plumbing:
+`Koan.Security.Trust.Identity.Current` is the ambient identity for the current request—available in a controller, a service, or a background job, with no `HttpContext` plumbing:
 
 ```csharp
 if (!Identity.Current.IsAuthenticated)

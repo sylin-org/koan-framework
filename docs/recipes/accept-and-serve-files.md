@@ -81,6 +81,21 @@ public static MediaRecipe Masonry() => MediaRecipe.New().ResizeFit(300, 300).Enc
 Recipe names are global slugs and must avoid the reserved format shortcuts (`jpeg`, `png`, `webp`,
 `gif`). The engine auto-orients by default, so no orient step is needed.
 
+Arriving bytes are ordinary ASP.NET Core - an `IFormFile` in a controller action, then the stream
+belongs to the Entity:
+
+```csharp
+[HttpPost("upload")]
+public async Task<IActionResult> Upload(IFormFile file, [FromForm] string album, CancellationToken ct)
+{
+    await using var stream = file.OpenReadStream();
+    var photo = await PhotoAsset.Upload(stream, file.FileName, file.ContentType, ct: ct);
+    photo.AlbumId = album;
+    await photo.Save(ct);
+    return Created($"/media/{photo.Id}/original", photo);
+}
+```
+
 Depth: [media recipes how-to](../guides/media-recipes-howto.md).
 
 ## Prove it

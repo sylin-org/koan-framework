@@ -16,7 +16,7 @@ costs: "Adds no service. Adds a boundary that every new surface must respect —
 ingredients:
   - "one | tenant isolation | Sylin.Koan.Tenancy"
   - "one | authentication, to know whose request this is | Sylin.Koan.Web.Auth"
-  - "optional | bind tenancy to a durable person | Sylin.Koan.Identity.Tenancy, Sylin.Koan.Identity"
+  - "one | resolve the tenant from an HTTP request - without this there is no way at all to scope HTTP callers to a tenant | Sylin.Koan.Identity.Tenancy, Sylin.Koan.Identity"
   - "optional | operator console for tenant lifecycle | Sylin.Koan.Tenancy.Web"
   - "optional | protect specific fields at rest | Sylin.Koan.Classification"
 ---

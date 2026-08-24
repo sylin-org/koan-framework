@@ -35,6 +35,13 @@ Configuration section: `Koan:Web:Auth:TestProvider`.
 - optional JWT access-token settings;
 - optional client-credentials clients and allowed scopes.
 
+### Personas
+
+Personas travel by cookie, not by the login form's visible fields: the shipped `login.html` writes
+`document.cookie = '_tp_user=<name>|<email>'` and the provider reads that cookie at the callback.
+Flows that avoid browser automation should set the `_tp_user` cookie directly before calling the
+authorize endpoint; the form fields on the sample page are presentation only.
+
 ## Failure and security posture
 
 Inactive controllers return 404. Invalid clients, redirect URIs, grants, PKCE verifiers, codes, and bearer tokens are
