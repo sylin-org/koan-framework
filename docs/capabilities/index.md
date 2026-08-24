@@ -13,28 +13,43 @@ validation:
 
 # Koan capabilities
 
-Fetch this page first, follow one link, and stop when you can act. Each domain line routes to a
-page that carries decision guidance and links the working recipe. Domains without a dedicated node
-yet link the current best leaf directly - the tree deepens with evidence.
+Fetch this page first, follow one domain, then follow one named outcome. Domain pages route;
+capability nodes state the pieces, binding constraint, and deployment choice; leaves carry working
+Entity code and provider mechanics. Stop when the leaf lets you act.
+
+- **Start with `Entity<T>`** - see the common verbs, contexts, policy hooks, projections, work,
+  intelligence, and specialized Entity shapes that can attach to one business noun:
+  [Entity capability hooks](data/entities.md)
+- **Compose a whole solution** - use a receipt that unions packages, Entity shapes, runtime
+  dependencies, inherited constraints, and three-part proof across several capabilities:
+  [solution compositions](solutions.md)
 
 - **AI** - chat, embeddings, semantic search, vision, reasoning, model operations, evaluation:
   [ai.md](ai.md)
-- **Data** - entity stores, vector stores, migration and cutover:
-  [data reference](../reference/data/index.md) · cutover: [harden-for-production](../recipes/harden-for-production.md)
+- **Data** - Entity grammar, relationships, stores, named sources, migration and cutover:
+  [data.md](data.md)
 - **Web** - entity controllers, OpenAPI, SSE, and the frontend topology decision:
-  [serve-a-web-frontend](../recipes/serve-a-web-frontend.md)
+  [web.md](web.md)
 - **Trust and isolation** - sign-in, access rules, tenants, field protection:
-  [let-people-sign-in](../recipes/let-people-sign-in.md) · [isolate-tenants](../recipes/isolate-tenants.md)
+  [trust.md](trust.md)
 - **Work and integration** - background jobs, events and transport:
-  [run-work-in-background](../recipes/run-work-in-background.md) · [tell-another-system](../recipes/tell-another-system.md)
+  [work.md](work.md)
 - **State and content** - cache, entity-owned files, media:
-  [make-repeated-reads-fast](../recipes/make-repeated-reads-fast.md) · [accept-and-serve-files](../recipes/accept-and-serve-files.md)
+  [state.md](state.md)
 - **Agent surfaces** - MCP tools and resources over your entities:
-  [let-an-agent-use-my-app](../recipes/let-an-agent-use-my-app.md)
+  [agents.md](agents.md)
 - **Trusted records** - reconcile messy arrivals into canonical entities:
-  [reconcile-messy-arrivals](../recipes/reconcile-messy-arrivals.md)
+  [records.md](records.md)
 - **Operations** - single-binary publish, observability, hardening:
-  [ship-a-single-binary](../recipes/ship-a-single-binary.md) · [harden-for-production](../recipes/harden-for-production.md)
+  [operations.md](operations.md)
 
 The one-screen summary of every capability and its maturity lives in the
 [capability map](../reference/capability-map.md).
+
+## Application destinations
+
+Use these when the request is about the whole application rather than one capability:
+
+1. **Idea to local POC** - [turn an idea into a running application](../recipes/poc-an-idea.md)
+2. **POC to shared prototype** - [let people outside your machine test it](../recipes/share-a-prototype.md)
+3. **Prototype to production claim** - [harden for production](../recipes/harden-for-production.md)

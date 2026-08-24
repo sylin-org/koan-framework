@@ -1,7 +1,7 @@
 ---
 type: REFERENCE
 domain: ai
-title: "Embedding variant: portable single exe"
+title: "Embedding variant: portable offline bundle"
 audience: [ai-agents, developers]
 status: current
 last_updated: 2026-08-23
@@ -11,12 +11,13 @@ validation:
   scope: docs/capabilities/ai/embedding/portable.md
 ---
 
-# Embedding variant: portable single exe
+# Embedding variant: portable offline bundle
 
 In-process ONNX: no model server, no network call, no account. The model artifacts travel with
-the application, so the finished binary works offline - including published as a NativeAOT single
-file. The inherited constraint from [semantic search](../semantic-search.md) applies unchanged:
-one model, one dimensionality, everywhere.
+the application, so the published bundle works offline, including with a NativeAOT executable. The
+ONNX graph and vocabulary remain content sidecars; this is not literally one file. The inherited
+constraint from [semantic search](../semantic-search.md) applies unchanged: one model, one
+dimensionality, everywhere.
 
 ## Variant gotchas
 
@@ -29,8 +30,15 @@ one model, one dimensionality, everywhere.
 2. **Relative artifact paths resolve against the build output**, not the content root. Copy the
    artifacts into the project and let the SDK carry them:
    `<Content Include="models\**" CopyToOutputDirectory="PreserveNewest" />`.
-3. **Size is the trade.** The quantized reference model is ~22 MB plus vocabulary - fine for a
-   tool or a single binary, worth reconsidering if the artifact cannot ship.
+3. **Size and file count are the trade.** The quantized reference model is ~22 MB plus vocabulary -
+   fine for an offline tool bundle, worth reconsidering if the complete directory cannot ship.
+
+## Do not, at this variant
+
+- Do not expect runtime downloads - absent artifacts mean an inactive embedder, stated at
+  startup, not a fallback.
+- Do not reference model paths outside the copied content folder; relative resolution lands in
+  the build output.
 
 ## Mechanics
 

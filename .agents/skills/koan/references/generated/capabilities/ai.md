@@ -31,3 +31,18 @@ Pick the capability; the node or leaf carries the constraints.
   (installable, not yet assessed): [AI.Orchestration README](../../../src/Koan.AI.Orchestration/README.md)
 
 Constraints that span steps live on the capability nodes - read them before writing code.
+
+## Standing constraints
+
+- Local-first is the identity: connectors run in-process or on your machine, and hosted
+  frontier-model connectors deliberately do not ship.
+- `Sylin.Koan.Data.AI` owns `[Embedding]` - no other package brings it in transitively; reference
+  it explicitly whenever a save should produce a vector.
+- Capabilities marked *not assessed* on the product surface carry no guarantees.
+
+## Do not, at this level
+
+- Do not promise hosted-model behavior, quote per-token pricing, or name connectors that do not
+  exist.
+- Do not mix embedding models between indexing and querying - the constraint lives on the
+  semantic-search node and it is absolute.

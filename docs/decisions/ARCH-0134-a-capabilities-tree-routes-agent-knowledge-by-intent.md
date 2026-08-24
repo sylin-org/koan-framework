@@ -84,3 +84,26 @@ its stable GitHub URLs make every node fetchable by an agent with no Koan instal
   drift appears, the map shrinks toward a summary and the tree absorbs the depth.
 - Constraint boxes are candidates to graduate into framework diagnostics (frontmatter the build
   or analyzers can read) once the tree stabilizes.
+
+## Amendment (2026-08-23): the node contract
+
+First cold-run review showed the difference between documentation that reads well and
+documentation that orients an agent. Prose can be correct and still leave the agent guessing
+about fetch order, decision tests, and stop conditions. Every node in the tree therefore carries
+four sections, in this order:
+
+1. **Route by need** - a table whose left column is a decision test written in the requester's
+   vocabulary ("we outgrew SQLite", "orders belong to customers") and whose right column names
+   the exact next fetch. Adjectives are not decision tests.
+2. **Standing constraints** - the invariants that span steps, stated as gates (same model and
+   dimensions for index and query; adding a store never moves data).
+3. **Do not, at this level** - the stop conditions planted where the temptation occurs
+   (no pre-created schemas; no auth ceremony at idea stage; no second store without a named
+   outcome).
+4. **Leaves and exemplars** - the working recipe, the guide, and compiled-sample files that
+   cannot drift.
+
+Delight lines survive only when they carry decision content ("the code keeps saying `Recipe`
+while everything underneath changes" is the invariance promise, so it stays). Capability nodes
+promote the constraint box above the route table; domain nodes lead with it. The contract is the
+template for all future nodes and for revisions of existing ones.

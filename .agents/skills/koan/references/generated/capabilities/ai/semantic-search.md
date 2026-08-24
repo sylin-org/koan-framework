@@ -35,16 +35,24 @@ finds the right chores without a keyword in common.
 
 | Scale | Variant | What it means |
 |---|---|---|
-| Portable single exe | [embedding/portable](embedding/portable.md) | in-process ONNX; model artifacts ride with the app; air-gap friendly |
+| Portable offline bundle | [embedding/portable](embedding/portable.md) | in-process ONNX; model and vocabulary sidecars ride with the app; air-gap friendly |
 | Local with a model server | Ollama connector | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) - Koan discovers the local service; keep the served embedding model consistent |
 | Hosted / remote | **does not ship** | Koan AI is local-first; hosted frontier-model connectors are deliberately absent. An OpenAI-spec-compatible gateway is unassessed territory, not a supported path |
 
+## Do not, at this level
+
+- Do not mix embedding models or dimensions between the indexing path and the query path - the
+  index invalidates silently.
+- Do not add vector-space wiring lambdas "to be safe" - attribute-only composition is the
+  supported path; if saves report "no declared space", the owned flow above owns the fix.
+- Do not hand-write embedding pipelines beside `Client.Embed`.
+
 ## Leaves
 
-- Working recipe: [search-by-meaning](../../recipes/search-by-meaning.md) - install, attribute,
+- **Pasteable build:** [search-by-meaning](../../recipes/search-by-meaning.md) - install, attribute,
   query endpoint, provider limits
-- Working consumer end to end: GardenCoop chapter 2 - entity with
+- **Runnable exemplar:** GardenCoop chapter 2 - entity with
   [Embedding](https://github.com/sylin-org/koan-framework/blob/main/samples/journeys/GardenCoop/02-LocalDiscovery/Models/Produce.cs),
   [search controller](https://github.com/sylin-org/koan-framework/blob/main/samples/journeys/GardenCoop/02-LocalDiscovery/Controllers/ProduceSearchController.cs),
   [search page](https://github.com/sylin-org/koan-framework/blob/main/samples/journeys/GardenCoop/02-LocalDiscovery/wwwroot/index.html)
-- Deeper guide: [AI and vector search how-to](../../guides/ai-vector-howto.md)
+- **Deep contract:** [AI and vector search how-to](../../guides/ai-vector-howto.md)
