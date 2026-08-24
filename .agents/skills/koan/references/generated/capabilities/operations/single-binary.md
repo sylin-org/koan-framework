@@ -34,6 +34,14 @@ the result an offline self-contained bundle instead.
 > the artifact, reflection-discovered application types need trim roots, and each operating-system
 > and architecture target needs its own published-and-run proof. Do not call a directory containing
 > ONNX model files “one file.”
+>
+> Known limit (2026-08-24): the certified published-and-run proof is the console journey
+> ([AotRelational sample](https://github.com/sylin-org/koan-framework/blob/main/samples/fundamentals/AotRelational/AotRelational.csproj)).
+> A template web application with trim roots declared per [ship a runtime-self-contained artifact](../../recipes/ship-a-single-binary.md)
+> resolves Entity routes in the artifact but every Entity request fails with
+> `NotSupportedException: IsConvertibleType is not initialized when
+> Microsoft.AspNetCore.Mvc.ApiExplorer.IsEnhancedModelMetadataSupported is false`. Web + NativeAOT
+> is not proven until that signature is fixed and a fresh publish-and-run passes.
 
 ## Audit the composition before publishing
 
