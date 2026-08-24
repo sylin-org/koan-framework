@@ -206,7 +206,7 @@ internal sealed class ChainExecutor : IChainExecutor
 
         foreach (var (id, score, metadata) in results)
         {
-            var excerpt = metadata?.ToString() ?? id;
+            var excerpt = RenderExcerpt(metadata, id);
             contextParts.Add(excerpt);
             citations.Add(new Citation(id, excerpt, score));
         }
@@ -514,7 +514,10 @@ internal sealed class ChainExecutor : IChainExecutor
             {
                 var matchType = match.GetType();
                 var id = matchType.GetProperty("Id")?.GetValue(match)?.ToString() ?? "";
-                var score = (double)(matchType.GetProperty("Score")?.GetValue(match) ?? 0.0);
+                // VectorMatch exposes the normalized closeness as Similarity; keep a Score fallback
+                // for provider-specific shapes so citations never silently carry 0.
+                var scoreProp = matchType.GetProperty("Similarity") ?? matchType.GetProperty("Score");
+                var score = (double)(scoreProp?.GetValue(match) ?? 0.0);
                 var metadata = matchType.GetProperty("Metadata")?.GetValue(match);
                 results.Add((id, score, metadata));
             }
@@ -547,6 +550,18 @@ internal sealed class ChainExecutor : IChainExecutor
         Koan.Data.Abstractions.Filtering.FilterParseException or
         Koan.Data.Abstractions.Filtering.InvalidFilterFieldException or
         NotSupportedException;
+
+    /// <summary>
+    /// Vector metadata is a provider-neutral DataObject; its default ToString is just the type name,
+    /// which used to leak into citations as both Source-adjacent noise and the entire excerpt.
+    /// Render ordered properties instead, and fall back to the point id when a provider supplies none.
+    /// </summary>
+    private static string RenderExcerpt(object? metadata, string id)
+    {
+        if (metadata is Koan.Data.Abstractions.DataObject dto && dto.Properties.Count > 0)
+            return string.Join("; ", dto.Properties.Select(p => $"{p.Name}={p.Value}"));
+        return id;
+    }
 }
 
 /// <summary>
