@@ -14,7 +14,7 @@ validation:
     same-key arrival merged into the SAME canonical record (phone + name applied), replay idempotent,
     invalid arrival refused 422 leaving the store untouched, /api/canon/models discovery. Newest-wins
     default for UNDECLARED properties verified against a source pin - published packages freeze such
-    fields on first value unless each declares [AggregationPolicy(Latest)].
+    fields on first value unless each declares [Reconcile(Keep.Latest)].
 ---
 
 # Canon reconciliation
@@ -37,10 +37,10 @@ Keep every raw arrival, decide whether it matches an existing real-world thing, 
 > failure can leave earlier state durable, so Canon reports the checkpoint and does not promise
 > rollback or blind-retry safety.
 >
-> **Default conflict rule: newest wins.** A property without `[AggregationPolicy]` reconciles as
+> **Default conflict rule: newest wins.** A property without `[Reconcile]` reconciles as
 > latest-wins — each arrival's value supersedes the previous one. Declare an explicit policy
 > (`First` / `Min` / `Max` / `SourceOfTruth`) only where newest is the wrong answer. Keys declared
-> with `[AggregationKey]` are identity, never conflicted fields.
+> with `[MatchKey]` are identity, never conflicted fields.
 
 ## Decide whether Canon is the answer
 

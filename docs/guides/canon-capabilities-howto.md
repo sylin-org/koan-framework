@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: canon
 title: "Build a trusted canonical Entity"
@@ -48,7 +48,7 @@ using Koan.Canon;
 
 public sealed class Customer : CanonEntity<Customer>
 {
-    [AggregationKey]
+    [MatchKey]
     public string Email { get; set; } = "";
 
     public string FirstName { get; set; } = "";
