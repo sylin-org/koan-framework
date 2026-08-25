@@ -45,7 +45,7 @@ public sealed class CanonModule : KoanModule
         var contributors = plan.Models.Sum(static model => model.ContributorTypes.Count);
         services.GetService<ILoggerFactory>()?.CreateLogger("Koan.Canon").LogInformation(
             "Canon composition active: models={Models}; custom-contributors={Contributors}; " +
-            "defaults=aggregation/policy; commit=canonical->indexes->audit (non-atomic).",
+            "defaults=reconcile/newest-wins; commit=canonical->match-indexes->audit (non-atomic).",
             plan.Models.Count,
             contributors);
         return Task.CompletedTask;
@@ -60,7 +60,7 @@ public sealed class CanonModule : KoanModule
             [
                 $"models:{plan.Models.Count}",
                 $"custom-pipelines:{customModels}",
-                "default-aggregation-policy",
+                "default-reconcile-rule",
                 "ordered-non-atomic-commit",
             ]);
         composition.AddGuarantee(

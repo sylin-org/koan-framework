@@ -47,7 +47,7 @@ and policy behavior and persists through the selected Koan Data provider.
 ## Requirements and limits
 
 - `CanonEntity<T>` is the supported canonical model shape; `AddKoan()` is the only registration step.
-- Default commit order is canonical Entity, aggregation indexes, then audit. That sequence is not an
+- Default commit order is canonical Entity, match-key indexes, then audit. That sequence is not an
   atomic transaction across all Data providers.
 - A canonical-write failure attempts neither indexes nor audit. An index failure can leave canonical
   state and some indexes durable; audit is skipped. An audit failure occurs after canonical state and

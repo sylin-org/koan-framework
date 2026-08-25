@@ -145,7 +145,7 @@ not cold-run · `not assessed` = capability-map label · `shipped?` = source exi
 
 | Capability | Expression | Depth | Evidence |
 |---|---|---|---|
-| Canonized entity | `class Customer : CanonEntity<Customer>` + `[AggregationKey]` on Email | served at `/api/canon/customer`; `/api/canon/models` explains | not assessed |
+| Canonized entity | `class Customer : CanonEntity<Customer>` + `[MatchKey]` on Email | served at `/api/canon/customer`; `/api/canon/models` explains | not assessed |
 | Pipeline phases | `ICanonPipelineContributor<T>` with `Phase => Validation` | phase→order→type ordering; park/fail semantics; 202/422 mapping | not assessed |
 | Runtime control | `entity.Canonize()` · `ICanonRuntime.RebuildViews<T>()` | persistence/audit sinks replaceable independently | not assessed |
 

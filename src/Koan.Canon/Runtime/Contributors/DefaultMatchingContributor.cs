@@ -10,7 +10,7 @@ using Koan.Canon;
 namespace Koan.Canon.Internal;
 
 /// <summary>
-/// Default contributor that resolves canonical aggregation keys and aligns canonical identifiers.
+/// Default contributor that resolves canonical match keys and aligns canonical identifiers.
 /// </summary>
 /// <typeparam name="TModel">Canonical entity type.</typeparam>
 internal sealed class DefaultMatchingContributor<TModel> : ICanonPipelineContributor<TModel>
@@ -284,7 +284,7 @@ internal sealed class DefaultMatchingContributor<TModel> : ICanonPipelineContrib
         if (tokens.Count == 0)
         {
             var declared = string.Join(", ", _metadata.MatchKeyNames);
-            throw new InvalidOperationException($"Canonical entity '{_metadata.ModelType.Name}' requires at least one aggregation key value; all declared keys were null or empty ({declared}).");
+            throw new InvalidOperationException($"Canonical entity '{_metadata.ModelType.Name}' requires at least one match key value; all declared keys were null or empty ({declared}).");
         }
 
         var composite = tokens.Count > 1 ? string.Join('|', tokens) : null;

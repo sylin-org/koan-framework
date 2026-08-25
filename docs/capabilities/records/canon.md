@@ -39,7 +39,7 @@ Keep every raw arrival, decide whether it matches an existing real-world thing, 
 >
 > **Default conflict rule: newest wins.** A property without `[Reconcile]` reconciles as
 > latest-wins — each arrival's value supersedes the previous one. Declare an explicit policy
-> (`First` / `Min` / `Max` / `SourceOfTruth`) only where newest is the wrong answer. Keys declared
+> (`Keep.First` / `Keep.Min` / `Keep.Max` / `Keep.From("source")`) only where newest is the wrong answer. Keys declared
 > with `[MatchKey]` are identity, never conflicted fields.
 
 ## Decide whether Canon is the answer

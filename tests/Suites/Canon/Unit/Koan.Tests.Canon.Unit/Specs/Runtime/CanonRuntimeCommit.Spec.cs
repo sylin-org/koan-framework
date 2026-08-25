@@ -54,7 +54,7 @@ public sealed class CanonRuntimeCommitSpec
 
         var error = (await act.Should().ThrowAsync<InvalidOperationException>()).Which;
         error.Message.Should().Contain("checkpoint 'audit'")
-            .And.Contain("Canonical state and aggregation indexes are durable")
+            .And.Contain("Canonical state and match-key indexes are durable")
             .And.Contain("blind-retry safety");
         error.InnerException.Should().BeSameAs(failure);
         persistence.CanonicalAttempts.Should().Be(1);

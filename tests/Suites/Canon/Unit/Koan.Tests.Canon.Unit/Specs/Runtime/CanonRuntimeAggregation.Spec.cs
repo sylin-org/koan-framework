@@ -33,7 +33,7 @@ public sealed class CanonRuntimeAggregationSpec
         var assertion = await runtime.Awaiting(r => r.Canonize(entity, options: null, CancellationToken.None))
             .Should().ThrowAsync<InvalidOperationException>();
 
-        assertion.Which.Message.Should().Contain("requires at least one aggregation key value");
+        assertion.Which.Message.Should().Contain("requires at least one match key value");
     }
 
     [Fact]

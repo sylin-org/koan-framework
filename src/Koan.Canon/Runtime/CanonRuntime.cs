@@ -161,7 +161,7 @@ internal sealed class CanonRuntime : ICanonRuntime
         {
             throw CommitFailure(
                 Infrastructure.Constants.Commit.Indexes,
-                "Canonical state is durable; zero or more aggregation indexes may be durable. Audit was not attempted. " +
+                "Canonical state is durable; zero or more match-key indexes may be durable. Audit was not attempted. " +
                 "Do not assume rollback or blindly retry with a new arrival.",
                 exception);
         }
@@ -178,7 +178,7 @@ internal sealed class CanonRuntime : ICanonRuntime
         {
             throw CommitFailure(
                 Infrastructure.Constants.Commit.Audit,
-                "Canonical state and aggregation indexes are durable; audit completion is unknown. " +
+                "Canonical state and match-key indexes are durable; audit completion is unknown. " +
                 "Do not assume rollback or blind-retry safety.",
                 exception);
         }

@@ -1,4 +1,4 @@
-﻿---
+---
 type: RECIPE
 recipe: reconcile-messy-arrivals
 title: "Turn inconsistent arrivals into one trusted record"
@@ -46,7 +46,7 @@ The questions that decide the design:
   options are reject or route to a human, and someone must actually work that queue.
 - **Who wins when sources conflict?** Most recent, most trusted source, or field-by-field. Say it
   explicitly; "it depends" becomes an unexplainable record. Undeclared properties already have an
-  answer — newest wins — so declare a different `[AggregationPolicy]` only where newest is wrong.
+  answer — newest wins — so declare a different `[Reconcile]` only where newest is wrong.
 - **Must a merge be undoable?** Usually yes, once someone sees a wrong one. That requirement shapes
   everything, so ask it early rather than after the first bad merge.
 

@@ -32,12 +32,12 @@ public interface ICanonPersistence
         where TModel : CanonEntity<TModel>, new();
 
     /// <summary>
-    /// Retrieves an aggregation index entry if one exists for the provided key.
+    /// Retrieves an match-key index entry if one exists for the provided key.
     /// </summary>
     Task<CanonIndex?> GetIndex(string entityType, string key, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Upserts an aggregation index entry.
+    /// Upserts an match-key index entry.
     /// </summary>
     Task UpsertIndex(CanonIndex index, CancellationToken cancellationToken);
 }

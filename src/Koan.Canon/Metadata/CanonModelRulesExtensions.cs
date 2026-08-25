@@ -59,7 +59,7 @@ public static class CanonModelRulesExtensions
         }
 
         var property = ResolveProperty(propertySelector.Body);
-        throw new KeyNotFoundException($"Canonical entity '{metadata.ModelType.Name}' does not declare an aggregation policy for property '{property.Name}'.");
+        throw new KeyNotFoundException($"Canonical entity '{metadata.ModelType.Name}' does not declare a reconcile rule for property '{property.Name}'.");
     }
 
     private static void EnsureCompatibleModel(CanonModelRules metadata, Type requestedType)

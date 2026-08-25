@@ -4,15 +4,18 @@ domain: canon
 title: "Canon pipeline"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-24
+last_updated: 2026-08-25
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-24
+  date_last_tested: 2026-08-25
   status: passed
   scope: docs/capabilities/records/canon-pipeline.md - mechanics verified by code read of
-    src/Koan.Canon (runtime, aggregation, policy, persistence, stage) against the live journey in
+    src/Koan.Canon (runtime, matching, reconcile, persistence, stage) against the live journey in
     canon.md (Sylin.Koan.Canon 1.0.7): create, same-key merge, replay idempotency, 422 refusal.
-    Multi-channel claims state the shipped surface, not aspiration - see Channels.
+    Declarations on this page use the current language ([MatchKey] / [Reconcile] / OnIntake);
+    published 1.0.x packages spell them [AggregationKey] / [AggregationPolicy(Kind)] with identical
+    semantics until the next release. Multi-channel claims state the shipped surface, not aspiration -
+    see Channels.
 ---
 
 # Canon pipeline
@@ -26,8 +29,12 @@ the three checkpoints that commit, and the provenance that explains the result.
 |---|---|---|
 | Canonical model + runtime | `Sylin.Koan.Canon` | `CanonEntity<T>`, `[MatchKey]`, `[Reconcile]`, `.Canonize()` |
 | HTTP arrival surface (optional) | `Sylin.Koan.Canon.Web` | projects `/api/canon/{model}` writes through the runtime |
+| Data provider | one connector | canonical records, stages, and indexes are ordinary entities |
 
 Verified against: `Sylin.Koan.Canon` 1.0.7 or newer (patch releases compatible).
+
+**Copy from here** (verified exemplar, kept compiling by the repo):
+`samples/applications/CustomerCanon/` — model, contributors, host, and README.
 
 ## The constraint box
 
@@ -131,7 +138,7 @@ A failure throws `InvalidOperationException` naming the checkpoint, with the pro
 - canonical write fails → *"no index or audit write was attempted."*
 - index write fails → *"Canonical state is durable; zero or more match-key indexes may be durable.
   Audit was not attempted. Do not assume rollback or blindly retry with a new arrival."*
-- audit fails → *"Canonical state and aggregation indexes are durable; audit completion is unknown."*
+- audit fails → *"Canonical state and match-key indexes are durable; audit completion is unknown."*
 
 Both storage shapes are ordinary Koan entities — the canonical model itself, plus `CanonIndex`
 (`EntityType + Key → CanonicalId`, carrying origin/channel/seenAt attribution attributes) — lowered
@@ -147,7 +154,7 @@ per-property footprints, reconcile decisions, lineage changes, lifecycle and rea
 
 ## Correction box
 
-- All match keys empty → "requires at least one aggregation key value", naming the declared keys.
+- All match keys empty → "requires at least one match key value", naming the declared keys.
 - Validation-phase rejection (contributor sets Withdrawn/Degraded + Failed) surfaces over HTTP as 422
   with the canonical echo and failed event detail; the store keeps exactly what was already true.
 - Checkpoint failures name their checkpoint and explicitly forbid blind retry — replay safety comes

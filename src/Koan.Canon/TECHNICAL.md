@@ -48,7 +48,7 @@ default audit sink also uses Koan Data.
 The successful default commit is ordered:
 
 1. persist canonical Entity;
-2. upsert aggregation indexes;
+2. upsert match-key indexes;
 3. write audit entries.
 
 This is deliberately fail-loud and not claimed as atomic. Exceptions identify the failed checkpoint

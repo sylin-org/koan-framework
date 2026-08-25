@@ -1,4 +1,4 @@
-﻿---
+---
 type: REFERENCE
 domain: canon
 title: "Reconcile arrivals into trusted Entities"
@@ -43,7 +43,7 @@ await app.RunAsync();
 
 public sealed class Customer : CanonEntity<Customer>
 {
-    [AggregationKey]
+    [MatchKey]
     public string Email { get; set; } = "";
 }
 ```
@@ -72,7 +72,7 @@ Koan discovers the contributor from source-generated metadata. Ordering is phase
 then type name. The first failed or parked contributor terminates before later contributors, phases,
 indexing, audit, or canonical persistence. Web maps those outcomes to 422 and 202.
 
-Models without application contributors still receive the built-in aggregation and policy phases.
+Models without application contributors still receive the built-in Matching and Reconcile phases.
 
 ## Package boundaries
 

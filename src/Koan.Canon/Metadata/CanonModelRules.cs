@@ -10,7 +10,7 @@ using Koan.Core.Reflection;
 namespace Koan.Canon;
 
 /// <summary>
-/// Describes aggregation behaviour declared on a canonical model via attributes.
+/// Describes reconcile behavior declared on a canonical model via attributes.
 /// </summary>
 public sealed class CanonModelRules
 {
@@ -39,7 +39,7 @@ public sealed class CanonModelRules
     public Type ModelType { get; }
 
     /// <summary>
-    /// Properties that compose the aggregation key, in declaration order.
+    /// Properties that compose the match key, in declaration order.
     /// </summary>
     public IReadOnlyList<PropertyInfo> KeyProperties { get; }
 
@@ -155,7 +155,7 @@ public sealed class CanonModelRules
             return descriptor;
         }
 
-        throw new KeyNotFoundException($"Canonical entity '{ModelType.Name}' does not declare an aggregation policy for property '{propertyName}'.");
+        throw new KeyNotFoundException($"Canonical entity '{ModelType.Name}' does not declare a reconcile rule for property '{propertyName}'.");
     }
 
     private static CanonModelRules Create([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] Type modelType)
@@ -250,7 +250,7 @@ public sealed class CanonModelRules
 
             if (!set.Add(property.Name))
             {
-                throw new InvalidOperationException($"Duplicate aggregation key property '{property.Name}' detected on '{property.DeclaringType?.Name}'.");
+                throw new InvalidOperationException($"Duplicate match key property '{property.Name}' detected on '{property.DeclaringType?.Name}'.");
             }
         }
     }

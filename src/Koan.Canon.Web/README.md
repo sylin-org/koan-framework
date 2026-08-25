@@ -1,4 +1,4 @@
-﻿# Sylin.Koan.Canon.Web
+# Sylin.Koan.Canon.Web
 
 Automatic HTTP projection for the Canon models already composed by `Sylin.Koan.Canon`. Reference the
 package and each concrete `CanonEntity<T>` receives Canon-aware routes from the ordinary `AddKoan()`
@@ -21,7 +21,7 @@ await app.RunAsync();
 
 public sealed class Customer : CanonEntity<Customer>
 {
-    [AggregationKey]
+    [MatchKey]
     public string Email { get; set; } = "";
 }
 ```
