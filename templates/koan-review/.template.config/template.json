@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Sylin Labs",
+  "classifications": [ "Koan", "Web", "AI", "Review" ],
+  "identity": "Sylin.Koan.Review.CSharp",
+  "name": "Koan Review Queue API",
+  "description": "A Koan web API with human-in-the-loop review of AI output: a typed review queue over an IReviewable Entity via AddKoanReview, approve/reject/edit/label/flag decisions through IReviewActionHandler persisted over SQLite. Runs its proof journey on startup.",
+  "shortName": "koan-review",
+  "defaultName": "KoanReviewApp",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "KoanReviewApp",
+  "preferNameDirectory": true,
+  "primaryOutputs": [
+    { "path": "KoanReviewApp.csproj" }
+  ],
+  "postActions": [
+    {
+      "id": "nextSteps",
+      "description": "Next steps",
+      "actionId": "AC1156F7-BB77-4DB8-B28F-24EEBCCA1E5C",
+      "continueOnError": true,
+      "manualInstructions": [
+        {
+          "text": "Run it:\n  dotnet run\n\nThe startup journey prints PROBE PASS after proving queue registration, approve/reject persistence, and duplicate-name refusal.\n\nWire your own generation pipeline to save entities as Pending, then expose an authorized endpoint that calls handler.ApproveAsync / RejectAsync and saves.\n\nWorking with a coding agent:\n  AGENTS.md orients any agent to this application and to Koan's capability map."
+        }
+      ]
+    }
+  ]
+}

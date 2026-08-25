@@ -4,11 +4,13 @@ domain: ai
 title: "AI capabilities"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/ai.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/ai.md - route table verified against leaf targets; semantic-search,
+    review, and RAG legs cold-executed this cycle
 ---
 
 # AI capabilities
@@ -21,12 +23,12 @@ Pick the capability; the node or leaf carries the constraints.
   [semantic-search](ai/semantic-search.md)
 - **Answer from your own data (RAG)** - grounded answers with citations; builds on semantic search:
   [answer-from-my-data](../recipes/answer-from-my-data.md)
+- **Human review** - approve, reject or edit AI output before it lands:
+  [review](ai/review.md)
 - **Chat and completion** - provider-neutral completion through one client facade:
   [AI reference](../reference/ai/index.md)
 - **Vision** - read and reason over images:
   [read-an-image](../recipes/read-an-image.md)
-- **Review human-in-the-loop** - approve, reject or edit AI output before it lands:
-  [review-ai-output](../recipes/review-ai-output.md)
 - **Reasoning and orchestration** - RAG chains, branching, structured output
   (installable, not yet assessed): [AI.Orchestration README](../../../src/Koan.AI.Orchestration/README.md)
 

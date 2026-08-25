@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Sylin.Koan.App" Version="1.*" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="1.*" />
+    <PackageReference Include="Sylin.Koan.AI.Review" Version="1.*" />
+  </ItemGroup>
+
+</Project>

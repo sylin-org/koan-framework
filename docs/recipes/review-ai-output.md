@@ -4,12 +4,16 @@ recipe: review-ai-output
 title: "Review AI output before it ships"
 domain: ai
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/review-ai-output.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/review-ai-output.md - cold-executed against published packages (AI.Review 1.0.6):
+    queue registered with all five actions, approve/reject/edit/label/flag persisted over SQLite,
+    duplicate-name and missing-Where corrections observed; requireReason noted as a declaration the
+    caller must enforce
 gets_you: "Model output waits in a queue until a person approves, edits, or rejects it."
 works_if: "Something in the application produces output a person would want to check."
 costs: "Adds no service. Adds a human step, which is the point — plan for who does the reviewing."
@@ -41,8 +45,8 @@ one", the honest recommendation is a narrower AI feature rather than a queue.
 dotnet add package Sylin.Koan.AI.Review
 ```
 
-**Not assessed.** Review infrastructure registers through `AddKoan()`; the application declares its
-business queue explicitly:
+Validated end-to-end on the Ollama-free path - no model runtime involved; see
+[the capability node](../capabilities/ai/review.md) for the full entity + queue assembly with symbol origins:
 
 ```csharp
 builder.Services.AddKoan();
