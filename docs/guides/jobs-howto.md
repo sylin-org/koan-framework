@@ -662,6 +662,10 @@ public sealed class MyJob : Entity<MyJob>, IKoanJob<MyJob>
     public static Task Execute(MyJob job, JobContext ctx, CancellationToken ct) => …;
 }
 
+// Ledger row (what Query/WithStatus return) — JobRecord : Entity<JobRecord>, so Id is a string
+// Key fields: WorkType, WorkId, Action, Status (JobStatus), Attempt, VisibleAt, Owner,
+//             ProgressFraction/Message, LastError, FirstSubmittedAt, Transitions
+
 // Attributes
 [JobChain(A, B, C)]                                  // linear pipeline
 [JobAction(A, Timeout="…", MaxAttempts=…, OnFailure=…, Lane="…", MaxConcurrency=…, Schedule="…")]
@@ -678,6 +682,8 @@ var handle = await myJob.Job.Submit();
 var outcome = await handle.Completion(TimeSpan.FromSeconds(30));  // JobOutcome { Status, Error }; ledger-polled
 await myJob.Job.Cancel();                 await MyJob.Jobs.Cancel(id);
 await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);   // → IReadOnlyList<JobRecord>
+// All .Job / .Jobs surfaces are ambient: they require the Koan host to be STARTED (after app.StartAsync()).
+// Querying before startup throws KoanHostContextException naming the missing service.
 await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)
 
 // From a handler
