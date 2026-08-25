@@ -4,12 +4,17 @@ recipe: let-an-agent-use-my-app
 title: "Let an outside agent use my application"
 domain: mcp
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/let-an-agent-use-my-app.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/let-an-agent-use-my-app.md - cold-executed against published packages
+    (Sylin.Koan.Mcp 1.0.12, Streamable HTTP): read-only entity advertised and served through MCP,
+    mutation verbs filtered by AllowMutations=false, an [Access(all:"authenticated")] entity hidden
+    from an anonymous caller's tools/list AND denied through tools/call (structured shortCircuit)
+    while the same rule returns 401 over REST - parity proven on both surfaces
 gets_you: "Your Entities exposed as MCP tools and resources, under the rules the rest of the app already has."
 works_if: "The application has Entities and operations worth exposing, and a rule about who may use them."
 costs: "Local transport adds nothing to operate. Remote transport is a public surface to secure like any API."
@@ -59,7 +64,14 @@ public sealed class Todo : Entity<Todo>;
 The same model already exposed over HTTP becomes agent-visible; the governance travels with it.
 `koan://facts`, `koan://entities`, and `koan://self` describe the application to whatever connects.
 
-Depth: [agent-native how-to](../guides/mcp-agent-native-howto.md) ·
+Two facts that bite when you skip them:
+
+- **`[Access]` actions you do not name are OPEN.** `[Access(read: "authenticated")]` still lets
+  anyone write. Name every action or use `all:` — `[Access(all: "authenticated")]`.
+- **Streamable HTTP is secure opt-in**: set `Koan:Mcp:EnableStreamableHttpTransport=true`
+  (route defaults to `/mcp`). Without it the edge does not exist and clients get a 404.
+
+Depth: [agent-native howto](../guides/mcp-agent-native-howto.md) ·
 [MCP over HTTP/SSE](../guides/mcp-http-sse-howto.md).
 
 ## Prove it

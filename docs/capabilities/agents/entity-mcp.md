@@ -4,11 +4,16 @@ domain: mcp
 title: "Entity MCP surface"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/agents/entity-mcp.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/agents/entity-mcp.md - cold-executed against published packages
+    (Sylin.Koan.Mcp 1.0.12, Streamable HTTP): anonymous tools/list advertises exactly the read-only
+    allowed set (AllowMutations=false filtered mutation verbs; an [Access(all:"authenticated")]
+    entity fully hidden), seeded rows returned through tools/call, invoking a filtered verb errors,
+    and the SAME rule denies via MCP (structured shortCircuit) and via REST (401)
 ---
 
 # Entity MCP surface
@@ -38,8 +43,12 @@ mirroring the model or writing CRUD tool handlers.
 |---|---|---|
 | Read or write | expose read-only operations first | add mutations only after deciding what the agent may do unattended |
 | Entity operation or custom workflow | reuse generated Entity operations | use `[McpTool]` only for a named business action beyond them |
-| Local or remote | STDIO when the client owns the local process | Streamable HTTP only when a network client must connect |
+| Local or remote | STDIO when the client owns the local process | Streamable HTTP only when a network client must connect — it is secure opt-in: `Koan:Mcp:EnableStreamableHttpTransport=true` (default `/mcp`) |
 | Human inspection | facts and caller-visible resources first | add Explorer when operators need governed try-it |
+
+Generated tools are named `{Name}.{operation}` (e.g. `article.collection`, `article.get-by-id`);
+`AllowMutations = false` filters persisting verbs but keeps `new` — a non-persisting factory for
+client-side construction.
 
 ## Leaves
 
