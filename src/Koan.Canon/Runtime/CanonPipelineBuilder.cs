@@ -79,7 +79,7 @@ internal sealed class CanonPipelineBuilder<TModel>
 
     internal CanonPipelineDescriptor<TModel> Build()
     {
-        var aggregationMetadata = CanonModelAggregationMetadata.For<TModel>();
+        var aggregationMetadata = CanonModelRules.For<TModel>();
         var map = new Dictionary<CanonPipelinePhase, List<ICanonPipelineContributor<TModel>>>(_contributors.Count);
         foreach (var pair in _contributors)
         {
@@ -87,11 +87,12 @@ internal sealed class CanonPipelineBuilder<TModel>
         }
 
         // Ensure default contributors execute before custom ones.
-        GetOrCreateList(map, CanonPipelinePhase.Aggregation).Insert(0, new Internal.DefaultAggregationContributor<TModel>(aggregationMetadata));
+        GetOrCreateList(map, CanonPipelinePhase.Validation).Insert(0, new Internal.DefaultIntakeContributor<TModel>());
+        GetOrCreateList(map, CanonPipelinePhase.Matching).Insert(0, new Internal.DefaultMatchingContributor<TModel>(aggregationMetadata));
 
-        if (aggregationMetadata.PolicyByProperty.Count > 0 || aggregationMetadata.AuditEnabled)
+        if (aggregationMetadata.RulesByProperty.Count > 0 || aggregationMetadata.AuditEnabled)
         {
-            GetOrCreateList(map, CanonPipelinePhase.Policy).Insert(0, new Internal.DefaultPolicyContributor<TModel>(aggregationMetadata));
+            GetOrCreateList(map, CanonPipelinePhase.Reconcile).Insert(0, new Internal.ReconcileContributor<TModel>(aggregationMetadata));
         }
 
         var finalized = map.ToDictionary(static pair => pair.Key, static pair => (IReadOnlyList<ICanonPipelineContributor<TModel>>)pair.Value.ToArray());

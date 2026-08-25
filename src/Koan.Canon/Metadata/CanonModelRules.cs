@@ -12,24 +12,24 @@ namespace Koan.Canon;
 /// <summary>
 /// Describes aggregation behaviour declared on a canonical model via attributes.
 /// </summary>
-public sealed class CanonModelAggregationMetadata
+public sealed class CanonModelRules
 {
-    private static readonly ConcurrentDictionary<Type, CanonModelAggregationMetadata> Cache = new();
+    private static readonly ConcurrentDictionary<Type, CanonModelRules> Cache = new();
 
-    private CanonModelAggregationMetadata(
+    private CanonModelRules(
         Type modelType,
         IReadOnlyList<PropertyInfo> keyProperties,
-        IReadOnlyDictionary<PropertyInfo, AggregationPolicyDescriptor> policyByProperty,
-        IReadOnlyDictionary<string, AggregationPolicyKind> policyByName,
-        IReadOnlyDictionary<string, AggregationPolicyDescriptor> policyDescriptorsByName,
+        IReadOnlyDictionary<PropertyInfo, ReconcileRule> policyByProperty,
+        IReadOnlyDictionary<string, Keep> ruleByName,
+        IReadOnlyDictionary<string, ReconcileRule> ruleDescriptorsByName,
         bool auditEnabled)
     {
         ModelType = modelType;
         KeyProperties = keyProperties;
-        PolicyByProperty = policyByProperty;
-        PolicyByName = policyByName;
-        PolicyDescriptorsByName = policyDescriptorsByName;
-        AggregationKeyNames = keyProperties.Select(static property => property.Name).ToArray();
+        RulesByProperty = policyByProperty;
+        PolicyByName = ruleByName;
+        PolicyDescriptorsByName = ruleDescriptorsByName;
+        MatchKeyNames = keyProperties.Select(static property => property.Name).ToArray();
         AuditEnabled = auditEnabled;
     }
 
@@ -46,22 +46,22 @@ public sealed class CanonModelAggregationMetadata
     /// <summary>
     /// Property name list for serialization and diagnostics.
     /// </summary>
-    public IReadOnlyList<string> AggregationKeyNames { get; }
+    public IReadOnlyList<string> MatchKeyNames { get; }
 
     /// <summary>
     /// Policies keyed by reflected property metadata.
     /// </summary>
-    public IReadOnlyDictionary<PropertyInfo, AggregationPolicyDescriptor> PolicyByProperty { get; }
+    public IReadOnlyDictionary<PropertyInfo, ReconcileRule> RulesByProperty { get; }
 
     /// <summary>
     /// Policies keyed by property name for serialization.
     /// </summary>
-    public IReadOnlyDictionary<string, AggregationPolicyKind> PolicyByName { get; }
+    public IReadOnlyDictionary<string, Keep> PolicyByName { get; }
 
     /// <summary>
     /// Detailed policy descriptors keyed by property name.
     /// </summary>
-    public IReadOnlyDictionary<string, AggregationPolicyDescriptor> PolicyDescriptorsByName { get; }
+    public IReadOnlyDictionary<string, ReconcileRule> PolicyDescriptorsByName { get; }
 
     /// <summary>
     /// Indicates whether auditing is enabled for the canonical type.
@@ -71,7 +71,7 @@ public sealed class CanonModelAggregationMetadata
     /// <summary>
     /// Retrieves metadata for the specified canonical model type.
     /// </summary>
-    public static CanonModelAggregationMetadata For([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] Type modelType)
+    public static CanonModelRules For([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] Type modelType)
     {
         if (modelType is null)
         {
@@ -91,21 +91,21 @@ public sealed class CanonModelAggregationMetadata
     /// <summary>
     /// Retrieves metadata for the specified canonical model type.
     /// </summary>
-    public static CanonModelAggregationMetadata For<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] TModel>()
+    public static CanonModelRules For<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] TModel>()
         where TModel : class
         => For(typeof(TModel));
 
     /// <summary>
     /// Attempts to retrieve a policy for the provided property metadata.
     /// </summary>
-    public bool TryGetPolicy(PropertyInfo property, out AggregationPolicyDescriptor descriptor)
+    public bool TryGetRule(PropertyInfo property, out ReconcileRule descriptor)
     {
         if (property is null)
         {
             throw new ArgumentNullException(nameof(property));
         }
 
-        if (PolicyByProperty.TryGetValue(property, out descriptor!))
+        if (RulesByProperty.TryGetValue(property, out descriptor!))
         {
             return true;
         }
@@ -122,7 +122,7 @@ public sealed class CanonModelAggregationMetadata
     /// <summary>
     /// Attempts to retrieve a policy descriptor by property name.
     /// </summary>
-    public bool TryGetPolicy(string propertyName, out AggregationPolicyDescriptor descriptor)
+    public bool TryGetRule(string propertyName, out ReconcileRule descriptor)
     {
         if (string.IsNullOrWhiteSpace(propertyName))
         {
@@ -142,15 +142,15 @@ public sealed class CanonModelAggregationMetadata
     /// <summary>
     /// Retrieves a policy descriptor by property name or returns <c>null</c> when not declared.
     /// </summary>
-    public AggregationPolicyDescriptor? GetPolicyOrDefault(string propertyName)
-        => TryGetPolicy(propertyName, out var descriptor) ? descriptor : null;
+    public ReconcileRule? GetRuleOrDefault(string propertyName)
+        => TryGetRule(propertyName, out var descriptor) ? descriptor : null;
 
     /// <summary>
     /// Retrieves a required policy descriptor by property name.
     /// </summary>
-    public AggregationPolicyDescriptor GetRequiredPolicy(string propertyName)
+    public ReconcileRule GetRequiredRule(string propertyName)
     {
-        if (TryGetPolicy(propertyName, out var descriptor))
+        if (TryGetRule(propertyName, out var descriptor))
         {
             return descriptor;
         }
@@ -158,7 +158,7 @@ public sealed class CanonModelAggregationMetadata
         throw new KeyNotFoundException($"Canonical entity '{ModelType.Name}' does not declare an aggregation policy for property '{propertyName}'.");
     }
 
-    private static CanonModelAggregationMetadata Create([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] Type modelType)
+    private static CanonModelRules Create([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties | DynamicallyAccessedMemberTypes.NonPublicProperties)] Type modelType)
     {
         var properties = modelType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         if (properties.Length == 0)
@@ -171,21 +171,21 @@ public sealed class CanonModelAggregationMetadata
             .ToArray();
 
         var keyProperties = orderedProperties
-            .Where(static property => property.IsDefined(typeof(AggregationKeyAttribute), inherit: true))
+            .Where(static property => property.IsDefined(typeof(MatchKeyAttribute), inherit: true))
             .OrderBy(static property => DeclarationOrder.Of(property))
             .ToArray();
 
         if (keyProperties.Length == 0)
         {
-            throw new InvalidOperationException($"Canonical entity '{modelType.Name}' must declare at least one [AggregationKey] property.");
+            throw new InvalidOperationException($"Canonical entity '{modelType.Name}' must declare at least one [MatchKey] property.");
         }
 
         ValidateKeyProperties(keyProperties);
 
-        var policyPairs = new Dictionary<PropertyInfo, AggregationPolicyDescriptor>();
+        var policyPairs = new Dictionary<PropertyInfo, ReconcileRule>();
         foreach (var property in orderedProperties)
         {
-            var attribute = property.GetCustomAttribute<AggregationPolicyAttribute>(inherit: true);
+            var attribute = property.GetCustomAttribute<ReconcileAttribute>(inherit: true);
             if (attribute is null)
             {
                 continue;
@@ -208,13 +208,13 @@ public sealed class CanonModelAggregationMetadata
             if (property.DeclaringType is null || !userDeclaredTypes.Contains(property.DeclaringType)) continue;
             if (!property.CanWrite || property.GetSetMethod(nonPublic: true) is null) continue;
 
-            policyPairs[property] = new AggregationPolicyDescriptor(AggregationPolicyKind.Latest, [], AggregationPolicyKind.Latest);
+            policyPairs[property] = new ReconcileRule(Keep.Latest, [], Keep.Latest);
         }
 
-        var policyByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value.Kind, StringComparer.OrdinalIgnoreCase);
-        var policyDescriptorsByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        var ruleByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value.Kind, StringComparer.OrdinalIgnoreCase);
+        var ruleDescriptorsByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value, StringComparer.OrdinalIgnoreCase);
         var auditEnabled = modelType.GetCustomAttribute<CanonAttribute>(inherit: true)?.Audit ?? false;
-        return new CanonModelAggregationMetadata(modelType, keyProperties, policyPairs, policyByName, policyDescriptorsByName, auditEnabled);
+        return new CanonModelRules(modelType, keyProperties, policyPairs, ruleByName, ruleDescriptorsByName, auditEnabled);
     }
 
     /// <summary>
@@ -255,35 +255,25 @@ public sealed class CanonModelAggregationMetadata
         }
     }
 
-    private static AggregationPolicyDescriptor ResolveDescriptor(Type modelType, PropertyInfo property, AggregationPolicyAttribute attribute)
+    private static ReconcileRule ResolveDescriptor(Type modelType, PropertyInfo property, ReconcileAttribute attribute)
     {
-        if (attribute.Kind == AggregationPolicyKind.SourceOfTruth)
+        if (attribute.Kind == Keep.From)
         {
             var sources = attribute.ResolveSources();
             if (sources.Count == 0)
             {
-                throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares SourceOfTruth policy but does not specify any Source or Sources.");
+                throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares Keep.From but does not specify any Source or Sources.");
             }
 
-            if (attribute.Fallback == AggregationPolicyKind.SourceOfTruth)
-            {
-                throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' cannot declare SourceOfTruth policy with SourceOfTruth fallback.");
-            }
-
-            return new AggregationPolicyDescriptor(attribute.Kind, sources, attribute.Fallback);
+            return new ReconcileRule(attribute.Kind, sources, Keep.Latest);
         }
 
         var resolvedSources = attribute.ResolveSources();
         if (resolvedSources.Count > 0)
         {
-            throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares {attribute.Kind} policy but also specifies authoritative sources. Sources may only be configured for SourceOfTruth.");
+            throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares {attribute.Kind} but also specifies authoritative sources. Sources may only be configured for Keep.From.");
         }
 
-        if (attribute.Fallback != AggregationPolicyKind.Latest)
-        {
-            throw new InvalidOperationException($"Canonical entity '{modelType.Name}' property '{property.Name}' declares {attribute.Kind} policy and cannot override the fallback behavior.");
-        }
-
-        return new AggregationPolicyDescriptor(attribute.Kind, [], AggregationPolicyKind.Latest);
+        return new ReconcileRule(attribute.Kind, [], Keep.Latest);
     }
 }

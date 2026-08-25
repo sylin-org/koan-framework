@@ -43,7 +43,7 @@ public sealed class CanonWebCompositionSpec
 
     private sealed class Account : CanonEntity<Account>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Key { get; set; } = "";
     }
 
@@ -51,7 +51,7 @@ public sealed class CanonWebCompositionSpec
     {
         internal sealed class Customer : CanonEntity<Customer>
         {
-            [AggregationKey]
+            [MatchKey]
             public string Key { get; set; } = "";
         }
     }
@@ -60,7 +60,7 @@ public sealed class CanonWebCompositionSpec
     {
         internal sealed class Customer : CanonEntity<Customer>
         {
-            [AggregationKey]
+            [MatchKey]
             public string Key { get; set; } = "";
         }
     }

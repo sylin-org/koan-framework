@@ -1,9 +1,10 @@
 namespace Koan.Canon;
 
 /// <summary>
-/// Supported aggregation merge policies for canonical properties.
+/// Reconcile strategies for canonical properties: when arrivals disagree, what wins?
+/// Undeclared properties reconcile as <see cref="Latest"/>.
 /// </summary>
-public enum AggregationPolicyKind
+public enum Keep
 {
     /// <summary>
     /// Retains the first non-null value encountered across sources.
@@ -26,7 +27,9 @@ public enum AggregationPolicyKind
     Max = 3,
 
     /// <summary>
-    /// Prefers contributions from authoritative sources while allowing a fallback policy until authority is observed.
+    /// Prefers contributions from authoritative sources (declare them via
+    /// <see cref="ReconcileAttribute.Source"/> / <c>Sources</c>) while they contribute,
+    /// falling back to newest-wins until then.
     /// </summary>
-    SourceOfTruth = 4
+    From = 4
 }

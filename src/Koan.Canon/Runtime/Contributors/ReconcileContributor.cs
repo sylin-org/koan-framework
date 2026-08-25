@@ -12,22 +12,22 @@ namespace Koan.Canon.Internal;
 /// Applies declared aggregation policies and emits audit metadata.
 /// </summary>
 /// <typeparam name="TModel">Canonical entity type.</typeparam>
-internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContributor<TModel>
+internal sealed class ReconcileContributor<TModel> : ICanonPipelineContributor<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
     internal const string AuditEntriesContextKey = Infrastructure.Constants.Context.AuditEntries;
 
-    private readonly CanonModelAggregationMetadata _metadata;
+    private readonly CanonModelRules _metadata;
     private readonly string _entityType;
 
-    public DefaultPolicyContributor(CanonModelAggregationMetadata metadata)
+    public ReconcileContributor(CanonModelRules metadata)
     {
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _entityType = metadata.ModelType.FullName ?? metadata.ModelType.Name;
     }
 
     /// <inheritdoc />
-    public CanonPipelinePhase Phase => CanonPipelinePhase.Policy;
+    public CanonPipelinePhase Phase => CanonPipelinePhase.Reconcile;
 
     /// <inheritdoc />
     public ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
@@ -37,21 +37,21 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
             throw new ArgumentNullException(nameof(context));
         }
 
-        if (_metadata.PolicyByProperty.Count == 0 && !_metadata.AuditEnabled)
+        if (_metadata.RulesByProperty.Count == 0 && !_metadata.AuditEnabled)
         {
             return ValueTask.FromResult<CanonizationEvent?>(null);
         }
 
-        context.TryGetItem(DefaultAggregationContributor<TModel>.ExistingEntityContextKey, out TModel? existingEntity);
-        context.TryGetItem(DefaultAggregationContributor<TModel>.ExistingMetadataContextKey, out CanonMetadata? existingMetadata);
-        context.TryGetItem(DefaultAggregationContributor<TModel>.ArrivalTokenContextKey, out string? arrivalToken);
+        context.TryGetItem(DefaultMatchingContributor<TModel>.ExistingEntityContextKey, out TModel? existingEntity);
+        context.TryGetItem(DefaultMatchingContributor<TModel>.ExistingMetadataContextKey, out CanonMetadata? existingMetadata);
+        context.TryGetItem(DefaultMatchingContributor<TModel>.ArrivalTokenContextKey, out string? arrivalToken);
 
         arrivalToken ??= context.Entity.Id;
 
         var auditEntries = _metadata.AuditEnabled ? new List<CanonAuditEntry>() : null;
         var now = DateTimeOffset.UtcNow;
 
-        foreach (var pair in _metadata.PolicyByProperty)
+        foreach (var pair in _metadata.RulesByProperty)
         {
             var property = pair.Key;
             var descriptor = pair.Value;
@@ -84,14 +84,14 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
             };
             context.Metadata.PropertyFootprints[property.Name] = footprint;
 
-            var policySnapshot = new CanonPolicySnapshot
+            var policySnapshot = new ReconcileDecision
             {
                 Policy = $"{property.Name}:{policy}",
                 Outcome = evaluation.Outcome,
                 AppliedAt = evaluation.ArrivalAt,
                 Evidence = new Dictionary<string, string?>(evaluation.Evidence, StringComparer.OrdinalIgnoreCase)
             };
-            context.Metadata.RecordPolicy(policySnapshot);
+            context.Metadata.RecordDecision(policySnapshot);
 
             if (_metadata.AuditEnabled && auditEntries is not null)
             {
@@ -120,7 +120,7 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     }
 
     private static PolicyEvaluationResult EvaluatePolicy(
-        AggregationPolicyDescriptor descriptor,
+        ReconcileRule descriptor,
         object? incomingValue,
         object? existingValue,
         CanonPropertyFootprint? existingFootprint,
@@ -130,13 +130,13 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     {
         return descriptor.Kind switch
         {
-            AggregationPolicyKind.SourceOfTruth => EvaluateSourceOfTruth(descriptor, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
+            Keep.From => EvaluateFrom(descriptor, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
             _ => EvaluateSimplePolicy(descriptor.Kind, incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey)
         };
     }
 
     private static PolicyEvaluationResult EvaluateSimplePolicy(
-        AggregationPolicyKind policy,
+        Keep policy,
         object? incomingValue,
         object? existingValue,
         CanonPropertyFootprint? existingFootprint,
@@ -146,16 +146,16 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
     {
         return policy switch
         {
-            AggregationPolicyKind.First => EvaluateFirst(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
-            AggregationPolicyKind.Latest => EvaluateLatest(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
-            AggregationPolicyKind.Min => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: true),
-            AggregationPolicyKind.Max => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: false),
+            Keep.First => EvaluateFirst(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
+            Keep.Latest => EvaluateLatest(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey),
+            Keep.Min => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: true),
+            Keep.Max => EvaluateMinMax(incomingValue, existingValue, existingFootprint, now, arrivalToken, sourceKey, preferMin: false),
             _ => throw new InvalidOperationException($"Policy '{policy}' is not supported as a fallback.")
         };
     }
 
-    private static PolicyEvaluationResult EvaluateSourceOfTruth(
-        AggregationPolicyDescriptor descriptor,
+    private static PolicyEvaluationResult EvaluateFrom(
+        ReconcileRule descriptor,
         object? incomingValue,
         object? existingValue,
         CanonPropertyFootprint? existingFootprint,

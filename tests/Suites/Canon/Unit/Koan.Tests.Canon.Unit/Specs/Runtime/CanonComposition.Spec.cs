@@ -40,7 +40,7 @@ public sealed class CanonCompositionSpec
         var configuration = builder.BuildConfiguration();
         configuration.PipelineMetadata.Should().ContainKey(typeof(ContributorFreeCanon));
         configuration.PipelineMetadata[typeof(ContributorFreeCanon)].Phases
-            .Should().Contain(CanonPipelinePhase.Aggregation);
+            .Should().Contain(CanonPipelinePhase.Matching);
 
         var runtime = builder.Build();
         var first = await runtime.Canonize(new ContributorFreeCanon { Email = "same@example.com" });
@@ -53,7 +53,7 @@ public sealed class CanonCompositionSpec
 
     private sealed class ContributorFreeCanon : CanonEntity<ContributorFreeCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Email { get; set; } = "";
     }
 

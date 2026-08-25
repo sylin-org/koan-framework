@@ -55,7 +55,7 @@ public sealed class CanonProjectionFlowSpec
         canonical.DisplayName.Should().Be("ANNABELLE LEE");
         canonical.Metadata.Origin.Should().Be("crm");
         canonical.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
-        canonical.Metadata.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Outcome.Should().Be("incoming");
+        canonical.Metadata.Policies.Should().ContainKey("Name.First:From").WhoseValue.Outcome.Should().Be("incoming");
         canonical.Metadata.PropertyFootprints.Should().ContainKey("Name.First");
         harness.Indices.Should().Contain(index => index.Key == "Email=ann@example.com");
         harness.Indices.Should().Contain(index => index.Key == "Dummy=alpha");
@@ -75,7 +75,7 @@ public sealed class CanonProjectionFlowSpec
         harness.PolicyStates.Should().ContainSingle();
         var policy = harness.PolicyStates.Single();
         policy.ReferenceId.Should().Be(canonical.Id);
-        policy.Policies.Should().ContainKey("Name.First:SourceOfTruth").WhoseValue.Should().Be("incoming");
+        policy.Policies.Should().ContainKey("Name.First:From").WhoseValue.Should().Be("incoming");
         policy.PropertyFootprints.Should().ContainKey("Name.First");
     }
 
@@ -126,11 +126,11 @@ public sealed class CanonProjectionFlowSpec
                     return ValueTask.CompletedTask;
                 });
 
-                pipeline.AddStep(CanonPipelinePhase.Policy, (context, cancellationToken) =>
+                pipeline.AddStep(CanonPipelinePhase.Reconcile, (context, cancellationToken) =>
                 {
-                    var snapshot = new CanonPolicySnapshot
+                    var snapshot = new ReconcileDecision
                     {
-                        Policy = "Name.First:SourceOfTruth",
+                        Policy = "Name.First:From",
                         Outcome = "incoming",
                         AppliedAt = DateTimeOffset.UtcNow,
                         Evidence = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
@@ -139,7 +139,7 @@ public sealed class CanonProjectionFlowSpec
                         }
                     };
 
-                    context.Metadata.RecordPolicy(snapshot);
+                    context.Metadata.RecordDecision(snapshot);
                     context.Metadata.PropertyFootprints["Name.First"] = new CanonPropertyFootprint
                     {
                         Property = "Name.First",
@@ -427,11 +427,11 @@ public sealed class CanonProjectionFlowSpec
     [Canon]
     private sealed class CustomerCanon : CanonEntity<CustomerCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Email { get; set; } = "";
 
-        [AggregationKey]
-        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" })]
+        [MatchKey]
+        [Reconcile(Keep.From, Source = "crm", Sources = new[] { "erp" })]
         public string Dummy { get; set; } = "";
 
         public string? DisplayName { get; set; }

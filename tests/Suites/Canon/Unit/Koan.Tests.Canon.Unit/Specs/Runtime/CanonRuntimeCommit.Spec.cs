@@ -68,9 +68,9 @@ public sealed class CanonRuntimeCommitSpec
             .UsePersistence(persistence)
             .UseAuditSink(audit);
         builder.ConfigurePipeline<CommitCanon>(pipeline =>
-            pipeline.AddStep(CanonPipelinePhase.Policy, (context, cancellationToken) =>
+            pipeline.AddStep(CanonPipelinePhase.Reconcile, (context, cancellationToken) =>
             {
-                context.SetItem(DefaultPolicyContributor<CommitCanon>.AuditEntriesContextKey, new List<CanonAuditEntry>
+                context.SetItem(ReconcileContributor<CommitCanon>.AuditEntriesContextKey, new List<CanonAuditEntry>
                 {
                     new() { Property = nameof(CommitCanon.Email), Policy = "test" }
                 });
@@ -82,7 +82,7 @@ public sealed class CanonRuntimeCommitSpec
     [Canon(audit: true)]
     private sealed class CommitCanon : CanonEntity<CommitCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Email { get; set; } = "";
     }
 

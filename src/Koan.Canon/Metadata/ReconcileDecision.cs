@@ -3,7 +3,7 @@ namespace Koan.Canon;
 /// <summary>
 /// Represents the evaluated outcome for a canon policy.
 /// </summary>
-public sealed class CanonPolicySnapshot
+public sealed class ReconcileDecision
 {
     /// <summary>
     /// Policy identifier.
@@ -41,9 +41,9 @@ public sealed class CanonPolicySnapshot
     /// <summary>
     /// Clones the snapshot to preserve immutability semantics.
     /// </summary>
-    public CanonPolicySnapshot Clone()
+    public ReconcileDecision Clone()
     {
-        return new CanonPolicySnapshot
+        return new ReconcileDecision
         {
             Policy = Policy,
             Outcome = Outcome,

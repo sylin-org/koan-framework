@@ -19,7 +19,7 @@ internal sealed class CanonPipelineDescriptor<TModel> : ICanonPipelineDescriptor
 
     public CanonPipelineDescriptor(
         IReadOnlyDictionary<CanonPipelinePhase, IReadOnlyList<ICanonPipelineContributor<TModel>>> contributors,
-        CanonModelAggregationMetadata aggregationMetadata)
+        CanonModelRules aggregationMetadata)
     {
         _contributors = contributors ?? throw new ArgumentNullException(nameof(contributors));
         _phases = contributors.Keys
@@ -30,7 +30,7 @@ internal sealed class CanonPipelineDescriptor<TModel> : ICanonPipelineDescriptor
             typeof(TModel),
             _phases,
             HasSteps,
-            aggregationMetadata.AggregationKeyNames,
+            aggregationMetadata.MatchKeyNames,
             aggregationMetadata.PolicyByName,
             aggregationMetadata.PolicyDescriptorsByName,
             aggregationMetadata.AuditEnabled);

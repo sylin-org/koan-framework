@@ -33,12 +33,12 @@ public sealed class CanonRuntimeBuilderSpec
         var metadata = configuration.PipelineMetadata[typeof(TestCanon)];
         metadata.ModelType.Should().Be(typeof(TestCanon));
         metadata.Phases.Should().Contain(CanonPipelinePhase.Intake);
-        metadata.Phases.Should().Contain(CanonPipelinePhase.Aggregation);
+        metadata.Phases.Should().Contain(CanonPipelinePhase.Matching);
         metadata.HasSteps.Should().BeTrue();
-        metadata.AggregationKeys.Should().Contain("Key");
-        metadata.AggregationPolicies.Should().ContainKey("Key").WhoseValue.Should().Be(AggregationPolicyKind.SourceOfTruth);
-        metadata.AggregationPolicyDetails.Should().ContainKey("Key");
-        metadata.AggregationPolicyDetails["Key"].AuthoritativeSources.Should().Contain("crm");
+        metadata.MatchKeys.Should().Contain("Key");
+        metadata.MatchRules.Should().ContainKey("Key").WhoseValue.Should().Be(Keep.From);
+        metadata.ReconcileDetails.Should().ContainKey("Key");
+        metadata.ReconcileDetails["Key"].AuthoritativeSources.Should().Contain("crm");
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public sealed class CanonRuntimeBuilderSpec
 
     private sealed class TestCanon : CanonEntity<TestCanon>
     {
-        [AggregationKey]
-        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm")]
+        [MatchKey]
+        [Reconcile(Keep.From, Source = "crm")]
         public string Key { get; set; } = "";
     }
 

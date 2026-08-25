@@ -233,7 +233,7 @@ public sealed class CanonParkAndSweepFlowSpec
     [Canon]
     private sealed class KeylessCanon : CanonEntity<KeylessCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string? Dummy { get; set; }
 
         public string? DisplayName { get; set; }

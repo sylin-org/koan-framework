@@ -173,6 +173,22 @@ public abstract class CanonEntity<TModel> : Entity<TModel>, ICanonModel
         return runtime.Canonize((TModel)this, options, cancellationToken);
     }
 
+    /// <summary>
+    /// Arrival normalization hook. Runs first in the Validation phase - before user validators,
+    /// before identity keys are matched - so overrides may trim, case, fill defaults, or otherwise
+    /// prepare the candidate and the aggregation keys see clean values.
+    /// The default returns the candidate unchanged; override to add model-specific rules.
+    /// Returning <c>null</c> is a contract violation and fails the operation correctively.
+    /// Runs before any rule registered on <see cref="Canon"/>.
+    /// </summary>
+    public virtual TModel OnIntake(TModel candidate) => candidate;
+
+    /// <summary>
+    /// The type-scoped canon surface: composition-time rules, staged payloads, and runtime operations
+    /// addressed through the closed entity type (e.g. <c>Person.Canon.OnIntake(...)</c>).
+    /// </summary>
+    public static CanonEntityGateway<TModel> Canon { get; } = new();
+
     private static ICanonRuntime ResolveRuntime()
         => AppHost.GetRequiredService<ICanonRuntime>("entity canonization");
 }

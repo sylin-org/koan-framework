@@ -6,17 +6,17 @@ using System.Reflection;
 namespace Koan.Canon;
 
 /// <summary>
-/// Convenience helpers for working with <see cref="CanonModelAggregationMetadata"/> in a strongly typed manner.
+/// Convenience helpers for working with <see cref="CanonModelRules"/> in a strongly typed manner.
 /// </summary>
-public static class CanonModelAggregationMetadataExtensions
+public static class CanonModelRulesExtensions
 {
     /// <summary>
     /// Attempts to locate an aggregation policy descriptor for the specified property selector.
     /// </summary>
-    public static bool TryGetPolicy<TModel, TValue>(
-        this CanonModelAggregationMetadata metadata,
+    public static bool TryGetRule<TModel, TValue>(
+        this CanonModelRules metadata,
         Expression<Func<TModel, TValue>> propertySelector,
-        out AggregationPolicyDescriptor descriptor)
+        out ReconcileRule descriptor)
         where TModel : class
     {
         if (metadata is null)
@@ -31,29 +31,29 @@ public static class CanonModelAggregationMetadataExtensions
 
         EnsureCompatibleModel(metadata, typeof(TModel));
         var property = ResolveProperty(propertySelector.Body);
-        return metadata.TryGetPolicy(property, out descriptor);
+        return metadata.TryGetRule(property, out descriptor);
     }
 
     /// <summary>
     /// Retrieves an aggregation policy descriptor using a property selector or returns <c>null</c> when not declared.
     /// </summary>
-    public static AggregationPolicyDescriptor? GetPolicyOrDefault<TModel, TValue>(
-        this CanonModelAggregationMetadata metadata,
+    public static ReconcileRule? GetRuleOrDefault<TModel, TValue>(
+        this CanonModelRules metadata,
         Expression<Func<TModel, TValue>> propertySelector)
         where TModel : class
     {
-        return metadata.TryGetPolicy(propertySelector, out var descriptor) ? descriptor : null;
+        return metadata.TryGetRule(propertySelector, out var descriptor) ? descriptor : null;
     }
 
     /// <summary>
     /// Retrieves a required aggregation policy descriptor using a property selector.
     /// </summary>
-    public static AggregationPolicyDescriptor GetRequiredPolicy<TModel, TValue>(
-        this CanonModelAggregationMetadata metadata,
+    public static ReconcileRule GetRequiredRule<TModel, TValue>(
+        this CanonModelRules metadata,
         Expression<Func<TModel, TValue>> propertySelector)
         where TModel : class
     {
-        if (metadata.TryGetPolicy(propertySelector, out var descriptor))
+        if (metadata.TryGetRule(propertySelector, out var descriptor))
         {
             return descriptor;
         }
@@ -62,7 +62,7 @@ public static class CanonModelAggregationMetadataExtensions
         throw new KeyNotFoundException($"Canonical entity '{metadata.ModelType.Name}' does not declare an aggregation policy for property '{property.Name}'.");
     }
 
-    private static void EnsureCompatibleModel(CanonModelAggregationMetadata metadata, Type requestedType)
+    private static void EnsureCompatibleModel(CanonModelRules metadata, Type requestedType)
     {
         if (metadata.ModelType == requestedType)
         {

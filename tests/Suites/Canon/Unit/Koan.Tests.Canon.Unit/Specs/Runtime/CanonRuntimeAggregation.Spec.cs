@@ -86,11 +86,11 @@ public sealed class CanonRuntimeAggregationSpec
                 return ValueTask.CompletedTask;
             });
 
-            pipeline.AddStep(CanonPipelinePhase.Policy, (context, cancellationToken) =>
+            pipeline.AddStep(CanonPipelinePhase.Reconcile, (context, cancellationToken) =>
             {
-                context.Metadata.RecordPolicy(new CanonPolicySnapshot
+                context.Metadata.RecordDecision(new ReconcileDecision
                 {
-                    Policy = "Primary:SourceOfTruth",
+                    Policy = "Primary:From",
                     Outcome = "existing",
                     Evidence = new Dictionary<string, string?> { ["winner"] = "existing" }
                 });
@@ -150,7 +150,7 @@ public sealed class CanonRuntimeAggregationSpec
             ArrivalToken = "existing-token",
             ArrivedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
             Value = "alpha-existing",
-            Policy = "Primary:SourceOfTruth",
+            Policy = "Primary:From",
             Evidence = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["winner"] = "existing"
@@ -217,7 +217,7 @@ public sealed class CanonRuntimeAggregationSpec
                     ArrivalToken = "existing-token",
                     ArrivedAt = DateTimeOffset.UtcNow.AddMinutes(-5),
                     Value = "alpha-existing",
-                    Policy = "Primary:SourceOfTruth",
+                    Policy = "Primary:From",
                     Evidence = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["winner"] = "existing"
@@ -354,21 +354,21 @@ public sealed class CanonRuntimeAggregationSpec
 
     private sealed class KeylessCanon : CanonEntity<KeylessCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string? Primary { get; set; }
 
-        [AggregationKey]
+        [MatchKey]
         public string? Secondary { get; set; }
     }
 
     private sealed class LinkedCanon : CanonEntity<LinkedCanon>
     {
-        [AggregationKey]
-        [AggregationPolicy(AggregationPolicyKind.SourceOfTruth, Source = "crm", Sources = new[] { "erp" }, Fallback = AggregationPolicyKind.Latest)]
+        [MatchKey]
+        [Reconcile(Keep.From, Source = "crm", Sources = new[] { "erp" })]
         public string Primary { get; set; } = "";
 
-        [AggregationKey]
-        [AggregationPolicy(AggregationPolicyKind.Latest)]
+        [MatchKey]
+        [Reconcile(Keep.Latest)]
         public string? Secondary { get; set; }
     }
 }

@@ -11,7 +11,7 @@ public sealed class CanonMetadata
     private readonly object _gate = new();
     private Dictionary<string, CanonExternalId> _externalIds = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, CanonSourceAttribution> _sources = new(StringComparer.OrdinalIgnoreCase);
-    private Dictionary<string, CanonPolicySnapshot> _policies = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, ReconcileDecision> _policies = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, CanonPropertyFootprint> _propertyFootprints = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, string> _tags = new(StringComparer.OrdinalIgnoreCase);
     private CanonLineage _lineage = new();
@@ -62,11 +62,11 @@ public sealed class CanonMetadata
     /// <summary>
     /// Policy outcomes tracked during canonization.
     /// </summary>
-    public Dictionary<string, CanonPolicySnapshot> Policies
+    public Dictionary<string, ReconcileDecision> Policies
     {
         get => _policies;
         set => _policies = value is null
-            ? new Dictionary<string, CanonPolicySnapshot>(StringComparer.OrdinalIgnoreCase)
+            ? new Dictionary<string, ReconcileDecision>(StringComparer.OrdinalIgnoreCase)
             : value.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value.Clone(), StringComparer.OrdinalIgnoreCase);
     }
 
@@ -265,7 +265,7 @@ public sealed class CanonMetadata
     /// Records a policy outcome.
     /// </summary>
     /// <param name="policy">Policy snapshot.</param>
-    public void RecordPolicy(CanonPolicySnapshot policy)
+    public void RecordDecision(ReconcileDecision policy)
     {
         if (policy is null)
         {

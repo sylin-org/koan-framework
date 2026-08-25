@@ -197,7 +197,7 @@ internal sealed class CanonRuntime : ICanonRuntime
     private static async Task CommitIndexesAsync<T>(CanonPipelineContext<T> context, CancellationToken cancellationToken)
         where T : CanonEntity<T>, new()
     {
-        if (!context.TryGetItem(DefaultAggregationContributor<T>.PendingIndexesContextKey, out List<CanonIndex>? pending)
+        if (!context.TryGetItem(DefaultMatchingContributor<T>.PendingIndexesContextKey, out List<CanonIndex>? pending)
             || pending is null)
         {
             return;
@@ -212,7 +212,7 @@ internal sealed class CanonRuntime : ICanonRuntime
     private async Task EmitAuditAsync<T>(CanonPipelineContext<T> context, CancellationToken cancellationToken)
         where T : CanonEntity<T>, new()
     {
-        if (!context.TryGetItem(DefaultPolicyContributor<T>.AuditEntriesContextKey, out List<CanonAuditEntry>? entries) || entries is null || entries.Count == 0)
+        if (!context.TryGetItem(ReconcileContributor<T>.AuditEntriesContextKey, out List<CanonAuditEntry>? entries) || entries is null || entries.Count == 0)
         {
             return;
         }

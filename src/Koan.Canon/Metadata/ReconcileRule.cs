@@ -8,14 +8,14 @@ namespace Koan.Canon;
 /// <summary>
 /// Resolved aggregation policy declaration for a canonical property.
 /// </summary>
-public sealed class AggregationPolicyDescriptor
+public sealed class ReconcileRule
 {
     private readonly HashSet<string>? _authoritativeLookup;
 
-    public AggregationPolicyDescriptor(
-        AggregationPolicyKind kind,
+    public ReconcileRule(
+        Keep kind,
         IReadOnlyList<string> authoritativeSources,
-        AggregationPolicyKind fallback)
+        Keep fallback)
     {
         Kind = kind;
         AuthoritativeSources = authoritativeSources?.Count > 0
@@ -32,7 +32,7 @@ public sealed class AggregationPolicyDescriptor
     /// <summary>
     /// Declared merge policy kind.
     /// </summary>
-    public AggregationPolicyKind Kind { get; }
+    public Keep Kind { get; }
 
     /// <summary>
     /// Ordered list of authoritative source keys for source-of-truth policies.
@@ -42,7 +42,7 @@ public sealed class AggregationPolicyDescriptor
     /// <summary>
     /// Fallback policy applied before an authoritative source contributes.
     /// </summary>
-    public AggregationPolicyKind Fallback { get; }
+    public Keep Fallback { get; }
 
     /// <summary>
     /// Indicates whether the descriptor has any authoritative source configuration.

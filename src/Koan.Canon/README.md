@@ -22,7 +22,7 @@ var result = await new Customer { Email = " Alice@Example.com " }.Canonize();
 
 public sealed class Customer : CanonEntity<Customer>
 {
-    [AggregationKey]
+    [MatchKey]
     public string Email { get; set; } = "";
 }
 

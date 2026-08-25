@@ -34,7 +34,7 @@ public sealed class CanonRuntimeSpec
         result.Metadata.Tags.Should().ContainKey("processed").WhoseValue.Should().Be("true");
         result.Metadata.Tags.Should().ContainKey("tracking").WhoseValue.Should().Be("enabled");
         result.Events.Should().NotBeEmpty();
-        result.Events.Select(evt => evt.Phase).Should().Contain(CanonPipelinePhase.Aggregation);
+        result.Events.Select(evt => evt.Phase).Should().Contain(CanonPipelinePhase.Matching);
 
         persistence.CanonicalEntities.OfType<ContactCanon>()
             .Should().ContainSingle(c => c.Id == result.Canonical.Id);
@@ -122,10 +122,10 @@ public sealed class CanonRuntimeSpec
             .UsePersistence(persistence)
             .UseAuditSink(new NoopAuditSink());
         builder.ConfigurePipeline<ContactCanon>(pipeline =>
-            pipeline.AddStep(CanonPipelinePhase.Policy, (context, cancellationToken) =>
+            pipeline.AddStep(CanonPipelinePhase.Reconcile, (context, cancellationToken) =>
                 ValueTask.FromResult<CanonizationEvent?>(new CanonizationEvent
                 {
-                    Phase = CanonPipelinePhase.Policy,
+                    Phase = CanonPipelinePhase.Reconcile,
                     StageStatus = CanonStageStatus.Failed,
                     CanonState = context.Entity.State,
                     Message = "Customer policy failed"
@@ -135,7 +135,7 @@ public sealed class CanonRuntimeSpec
         var result = await builder.Build().Canonize(new ContactCanon { Email = email, DisplayName = "Invalid" });
 
         result.Outcome.Should().Be(CanonizationOutcome.Failed);
-        result.Events.Select(static item => item.Phase).Should().Contain(CanonPipelinePhase.Aggregation);
+        result.Events.Select(static item => item.Phase).Should().Contain(CanonPipelinePhase.Matching);
         persistence.CanonicalEntities.Should().BeEmpty();
         persistence.FindIndex(typeof(ContactCanon).FullName!, $"Email={email}").Should().BeNull();
     }
@@ -336,10 +336,10 @@ public sealed class CanonRuntimeSpec
     [Canon]
     private sealed class ContactCanon : CanonEntity<ContactCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Email { get; set; } = "";
 
-        [AggregationKey]
+        [MatchKey]
         public string? PhoneNumber { get; set; }
 
         public string? DisplayName { get; set; }

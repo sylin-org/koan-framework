@@ -5,7 +5,7 @@ namespace CustomerCanon.Pipeline;
 
 internal sealed class CustomerEnrichmentContributor : ICanonPipelineContributor<Customer>
 {
-    public CanonPipelinePhase Phase => CanonPipelinePhase.Aggregation;
+    public CanonPipelinePhase Phase => CanonPipelinePhase.Reconcile;
 
     public ValueTask<CanonizationEvent?> Execute(
         CanonPipelineContext<Customer> context,

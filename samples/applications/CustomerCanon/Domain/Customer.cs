@@ -4,7 +4,7 @@ namespace CustomerCanon.Domain;
 
 public class Customer : CanonEntity<Customer>
 {
-    [AggregationKey]
+    [MatchKey]
     public string Email { get; set; } = "";
 
     public string? Phone { get; set; }

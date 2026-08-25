@@ -13,7 +13,7 @@ namespace Koan.Canon.Internal;
 /// Default contributor that resolves canonical aggregation keys and aligns canonical identifiers.
 /// </summary>
 /// <typeparam name="TModel">Canonical entity type.</typeparam>
-internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineContributor<TModel>
+internal sealed class DefaultMatchingContributor<TModel> : ICanonPipelineContributor<TModel>
     where TModel : CanonEntity<TModel>, new()
 {
     internal const string ExistingEntityContextKey = Infrastructure.Constants.Context.ExistingEntity;
@@ -21,11 +21,11 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
     internal const string ArrivalTokenContextKey = Infrastructure.Constants.Context.ArrivalToken;
     internal const string PendingIndexesContextKey = Infrastructure.Constants.Context.PendingIndexes;
 
-    private readonly CanonModelAggregationMetadata _metadata;
+    private readonly CanonModelRules _metadata;
     private readonly string _entityType;
     private readonly IReadOnlyList<PropertyInfo> _keyProperties;
 
-    public DefaultAggregationContributor(CanonModelAggregationMetadata metadata)
+    public DefaultMatchingContributor(CanonModelRules metadata)
     {
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _entityType = metadata.ModelType.FullName ?? metadata.ModelType.Name;
@@ -33,7 +33,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
     }
 
     /// <inheritdoc />
-    public CanonPipelinePhase Phase => CanonPipelinePhase.Aggregation;
+    public CanonPipelinePhase Phase => CanonPipelinePhase.Matching;
 
     /// <inheritdoc />
     public async ValueTask<CanonizationEvent?> Execute(CanonPipelineContext<TModel> context, CancellationToken cancellationToken)
@@ -46,7 +46,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         var arrivalToken = ResolveArrivalToken(context);
         context.SetItem(ArrivalTokenContextKey, arrivalToken);
 
-        var aggregationKey = BuildAggregationKey(context.Entity);
+        var aggregationKey = BuildMatchKey(context.Entity);
         var indexLookup = await LoadIndexes(context, aggregationKey, cancellationToken);
 
         var canonicalId = await EnsureCanonicalId(context, indexLookup, cancellationToken);
@@ -241,7 +241,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
     private async ValueTask<IReadOnlyDictionary<string, CanonIndex?>> LoadIndexes(
         CanonPipelineContext<TModel> context,
-        AggregationKey aggregationKey,
+        MatchKey aggregationKey,
         CancellationToken cancellationToken)
     {
         var lookup = new Dictionary<string, CanonIndex?>(StringComparer.OrdinalIgnoreCase);
@@ -261,7 +261,7 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
         return lookup;
     }
 
-    private AggregationKey BuildAggregationKey(TModel entity)
+    private MatchKey BuildMatchKey(TModel entity)
     {
         var tokens = new List<string>(_keyProperties.Count);
         foreach (var property in _keyProperties)
@@ -283,17 +283,17 @@ internal sealed class DefaultAggregationContributor<TModel> : ICanonPipelineCont
 
         if (tokens.Count == 0)
         {
-            var declared = string.Join(", ", _metadata.AggregationKeyNames);
+            var declared = string.Join(", ", _metadata.MatchKeyNames);
             throw new InvalidOperationException($"Canonical entity '{_metadata.ModelType.Name}' requires at least one aggregation key value; all declared keys were null or empty ({declared}).");
         }
 
         var composite = tokens.Count > 1 ? string.Join('|', tokens) : null;
-        return new AggregationKey(tokens, composite);
+        return new MatchKey(tokens, composite);
     }
 
-    private readonly struct AggregationKey
+    private readonly struct MatchKey
     {
-        public AggregationKey(IReadOnlyList<string> tokens, string? compositeKey)
+        public MatchKey(IReadOnlyList<string> tokens, string? compositeKey)
         {
             Tokens = tokens;
             CompositeKey = compositeKey;

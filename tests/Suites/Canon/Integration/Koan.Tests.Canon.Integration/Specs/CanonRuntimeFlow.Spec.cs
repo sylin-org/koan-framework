@@ -321,10 +321,10 @@ public sealed class CanonRuntimeFlowSpec
     [Canon]
     private sealed class ContactCanon : CanonEntity<ContactCanon>
     {
-        [AggregationKey]
+        [MatchKey]
         public string Email { get; set; } = "";
 
-        [AggregationKey]
+        [MatchKey]
         public string? PhoneNumber { get; set; }
 
         public string? DisplayName { get; set; }

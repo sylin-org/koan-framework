@@ -48,7 +48,7 @@ public sealed class CanonModelsController : ControllerBase
         }
 
         var metadata = ResolveMetadata(descriptor.ModelType);
-        var aggregationMetadata = CanonModelAggregationMetadata.For(descriptor.ModelType);
+        var aggregationMetadata = CanonModelRules.For(descriptor.ModelType);
         var detail = new CanonModelDetail(
             descriptor.Slug,
             descriptor.DisplayName,
@@ -56,9 +56,9 @@ public sealed class CanonModelsController : ControllerBase
             descriptor.ModelType.FullName ?? descriptor.ModelType.Name,
             metadata?.HasSteps ?? false,
             metadata?.Phases ?? [],
-            aggregationMetadata.AggregationKeyNames,
-            metadata?.AggregationPolicies ?? aggregationMetadata.PolicyByName,
-            metadata?.AggregationPolicyDetails ?? aggregationMetadata.PolicyDescriptorsByName,
+            aggregationMetadata.MatchKeyNames,
+            metadata?.MatchRules ?? aggregationMetadata.PolicyByName,
+            metadata?.ReconcileDetails ?? aggregationMetadata.PolicyDescriptorsByName,
             metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
 
         return Ok(detail);
@@ -67,13 +67,13 @@ public sealed class CanonModelsController : ControllerBase
     private CanonModelSummary CreateSummary(CanonModelDescriptor descriptor)
     {
         var metadata = ResolveMetadata(descriptor.ModelType);
-        var aggregationMetadata = CanonModelAggregationMetadata.For(descriptor.ModelType);
+        var aggregationMetadata = CanonModelRules.For(descriptor.ModelType);
         return new CanonModelSummary(
             descriptor.Slug,
             descriptor.DisplayName,
             descriptor.Route,
             metadata?.HasSteps ?? false,
-            aggregationMetadata.AggregationKeyNames,
+            aggregationMetadata.MatchKeyNames,
             metadata?.AuditEnabled ?? aggregationMetadata.AuditEnabled);
     }
 
@@ -85,7 +85,7 @@ public sealed class CanonModelsController : ControllerBase
         string DisplayName,
         string Route,
         bool HasPipeline,
-        IReadOnlyList<string> AggregationKeys,
+        IReadOnlyList<string> MatchKeys,
         bool AuditEnabled);
 
     public sealed record CanonModelDetail(
@@ -95,8 +95,8 @@ public sealed class CanonModelsController : ControllerBase
         string Type,
         bool HasPipeline,
         IReadOnlyList<CanonPipelinePhase> Phases,
-        IReadOnlyList<string> AggregationKeys,
-        IReadOnlyDictionary<string, AggregationPolicyKind> AggregationPolicies,
-        IReadOnlyDictionary<string, AggregationPolicyDescriptor> AggregationPolicyDetails,
+        IReadOnlyList<string> MatchKeys,
+        IReadOnlyDictionary<string, Keep> MatchRules,
+        IReadOnlyDictionary<string, ReconcileRule> ReconcileDetails,
         bool AuditEnabled);
 }

@@ -34,13 +34,13 @@ public sealed class CanonRelationshipMetadataSpec
     [Canon]
     private sealed class Order : CanonEntity<Order>
     {
-        [AggregationKey]
+        [MatchKey]
         public string OrderNumber { get; set; } = "";
     }
 
     private sealed class OrderLine : CanonEntity<OrderLine>
     {
-        [AggregationKey]
+        [MatchKey]
         public string LineNumber { get; set; } = "";
 
         [Parent(typeof(Order))]
