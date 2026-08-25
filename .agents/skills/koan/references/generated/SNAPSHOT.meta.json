@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-08-25T03:26:31Z",
-  "sourceCommit": "d29b29d108bcbef1b8804e092289f2fa339c1fcc",
+  "generatedUtc": "2026-08-25T04:06:17Z",
+  "sourceCommit": "ae3603ac856b23519c502aa076269286a8c74e09",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [
     ".agents/skills/koan/references/generated/capability-map.md",
@@ -29,6 +29,7 @@
     ".agents/skills/koan/references/generated/capabilities/operations/proof-and-observability.md",
     ".agents/skills/koan/references/generated/capabilities/operations/single-binary.md",
     ".agents/skills/koan/references/generated/capabilities/records.md",
+    ".agents/skills/koan/references/generated/capabilities/records/canon-pipeline.md",
     ".agents/skills/koan/references/generated/capabilities/records/canon.md",
     ".agents/skills/koan/references/generated/capabilities/solutions.md",
     ".agents/skills/koan/references/generated/capabilities/state.md",

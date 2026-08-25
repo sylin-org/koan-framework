@@ -53,6 +53,8 @@ Keep every raw arrival, decide whether it matches an existing real-world thing, 
 
 ## Leaves
 
+- **Pipeline mechanics:** [Canon pipeline](canon-pipeline.md) - channels, phases, checkpoints,
+  provenance
 - **Build and ambiguous-case proof:**
   [reconcile messy arrivals](../../recipes/reconcile-messy-arrivals.md)
 - **Pipeline contract:** [Canon guide](../../guides/canon-capabilities-howto.md)
