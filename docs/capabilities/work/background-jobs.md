@@ -4,12 +4,12 @@ domain: jobs
 title: "Background jobs"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-25
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-23
+  date_last_tested: 2026-08-25
   status: passed
-  scope: docs/capabilities/work/background-jobs.md - route table cold-verified twice against the run-work-in-background leaf, including restart-survival
+  scope: docs/capabilities/work/background-jobs.md - cold subagent journey against published feed: submit→Completed over SQLite, kill-before-due + restart survival, WithStatus inspection between runs; PASS (17m03s first cold run; doc frictions fixed same-day)
 ---
 
 # Background jobs
@@ -25,7 +25,7 @@ remain inspectable.
 | Deterministic execution in tests (optional) | `Sylin.Koan.Jobs.Testing` | drives the production engine without waiting on wall time |
 | Durable restart survival | an eligible durable Data connector | the in-memory floor alone cannot survive process loss |
 
-Verified against: `Sylin.Koan.Jobs` 1.0.5 or newer, durable ledger via `Sylin.Koan.Data.Connector.Sqlite` 1.0.10 or newer (patch releases compatible).
+Verified against: `Sylin.Koan.App` 1.0.8, `Sylin.Koan.Jobs` 1.0.9 or newer, durable ledger via `Sylin.Koan.Data.Connector.Sqlite` 1.0.14 or newer (patch releases compatible). SQLite needs no configuration — the reference is the whole step.
 
 ## The constraint box
 

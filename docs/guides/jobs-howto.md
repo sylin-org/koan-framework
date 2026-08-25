@@ -55,6 +55,8 @@ await app.RunAsync();
 
 With no data adapter referenced, jobs run in-memory (fast, ephemeral). Add a data adapter (SQLite, Postgres, Mongo, SQL Server) and the same jobs become **durable**—they survive restarts. You change nothing in your job code; see [§10](#10-durability-pick-your-tier).
 
+**SQLite needs zero configuration**: referencing `Sylin.Koan.Data.Connector.Sqlite` is the whole step — `AddKoan()` anchors a per-app database to your content root and elects it automatically (`jobs:ledger → durable-data` in facts). Postgres/Mongo/SQL Server read their connection strings from their connector's documented keys.
+
 ---
 
 ## 1. Your first job
@@ -443,6 +445,12 @@ Honor it in long-running handlers by passing `ct` to the calls you `await`. A ca
 | a data adapter (SQLite/Postgres/Mongo/SQL Server) | **durable**—survive restarts |
 | several nodes on the same store | **distributed**—nodes share the work |
 
+**Cross-node wake cadence (numbers).** With a durable ledger, every submission bumps a one-row stamp in
+the same transaction and each node probes it every 250 ms (`JobsOptions.WakeProbeInterval`), so peers
+pick up new work well under one second; the full claim scan still runs at most every `PollInterval`
+(1 s default). A restarted host claims due work within roughly a second of boot — size kill/restart
+tests accordingly. Referencing a Communication connector makes wake signal-instant instead (JOBS-0009).
+
 **Per-type control.** Override the tier for one model with `[JobPersistence]`:
 
 ```csharp
@@ -646,6 +654,8 @@ Everything a handler needs arrives on `ctx`:
 ## 13. Quick reference
 
 ```csharp
+// Usings for everything below: Koan.Data.Core.Model (Entity<>, IKoanJob<>), Koan.Jobs (attributes, JobContext)
+
 // Author
 public sealed class MyJob : Entity<MyJob>, IKoanJob<MyJob>
 {
@@ -662,9 +672,12 @@ public sealed class MyJob : Entity<MyJob>, IKoanJob<MyJob>
 
 // Submit & operate
 await myJob.Job.Submit();                 await myJob.Job.Submit(action);
-await myJob.Job.Submit(action, after);    await list.Submit(action);
+await myJob.Job.Submit(action, TimeSpan.FromMinutes(5));   // `after` is a TimeSpan delay
+await myJob.Job.Submit("", TimeSpan.FromSeconds(10));      // single-action jobs: pass "" as the action to delay one
+var handle = await myJob.Job.Submit();
+var outcome = await handle.Completion(TimeSpan.FromSeconds(30));  // JobOutcome { Status, Error }; ledger-polled
 await myJob.Job.Cancel();                 await MyJob.Jobs.Cancel(id);
-await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);
+await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);   // → IReadOnlyList<JobRecord>
 await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)
 
 // From a handler
