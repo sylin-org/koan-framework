@@ -22,7 +22,7 @@ var model = await Model.Pull(
     ct: cancellationToken);
 ```
 
-`Inspect`, `List`, `Routes`, `Health`, `History`, and `Audit` inspect current catalog/runtime facts. `Convert`,
+Inspect, List, Routes, Health, History, and Audit inspect current catalog facts - Health reports the deployments recorded in the catalog (model x runtime), which is exactly what Koan knows; runtime telemetry is not observed. `Convert`,
 `Quantize`, `Merge`, `Deploy`, `Rollback`, `Remove`, and `Prune` are explicit mutations routed to capable adapters.
 
 ## Guarantees and limitations

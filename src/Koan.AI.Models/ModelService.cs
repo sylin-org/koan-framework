@@ -215,10 +215,27 @@ internal sealed class ModelService(IAiAdapterRegistry registry) : IModelService
         }
     }
 
-    public Task<IReadOnlyList<ModelHealthReport>> Health(CancellationToken ct)
+    public async Task<IReadOnlyList<ModelHealthReport>> Health(CancellationToken ct)
     {
-        IReadOnlyList<ModelHealthReport> empty = [];
-        return Task.FromResult(empty);
+        // Report exactly what the catalog records: which models were deployed to which runtimes.
+        // Runtime telemetry (latency, memory, error counts) is not observed by any in-tree adapter,
+        // so those fields stay unset rather than invented.
+        var deployed = await ModelEntry.Query(m => m.DeployedTo.Count > 0, ct);
+        var reports = new List<ModelHealthReport>();
+        foreach (var entry in deployed)
+        {
+            foreach (var runtimeId in entry.DeployedTo)
+            {
+                reports.Add(new ModelHealthReport
+                {
+                    ModelId = entry.Id,
+                    RuntimeId = runtimeId,
+                    State = ModelDeploymentState.Ready
+                });
+            }
+        }
+
+        return reports;
     }
 
     // ── Pull (via adapter with Pull capability) ──
