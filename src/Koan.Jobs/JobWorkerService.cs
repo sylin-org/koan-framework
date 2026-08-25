@@ -52,6 +52,13 @@ internal sealed class JobWorkerService : BackgroundService
         var lastReap = _clock.GetUtcNow();
         var lastArchive = _clock.GetUtcNow();
         var lastFlush = _clock.GetUtcNow();
+        var lastDrain = _clock.GetUtcNow();
+        var lastSeenStamp = -1L;
+        // JOBS-0009: with a durable ledger, the single-row WakeStamp probe lets peers notice submissions at
+        // WakeProbeInterval cadence while the expensive full claim scan still runs at most one PollInterval apart.
+        var probesWakeStamp = _ledger is RoutingJobLedger or DataJobLedger;
+        if (probesWakeStamp)
+            lastSeenStamp = await WakeStamp.ReadVersion(stoppingToken);
         var iterationFailed = false;
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -74,7 +81,29 @@ internal sealed class JobWorkerService : BackgroundService
                     lastFlush = now;
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
-                await _orchestrator.DrainAsync(stoppingToken);
+
+                var due = now - lastDrain >= _options.PollInterval;
+                if (!probesWakeStamp)
+                {
+                    await _orchestrator.DrainAsync(stoppingToken);
+                    lastDrain = _clock.GetUtcNow();
+                }
+                else
+                {
+                    var stamp = await WakeStamp.ReadVersion(stoppingToken);
+                    var moved = stamp >= 0 && lastSeenStamp >= 0 && stamp != lastSeenStamp;
+                    if (moved || due)
+                    {
+                        await _orchestrator.DrainAsync(stoppingToken);
+                        lastDrain = _clock.GetUtcNow();
+                        lastSeenStamp = await WakeStamp.ReadVersion(stoppingToken);   // absorb bumps our drain just served
+                        if (lastSeenStamp < 0) lastSeenStamp = stamp;                  // keep the prior baseline on a failed read
+                    }
+                    else if (stamp >= 0)
+                    {
+                        lastSeenStamp = stamp;
+                    }
+                }
 
                 if (iterationFailed)
                 {
@@ -92,14 +121,18 @@ internal sealed class JobWorkerService : BackgroundService
                 iterationFailed = true;
             }
 
-            // A healthy worker wakes immediately on a submit signal. After a failure, bypass pending wake signals so
-            // an unavailable ledger cannot create a hot retry loop; the health contributor remains the durable signal.
+            // A healthy worker wakes immediately on a submit signal, and with a durable ledger re-probes the
+            // wake stamp at WakeProbeInterval. After a failure, bypass pending wake signals so an unavailable
+            // ledger cannot create a hot retry loop; the health contributor remains the durable signal.
             try
             {
+                var wait = probesWakeStamp && _options.WakeProbeInterval < _options.PollInterval
+                    ? _options.WakeProbeInterval
+                    : _options.PollInterval;
                 if (iterationFailed)
                     await Task.Delay(_options.PollInterval, stoppingToken);
                 else
-                    await _wake.WaitForWork(_options.PollInterval, stoppingToken);
+                    await _wake.WaitForWork(wait, stoppingToken);
             }
             catch (OperationCanceledException) { break; }
         }

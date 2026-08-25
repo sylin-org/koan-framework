@@ -21,6 +21,11 @@ public sealed class JobsOptions
     /// <summary>Worker poll cadence when idle (a wake signal short-circuits this).</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>Cadence of the durable-store wake-stamp probe (JOBS-0009): a single-row indexed read that lets
+    /// peers notice submissions far sooner than <see cref="PollInterval"/> at negligible cost. Only active when
+    /// a durable ledger is elected; the full claim scan still runs at most one <see cref="PollInterval"/> apart.</summary>
+    public TimeSpan WakeProbeInterval { get; set; } = TimeSpan.FromMilliseconds(250);
+
     /// <summary>Reaper sweep cadence (Running &amp;&amp; lease lapsed → reclaim).</summary>
     public TimeSpan ReaperInterval { get; set; } = TimeSpan.FromSeconds(30);
 

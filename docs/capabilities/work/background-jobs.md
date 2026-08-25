@@ -50,3 +50,8 @@ Verified against: `Sylin.Koan.Jobs` 1.0.5 or newer, durable ledger via `Sylin.Ko
 
 Tenant context is captured at submission and restored before execution when Tenancy is active. Prove
 that boundary whenever a Job reads tenant-owned Data, Storage, or vectors.
+
+With a durable ledger, submissions bump a framework-owned wake-stamp row in the same transaction and
+peers discover work at short-probe cadence — no extra infrastructure; a Communication connector makes
+wake instant (JOBS-0009). Long-running handlers renew their lease automatically; a handler that loses
+its lease abandons without settling rather than racing the new claimant.

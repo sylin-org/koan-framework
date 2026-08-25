@@ -547,6 +547,68 @@ public abstract class JobBehaviorSuite
         (await host.StatusOf<GreetJob>(id)).Should().Be(JobStatus.Completed);
     }
 
+    [Fact]
+    public async Task a_running_job_renews_its_lease_and_outlives_the_original_window()
+    {
+        // JOBS-0009: a live handler holds its lease past the original window; the reaper never sees it lapse and
+        // no second claim mints Attempt=2.
+        WaitJob.Reset();
+        await using var host = await CreateHostAsync(o => o.LeaseDuration = TimeSpan.FromSeconds(2));
+        var job = new WaitJob();
+        var id = job.Id;
+        var start = host.Clock.GetUtcNow();
+        await job.Job.Submit(WaitJob.Action);
+        var drain = host.Drain();
+        await Wait.Until(() => WaitJob.Executions == 1);
+
+        for (var i = 0; i < 5; i++)   // 3.5s wall-of-fake-time ≫ the 2s lease; each step fires a renewal tick
+            host.Advance(TimeSpan.FromMilliseconds(700));
+
+        DateTimeOffset renewedUntil = default;
+        await Wait.Until(() =>
+        {
+            var r = host.JobFor<WaitJob>(id).GetAwaiter().GetResult();
+            renewedUntil = r?.LeaseUntil ?? default;
+            return renewedUntil > start + TimeSpan.FromSeconds(2);
+        });
+        (await host.JobFor<WaitJob>(id))!.Status.Should().Be(JobStatus.Running);
+        (await host.JobFor<WaitJob>(id))!.Attempt.Should().Be(1);
+
+        await host.Coordinator.CancelWorkAsync(typeof(WaitJob).FullName!, id, default);
+        await drain;
+        (await host.StatusOf<WaitJob>(id)).Should().Be(JobStatus.Cancelled);
+        (await host.JobFor<WaitJob>(id))!.Attempt.Should().Be(1);
+        renewedUntil.Should().BeOnOrAfter(start + TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task losing_the_lease_abandons_without_settling()
+    {
+        // JOBS-0009: when another claimant takes the row mid-run, the loser cancels its handler and writes
+        // NOTHING — the winner's ownership and state survive untouched.
+        WaitJob.Reset();
+        await using var host = await CreateHostAsync(o => o.LeaseDuration = TimeSpan.FromSeconds(2));
+        var job = new WaitJob();
+        var id = job.Id;
+        await job.Job.Submit(WaitJob.Action);
+        var drain = host.Drain();
+        await Wait.Until(() => WaitJob.Executions == 1);
+
+        var stolen = await host.JobFor<WaitJob>(id);
+        stolen!.Owner = "node-b";
+        stolen.LeaseUntil = host.Clock.GetUtcNow() + TimeSpan.FromMinutes(5);
+        await host.Ledger.Update(stolen, default);
+
+        host.Advance(TimeSpan.FromMilliseconds(700));   // next renewal tick discovers the foreign owner
+        await Wait.Until(() => WaitJob.Cancellations >= 1);
+        await drain;
+
+        var final = await host.JobFor<WaitJob>(id);
+        final!.Owner.Should().Be("node-b");
+        final.Status.Should().Be(JobStatus.Running);
+        final.Attempt.Should().Be(1);
+    }
+
     // --- type-level trigger ---
 
     [Fact]

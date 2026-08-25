@@ -34,6 +34,14 @@ public interface IJobLedger
     /// <summary>Persist a transition (settle / advance / defer / cancel). The orchestrator is the only caller — single writer.</summary>
     Task Update(JobRecord record, CancellationToken ct);
 
+    /// <summary>
+    /// Guarded lease renewal (JOBS-0009): push <paramref name="leaseUntil"/> forward only while the row is
+    /// <see cref="JobStatus.Running"/> and owned by <paramref name="owner"/>. Returns false when another
+    /// claimant owns the row (the caller abandons — it never settles a row it no longer owns). A narrow
+    /// purpose-built mid-flight write, same family as <see cref="Progress"/>; never a full-record replace.
+    /// </summary>
+    Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct);
+
     /// <summary>Update only durable progress for an in-flight job (cheap, off the transition path).</summary>
     Task Progress(string jobId, double fraction, string? message, CancellationToken ct);
 

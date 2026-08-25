@@ -188,9 +188,20 @@ internal sealed class JobOrchestrator
         }
 
         var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, PersistProgress);
+        // JOBS-0009 lease heartbeat: hold the claim alive while the handler runs. Losing the lease means another
+        // claimant owns the row — execution cancels and NOTHING settles (any write here would clobber that owner).
+        var lostLease = 0;
         try
         {
-            await binding.Execute(workItem, ctx, linked.Token);
+            using (_ = StartLeaseRenewal(rec, linked, () => Volatile.Write(ref lostLease, 1), workerCt))
+            {
+                await binding.Execute(workItem, ctx, linked.Token);
+            }
+            if (Volatile.Read(ref lostLease) != 0)
+            {
+                _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
+                return ctx;
+            }
             await SettleSuccessAsync(rec, workItem, binding, policy, ctx, snapshot);
         }
         catch (RescheduleException rex)
@@ -200,7 +211,11 @@ internal sealed class JobOrchestrator
         }
         catch (OperationCanceledException)
         {
-            if (timeoutCts.IsCancellationRequested)
+            if (Volatile.Read(ref lostLease) != 0)
+            {
+                _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
+            }
+            else if (timeoutCts.IsCancellationRequested)
                 await SettleFailureAsync(rec, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."));
             else if (await IsCancelMarkerSet(rec.Id))
                 await SettleCancelledAsync(rec);
@@ -216,6 +231,67 @@ internal sealed class JobOrchestrator
             _running.TryRemove(rec.Id, out _);
         }
         return ctx;
+    }
+
+    /// <summary>JOBS-0009: renew the claim's lease on a derived cadence (LeaseDuration/3, 100ms floor) while the
+    /// handler runs. A false renewal means another claimant owns the row: signal <paramref name="onLost"/>, cancel
+    /// the execution token so the handler stops at its next checkpoint, and stop. The loop swallows its own
+    /// cancellation; transient renewal-write failures are retried next tick — the reaper remains the bound.</summary>
+    private LeaseHeartbeat StartLeaseRenewal(JobRecord rec, CancellationTokenSource execution, Action onLost, CancellationToken workerCt)
+    {
+        var duration = _options.LeaseDuration;
+        if (duration <= TimeSpan.Zero || rec.Owner is not { } owner || rec.Id is null)
+            return default;
+
+        var interval = TimeSpan.FromTicks(Math.Max(TimeSpan.FromMilliseconds(100).Ticks, duration.Ticks / 3));
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(workerCt);
+        var timer = new PeriodicTimer(interval, _clock);
+        var jobId = rec.Id;
+        _ = RenewLoopAsync();
+
+        async Task RenewLoopAsync()
+        {
+            try
+            {
+                while (await timer.WaitForNextTickAsync(cts.Token))
+                {
+                    bool renewed;
+                    var now = _clock.GetUtcNow();
+                    try { renewed = await _ledger.TryRenewLease(jobId, owner, now + duration, now, cts.Token); }
+                    catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { break; }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Koan.Jobs could not write the lease renewal for job {JobId}; retrying next tick.", jobId);
+                        continue;
+                    }
+                    if (renewed) continue;
+                    _logger.LogWarning("Koan.Jobs lost the lease for job {JobId}; cancelling execution so it can abandon without settling.", jobId);
+                    onLost();
+                    try { execution.Cancel(); } catch (ObjectDisposedException) { }
+                    break;
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (ObjectDisposedException) { }
+            finally
+            {
+                timer.Dispose();
+                cts.Dispose();
+            }
+        }
+
+        return new LeaseHeartbeat(cts);
+    }
+
+    private readonly struct LeaseHeartbeat : IDisposable
+    {
+        private readonly CancellationTokenSource? _cts;
+        public LeaseHeartbeat(CancellationTokenSource? cts) => _cts = cts;
+        public void Dispose()
+        {
+            if (_cts is null) return;
+            try { _cts.Cancel(); } catch (ObjectDisposedException) { }
+        }
     }
 
     // --- settle paths ---

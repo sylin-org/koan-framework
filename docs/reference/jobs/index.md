@@ -43,6 +43,16 @@ var status = await job.Job.Status();
 adds a durable ledger, and a qualifying Communication connector can add cross-node wake hints. The
 handler stays the same across those tiers.
 
+### Wake stamp and lease heartbeat
+
+The ledger decides; hints only hurry (JOBS-0009). With a durable ledger, submissions bump one
+framework-owned `WakeStamp` row inside the same transaction, and peers probe it at short cadence —
+cross-node discovery lands well under `PollInterval` with zero extra infrastructure. Referencing a
+Communication connector adds instant signal-based wake on top. A missed hint costs one poll pass,
+never work: polling remains the complete correctness mechanism. A running handler renews its lease
+(`LeaseDuration`, renewal at ⅓ cadence); if another claimant takes the row mid-run, the loser
+cancels and abandons without writing — no settle can clobber the new owner.
+
 ## Add policy only when needed
 
 | Need | Expression |

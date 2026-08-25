@@ -26,7 +26,10 @@ The retained module's `JobsCompositionFacts` projector publishes this decision i
 | `jobs:wake` | elected Communication provider | `ledger-backed-latency-hint` |
 
 These are semantic tiers, not CLR implementation names. They describe the running host without
-claiming provider-fleet certification.
+claiming provider-fleet certification. Cross-node discovery with only a durable Data reference rides
+the framework-owned `WakeStamp` sentinel (JOBS-0009): submissions bump it inside the submission
+transaction and durable-tier workers probe it every `WakeProbeInterval`; the full claim scan still
+runs at most one `PollInterval` apart.
 
 ## Authoring and persistence
 
@@ -64,15 +67,23 @@ The ledger is the queue. A provider-declared Data conditional replace is the dur
 an adapter without it retains the documented optimistic at-least-once fallback. There is no user-selected claim
 algorithm, clock-skew election window, or claim-ticket store.
 
-`JobWakeCoordinator` emits one internal, bounded Communication signal after
-a non-transactional submit. The process-local provider is automatic; directly referencing a
-Communication connector transparently changes its reach. A dropped or duplicated signal costs at
-most one poll interval. Claims, leases, retries, and reclaim behavior remain ledger-owned.
+`JobWakeCoordinator` emits one internal, bounded Communication signal after a non-transactional
+submit. The process-local provider is automatic; directly referencing a Communication connector
+transparently changes its reach. Independently of signals, durable submissions bump the single-row
+`WakeStamp` inside the same transaction and durable-tier workers probe it at `WakeProbeInterval`
+(JOBS-0009), so peers on any store discover work well under `PollInterval`. A dropped or duplicated
+hint costs at most one poll pass. Claims, leases, retries, and reclaim behavior remain ledger-owned.
+
+A claimed job renews its lease on a derived cadence (`LeaseDuration`/3, 100 ms floor) through a
+guarded `TryRenewLease` that only extends rows it still owns (JOBS-0009). Failing renewal means
+another claimant won: execution cancels and settles nothing, so no write can clobber the new owner.
+The renewal loop swallows its own cancellation; transient store errors retry next tick with the
+reaper as the bound.
 
 Jobs does not own a transport provider or application-visible message contract. Connector election,
-health, wire encoding, and local/network delivery belong exclusively to Communication. The internal
-signal carries no job or ambient business context; the claimed ledger record remains the durable,
-context-bearing truth.
+health, wire encoding, and local/network delivery belong exclusively to Communication. The wake
+stamp is an ordinary Jobs-owned Entity — carriage needs no adapter surface. Hints carry no job or
+ambient business context; the claimed ledger record remains the durable, context-bearing truth.
 
 ## Logical-flow context
 

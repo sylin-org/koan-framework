@@ -59,6 +59,11 @@ internal sealed class RoutingJobLedger : IJobLedger
         else await _inMemory.Progress(jobId, fraction, message, ct);
     }
 
+    // A running job lives in exactly one ledger; probe durable then volatile like Get.
+    public async Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct)
+        => await _durable.TryRenewLease(jobId, owner, leaseUntil, now, ct)
+           || await _inMemory.TryRenewLease(jobId, owner, leaseUntil, now, ct);
+
     public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
         => Concat(await _durable.Stuck(now, ct), await _inMemory.Stuck(now, ct));
 

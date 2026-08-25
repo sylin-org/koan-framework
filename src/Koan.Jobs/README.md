@@ -64,10 +64,12 @@ concept or requiring application plumbing.
 |---|---|
 | No durable data adapter | In-memory ledger; work is lost on restart |
 | SQLite, Postgres, SQL Server, Mongo, or another durable adapter | Data-backed ledger; job state survives restart |
-| Shared durable store across nodes | Competing consumers share the ledger |
-| Direct Communication connector that claims framework signals, such as RabbitMQ | The same internal wake hint crosses nodes; the ledger remains the source of truth |
+| Shared durable store across nodes | Competing consumers share the ledger; a one-row wake stamp lets peers discover submissions at short-probe cadence (JOBS-0009) |
+| Direct Communication connector that claims framework signals, such as RabbitMQ | Wake becomes instant; the ledger remains the source of truth |
 
-Inspect `jobs:ledger`, `jobs:wake`, and `communication:framework-signals:default` through
+Handlers renew their lease while running (JOBS-0009); if another claimant takes a row mid-run, the
+loser abandons without settling instead of racing the new owner. Inspect `jobs:ledger`, `jobs:wake`,
+and `communication:framework-signals:default` through
 `/.well-known/Koan/facts` or `koan://facts`.
 The standard `/health/ready` response includes queue depth, running depth, reclaim backlog, and oldest
 queued age in Development; production returns only aggregate readiness. Per-work-item status and history

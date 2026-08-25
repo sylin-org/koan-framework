@@ -46,10 +46,17 @@ internal sealed class DataJobLedger : IJobLedger
         _classifiers = classifiers?.ToArray() ?? [];
     }
 
-    public Task Append(JobRecord record, CancellationToken ct) => JobRecord.Upsert(record, ct);
+    public async Task Append(JobRecord record, CancellationToken ct)
+    {
+        await JobRecord.Upsert(record, ct);
+        await WakeStamp.TryBump(ct);   // JOBS-0009: same ambient transaction — rollback never moves the stamp
+    }
 
     public async Task AppendMany(IReadOnlyCollection<JobRecord> records, CancellationToken ct)
-        => await JobRecord.UpsertMany(records, ct);
+    {
+        await JobRecord.UpsertMany(records, ct);
+        await WakeStamp.TryBump(ct);   // one bump per batch, not per row
+    }
 
     public Task<JobRecord?> Get(string jobId, CancellationToken ct) => JobRecord.Get(jobId, ct);
 
@@ -208,6 +215,31 @@ internal sealed class DataJobLedger : IJobLedger
     }
 
     public Task Update(JobRecord record, CancellationToken ct) => JobRecord.Upsert(record, ct);
+
+    /// <summary>Capability-graded like the claim: guarded CAS where <see cref="DataCaps.Write.ConditionalReplace"/>
+    /// exists, optimistic write-then-verify otherwise — a false return means another claimant owns the row.</summary>
+    public async Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct)
+    {
+        var current = await JobRecord.Get(jobId, ct);
+        if (current is not { Status: JobStatus.Running } || !string.Equals(current.Owner, owner, StringComparison.Ordinal))
+            return false;
+
+        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
+            : null;
+        if (cas is not null)
+        {
+            current.LeaseUntil = leaseUntil;
+            return await cas.ConditionalReplaceAsync(current, r => r.Status == JobStatus.Running && r.Owner == owner, ct);
+        }
+
+        current.LeaseUntil = leaseUntil;
+        await JobRecord.Upsert(current, ct);
+        var verified = await JobRecord.Get(jobId, ct);
+        return verified is { Status: JobStatus.Running }
+            && string.Equals(verified.Owner, owner, StringComparison.Ordinal)
+            && verified.LeaseUntil == leaseUntil;
+    }
 
     public async Task Progress(string jobId, double fraction, string? message, CancellationToken ct)
     {

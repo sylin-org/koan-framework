@@ -143,6 +143,21 @@ internal sealed class InMemoryJobLedger : IJobLedger
         return Task.CompletedTask;
     }
 
+    public Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (!_records.TryGetValue(jobId, out var r)
+                || r.Status != JobStatus.Running
+                || !string.Equals(r.Owner, owner, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+            r.LeaseUntil = leaseUntil;
+            return Task.FromResult(true);
+        }
+    }
+
     public Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
     {
         lock (_gate)
