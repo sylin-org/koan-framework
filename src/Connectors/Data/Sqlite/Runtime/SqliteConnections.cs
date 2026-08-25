@@ -3,17 +3,29 @@ using System.Text;
 using Koan.Core.Orchestration;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.Sqlite.Runtime;
 
-internal sealed class SqliteConnections(ILogger<SqliteConnections> logger) : IDisposable, IAsyncDisposable
+internal sealed class SqliteConnections(ILogger<SqliteConnections> logger, IHostEnvironment? environment = null) : IDisposable, IAsyncDisposable
 {
     private readonly string _host = Guid.CreateVersion7().ToString("n");
+    private readonly string? _contentRoot = environment?.ContentRootPath;
     private readonly object _gate = new();
     private readonly Dictionary<string, SqliteConnection> _keepers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _poolGroups = new(StringComparer.Ordinal);
     private bool _disposed;
+
+    /// <summary>
+    /// Anchors a relative Data Source to the application's content root. Auto-created databases must
+    /// live inside the application's own scope - resolving them against whatever directory a process
+    /// happened to start from makes unrelated applications share (or fight over) one store.
+    /// </summary>
+    internal string AnchorDataSource(string dataSource)
+        => Path.IsPathRooted(dataSource) || string.IsNullOrWhiteSpace(_contentRoot)
+            ? Path.GetFullPath(dataSource)
+            : Path.GetFullPath(Path.Combine(_contentRoot, dataSource));
 
     public SqliteConnection Create(string connectionString, string source, bool nonCreating = false)
     {
@@ -30,7 +42,7 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger) : IDi
     {
         var builder = Parse(connectionString);
         if (IsMemory(builder) || string.IsNullOrWhiteSpace(builder.DataSource) || IsUri(builder.DataSource)) return;
-        var fullPath = Path.GetFullPath(builder.DataSource);
+        var fullPath = AnchorDataSource(builder.DataSource);
         var directory = Path.GetDirectoryName(fullPath);
         if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
     }
@@ -57,7 +69,7 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger) : IDi
         var builder = Parse(connectionString);
         if (IsMemory(builder)) return Memory(builder, source);
         if (!string.IsNullOrWhiteSpace(builder.DataSource) && !IsUri(builder.DataSource))
-            builder.DataSource = Path.GetFullPath(builder.DataSource);
+            builder.DataSource = AnchorDataSource(builder.DataSource);
         if (nonCreating) builder.Mode = SqliteOpenMode.ReadOnly;
         return builder.ToString();
     }

@@ -57,6 +57,10 @@ internal sealed class DefaultPolicyContributor<TModel> : ICanonPipelineContribut
             var descriptor = pair.Value;
             var policy = descriptor.Kind;
 
+            // Policy application writes through reflection; a declared-but-unwritable property
+            // (get-only, private setter surfaced publicly) must be skipped, not crashed on.
+            if (!property.CanWrite || property.GetSetMethod(nonPublic: true) is null) continue;
+
             var incomingValue = property.GetValue(context.Entity);
             var existingValue = existingEntity is not null ? property.GetValue(existingEntity) : null;
             var existingFootprint = existingMetadata?.PropertyFootprints.GetValueOrDefault(property.Name);

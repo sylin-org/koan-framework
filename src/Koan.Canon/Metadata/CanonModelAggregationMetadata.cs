@@ -195,14 +195,45 @@ public sealed class CanonModelAggregationMetadata
             policyPairs[property] = descriptor;
         }
 
+        // A property without an explicit policy still needs a winner when arrivals disagree.
+        // Newest-wins is the honest default; leaving such fields unmerged made them silently
+        // freeze on their first value while declared siblings reconciled around them.
+        // Keys are identity, not conflict fields, and framework-owned base properties are
+        // infrastructure, so neither participates in this default.
+        var userDeclaredTypes = CollectUserDeclaredTypes(modelType);
+        foreach (var property in orderedProperties)
+        {
+            if (policyPairs.ContainsKey(property)) continue;
+            if (keyProperties.Contains(property)) continue;
+            if (property.DeclaringType is null || !userDeclaredTypes.Contains(property.DeclaringType)) continue;
+            if (!property.CanWrite || property.GetSetMethod(nonPublic: true) is null) continue;
+
+            policyPairs[property] = new AggregationPolicyDescriptor(AggregationPolicyKind.Latest, [], AggregationPolicyKind.Latest);
+        }
+
         var policyByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value.Kind, StringComparer.OrdinalIgnoreCase);
         var policyDescriptorsByName = policyPairs.ToDictionary(static pair => pair.Key.Name, static pair => pair.Value, StringComparer.OrdinalIgnoreCase);
         var auditEnabled = modelType.GetCustomAttribute<CanonAttribute>(inherit: true)?.Audit ?? false;
         return new CanonModelAggregationMetadata(modelType, keyProperties, policyPairs, policyByName, policyDescriptorsByName, auditEnabled);
     }
 
-    private static void ValidateKeyProperties(IReadOnlyList<PropertyInfo> keyProperties)
+    /// <summary>
+    /// The model's own declaring types: the concrete type and any user-authored bases, stopping at the
+    /// Canon framework boundary. Framework-declared properties (Id, metadata, state) never receive
+    /// implicit aggregation policies.
+    /// </summary>
+    private static HashSet<Type> CollectUserDeclaredTypes(Type modelType)
     {
+        var types = new HashSet<Type>();
+        for (var t = (Type?)modelType; t is not null && t != typeof(object); t = t.BaseType)
+        {
+            types.Add(t);
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(CanonEntity<>)) break;
+        }
+        return types;
+    }
+
+    private static void ValidateKeyProperties(IReadOnlyList<PropertyInfo> keyProperties)    {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < keyProperties.Count; i++)
         {

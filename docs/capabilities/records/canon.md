@@ -4,11 +4,17 @@ domain: canon
 title: "Canon reconciliation"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-24
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/records/canon.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/capabilities/records/canon.md - cold-executed against published packages
+    (Sylin.Koan.Canon 1.0.7, Streamable HTTP): new arrival canonized with enrichment contributor,
+    same-key arrival merged into the SAME canonical record (phone + name applied), replay idempotent,
+    invalid arrival refused 422 leaving the store untouched, /api/canon/models discovery. Newest-wins
+    default for UNDECLARED properties verified against a source pin - published packages freeze such
+    fields on first value unless each declares [AggregationPolicy(Latest)].
 ---
 
 # Canon reconciliation
@@ -30,6 +36,11 @@ Keep every raw arrival, decide whether it matches an existing real-world thing, 
 > commits the canonical Entity, indexes, and audit in an explicit non-atomic order; a later checkpoint
 > failure can leave earlier state durable, so Canon reports the checkpoint and does not promise
 > rollback or blind-retry safety.
+>
+> **Default conflict rule: newest wins.** A property without `[AggregationPolicy]` reconciles as
+> latest-wins — each arrival's value supersedes the previous one. Declare an explicit policy
+> (`First` / `Min` / `Max` / `SourceOfTruth`) only where newest is the wrong answer. Keys declared
+> with `[AggregationKey]` are identity, never conflicted fields.
 
 ## Decide whether Canon is the answer
 

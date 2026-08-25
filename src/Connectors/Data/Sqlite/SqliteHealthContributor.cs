@@ -63,7 +63,7 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
             if (builder.DataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase)) return false;
             if (builder.DataSource.Contains("://", StringComparison.Ordinal)) return false;
 
-            var path = Path.GetFullPath(builder.DataSource);
+            var path = _connections.AnchorDataSource(builder.DataSource);
             if (File.Exists(path)) return false;
 
             var directory = Path.GetDirectoryName(path);

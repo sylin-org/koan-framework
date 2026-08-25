@@ -4,12 +4,16 @@ recipe: reconcile-messy-arrivals
 title: "Turn inconsistent arrivals into one trusted record"
 domain: canon
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-24
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/reconcile-messy-arrivals.md
+  date_last_tested: 2026-08-24
+  status: passed
+  scope: docs/recipes/reconcile-messy-arrivals.md - cold-executed against published packages
+    (Sylin.Koan.Canon 1.0.7): clean arrival creates, same-key arrival merges in place, replay
+    duplicates nothing, invalid arrival refused 422 with the store untouched, per-field policy
+    evidence present on the committed record
 gets_you: "One trusted Entity assembled from several imperfect sources, with the reasoning kept."
 works_if: "The same real-world thing arrives more than once, from places that disagree."
 costs: "Adds no service. Adds a review path for ambiguity, which needs someone to work it."
@@ -41,7 +45,8 @@ The questions that decide the design:
 - **When the rule is ambiguous, what happens?** Guessing is how bad merges get shipped. The honest
   options are reject or route to a human, and someone must actually work that queue.
 - **Who wins when sources conflict?** Most recent, most trusted source, or field-by-field. Say it
-  explicitly; "it depends" becomes an unexplainable record.
+  explicitly; "it depends" becomes an unexplainable record. Undeclared properties already have an
+  answer — newest wins — so declare a different `[AggregationPolicy]` only where newest is wrong.
 - **Must a merge be undoable?** Usually yes, once someone sees a wrong one. That requirement shapes
   everything, so ask it early rather than after the first bad merge.
 

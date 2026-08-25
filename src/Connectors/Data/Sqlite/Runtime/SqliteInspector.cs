@@ -30,7 +30,7 @@ internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections conne
         var memory = builder.Mode == SqliteOpenMode.Memory ||
                      string.Equals(builder.DataSource, ":memory:", StringComparison.OrdinalIgnoreCase);
         var uri = builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase);
-        if (!memory && !uri && !File.Exists(Path.GetFullPath(builder.DataSource)))
+        if (!memory && !uri && !File.Exists(connections.AnchorDataSource(builder.DataSource)))
             return new DataSourceStorageState(DataSourceStorageStatus.Missing, "file-missing");
 
         try
