@@ -270,6 +270,26 @@ public sealed class OllamaAdapterSpec
         handler.Requests.Select(request => request.Uri.AbsolutePath).Should().Equal("/api/chat", "/api/generate");
     }
 
+    [Fact]
+    public async Task Chat_without_any_endpoint_names_both_configuration_remedies()
+    {
+        // The exact state a sourceless boot leaves: no configured endpoints, so the constructor
+        // never set a BaseAddress and discovery contributed nothing.
+        using var adapter = new OllamaAdapter(
+            new HttpClient(new RecordingHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK))),
+            NullLogger<OllamaAdapter>.Instance,
+            new OllamaOptions { Endpoints = [], DefaultModel = "phi3" });
+
+        var act = () => adapter.Chat(new AiChatRequest
+        {
+            Messages = [new AiMessage("user", "Ping")]
+        });
+
+        var ex = await act.Should().ThrowAsync<InvalidOperationException>();
+        ex.Which.Message.Should().Contain("ConnectionStrings:Ollama").And
+            .Contain("Koan:Ai:Ollama:Endpoints");
+    }
+
     private static OllamaAdapter CreateAdapter(RecordingHandler handler, string model = "phi3")
     {
         var http = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:11434") };

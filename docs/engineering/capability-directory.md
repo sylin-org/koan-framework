@@ -199,6 +199,7 @@ Their engineering register (MEDIA-0004/0006/0007/0008) tracks several of these u
 Ladder per pillar: **cold-run the floor → climb to the delight rungs → grow the nodes tree → fix code only where runs expose gaps.**
 
 1. **AI (Leo priority)**: Phase 0 audit done via table above → Phase 1 cold-runs (`ai/semantic-search.md`, `embedding/portable.md`) → Phase 2 rungs: Orchestration RAG → Agents → Models → Review/Eval → then grow `docs/capabilities/ai/` leaves per ARCH-0134.
+   - Shaping notes from the Models rung (2026-08-24): discovery hardening candidates — expose the Ollama health-probe timeout as a typed option (`Koan:Ai:Ollama:Discovery:HealthTimeoutMs`, today a 750ms literal in `OllamaAdapterContributor`); optionally re-probe a zero-source discovered set after boot instead of leaving it empty until restart. The corrective no-endpoint guard itself shipped with the rung.
 2. **Media**: convert harvest frictions 3–8 into register entries/triage; decide ownership of prewarm/warm API (framework vs library guidance).
 3. **Agents domain coverage**: `AI.Agents` rung doubles as the missing agents-domain validation; `records/canon.md` still needs its cold-run.
 4. **Triage the unmapped families** before anyone teaches them; either give them reference indexes + map rows or mark them explicitly internal.

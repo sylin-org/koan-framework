@@ -525,6 +525,16 @@ internal sealed class OllamaAdapter : IChatAdapter, IEmbedAdapter, IAiSourceInsp
             });
         }
 
+        if (_http.BaseAddress is null)
+        {
+            // Discovery soft-fails at boot by design; without this guard the failure surfaces one
+            // hop later as a raw URI error that names nothing. Name the remedy here instead.
+            throw new InvalidOperationException(
+                "No Ollama endpoint was configured and startup auto-discovery found none. " +
+                "Set ConnectionStrings:Ollama or Koan:Ai:Ollama:Endpoints (for example " +
+                "[\"http://localhost:11434\"]) to pin the server.");
+        }
+
         return _http;
     }
 
