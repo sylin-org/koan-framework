@@ -70,12 +70,16 @@
   <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="/" />
   </ItemGroup>
   <!-- In-repo Roslyn generators attached as analyzers. -->
-  <ItemGroup>
+  <ItemGroup Condition="!$([System.String]::Copy('$(MSBuildProjectDirectory)').StartsWith('$(_KoanScratchRoot)'))">
     <!--
       Registry generator (modern IIncrementalGenerator). Harmless on projects with no registry
       entries — emits nothing. Still attached broadly because some downstream Koan projects do
       rely on its output. Exclusion list keeps it from analyzing itself or the orchestration
       generator project.
+      Scratch scaffolds under tmp/ are excluded too: package consumers already receive this
+      generator via Sylin.Koan.Core's buildTransitive targets, and attaching the in-repo copy as
+      well makes two generator instances emit the identical KoanRegistry_<app>.g.cs hint name,
+      failing the build with CS9068 (duplicate file-local type at the same path).
     -->
     <ProjectReference Include="$(MSBuildThisFileDirectory)src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
                       OutputItemType="Analyzer"
