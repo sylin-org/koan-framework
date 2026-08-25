@@ -40,13 +40,14 @@ internal sealed class JobScheduler
     /// lapsed-lease set is the whole job.</summary>
     public Task RecoverAsync(CancellationToken ct = default) => ReapAsync(ct);
 
-    /// <summary>Submit each <c>@boot</c> action once (called at startup).</summary>
+    /// <summary>Submit each <c>@boot</c> action once (called at startup). Union of attribute-declared and
+    /// gateway-registered schedules (<c>MyJob.Jobs.Schedule</c>, JOBS gateway pilot).</summary>
     public async Task SubmitBootActionsAsync(CancellationToken ct = default)
     {
         foreach (var binding in _registry.All)
-            foreach (var action in binding.ScheduledActions(_options))
-                if (ParseSchedule(action.Schedule).Kind == ScheduleKind.Boot)
-                    await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
+            foreach (var (_, action, schedule) in ScheduledFor(binding))
+                if (ParseSchedule(schedule).Kind == ScheduleKind.Boot)
+                    await _coordinator.TriggerAsync(binding.WorkType, action, ct);
     }
 
     /// <summary>Submit a fresh job for every scheduled action whose cadence is due. The worker calls this each tick;
@@ -56,39 +57,49 @@ internal sealed class JobScheduler
     {
         var now = _clock.GetUtcNow();
         foreach (var binding in _registry.All)
+            foreach (var (_, action, schedule) in ScheduledFor(binding))
+                await FireIfDueAsync(binding, action, schedule, now, ct);
+    }
+
+    /// <summary>Attribute-declared schedules plus code-first gateway registrations for one job type.</summary>
+    private IEnumerable<(string WorkType, string Action, string Schedule)> ScheduledFor(JobTypeBinding binding)
+    {
+        foreach (var action in binding.ScheduledActions(_options))
+            yield return (binding.WorkType, action.Action, action.Schedule!);
+        foreach (var (action, expression) in JobScheduleRegistry.For(binding.ClrType))
+            yield return (binding.WorkType, action, expression);
+    }
+
+    private async Task FireIfDueAsync(JobTypeBinding binding, string action, string schedule, DateTimeOffset now, CancellationToken ct)
+    {
+        var (kind, interval) = ParseSchedule(schedule);
+        if (kind is ScheduleKind.Boot or ScheduleKind.None) return;
+
+        var key = (binding.WorkType, action);
+
+        if (kind is ScheduleKind.Cron)
         {
-            foreach (var action in binding.ScheduledActions(_options))
+            var cron = GetCron(schedule);
+            if (cron is null)
             {
-                var (kind, interval) = ParseSchedule(action.Schedule);
-                if (kind is ScheduleKind.Boot or ScheduleKind.None) continue;
-
-                var key = (binding.WorkType, action.Action);
-
-                if (kind is ScheduleKind.Cron)
-                {
-                    var cron = GetCron(action.Schedule!);
-                    if (cron is null)
-                    {
-                        _logger.LogWarning("Invalid cron schedule '{Schedule}' on {Type}.{Action}; skipping.",
-                            action.Schedule, binding.WorkType, action.Action);
-                        continue;
-                    }
-                    // Baseline on first sight (cron fires at its scheduled time, not at startup), then fire once the
-                    // next occurrence after the last fire has passed (missed occurrences are not replayed).
-                    if (!_lastRun.TryGetValue(key, out var lastCron)) { _lastRun[key] = now; continue; }
-                    var next = cron.GetNextOccurrence(lastCron.UtcDateTime);
-                    if (next is not { } occurrence || now.UtcDateTime < occurrence) continue;
-                    _lastRun[key] = now;
-                    await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
-                    continue;
-                }
-
-                // interval / @continuous
-                if (_lastRun.TryGetValue(key, out var last) && now - last < interval) continue;
-                _lastRun[key] = now;
-                await _coordinator.TriggerAsync(binding.WorkType, action.Action, ct);
+                _logger.LogWarning("Invalid cron schedule '{Schedule}' on {Type}.{Action}; skipping.",
+                    schedule, binding.WorkType, action);
+                return;
             }
+            // Baseline on first sight (cron fires at its scheduled time, not at startup), then fire once the
+            // next occurrence after the last fire has passed (missed occurrences are not replayed).
+            if (!_lastRun.TryGetValue(key, out var lastCron)) { _lastRun[key] = now; return; }
+            var next = cron.GetNextOccurrence(lastCron.UtcDateTime);
+            if (next is not { } occurrence || now.UtcDateTime < occurrence) return;
+            _lastRun[key] = now;
+            await _coordinator.TriggerAsync(binding.WorkType, action, ct);
+            return;
         }
+
+        // interval / @continuous
+        if (_lastRun.TryGetValue(key, out var last) && now - last < interval) return;
+        _lastRun[key] = now;
+        await _coordinator.TriggerAsync(binding.WorkType, action, ct);
     }
 
     private CronExpression? GetCron(string schedule)

@@ -61,10 +61,10 @@ the pipeline ahead of user Validation contributors.
    delivers `.Job` / `.Jobs` / source `Submit` via C# 14 extension members constrained on
    `IKoanJob<T>` — pillar-owned name, thin router over `IJobCoordinator`, absent without the
    package reference. Pilot remainder, in order:
-   - **Schedule** — code-first twin of `[JobAction(Schedule="…")]`: `MyJob.Jobs.Schedule(name,
-     expression, action)` registrations held per closed type in a `JobStatics<T>`-adjacent store
-     (Canon `OnIntake` pattern: process-global per closed type, `Reset()` for tests, consumed by
-     `JobScheduler` at boot alongside attribute-declared schedules).
+   - **Schedule** — SHIPPED (2026-08-25): `MyJob.Jobs.Schedule(action, interval | expression)` +
+     `ResetSchedules()` over the per-closed-type `JobScheduleRegistry` (idempotent identical
+     re-entry, corrective on conflicting cadence); `JobScheduler` unions gateway registrations with
+     attribute schedules in both the `@boot` and due-tick paths.
    - **Promote** — stage-promotion operation over staged receipts; depends on the Staging surface
      (queue item 3), so it lands with or after that slice, not before.
    - Discovery relocation of `IKoanJob<T>.Execute` is thereby CLOSED without code: the interface

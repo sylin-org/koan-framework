@@ -60,6 +60,28 @@ public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
     /// <summary>Convenience: this type's jobs in a given status.</summary>
     public Task<IReadOnlyList<JobRecord>> WithStatus(JobStatus status, CancellationToken ct = default)
         => JobAmbient.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(T).FullName!, Status: status), ct);
+
+    /// <summary>Register a code-first schedule for one of this type's actions — the runtime twin of
+    /// <c>[JobAction(Schedule = "…")]</c>. The expression grammar is the attribute's: a <c>TimeSpan</c> string
+    /// interval, a cron expression, or <c>@boot</c> / <c>@continuous</c>. Compose once at host configuration;
+    /// the scheduler picks registrations up at boot alongside attribute-declared schedules.</summary>
+    public JobStatics<T> Schedule(string action, string expression)
+    {
+        JobScheduleRegistry.Register<T>(action, expression);
+        return this;
+    }
+
+    /// <summary>Interval convenience for <see cref="Schedule(string, string)"/> — a fixed cadence between fires.</summary>
+    public JobStatics<T> Schedule(string action, TimeSpan interval)
+        => Schedule(action, interval.ToString());
+
+    /// <summary>Remove every gateway-registered schedule for this type. Intended for test isolation —
+    /// attribute-declared schedules are untouched.</summary>
+    public JobStatics<T> ResetSchedules()
+    {
+        JobScheduleRegistry.Reset<T>();
+        return this;
+    }
 }
 
 /// <summary>The <c>.Job</c> (instance) / <c>.Jobs</c> (static) accessors and pointwise source <c>Submit</c>, delivered via

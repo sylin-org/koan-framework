@@ -309,6 +309,18 @@ The resolved key is frozen onto the job exactly like a property gate, so dispatc
 public sealed class Maintenance : Entity<Maintenance>, IKoanJob<Maintenance> { … }
 ```
 
+**Code-first twin.** The same grammar registers at host-configuration time through the type gateway —
+useful when the cadence lives in config or composition rather than on the type:
+
+```csharp
+Maintenance.Jobs.Schedule("Reconcile", TimeSpan.FromMinutes(10));
+Maintenance.Jobs.Schedule("NightlySweep", "0 2 * * *");   // or a TimeSpan / "@boot" / "@continuous"
+```
+
+One cadence per action: re-registering the same action with the same expression is idempotent;
+a *different* expression fails correctively naming both. `Maintenance.Jobs.ResetSchedules()` clears
+gateway registrations for the type (test isolation); attribute schedules are untouched.
+
 `Schedule` accepts a **TimeSpan interval** (`"00:10:00"`), a **cron** expression (`"0 2 * * *"`), or a **sentinel** (`@boot`, `@continuous`). A scheduled action runs on its own **singleton** work-item, so its handler typically does the bulk operation or fans out per-entity submits:
 
 ```csharp
@@ -685,6 +697,8 @@ await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.
 // All .Job / .Jobs surfaces are ambient: they require the Koan host to be STARTED (after app.StartAsync()).
 // Querying before startup throws KoanHostContextException naming the missing service.
 await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)
+MyJob.Jobs.Schedule(action, TimeSpan.FromMinutes(5));   // code-first schedule — same grammar as [JobAction(Schedule=)]
+MyJob.Jobs.ResetSchedules();              // clear gateway registrations for this type (tests)
 
 // From a handler
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();
