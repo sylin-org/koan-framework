@@ -57,8 +57,18 @@ the pipeline ahead of user Validation contributors.
 ## Rollout order
 
 1. **Canon** — shipped (`Person.Canon`).
-2. **Jobs** — relocate `IKoanJob<T>.Execute` discovery behind `Person.Jobs.*`; add
-   `Schedule/Promote` operations over `CanonStage`-style receipts.
+2. **Jobs** — gateway surface ALREADY CONFORMANT (verified 2026-08-25): `JobAccessorExtensions`
+   delivers `.Job` / `.Jobs` / source `Submit` via C# 14 extension members constrained on
+   `IKoanJob<T>` — pillar-owned name, thin router over `IJobCoordinator`, absent without the
+   package reference. Pilot remainder, in order:
+   - **Schedule** — code-first twin of `[JobAction(Schedule="…")]`: `MyJob.Jobs.Schedule(name,
+     expression, action)` registrations held per closed type in a `JobStatics<T>`-adjacent store
+     (Canon `OnIntake` pattern: process-global per closed type, `Reset()` for tests, consumed by
+     `JobScheduler` at boot alongside attribute-declared schedules).
+   - **Promote** — stage-promotion operation over staged receipts; depends on the Staging surface
+     (queue item 3), so it lands with or after that slice, not before.
+   - Discovery relocation of `IKoanJob<T>.Execute` is thereby CLOSED without code: the interface
+     remains the authoring contract (it owns the handler); the capability surface is the gateway.
 3. **AI** — `Person.AI.Embed/Search` bound to the model's declared embedding configuration.
 4. **Events/Communication** — mirror the instance-side `order.Events.Raise` as type-scoped
    subscription/handler registration.
