@@ -10,7 +10,7 @@ validation:
   date_last_tested: 2026-08-24
   status: passed
   scope: docs/capabilities/ai.md - route table verified against leaf targets; semantic-search,
-    review, and RAG legs cold-executed this cycle
+    review, RAG, models, and eval legs cold-executed this cycle
 ---
 
 # AI capabilities
@@ -25,6 +25,10 @@ Pick the capability; the node or leaf carries the constraints.
   [answer-from-my-data](../recipes/answer-from-my-data.md)
 - **Human review** - approve, reject or edit AI output before it lands:
   [review](ai/review.md)
+- **Models** - discover, pull, deploy and inspect models across your runtimes:
+  [models](ai/models.md)
+- **Evaluation** - metric gates, regression and drift for model quality:
+  [eval](ai/eval.md)
 - **Chat and completion** - provider-neutral completion through one client facade:
   [AI reference](../reference/ai/index.md)
 - **Vision** - read and reason over images:

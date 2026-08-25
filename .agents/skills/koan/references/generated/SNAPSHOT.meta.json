@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-08-25T00:16:50Z",
-  "sourceCommit": "f90ea9b48fd711d541b737f652c4cfc6c76e4ff9",
+  "generatedUtc": "2026-08-25T01:47:09Z",
+  "sourceCommit": "2a60471aa2715edf7f129963f6ad1e6a60124e0c",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [
     ".agents/skills/koan/references/generated/capability-map.md",
@@ -11,6 +11,8 @@
     ".agents/skills/koan/references/generated/capabilities/agents/in-app-agent.md",
     ".agents/skills/koan/references/generated/capabilities/ai.md",
     ".agents/skills/koan/references/generated/capabilities/ai/embedding/portable.md",
+    ".agents/skills/koan/references/generated/capabilities/ai/eval.md",
+    ".agents/skills/koan/references/generated/capabilities/ai/models.md",
     ".agents/skills/koan/references/generated/capabilities/ai/review.md",
     ".agents/skills/koan/references/generated/capabilities/ai/semantic-search.md",
     ".agents/skills/koan/references/generated/capabilities/data.md",
