@@ -9,9 +9,10 @@ framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-26
   status: passed
-  scope: docs/capabilities/data/field-hygiene.md - unit-verified against the transform-plan host
-    (Koan.Tests.Data.Core HygieneTransformSpec): trim/casing applied to the persisted clone,
-    caller instance untouched, null/empty passthrough, non-hygiene types excluded.
+  scope: docs/capabilities/data/field-hygiene.md - feed-validated by an independent external agent
+    (Sylin.Koan.Data.Hygiene 1.0.249 / App 1.0.8 / Sqlite 1.0.14): dirty values persisted normalized
+    and reloaded clean ([Trim], [Lowercase], [Uppercase] incl. [Uppercase]-alone), null/empty
+    passthrough, caller instance retained dirty values (clone discipline). PASS 2m40s.
 ---
 
 # Field hygiene
@@ -53,6 +54,10 @@ public sealed class Contact : Entity<Contact>
 
 await new Contact { Email = "  Ada@Example.COM ", DisplayName = "  Ada  ", Region = " eu " }.Save(ct);
 // persisted: "ada@example.com", "Ada", "EU" — the in-memory instance still holds the original text
+
+// Reload fresh by Id (static Get on the Entity):
+var stored = await Contact.Get("p1", ct);
+// stored.Email == "ada@example.com" — the STORED value is normalized; the in-memory original is not.
 ```
 
 ## Route by need
