@@ -588,6 +588,10 @@ the migration control plane.
 **Sample – ordinary writes**
 
 ```csharp
+using Koan.Core;                       // AddKoan()
+using Koan.Data.Core;                  // Save/Query extensions
+using Koan.Data.Core.Model;            // Entity<T>
+using Koan.Data.AI;                    // EntityAi, lifecycle indexing
 using Koan.Data.AI.Attributes;   // [Embedding]
 [Embedding(Async = true, Template = "{Title}\n\n{Description}")]
 public sealed class Media : Entity<Media>
