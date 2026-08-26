@@ -36,30 +36,52 @@ Canon owns the funnel: phases, holds, and recovery.
 | **Phase hold** | The record stopped at a specific phase for a specific, fixable reason — preserved durably in Canon's `Entity<>` partitions | `CanonStage` gains an explicit **parked-phase**; examples: missing aggregation/match keys → *Onboarding hold*; mismatched identifiers / reconciliation conflict → *Matching hold*; failed verification → its phase's hold |
 | **Recovery** | Phase-aware re-entry: apply a fixer, re-enter **at the phase that parked the record** — not from the top | `Person.Canon.Recover(...)` — operation with an optional fixer hook; bulk variant sweeps a phase |
 
-### Recovery
+### Recovery — the `Hold` namespace
+
+`Hold` is a namespace under the gateway, not a method prefix: phases become typed members,
+counts become walkable surface, and the closed type removes casts.
+
+```csharp
+// Counts — index-served, per phase and per reason category:
+Person.Canon.Hold.Counts.Onboarding        // int
+Person.Canon.Hold.Counts.Rules             // business-rule vetoes, any phase (reason-category view)
+Person.Canon.Hold.Counts.All
+
+// Triage — the held receipts themselves, paged:
+Person.Canon.Hold.Onboarding.Records()
+Person.Canon.Hold.Records()
+
+// Recovery — sweep-with-fixer over a scope; re-enters at intake:
+Person.Canon.Hold.Recover(fix)             // all scopes;   fix: HoldContext<T> -> Task
+Person.Canon.Hold.Onboarding.Recover(fix)  // one phase
+Person.Canon.Hold.Recover(id, fix)         // single receipt
+// Returns a summary: attempted / recovered / re-parked — the sweep receipt IS the telemetry.
+```
+
+`HoldContext<T>` carries `Model` (already `T` — the closed gateway pays the cast), `Step`
+(parked phase), `Reason` (category), `Justification`, `Attempts`; the fixer mutates `Model`
+in place, Canon-style, and may be async (a CRM lookup lives there).
+
+Two dimensions on every hold: **`Phase`** (where the funnel stopped — the ratified `CanonPhase`
+set drives the typed members) and **`Reason` category** (`Structural` | `Rule` | …) — a business
+veto files under `Rules` no matter which phase raised it, so `Counts.Rules` is queryable without
+every phase knowing every business rule.
+
+### Recovery semantics
 
 Recovery re-enters the funnel **at intake**. A fix is a hypothesis, not a pass: business rules get
 a vote again, every gate re-applies, and convergence makes the re-run cheap. The parked phase is
 therefore a **label for triage and queries** — "stopped at Matching" — never a resume cursor.
-
-```csharp
-// Release one held record, optionally repairing it first (fixer runs before re-entry):
-await Person.Canon.Recover(stageId, fix: p => { p.SetMatchKey(p.Email); });
-
-// Bulk: recover every Onboarding hold after fixing the systemic cause — a scheduled/triggered
-// job sweeping the phase, applying the registered fixer per record.
-Person.Canon.OnRecovery(CanonPhase.Onboarding, fixer);   // registration form; naming per lexicon amendment
-```
 
 The hold records **which phase parked it** explicitly (today that lives only in transition
 history), so triage and phase-scoped queries ("all Onboarding holds") are index-served.
 
 ### Hold observability
 
-Counts of pending holds, per entity type × phase, off the parked-phase index — three surfaces:
-a query API (`HoldCounts()`), a Canon health contributor projecting the numbers onto
-`/health/ready` (the Jobs pattern), and composition facts. The trend is the recovery signal:
-Onboarding holds 42 → 17 → 0 after the fix ships is the proof the fix worked.
+The `Counts` surface is index-served aggregation, projected three ways: the gateway members
+above, a Canon health contributor onto `/health/ready` (the Jobs pattern), and composition facts.
+The trend is the recovery signal: Onboarding holds 42 → 17 → 0 after the fix ships is the proof
+the fix worked — and each `Recover` sweep's summary receipt updates it.
 
 ### Business-rule holds: `Hold(why)`
 
