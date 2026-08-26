@@ -68,7 +68,8 @@ embed the query, `Vector<T>.Search`, fan out `Get`, map results — collapses in
 gateway. `Sylin.Koan.Data.AI` 1.0.13 or newer delivers `YourEntity.AI.*` to every Entity kind:
 
 ```csharp
-using Koan.Data.AI;   // the gateway lives here
+using Koan.Data.AI;                    // the gateway lives here
+using Koan.Data.AI.Attributes;         // [Embedding]
 
 // Save as usual - the [Embedding] attribute indexes it (see above).
 await new Produce { Name = "Cherry tomatoes", Description = "sweet, quick" }.Save(ct);

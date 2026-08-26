@@ -588,6 +588,7 @@ the migration control plane.
 **Sample – ordinary writes**
 
 ```csharp
+using Koan.Data.AI.Attributes;   // [Embedding]
 [Embedding(Async = true, Template = "{Title}\n\n{Description}")]
 public sealed class Media : Entity<Media>
 {
