@@ -241,6 +241,32 @@ internal sealed class DataJobLedger : IJobLedger
             && verified.LeaseUntil == leaseUntil;
     }
 
+    /// <summary>PMC-055 fencing at the settle point: the stored row must still be Running and owned by
+    /// <paramref name="expectedOwner"/>, or the settlement bounces — a revived zombie cannot clobber the
+    /// node that reclaimed the row.</summary>
+    public async Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct)
+    {
+        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
+            : null;
+        if (cas is not null)
+        {
+            return await cas.ConditionalReplaceAsync(
+                record,
+                r => r.Status == JobStatus.Running && r.Owner == expectedOwner,
+                ct);
+        }
+
+        // Optimistic floor: verify ownership immediately before the write (the documented
+        // at-least-once tier — a race here is the same window the claim fallback already carries).
+        var stored = await JobRecord.Get(record.Id, ct);
+        if (stored is not { Status: JobStatus.Running } || !string.Equals(stored.Owner, expectedOwner, StringComparison.Ordinal))
+            return false;
+
+        await JobRecord.Upsert(record, ct);
+        return true;
+    }
+
     public async Task Progress(string jobId, double fraction, string? message, CancellationToken ct)
     {
         var r = await JobRecord.Get(jobId, ct);
@@ -255,6 +281,9 @@ internal sealed class DataJobLedger : IJobLedger
         var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
         return running.Where(r => r.LeaseUntil is { } l && l < now).ToList();
     }
+
+    public Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct)
+        => JobRecord.Query(r => r.Status == JobStatus.Running, ct);
 
     public Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
         // Pushed down (§19.3): Status < Completed — terminals are 4..7, so one comparison, not All() + in-memory filter.

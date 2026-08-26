@@ -26,6 +26,19 @@ public sealed class JobsOptions
     /// a durable ledger is elected; the full claim scan still runs at most one <see cref="PollInterval"/> apart.</summary>
     public TimeSpan WakeProbeInterval { get; set; } = TimeSpan.FromMilliseconds(250);
 
+    /// <summary>How often this worker refreshes its fleet-roster heartbeat (PMC-055). Kubernetes ratio: keep
+    /// <see cref="WorkerDeathTimeout"/> at ~4× this value, and comfortably above 2× your worst GC pause.</summary>
+    public TimeSpan WorkerHeartbeatInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>How long a worker's silence before peers confirm it dead and reclaim its running jobs ahead of
+    /// lease lapse. Default 40s (4 missed heartbeats — the Kubernetes node-monitor ratio).</summary>
+    public TimeSpan WorkerDeathTimeout { get; set; } = TimeSpan.FromSeconds(40);
+
+    /// <summary>When true (default), the reaper reclaims running jobs of a <em>confirmed-dead</em> worker as soon
+    /// as the death timeout expires, instead of waiting for the lease to lapse. Safe because the revived node's
+    /// lease renewal and settlement are ownership-guarded and it abandons without settling (JOBS-0009).</summary>
+    public bool ReclaimFromConfirmedDead { get; set; } = true;
+
     /// <summary>Reaper sweep cadence (Running &amp;&amp; lease lapsed → reclaim).</summary>
     public TimeSpan ReaperInterval { get; set; } = TimeSpan.FromSeconds(30);
 

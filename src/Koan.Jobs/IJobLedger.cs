@@ -42,11 +42,23 @@ public interface IJobLedger
     /// </summary>
     Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct);
 
+    /// <summary>
+    /// Ownership-guarded settlement (PMC-055 fencing): apply <paramref name="record"/>'s terminal or
+    /// re-queued state only while the stored row is still <see cref="JobStatus.Running"/> and owned by
+    /// <paramref name="expectedOwner"/>. Returns false when the claim was lost (another node reclaimed the
+    /// row) — the caller abandons without writing, so a revived zombie cannot clobber the new claimant.
+    /// </summary>
+    Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct);
+
     /// <summary>Update only durable progress for an in-flight job (cheap, off the transition path).</summary>
     Task Progress(string jobId, double fraction, string? message, CancellationToken ct);
 
     /// <summary>Running jobs whose lease lapsed (the reaper sweep).</summary>
     Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>All currently-Running rows (PMC-055 death sweep: the orchestrator filters by roster
+    /// liveness in memory — the running set is bounded by concurrency × nodes).</summary>
+    Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct);
 
     /// <summary>All non-terminal jobs (the boot-recovery sweep).</summary>
     Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct);

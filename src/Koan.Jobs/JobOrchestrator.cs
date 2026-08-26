@@ -147,6 +147,10 @@ internal sealed class JobOrchestrator
 
     private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
     {
+        // PMC-055 fencing: the owner captured at claim time is this execution's authority for every
+        // guarded write (lease renewal, settlement). If it stops matching the stored row, this
+        // execution has been reclaimed and every write bounces.
+        var claimedOwner = rec.Owner ?? throw new InvalidOperationException("Claimed job has no owner.");
         // Restore the Koan context captured at submit BEFORE loading the (possibly tenant-scoped)
         // work-item, and keep them in scope across load + execute + settle (the conditional auto-save included) so
         // every tenant-scoped read/write runs in the submitted tenant. A restore failure (an unregistered axis, or
@@ -158,15 +162,15 @@ internal sealed class JobOrchestrator
         {
             ambientScope = _contextPlan.RestoreForExecution(binding.ClrType, rec.AmbientCarrier);
         }
-        catch (Exception ex) { await SettleCarrierFailureAsync(rec, ex); return null; }
+        catch (Exception ex) { await SettleCarrierFailureAsync(rec, claimedOwner, ex); return null; }
         using var _ambient = ambientScope;
 
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
-        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex); return null; }
+        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex, claimedOwner); return null; }
         // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
         workItem ??= rec.WorkId == Infrastructure.Constants.Work.SingletonId ? binding.NewSingleton(rec.WorkId) : null;
-        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return null; }
+        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found."), claimedOwner); return null; }
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
 
@@ -202,12 +206,12 @@ internal sealed class JobOrchestrator
                 _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
                 return ctx;
             }
-            await SettleSuccessAsync(rec, workItem, binding, policy, ctx, snapshot);
+            await SettleSuccessAsync(rec, workItem, binding, policy, ctx, snapshot, claimedOwner);
         }
         catch (RescheduleException rex)
         {
             var until = rex.Until ?? _clock.GetUtcNow() + (rex.After ?? TimeSpan.Zero);
-            await ApplyDeferralAsync(rec, binding, policy, until, rex.Gate, rex.Gate ? rex.GateKey : null, hasOverride: rex.Gate, "reschedule-exception");
+            await ApplyDeferralAsync(rec, binding, policy, until, rex.Gate, rex.Gate ? rex.GateKey : null, hasOverride: rex.Gate, "reschedule-exception", claimedOwner);
         }
         catch (OperationCanceledException)
         {
@@ -216,15 +220,15 @@ internal sealed class JobOrchestrator
                 _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
             }
             else if (timeoutCts.IsCancellationRequested)
-                await SettleFailureAsync(rec, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."));
+                await SettleFailureAsync(rec, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."), claimedOwner);
             else if (await IsCancelMarkerSet(rec.Id))
-                await SettleCancelledAsync(rec);
+                await SettleCancelledAsync(rec, claimedOwner);
             else
-                await SettleShutdownAsync(rec); // worker stopping — revert for reclaim
+                await SettleShutdownAsync(rec, claimedOwner); // worker stopping — revert for reclaim
         }
         catch (Exception ex)
         {
-            await SettleFailureAsync(rec, binding, policy, ex);
+            await SettleFailureAsync(rec, binding, policy, ex, claimedOwner);
         }
         finally
         {
@@ -296,12 +300,24 @@ internal sealed class JobOrchestrator
 
     // --- settle paths ---
 
-    private async Task SettleSuccessAsync(JobRecord rec, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, string? snapshot)
+    /// <summary>PMC-055 fencing at the settle point: the write lands only while the stored row is still
+    /// Running and owned by the node that claimed it. A lost settle means another node reclaimed the row —
+    /// the revived zombie abandons without writing, and the new claimant's settlement stands.</summary>
+    private async Task<bool> SettleOwnedAsync(JobRecord rec, string claimedOwner)
+    {
+        if (await _ledger.TrySettle(rec, claimedOwner, CancellationToken.None)) return true;
+        _logger.LogWarning(
+            "Koan.Jobs abandoned settling job {JobId}: the claim was lost to another node (reclaimed); no write was made.",
+            rec.Id);
+        return false;
+    }
+
+    private async Task SettleSuccessAsync(JobRecord rec, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, string? snapshot, string claimedOwner)
     {
         if (ctx.Signal is JobSignal.Reschedule or JobSignal.Backoff)
         {
             var until = ctx.DeferUntil ?? _clock.GetUtcNow();
-            await ApplyDeferralAsync(rec, binding, policy, until, ctx.Signal == JobSignal.Backoff, ctx.GateKeyOverride, ctx.GateKeyOverrideSet, "cooperative-backoff");
+            await ApplyDeferralAsync(rec, binding, policy, until, ctx.Signal == JobSignal.Backoff, ctx.GateKeyOverride, ctx.GateKeyOverrideSet, "cooperative-backoff", claimedOwner);
             return;
         }
 
@@ -331,7 +347,7 @@ internal sealed class JobOrchestrator
         rec.LastSettledAt = now;
         rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Completed, now, "completed");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
 
         if (next is not null && !cancelledInSettleWindow)
@@ -345,7 +361,7 @@ internal sealed class JobOrchestrator
         }
     }
 
-    private async Task SettleFailureAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, Exception ex)
+    private async Task SettleFailureAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, Exception ex, string claimedOwner)
     {
         var now = _clock.GetUtcNow();
         rec.Owner = null;
@@ -357,14 +373,14 @@ internal sealed class JobOrchestrator
         {
             rec.VisibleAt = now + RetryDelay(rec.Attempt);
             SetStatus(rec, JobStatus.Queued, now, $"retry {rec.Attempt}/{policy.MaxAttempts}: {ex.GetType().Name}");
-            await _ledger.Update(rec, CancellationToken.None);
+            if (!await SettleOwnedAsync(rec, claimedOwner)) return;
             return;
         }
 
         rec.DeadReason = DeadReason.Poison.ToString();
         rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
         SetStatus(rec, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Failed, now);
 
         if (policy.OnFailure == OnFailure.Continue && binding.NextInChain(rec.Action) is { } next)
@@ -381,7 +397,7 @@ internal sealed class JobOrchestrator
     /// <summary>The captured Koan context could not be restored (unknown axis, invalid format/version, or insufficient
     /// trust). Deterministic — retrying would fail identically — so dead-letter immediately rather than run the handler
     /// in a wrong/absent context. The work item is never loaded.</summary>
-    private async Task SettleCarrierFailureAsync(JobRecord rec, Exception ex)
+    private async Task SettleCarrierFailureAsync(JobRecord rec, string claimedOwner, Exception ex)
     {
         var now = _clock.GetUtcNow();
         rec.Owner = null;
@@ -391,11 +407,11 @@ internal sealed class JobOrchestrator
         rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
         rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
         SetStatus(rec, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
     }
 
-    private async Task SettleUnregisteredWorkTypeAsync(JobRecord rec)
+    private async Task SettleUnregisteredWorkTypeAsync(JobRecord rec, string claimedOwner)
     {
         var now = _clock.GetUtcNow();
         rec.Owner = null;
@@ -405,7 +421,7 @@ internal sealed class JobOrchestrator
         rec.DeadReason = DeadReason.UnregisteredWorkType.ToString();
         rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
         SetStatus(rec, JobStatus.Dead, now, $"unregistered work type: {rec.WorkType}");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
         if (_unregisteredWorkTypeWarnings.TryAdd(rec.WorkType, 0))
             _logger.LogWarning(
@@ -420,7 +436,7 @@ internal sealed class JobOrchestrator
     }
 
     private async Task ApplyDeferralAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy,
-        DateTimeOffset until, bool gate, string? gateKeyOverride, bool hasOverride, string reason)
+        DateTimeOffset until, bool gate, string? gateKeyOverride, bool hasOverride, string reason, string claimedOwner)
     {
         var now = _clock.GetUtcNow();
         // reschedule does NOT consume a retry attempt: undo the claim-time increment.
@@ -438,7 +454,7 @@ internal sealed class JobOrchestrator
             rec.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
             rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
             SetStatus(rec, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
-            await _ledger.Update(rec, CancellationToken.None);
+            if (!await SettleOwnedAsync(rec, claimedOwner)) return;
             _metrics.Record(rec.WorkType, JobStatus.Dead, now);
             return;
         }
@@ -446,7 +462,7 @@ internal sealed class JobOrchestrator
         rec.DeferReason = reason;
         rec.VisibleAt = ApplyJitter(until);
         SetStatus(rec, JobStatus.Queued, now, $"deferred to {rec.VisibleAt:O} ({reason})");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
 
         if (gate)
         {
@@ -456,7 +472,7 @@ internal sealed class JobOrchestrator
         }
     }
 
-    private async Task SettleCancelledAsync(JobRecord rec)
+    private async Task SettleCancelledAsync(JobRecord rec, string claimedOwner)
     {
         var now = _clock.GetUtcNow();
         rec.Owner = null;
@@ -464,11 +480,11 @@ internal sealed class JobOrchestrator
         rec.LastSettledAt = now;
         rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Cancelled, now);
     }
 
-    private async Task SettleShutdownAsync(JobRecord rec)
+    private async Task SettleShutdownAsync(JobRecord rec, string claimedOwner)
     {
         var now = _clock.GetUtcNow();
         rec.Attempt = Math.Max(0, rec.Attempt - 1); // worker stopped before completing; don't penalize
@@ -476,7 +492,7 @@ internal sealed class JobOrchestrator
         rec.LeaseUntil = null;
         rec.VisibleAt = now;
         SetStatus(rec, JobStatus.Queued, now, "requeued (worker shutdown)");
-        await _ledger.Update(rec, CancellationToken.None);
+        if (!await SettleOwnedAsync(rec, claimedOwner)) return;
     }
 
     /// <summary>Archival sweep (§19.3): purge Completed/Cancelled past <c>ArchiveAfter</c>, Failed/Dead past
@@ -524,6 +540,60 @@ internal sealed class JobOrchestrator
             SetStatus(stuck, JobStatus.Queued, now, "reclaimed (lease lapsed)");
             await _ledger.Update(stuck, ct);
         }
+
+        // PMC-055: a worker confirmed dead by roster silence forfeits its running jobs immediately —
+        // ahead of lease lapse. Safe because the revived node's renewal and settlement are
+        // ownership-guarded: it abandons without writing. This node never death-reclaims its own
+        // in-flight jobs (its heartbeat governs them; the lease is the only bound).
+        if (_options.ReclaimFromConfirmedDead && _options.WorkerDeathTimeout > TimeSpan.Zero)
+        {
+            var cutoff = now - _options.WorkerDeathTimeout;
+            var alive = (await WorkerNode.Query(w => w.LastSeenAt >= cutoff, ct))
+                .Select(w => w.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            alive.Add(_owner);
+
+            foreach (var orphan in (await _ledger.Running(ct)).Where(r => r.Owner is not null && !alive.Contains(r.Owner!)))
+            {
+                orphan.Owner = null;
+                orphan.LeaseUntil = null;
+                orphan.VisibleAt = now;
+                SetStatus(orphan, JobStatus.Queued, now, "reclaimed (worker confirmed dead)");
+                await _ledger.Update(orphan, ct);
+            }
+
+            foreach (var stale in await WorkerNode.Query(w => w.LastSeenAt < cutoff, ct))
+                await stale.Remove(ct);
+        }
+    }
+
+    /// <summary>PMC-055: register this worker in the fleet roster, or heartbeat its existing entry.
+    /// Self-throttling to <c>WorkerHeartbeatInterval</c>; safe to call every loop iteration.</summary>
+    public async Task BeatAsync(CancellationToken ct = default)
+    {
+        var now = _clock.GetUtcNow();
+        var node = await WorkerNode.Get(_owner, ct);
+        if (node is null)
+        {
+            await WorkerNode.Upsert(new WorkerNode { Id = _owner, StartedAt = now, LastSeenAt = now, Machine = Environment.MachineName }, ct);
+            return;
+        }
+
+        if (now - node.LastSeenAt >= _options.WorkerHeartbeatInterval)
+        {
+            node.LastSeenAt = now;
+            node.Machine = Environment.MachineName;
+            await WorkerNode.Upsert(node, ct);
+        }
+    }
+
+    /// <summary>PMC-055: graceful departure — peers see the resignation immediately instead of
+    /// waiting out the death timeout on a planned shutdown.</summary>
+    public async Task ResignAsync(CancellationToken ct = default)
+    {
+        var node = await WorkerNode.Get(_owner, ct);
+        if (node is not null)
+            await node.Remove(ct);
     }
 
     // --- helpers ---
@@ -553,7 +623,7 @@ internal sealed class JobOrchestrator
             var binding = _registry.Get(rec.WorkType);
             if (binding is not null) return (rec, binding);
 
-            await SettleUnregisteredWorkTypeAsync(rec);
+            await SettleUnregisteredWorkTypeAsync(rec, rec.Owner!);
         }
 
         return null;

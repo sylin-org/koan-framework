@@ -23,12 +23,14 @@ internal sealed class JobsHealthContributor(IJobLedger ledger, IOptions<JobsOpti
         {
             var now = clock.GetUtcNow();
             var s = await ledger.HealthSnapshot(now, ct);
+            var workersOnline = (await WorkerNode.Query(w => w.LastSeenAt >= now - TimeSpan.FromMinutes(5), ct)).Count;
             var data = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["queued"] = s.Queued,
                 ["running"] = s.Running,
                 ["reclaimBacklog"] = s.ReclaimBacklog,
                 ["oldestQueuedAgeSeconds"] = (long)s.OldestQueuedAge.TotalSeconds,
+                ["workersOnline"] = workersOnline,
             };
 
             var budget = options.Value.QueueAgeWarning;
@@ -37,7 +39,8 @@ internal sealed class JobsHealthContributor(IJobLedger ledger, IOptions<JobsOpti
                     $"Oldest queued job has waited {s.OldestQueuedAge.TotalSeconds:N0}s " +
                     $"(> {budget.TotalSeconds:N0}s budget) — possible lane starvation/stall.", null, data);
 
-            return new HealthReport(Name, HealthState.Healthy, $"{s.Queued} queued, {s.Running} running", null, data);
+            return new HealthReport(Name, HealthState.Healthy,
+                $"{s.Queued} queued, {s.Running} running, {workersOnline} workers online", null, data);
         }
         catch (Exception ex)
         {

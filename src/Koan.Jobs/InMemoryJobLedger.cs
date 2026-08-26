@@ -158,12 +158,38 @@ internal sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
+    public Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (!_records.TryGetValue(record.Id, out var stored)
+                || stored.Status != JobStatus.Running
+                || !string.Equals(stored.Owner, expectedOwner, StringComparison.Ordinal))
+            {
+                return Task.FromResult(false);
+            }
+            _records[record.Id] = record.Clone();
+            return Task.FromResult(true);
+        }
+    }
+
     public Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
     {
         lock (_gate)
         {
             var list = _records.Values
                 .Where(r => r.Status == JobStatus.Running && r.LeaseUntil is { } l && l < now)
+                .Select(r => r.Clone()).ToList();
+            return Task.FromResult<IReadOnlyList<JobRecord>>(list);
+        }
+    }
+
+    public Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var list = _records.Values
+                .Where(r => r.Status == JobStatus.Running)
                 .Select(r => r.Clone()).ToList();
             return Task.FromResult<IReadOnlyList<JobRecord>>(list);
         }

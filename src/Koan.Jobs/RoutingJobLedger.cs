@@ -64,8 +64,15 @@ internal sealed class RoutingJobLedger : IJobLedger
         => await _durable.TryRenewLease(jobId, owner, leaseUntil, now, ct)
            || await _inMemory.TryRenewLease(jobId, owner, leaseUntil, now, ct);
 
+    public async Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct)
+        => await _durable.TrySettle(record, expectedOwner, ct)
+           || await _inMemory.TrySettle(record, expectedOwner, ct);
+
     public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
         => Concat(await _durable.Stuck(now, ct), await _inMemory.Stuck(now, ct));
+
+    public async Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct)
+        => Concat(await _durable.Running(ct), await _inMemory.Running(ct));
 
     public async Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
         => Concat(await _durable.NonTerminal(ct), await _inMemory.NonTerminal(ct));

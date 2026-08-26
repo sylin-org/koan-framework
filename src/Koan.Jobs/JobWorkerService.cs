@@ -44,6 +44,7 @@ internal sealed class JobWorkerService : BackgroundService
 
         try
         {
+            await _orchestrator.BeatAsync(stoppingToken);            // join the fleet roster (PMC-055)
             await _scheduler.RecoverAsync(stoppingToken);          // reclaim anything left mid-flight by a crash
             await _scheduler.SubmitBootActionsAsync(stoppingToken); // fire @boot actions once
         }
@@ -81,6 +82,7 @@ internal sealed class JobWorkerService : BackgroundService
                     lastFlush = now;
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
+                await _orchestrator.BeatAsync(stoppingToken);      // fleet-roster heartbeat (self-throttled, PMC-055)
 
                 var due = now - lastDrain >= _options.PollInterval;
                 if (!probesWakeStamp)
@@ -136,6 +138,11 @@ internal sealed class JobWorkerService : BackgroundService
             }
             catch (OperationCanceledException) { break; }
         }
+
+        // Graceful departure: resign from the fleet roster so peers see the planned shutdown
+        // immediately instead of waiting out the death timeout (PMC-055). Best-effort.
+        try { await _orchestrator.ResignAsync(CancellationToken.None); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Fleet-roster resignation failed on shutdown"); }
 
         // Flush the last accumulated deltas on graceful stop (best-effort; metrics are lossy-tolerant).
         if (_options.MetricsEnabled)
