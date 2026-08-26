@@ -51,11 +51,18 @@ Person.Canon.Hold.Counts.All
 Person.Canon.Hold.Onboarding.Records()
 Person.Canon.Hold.Records()
 
-// Recovery — sweep-with-fixer over a scope; re-enters at intake:
-Person.Canon.Hold.Recover(fix)             // all scopes;   fix: HoldContext<T> -> Task
-Person.Canon.Hold.Onboarding.Recover(fix)  // one phase
-Person.Canon.Hold.Recover(id, fix)         // single receipt
-// Returns a summary: attempted / recovered / re-parked — the sweep receipt IS the telemetry.
+// Triage-and-release cursor — walk the holds, decide per record:
+Person.Canon.Hold.Records()                      // paged triage, no side effects
+Person.Canon.Hold.Records(i =>
+{
+    if (i.Step == CanonPhase.Onboarding) i.Model.Name = "Lalala";
+    return i.Step == CanonPhase.Onboarding ? i : null;   // non-null ⇒ Recover; null ⇒ stays held
+})
+Person.Canon.Hold.RecordsAsync(fix)              // async fixers (a CRM lookup lives here)
+Person.Canon.Hold.Recover(id, fix)               // single known receipt
+// A Records(func) sweep returns the summary: attempted / recovered / re-parked — the walk IS the telemetry.
+// A fixer that throws leaves that record held with the error on its receipt; the sweep continues.
+// Bulk Recover(fix) is deliberately absent: Recover(fix) ≡ Records(i => { fix(i); return i; }).
 ```
 
 `HoldContext<T>` carries `Model` (already `T` — the closed gateway pays the cast), `Step`
