@@ -38,7 +38,11 @@ without touching job code, controllers, or setters.
 ## Use it
 
 ```csharp
-using Koan.Data.Abstractions.Annotations;
+// Usings required for everything below:
+using Koan.Core;                          // AddKoan()
+using Koan.Data.Core;                    // Save/Query extensions
+using Koan.Data.Core.Model;              // Entity<T>
+using Koan.Data.Abstractions.Annotations; // [Trim] / [Lowercase] / [Uppercase]
 
 public sealed class Contact : Entity<Contact>
 {
