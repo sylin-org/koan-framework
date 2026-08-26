@@ -34,6 +34,7 @@
                       ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Hygiene\Koan.Data.Hygiene.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Relational\Koan.Data.Relational.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.AI\Koan.Data.AI.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Vector.Abstractions\Koan.Data.Vector.Abstractions.csproj" />
