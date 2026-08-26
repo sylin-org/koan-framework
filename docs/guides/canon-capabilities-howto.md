@@ -12,8 +12,8 @@ validation:
   scope: cold-executed against published packages (Sylin.Koan.Canon 1.0.7): create / merge /
     replay-idempotent / 422-refusal journey over HTTP plus code-read of runtime, matching,
     reconcile, persistence, and stage paths. Declarations on this page use the current language
-    ([MatchKey] / [Reconcile] / OnIntake); published 1.0.x packages spell them
-    [AggregationKey] / [AggregationPolicy(Kind)] with identical semantics until the next release.
+    ([MatchKey] / [Reconcile] / OnIntake); Canon 1.0.12+ ships these spellings on nuget.org —
+    older published 1.0.x packages spelled them [AggregationKey] / [AggregationPolicy(Kind)].
 related_guides:
   - entity-capabilities-howto.md
 ---
