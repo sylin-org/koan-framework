@@ -14,6 +14,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read   # the SignPath action reads job details + downloads the artifact (docs.signpath.io/trusted-build-systems/github)
 
 jobs:
   certify:
@@ -63,7 +64,88 @@ jobs:
           ./scripts/pack-release.ps1 `
             -PlanPath artifacts/release/release-plan.json `
             -OutputDirectory artifacts/release/feed `
-            -Configuration Release
+            -Configuration Release `
+            -PublisherSigningEnabled ('${{ vars.SIGNPATH_ENABLED }}' -eq 'true')
+
+      - name: Record release plan state
+        id: release-plan
+        shell: pwsh
+        run: |
+          $plan = Get-Content -LiteralPath artifacts/release/release-plan.json -Raw | ConvertFrom-Json
+          $count = @($plan.packages | Where-Object { $_.publish }).Count
+          "package-count=$count" >> $env:GITHUB_OUTPUT
+          Write-Host "RELEASE|PACKAGES|$count"
+
+      - name: Require complete SignPath configuration
+        if: steps.release-plan.outputs.package-count != '0' && vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          $required = @(
+            'SIGNPATH_API_TOKEN',
+            'SIGNPATH_ORGANIZATION_ID',
+            'SIGNPATH_PROJECT_SLUG',
+            'SIGNPATH_SIGNING_POLICY_SLUG',
+            'SIGNPATH_ARTIFACT_CONFIGURATION_SLUG'
+          )
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "SIGNPATH_ENABLED is true but '$name' is not configured."
+            }
+          }
+
+      - name: Upload unsigned packages for SignPath
+        if: steps.release-plan.outputs.package-count != '0' && vars.SIGNPATH_ENABLED == 'true'
+        id: upload-unsigned-packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: koan-signing-input-${{ github.sha }}
+        overwrite: true   # re-running failed jobs must replace, not collide (actions/upload-artifact#769)
+          path: artifacts/release/feed/*.nupkg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+      - name: Submit the SignPath signing request
+        if: steps.release-plan.outputs.package-count != '0' && vars.SIGNPATH_ENABLED == 'true'
+        uses: signpath/github-action-submit-signing-request@a790881fc89970675894221b0be3bb12a87eb391 # v2.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-packages.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 21600   # manual approval is part of the policy; give it a working day
+          output-artifact-directory: artifacts/release/signpath-output
+
+      - name: Finalize signed packages
+        if: steps.release-plan.outputs.package-count != '0' && vars.SIGNPATH_ENABLED == 'true'
+        shell: pwsh
+        run: |
+          ./scripts/finalize-signpath-release.ps1 `
+            -PlanPath artifacts/release/release-plan.json `
+            -FeedDirectory artifacts/release/feed `
+            -SignedDirectory artifacts/release/signpath-output
+
+      - name: Record code signing state
+        shell: pwsh
+        run: |
+          $count = [int]'${{ steps.release-plan.outputs.package-count }}'
+          $enabled = '${{ vars.SIGNPATH_ENABLED }}' -eq 'true'
+          $status = [ordered]@{
+            policy = 'https://github.com/sylin-org/koan-framework/blob/main/CODE_SIGNING_POLICY.md'
+            enabled = $enabled
+            signed = $enabled -and $count -gt 0
+            packageCount = $count
+          }
+          $status | ConvertTo-Json | Set-Content -LiteralPath artifacts/release/code-signing.json -Encoding utf8
 
       - name: Prove the release through a package-only application
         shell: pwsh

@@ -1,51 +1,71 @@
 ﻿# Contributing to Koan
 
-Thank you for wanting to make Koan better. Koan is an opinionated framework — contributions
-succeed when they work **with** those opinions, and the fastest way to a merged PR is understanding
-them first.
+Koan’s public promise is simple: application code reads as the business, while referenced capabilities own
+composition, safe defaults, infrastructure negotiation, runtime explanation, and corrective failure. Contributions
+should make that promise smaller, clearer, or more dependable.
 
-## The laws of the tree
+## First contribution
 
-These are short, and they are load-bearing (full versions in [CLAUDE.md](CLAUDE.md) and
-[docs/MEMORY.md](docs/MEMORY.md)):
+1. Use the .NET 10 SDK and choose one affected capability, package, or document owner.
+2. Find its current contract through the [documentation curriculum](docs/index.md) and
+   [product surface](docs/reference/product-surface.md).
+3. Build the smallest affected project and run its focused tests or documentation gate.
+4. Update the canonical owner and any package, sample, template, or agent guidance that would
+   otherwise teach a different result.
+5. Open a focused pull request to `dev`, explain the user-visible promise, and sign the commit.
 
-- **A package reference is the intent.** Capabilities activate by being referenced; `AddKoan()`
-  composes them. No manual registration, no service locators, no per-app provider wiring.
-- **Application code states business meaning.** Framework pillars own composition, provider
-  election, lifecycle, and explanation.
-- **Never construct an identifier from a product name.** Package and API names are exact; copy
-  them from the [capability map](docs/reference/capability-map.md).
-- **Verify empirically.** Probe the real store, read startup facts, run the thing. Confident
-  claims that one command would have caught are the classic failure here.
-- **Root fix, not spot fix.** Repair the owner; don't drop a capability to a floor to make a
-  suite green.
-- **Never hand-edit a package version.** Versions come from the per-project `version.json`
-  (NBGV); releases fast-forward `main` from `dev`.
+## Before changing code
 
-## Getting started
+1. Read `CLAUDE.md` and the current initiative handoff only when your change belongs to an active
+   maintainer work item.
+2. Map the complete concern before implementation: public contract, owning module, closest existing pattern,
+   configuration, runtime facts, health, failure correction, tests, and documentation.
+3. Prefer standard .NET hosting, DI, options, health checks, and logging. Add Koan-specific vocabulary only when it
+   expresses business intent or removes repeated application ceremony.
+4. Put cross-module contracts in genuinely independent abstractions. Keep provider mechanics in connectors and
+   policy in the functional owner.
 
-1. Fork, branch from `dev`.
-2. `dotnet build Koan.sln` — one build at a time; the repo builds all projects into a shared
-   output path, so parallel builds clobber each other.
-3. Run the suite that owns the project you changed (see `tests/Suites/`), not just the ones that
-   use it.
-4. Before changing production code, read the relevant ADR in `docs/decisions/` — decisions are
-   dated records, and a later one supersedes; don't re-litigate without new evidence.
+The [engineering workbooks](docs/engineering/README.md) cover repeatable repository tasks. Start with
+[test authoring](docs/engineering/test-authoring.md), [adding a connector](docs/engineering/adding-a-connector.md),
+or [package versioning](docs/engineering/versioning.md) when those match your change.
 
-## Pull requests
+## Prove the affected promise
 
-- One concern per PR; keep the diff reviewable.
-- Behavior changes need a spec in the owning suite and, when policy changes, a doc touch in the
-  same PR.
-- Corrective errors are part of the API: a refusal should name what to do next.
-- CI runs `PR gate`; releases are fast-forwards of `main` and publish only what changed.
+Use the .NET 10 SDK. Build the smallest affected project and run focused tests that exercise the changed contract.
+Broaden only when a dependency or shared seam justifies it. A full solution/release ratchet is certification work,
+not the default inner loop.
 
-## Reporting issues
+For public examples, include the package reference, host code, configuration, runtime prerequisite, inspection path,
+and expected corrective failure. Run the repository’s relevant lint/example checks before proposing the change.
 
-Include: what you expected, what happened, the resolved `Sylin.*` package versions
-(`dotnet list package`), and the composition facts if runtime behavior is involved
-(`/.well-known/Koan/facts`). A minimal reproduction beats a long description.
+## Keep one public story
 
-## Questions
+- Current guidance starts at the 1.x stabilization train, `AddKoan()`, the four-line host, and `Entity<T>`.
+- The [generated product surface](docs/reference/product-surface.md) projects the active package inventory and capability maturity.
+- Link to one canonical explanation instead of copying another current guide.
+- Keep ADRs, initiatives, assessments, and superseded plans as dated evidence—not required user instructions.
+- Update package companions, templates, samples, skills, or feedback guidance when your public change affects them.
 
-See [SUPPORT.md](SUPPORT.md).
+## Versions and releasing
+
+Never set or hand-edit a package version. Each packable project owns a `version.json` and its patch
+comes from the commits that touched it, so changing a project is what publishes it. Merge to `dev`;
+a maintainer fast-forwards `main`, which publishes only the packages whose versions are not already
+on nuget.org. See the [release playbook](docs/engineering/nuget-publishing.md).
+
+## Review and safety
+
+Reviewers look for correctness, a small public surface, explicit application responsibilities, actionable failures,
+focused evidence, and documentation that tells the same story as the code. Never commit credentials or private
+application material. Use parameterized provider APIs and preserve nullable-reference correctness.
+
+## DCO and licenses
+
+Every commit requires a Developer Certificate of Origin sign-off:
+
+```text
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+Use `git commit -s` to add it automatically; the full certificate is in `DCO`. Code is Apache-2.0 licensed and
+documentation uses [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
