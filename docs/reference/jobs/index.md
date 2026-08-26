@@ -94,6 +94,22 @@ else
     await context.Progress(0.5, "halfway");
 ```
 
+## Observe the lifecycle
+
+Type-scoped observers fire **after** the durable write — past participles that react to what
+happened, never intervene, and are throw-safe (a throwing observer is swallowed; settlement is
+untouched). Each event carries the ledger `Record`, the typed `Model` when loaded, `Kind`, and
+`Error`.
+
+```csharp
+SendDigest.Jobs.OnCompleted(e => metrics.Mark(e.Record.WorkId));
+SendDigest.Jobs.OnFailed(e => alerting.Page(e.Error));
+SendDigest.Jobs.OnStalled(e => logger.LogWarning("reclaimed from a dead worker"));
+```
+
+Full set: `OnClaimed`, `OnCompleted`, `OnFailed`, `OnDeadLettered`, `OnRescheduled`, `OnCancelled`,
+`OnStalled`, `OnAbandoned`. `ResetEvents()` clears observers for the type (test isolation).
+
 ## Inspect and correct
 
 - Query status/progress from the job accessor and ledger.

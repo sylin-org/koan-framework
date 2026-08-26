@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: jobs
 title: "Background Jobs How-To"
@@ -538,7 +538,31 @@ Off by default (the zero-config path stays write-free); the flush cadence is `Me
 
 ---
 
-## 11. Testing your jobs
+## 11. Lifecycle observers: react without touching the job
+
+**Concept.** Sometimes something should happen *because* a job finished — update a dashboard, fire a
+webhook, log a trend — and the job itself shouldn't know or care. Lifecycle observers are
+type-scoped hooks: **past participles** that observe after the fact, never intervene, and run after
+the durable write. A throwing observer is swallowed by design — settlement is never affected.
+
+**Recipe.** Register observers on the type gateway at host configuration time.
+
+**Sample.**
+
+```csharp
+Poke.Jobs.OnCompleted(e => Console.WriteLine($"{e.Model?.Id} canonized"));
+Poke.Jobs.OnFailed(e => logger.LogWarning("Poke failed: {Error}", e.Error));
+Poke.Jobs.OnStalled(e => logger.LogWarning("Poke stalled — reclaimed from a dead worker"));
+```
+
+Full set: `OnClaimed`, `OnCompleted`, `OnFailed`, `OnDeadLettered`, `OnRescheduled`, `OnCancelled`,
+`OnStalled`, `OnAbandoned` (this node lost the claim mid-flight and settled nothing). Each event
+carries `Record` (the ledger row), `Model` (your typed Entity, when the pipeline has it loaded),
+`Kind`, and `Error`. `Poke.Jobs.ResetEvents()` clears observers for the type (test isolation).
+
+---
+
+## 12. Testing your jobs
 
 **Concept.** Jobs are testable without background timers. Inline mode is useful for the smallest handler test.
 For schedules, leases, retries, deferrals, and chain boundaries, the xUnit-free
@@ -646,7 +670,7 @@ stage2.Settled.Status.Should().Be(JobStatus.Completed);
 
 ---
 
-## 12. The `JobContext` at a glance
+## 13. The `JobContext` at a glance
 
 Everything a handler needs arrives on `ctx`:
 
@@ -663,7 +687,7 @@ Everything a handler needs arrives on `ctx`:
 
 ---
 
-## 13. Quick reference
+## 14. Quick reference
 
 ```csharp
 // Usings for everything below: Koan.Data.Core.Model (Entity<>, IKoanJob<>), Koan.Jobs (attributes, JobContext)
@@ -699,6 +723,17 @@ await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.
 await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)
 MyJob.Jobs.Schedule(action, TimeSpan.FromMinutes(5));   // code-first schedule — same grammar as [JobAction(Schedule=)]
 MyJob.Jobs.ResetSchedules();              // clear gateway registrations for this type (tests)
+
+// Lifecycle observers — past participles: they observe, never intervene. Fired after the durable
+// write; a throwing observer is swallowed by design. ResetEvents() clears them (tests).
+MyJob.Jobs.OnCompleted(e => Console.WriteLine($"{e.Record.WorkId} done"));   // e.Model is your typed Entity
+MyJob.Jobs.OnFailed(e => Console.WriteLine(e.Error));     // terminal failure (retries exhausted)
+MyJob.Jobs.OnClaimed(e => { });                           // engine claimed the job
+MyJob.Jobs.OnDeadLettered(e => { });                      // carrier/unregistered/perpetual-deferral terminal
+MyJob.Jobs.OnRescheduled(e => { });                       // cooperative deferral (reschedule / backoff)
+MyJob.Jobs.OnCancelled(e => { });                         // cancelled
+MyJob.Jobs.OnStalled(e => { });                           // lease lapse or confirmed worker death
+MyJob.Jobs.OnAbandoned(e => { });                         // this node lost the claim mid-flight
 
 // From a handler
 ctx.Progress(0.4, "…");  ctx.ContinueWith(next);  ctx.StopChain();
