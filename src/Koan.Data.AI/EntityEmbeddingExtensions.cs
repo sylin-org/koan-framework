@@ -60,8 +60,47 @@ public static class EntityEmbeddingExtensions
     }
 
     /// <summary>
+    /// Performs semantic search across entities and returns them with similarity scores attached —
+    /// the dashboard-shaped variant of <see cref="SemanticSearch{TEntity}"/>.
+    /// </summary>
+    public static async Task<List<(TEntity Entity, double Similarity)>> SemanticSearchScored<TEntity>(
+        string query,
+        int limit = 10,
+        string? partition = null,
+        CancellationToken ct = default)
+        where TEntity : class, IEntity<string>, new()
+    {
+        var metadata = EmbeddingMetadata.Resolve<TEntity>();
+
+        float[] queryEmbedding;
+        using (metadata.Source != null || metadata.Model != null
+            ? Client.Scope(all: metadata.Source)
+            : null)
+        {
+            queryEmbedding = await Client.Embed(query, ct);
+        }
+
+        var vectorResults = await Vector<TEntity>.Search(
+            queryEmbedding,
+            vectorQuery => vectorQuery.Top(limit),
+            ct);
+
+        var matches = new List<(TEntity Entity, double Similarity)>();
+        foreach (var match in vectorResults.Items)
+        {
+            var entity = await LoadEntity<TEntity>(match.Id, partition, ct);
+            if (entity != null)
+            {
+                matches.Add((entity, match.Similarity));
+            }
+        }
+
+        return matches;
+    }
+
+    /// <summary>
     /// Finds entities similar to the current entity based on embedding similarity.
-    /// Works by convention — no [Embedding] attribute required for on-demand use.
+    /// Works by convention - no [Embedding] attribute required for on-demand use.
     /// </summary>
     public static async Task<List<TEntity>> FindSimilar<TEntity>(
         this TEntity entity,
