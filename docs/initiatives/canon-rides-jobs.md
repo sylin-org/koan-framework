@@ -38,6 +38,10 @@ Canon owns the funnel: phases, holds, and recovery.
 
 ### Recovery
 
+Recovery re-enters the funnel **at intake**. A fix is a hypothesis, not a pass: business rules get
+a vote again, every gate re-applies, and convergence makes the re-run cheap. The parked phase is
+therefore a **label for triage and queries** — "stopped at Matching" — never a resume cursor.
+
 ```csharp
 // Release one held record, optionally repairing it first (fixer runs before re-entry):
 await Person.Canon.Recover(stageId, fix: p => { p.SetMatchKey(p.Email); });
@@ -48,8 +52,29 @@ Person.Canon.OnRecovery(CanonPhase.Onboarding, fixer);   // registration form; n
 ```
 
 The hold records **which phase parked it** explicitly (today that lives only in transition
-history), so recovery re-enters at the right phase and phase-scoped queries
-("all Onboarding holds") are index-served.
+history), so triage and phase-scoped queries ("all Onboarding holds") are index-served.
+
+### Hold observability
+
+Counts of pending holds, per entity type × phase, off the parked-phase index — three surfaces:
+a query API (`HoldCounts()`), a Canon health contributor projecting the numbers onto
+`/health/ready` (the Jobs pattern), and composition facts. The trend is the recovery signal:
+Onboarding holds 42 → 17 → 0 after the fix ships is the proof the fix worked.
+
+### Business-rule holds: `Hold(why)`
+
+Data can be pipeline-correct and still fail a business rule ("user exists in CRM"). Steps get a
+deliberate verb, and the engine gives the two failure modes different futures:
+
+| Step outcome | Engine behavior |
+|---|---|
+| pass | funnel continues |
+| **`ctx.Hold(justification)`** | **deterministic business veto → phase hold**, justification on the receipt; retrying is meaningless |
+| thrown exception | transient failure → Jobs retry/backoff; exhaustion dead-letters |
+
+A CRM outage retries; a user missing from the CRM holds. "Pipeline-correct but business-failed"
+becomes a first-class outcome instead of an exception abused as control flow, and the
+justification is what recovery triage reads.
 
 ### Jobs' role (transport, not semantics)
 
@@ -98,14 +123,17 @@ phase with the failure reason on the receipt; nothing silently loops.
 
 ## Rollout slices
 
-0. **Lexicon amendment** — `canon-language.md`: Recover, phase-holds, `CanonPhase`, Promote's fate.
+0. **Lexicon amendment** — `canon-language.md`: `Recover`, phase-holds, `CanonPhase`, `Hold(why)`
+   (business veto vs transient exception), Promote's fate.
 1. **Engine + phases** — Canon→Jobs dependency; StageOnly enqueues (OnIntake preserved at
    processing); `CanonStage.ParkedPhase` + index; phase-specific parking from contributors;
-   spec flips where "stays parked" becomes phase-labeled.
-2. **Recovery** — single-record operation with fixer; phase-scoped hold queries; corrective
-   re-park on persistent failure.
+   `ctx.Hold(justification)` verb with deterministic-vs-transient semantics; spec flips where
+   "stays parked" becomes phase-labeled.
+2. **Recovery + observability** — single-record operation with fixer (re-enters at intake);
+   `HoldCounts()` query surface; Canon health contributor; corrective re-park on persistent
+   failure.
 3. **Bulk recovery + built-in sweep** — scheduled job sweeping a phase under a registered fixer
-   (opt-out); docs pass: "the queue is yours to work" retires, funnel + recovery taught in
+   (opt-out); docs pass: "the queue is yours to work" retires, funnel + holds + recovery taught in
    `canon-pipeline.md`, the howto, and the capability leaf.
 
 ## Status
