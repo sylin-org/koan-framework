@@ -1,4 +1,4 @@
-﻿---
+---
 type: GUIDE
 domain: ai
 title: "AI & Vector Search How-To"
@@ -244,6 +244,31 @@ if (capabilities.Has(VectorCaps.Knn))
 ```
 
 ---
+
+## 3.5 The Type-Scoped Gateway - Entity.AI
+
+Sections 1-3 are the primitives. When you want the shortcut - search and embed scoped to one
+Entity kind, bound to its declared embedding configuration - the gateway collapses the dance:
+
+```csharp
+using Koan.Data.AI;
+
+// embed the query, search, load entities - one call:
+var media = await Media.AI.Search("sunset beach", limit: 20);
+
+// with similarity scores:
+var scored = await Media.AI.SearchScored("sunset beach", limit: 20);
+
+// embed one instance through its declared model/source:
+var vector = await Media.AI.Embed(media);
+
+// similar entities, excluding the source itself:
+var similar = await Media.AI.Similar(media, limit: 10);
+```
+
+Routing honors the kind's `[Embedding]` declaration (model + source) automatically, so queries
+and indexing stay on the same model by construction. Convention-first: `Search` works even
+without the attribute. Requires `Sylin.Koan.Data.AI` 1.0.13 or newer.
 
 ## 4. Hybrid Search – Semantic + Keyword
 

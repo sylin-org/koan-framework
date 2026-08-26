@@ -61,6 +61,37 @@ Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.
   supported path; if saves report "no declared space", the owned flow above owns the fix.
 - Do not hand-write embedding pipelines beside `Client.Embed`.
 
+## The type-scoped shortcut: `Entity.AI`
+
+For applications that just want semantic search over one Entity kind, the four-step dance —
+embed the query, `Vector<T>.Search`, fan out `Get`, map results — collapses into the type
+gateway. `Sylin.Koan.Data.AI` 1.0.13 or newer delivers `YourEntity.AI.*` to every Entity kind:
+
+```csharp
+using Koan.Data.AI;   // the gateway lives here
+
+// Save as usual - the [Embedding] attribute indexes it (see above).
+await new Produce { Name = "Cherry tomatoes", Description = "sweet, quick" }.Save(ct);
+
+// Search by meaning - embeds the query, finds nearest vectors, loads the entities.
+var produce = await Produce.AI.Search("something quick before the game", limit: 10);
+
+// With similarity scores attached:
+var scored = await Produce.AI.SearchScored("something quick", limit: 10);
+// scored[i].Entity / scored[i].Similarity
+
+// Embed one instance through the kind's declared model + source:
+var vector = await Produce.AI.Embed(produce);
+
+// Find entities similar to one instance (excludes itself by default):
+var similar = await Produce.AI.Similar(produce, limit: 10);
+```
+
+The gateway is bound to the same `[Embedding]` declaration as indexing — model, source and
+dimensions route automatically, so the one-model constraint above is enforced by construction.
+`Search` is convention-first (works without the attribute); the attribute remains the authority
+for indexing behavior. Usings: `Koan.Data.AI` for the gateway; your model's regular usings.
+
 ## Leaves
 
 - **Pasteable build:** [search-by-meaning](../../recipes/search-by-meaning.md) - install, attribute,
