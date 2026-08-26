@@ -7,7 +7,9 @@ param(
     [string] $OutputDirectory,
 
     [ValidateNotNullOrEmpty()]
-    [string] $Configuration = 'Release'
+    [string] $Configuration = 'Release',
+
+    [bool] $PublisherSigningEnabled = $false
 )
 
 Set-StrictMode -Version Latest
@@ -18,9 +20,21 @@ $ErrorActionPreference = 'Stop'
 # unchanged package rebuilt at a later commit is a different artifact wearing an already published
 # version. Not building it is what makes "no change, no new package" true rather than aspirational.
 
+function Get-AbsolutePath([string] $Path) {
+    if ([IO.Path]::IsPathFullyQualified($Path)) { return [IO.Path]::GetFullPath($Path) }
+    return [IO.Path]::GetFullPath((Join-Path (Get-Location) $Path))
+}
+
 $repository = Split-Path -Parent $PSScriptRoot
-$planFile = [IO.Path]::GetFullPath((Join-Path (Get-Location) $PlanPath))
-$outputPath = [IO.Path]::GetFullPath((Join-Path (Get-Location) $OutputDirectory))
+$planFile = Get-AbsolutePath $PlanPath
+$outputPath = Get-AbsolutePath $OutputDirectory
+$codeSigningPolicy = 'Code signing policy: https://github.com/sylin-org/koan-framework/blob/main/CODE_SIGNING_POLICY.md.'
+if ($PublisherSigningEnabled) {
+    $codeSigningPolicy += ' Free code signing provided by SignPath.io, certificate by SignPath Foundation.'
+}
+# MSBuild treats commas in /property values as property separators. Percent-encoding survives the
+# command-line parser and is decoded before the value is written to the package nuspec.
+$codeSigningPolicyArgument = $codeSigningPolicy.Replace(',', '%2C')
 
 if (-not (Test-Path -LiteralPath $planFile -PathType Leaf)) {
     throw "Release plan '$planFile' does not exist."
@@ -64,6 +78,7 @@ foreach ($package in $selected) {
         --configuration $Configuration `
         --output $outputPath `
         --property:PublicRelease=true `
+        "--property:PackageReleaseNotes=$codeSigningPolicyArgument" `
         --nologo
     if ($LASTEXITCODE -ne 0) {
         throw "Packing '$packageId' failed."
