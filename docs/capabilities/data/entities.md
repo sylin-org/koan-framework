@@ -41,6 +41,7 @@ var open = await Todo.Query(item => !item.Done, ct);
 | Need | Hook on or around the Entity | Continue at |
 |---|---|---|
 | Save, get, query, page, stream, or remove | `Save`, `Get`, `Query`, `Page`, `AllStream`, `Remove` | [choose an Entity store](entity-stores.md) |
+| Normalize string fields before persistence (trim, casing) | `[Trim]`, `[Lowercase]`, `[Uppercase]` | [field hygiene](field-hygiene.md) |
 | Use a non-string identifier | `Entity<T, TKey>` | [Data reference](../../reference/data/index.md#the-application-vocabulary) |
 | Keep several runtime shapes in one searchable set | one `Entity<TRoot>` plus generated root variants | [polymorphic Entity family](../../reference/data/index.md#keep-a-polymorphic-family-in-one-set) |
 | Relate a child to a parent | `[Parent(typeof(ParentType))]`, `GetParent`, `GetChildren` | [Entity relationships](relationships.md) |

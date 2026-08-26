@@ -1,4 +1,4 @@
-﻿---
+---
 type: REFERENCE
 domain: framework
 title: "Koan Capability Map"
@@ -151,6 +151,7 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 | Tenant operator console | `Sylin.Koan.Tenancy.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Tenancy.Web/README.md) |
 | Identity-bound tenancy | `Sylin.Koan.Identity.Tenancy` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Identity.Tenancy/README.md) |
 | Field-at-rest classification | `Sylin.Koan.Classification` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Classification/README.md) |
+| Field hygiene (trim/casing on write) | `Sylin.Koan.Data.Hygiene` | [capability node](../capabilities/data/field-hygiene.md) | - |
 
 ## Work and integration
 

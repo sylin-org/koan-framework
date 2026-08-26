@@ -27,6 +27,7 @@ keeps saying `Recipe` while everything underneath changes.
 | "publish approved records to another audience" | [named sources](data/named-sources.md) |
 | "we outgrew SQLite" - move without rewriting verbs | [store cutover](data/store-cutover.md) |
 | "users delete things by accident" - undo | [recoverable deletion](data/recoverable-deletion.md) |
+| "emails/keys/regions keep arriving dirty" - trim and casing | [field hygiene](data/field-hygiene.md) |
 | "backups / disaster recovery" | [backups](data/backups.md) |
 | "search by meaning" | [semantic search](ai/semantic-search.md) |
 | "what can an `Entity<T>` become?" - the full hook map | [Entity capability hooks](data/entities.md) |
