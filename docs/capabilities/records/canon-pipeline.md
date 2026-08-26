@@ -64,12 +64,10 @@ durable *before* processing, stage them instead of canonizing immediately:
 
 ```csharp
 var parked = await person.Canonize(o => o.WithStageBehavior(CanonStageBehavior.StageOnly), ct: ct);
-// result.Outcome == Parked; payload persisted as a CanonStage receipt with transition history
+// result.Outcome == Parked; the receipt is enqueued and the engine processes it at-least-once.
 ```
 
-A staged payload waits as data — `Pending → Processing → Completed | Parked | Failed`, full transition
-log, correlation id — until something promotes it back through `.Canonize()` and marks the stage
-completed. There is no built-in sweeper or retry clock; the queue is yours to work.
+A staged receipt is a job (the receipt *is* the work item): the engine claims it, re-enters the funnel at Intake — `OnIntake` and business rules apply — and settles the receipt by outcome. A business-rule veto (`ctx.Hold(why)` or `OnRule`) parks it as **Refused** at the vetoing phase; a mechanical block parks it as **Stalled**. Held records wait in `Person.Canon.Hold`: `Hold.Counts.*` for the scoreboard, `Hold.Recover(...)` to resubmit, optionally repairing via the fixer hook. Recovery re-enters at Intake — a fix is a hypothesis, not a pass.
 
 ## The six phases
 
@@ -164,7 +162,7 @@ per-property footprints, reconcile decisions, lineage changes, lifecycle and rea
 
 - Do not call entity Save/Delete beside the pipeline for canonical models — writes belong through
   `Canonize()` so indexes and provenance stay truthful.
-- Do not treat Parked stages as processed; someone (or some job) must promote them.
+- Do not treat held (Parked) stages as processed; Person.Canon.Hold.Recover(...) releases them back through the funnel at Intake.
 - Do not assume a fuzzy-matcher exists: identity is exactly your declared keys.
 
 ## Glossary (MDM bridge)
