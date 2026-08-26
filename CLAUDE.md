@@ -40,6 +40,9 @@ public sealed class TodosController : EntityController<Todo>;
 - Structural discovery, contribution ordering, and provider election compile once per host shape.
   Runtime operations consume immutable plans.
 - Same syntax does not imply backend parity. Required guarantees negotiate or reject correctively.
+- Koan methods are async by nature: a method returning `Task`/`IAsyncEnumerable` keeps its plain
+  name — the `Async` suffix is never used on Koan surfaces (`Save()`, `Query()`, `Recover()`;
+  match `Entity<T>`).
 - Cross-cutting capabilities contribute to each affected pillar only when the functional module is active.
 - Prefer standard .NET hosting, DI, options, health, assembly, MSBuild, and NuGet concepts before
   creating a Koan-specific part.
