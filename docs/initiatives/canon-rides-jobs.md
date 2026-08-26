@@ -98,7 +98,7 @@ above, a Canon health contributor onto `/health/ready` (the Jobs pattern), and c
 The trend is the recovery signal: Onboarding holds 42 → 17 → 0 after the fix ships is the proof
 the fix worked — and each `Recover` sweep's summary receipt updates it.
 
-### Business-rule holds: `Hold(why)`
+### Business-rule holds: `Hold(why)` — and where business evaluation lives
 
 Data can be pipeline-correct and still fail a business rule ("user exists in CRM"). Steps get a
 deliberate verb, and the engine gives the two failure modes different futures:
@@ -106,12 +106,34 @@ deliberate verb, and the engine gives the two failure modes different futures:
 | Step outcome | Engine behavior |
 |---|---|
 | pass | funnel continues |
-| **`ctx.Hold(justification)`** | **deterministic business veto → phase hold**, justification on the receipt; retrying is meaningless |
+| **`ctx.Hold(justification)`** | **deterministic veto → phase hold**, justification on the receipt; retrying is meaningless |
 | thrown exception | transient failure → Jobs retry/backoff; exhaustion dead-letters |
 
-A CRM outage retries; a user missing from the CRM holds. "Pipeline-correct but business-failed"
-becomes a first-class outcome instead of an exception abused as control flow, and the
-justification is what recovery triage reads.
+**Position law: cheap checks early, business evaluation late.**
+
+- **Per-step quick guards** are the existing contributor powers: mutate (adjust), fail (transient),
+  `ctx.Hold` (quick veto on what the step cheaply knows — malformed input, ambiguous identity).
+- **Business evaluation runs at the business checkpoint** — post-Projection, pre-Distribution,
+  where the synthetic candidate is complete and the identity reconciled. The business question is
+  only well-posed against the complete record; the expensive external call runs once per attempt;
+  and the veto semantics ("do not commit this record") is literally a commit-gate concern.
+- **Mechanism**: the business checkpoint is a framework-owned phase occupant (the third, beside
+  OnIntake and the matchkey contributor) that runs registered rules as a set:
+
+```csharp
+Person.Canon.OnRule(async candidate =>
+    await Crm.Exists(candidate.Model.Email)
+        ? null                          // pass
+        : "user not found in CRM");     // hold — parks as Refused at the business checkpoint
+```
+
+Rules run in registration order; first hold terminates the operation (the funnel law every phase
+follows); recovery re-runs the funnel and therefore the rules, once per attempt. Telemetry stays
+sharp: `Counts.Refused` aggregates all vetoes while the phase breakdown distinguishes quick early
+rejects from late business vetoes — Refused piling up at Intake means business checks are running
+too early or intake is dirty.
+
+Lexicon items: the business checkpoint's name, and the rule-registration verb (`OnRule`).
 
 ### Jobs' role (transport, not semantics)
 
