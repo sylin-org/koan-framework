@@ -44,7 +44,7 @@ counts become walkable surface, and the closed type removes casts.
 ```csharp
 // Counts — index-served, per phase and per reason category:
 Person.Canon.Hold.Counts.Onboarding        // int
-Person.Canon.Hold.Counts.Rules             // business-rule vetoes, any phase (reason-category view)
+Person.Canon.Hold.Counts.Vetoed             // business-rule vetoes, any phase (reason-category view)
 Person.Canon.Hold.Counts.All
 
 // Triage — the held receipts themselves, paged:
@@ -54,7 +54,7 @@ Person.Canon.Hold.Records()
 // Triage-and-release — Records is a namespace; every walk names its scope explicitly:
 Person.Canon.Hold.Records.All()                  // paged triage, no side effects
 Person.Canon.Hold.Records.Onboarding()           // one phase's holds
-Person.Canon.Hold.Records.Rules()                // reason-category view
+Person.Canon.Hold.Records.Vetoed()                // reason-category view
 Person.Canon.Hold.Records.All(i =>
 {
     if (i.Step == CanonPhase.Onboarding) i.Model.Name = "Lalala";
@@ -72,7 +72,7 @@ in place, Canon-style, and may be async (a CRM lookup lives there).
 
 Two dimensions on every hold: **`Phase`** (where the funnel stopped — the ratified `CanonPhase`
 set drives the typed members) and **`Reason` category** (`Structural` | `Rule` | …) — a business
-veto files under `Rules` no matter which phase raised it, so `Counts.Rules` is queryable without
+veto files under `Vetoed` no matter which phase raised it, so `Counts.Vetoed` is queryable without
 every phase knowing every business rule.
 
 ### Recovery semantics
@@ -179,16 +179,16 @@ Person.Canon.Hold                                    // Hold gateway — thin ro
 │     .All              → Task<int>
 │     .Onboarding       → Task<int>                  // per ratified CanonPhase member
 │     .Matching         → Task<int>
-│     .Rules            → Task<int>                  // reason-category view (business vetoes, any phase)
+│     .Vetoed            → Task<int>                  // reason-category view (business vetoes, any phase)
 │     .<phase>          → Task<int>                  // grows with the lexicon, never a string
 ├── .Records                                         // ── triage + release cursor ──
 │     .All()               → Task<PageResult<CanonStage<T>>>    // paged, no side effects
 │     .Onboarding()        → Task<PageResult<CanonStage<T>>>
-│     .Rules()             → Task<PageResult<CanonStage<T>>>
+│     .Vetoed()             → Task<PageResult<CanonStage<T>>>
 │     .<phase>()
 │     .All(fix)            → Task<HoldSweepSummary> // fix: HoldContext<T> → HoldContext<T>? (null ⇒ held)
 │     .Onboarding(fix)     →                        // or HoldContext<T> → Task<HoldContext<T>?> — same name
-│     .Rules(fix)          →
+│     .Vetoed(fix)          →
 │     .<phase>(fix)
 └── .Recover(id, fix = null)  → Task<HoldOutcome>    // one known receipt
 ``
@@ -201,3 +201,13 @@ suffixes (async by nature — overloads share the name); non-null return ⇒ Rec
 intake), null ⇒ stays held; a throwing fixer leaves the record held with the error on its
 receipt and the sweep continues; every sweep returns its summary; Counts and Records grow
 with CanonPhase — no string parameters; everything is a thin router over the ambient runtime.
+
+## Segment grammar (naming law for this surface)
+
+In a noun-chain surface, segment grammar carries the semantics: **phases are proper nouns**
+(Onboarding, Matching — place-filters), **reason categories are past participles**
+(Vetoed — outcome-filters, read as adjectives). Records.Rules() was rejected: a plural noun
+mid-chain parses as an owner ("the rules' records") and, sitting beside phase members, pretends
+a reason category is a phase. Participles cannot be misread — and agents mapping natural-language
+requests to members (""records blocked by business rules"" → Records.Vetoed()) get a
+semantically tight token instead of a guessable one.
