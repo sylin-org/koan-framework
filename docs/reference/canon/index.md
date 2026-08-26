@@ -115,8 +115,9 @@ safety.
 ## Operational honesty
 
 - `CanonizationEvent` is a phase result, not Koan Communication transport.
-- Stage-only arrivals persist as stages and return parked. Failed and parked pipeline outcomes remain
-  non-canonical.
+- Stage-only arrivals persist as stages, enqueue through the Jobs engine, and return parked. Failed
+  and held pipeline outcomes remain non-canonical; held receipts are released via
+  `Person.Canon.Hold.Recover(...)`, which re-enters the funnel at Intake.
 - Canon currently runs in-process; distributed delivery, locking, durable replay, retry, and recovery
   require explicit application or adapter capability.
 - Provider concurrency, transaction, and durability guarantees come from the selected persistence

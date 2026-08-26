@@ -189,7 +189,13 @@ Content-Type: application/json
 Inspect `/api/canon/models` for the exact host model plan and `/.well-known/Koan/facts` for the runtime,
 Web projection, selected Data provider, and non-atomic commit posture. For non-Web code, call
 `await customer.Canonize()` within an active Koan host. Deferred arrivals stage instead:
-`CanonStageBehavior.StageOnly` persists a receipt you promote by canonizing its payload later.
+`CanonStageBehavior.StageOnly` persists a receipt **and enqueues it** — the Jobs engine claims it,
+re-enters the funnel at Intake (`OnIntake` and business rules apply), and settles the receipt by
+outcome. A business-rule veto (`ctx.Hold(why)` in a contributor, or a registered `OnRule`) parks
+the receipt as **Refused** at the vetoing phase; a mechanical block parks it as **Stalled**. Held
+receipts wait in `Person.Canon.Hold`: `Hold.Counts.*` for the scoreboard, `Hold.Recover(...)`
+to release — optionally repairing via the fixer hook; recovery always re-enters at Intake, because
+a fix is a hypothesis, not a pass.
 
 ## Failure and operational boundaries
 

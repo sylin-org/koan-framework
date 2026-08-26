@@ -173,7 +173,8 @@ phase with the failure reason on the receipt; nothing silently loops.
 - `CanonStage` gains a parked-phase field + index; specs asserting undifferentiated "stays parked"
   flip to phase-specific expectations.
 - The lexicon amendment precedes code — no implementation may invent names.
-
+- `CanonModule.Register` uses `RemoveAll<JobTypeRegistry>()` before registering the plan-built registry factory: deterministic regardless of module registration order, but it overrides any earlier registration of that service. Justified - Canon owns the stage-job closure requirement no other module can know.
+- **Built-in sweeper: obsoleted by the final model.** Machine-deferred receipts are enqueued at creation (nothing accumulates to sweep), and held receipts are human-gated by definition (auto-resubmitting without a fix just re-parks). The replacement is the application-owned bulk recovery sweep - an ordinary scheduled job calling `Hold.Recover(phase, fixer)` - taught in `canon-pipeline.md`. Opt-in by existing, opt-out by not existing.
 ### Non-goals
 
 - Jobs never learns canon semantics; the pipeline stays in-process inside the handler.

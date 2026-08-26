@@ -69,6 +69,20 @@ var parked = await person.Canonize(o => o.WithStageBehavior(CanonStageBehavior.S
 
 A staged receipt is a job (the receipt *is* the work item): the engine claims it, re-enters the funnel at Intake — `OnIntake` and business rules apply — and settles the receipt by outcome. A business-rule veto (`ctx.Hold(why)` or `OnRule`) parks it as **Refused** at the vetoing phase; a mechanical block parks it as **Stalled**. Held records wait in `Person.Canon.Hold`: `Hold.Counts.*` for the scoreboard, `Hold.Recover(...)` to resubmit, optionally repairing via the fixer hook. Recovery re-enters at Intake — a fix is a hypothesis, not a pass.
 
+**Bulk recovery sweep.** After fixing a systemic cause, resubmit a phase's holds on a cadence with an ordinary scheduled job:
+
+```csharp
+[JobAction("RecoverOnboarding", Schedule = "00:30:00")]
+public sealed class OnboardingRecovery : Entity<OnboardingRecovery>, IKoanJob<OnboardingRecovery>
+{
+    public static async Task Execute(OnboardingRecovery job, JobContext ctx, CancellationToken ct)
+        => _ = await Person.Canon.Hold.Recover(CanonPipelinePhase.Intake, ct);
+}
+```
+
+The sweep's summary (attempted / recovered / re-parked) is the telemetry: records whose blocking
+condition persists re-park with their reason — the loop is corrective, never silent.
+
 ## The six phases
 
 `Intake → Validation → Matching → Reconcile → Projection → Distribution`, each phase's contributors
