@@ -82,6 +82,45 @@ public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
         JobScheduleRegistry.Reset<T>();
         return this;
     }
+
+    // --- lifecycle observers (PMC-056): past-participle hooks, fired after the durable write ---
+
+    /// <summary>Observe engine claims of this type's jobs.</summary>
+    public JobStatics<T> OnClaimed(Action<JobEvent<T>> handler) => Observe(JobEventKind.Claimed, handler);
+
+    /// <summary>Observe successful settlement.</summary>
+    public JobStatics<T> OnCompleted(Action<JobEvent<T>> handler) => Observe(JobEventKind.Completed, handler);
+
+    /// <summary>Observe terminal failure (retries exhausted).</summary>
+    public JobStatics<T> OnFailed(Action<JobEvent<T>> handler) => Observe(JobEventKind.Failed, handler);
+
+    /// <summary>Observe dead-lettering (carrier/unregistered/perpetual-deferral terminal states).</summary>
+    public JobStatics<T> OnDeadLettered(Action<JobEvent<T>> handler) => Observe(JobEventKind.DeadLettered, handler);
+
+    /// <summary>Observe cooperative deferral (reschedule / backoff).</summary>
+    public JobStatics<T> OnRescheduled(Action<JobEvent<T>> handler) => Observe(JobEventKind.Rescheduled, handler);
+
+    /// <summary>Observe cancellation.</summary>
+    public JobStatics<T> OnCancelled(Action<JobEvent<T>> handler) => Observe(JobEventKind.Cancelled, handler);
+
+    /// <summary>Observe stall-reclaims (lease lapse or confirmed worker death).</summary>
+    public JobStatics<T> OnStalled(Action<JobEvent<T>> handler) => Observe(JobEventKind.Stalled, handler);
+
+    /// <summary>Observe abandoned executions (this node lost the claim mid-flight and settled nothing).</summary>
+    public JobStatics<T> OnAbandoned(Action<JobEvent<T>> handler) => Observe(JobEventKind.Abandoned, handler);
+
+    /// <summary>Remove every lifecycle observer for this type. Intended for test isolation.</summary>
+    public JobStatics<T> ResetEvents()
+    {
+        JobEventRegistry.Reset<T>();
+        return this;
+    }
+
+    private JobStatics<T> Observe(JobEventKind kind, Action<JobEvent<T>> handler)
+    {
+        JobEventRegistry.Add(kind, handler);
+        return this;
+    }
 }
 
 /// <summary>The <c>.Job</c> (instance) / <c>.Jobs</c> (static) accessors and pointwise source <c>Submit</c>, delivered via

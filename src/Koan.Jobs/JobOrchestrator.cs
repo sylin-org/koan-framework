@@ -171,6 +171,7 @@ internal sealed class JobOrchestrator
         // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
         workItem ??= rec.WorkId == Infrastructure.Constants.Work.SingletonId ? binding.NewSingleton(rec.WorkId) : null;
         if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found."), claimedOwner); return null; }
+        Notify(rec.WorkType, JobEventKind.Claimed, workItem, rec);
 
         var snapshot = Snapshot(workItem);   // for conditional auto-save (§17.1): only persist if the handler mutates it
 
@@ -204,6 +205,7 @@ internal sealed class JobOrchestrator
             if (Volatile.Read(ref lostLease) != 0)
             {
                 _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
+                Notify(rec.WorkType, JobEventKind.Abandoned, workItem, rec);
                 return ctx;
             }
             await SettleSuccessAsync(rec, workItem, binding, policy, ctx, snapshot, claimedOwner);
@@ -218,6 +220,7 @@ internal sealed class JobOrchestrator
             if (Volatile.Read(ref lostLease) != 0)
             {
                 _logger.LogWarning("Koan.Jobs abandoned job {JobId}/{Action} after losing its lease; another claimant owns the row and no settle was written.", rec.Id, rec.Action);
+                Notify(rec.WorkType, JobEventKind.Abandoned, workItem, rec);
             }
             else if (timeoutCts.IsCancellationRequested)
                 await SettleFailureAsync(rec, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."), claimedOwner);
@@ -300,6 +303,14 @@ internal sealed class JobOrchestrator
 
     // --- settle paths ---
 
+    /// <summary>PMC-056: lifecycle events are pure projection — fired after the durable write, never
+    /// on it, and a throwing observer can never affect settlement.</summary>
+    private void Notify(string workType, JobEventKind kind, object? model, JobRecord rec, string? error = null)
+    {
+        try { JobEventRegistry.Publish(workType, kind, model, rec, error); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Job lifecycle observer for {WorkType} threw; treated as consumed.", rec.WorkType); }
+    }
+
     /// <summary>PMC-055 fencing at the settle point: the write lands only while the stored row is still
     /// Running and owned by the node that claimed it. A lost settle means another node reclaimed the row —
     /// the revived zombie abandons without writing, and the new claimant's settlement stands.</summary>
@@ -349,6 +360,7 @@ internal sealed class JobOrchestrator
         SetStatus(rec, JobStatus.Completed, now, "completed");
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
+        Notify(rec.WorkType, JobEventKind.Completed, workItem, rec);
 
         if (next is not null && !cancelledInSettleWindow)
         {
@@ -382,6 +394,7 @@ internal sealed class JobOrchestrator
         SetStatus(rec, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Failed, now);
+        Notify(rec.WorkType, JobEventKind.Failed, null, rec, ex.Message);
 
         if (policy.OnFailure == OnFailure.Continue && binding.NextInChain(rec.Action) is { } next)
         {
@@ -407,6 +420,7 @@ internal sealed class JobOrchestrator
         rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
         rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
         SetStatus(rec, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
+        Notify(rec.WorkType, JobEventKind.DeadLettered, null, rec, ex.Message);
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
     }
@@ -454,6 +468,7 @@ internal sealed class JobOrchestrator
             rec.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
             rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
             SetStatus(rec, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
+        Notify(rec.WorkType, JobEventKind.DeadLettered, null, rec);
             if (!await SettleOwnedAsync(rec, claimedOwner)) return;
             _metrics.Record(rec.WorkType, JobStatus.Dead, now);
             return;
@@ -462,6 +477,7 @@ internal sealed class JobOrchestrator
         rec.DeferReason = reason;
         rec.VisibleAt = ApplyJitter(until);
         SetStatus(rec, JobStatus.Queued, now, $"deferred to {rec.VisibleAt:O} ({reason})");
+        Notify(rec.WorkType, JobEventKind.Rescheduled, null, rec);
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
 
         if (gate)
@@ -480,6 +496,7 @@ internal sealed class JobOrchestrator
         rec.LastSettledAt = now;
         rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
+        Notify(rec.WorkType, JobEventKind.Cancelled, null, rec);
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
         _metrics.Record(rec.WorkType, JobStatus.Cancelled, now);
     }
@@ -538,6 +555,7 @@ internal sealed class JobOrchestrator
             stuck.LeaseUntil = null;
             stuck.VisibleAt = now;
             SetStatus(stuck, JobStatus.Queued, now, "reclaimed (lease lapsed)");
+            Notify(stuck.WorkType, JobEventKind.Stalled, null, stuck);
             await _ledger.Update(stuck, ct);
         }
 
@@ -559,6 +577,7 @@ internal sealed class JobOrchestrator
                 orphan.LeaseUntil = null;
                 orphan.VisibleAt = now;
                 SetStatus(orphan, JobStatus.Queued, now, "reclaimed (worker confirmed dead)");
+                Notify(orphan.WorkType, JobEventKind.Stalled, null, orphan);
                 await _ledger.Update(orphan, ct);
             }
 
