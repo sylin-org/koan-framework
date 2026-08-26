@@ -13,9 +13,38 @@ public sealed class CanonEntityGateway<TModel>
 {
     private readonly object _gate = new();
     private List<Func<TModel, TModel>> _intakeRules = [];
+    private List<Func<TModel, Task<string?>>> _businessRules = [];
     private List<Action<CanonizationResult<TModel>>> _committedHandlers = [];
     private List<Action<CanonizationResult<TModel>>> _parkedHandlers = [];
     private List<Action<CanonizationResult<TModel>>> _failedHandlers = [];
+
+    /// <summary>
+    /// Register a business rule. Runs at the business checkpoint (first occupant of Distribution,
+    /// after the synthetic candidate is complete): return null to pass, or a justification string
+    /// to hold the receipt as Refused. Rules run in registration order; first hold wins.
+    /// </summary>
+    public CanonEntityGateway<TModel> OnRule(Func<TModel, string?> rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        lock (_gate)
+        {
+            _businessRules.Add(candidate => Task.FromResult(rule(candidate)));
+        }
+
+        return this;
+    }
+
+    /// <summary>Async business rule — same name, async by nature (a CRM lookup lives here).</summary>
+    public CanonEntityGateway<TModel> OnRule(Func<TModel, Task<string?>> rule)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        lock (_gate)
+        {
+            _businessRules.Add(rule);
+        }
+
+        return this;
+    }
 
     /// <summary>
     /// Register an arrival-normalization rule. Mutate the candidate in place and return it;
@@ -85,6 +114,20 @@ public sealed class CanonEntityGateway<TModel>
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// The hold surface: scoreboard (`Counts`), triage (query the stage receipts directly), and
+    /// the `Recover` verb. See `canon-rides-jobs.md` and the canon language document.
+    /// </summary>
+    public HoldGateway<TModel> Hold => new();
+
+    internal IReadOnlyList<Func<TModel, Task<string?>>> RuleSnapshot()
+    {
+        lock (_gate)
+        {
+            return [.. _businessRules];
+        }
     }
 
     internal TModel ApplyIntakeRules(TModel candidate)
@@ -157,6 +200,7 @@ public sealed class CanonEntityGateway<TModel>
         lock (_gate)
         {
             _intakeRules = [];
+            _businessRules = [];
             _committedHandlers = [];
             _parkedHandlers = [];
             _failedHandlers = [];

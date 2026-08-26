@@ -1,7 +1,10 @@
+using Koan.Canon.Diagnostics;
 using Koan.Core;
 using Koan.Core.Composition;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Provenance;
+using Koan.Jobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -27,7 +30,47 @@ public sealed class CanonModule : KoanModule
             services.TryAddSingleton(contributorType);
         }
 
+        SeedStageJobs();
+
+        // The stage receipts are jobs (canon-rides-jobs), but their closed job types cannot ride
+        // KoanRegistry discovery: registry statics are rebuilt per boot AFTER module registration,
+        // and open generics are never discovered anyway. So Canon owns the registry factory: built
+        // from the composition plan (which survives), not from KoanRegistry. RemoveAll makes this
+        // deterministic regardless of module registration order.
+        services.RemoveAll<JobTypeRegistry>();
+        services.AddSingleton<JobTypeRegistry>(static sp =>
+        {
+            var plan = sp.GetRequiredService<CanonCompositionPlan>();
+            var stageJobTypes = plan.Models
+                .Select(static model => typeof(CanonStage<>).MakeGenericType(model.ModelType))
+                .ToArray();
+            return new JobTypeRegistry(stageJobTypes);
+        });
+
         services.AddCanonRuntime();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, CanonHoldsHealthContributor>());
+    }
+
+    /// <summary>
+    /// The receipt is the job (canon-rides-jobs): seed one closed <see cref="CanonStage{TModel}"/>
+    /// job type per discovered canon model, so the Jobs engine can claim and process staged
+    /// receipts. Open generics are never discovered — Canon closes them over its own models.
+    /// Idempotent; called at register <em>and</em> again at first enqueue, because a host's own
+    /// assembly manifest (where its models live) can load after module registration.
+    /// </summary>
+    internal static void SeedStageJobs()
+    {
+        var stageJobTypes = KoanRegistry.GetDiscoveredImplementors(typeof(ICanonModel))
+            .Where(static t => t is { IsClass: true, IsAbstract: false, IsGenericTypeDefinition: false }
+                               && typeof(CanonEntity<>).IsAssignableFrom(t))
+            .Select(static model => typeof(CanonStage<>).MakeGenericType(model))
+            .Distinct()
+            .ToArray();
+
+        if (stageJobTypes.Length > 0)
+        {
+            KoanRegistry.RegisterDiscoveredImplementors(typeof(IKoanJob), stageJobTypes);
+        }
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

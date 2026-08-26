@@ -1,13 +1,17 @@
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Jobs;
 
 namespace Koan.Canon;
 
 /// <summary>
-/// Represents staged canonization payloads awaiting processing.
+/// Represents staged canonization payloads awaiting processing. The receipt <em>is</em> the job
+/// (<c>canon-rides-jobs</c>): deferred arrivals enqueue it, the engine claims it, and
+/// <see cref="Execute"/> re-enters the funnel at Intake, then settles the receipt by outcome.
 /// </summary>
 /// <typeparam name="TModel">Canonical entity type.</typeparam>
-public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>
+public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>, IKoanJob<CanonStage<TModel>>
     where TModel : CanonEntity<TModel>, new()
 {
     private readonly object _lock = new();
@@ -78,6 +82,19 @@ public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>
     /// Detailed failure message.
     /// </summary>
     public string? ErrorMessage { get; private set; }
+
+    /// <summary>
+    /// The phase that parked the receipt, when held — a triage label, never a resume cursor
+    /// (recovery always re-enters at Intake).
+    /// </summary>
+    [Index]
+    public CanonPipelinePhase? ParkedPhase { get; private set; }
+
+    /// <summary>
+    /// Who stopped the record: the engine (<see cref="HoldReason.Stalled"/>) or a business rule
+    /// (<see cref="HoldReason.Refused"/>).
+    /// </summary>
+    public HoldReason? Reason { get; private set; }
 
     /// <summary>
     /// Arbitrary metadata persisted with the stage record.
@@ -174,7 +191,7 @@ public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>
     }
 
     /// <summary>
-    /// Park the stage for manual inspection.
+    /// Park the stage for manual inspection (a mechanical stall — the funnel could not proceed).
     /// </summary>
     public void Park(string reason, string? actor = null)
     {
@@ -186,9 +203,29 @@ public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>
         lock (_lock)
         {
             Status = CanonStageStatus.Parked;
+            Reason = HoldReason.Stalled;
             ErrorCode = "parked";
             ErrorMessage = reason;
             AppendTransition(CanonStageStatus.Parked, actor, reason);
+        }
+    }
+
+    /// <summary>
+    /// Hold the stage at a phase for a stated reason — the deliberate veto
+    /// (<paramref name="reason"/> names who stopped the record: engine stall or business refusal).
+    /// </summary>
+    public void Hold(CanonPipelinePhase phase, HoldReason reason, string justification, string? actor = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(justification);
+
+        lock (_lock)
+        {
+            Status = CanonStageStatus.Parked;
+            ParkedPhase = phase;
+            Reason = reason;
+            ErrorCode = "held";
+            ErrorMessage = justification;
+            AppendTransition(CanonStageStatus.Parked, actor, $"{reason} hold at {phase}: {justification}");
         }
     }
 
@@ -226,8 +263,54 @@ public sealed class CanonStage<TModel> : Entity<CanonStage<TModel>>
             Status = CanonStageStatus.Pending;
             ErrorCode = null;
             ErrorMessage = null;
+            ParkedPhase = null;
+            Reason = null;
             AppendTransition(CanonStageStatus.Pending, actor, notes ?? "Stage reset to pending");
         }
+    }
+
+    /// <summary>
+    /// The engine's processing of one receipt: re-enter the funnel at Intake, then settle the
+    /// receipt by outcome. At-least-once is safe — re-canonizing converges by match key.
+    /// </summary>
+    public static async Task Execute(CanonStage<TModel> stage, JobContext ctx, CancellationToken ct)
+    {
+        if (stage.Payload is null)
+        {
+            stage.MarkFailed("stage:empty-payload", "Staged payload is missing; the receipt cannot be canonized.", "engine");
+            await stage.Save(ct);
+            return;
+        }
+
+        var result = await stage.Payload.Canonize(cancellationToken: ct);
+        switch (result.Outcome)
+        {
+            case CanonizationOutcome.Parked when stage.Reason == HoldReason.Refused:
+                // ctx.Hold / a business rule stamped the receipt during the pipeline — keep its phase and justification.
+                break;
+            case CanonizationOutcome.Parked:
+            {
+                var parkEvent = result.Events.LastOrDefault(e => e.StageStatus == CanonStageStatus.Parked);
+                var phase = parkEvent?.Phase ?? stage.ParkedPhase ?? CanonPipelinePhase.Intake;
+                var reason = parkEvent?.Reason ?? HoldReason.Stalled;
+                var why = !string.IsNullOrWhiteSpace(parkEvent?.Message) ? parkEvent.Message : "pipeline parked the payload.";
+                stage.Hold(phase, reason, why, "engine");
+                break;
+            }
+            case CanonizationOutcome.Failed:
+            {
+                var why = result.Events.LastOrDefault(e => e.StageStatus == CanonStageStatus.Failed) is { } evt && !string.IsNullOrWhiteSpace(evt.Message)
+                    ? evt.Message
+                    : "pipeline failed.";
+                stage.MarkFailed("canonization:failed", why, "engine");
+                break;
+            }
+            default:
+                stage.MarkCompleted("engine", $"canonized ({result.Outcome}).");
+                break;
+        }
+
+        await stage.Save(ct);
     }
 
     private void AppendTransition(CanonStageStatus status, string? actor, string? notes)

@@ -28,5 +28,6 @@
     <InternalsVisibleTo Include="Koan.Jobs.Adapter.Sqlite.Tests" />
     <InternalsVisibleTo Include="Koan.Tests.Integration.Bootstrap.Pillars" />
     <InternalsVisibleTo Include="Koan.Samples.SnapVault.Tests" />
+    <InternalsVisibleTo Include="Koan.Canon" />
   </ItemGroup>
 </Project>

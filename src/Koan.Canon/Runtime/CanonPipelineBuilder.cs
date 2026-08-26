@@ -90,6 +90,10 @@ internal sealed class CanonPipelineBuilder<TModel>
         GetOrCreateList(map, CanonPipelinePhase.Validation).Insert(0, new Internal.DefaultIntakeContributor<TModel>());
         GetOrCreateList(map, CanonPipelinePhase.Matching).Insert(0, new Internal.DefaultMatchingContributor<TModel>(aggregationMetadata));
 
+        // The business checkpoint: first Distribution occupant, reading gateway-registered rules at
+        // runtime (registration may follow composition). No rules → no-op.
+        GetOrCreateList(map, CanonPipelinePhase.Distribution).Insert(0, new Internal.BusinessRuleContributor<TModel>());
+
         if (aggregationMetadata.RulesByProperty.Count > 0 || aggregationMetadata.AuditEnabled)
         {
             GetOrCreateList(map, CanonPipelinePhase.Reconcile).Insert(0, new Internal.ReconcileContributor<TModel>(aggregationMetadata));

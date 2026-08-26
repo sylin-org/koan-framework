@@ -33,6 +33,13 @@ public sealed class CanonizationEvent
     public string Message { get; init; } = "";
 
     /// <summary>
+    /// Who stopped the record, when this event parks it — the verb stamps
+    /// <see cref="HoldReason.Refused"/>; engine-detected stalls default to
+    /// <see cref="HoldReason.Stalled"/>.
+    /// </summary>
+    public HoldReason? Reason { get; init; }
+
+    /// <summary>
     /// Optional structured detail.
     /// </summary>
     public string? Detail { get; init; }

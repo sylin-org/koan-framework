@@ -54,8 +54,33 @@ public sealed class CanonPipelineContext<TModel> : ICanonPipelineContext
     /// </summary>
     public CanonStage<TModel>? Stage { get; private set; }
 
+    /// <summary>
+    /// The phase whose contributors are currently executing — the phase a
+    /// <see cref="Hold"/> parks the receipt under.
+    /// </summary>
+    public CanonPipelinePhase CurrentPhase { get; internal set; }
+
     /// <inheritdoc />
     public Type EntityType => typeof(TModel);
+
+    /// <summary>
+    /// Deterministic business veto: park the receipt at the current phase with a justification.
+    /// Returning the event terminates the phase and the operation (the funnel law every phase
+    /// follows). Thrown exceptions remain the transient channel — the engine retries those.
+    /// </summary>
+    public CanonizationEvent? Hold(string justification)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(justification);
+
+        Stage?.Hold(CurrentPhase, HoldReason.Refused, justification, "pipeline");
+        return new CanonizationEvent
+        {
+            Phase = CurrentPhase,
+            StageStatus = CanonStageStatus.Parked,
+            Reason = HoldReason.Refused,
+            Message = justification
+        };
+    }
 
     /// <inheritdoc />
     public IReadOnlyDictionary<string, object?> Items => _items;

@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Canon;
 using Koan.Canon.Internal;
+using Koan.Core.Hosting.App;
+using Koan.Jobs;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Canon;
 
@@ -71,6 +74,17 @@ internal sealed class CanonRuntime : ICanonRuntime
         if (effectiveOptions.StageBehavior == CanonStageBehavior.StageOnly)
         {
             var stage = await CreateStageAsync(context, cancellationToken);
+            var detail = $"stage:{stage.Id}";
+
+            // canon-rides-jobs: the receipt rides the job engine. No coordinator (a hand-built
+            // runtime outside a host) leaves the receipt Pending — today's semantics, unchanged.
+            if (_services?.GetService(typeof(IJobCoordinator)) is IJobCoordinator coordinator)
+            {
+                CanonModule.SeedStageJobs();   // idempotent — covers late-loading host manifests
+                var handle = await coordinator.SubmitAsync(stage, "", null, cancellationToken);
+                detail = $"{detail} job:{handle.JobId}";
+            }
+
             var stageEvent = new CanonizationEvent
             {
                 Phase = CanonPipelinePhase.Intake,
@@ -78,7 +92,7 @@ internal sealed class CanonRuntime : ICanonRuntime
                 CanonState = entity.State,
                 OccurredAt = DateTimeOffset.UtcNow,
                 Message = "Payload staged for deferred canonization.",
-                Detail = $"stage:{stage.Id}"
+                Detail = detail
             };
 
             return new CanonizationResult<T>(entity, CanonizationOutcome.Parked, metadata.Clone(), new[] { stageEvent }, reprojectionTriggered: false, distributionSkipped: true);
@@ -96,6 +110,7 @@ internal sealed class CanonRuntime : ICanonRuntime
         foreach (var phase in descriptor.Phases)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            context.CurrentPhase = phase;
             CanonizationEvent? overrideEvent = null;
             foreach (var contributor in descriptor.GetContributors(phase))
             {
@@ -122,6 +137,19 @@ internal sealed class CanonRuntime : ICanonRuntime
 
             if (terminalOutcome is { } terminal)
             {
+                // Stamp a hold on an attached receipt the verb did not already stamp (a contributor
+                // returning a raw Parked event) — mechanical stalls file under Stalled.
+                if (terminal == CanonizationOutcome.Parked
+                    && context.Stage is { } held
+                    && held.Status != CanonStageStatus.Parked)
+                {
+                    held.Hold(
+                        phase,
+                        HoldReason.Stalled,
+                        string.IsNullOrWhiteSpace(phaseEvent.Message) ? $"held at {phase}." : phaseEvent.Message,
+                        "engine");
+                }
+
                 entity.Metadata = context.Metadata.Clone();
                 return new CanonizationResult<T>(
                     entity,
@@ -295,6 +323,7 @@ internal sealed class CanonRuntime : ICanonRuntime
             CanonState = candidate.CanonState ?? baseline.CanonState,
             OccurredAt = candidate.OccurredAt == default ? baseline.OccurredAt : candidate.OccurredAt,
             Message = string.IsNullOrWhiteSpace(candidate.Message) ? baseline.Message : candidate.Message,
+            Reason = candidate.Reason ?? baseline.Reason,
             Detail = candidate.Detail ?? baseline.Detail
         };
     }
