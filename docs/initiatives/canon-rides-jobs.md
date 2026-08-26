@@ -1,105 +1,114 @@
 ---
 type: PLAN
 domain: framework
-title: "Canon rides the job engine (Jobs is not optional)"
+title: "Canon rides the job engine — holds are phase-specific, recovery is a pipeline"
 audience: [maintainers, framework-authors]
 status: proposed
 last_updated: 2026-08-25
 framework_version: v1.0.0
 ---
 
-# Canon rides the job engine (Jobs is not optional)
+# Canon rides the job engine — holds are phase-specific, recovery is a pipeline
 
-> Supersedes the bridge-package proposal of earlier today (git history keeps it). The pivot: a
-> bridge made "Canon without Jobs" a supported mode; the review question that killed it — *should
-> Canon exist without Jobs at all?* — exposed that the mode was a trap, not a feature.
+> Third revision. History: (1) bridge package — dropped, a bridge made "Canon without Jobs" a
+> supported trap; (2) machine-deferred vs human-held — dropped, still transport-thinking. Leo's
+> correction: the real axis is **the funnel**. Jobs is transport; Canon owns phases, holds, and
+> recovery.
 
 ## Problem
 
-`CanonStage<TModel>` is a hand-rolled queue without an engine: status lifecycle, transition log,
-correlation, durable persistence — then nothing. No retry clock, no sweeper, no claiming, no
-multi-node dispatch, no health. The docs apologize: *"the queue is yours to work."* Meanwhile the
-Jobs pillar owns a proven engine for every one of those concerns, with an **in-memory floor** that
-requires zero infrastructure.
-
-A staging surface whose receipts rot unless the application builds its own sweeper is not
-flexibility; it is a documented trap. The answer is not to gate the engine behind an optional
-bridge — it is to make the engine part of Canon's composition.
+`CanonStage<TModel>` is a hand-rolled queue without an engine, and its single `Parked` state
+conflates every reason a record stops moving. A missing match key and a disputed identity are the
+same bit today — and neither has a way back into the funnel. The docs apologize: *"the queue is
+yours to work."*
 
 ## Decision
 
-**`Koan.Canon` depends on `Koan.Jobs`.** Not a bridge package, not an optional mode. Module
-auto-discovery composes Jobs wherever Canon is referenced; the Jobs ledger election grades itself
-by the host (in-memory data floor → in-memory ledger; durable connector → durable ledger), so
-Canon keeps a zero-infrastructure story end to end.
+**`Koan.Canon` depends on `Koan.Jobs`** (module auto-discovery composes it; the ledger grades by
+host — in-memory floor keeps zero-infrastructure coherent). Jobs is **transport and engine**;
+Canon owns the funnel: phases, holds, and recovery.
 
-### The clarification the engine forces: machine-deferred ≠ human-held
+### The funnel model
 
-Today `Parked` conflates two intents. With an engine they must be distinct:
-
-| Intent | Trigger | Mechanism |
+| Concept | Meaning | Mechanism |
 |---|---|---|
-| **Machine-deferred** — "process this soon, durably" | `CanonStageBehavior.StageOnly` | Receipt created **and enqueued**: at-least-once processing, retry/backoff, lanes, multi-node CAS claims, wake |
-| **Human-held** — "wait for approval" | Contributor park (`StageStatus.Parked`) | Receipt created, **no job**; waits for `Person.Canon.Promote(stageId)` |
+| **Deferred arrival** (`StageOnly`) | Async intake — processing happens later, but it is *processing*: `OnIntake` still applies, the user can modify the candidate | Enqueued as a canonization job (retries, lanes, multi-node = Jobs engine) |
+| **Phase hold** | The record stopped at a specific phase for a specific, fixable reason — preserved durably in Canon's `Entity<>` partitions | `CanonStage` gains an explicit **parked-phase**; examples: missing aggregation/match keys → *Onboarding hold*; mismatched identifiers / reconciliation conflict → *Matching hold*; failed verification → its phase's hold |
+| **Recovery** | Phase-aware re-entry: apply a fixer, re-enter **at the phase that parked the record** — not from the top | `Person.Canon.Recover(...)` — operation with an optional fixer hook; bulk variant sweeps a phase |
 
-This is the semantic cleanup staging always needed: the receipt table stops meaning both
-"waiting for a machine" and "waiting for a human."
+### Recovery
 
-### What each gap becomes
+```csharp
+// Release one held record, optionally repairing it first (fixer runs before re-entry):
+await Person.Canon.Recover(stageId, fix: p => { p.SetMatchKey(p.Email); });
 
-| Canon solo today | With the engine |
-|---|---|
-| No promote operation | `Person.Canon.Promote(stageId)` — enqueues the held receipt (naming: `canon-language.md`) |
-| No sweeper / retry clock | **Built-in**: a default scheduled sweep over `Pending` machine-deferred receipts (opt-out via options), plus ordinary Jobs retry policy |
-| No throughput / multi-node control | Lanes, pools, gates, CAS claims, wake stamp (JOBS-0009) |
-| No queue observability | `WithStatus`, `JobsHealthContributor`, facts |
+// Bulk: recover every Onboarding hold after fixing the systemic cause — a scheduled/triggered
+// job sweeping the phase, applying the registered fixer per record.
+Person.Canon.OnRecovery(CanonPhase.Onboarding, fixer);   // registration form; naming per lexicon amendment
+```
+
+The hold records **which phase parked it** explicitly (today that lives only in transition
+history), so recovery re-enters at the right phase and phase-scoped queries
+("all Onboarding holds") are index-served.
+
+### Jobs' role (transport, not semantics)
+
+- Deferred arrivals ride the engine: at-least-once, retry/backoff, multi-node claims + wake.
+- Bulk recovery sweeps are ordinary scheduled jobs.
+- Single recovery and holds are data-at-rest operations — no job involved.
+- At-least-once remains safe: re-canonization converges by match key.
+
+### Naming — lexicon amendment required first
+
+`canon-language.md` wins naming arguments and must be amended before implementation:
+`Recover` (operation + fixer registration), phase-holds (`Onboarding hold`, `Matching hold`, …),
+`CanonPhase` vocabulary, and whether `Promote` retires or survives as the Web-route verb for
+release-without-modification. Hook grammar applies: a fixer registration **intervenes**
+(base form); phase-hold observers **observe** (participle).
 
 ### Public expression
 
 ```csharp
-builder.Services.AddKoan();   // Canon referenced ⇒ Jobs composed; ledger grades by host
+builder.Services.AddKoan();   // Canon ⇒ Jobs composed; ledger grades by host
 
-// Durable handoff: enqueued immediately, processed at-least-once.
-var parked = await person.Canonize(o => o.WithStageBehavior(CanonStageBehavior.StageOnly), ct: ct);
+var r = await person.Canonize(o => o.WithStageBehavior(CanonStageBehavior.StageOnly), ct: ct);
+// deferred: enqueued; OnIntake applies at processing time
 
-// Human hold: contributor parks; nothing processes until release.
-await Person.Canon.Promote(stageId);
+// a reconciliation conflict parks the record as a Matching hold, durably, with its phase
+await Person.Canon.Recover(stageId, fix: p => /* repair */ );
 ```
 
-**Guarantee**: every machine-deferred receipt is processed at-least-once with Jobs' full
-operational surface; every human-held receipt is processed exactly once someone says so.
-**Correction**: staging with no data adapter at all behaves as today's in-memory floors dictate;
-a failed canonization inside a job retries under Jobs policy and converges by match key —
-at-least-once is safe because Canon's core promise is idempotent convergence.
+**Guarantee**: deferred arrivals process at-least-once with `OnIntake` applied; held records are
+durable, phase-labeled, queryable, and recoverable — with re-entry at the parking phase.
+**Correction**: recovery of a record whose blocking condition persists re-parks it at the same
+phase with the failure reason on the receipt; nothing silently loops.
 
 ### Costs, stated plainly
 
-- Every Canon consumer gains Jobs' worker thread and health/facts surface. The idle worker is
-  near-free, but it is a behavior surface — documented, not hidden.
-- Specs asserting receipts *stay parked* (`CanonParkAndSweepFlow` and friends) flip to expecting
-  processing under StageOnly, or use explicit human-hold. The spec diff is the map of the
-  semantic change.
-- Release trains couple at the minor boundary (bounded dependency ranges already govern this).
+- Canon consumers gain Jobs' worker surface (documented; near-free when idle).
+- `CanonStage` gains a parked-phase field + index; specs asserting undifferentiated "stays parked"
+  flip to phase-specific expectations.
+- The lexicon amendment precedes code — no implementation may invent names.
 
 ### Non-goals
 
-- Jobs never learns canon semantics; the canonization pipeline stays in-process inside the job
-  handler (load receipt → canonize → mark completed — three lines).
-- Immediate (synchronous) canonization does not become a job; only staged/deferred arrivals ride
-  the engine.
-- `Koan.AI.Review` stays decoupled; an approval may call `Promote` in application code.
+- Jobs never learns canon semantics; the pipeline stays in-process inside the handler.
+- Immediate canonization does not become a job.
+- `Koan.AI.Review` stays decoupled; an approval may call `Recover` in application code.
 
 ## Rollout slices
 
-1. **Dependency + enqueue** — Canon→Jobs reference; StageOnly enqueues; human-hold parks without
-   a job; built-in sweeper job (opt-out). Spec updates where "stays parked" flips.
-2. **Promote** — `Person.Canon.Promote(stageId)` gateway op (+ Web route
-   `POST /api/canon/{model}/stages/{id}/promote` per `CanonEntitiesController` conventions),
-   corrective on unknown/terminal stages. Closes the Jobs-gateway pilot's final item.
-3. **Docs** — `canon-pipeline.md`'s "queue is yours to work" paragraph retires; capability leaf
-   rows; howto staging sections teach the two intents; Jobs docs gain the canon-handler example.
+0. **Lexicon amendment** — `canon-language.md`: Recover, phase-holds, `CanonPhase`, Promote's fate.
+1. **Engine + phases** — Canon→Jobs dependency; StageOnly enqueues (OnIntake preserved at
+   processing); `CanonStage.ParkedPhase` + index; phase-specific parking from contributors;
+   spec flips where "stays parked" becomes phase-labeled.
+2. **Recovery** — single-record operation with fixer; phase-scoped hold queries; corrective
+   re-park on persistent failure.
+3. **Bulk recovery + built-in sweep** — scheduled job sweeping a phase under a registered fixer
+   (opt-out); docs pass: "the queue is yours to work" retires, funnel + recovery taught in
+   `canon-pipeline.md`, the howto, and the capability leaf.
 
 ## Status
 
-Proposed 2026-08-25 (second revision — Leo's call: no Canon-without-Jobs mode). Ratification
-pending Leo.
+Proposed 2026-08-25 (third revision — Leo's funnel correction). Ratification pending Leo;
+slice 0 blocks the rest.
