@@ -38,42 +38,49 @@ Canon owns the funnel: phases, holds, and recovery.
 
 ### Recovery — the `Hold` namespace
 
-`Hold` is a namespace under the gateway, not a method prefix: phases become typed members,
-counts become walkable surface, and the closed type removes casts.
+`Hold` carries exactly two things: the **scoreboard** (`Counts`) and the **verb** (`Recover`).
+There is no listing namespace — held receipts are `CanonStage<T>` Entities, so triage listing is
+the ordinary Entity surface (`CanonStage<T>.Query(s => s.ParkedPhase == CanonPhase.Onboarding)`,
+index-served, full Entity paging), not a bespoke projection of it.
 
 ```csharp
 // Counts — index-served, per phase and per reason category:
-Person.Canon.Hold.Counts.Onboarding        // int
-Person.Canon.Hold.Counts.Refused             // business-rule vetoes, any phase (reason-category view)
-Person.Canon.Hold.Counts.All
+Person.Canon.Hold.Counts.All                       // int
+Person.Canon.Hold.Counts.Onboarding                // per ratified CanonPhase member
+Person.Canon.Hold.Counts.Refused                   // business holds (a rule said no) — reason category
+Person.Canon.Hold.Counts.Stalled                   // mechanical holds (the funnel could not proceed)
 
-// Triage — the held receipts themselves, paged:
-Person.Canon.Hold.Onboarding.Records()
-Person.Canon.Hold.Records()
+// Recovery — one verb, scope × decision:
+Person.Canon.Hold.Recover()                        // ALL holds, as-is → back to the onboarding queue
+Person.Canon.Hold.Recover(CanonPhase.Onboarding)   // one phase, as-is
+Person.Canon.Hold.Recover(i => ...)                // all holds, per-record decision/repair
+Person.Canon.Hold.Recover(CanonPhase.Onboarding, i => ...)   // one phase, per-record decision/repair
+Person.Canon.Hold.Recover(id)                      // release one known receipt as-is
+Person.Canon.Hold.Recover(id, i => ...)            // release one, repaired
 
-// Triage-and-release — Records is a namespace; every walk names its scope explicitly:
-Person.Canon.Hold.Records.All()                  // paged triage, no side effects
-Person.Canon.Hold.Records.Onboarding()           // one phase's holds
-Person.Canon.Hold.Records.Refused()                // reason-category view
-Person.Canon.Hold.Records.All(i =>
+// The parameterless form is the blunt instrument — resubmit everything to onboarding after a
+// systemic fix. Safe by construction: business rules vote again, whatever still fails re-parks
+// with its reason, and Counts shows the aftermath. Bulk forms fan out per receipt through the
+// jobs engine — retries, wake, and multi-node apply per record.
+// The decision: mutate i.Model, return i ⇒ recover (re-enters at intake);
+// return null ⇒ stays held. Throw-safe: a failing fixer leaves that record held
+// with the error on its receipt; the walk continues. Returns the summary
+// attempted / recovered / re-parked — the walk IS the telemetry.
+Person.Canon.Hold.Recover(i =>
 {
     if (i.Step == CanonPhase.Onboarding) i.Model.Name = "Lalala";
-    return i.Step == CanonPhase.Onboarding ? i : null;   // non-null ⇒ Recover; null ⇒ stays held
+    return i.Step == CanonPhase.Onboarding ? i : null;
 })
-Person.Canon.Hold.Records.Onboarding(fix)        // async fixers take the same name — never an Async suffix
-Person.Canon.Hold.Recover(id, fix)               // single known receipt
-// A cursor walk returns the summary: attempted / recovered / re-parked — the walk IS the telemetry.
-// A fixer that throws leaves that record held with the error on its receipt; the sweep continues.
 ```
 
 `HoldContext<T>` carries `Model` (already `T` — the closed gateway pays the cast), `Step`
 (parked phase), `Reason` (category), `Justification`, `Attempts`; the fixer mutates `Model`
-in place, Canon-style, and may be async (a CRM lookup lives there).
+in place, Canon-style, and may be async (a CRM lookup lives there) under the same name.
 
 Two dimensions on every hold: **`Phase`** (where the funnel stopped — the ratified `CanonPhase`
-set drives the typed members) and **`Reason` category** (`Structural` | `Rule` | …) — a business
-veto files under `Refused` no matter which phase raised it, so `Counts.Refused` is queryable without
-every phase knowing every business rule.
+set) and **`Reason` category** (`Stalled` mechanical | `Refused` business) — a business veto
+files under `Refused` no matter which phase raised it. Reason-scoped recovery needs no member:
+the decision lambda reads `i.Reason`; `Counts` keeps the per-category scoreboard.
 
 ### Recovery semantics
 
