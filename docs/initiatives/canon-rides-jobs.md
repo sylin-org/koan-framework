@@ -170,3 +170,34 @@ phase with the failure reason on the receipt; nothing silently loops.
 
 Proposed 2026-08-25 (third revision — Leo's funnel correction). Ratification pending Leo;
 slice 0 blocks the rest.
+
+## Consolidated surface (the ratification artifact)
+
+``csharp
+Person.Canon.Hold                                    // Hold gateway — thin router, no state
+├── .Counts                                          // ── the scoreboard ──
+│     .All              → Task<int>
+│     .Onboarding       → Task<int>                  // per ratified CanonPhase member
+│     .Matching         → Task<int>
+│     .Rules            → Task<int>                  // reason-category view (business vetoes, any phase)
+│     .<phase>          → Task<int>                  // grows with the lexicon, never a string
+├── .Records                                         // ── triage + release cursor ──
+│     .All()               → Task<PageResult<CanonStage<T>>>    // paged, no side effects
+│     .Onboarding()        → Task<PageResult<CanonStage<T>>>
+│     .Rules()             → Task<PageResult<CanonStage<T>>>
+│     .<phase>()
+│     .All(fix)            → Task<HoldSweepSummary> // fix: HoldContext<T> → HoldContext<T>? (null ⇒ held)
+│     .Onboarding(fix)     →                        // or HoldContext<T> → Task<HoldContext<T>?> — same name
+│     .Rules(fix)          →
+│     .<phase>(fix)
+└── .Recover(id, fix = null)  → Task<HoldOutcome>    // one known receipt
+``
+
+Supporting types: HoldContext<T> (Model already T · Step · Reason · Justification ·
+Attempts · StageId); HoldSweepSummary(Attempted, Recovered, ReParked, Skipped).
+
+Rules baked into the shape: no scope-less walks (.All is the explicit all); no Async
+suffixes (async by nature — overloads share the name); non-null return ⇒ Recover (re-enter at
+intake), null ⇒ stays held; a throwing fixer leaves the record held with the error on its
+receipt and the sweep continues; every sweep returns its summary; Counts and Records grow
+with CanonPhase — no string parameters; everything is a thin router over the ambient runtime.
