@@ -1,9 +1,21 @@
-# Koan
-> Koan 1.x is the .NET 10 stabilization train. Every active package ships on it.
-
-> Koan 1.0 is the stable .NET 10 release train.
+<div align="center">
 
 # Koan
+
+**Write with intent. Koan makes it real.**
+
+[![Release](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml/badge.svg)](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml)
+[![NuGet](https://img.shields.io/nuget/v/Sylin.Koan.App.svg?label=NuGet&color=004880)](https://www.nuget.org/packages/Sylin.Koan.App)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)
+
+An opinionated .NET meta-framework for agentic, data-driven applications.
+A package reference is the intent — referencing a capability makes it available, and
+`AddKoan()` composes everything referenced, once.
+
+</div>
+
+---
 
 ## Write with intent. Koan makes it real.
 
@@ -70,8 +82,21 @@ search semantically, serve media, or collaborate with an agent.
 
 Add only what the application needs. **The code keeps saying `Todo`.**
 
+| You add | You get | Surface on your model |
+|---|---|---|
+| `Sylin.Koan.Data.Connector.Sqlite` / `.Postgres` / `.Mongo` / `.SqlServer` | Durable, restart-surviving persistence — provider negotiated, not coded | nothing changes |
+| `Sylin.Koan.Jobs` | Durable background work: retries, schedules, chains, multi-node | `todo.Job.Submit()` · `Todo.Jobs.Schedule(...)` |
+| `Sylin.Koan.Mcp` | MCP clients work your model under the same access rules | `[McpEntity]` |
+| `Sylin.Koan.Communication` (+ `.Connector.RabbitMq`) | Entity events and transport, local-first | `todo.Events.Raise(...)` |
+| `Sylin.Koan.Canon` | Multi-source record reconciliation with staged review | `Person.Canon.OnIntake(...)` |
+| `Sylin.Koan.Tenancy` | Tenant-scoped everything, carried ambiently | nothing changes |
+| `Sylin.Koan.Cache` / `.Storage` | Layered caching; local or S3 media | `[CachePolicy]` |
+| `Sylin.Koan.AI` (+ `.Connector.Ollama` / `.Onnx`) | Embeddings, semantic search, local models | `[Embedding]` |
+
 Underneath, it's still ASP.NET Core. Reach for a normal controller or service whenever you want
-one. Want to look behind the magic? Koan tells you what it chose and why.
+one. Want to look behind the magic? Koan tells you what it chose and why — every boot publishes
+its composition decisions at `/.well-known/Koan/facts`, and `koan.lock.json` records them for
+code review.
 
 ## Go further
 
@@ -81,5 +106,15 @@ one. Want to look behind the magic? Koan tells you what it chose and why.
 - [Build for agents](docs/reference/agents/index.md)
 - [Understand the architecture](docs/architecture/index.md)
 - [See what works today](docs/reference/what-works.md)
+- [Capability map — every package, assessed](docs/reference/capability-map.md)
+- [Agent retrieval map (llms.txt)](llms.txt)
+- [Code signing policy](CODE_SIGNING_POLICY.md)
+
+## Community
+
+- [Contributing](CONTRIBUTING.md) — laws of the tree, first issue guidance, PR expectations
+- [Security](SECURITY.md) — how to report vulnerabilities
+- [Support](SUPPORT.md) — where to ask questions
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 
 > Koan 1.x is the .NET 10 stabilization train. Every active package ships on it.
