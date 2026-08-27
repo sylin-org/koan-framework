@@ -31,6 +31,8 @@ dotnet add package Sylin.Koan.Data.Connector.Sqlite
 Keep the normal Koan bootstrap:
 
 ```csharp
+using Koan.Core;   // AddKoan()
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
 

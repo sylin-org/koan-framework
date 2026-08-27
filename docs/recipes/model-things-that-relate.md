@@ -44,6 +44,9 @@ The decisions worth making deliberately:
 ## Assembly
 
 ```csharp
+using Koan.Data.Core.Model;            // Entity<T>
+using Koan.Data.Core.Relationships;    // Parent
+
 public sealed class TodoItem : Entity<TodoItem>
 {
     [Parent(typeof(Todo))]
@@ -65,6 +68,10 @@ Two parents on one Entity is fine; naming the type at the call site is what keep
 Bound the reads at the projection rather than trusting callers:
 
 ```csharp
+using Koan.Web.Controllers;         // EntityController<T>
+using Koan.Web.Attributes;          // Pagination, PaginationMode
+using Microsoft.AspNetCore.Mvc;     // Route
+
 [Route("api/categories")]
 [Pagination(Mode = PaginationMode.Required, DefaultSize = 10, MaxSize = 200)]
 public sealed class CategoryController : EntityController<Category>;
@@ -73,6 +80,8 @@ public sealed class CategoryController : EntityController<Category>;
 And cache what genuinely does not move:
 
 ```csharp
+using Koan.Cache.Abstractions.Policies;   // Cacheable
+
 [Cacheable(120)]
 public sealed class Category : Entity<Category>;
 ```

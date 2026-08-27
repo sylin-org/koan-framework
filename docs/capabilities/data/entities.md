@@ -4,11 +4,12 @@ domain: data
 title: "Entity capability hooks"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/entities.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (App + Data.Connector.Sqlite) via store-and-expose — create/query/get over HTTP with persistence across restart, plus the fail-fast correction when a configured adapter is unavailable
 ---
 
 # Entity capability hooks
