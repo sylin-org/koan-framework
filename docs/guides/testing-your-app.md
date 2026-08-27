@@ -58,6 +58,19 @@ Two version rules, both proven the hard way:
 - If a template added the older `xunit` / v2 runner pair, remove it — mixing v2 test packages with
   the v3 runner produces a host that cannot launch.
 
+The application project must also declare a stable Koan package identity — the conformance host
+reads the application's embedded composition manifest, and an unnamed project cannot produce one:
+
+```xml
+<PropertyGroup>
+  <PackageId>Sylin.Koan.MyApp</PackageId>
+</PropertyGroup>
+```
+
+Without it the batteries fail at boot with `The embedded koan.references.manifest resource is
+malformed at line N. Rebuild the application with a matching Sylin.Koan.Core build target; do not
+edit the generated manifest.`
+
 `dotnet test` now runs, for `Anime`:
 
 | Battery | What it pins | Gated on |
