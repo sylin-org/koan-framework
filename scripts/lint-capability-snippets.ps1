@@ -152,7 +152,7 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
     }
 
     if ($typeLines.Count -gt 0 -and $statementLines.Count -gt 0) {
-        # mixed: statements first (in method), declarations after (outside method)
+        # mixed: the top-level-program shape is usings → statements → type declarations
         $stmtBlock = ($statementLines | Where-Object { $_ -match '\S' }) -join "`n"
         $typeBlock = ($typeLines | Where-Object { $_ -match '\S' }) -join "`n"
         $usingBlock = if ($usingLines.Count -gt 0) { ($usingLines | ForEach-Object { $_.Trim() }) -join "`n" } else { $preamble }
@@ -160,13 +160,7 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
         $code = @"
 $usingBlock
 
-public static class Snippet
-{
-    public static async System.Threading.Tasks.Task Run(System.Threading.CancellationToken ct = default)
-    {
 $stmtBlock
-    }
-}
 
 $typeBlock
 "@
