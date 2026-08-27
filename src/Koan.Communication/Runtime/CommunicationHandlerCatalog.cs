@@ -44,9 +44,20 @@ internal sealed class CommunicationHandlerCatalog
         => _eventsByContract.TryGetValue((entityType, eventType), out var bindings) ? bindings : [];
 
     public static CommunicationHandlerCatalog FromDiscovery()
-        => new(
+    {
+        var discoveredEventHandlers = KoanRegistry.GetDiscoveredImplementors(typeof(IHandleEntityEvent));
+
+        // PMC-056: gateway-registered lambda handlers enter the same binding pipeline as
+        // discovered classes. Each registration produces a synthetic adapter class that
+        // implements IHandleEntityEvent and dispatches through the captured lambda.
+        var lambdaAdapterTypes = EventSubscriptionRegistry.Registrations
+            .Select(static r => typeof(LambdaEventAdapter<,>).MakeGenericType(r.Model, r.Event))
+            .ToArray();
+
+        return new(
             KoanRegistry.GetDiscoveredImplementors(typeof(IReceiveEntity)),
-            KoanRegistry.GetDiscoveredImplementors(typeof(IHandleEntityEvent)));
+            discoveredEventHandlers.Concat(lambdaAdapterTypes));
+    }
 
     private static IReadOnlyList<TransportReceiverBinding> BuildTransportBindings(
         IEnumerable<Type> discoveredHandlers)
