@@ -107,6 +107,36 @@ boundary; it does not wait for handler completion. Receipts identify provider, c
 and whether settlement is observable. The local provider supports operation-scoped settlement;
 external providers may not.
 
+## Subscribe with the EventGateway
+
+The class-based handler path (`IHandleEntityEvent`) is the canonical subscription. For the common
+one-handler-one-lambda case, the type-scoped gateway accepts inline lambdas at composition time —
+they enter the same binding pipeline as discovered handler classes.
+
+```csharp
+using Koan.Communication;
+using Koan.Data.Core.Model;
+
+// usings for the gateway: Koan.Communication (EventGateway), Koan.Data.Core.Model (extension)
+Note.EventGateway.On<NoteCreated>((note, occurrence, ct) =>
+{
+    Console.WriteLine($"note {note.Id} created: {occurrence.Details?.Title}");
+    return Task.CompletedTask;
+});
+
+// with a filter (same semantics as IHandleEntityEvent.Where):
+Note.EventGateway.On<NoteArchived>(
+    (note, occurrence, ct) => archive(note),
+    where: (note, occurrence) => note.Title != "draft");
+
+// release all gateway-registered handlers for this type (test isolation):
+Note.EventGateway.Reset();
+```
+
+Must be called **before the host starts** (composition time), so the binding pipeline sees the
+registration. Handlers receive the Entity snapshot, occurrence metadata, and the strongly-typed
+event details. A lambda that throws is treated as a handler failure — the engine retries it.
+
 ## Guarantees
 
 - Every deliberate `Raise` or `Send` creates a new operation.
