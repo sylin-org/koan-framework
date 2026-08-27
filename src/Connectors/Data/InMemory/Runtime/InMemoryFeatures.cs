@@ -12,6 +12,7 @@ internal static class InMemoryFeatures
         DataCaps.Query.Linq,
         DataCaps.Query.Filter,
         DataCaps.Query.FilterExecution,
+        DataCaps.Write.ConditionalReplace,
         DataCaps.Write.BulkUpsert,
         DataCaps.Write.BulkDelete,
         DataCaps.Isolation.RowScoped,
@@ -27,6 +28,7 @@ internal static class InMemoryFeatures
     internal static void DescribeBackend(ICapabilities capabilities) => capabilities
         .Add(DataCaps.Query.FilterExecution,
             new FilterExecutionProfile(FilterExecutionKind.InMemory, SupportsBoundedCandidates: true))
+        .Add(DataCaps.Write.ConditionalReplace)
         .Add(DataCaps.Write.BulkUpsert)
         .Add(DataCaps.Write.BulkDelete);
 }

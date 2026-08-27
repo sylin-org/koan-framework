@@ -7,6 +7,10 @@ internal sealed class InMemoryState
     private readonly ConcurrentDictionary<StoreKey, object> _stores = new();
     private readonly object _creationGate = new();
 
+    /// <summary>Serializes read→guard→write sequences (guarded conditional replaces). One adapter-wide
+    /// gate: the in-memory tier is single-process by definition, so correctness beats lock granularity.</summary>
+    internal object RowGate { get; } = new();
+
     internal ConcurrentDictionary<TKey, Record> Store<TKey>(string source, Type root, string partition)
         where TKey : notnull
     {

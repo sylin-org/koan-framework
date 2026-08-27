@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.KeyValue;
@@ -8,11 +9,34 @@ namespace Koan.Data.Connector.InMemory.Runtime;
 
 /// <summary>Translates the KeyValue family primitives to detached host-memory snapshots.</summary>
 internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, string source)
-    : KeyValueStore<TEntity, TKey>
+    : KeyValueStore<TEntity, TKey>,
+      IConditionalWriteRepository<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
     private static readonly Type RootType = EntityRootDescriptor.For(typeof(TEntity)).RootType;
+
+    /// <summary>Guarded conditional replace (the in-memory analogue of the relational CAS): the store is
+    /// a concurrent snapshot map, so the read→guard→write sequence runs under the adapter gate — the
+    /// guard always evaluates the STORED row, and a false guard leaves it untouched.</summary>
+    public async Task<bool> ConditionalReplaceAsync(
+        TEntity model,
+        Expression<Func<TEntity, bool>> guard,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var guardFn = guard.Compile();
+        var store = Current();
+        lock (state.RowGate)
+        {
+            if (!store.TryGetValue(model.Id!, out var record)) return false;
+            var stored = Materialize(record);
+            if (!guardFn(stored.Entity)) return false;
+            var snapshot = GuardAndSnapshotAsync(model, ct).GetAwaiter().GetResult();
+            WriteAsync(model.Id!, snapshot, ct).GetAwaiter().GetResult();
+        }
+        return true;
+    }
 
     protected override Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct)
     {

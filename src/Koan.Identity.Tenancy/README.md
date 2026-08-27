@@ -77,16 +77,40 @@ memberships and tenant-scoped `AgentGrant` rows for registered tenants, then de-
 receipts and tenancy audit summaries. The final identity-erasure receipt reports this package as
 `Koan.Identity.Tenancy`; no extra registration is required.
 
+## Invitations (PMC-035)
+
+`InviteIssuanceService` issues a tenant seat to one email address and returns the raw token **once** — only its
+SHA-256 hash is stored. `InviteAcceptanceService.AcceptAsync(token, identityId)` runs the claim: the signed-in person
+must own a **verified** `IdentityEmail` matching the invitation, and the claim itself is a conditional write on the
+invitation row (`Status == Pending && ClaimedBy == null`). Two identities racing one token — on one host or across a
+fleet — converge to one claimant and one deterministic `Membership` seat; a claimant whose run was interrupted
+re-drives the same token idempotently until they complete or an operator revokes. Issuance, revocation, and
+acceptance are audited through the tenant audit log. Reserved host roles (`koan:tenancy-operator`) can never travel
+through an invitation.
+
+```csharp
+var issued = await issuance.IssueAsync(actor, tenantId, "ada@example.com", "editor");
+
+// the invited person, signed in and holding a verified IdentityEmail for that address:
+var result = await acceptance.AcceptAsync(issued.Token, identityId);
+// result.Outcome: Accepted | AlreadyMember | AlreadyClaimed | NotFound | Expired | Revoked |
+//                 EmailNotOwned | ReservedRoleRefused — reported, never thrown (except the
+//                 conditional-write guarantee: an adapter without write.conditionalReplace refuses at boot of the ceremony).
+```
+
+Over HTTP, `Koan.Tenancy.Web` exposes the ceremony: `POST /api/tenancy/invitations` (issue, operator policy),
+`POST /api/tenancy/invitations/{id}/revoke` (operator policy), and `POST /api/tenancy/invitations/accept`
+(any authenticated subject).
+
 ## Boundaries
 
 - The bridge scopes inbound ASP.NET Core requests. Background work must establish its tenant through the normal
   captured/explicit Koan context rather than copying a raw header or path value.
-- Membership roles cannot project Koan host-operator roles.
+- Membership roles cannot project Koan host-operator roles, and invitations cannot grant them either.
 - Already-issued bearer tokens remain governed by their issuer outside tenant scope; this package does not revoke
   OAuth tokens or claim global authorization closure.
 - Public/anonymous tenant routing is not a switch on this security boundary and is not currently provided.
 - Tenant suspension and custom-domain ownership verification are not enforced here.
-- Koan V1 does not currently provide an invitation creation/delivery/acceptance ceremony.
-  Applications should not treat a check-then-save flow as a distributed single-use claim.
+- Invitation delivery (email send) is the application's job; this package owns the token, the claim, and the seat.
 
 See [TECHNICAL.md](TECHNICAL.md) and the public [tenancy guide](../../docs/guides/tenancy-howto.md).

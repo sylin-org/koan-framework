@@ -17,6 +17,7 @@
          Identity integration stays optional and the core layering remains clean. -->
     <ProjectReference Include="..\Koan.Web\Koan.Web.csproj"
                       />
+    <ProjectReference Include="..\Koan.Identity.Tenancy\Koan.Identity.Tenancy.csproj" />
     <ProjectReference Include="..\Koan.Tenancy\Koan.Tenancy.csproj"
                       />
   </ItemGroup>

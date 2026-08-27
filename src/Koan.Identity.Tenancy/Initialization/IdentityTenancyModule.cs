@@ -52,6 +52,11 @@ public sealed class IdentityTenancyModule : KoanModule
 
         // P4 — one explicit lifecycle workflow for closing seats and durable persons.
         services.TryAddSingleton<DeprovisioningService>();
+
+        // PMC-035 — the invitation ceremony: operator issuance/revocation plus the contested claim
+        // that turns one verified claimant into exactly one seat (see Invitations/TenantInvite.cs).
+        services.TryAddSingleton<Invitations.InviteIssuanceService>();
+        services.TryAddSingleton<Invitations.InviteAcceptanceService>();
     }
 
     public override Task Start(IServiceProvider services, CancellationToken ct)

@@ -243,7 +243,7 @@ public abstract class KeyValueStore<TEntity, TKey> :
     /// <summary>The cross-scope write guard + managed-value stamp for one row, shared by <see cref="Upsert"/> and
     /// <see cref="UpsertMany"/>. Guards only the GUARDED isolation values (<c>ManagedFieldWriteScope.Current</c>), never
     /// the unguarded operation overrides — the KV analogue of the relational <c>ON CONFLICT … WHERE json_extract(...)</c>.</summary>
-    private async Task<KvRecord<TEntity>> GuardAndSnapshotAsync(TEntity model, CancellationToken ct)
+    protected async Task<KvRecord<TEntity>> GuardAndSnapshotAsync(TEntity model, CancellationToken ct)
     {
         var guarded = ManagedFieldWriteScope.Current;
         if (guarded is { Count: > 0 })
