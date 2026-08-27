@@ -8,15 +8,22 @@ Field-at-rest protection as Entity metadata: mark a writable string property and
 dotnet add package Sylin.Koan.Classification
 ```
 
-Keep the ordinary Koan bootstrap:
+Keep the ordinary Koan bootstrap — Data verbs work once the host is up:
 
 ```csharp
 using Koan.Core;   // AddKoan()
 
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
+
+var app = builder.Build();
+await app.RunAsync();
 ```
 
 ## Meaningful use
+
+Inside the running host — a request handler, a background service, or a console app started through
+`services.StartKoan()` — ordinary Entity verbs read and write; encryption rides the save:
 
 ```csharp
 using Koan.Data.Core.Model;               // Entity<T>

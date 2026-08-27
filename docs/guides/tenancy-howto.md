@@ -253,7 +253,17 @@ do not add application middleware or re-read raw carrier values inside domain co
 dotnet add package Sylin.Koan.Identity.Tenancy
 ```
 
+The registry row comes from `Koan.Tenancy` (`TenantRecord`, §8), the durable person from `Koan.Identity`
+(`Identity`). Membership connects them and authorizes that person inside that tenant:
+
 ```csharp
+using Koan.Tenancy;    // TenantRecord, Membership
+using Koan.Identity;   // Identity
+using Koan.Data.Core;  // Save
+
+var tenant = await new TenantRecord { Name = "Acme Corp", Code = "acme" }.Save();
+var person = await new Identity { DisplayName = "Ada" }.Save();
+
 await new Membership
 {
     TenantId = tenant.Id,

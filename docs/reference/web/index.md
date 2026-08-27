@@ -29,6 +29,11 @@ closed with `422`; a response past the safety cap answers `413`.
 ## Shortest supported shape
 
 ```csharp
+using Koan.Data.Core.Model;      // Entity<T>
+using Koan.Web.Controllers;      // EntityController<T>
+using Microsoft.AspNetCore.Mvc;  // Route
+using Koan.Core;                 // AddKoan()
+
 public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";
