@@ -2,6 +2,6 @@
   "Sylin.Koan.AI": "1.0.14",
   "Sylin.Koan.AI.Contracts": "1.0.14",
   "Sylin.Koan.Web": "1.0.25",
-  "Sylin.Koan.Web.Sse": "1.0.11",
-  "$transitive": "16D7AD32EE5A61B61D9C7AE85784BED54EFCCEE9ED2CCC0D1BCDFACC760C6CC3"
+  "Sylin.Koan.Web.Sse": "1.0.12",
+  "$transitive": "C5BF70E9CA15894F4B6AF48E193CEDC723E17AFC793A1BF44CEE1E046801FACD"
 }
