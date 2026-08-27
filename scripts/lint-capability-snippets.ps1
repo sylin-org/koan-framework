@@ -152,13 +152,22 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
     }
 
     if ($typeLines.Count -gt 0 -and $statementLines.Count -gt 0) {
-        # mixed: the top-level-program shape is usings → statements → type declarations
+        # mixed: the top-level-program shape is usings → statements → type declarations.
+        # Attribute lines that trail at the end of statementLines (they precede a type declaration
+        # in the original doc) are moved to the type block — they belong to the type, not the flow.
+        while ($statementLines.Count -gt 0 -and $statementLines[$statementLines.Count - 1] -match '^\s*\[') {
+            $typeLines.Insert(0, $statementLines[$statementLines.Count - 1])
+            $statementLines.RemoveAt($statementLines.Count - 1)
+        }
+
         $stmtBlock = ($statementLines | Where-Object { $_ -match '\S' }) -join "`n"
         $typeBlock = ($typeLines | Where-Object { $_ -match '\S' }) -join "`n"
         $usingBlock = if ($usingLines.Count -gt 0) { ($usingLines | ForEach-Object { $_.Trim() }) -join "`n" } else { $preamble }
 
         $code = @"
 $usingBlock
+
+var ct = CancellationToken.None;
 
 $stmtBlock
 
@@ -171,6 +180,8 @@ $block
     } elseif ($hasExecutableCode) {
         $code = @"
 $preamble
+
+var ct = CancellationToken.None;
 
 $block
 "@
