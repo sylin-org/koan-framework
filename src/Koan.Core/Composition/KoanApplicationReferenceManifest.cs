@@ -147,8 +147,12 @@ public sealed class KoanApplicationReferenceManifest
                     };
                     var rawIdentity = parts[2].Trim();
                     var canonicalIdentity = parts[3].Trim();
-                    if (!IsKoanIdentity(kind, rawIdentity)
-                        || !IsCanonicalKoanIdentity(canonicalIdentity))
+                    // The canonical identity is framework-owned and must always be a Koan identity. The raw
+                    // identity of a PROJECT reference is the referenced project's own (arbitrary) application
+                    // name — provenance, not a Koan identity — so it is recorded as written. Package
+                    // references have no such free form: their raw id must itself be a Koan package.
+                    if (!IsCanonicalKoanIdentity(canonicalIdentity)
+                        || (kind == KoanReferenceKind.Package && !IsKoanIdentity(kind, rawIdentity)))
                     {
                         throw InvalidLine(lineNumber);
                     }

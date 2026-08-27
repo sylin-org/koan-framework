@@ -35,6 +35,26 @@ public sealed class KoanApplicationReferenceManifestSpec
     }
 
     [Fact]
+    public void Parses_project_references_whose_raw_identity_is_the_applications_own_name()
+    {
+        // PMC-062 evidence: the documented conformance-kit flow has a test project reference an
+        // application project whose assembly carries an ordinary (non-Koan) name. The writer records
+        // that assembly name as the raw identity — provenance — while the canonical identity stays
+        // framework-owned. Rejecting the raw name made every real-host battery fail at boot.
+        using var reader = new StringReader("""
+            schema|1
+            reference|package|Sylin.Koan.Testing|Sylin.Koan.Testing
+            reference|project|TmplApp|Sylin.Koan.TmplApp
+            dependency|Sylin.Koan.App|Sylin.Koan
+            """);
+
+        var manifest = KoanApplicationReferenceManifest.Parse(reader);
+
+        manifest.IsPresent.Should().BeTrue();
+        manifest.Contains(KoanReferenceKind.Project, "Sylin.Koan.TmplApp").Should().BeTrue();
+    }
+
+    [Fact]
     public void Parses_deduplicates_and_orders_dependencies()
     {
         using var reader = new StringReader("""
