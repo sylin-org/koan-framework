@@ -13,6 +13,10 @@ dotnet add package Sylin.Koan.Data.SoftDelete
 Mark only the models whose durable deletion meaning is soft removal:
 
 ```csharp
+using Koan.Data.Core.Model;   // Entity<T>, Get
+using Koan.Data.Core;         // Remove
+using Koan.Data.SoftDelete;   // SoftDelete, WithDeleted, Restore
+
 [SoftDelete]
 public sealed class Order : Entity<Order>;
 
