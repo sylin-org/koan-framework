@@ -14,7 +14,8 @@ Keep the normal Koan boot and declare the policy where the business type lives:
 ```csharp
 using Koan.Core;                          // AddKoan()
 using Koan.Cache.Abstractions.Policies;   // Cacheable
-using Koan.Data.Core.Model;               // Entity<T>
+using Koan.Data.Core.Model;               // Entity<T>, Get
+using Koan.Data.Core;                     // Save
 
 builder.Services.AddKoan();
 
@@ -28,6 +29,27 @@ public sealed class Todo : Entity<Todo>
 That is the complete shortest path. `Todo.Get`, `Save`, and `Delete` retain their normal meaning; Cache applies
 read-through and invalidation behind the Entity repository. No cache-specific registration belongs in
 `Program.cs`.
+
+Cache is not the source of truth — the cached Entity still needs a durable store. Reference one Data
+connector and configure it (without one, Entity verbs fail with `Koan Data has no provider candidates.
+Reference a Data connector and call AddKoan().`):
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+```json
+"Koan": {
+  "Data": {
+    "Sources": {
+      "Default": {
+        "Adapter": "sqlite",
+        "ConnectionString": "Data Source=app.db"
+      }
+    }
+  }
+}
+```
 
 ## Meaningful result
 
