@@ -4,11 +4,12 @@ domain: security
 title: "Entity access rules"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/trust/access-rules.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Web 1.0.20, Web.Auth 1.0.11, Connector.Test 1.0.10) — [Access(read,write,remove)] gate proven anonymous 401 / forbidden 403 / allowed 200 through the governed EntityController projection, row survives denied deletes, per-identity `can` projection verified
 ---
 
 # Entity access rules

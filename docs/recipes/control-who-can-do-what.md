@@ -8,8 +8,9 @@ last_updated: 2026-08-19
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/control-who-can-do-what.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Web 1.0.20, Web.Auth 1.0.11, Connector.Test 1.0.10) — anonymous 401 / forbidden 403 / allowed 200 negative-path matrix through the governed EntityController projection
 gets_you: "One rule about who may read or change a thing, enforced everywhere that thing is exposed."
 works_if: "People can already sign in, or will be able to before this ships."
 costs: "Adds no service. Adds a decision you must make per operation, which is the work."
