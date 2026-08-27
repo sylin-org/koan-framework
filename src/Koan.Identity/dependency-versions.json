@@ -1,7 +1,7 @@
 {
   "Sylin.Koan.Core": "1.0.26",
-  "Sylin.Koan.Data.Core": "1.0.36",
-  "Sylin.Koan.Web": "1.0.23",
+  "Sylin.Koan.Data.Core": "1.0.37",
+  "Sylin.Koan.Web": "1.0.24",
   "Sylin.Koan.Web.Auth.Abstractions": "1.0.9",
-  "$transitive": "B4B63132C5741836DC64A6EB2B618DB47D0F12FCF2D61C3D663534AFBB5AC614"
+  "$transitive": "7A6F018101291DF5A8518BE279C328E1B7BE93B5D5A027430560B4256C23405B"
 }
