@@ -374,13 +374,10 @@ internal sealed class DataJobLedger : IJobLedger
         await JobGateRecord.Upsert(new JobGateRecord { GateKey = gateKey, ReleaseAt = releaseAt, Reason = reason }, ct);
     }
 
-    public async Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct)
-    {
-        var all = await JobGateRecord.All(ct);
-        return all.Where(g => g.ReleaseAt > now)
-            .Select(g => new JobGate { GateKey = g.GateKey, ReleaseAt = g.ReleaseAt, Reason = g.Reason })
-            .ToList();
-    }
+    public Task<IReadOnlyList<JobGateRecord>> ActiveGates(DateTimeOffset now, CancellationToken ct)
+        // Single type since PMC-060 unified the former read-shape POCO: materialized fresh from the store like
+        // every other read; only still-relevant rows (> now) are returned.
+        => JobGateRecord.Query(g => g.ReleaseAt > now, ct);
 
     public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
     {

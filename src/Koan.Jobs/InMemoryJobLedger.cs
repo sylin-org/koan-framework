@@ -11,7 +11,7 @@ internal sealed class InMemoryJobLedger : IJobLedger
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, JobRecord> _records = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, JobGate> _gates = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, JobGateRecord> _gates = new(StringComparer.Ordinal);
     // JOBS-0008: per-lane WFQ virtual time. The Local tier is single-process, so this in-process dict IS the whole
     // fairness state — the identical LaneFairSelector runs over it (the durable tier supplies LaneCursor rows instead).
     private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
@@ -287,18 +287,18 @@ internal sealed class InMemoryJobLedger : IJobLedger
         lock (_gate)
         {
             if (_gates.TryGetValue(gateKey, out var existing) && existing.ReleaseAt >= releaseAt) return Task.CompletedTask;
-            _gates[gateKey] = new JobGate { GateKey = gateKey, ReleaseAt = releaseAt, Reason = reason };
+            _gates[gateKey] = new JobGateRecord { GateKey = gateKey, ReleaseAt = releaseAt, Reason = reason };
         }
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct)
+    public Task<IReadOnlyList<JobGateRecord>> ActiveGates(DateTimeOffset now, CancellationToken ct)
     {
         lock (_gate)
         {
             var list = _gates.Values.Where(g => g.ReleaseAt > now)
-                .Select(g => new JobGate { GateKey = g.GateKey, ReleaseAt = g.ReleaseAt, Reason = g.Reason }).ToList();
-            return Task.FromResult<IReadOnlyList<JobGate>>(list);
+                .Select(g => new JobGateRecord { GateKey = g.GateKey, ReleaseAt = g.ReleaseAt, Reason = g.Reason }).ToList();
+            return Task.FromResult<IReadOnlyList<JobGateRecord>>(list);
         }
     }
 

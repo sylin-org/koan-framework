@@ -7,9 +7,10 @@ public sealed record JobOutcome(JobStatus Status, string? Error)
 }
 
 /// <summary>
-/// A handle to a submitted job. <see cref="Completion"/> awaits the terminal state (ledger-polled; a push signal
-/// when a bus is present) — bounded by a timeout because a durable job can run for minutes / cross-process.
-/// JOBS-0005 §4.5.
+/// A handle to a submitted job. <see cref="Completion"/> awaits terminal state by polling the ledger on a short
+/// interval up to the caller's timeout — bounded because a durable job can run for minutes or cross-process, and
+/// no push signal exists by design: hints hurry claims, handlers settle rows, and the ledger remains the single
+/// truth a waiter reads. JOBS-0005 §4.5.
 /// </summary>
 public sealed class JobHandle
 {

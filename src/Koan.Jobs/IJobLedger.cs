@@ -85,12 +85,15 @@ public interface IJobLedger
     /// <summary>Queued jobs of a type resting in a given action/stage (the level-triggered reconcile sweep).</summary>
     Task<IReadOnlyList<JobRecord>> InStage(string workType, string action, CancellationToken ct);
 
-    /// <summary>Facade/dashboard query.</summary>
+    /// <summary>The declarative facade/dashboard query: a pure wildcard-axis <em>filter</em> (PMC-060 contract note),
+    /// identical on every tier — no sort, no paging. Result order is unspecified by design (a dictionary walk locally,
+    /// store-determined when durable); a caller needing determinism orders client-side on a business key the way
+    /// <see cref="JobCoordinator.StatusAsync"/> orders by <c>FirstSubmittedAt</c>.</summary>
     Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct);
 
     // --- shared resource gates (cooperative backoff) ---
     Task SetGate(string gateKey, DateTimeOffset releaseAt, string? reason, CancellationToken ct);
-    Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct);
+    Task<IReadOnlyList<JobGateRecord>> ActiveGates(DateTimeOffset now, CancellationToken ct);
 
     /// <summary>Remove benign terminal rows (Completed/Cancelled) settled before <paramref name="olderThan"/>, keeping
     /// the active set lean. Returns the number purged.</summary>

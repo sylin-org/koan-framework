@@ -548,6 +548,47 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
+    public async Task facade_query_filters_converge_across_tiers()
+    {
+        // PMC-060: the JobQuery surface is a filter-only, unordered contract identical on every tier — no
+        // sort/paging axis exists to diverge. These asserts pin the semantics: same filters, same record set,
+        // regardless of dictionary insertion order (in-memory) or store-side layout (durable).
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var ids = new List<string>();
+        foreach (var (name, status) in new[] { ("a", JobStatus.Queued), ("b", JobStatus.Queued), ("c", JobStatus.Completed) })
+        {
+            var g = new GreetJob { Name = name };
+            ids.Add(g.Id);
+            await GreetJob.Upsert(g);
+            var now = host.Clock.GetUtcNow();
+            await host.Ledger.Append(new JobRecord
+            {
+                WorkType = typeof(GreetJob).FullName!,
+                WorkId = g.Id,
+                Action = "",
+                Status = status,
+                Attempt = status == JobStatus.Completed ? 1 : 0,
+                Lane = "default",
+                FirstSubmittedAt = now,
+                VisibleAt = now,
+                LastSettledAt = status == JobStatus.Completed ? now : null,
+            }, default);
+        }
+        var workType = typeof(GreetJob).FullName!;
+
+        var all = await host.Ledger.Query(new JobQuery(WorkType: workType), default);
+        all.Select(r => r.WorkId).OrderBy(x => x).Should().Equal(ids.OrderBy(x => x),
+            "the wildcard-axis query returns the whole filtered set, unordered");
+
+        var queued = await host.Ledger.Query(new JobQuery(WorkType: workType, Status: JobStatus.Queued), default);
+        queued.Select(r => r.WorkId).OrderBy(x => x).Should().HaveCount(2);
+
+        var single = await host.Ledger.Query(new JobQuery(WorkType: workType, WorkId: ids[0]), default);
+        single.Should().ContainSingle(r => r.WorkId == ids[0]);
+    }
+
+    [Fact]
     public async Task claim_honors_reservations_on_every_tier()
     {
         // PMC-056: the reservation eligibility clause converges across tiers (ARCH-0079) — a fresh foreign

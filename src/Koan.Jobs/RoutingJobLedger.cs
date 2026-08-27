@@ -101,9 +101,9 @@ internal sealed class RoutingJobLedger : IJobLedger
         await _inMemory.SetGate(gateKey, releaseAt, reason, ct);
     }
 
-    public async Task<IReadOnlyList<JobGate>> ActiveGates(DateTimeOffset now, CancellationToken ct)
+    public async Task<IReadOnlyList<JobGateRecord>> ActiveGates(DateTimeOffset now, CancellationToken ct)
     {
-        var gates = new Dictionary<string, JobGate>(StringComparer.Ordinal);
+        var gates = new Dictionary<string, JobGateRecord>(StringComparer.Ordinal);
         foreach (var g in await _durable.ActiveGates(now, ct)) gates[g.GateKey] = g;
         foreach (var g in await _inMemory.ActiveGates(now, ct)) gates.TryAdd(g.GateKey, g);
         return gates.Values.ToList();

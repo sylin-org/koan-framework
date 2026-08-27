@@ -4,8 +4,11 @@ using Koan.Data.Core.Model;
 namespace Koan.Jobs;
 
 /// <summary>
-/// Durable form of a resource gate (<see cref="JobGate"/>) — a parallel <see cref="Entity{T}"/> set so cooperative
-/// backoff (429 cooldowns) is honored across all nodes, not just the one that hit the limit (JOBS-0005 §6.5/§8).
+/// A shared resource gate (cooperative-backoff circuit-breaker, JOBS-0005 §6.5): set by <c>ctx.Backoff</c> on a
+/// 429-style trip, it defers — at dispatch, without running — every job whose gate key matches until
+/// <see cref="ReleaseAt"/>. Graded like the ledger itself (PMC-060 unified the former read-shape POCO into this
+/// single type): an in-memory row locally, a shared <see cref="Entity{T}"/> when durable, so the cooldown is
+/// honored across all nodes. Not an application Entity — framework control-plane state like <see cref="JobRecord"/>.
 /// </summary>
 public sealed class JobGateRecord : Entity<JobGateRecord>, IAmbientExempt
 {
