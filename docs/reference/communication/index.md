@@ -1,4 +1,4 @@
-﻿---
+---
 type: REFERENCE
 domain: communication
 title: "Raise occurrences and send Entity snapshots"
