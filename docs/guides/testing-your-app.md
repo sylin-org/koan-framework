@@ -33,7 +33,7 @@ public sealed class AnimeConformance : EntityConformanceSpecs<Anime>
 
 The batteries run on xUnit **v3**, which requires the test project itself to be an executable — a
 fresh `dotnet new xunit` project (library-shaped, xUnit v2 packages) will not run them. The test
-project references the application project plus these packages:
+project references the application project plus these packages, **pinned to the proven set**:
 
 ```xml
 <PropertyGroup>
@@ -43,15 +43,20 @@ project references the application project plus these packages:
 
 <ItemGroup>
   <PackageReference Include="Sylin.Koan.Testing" />
-  <PackageReference Include="xunit.v3" />
+  <PackageReference Include="xunit.v3" Version="3.2.2" />
   <PackageReference Include="Microsoft.NET.Test.Sdk" />
-  <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" PrivateAssets="all" />
   <ProjectReference Include="..\MyApp\MyApp.csproj" />
 </ItemGroup>
 ```
 
-If a template added the older `xunit` / `xunit.runner.visualstudio` v2 pair, remove it — mixing v2
-test packages with the v3 runner produces a host that cannot launch.
+Two version rules, both proven the hard way:
+
+- Pin `xunit.v3` to the **3.x** line. The 4.x packages moved onto Microsoft.Testing.Platform, and
+  mixing them with `Microsoft.NET.Test.Sdk` makes `dotnet test` on the .NET 10 SDK refuse to run
+  ("Testing with VSTest target is no longer supported").
+- If a template added the older `xunit` / v2 runner pair, remove it — mixing v2 test packages with
+  the v3 runner produces a host that cannot launch.
 
 `dotnet test` now runs, for `Anime`:
 
