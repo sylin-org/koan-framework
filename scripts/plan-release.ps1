@@ -148,6 +148,41 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $outputFile) -Force | Out
 $plan | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $outputFile -Encoding utf8
 
 $changed = @($packages | Where-Object { $_.publish })
+
+# PMC-062 guard: compat-band floors pin the referenced package's version at pack time, so a
+# publishing package's direct dependents MUST publish too or consumers stay locked to the old
+# floor forever. A stale dependent means the floor-stamp commits are missing.
+$byId = @{}
+foreach ($package in $packages) { $byId[$package.packageId] = $package }
+$stale = [Collections.Generic.List[string]]::new()
+# Reverse edges: for each changed package, find dependents from the forward graph.
+$dependents = @{}
+foreach ($entry in $inventory) {
+    $packageId = [string]$entry.packageId
+    foreach ($reference in @($entry.projectReferences)) {
+        $full = [IO.Path]::GetFullPath([string]$reference)
+        if ($byProject.TryGetValue($full, [ref]$dependencyId)) {
+            if (-not $dependents.ContainsKey($dependencyId)) {
+                $dependents[$dependencyId] = [Collections.Generic.List[string]]::new()
+            }
+            $dependents[$dependencyId].Add($packageId)
+        }
+    }
+}
+foreach ($package in $changed) {
+    if (-not $dependents.ContainsKey($package.packageId)) { continue }
+    foreach ($dependentId in $dependents[$package.packageId]) {
+        $dependent = $byId[$dependentId]
+        if ($dependent.publish) { continue }
+        $stale.Add("$($dependent.packageId) $($dependent.version) (needs the new $($package.packageId) $($package.version))")
+    }
+}
+if ($stale.Count -gt 0) {
+    throw ("Release would strand dependents behind new floors. Run " +
+           "'dotnet run --project tools/Koan.Packaging -- stamp-dependents', commit, and re-plan. " +
+           "Stale: " + ($stale -join '; '))
+}
+
 Write-Host "RELEASE-PLAN|train=$train|inventory=$($packages.Count)|publish=$($changed.Count)"
 foreach ($package in $changed) {
     Write-Host "RELEASE-PLAN|PUBLISH|$($package.packageId)|$($package.version)"

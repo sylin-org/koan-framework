@@ -94,6 +94,18 @@ internal static class PackagingProgram
                     Console.WriteLine($"inventory  {packages.Count} package project(s)");
                     return 0;
                 }
+                case "stamp-dependents":
+                {
+                    // PMC-062: floors stamp at pack time, versions advance on directory-touching
+                    // commits — without this pass, a shared-package fix never reaches dependents.
+                    var stamper = new DependencyStamper(root, processRunner);
+                    var report = await stamper.StampAsync(cancellationToken);
+                    foreach (var packageId in report.Changed)
+                        Console.WriteLine($"stamp      {packageId} (dependency versions moved)");
+                    Console.WriteLine($"stamp      {report.Changed.Count} stamped, {report.Unchanged} unchanged" +
+                        (report.Changed.Count > 0 ? " — commit, then re-run until quiescent" : string.Empty));
+                    return 0;
+                }
                 case "help":
                 case "--help":
                 case "-h":
@@ -114,6 +126,7 @@ internal static class PackagingProgram
         Koan package inventory
 
           inventory       [--output PATH]
+          stamp-dependents
           quality         [--output PATH] [--markdown PATH]
           product-surface [--output PATH] [--markdown PATH] [--check]
         """);
