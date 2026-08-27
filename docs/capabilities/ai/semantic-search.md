@@ -24,8 +24,10 @@ finds the right chores without a keyword in common.
 | Piece | Package | Note |
 |---|---|---|
 | The `[Embedding]` attribute and save-time indexing | `Sylin.Koan.Data.AI` | nothing else brings it in |
+| One embedding AI connector | `Sylin.Koan.AI.Connector.Ollama` (local model server) or `Sylin.Koan.AI.Connector.Onnx` (portable in-process) | the source that produces embeddings; without it, first save throws "No source found with capability 'Embedding'" |
 | One embedding-capable adapter | scale table below | in-process, no service |
 | One vector store | scale table below | pairs with your data store's engine where possible |
+| One vector store connector | e.g. `Sylin.Koan.Data.Vector.Connector.InMemory` (probe) or SqliteVec | without it, first save throws "No vector adapter is available" |
 
 Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.6 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.8 or newer (patch releases compatible).
 
