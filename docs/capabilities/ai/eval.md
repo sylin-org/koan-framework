@@ -51,6 +51,8 @@ Verified against: `Sylin.Koan.AI.Eval` 1.0.6 or newer (patch releases compatible
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Eval;
 using Koan.Core;
+using Microsoft.AspNetCore.Builder;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();

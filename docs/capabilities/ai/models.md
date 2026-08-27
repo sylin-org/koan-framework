@@ -59,6 +59,8 @@ releases compatible).
 using Koan.AI.Contracts.Shared;
 using Koan.AI.Models;
 using Koan.Core;
+using Microsoft.AspNetCore.Builder;
+using System.Security.Cryptography;
 using Koan.Data.Core;
 
 var builder = WebApplication.CreateBuilder(args);

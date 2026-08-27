@@ -1,0 +1,23 @@
+{
+  "generatedBy": "codex",
+  "blocks": [
+    { "file": "ai/eval.md", "index": 0, "classification": "compilable", "reason": "complete host composition sequence" },
+    { "file": "ai/eval.md", "index": 1, "classification": "compilable", "reason": "complete evaluation call sequence with defined variables" },
+    { "file": "ai/models.md", "index": 0, "classification": "compilable", "reason": "complete host composition sequence" },
+    { "file": "ai/models.md", "index": 1, "classification": "compilable", "reason": "complete model lifecycle call sequence" },
+    { "file": "ai/models.md", "index": 2, "classification": "compilable", "reason": "complete model pull call" },
+    { "file": "ai/review.md", "index": 0, "classification": "compilable", "reason": "complete reviewable entity declaration" },
+    { "file": "ai/review.md", "index": 1, "classification": "shape", "reason": "relies on builder and ArticleSummary declared outside the block" },
+    { "file": "ai/review.md", "index": 2, "classification": "shape", "reason": "relies on undefined app and summary variables" },
+    { "file": "ai/review.md", "index": 3, "classification": "shape", "reason": "relies on app and ArticleSummary declared outside the block" },
+    { "file": "ai/semantic-search.md", "index": 0, "classification": "shape", "reason": "relies on an undefined Produce entity" },
+    { "file": "data/entities.md", "index": 0, "classification": "compilable", "reason": "complete entity and call sequence" },
+    { "file": "data/field-hygiene.md", "index": 0, "classification": "compilable", "reason": "complete entity and call sequence" },
+    { "file": "records/canon-pipeline.md", "index": 0, "classification": "shape", "reason": "shows alternative calls with undefined context and a repeated result variable" },
+    { "file": "records/canon-pipeline.md", "index": 1, "classification": "shape", "reason": "relies on undefined person and cancellation token variables" },
+    { "file": "records/canon-pipeline.md", "index": 2, "classification": "shape", "reason": "combines pipeline fragments with undefined application symbols" },
+    { "file": "records/canon-pipeline.md", "index": 3, "classification": "shape", "reason": "job declaration relies on an undefined Person entity" },
+    { "file": "records/canon-pipeline.md", "index": 4, "classification": "shape", "reason": "entity references undeclared name properties" },
+    { "file": "records/canon-pipeline.md", "index": 5, "classification": "shape", "reason": "relies on undefined Person, auditTrail, and reviewQueue symbols" }
+  ]
+}
