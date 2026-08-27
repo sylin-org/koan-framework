@@ -159,6 +159,13 @@ Person.Canon
     .OnParked(result => reviewQueue.Enqueue(result));
 ```
 
+For pure token-shape preparation you can also declare what persistence-tier hygiene would do —
+`[Trim]`, `[Lowercase]`, `[Uppercase]` on string properties (from `Koan.Data.Abstractions.Annotations`).
+The intake sweep applies them after the override and before composed rules, so match keys see prepared
+values with no hand-written normalization; explicit rules still win final say over a declared case.
+The semantics live in one shared owner (`HygieneTransform` in Data.Abstractions), identical to what
+Data.Hygiene applies at save — intake and stored rows cannot disagree on a token's shape.
+
 Grammar: **base-form hooks intervene** (`OnIntake` may mutate the candidate); **past-participle hooks
 observe** (`OnCommitted`, `OnParked`, `OnFailed` fire after the operation resolves, with the result
 envelope). Registrations chain; operations terminate. Observer exceptions surface to the caller after

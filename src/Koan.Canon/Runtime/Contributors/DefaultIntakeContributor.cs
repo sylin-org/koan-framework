@@ -35,6 +35,11 @@ internal sealed class DefaultIntakeContributor<TModel> : ICanonPipelineContribut
                 "Mutate the candidate in place and return it - the pipeline carries one arriving instance through its phases.");
         }
 
+        // Declarative [Trim]/[Lowercase]/[Uppercase] annotations run before composition rules: the model
+        // override still sees raw arrival text, but rules, validators, and aggregation-key matching all see
+        // prepared values — intake parity with what Data.Hygiene applies at persistence time.
+        IntakeHygiene<TModel>.Apply(onboarded);
+
         onboarded = CanonEntity<TModel>.Canon.ApplyIntakeRules(onboarded);
 
         return ValueTask.FromResult<CanonizationEvent?>(null);

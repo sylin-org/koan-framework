@@ -1,6 +1,7 @@
 using Koan.Canon;
 using Koan.Canon;
 using Koan.Canon.Internal;
+using Koan.Data.Abstractions.Annotations;
 
 namespace Koan.Tests.Canon.Unit.Specs.Runtime;
 
@@ -91,6 +92,57 @@ public sealed class CanonIntakeSpec
         await act.Should().NotThrowAsync();
     }
 
+    [Fact]
+    public async Task Hygiene_annotations_normalize_arrival_without_a_manual_override()
+    {
+        // Intake parity with Data.Hygiene: declaring [Trim]/[Lowercase]/[Uppercase] on the model does at
+        // intake what the persistence tier does at save — no hand-written OnIntake normalization required.
+        AnnotatedCanon.Canon.Reset();
+        var persistence = new RecordingPersistence();
+        var runtime = new CanonRuntimeBuilder().UsePersistence(persistence)
+            .ConfigurePipeline<AnnotatedCanon>(pipeline => { })
+            .Build();
+
+        await runtime.Canonize(new AnnotatedCanon
+        {
+            Email = "  Alice@Example.COM ",
+            Code = " ship-7 ",
+            Note = "  keep my padding  ",
+        });
+
+        var persisted = (AnnotatedCanon)persistence.LastCanonical!;
+        persisted.Email.Should().Be("alice@example.com");
+        persisted.Code.Should().Be("SHIP-7");
+        persisted.Note.Should().Be("  keep my padding  ", "properties without hygiene annotations are never touched");
+    }
+
+    [Fact]
+    public async Task Hygiene_runs_after_the_model_override_and_before_composition_rules()
+    {
+        // Composition rules observe hygiene-normalized values, and an explicit business rule keeps final say
+        // over a declarative annotation.
+        AnnotatedCanon.Canon.Reset();
+        string? seenByRule = null;
+        AnnotatedCanon.Canon.OnIntake(p =>
+        {
+            seenByRule = $"code={p.Code}|email={p.Email}";
+            p.Code = p.Code.ToLowerInvariant();   // explicit rule overrides [Uppercase]
+            return p;
+        });
+
+        var persistence = new RecordingPersistence();
+        var runtime = new CanonRuntimeBuilder().UsePersistence(persistence)
+            .ConfigurePipeline<AnnotatedCanon>(pipeline => { })
+            .Build();
+
+        await runtime.Canonize(new AnnotatedCanon { Email = " Alice@Example.COM ", Code = " ship-7 " });
+
+        seenByRule.Should().Be("code=SHIP-7|email=alice@example.com",
+            "hygiene sweeps between the model override and composition rules");
+        ((AnnotatedCanon)persistence.LastCanonical!).Code.Should().Be("ship-7",
+            "an explicit intake rule wins final say over the annotation");
+    }
+
     private static CanonRuntime Runtime(RecordingPersistence persistence)
     {
         var builder = new CanonRuntimeBuilder().UsePersistence(persistence);
@@ -152,5 +204,19 @@ public sealed class CanonIntakeSpec
             OverrideOrder?.Add("model");
             return base.OnIntake(candidate);
         }
+    }
+
+    /// <summary>Declares hygiene annotations on identity-ish tokens but NO manual OnIntake normalization —
+    /// the intake sweep must do the preparation (intake parity with Data.Hygiene).</summary>
+    public sealed class AnnotatedCanon : CanonEntity<AnnotatedCanon>
+    {
+        [MatchKey]
+        [Trim, Lowercase]
+        public string Email { get; set; } = "";
+
+        [Trim, Uppercase]
+        public string Code { get; set; } = "";
+
+        public string Note { get; set; } = "";
     }
 }

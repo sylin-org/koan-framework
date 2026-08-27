@@ -40,16 +40,7 @@ internal sealed class HygienePropertyBag
     }
 
     private static object? Normalize(object? value, bool trim, bool lower, bool upper)
-        => value is not string s ? value : Apply(s, trim, lower, upper);
-
-    private static string Apply(string s, bool trim, bool lower, bool upper)
-    {
-        if (s.Length == 0) return s;
-        if (trim) s = s.Trim();
-        if (lower) s = s.ToLowerInvariant();
-        else if (upper) s = s.ToUpperInvariant();
-        return s;
-    }
+        => value is not string s ? value : HygieneTransform.Apply(s, trim, lower, upper);
 
     private static Action<object, object?> CompileSetter(PropertyInfo property)
     {
