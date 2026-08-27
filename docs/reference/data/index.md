@@ -212,6 +212,10 @@ operator sequence; the [package companion](../../../src/Koan.Data.Cutover/README
 Declare a direct edge with `[Parent]`, then navigate it without introducing a repository layer:
 
 ```csharp
+using Koan.Data.Core.Model;          // Entity<T>
+using Koan.Data.Core.Relationships;  // Parent, GetParent, GetChildren
+using Koan.Data.Core;                // Save
+
 public sealed class Order : Entity<Order>
 {
     [Parent(typeof(Customer))]

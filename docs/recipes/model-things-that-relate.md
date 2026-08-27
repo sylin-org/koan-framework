@@ -77,6 +77,10 @@ using Microsoft.AspNetCore.Mvc;     // Route
 public sealed class CategoryController : EntityController<Category>;
 ```
 
+`Required` means every list read is paginated, always: omitted parameters take the defaults, and an
+oversized page size is clamped to `MaxSize` with the applied bound reported in the `X-Page-Size`
+response header. A caller can never request an unbounded read.
+
 And cache what genuinely does not move:
 
 ```csharp
@@ -93,10 +97,11 @@ Depth: [read and stream Entities](../guides/data/entity-access-and-streaming.md)
 
 1. **Behavior** — create a parent and children; read one child, a page of children, and a stream of
    them, asserting the relationship holds in each.
-2. **Composition** — assert paging is actually enforced. `MustPaginate` is the guard, and an unbounded
-   read that quietly works is the defect.
-3. **Correction** — request a child of a parent that does not exist, and a page beyond the maximum, and
-   assert both fail usefully rather than returning everything.
+2. **Composition** — assert pagination is actually applied: every list read returns a bounded page
+   with paging headers, and an oversized page size comes back clamped to `MaxSize` (`X-Page-Size`
+   reports the applied bound). An unbounded read that quietly works is the defect.
+3. **Correction** — request a child of a parent that does not exist and assert it fails or reports
+   empty usefully rather than returning everything.
 
 Test with enough children that a full read would be obviously wrong. Ten rows prove nothing.
 
