@@ -72,6 +72,7 @@ From a running host (`app.StartAsync()` or later):
 
 ```csharp
 using Koan.AI.Contracts.Shared;
+using Koan.Data.Core;
 using Koan.AI.Models;
 
 var installed = await Model.List(null);                       // runtime + catalog, deduped by id
