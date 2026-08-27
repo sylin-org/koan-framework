@@ -8,8 +8,9 @@ last_updated: 2026-08-27
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/recipes/isolate-tenants.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Tenancy 1.0.9, Data.Connector.Sqlite) — cross-tenant denial matrix and fail-closed negative path proven through a real AddKoan() host
 gets_you: "Every read and write scoped to one customer, by construction rather than by remembering a filter."
 works_if: "More than one customer will ever use this application. Decide before there is data."
 costs: "Adds no service. Adds a boundary that every new surface must respect — retrofitting it later is the expensive path."

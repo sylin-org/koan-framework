@@ -4,11 +4,12 @@ domain: security
 title: "Tenant isolation"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/trust/tenant-isolation.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Tenancy 1.0.9, Data.Connector.Sqlite) — cross-tenant read/write denial matrix, fail-closed unscoped query with the verbatim SegmentationRequiredException, koan.lock.json composition proof
 ---
 
 # Tenant isolation

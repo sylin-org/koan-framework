@@ -8,6 +8,27 @@ Field-at-rest protection as Entity metadata: mark a writable string property and
 dotnet add package Sylin.Koan.Classification
 ```
 
+Classification marks up Entity strings, so the Entity also needs a durable store — reference one Data
+connector and configure it (without one, Entity verbs fail with `Koan Data has no provider candidates.
+Reference a Data connector and call AddKoan().`):
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+```json
+"Koan": {
+  "Data": {
+    "Sources": {
+      "Default": {
+        "Adapter": "sqlite",
+        "ConnectionString": "Data Source=app.db"
+      }
+    }
+  }
+}
+```
+
 Keep the ordinary Koan bootstrap — Data verbs work once the host is up:
 
 ```csharp

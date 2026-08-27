@@ -22,6 +22,7 @@ decision.
 |---|---|---|
 | Entity and HTTP policy pipeline | `Sylin.Koan.Web` | owns the governed Entity endpoint seam |
 | Authenticated identities and authorization | `Sylin.Koan.Web.Auth` | supplies the subject and policy runtime |
+| Durable rows the rules protect | a Koan Data connector, e.g. `Sylin.Koan.Data.Connector.Sqlite` | without one, Entity requests fail: `Koan Data has no provider candidates. Reference a Data connector and call AddKoan().` |
 | Richer HTTP projections (optional) | `Sylin.Koan.Web.Extensions` | must remain on the same policy path |
 
 ## The constraint box

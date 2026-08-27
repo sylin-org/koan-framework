@@ -21,6 +21,7 @@ Koan encrypts the provider-bound copy.
 | Piece | Package | Note |
 |---|---|---|
 | Field classification and transforms | `Sylin.Koan.Classification` | supports writable string properties |
+| Durable rows the declarations protect | a Koan Data connector, e.g. `Sylin.Koan.Data.Connector.Sqlite` | without one, Entity verbs fail: `Koan Data has no provider candidates. Reference a Data connector and call AddKoan().` |
 | Local key custody | supplied automatically for Development | persists beside the application for restart continuity |
 | Production key custody | application implementation | register the trusted key provider before `AddKoan()` |
 

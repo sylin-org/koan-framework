@@ -16,6 +16,7 @@ costs: "Adds no service. Adds a decision you must make per operation, which is t
 ingredients:
   - "one | HTTP conventions and EntityController | Sylin.Koan.Web"
   - "one | authentication and authorization | Sylin.Koan.Web.Auth"
+  - "one | durable rows the rules protect - without a store there is no Entity to govern | any Koan Data connector (e.g. Sylin.Koan.Data.Connector.Sqlite)"
   - "optional | shaping and projection add-ons | Sylin.Koan.Web.Extensions"
 ---
 
@@ -52,6 +53,28 @@ dotnet add package Sylin.Koan.Web.Auth
 
 Authorization rides on the same package as sign-in; there is no separate one to add. Express the rule
 at the operation boundary rather than inside business code, and let every projection inherit it.
+
+The Entity being protected needs durable rows — reference one Data connector and configure it:
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+```json
+"Koan": {
+  "Data": {
+    "Sources": {
+      "Default": {
+        "Adapter": "sqlite",
+        "ConnectionString": "Data Source=app.db"
+      }
+    }
+  }
+}
+```
+
+Without it the host starts and authentication works, but every Entity request fails with
+`Koan Data has no provider candidates. Reference a Data connector and call AddKoan().`
 
 Depth: [authorization how-to](../guides/authorization-howto.md) ·
 [auth how-to](../guides/auth-howto.md).
