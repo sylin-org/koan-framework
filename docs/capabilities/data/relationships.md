@@ -4,11 +4,12 @@ domain: data
 title: "Entity relationships"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/relationships.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages - [Parent] edge navigated as one/page/stream at 250-child scale, Required pagination clamps an oversized page with X-Page-Size, missing parent fails closed
 ---
 
 # Entity relationships
