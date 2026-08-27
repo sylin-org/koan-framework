@@ -28,7 +28,10 @@ connector reference can change physical reach without changing this application 
 Define an Entity and business-named handlers. Koan discovers both classes:
 
 ```csharp
-using Koan.Communication;
+using Koan.Core;                       // AddKoan()
+using Koan.Data.Core;                  // Save/Query extensions
+using Koan.Data.Core.Model;            // Entity<T>
+using Koan.Communication;              // Events, Raise, EventGateway
 using Koan.Data.Core.Model;
 
 public sealed class Order : Entity<Order>
@@ -114,7 +117,10 @@ one-handler-one-lambda case, the type-scoped gateway accepts inline lambdas at c
 they enter the same binding pipeline as discovered handler classes.
 
 ```csharp
-using Koan.Communication;
+using Koan.Core;                       // AddKoan()
+using Koan.Data.Core;                  // Save/Query extensions
+using Koan.Data.Core.Model;            // Entity<T>
+using Koan.Communication;              // Events, Raise, EventGateway
 using Koan.Data.Core.Model;
 
 // usings for the gateway: Koan.Communication (EventGateway), Koan.Data.Core.Model (extension)
