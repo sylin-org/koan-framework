@@ -90,6 +90,7 @@ An Entity that owns files derives from `MediaEntity<T>` and names where its byte
 ```csharp
 using Koan.Data.Core;
 using Koan.Storage;
+using Koan.Media;   // MediaEntity
 
 [StorageBinding(Profile = "cold", Container = "photos")]
 public class PhotoAsset : MediaEntity<PhotoAsset>

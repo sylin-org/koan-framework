@@ -27,6 +27,10 @@ Define the business model and inherit one controller. `AddKoan()` discovers the 
 the CRUD projection through the shared Entity operation boundary:
 
 ```csharp
+using Koan.Data.Core.Model;      // Entity<T>
+using Koan.Web.Controllers;      // EntityController<T>
+using Microsoft.AspNetCore.Mvc;  // Route
+
 public sealed class Todo : Entity<Todo>
 {
     public string Title { get; set; } = "";

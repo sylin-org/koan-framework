@@ -15,6 +15,7 @@ works_if: "The application needs pixels in a browser: a tool page, an admin surf
 costs: "Embedded static files cost nothing. A client build adds a node toolchain to every build and CI. CDN scripts add a runtime network dependency and third-party script running on your origin."
 ingredients:
   - "one | the web layer this UI talks to | Sylin.Koan.Web"
+  - "one | durable rows behind the API - without it every Entity call fails with \"Koan Data has no provider candidates. Reference a Data connector and call AddKoan().\" | any Koan Data connector (e.g. Sylin.Koan.Data.Connector.Sqlite)"
   - "optional | entity-owned files behind upload UIs | Sylin.Koan.Storage, Sylin.Koan.Media.Web"
 ---
 
