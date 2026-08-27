@@ -19,6 +19,7 @@ costs: "The local path needs disk you must back up. Derivatives cost CPU on firs
 ingredients:
   - "one | Entity-owned files | Sylin.Koan.Storage"
   - "one | somewhere to put the bytes, user's choice | Sylin.Koan.Storage.Connector.Local, Sylin.Koan.Storage.Connector.S3"
+  - "one | durable metadata row for the owning Entity | any Koan Data connector (e.g. Sylin.Koan.Data.Connector.Sqlite)"
   - "optional | recipes and derivatives over HTTP | Sylin.Koan.Media.Core, Sylin.Koan.Media.Web"
   - "optional | durable ingest and processing | Sylin.Koan.Jobs"
 ---
@@ -57,10 +58,14 @@ calls it shelved — prefer the local path and say so plainly.
 ```powershell
 dotnet add package Sylin.Koan.Storage
 dotnet add package Sylin.Koan.Storage.Connector.Local
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
 ```
 
-Storage needs a connector; without one it has nowhere to put anything. Media brings Storage
-transitively, so adding media does *not* remove the need to choose where bytes live.
+Storage needs a connector; without one it has nowhere to put anything. The owning Entity's metadata
+row is an ordinary Entity, so it also needs a Data connector and `Koan:Data:Sources:Default`
+configuration — without it, `.Save()` fails with `Koan Data has no provider candidates. Reference a
+Data connector and call AddKoan().` Media brings Storage transitively, so adding media does *not*
+remove the need to choose where bytes live.
 
 Configure one profile and the provider's physical settings. A sole profile is the implicit default.
 Without at least one profile the first upload fails with "Koan Storage has no profiles":

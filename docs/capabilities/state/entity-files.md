@@ -22,6 +22,7 @@ business object that owns them.
 |---|---|---|
 | Entity-owned storage runtime | `Sylin.Koan.Storage` | use `[StorageBinding(...)]` on `StorageEntity<T>` |
 | Local provider | `Sylin.Koan.Storage.Connector.Local` | supported single-node filesystem path |
+| Durable metadata row for the owning Entity | a Koan Data connector, e.g. `Sylin.Koan.Data.Connector.Sqlite` | without one, `.Save()` fails: `Koan Data has no provider candidates. Reference a Data connector and call AddKoan().` |
 | Remote S3-compatible provider | `Sylin.Koan.Storage.Connector.S3` (not assessed, shelved) | not the recommended greenfield route |
 
 ## The constraint box
