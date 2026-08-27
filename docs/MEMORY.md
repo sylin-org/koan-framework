@@ -503,3 +503,12 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   `EntityJsonSerialization`). The law: hydration is store-authoritative; constructors own creation-time
   artifacts and hydration must discard them, never merge with them. When a ctor-seeded list grows across
   cycles, suspect the serializer before the state machine. (2026-08-27)
+
+- **A plain-SDK package must never ship `<Content Include="wwwroot\**">`.** Static-web-assets from a
+  plain `Microsoft.NET.Sdk` package re-root against the CONSUMING app's content root, so any referencing
+  app without a `wwwroot` folder (`dotnet new web` creates none) crashes at startup with
+  `DirectoryNotFoundException` in `StaticWebAssetsLoader` — before its own code runs. Ship the file as
+  an `EmbeddedResource` and serve it from a mapped endpoint (the StaticController pattern). Found by the
+  trust-leaf blind runs 2026-08-27 (`Sylin.Koan.Web.Auth.Connector.Test` 1.0.9 → fixed in 1.0.10).
+  Related: nuget clients cache flatcontainer indexes ~30 min — a just-published fix resolves as the old
+  version unless the consumer pins it. (2026-08-27)
