@@ -4,7 +4,7 @@ domain: communication
 title: "Raise occurrences and send Entity snapshots"
 audience: [developers, architects, operators, ai-agents]
 status: current
-last_updated: 2026-07-16
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-16
@@ -21,7 +21,9 @@ Communication gives Entity code two distinct intents without exposing a bus:
 
 The foundation includes a faithful process-local runtime. Reference `Sylin.Koan`, call `AddKoan()`,
 and write the business types; there is no handler registration or routing configuration. A direct
-connector reference can change physical reach without changing this application grammar.
+connector reference can change physical reach without changing this application grammar. Publication
+pairs with subscription: every raised occurrence is observed by discovered `IHandleEntityEvent`
+classes and by composition-time gateway lambdas — [Subscribe with the EventGateway](#subscribe-with-the-eventgateway).
 
 ## Shortest supported path
 
@@ -32,7 +34,6 @@ using Koan.Core;                       // AddKoan()
 using Koan.Data.Core;                  // Save/Query extensions
 using Koan.Data.Core.Model;            // Entity<T>
 using Koan.Communication;              // Events, Raise, EventGateway
-using Koan.Data.Core.Model;
 
 public sealed class Order : Entity<Order>
 {
@@ -114,16 +115,15 @@ external providers may not.
 
 The class-based handler path (`IHandleEntityEvent`) is the canonical subscription. For the common
 one-handler-one-lambda case, the type-scoped gateway accepts inline lambdas at composition time —
-they enter the same binding pipeline as discovered handler classes.
+they enter the same binding pipeline as discovered handler classes, and each registration observes
+the occurrences published by `Events.Raise<TEvent>()` above.
 
 ```csharp
 using Koan.Core;                       // AddKoan()
 using Koan.Data.Core;                  // Save/Query extensions
 using Koan.Data.Core.Model;            // Entity<T>
 using Koan.Communication;              // Events, Raise, EventGateway
-using Koan.Data.Core.Model;
 
-// usings for the gateway: Koan.Communication (EventGateway), Koan.Data.Core.Model (extension)
 Note.EventGateway.On<NoteCreated>((note, occurrence, ct) =>
 {
     Console.WriteLine($"note {note.Id} created: {occurrence.Details?.Title}");
