@@ -4,11 +4,12 @@ domain: storage
 title: "Entity-owned files"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/state/entity-files.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the Local + SQLite path against published packages - bytes written through the configured profile and returned unchanged via StorageEntity<T>, metadata row saved through the elected Data connector, and the absent-connector correction observed verbatim before adding it
 ---
 
 # Entity-owned files
