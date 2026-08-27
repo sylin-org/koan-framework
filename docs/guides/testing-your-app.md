@@ -31,6 +31,28 @@ public sealed class AnimeConformance : EntityConformanceSpecs<Anime>
 }
 ```
 
+The batteries run on xUnit **v3**, which requires the test project itself to be an executable — a
+fresh `dotnet new xunit` project (library-shaped, xUnit v2 packages) will not run them. The test
+project references the application project plus these packages:
+
+```xml
+<PropertyGroup>
+  <TargetFramework>net10.0</TargetFramework>
+  <OutputType>Exe</OutputType>
+</PropertyGroup>
+
+<ItemGroup>
+  <PackageReference Include="Sylin.Koan.Testing" />
+  <PackageReference Include="xunit.v3" />
+  <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  <ProjectReference Include="..\MyApp\MyApp.csproj" />
+</ItemGroup>
+```
+
+If a template added the older `xunit` / `xunit.runner.visualstudio` v2 pair, remove it — mixing v2
+test packages with the v3 runner produces a host that cannot launch.
+
 `dotnet test` now runs, for `Anime`:
 
 | Battery | What it pins | Gated on |
