@@ -142,9 +142,10 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
         }
         if ($inType) {
             $typeLines.Add($line)
-            $braceDepth += ($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count
-            $braceDepth -= ($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
-            if ($braceDepth -le 0 -and $line -match '}') { $inType = $false }
+            $openCount = @($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count
+            $closeCount = @($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
+            $braceDepth += $openCount - $closeCount
+            if ($braceDepth -le 0 -and $line -match '}') { $inType = false }
         } else {
             $statementLines.Add($line)
         }
