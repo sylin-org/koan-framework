@@ -145,7 +145,7 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
             $openCount = @($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count
             $closeCount = @($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
             $braceDepth += $openCount - $closeCount
-            if ($braceDepth -le 0 -and $line -match '}') { $inType = false }
+            if ($braceDepth -le 0 -and $line -match '}') { $inType = $false }
         } else {
             $statementLines.Add($line)
         }
