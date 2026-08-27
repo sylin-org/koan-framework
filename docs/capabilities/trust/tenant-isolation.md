@@ -22,10 +22,10 @@ scope through every active capability.
 |---|---|---|
 | Ambient tenant isolation | `Sylin.Koan.Tenancy` | contributes segmentation to active pillars |
 | Authentication | `Sylin.Koan.Web.Auth` | establishes the trusted caller from which tenancy may resolve |
-
-Verified against: `Sylin.Koan.Tenancy` 1.0.8 or newer, `Sylin.Koan.Identity.Tenancy` 1.0.6 or newer, `Sylin.Koan.Web.Auth.Connector.Test` 1.0.7 or newer (patch releases compatible).
 | Durable person-to-tenant membership (optional) | `Sylin.Koan.Identity.Tenancy` · `Sylin.Koan.Identity` | supports people who belong to several tenants |
 | Operator lifecycle surface (optional) | `Sylin.Koan.Tenancy.Web` | separates administration exposure from authority |
+
+Verified against: `Sylin.Koan.Tenancy` 1.0.8 or newer, `Sylin.Koan.Identity.Tenancy` 1.0.6 or newer, `Sylin.Koan.Web.Auth.Connector.Test` 1.0.7 or newer (patch releases compatible).
 
 ## The constraint box
 

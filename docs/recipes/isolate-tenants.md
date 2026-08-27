@@ -4,7 +4,7 @@ recipe: isolate-tenants
 title: "Keep customers from seeing each other's data"
 domain: identity
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-27
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
@@ -51,9 +51,32 @@ The decisions worth settling, in this order:
 dotnet add package Sylin.Koan.Tenancy
 ```
 
+Tenancy also needs an isolating backing store — reference one connector and configure it once (a
+non-isolating store fails closed for a tenant-scoped operation rather than leak):
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+```json
+"Koan": {
+  "Data": {
+    "Sources": {
+      "Default": {
+        "Adapter": "sqlite",
+        "ConnectionString": "Data Source=app.db"
+      }
+    }
+  }
+}
+```
+
 Scope is deliberate and disposable where an operation must cross or pin it:
 
 ```csharp
+using Koan.Tenancy;   // Tenant
+using Koan.Data.Core; // FirstPage
+
 using (Tenant.Use("acme"))
 {
     var page = await Todo.FirstPage(25, ct);

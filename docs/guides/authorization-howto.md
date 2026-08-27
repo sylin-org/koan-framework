@@ -32,6 +32,9 @@ The everyday path. One model authorizes an `Entity<T>` identically on REST **and
 **Gate** — *who may touch this entity at all, per action.* A token bag per action; allow-by-default (an unspecified action is open). `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` are the declarative form of the same thing: they lower into this gate, so one model enforces whichever you write.
 
 ```csharp
+using Koan.Data.Core.Model;    // Entity<T>
+using Koan.Web.Authorization;  // Access attribute
+
 // read open, write needs sign-in, remove needs the admin role. Tokens: anyone | authenticated | is:role |
 // has:scope:x | has:role:y | has:claim:t=v | owner — comma-separates as OR; the row layer stays typed.
 [Access(read: "anyone", write: "authenticated", remove: "is:admin")]

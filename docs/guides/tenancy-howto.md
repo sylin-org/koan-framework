@@ -41,7 +41,38 @@ Repository samples use the equivalent project reference; application code is ide
 
 Tenancy needs a backing store that **announces isolation** (`DataCaps.Isolation.RowScoped`) — SQLite, PostgreSQL,
 SQL Server, Mongo. A non-isolating store (the JSON file adapter) **fails closed** for a tenant-scoped op rather than
-leak. (ARCH-0095, ARCH-0099.)
+leak. (ARCH-0095, ARCH-0099.) Name the layer and configure it once:
+
+```powershell
+dotnet add package Sylin.Koan.Data.Connector.Sqlite
+```
+
+```json
+"Koan": {
+  "Data": {
+    "Sources": {
+      "Default": {
+        "Adapter": "sqlite",
+        "ConnectionString": "Data Source=app.db"
+      }
+    }
+  }
+}
+```
+
+A tenant-scoped operation without an isolating store fails closed — if a request with no resolvable tenant returns
+rows instead of failing, the feature is inverted.
+
+The whole host reads as the ordinary grammar:
+
+```csharp
+using Koan.Core;   // AddKoan()
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
 
 ---
 
@@ -56,6 +87,8 @@ framework, so your entity stays a pure description of your domain.
 **Sample.**
 
 ```csharp
+using Koan.Data.Core.Model;   // Entity<T>
+
 public sealed class Invoice : Entity<Invoice>
 {
     public decimal Amount { get; set; }
@@ -81,6 +114,9 @@ exemption.
 **Sample.**
 
 ```csharp
+using Koan.Tenancy;           // HostScoped
+using Koan.Data.Core.Model;   // Entity<T>
+
 [HostScoped]
 public sealed class FeatureFlag : Entity<FeatureFlag>
 {
@@ -107,6 +143,10 @@ inside the scope — reads, writes, blob ops, cache — is isolated to that tena
 **Sample.**
 
 ```csharp
+using Koan.Tenancy;           // Tenant
+using Koan.Data.Core.Model;  // Entity<T> statics: All, Get
+using Koan.Data.Core;        // Save
+
 using (Tenant.Use("acme"))
 {
     await new Invoice { Amount = 100m, Customer = "Acme Corp" }.Save();  // stamped to "acme"
@@ -185,6 +225,9 @@ posture (Closed → the handler's first tenant-scoped op fails closed; Open → 
 **Sample.**
 
 ```csharp
+using Koan.Tenancy;   // Tenant
+using Koan.Jobs;      // .Job.Submit (IKoanJob work types)
+
 using (Tenant.Use("acme"))
     await new SendInvoiceEmail { InvoiceId = id }.Job.Submit(); // executes later, still scoped to "acme"
 ```
@@ -255,6 +298,8 @@ write-takeover · scoped delete · cache-key · async-hop) for any value-isolati
 **Sample.**
 
 ```csharp
+using Koan.Tenancy;   // Tenant
+
 await Koan.Data.Core.Axes.DataAxis.AssertNoLeak<Invoice, string>(Tenant.Use, "acme", "globex");   // returns if isolated; throws on a leak
 ```
 

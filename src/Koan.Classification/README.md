@@ -11,12 +11,18 @@ dotnet add package Sylin.Koan.Classification
 Keep the ordinary Koan bootstrap:
 
 ```csharp
+using Koan.Core;   // AddKoan()
+
 builder.Services.AddKoan();
 ```
 
 ## Meaningful use
 
 ```csharp
+using Koan.Data.Core.Model;               // Entity<T>
+using Koan.Data.Abstractions.Annotations; // [Pii]
+using Koan.Data.Core;                     // Save, Get
+
 public sealed class Customer : Entity<Customer>
 {
     [Pii] public string Email { get; set; } = "";
