@@ -1,5 +1,5 @@
 {
-  "Sylin.Koan.Web": "1.0.24",
-  "Sylin.Koan.Identity": "1.0.11",
-  "$transitive": "79412A31BAD068EDADB080A2B60CFE418907D458DC63BD9E3886CBE9529163DE"
+  "Sylin.Koan.Web": "1.0.25",
+  "Sylin.Koan.Identity": "1.0.12",
+  "$transitive": "63ECB10DF4E5D27B004EEFB7C375B5BD969F709107E94AAB156DD3E35EDF7C4A"
 }
