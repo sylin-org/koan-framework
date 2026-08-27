@@ -1,8 +1,8 @@
 {
   "Sylin.Koan.Core": "1.0.26",
-  "Sylin.Koan.Data.Core": "1.0.35",
-  "Sylin.Koan.AI": "1.0.12",
-  "Sylin.Koan.AI.Contracts": "1.0.13",
+  "Sylin.Koan.Data.Core": "1.0.36",
+  "Sylin.Koan.AI": "1.0.13",
+  "Sylin.Koan.AI.Contracts": "1.0.14",
   "Sylin.Koan.AI.Contracts.Shared": "1.0.8",
-  "$transitive": "6F2EF1702FD88C932B285918BBF05F8A78F47540DB87CE24AB9B2D9D3181B4D6"
+  "$transitive": "C00B4806E6821D2666540CD1E429487C9499E33DB42B0359EAB8F0899C6B6A57"
 }
