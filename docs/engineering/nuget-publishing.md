@@ -44,6 +44,22 @@ Then watch the **Release** workflow. Never publish from a workstation.
 
 If `--ff-only` refuses, `main` and `dev` have diverged — see [Recovery](#recovery).
 
+## Carry dependency fixes forward (stamp-dependents)
+
+Compat-band floors stamp at pack time with the referenced package's version, and a package's NBGV
+version advances only when commits touch its own directory. So a fix to a shared package (Core,
+Data.Abstractions) does not reach consumers through unchanged dependents until those dependents
+re-stamp and re-advance. Before planning a release that includes a shared-package change:
+
+```powershell
+dotnet run --project tools/Koan.Packaging -- stamp-dependents
+# commit the rewritten dependency-versions.json files, then re-run until it reports 0 stamped
+```
+
+`plan-release` refuses to produce a plan that would strand a direct dependent behind a new floor,
+naming each stale package. First adoption of the stamp file advances the whole train once; after
+that, only packages whose dependency closure actually moved.
+
 ## Know what will ship, before you push
 
 The plan is reproducible locally and touches nothing:
