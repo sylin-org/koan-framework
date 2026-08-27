@@ -10,12 +10,11 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" />
   </ItemGroup>
+  <!-- The login page is served by StaticController from this embedded resource. It is deliberately NOT
+       shipped as Content/wwwroot: a plain-SDK package's wwwroot content re-roots against the CONSUMING
+       app's content root in the static-web-assets manifest, so every reference demanded a wwwroot folder
+       that minimal template apps do not have (startup DirectoryNotFoundException, blind run 2026-08-27). -->
   <ItemGroup>
-    <Content Include="wwwroot\**\*">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </Content>
-    <!-- Embed login HTML as a fallback when running from published container where content may be trimmed -->
     <EmbeddedResource Include="wwwroot\testprovider-login.html" />
   </ItemGroup>
   <ItemGroup>
