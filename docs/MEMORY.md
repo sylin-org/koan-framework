@@ -463,4 +463,34 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   SDK-seeded escape-hatch properties, NuGet's conventional-asset-name-only import rule, generated packaging
   output owning `<PackageId>.props`, and the diagnostic trio (`-preprocess`, `-getProperty`, `ilc.rsp`) are
   written once at [docs/engineering/msbuild-nuget-debugging-notes.md](engineering/msbuild-nuget-debugging-notes.md);
-  consult it before debugging anything that lives between a package and the compiler. (2026-08-24)
+  consult it before debugging anything that lives between a package and the compiler.
+- **Snippet usings are never optional — they are the #1 blind-run killer.** Across five cold-agent runs
+  (2026-08-26), the dominant doc-defect class was missing `using` statements: `AddKoan()` (Koan.Core),
+  `Save()` (Koan.Data.Core), `[Embedding]` (Koan.Data.AI.Attributes) — each caught by an agent that
+  correctly refused to guess. Capability-leaf samples must state their complete using-block inline,
+  labeled per symbol. A leaf that assumes "the app grammar" taught elsewhere is a leaf-island; cold
+  readers island-hop.
+- **Every capability needs the full scaffold named, layer by layer, with its corrective failure
+  message.** The AI-gateway cold run composed four packages and still had zero embedding sources
+  (first save threw "No source found with capability 'Embedding'"), then zero vector stores ("No
+  vector adapter is available"). The "You need" table must name every layer and quote the exact
+  error each missing layer produces — the error text is the doc that agents actually read at failure time.
+- **KoanRegistry statics reset after module registration.** Anything needing discovered types at
+  runtime (enqueue-time job binding, per-model closures) must build from composition-plan/DI state
+  that survives, never from `KoanRegistry` snapshots taken at Register. Verified by the Canon
+  stage-job seeding (canon-rides-jobs).
+- **In-memory tier: Entity statics and the ledger's private store are two different worlds.**
+  Ledger-owned data must be read through `IJobLedger` (e.g. `Running()`), never via `Entity<T>.Query`
+  on the in-memory tier — the Jobs death-sweep initially saw an empty world through the wrong pane.
+- **bash-regex edits on C# files corrupt silently; revert-and-redo beats surgical debugging.**
+  A PowerShell -replace overwrote a `SetStatus(Queued, deferred)` line with a Dead-branch line and
+  duplicated notifies; the corruption surfaced two suites later. Fix: Edit tool only for code;
+  when edits get weird, `git checkout` the file to last-green and re-apply carefully.
+- **The external-agent blind run (prompt relayed by Leo to a different harness) works** and catches
+  what context-poisoned agents cannot see. Two structural requirements for the prompt: docs fetched
+  from the dev branch online (never local paths — no uncommitted state, no scaffolding leaks), and a
+  restore-availability gate up front (nuget.org indexes list versions before blobs are restorable;
+  new package IDs can queue ~35 minutes).
+- **`Set-Content -NoNewline` on multi-line content flattens files to one line.** PowerShell string
+  handling corrupted CONTINUATION.md during an edit; rebuild from known content rather than
+  repairing character soup. (2026-08-24)
