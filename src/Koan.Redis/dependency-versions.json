@@ -1,5 +1,5 @@
 {
-  "Sylin.Koan.Core": "1.0.25",
-  "Sylin.Koan.Redis.Abstractions": "1.0.7",
-  "$transitive": "B108C71DE834C3D406B88F805B64C3623DB307EB8B5006FB6B48E857AB57A37A"
+  "Sylin.Koan.Core": "1.0.26",
+  "Sylin.Koan.Redis.Abstractions": "1.0.8",
+  "$transitive": "EA34440B4B4F589DF99666BA47DE418A3C5CAE93891D8521624E5F7888A574A5"
 }
