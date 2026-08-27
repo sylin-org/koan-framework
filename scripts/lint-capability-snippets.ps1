@@ -117,25 +117,61 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
 
     # compilable blocks are self-contained top-level programs: compile verbatim as the whole
     # Program.cs. Blocks that start with their own usings are already complete; blocks without
-    # get the standard preamble prepended. Blocks that contain NO executable statements (pure
-    # declarations) also get the preamble + a dummy call so the entry point exists.
-    $hasExecutableCode = @($block -split "`r?`n" | Where-Object { $_ -match '^\s*(await |var |return |_ =|\w+\.|if\s|foreach|for\s|while\s)' }).Count -gt 0
+    # get the standard preamble prepended. Blocks that mix type declarations and executable
+    # statements get the declarations moved after the statements (the correct top-level-program
+    # shape — the doc presents class-first for readability, but C# demands statements first).
+
     $hasOwnUsings = $block -match '^\s*using\s+'
+    $hasExecutableCode = @($block -split "`r?`n" | Where-Object { $_ -match '^\s*(await |var |return |_ =|\w+\.|if\s|foreach|for\s|while\s)' }).Count -gt 0
 
-    if ($hasOwnUsings -and $hasExecutableCode) {
-        # self-contained: usings + types + statements all present
-        $code = @"
-$block
-"@
-    } elseif ($hasOwnUsings) {
-        # usings + declarations but no statements: add a dummy entry point
-        $code = @"
-$block
+    # extract type declarations (including their attribute lines) from the block
+    $typeLines = [System.Collections.Generic.List[string]]::new()
+    $statementLines = [System.Collections.Generic.List[string]]::new()
+    $usingLines = [System.Collections.Generic.List[string]]::new()
+    $inType = $false
+    $braceDepth = 0
 
-public static class Entry
+    foreach ($line in ($block -split "`r?`n")) {
+        if ($line -match '^\s*using\s+') {
+            $usingLines.Add($line)
+            continue
+        }
+        if ($line -match '\b(class|record|interface|enum)\s+\w+') {
+            $inType = $true
+            $braceDepth = 0
+        }
+        if ($inType) {
+            $typeLines.Add($line)
+            $braceDepth += ($line.ToCharArray() | Where-Object { $_ -eq '{' }).Count
+            $braceDepth -= ($line.ToCharArray() | Where-Object { $_ -eq '}' }).Count
+            if ($braceDepth -le 0 -and $line -match '}') { $inType = $false }
+        } else {
+            $statementLines.Add($line)
+        }
+    }
+
+    if ($typeLines.Count -gt 0 -and $statementLines.Count -gt 0) {
+        # mixed: statements first (in method), declarations after (outside method)
+        $stmtBlock = ($statementLines | Where-Object { $_ -match '\S' }) -join "`n"
+        $typeBlock = ($typeLines | Where-Object { $_ -match '\S' }) -join "`n"
+        $usingBlock = if ($usingLines.Count -gt 0) { ($usingLines | ForEach-Object { $_.Trim() }) -join "`n" } else { $preamble }
+
+        $code = @"
+$usingBlock
+
+public static class Snippet
 {
-    public static void Main() { }
+    public static async System.Threading.Tasks.Task Run()
+    {
+$stmtBlock
+    }
 }
+
+$typeBlock
+"@
+    } elseif ($hasOwnUsings -and $hasExecutableCode) {
+        $code = @"
+$block
 "@
     } elseif ($hasExecutableCode) {
         $code = @"
@@ -143,8 +179,7 @@ $preamble
 
 $block
 "@
-    } else {
-        # pure declarations: preamble + entry point
+    } elseif ($typeLines.Count -gt 0 -or $block -match '\b(class|record|interface|enum)\b') {
         $code = @"
 $preamble
 
@@ -154,6 +189,12 @@ public static class Entry
 {
     public static void Main() { }
 }
+"@
+    } else {
+        $code = @"
+$preamble
+
+$block
 "@
     }
 
