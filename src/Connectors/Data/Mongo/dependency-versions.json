@@ -1,0 +1,7 @@
+{
+  "Sylin.Koan.Data.Abstractions": "1.0.17",
+  "Sylin.Koan.Data.Core": "1.0.34",
+  "Sylin.Koan.Core": "1.0.25",
+  "Sylin.Koan.ZenGarden.Contracts": "1.0.8",
+  "$transitive": "C286F7697E99F86975F8D119B50450CD6541F6DD525889084B7149C6E5FECA17"
+}
