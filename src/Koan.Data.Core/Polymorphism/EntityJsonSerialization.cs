@@ -13,7 +13,10 @@ public static class EntityJsonSerialization
         new JsonSerializerSettings
         {
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
-            NullValueHandling = NullValueHandling.Include
+            NullValueHandling = NullValueHandling.Include,
+            // Same hydration law as the relational codec (PMC-061): the stored document is authoritative —
+            // Replace, never populate-into constructor-seeded collections.
+            ObjectCreationHandling = ObjectCreationHandling.Replace,
         });
 
     public static JsonSerializerSettings Apply(JsonSerializerSettings settings)

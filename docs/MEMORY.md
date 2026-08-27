@@ -494,3 +494,12 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 - **`Set-Content -NoNewline` on multi-line content flattens files to one line.** PowerShell string
   handling corrupted CONTINUATION.md during an edit; rebuild from known content rather than
   repairing character soup. (2026-08-24)
+
+- **Newtonsoft hydration populates constructor-seeded collections — set `ObjectCreationHandling.Replace` at
+  every framework deserialize site.** The default `Auto` handling ADDS stored list items onto whatever the
+  entity's constructor built, so a ctor that seeds an audit collection (e.g. `CanonStage<T>`'s "Stage
+  created" transition) duplicates that entry on EVERY save/reload cycle — 3–5 ghosts per receipt in the
+  blind capability run (PMC-061, fixed 2026-08-27 in `RelationalManagedMapping` and
+  `EntityJsonSerialization`). The law: hydration is store-authoritative; constructors own creation-time
+  artifacts and hydration must discard them, never merge with them. When a ctor-seeded list grows across
+  cycles, suspect the serializer before the state machine. (2026-08-27)

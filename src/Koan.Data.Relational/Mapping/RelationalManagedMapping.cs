@@ -49,7 +49,12 @@ public static class RelationalManagedMapping
         private readonly RelationalStructuredValueCodec _values = new();
         private readonly JsonSerializerSettings _settings = ComparableScalarEncoding.Apply(new JsonSerializerSettings
         {
-            NullValueHandling = NullValueHandling.Include
+            NullValueHandling = NullValueHandling.Include,
+            // Hydration is store-authoritative (PMC-061). Newtonsoft's default ObjectCreationHandling.Auto
+            // populates an already-populated collection: a materialized instance's constructor-seeded entries
+            // would survive hydration AND gain the stored history on top, so every save/reload cycle duplicated
+            // constructor artifacts (observed as growing "Stage created" transitions on CanonStage receipts).
+            ObjectCreationHandling = ObjectCreationHandling.Replace,
         });
 
         public EntityObjectCodec(MappingPath identity)
