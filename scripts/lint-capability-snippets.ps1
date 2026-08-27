@@ -119,7 +119,7 @@ function New-ScratchProject([string] $directory, [string] $block, [string] $slug
     # Program.cs. Blocks that start with their own usings are already complete; blocks without
     # get the standard preamble prepended. Blocks that contain NO executable statements (pure
     # declarations) also get the preamble + a dummy call so the entry point exists.
-    $hasExecutableCode = ($block -split "`r?`n" | Where-Object { $_ -match '^\s*(await |var |return |_ =|\w+\.|if\s|foreach|for\s|while\s)' }).Count -gt 0
+    $hasExecutableCode = @($block -split "`r?`n" | Where-Object { $_ -match '^\s*(await |var |return |_ =|\w+\.|if\s|foreach|for\s|while\s)' }).Count -gt 0
     $hasOwnUsings = $block -match '^\s*using\s+'
 
     if ($hasOwnUsings -and $hasExecutableCode) {
