@@ -83,6 +83,7 @@ internal sealed class JobWorkerService : BackgroundService
                 }
                 await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
                 await _orchestrator.BeatAsync(stoppingToken);      // fleet-roster heartbeat (self-throttled, PMC-055)
+                await _orchestrator.AssignReservationsAsync(stoppingToken);   // dispatch duty when Reservation (PMC-056)
 
                 var due = now - lastDrain >= _options.PollInterval;
                 if (!probesWakeStamp)

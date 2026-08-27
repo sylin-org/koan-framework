@@ -63,6 +63,14 @@ public sealed class JobRecord : Entity<JobRecord>, IAmbientExempt
     public string? Owner { get; set; }
     public DateTimeOffset? LeaseUntil { get; set; }
 
+    // --- reservation (dispatch hand-off, PMC-056) ---
+    /// <summary>The named roster node this Queued row is reserved for (<c>DispatchMode.Reservation</c> only).
+    /// The assignment is dispatch metadata, not lifecycle: the row stays <see cref="JobStatus.Queued"/>, writes no
+    /// transition, and raises no event. Claimable by this hand while fresh; open to any hand once lapsed or when the
+    /// coordinator releases a dead hand's reservation. Consumed at claim together with Owner.</summary>
+    public string? ReservedFor { get; set; }
+    public DateTimeOffset? ReservedUntil { get; set; }
+
     // --- coalesce / idempotency ---
     public string? CoalesceKey { get; set; }
 

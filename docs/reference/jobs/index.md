@@ -4,7 +4,7 @@ domain: jobs
 title: "Run retryable background work"
 audience: [developers, operators, architects, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-22
@@ -52,6 +52,36 @@ Communication connector adds instant signal-based wake on top. A missed hint cos
 never work: polling remains the complete correctness mechanism. A running handler renews its lease
 (`LeaseDuration`, renewal at ⅓ cadence); if another claimant takes the row mid-run, the loser
 cancels and abandons without writing — no settle can clobber the new owner.
+
+## Choose the dispatch regime
+
+By default every worker competes for the next ready row through pull/CAS; that needs nothing from
+you. A fleet that wants work *handed* to specific members instead — placement-aware assignment,
+no hot-row contention on a deep shared shelf — opts in once (PMC-056):
+
+```csharp
+using Koan.Core;   // AddKoan()
+
+builder.Services.AddKoanJobs(o =>
+{
+    o.Mode = JobMode.Normal;
+    o.DispatchMode = JobDispatchMode.Reservation;
+});
+```
+
+The senior live roster member coordinates: it releases reservations of confirmed-dead hands and
+lapsed stamps, then hands the oldest due work to the least-loaded live hand ("a cookie to a named
+hand"). The assignment lives on the job row itself — `ReservedFor`/`ReservedUntil` while queued —
+so there is no side queue and no routing table: a fresh reservation binds exactly its hand, the
+claim consumes it, and any hand may take a lapsed one. Seniority is derived from the shared fleet
+roster; if the coordinator dies, the next-senior takes over at the death timeout without an election
+protocol. Pull behavior automatically resumes for unreserved work.
+
+| When you need | You get | What must already be true | Corrective failure if not |
+|---|---|---|---|
+| Handed-not-raced dispatch | Active assignment to live roster members, fenced claims as always | `Mode = JobMode.Normal` — a fleet exists | Composition throws at boot: *"Koan Jobs cannot honor DispatchMode.Reservation because the host runs Mode.Inline — submission executes synchronously on the caller and there is no fleet roster to reserve against. Remove the DispatchMode override, or set Mode.Normal."* |
+
+Inspect the elected regime through `jobs:dispatch` in startup facts or `/.well-known/Koan/facts`.
 
 ## Add policy only when needed
 
@@ -113,7 +143,7 @@ Full set: `OnClaimed`, `OnCompleted`, `OnFailed`, `OnDeadLettered`, `OnReschedul
 ## Inspect and correct
 
 - Query status/progress from the job accessor and ledger.
-- Read startup and runtime facts for persistence tier, schedules, lanes, and connector participation.
+- Read startup and runtime facts for persistence tier, dispatch regime, schedules, lanes, and connector participation.
 - Use `/health/ready` for selected durable dependencies.
 - Treat retries, timeouts, cancellation, and redelivery as observable outcomes, not hidden worker logs.
 - If a required durability or signal capability is absent, add the qualifying package/service or

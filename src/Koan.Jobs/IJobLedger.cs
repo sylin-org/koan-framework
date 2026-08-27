@@ -50,6 +50,25 @@ public interface IJobLedger
     /// </summary>
     Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct);
 
+    // --- reservation dispatch (PMC-056) ---
+
+    /// <summary>
+    /// Guarded assignment (PMC-056): stamp <c>ReservedFor=<paramref name="hand"/></c> on a Queued row only while it is
+    /// still Queued and unreserved. The assignment is ledger-verifiable dispatch metadata (no side queues, no routing
+    /// state): the row stays Queued and writes no transition. Capability-graded like <see cref="TrySettle"/>;
+    /// a false return means another coordinator won the stamp or the row moved on.
+    /// </summary>
+    Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>The oldest due, unreserved, non-cancelled Queued rows in dispatch order — what an active
+    /// coordinator considers for assignment, bounded by <paramref name="limit"/> so a deep backlog costs one
+    /// indexed seek, never a scan.</summary>
+    Task<IReadOnlyList<JobRecord>> ReservationCandidates(DateTimeOffset now, int limit, CancellationToken ct);
+
+    /// <summary>All currently-reserved non-terminal rows regardless of hand or age — bounded by outstanding
+    /// assignments (fleet capacity), never by backlog size. The coordinator sweeps this for lapses and dead hands.</summary>
+    Task<IReadOnlyList<JobRecord>> Reservations(CancellationToken ct);
+
     /// <summary>Update only durable progress for an in-flight job (cheap, off the transition path).</summary>
     Task Progress(string jobId, double fraction, string? message, CancellationToken ct);
 

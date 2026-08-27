@@ -88,6 +88,7 @@ internal sealed class InMemoryJobLedger : IJobLedger
                 .Where(r => r.Status == JobStatus.Queued
                             && r.VisibleAt <= now
                             && r.CancelRequestedAt is null
+                            && OpenTo(r, owner, now)
                             && !saturatedLanes.Contains(r.Lane)
                             && !(r.Exclusive && busy.Contains((r.WorkType, r.WorkId))))
                 .OrderBy(r => r.VisibleAt)
@@ -119,6 +120,9 @@ internal sealed class InMemoryJobLedger : IJobLedger
             Transition(candidate, JobStatus.Running, now, $"claimed by {owner}");
             candidate.Owner = owner;
             candidate.LeaseUntil = leaseUntil;
+            // PMC-056: the claim consumes the reservation cookie (if this hand held one).
+            candidate.ReservedFor = null;
+            candidate.ReservedUntil = null;
             _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane));
             return Task.FromResult<JobRecord?>(candidate.Clone());
         }
@@ -170,6 +174,55 @@ internal sealed class InMemoryJobLedger : IJobLedger
             }
             _records[record.Id] = record.Clone();
             return Task.FromResult(true);
+        }
+    }
+
+    // --- reservation dispatch (PMC-056) ---
+
+    public Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (!_records.TryGetValue(jobId, out var r)
+                || r.Status != JobStatus.Queued
+                || r.ReservedFor is not null)
+            {
+                return Task.FromResult(false);
+            }
+            r.ReservedFor = hand;
+            r.ReservedUntil = reservedUntil;
+            return Task.FromResult(true);
+        }
+    }
+
+    public Task<IReadOnlyList<JobRecord>> ReservationCandidates(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var list = limit <= 0
+                ? new List<JobRecord>()
+                : _records.Values
+                    .Where(r => r.Status == JobStatus.Queued
+                                && r.VisibleAt <= now
+                                && r.CancelRequestedAt is null
+                                && r.ReservedFor is null)
+                    .OrderBy(r => r.VisibleAt)
+                    .ThenBy(r => r.FirstSubmittedAt)
+                    .Take(limit)
+                    .Select(r => r.Clone())
+                    .ToList();
+            return Task.FromResult<IReadOnlyList<JobRecord>>(list);
+        }
+    }
+
+    public Task<IReadOnlyList<JobRecord>> Reservations(CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            var list = _records.Values
+                .Where(r => !r.IsTerminal && r.ReservedFor is not null)
+                .Select(r => r.Clone()).ToList();
+            return Task.FromResult<IReadOnlyList<JobRecord>>(list);
         }
     }
 
@@ -323,6 +376,13 @@ internal sealed class InMemoryJobLedger : IJobLedger
 
     private bool IsGated(string? gateKey, DateTimeOffset now)
         => gateKey is not null && _gates.TryGetValue(gateKey, out var g) && g.ReleaseAt > now;
+
+    /// <summary>PMC-056 claim eligibility: a fresh reservation binds its named hand; unreserved or lapsed rows
+    /// are open to anyone. Mirrored by both durable claim predicates so the tiers converge (ARCH-0079).</summary>
+    private static bool OpenTo(JobRecord r, string owner, DateTimeOffset now)
+        => r.ReservedFor is null
+           || string.Equals(r.ReservedFor, owner, StringComparison.Ordinal)
+           || (r.ReservedUntil is { } until && until < now);
 
     private static void Transition(JobRecord r, JobStatus to, DateTimeOffset at, string? note)
     {

@@ -65,6 +65,7 @@ concept or requiring application plumbing.
 | No durable data adapter | In-memory ledger; work is lost on restart |
 | SQLite, Postgres, SQL Server, Mongo, or another durable adapter | Data-backed ledger; job state survives restart |
 | Shared durable store across nodes | Competing consumers share the ledger; a one-row wake stamp lets peers discover submissions at short-probe cadence (JOBS-0009) |
+| `JobsOptions.DispatchMode = JobDispatchMode.Reservation` (opt-in) | The senior live roster node actively hands due work to named fleet members ("a cookie to a named hand"); a fresh reservation binds its hand and every claim stays CAS-fenced. Default remains pull/CAS competition (PMC-056) |
 | Direct Communication connector that claims framework signals, such as RabbitMQ | Wake becomes instant; the ledger remains the source of truth |
 
 Handlers renew their lease while running (JOBS-0009); if another claimant takes a row mid-run, the
@@ -84,6 +85,29 @@ var outcomes = await JobMetrics.Summary(
     DateTimeOffset.UtcNow.AddDays(-1),
     DateTimeOffset.UtcNow);
 ```
+
+### Reservation dispatch (opt-in)
+
+Pull/CAS competition is the default and needs nothing from the fleet roster beyond liveness. When a host wants
+work handed to specific members instead — placement-aware assignment, no hot-row contention, each node draining
+its own cookies — set the mode once:
+
+```csharp
+builder.Services.AddKoanJobs(o =>
+{
+    o.Mode = JobMode.Normal;
+    o.DispatchMode = JobDispatchMode.Reservation;
+});
+```
+
+The senior live roster member coordinates: it releases reservations of confirmed-dead hands and lapsed stamps,
+then assigns the oldest due work to the least-loaded live hand. The assignment lives on the job row itself
+(`JobRecord.ReservedFor`/`ReservedUntil`) — there is no side queue, no routing table, and no election protocol;
+if the coordinator dies, the next-senior takes over at the death timeout, and a concurrent stamp is resolved by
+the same conditional write that claims use. Reservation mode requires `Mode.Normal`: an inline host has no fleet,
+and composition refuses the combination.
+
+Inspect `jobs:dispatch` alongside `jobs:ledger` through `/.well-known/Koan/facts` or `koan://facts`.
 
 ## Boundaries
 

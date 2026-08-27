@@ -133,8 +133,11 @@ internal sealed class DataJobLedger : IJobLedger
         // costs one indexed probe — never an ordered scan over the backlog.
         var batchSize = Math.Max(1, _options.ClaimScanBatch);
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
+        // PMC-056 in the pushed-down filter: a fresh reservation is visible only to its named hand; unreserved
+        // or lapsed rows stay open to everyone. Kept textual so it translates through every provider's LINQ.
         var window = await JobRecord.Query(
-            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null,
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null
+                 && (r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now)),
             QueryDefinition.All.WithSort(sort).WithPagination(1, batchSize), ct);
 
         var heads = new Dictionary<string, JobRecord>(StringComparer.Ordinal);
@@ -143,7 +146,7 @@ internal sealed class DataJobLedger : IJobLedger
         {
             windowLanes.Add(r.Lane);
             if (saturatedLanes.Contains(r.Lane) || heads.ContainsKey(r.Lane)) continue;
-            if (IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) heads[r.Lane] = r;
+            if (IsClaimable(r, owner, now, saturatedLanes, claimablePools, gatedKeys, busy)) heads[r.Lane] = r;
         }
 
         // (a) Window lanes whose window rows were all unclaimable (gated/pool/busy): probe deeper. Bounded by the few
@@ -151,7 +154,7 @@ internal sealed class DataJobLedger : IJobLedger
         foreach (var lane in windowLanes)
         {
             if (heads.ContainsKey(lane) || saturatedLanes.Contains(lane)) continue;
-            var head = await HydrateLaneHead(lane, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
+            var head = await HydrateLaneHead(lane, owner, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
             if (head is not null) heads[lane] = head;
         }
 
@@ -160,6 +163,8 @@ internal sealed class DataJobLedger : IJobLedger
         //     backlog short-circuits here to ZERO per-lane probes, so the claim stays O(window) instead of O(declared
         //     lanes); when buried work does exist the per-lane seek (index-served on Mongo / a relational composite
         //     index) finds it. JOBS-0008.
+        //     The existence guard deliberately ignores reservations: worst case it triggers one extra bounded
+        //     per-lane seek that finds nothing claimable, never a missed candidate.
         var buried = _registry.All.SelectMany(b => b.Lanes(_options))
             .Where(l => !windowLanes.Contains(l) && !saturatedLanes.Contains(l))
             .Distinct(StringComparer.Ordinal).ToList();
@@ -167,7 +172,7 @@ internal sealed class DataJobLedger : IJobLedger
             foreach (var lane in buried)
             {
                 if (heads.ContainsKey(lane)) continue;
-                var head = await HydrateLaneHead(lane, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
+                var head = await HydrateLaneHead(lane, owner, now, saturatedLanes, claimablePools, gatedKeys, busy, ct);
                 if (head is not null) heads[lane] = head;
             }
 
@@ -196,12 +201,26 @@ internal sealed class DataJobLedger : IJobLedger
             JobRecord? claimed;
             if (cas is null)
             {
+                // Optimistic floor (PMC-056): re-read immediately before the write and honor a reservation another
+                // coordinator stamped after our snapshot. The floor stays at-least-once for claim races — that window
+                // is the documented tier — but it must not knowingly violate an assignment.
+                var storedNow = await JobRecord.Get(candidate.Id!, ct);
+                if (storedNow is null || storedNow.Status != JobStatus.Queued
+                    || !(storedNow.ReservedFor == null || storedNow.ReservedFor == owner
+                         || (storedNow.ReservedUntil != null && storedNow.ReservedUntil < now)))
+                {
+                    continue;   // moved on / freshly reserved elsewhere → next-fairest lane
+                }
                 claimed = await ClaimOptimistic(candidate, owner, now, leaseUntil, ct);   // GateKey already stamped above
             }
             else
             {
                 Mark(candidate, owner, now, leaseUntil);
-                claimed = await cas.ConditionalReplaceAsync(candidate, r => r.Status == JobStatus.Queued && r.Owner == null, ct)
+                claimed = await cas.ConditionalReplaceAsync(
+                    candidate,
+                    r => r.Status == JobStatus.Queued && r.Owner == null
+                         && (r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now)),
+                    ct)
                     ? candidate : null;
             }
 
@@ -266,6 +285,49 @@ internal sealed class DataJobLedger : IJobLedger
         await JobRecord.Upsert(record, ct);
         return true;
     }
+
+    // --- reservation dispatch (PMC-056) ---
+
+    /// <summary>Capability-graded like <see cref="TrySettle"/>: guarded CAS where the provider offers it,
+    /// verify-then-write otherwise. Applies only while the row is Queued and unreserved.</summary>
+    public async Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
+    {
+        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
+            : null;
+        if (cas is not null)
+        {
+            var candidate = await JobRecord.Get(jobId, ct);
+            if (candidate is not { Status: JobStatus.Queued } || candidate.ReservedFor != null) return false;
+            candidate.ReservedFor = hand;
+            candidate.ReservedUntil = reservedUntil;
+            return await cas.ConditionalReplaceAsync(
+                candidate,
+                r => r.Status == JobStatus.Queued && r.ReservedFor == null,
+                ct);
+        }
+
+        // Optimistic floor: verify unreserved immediately before the write.
+        var stored = await JobRecord.Get(jobId, ct);
+        if (stored is not { Status: JobStatus.Queued } || stored.ReservedFor != null) return false;
+        stored.ReservedFor = hand;
+        stored.ReservedUntil = reservedUntil;
+        await JobRecord.Upsert(stored, ct);
+        return true;
+    }
+
+    public async Task<IReadOnlyList<JobRecord>> ReservationCandidates(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        if (limit <= 0) return [];
+        // Pushed down and ordered like the claim head — one bounded indexed seek per dispatch pass.
+        var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
+        return await JobRecord.Query(
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && r.ReservedFor == null,
+            QueryDefinition.All.WithSort(sort).WithPagination(1, limit), ct);
+    }
+
+    public Task<IReadOnlyList<JobRecord>> Reservations(CancellationToken ct)
+        => JobRecord.Query(r => r.Status == JobStatus.Queued && r.ReservedFor != null, ct);
 
     public async Task Progress(string jobId, double fraction, string? message, CancellationToken ct)
     {
@@ -420,10 +482,11 @@ internal sealed class DataJobLedger : IJobLedger
             QueryDefinition.All.WithPagination(1, 1), ct)).Count > 0;
 
     /// <summary>The per-lane head seek (ix_jobs_lane_claim): the oldest claimable Queued+due row in <paramref name="lane"/>.
-    /// Pages forward past this lane's own unclaimable head (gated / pool-exhausted / busy-exclusive) to its oldest
-    /// claimable row — O(batch) and index-served, never O(backlog). Returns null when the lane has no claimable work.</summary>
+    /// Pages forward past this lane's own unclaimable head (gated / pool-exhausted / busy-exclusive / reserved elsewhere)
+    /// to its oldest claimable row — O(batch) and index-served, never O(backlog). Returns null when the lane has no
+    /// claimable work.</summary>
     private async Task<JobRecord?> HydrateLaneHead(
-        string lane, DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
+        string lane, string owner, DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
         HashSet<string>? claimablePools, HashSet<string> gatedKeys,
         HashSet<(string WorkType, string WorkId)> busy, CancellationToken ct)
     {
@@ -437,21 +500,24 @@ internal sealed class DataJobLedger : IJobLedger
                 scan, ct);
             if (window.Count == 0) return null;
             foreach (var r in window)
-                if (IsClaimable(r, saturatedLanes, claimablePools, gatedKeys, busy)) return r;
+                if (IsClaimable(r, owner, now, saturatedLanes, claimablePools, gatedKeys, busy)) return r;
             if (window.Count < batchSize) return null;   // short page → this lane's ready set is exhausted
         }
     }
 
-    /// <summary>A queued row is claimable now iff its lane isn't saturated, it isn't an exclusive job whose work-item is
-    /// already running, and — pool-XOR-gate — a pool job's pool currently has an open member while a non-pool job's gate
-    /// (if any) isn't active. <paramref name="claimablePools"/> null means no pool has capacity (or no resolver), so
-    /// every pool job is currently unclaimable. The pool-XOR-gate split matches <see cref="InMemoryJobLedger"/> so the
-    /// tiers converge (ARCH-0079): a pool job's admission is governed by member capacity, not by resource gates — its
-    /// <see cref="JobRecord.GateKey"/> is the elected member (null while queued), not a cooperative-backoff key.</summary>
-    private static bool IsClaimable(JobRecord r,
+    /// <summary>A queued row is claimable by <paramref name="owner"/> now iff it is open to that hand (PMC-056:
+    /// unreserved / reserved for them / reservation lapsed), its lane isn't saturated, it isn't an exclusive job whose
+    /// work-item is already running, and — pool-XOR-gate — a pool job's pool currently has an open member while a
+    /// non-pool job's gate (if any) isn't active. <paramref name="claimablePools"/> null means no pool has capacity (or no
+    /// resolver), so every pool job is currently unclaimable. The pool-XOR-gate split matches <see cref="InMemoryJobLedger"/>
+    /// so the tiers converge (ARCH-0079): a pool job's admission is governed by member capacity, not by resource gates —
+    /// its <see cref="JobRecord.GateKey"/> is the elected member (null while queued), not a cooperative-backoff key.</summary>
+    private static bool IsClaimable(JobRecord r, string owner, DateTimeOffset now,
         IReadOnlyCollection<string> saturatedLanes, HashSet<string>? claimablePools,
         HashSet<string> gatedKeys, HashSet<(string WorkType, string WorkId)> busy)
     {
+        if (!(r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now)))
+            return false;
         if (saturatedLanes.Contains(r.Lane)) return false;
         if (r.Exclusive && busy.Contains((r.WorkType, r.WorkId))) return false;
         if (r.PoolKey is not null)
@@ -473,6 +539,9 @@ internal sealed class DataJobLedger : IJobLedger
         r.Status = JobStatus.Running;
         r.Owner = owner;
         r.LeaseUntil = leaseUntil;
+        // PMC-056: the claim consumes the reservation cookie (if this hand held one).
+        r.ReservedFor = null;
+        r.ReservedUntil = null;
     }
 
 }

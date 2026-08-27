@@ -68,6 +68,17 @@ internal sealed class RoutingJobLedger : IJobLedger
         => await _durable.TrySettle(record, expectedOwner, ct)
            || await _inMemory.TrySettle(record, expectedOwner, ct);
 
+    // Reservations (PMC-056) live in exactly one tier's ledger, like the rows they point at.
+    public async Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
+        => await _durable.TryReserve(jobId, hand, reservedUntil, now, ct)
+           || await _inMemory.TryReserve(jobId, hand, reservedUntil, now, ct);
+
+    public async Task<IReadOnlyList<JobRecord>> ReservationCandidates(DateTimeOffset now, int limit, CancellationToken ct)
+        => Concat(await _durable.ReservationCandidates(now, limit, ct), await _inMemory.ReservationCandidates(now, limit, ct));
+
+    public async Task<IReadOnlyList<JobRecord>> Reservations(CancellationToken ct)
+        => Concat(await _durable.Reservations(ct), await _inMemory.Reservations(ct));
+
     public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
         => Concat(await _durable.Stuck(now, ct), await _inMemory.Stuck(now, ct));
 

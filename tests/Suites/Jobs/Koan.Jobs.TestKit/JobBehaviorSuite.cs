@@ -548,6 +548,42 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
+    public async Task claim_honors_reservations_on_every_tier()
+    {
+        // PMC-056: the reservation eligibility clause converges across tiers (ARCH-0079) — a fresh foreign
+        // cookie hides the row, restamping is refused, and the named hand claims through the normal path.
+        GreetJob.Reset();
+        await using var host = await CreateHostAsync();
+        var g = new GreetJob { Name = "reserved" };
+        var id = g.Id;
+        await GreetJob.Upsert(g);
+        var now = host.Clock.GetUtcNow();
+        var record = new JobRecord
+        {
+            WorkType = typeof(GreetJob).FullName!,
+            WorkId = id,
+            Action = "",
+            Status = JobStatus.Queued,
+            Lane = "default",
+            FirstSubmittedAt = now,
+            VisibleAt = now,
+        };
+        await host.Ledger.Append(record, default);
+        var jobId = (await host.JobFor<GreetJob>(id))!.Id;
+
+        (await host.Ledger.TryReserve(jobId, "peer-hand", now + TimeSpan.FromMinutes(5), now, default)).Should().BeTrue();
+
+        (await host.Ledger.ClaimNext("me", now, now + TimeSpan.FromMinutes(1), Array.Empty<string>(), default))
+            .Should().BeNull("a fresh foreign reservation hides the row from another hand");
+        (await host.Ledger.TryReserve(jobId, "second-hand", now + TimeSpan.FromMinutes(5), now, default))
+            .Should().BeFalse("a row already carrying a fresh reservation cannot be re-stamped");
+
+        var claimed = await host.Ledger.ClaimNext("peer-hand", now, now + TimeSpan.FromMinutes(1), Array.Empty<string>(), default);
+        claimed.Should().NotBeNull();
+        claimed!.Owner.Should().Be("peer-hand");
+    }
+
+    [Fact]
     public async Task a_running_job_renews_its_lease_and_outlives_the_original_window()
     {
         // JOBS-0009: a live handler holds its lease past the original window; the reaper never sees it lapse and

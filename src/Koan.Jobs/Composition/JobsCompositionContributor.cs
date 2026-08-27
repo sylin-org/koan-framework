@@ -2,6 +2,7 @@ using Koan.Core.Composition;
 using Koan.Communication.Signals;
 using Koan.Jobs.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Koan.Core.Semantics.Segmentation;
 
 namespace Koan.Jobs.Composition;
@@ -35,6 +36,19 @@ internal static class JobsCompositionFacts
                 Constants.Diagnostics.Reasons.CommunicationSignal,
                 source: source,
                 factCode: Constants.Diagnostics.Codes.WakeSelected);
+        }
+
+        // PMC-056: the elected dispatch regime is a host fact — read alongside the ledger/wake elections.
+        var jobsOptions = services.GetService<IOptions<Koan.Jobs.JobsOptions>>()?.Value;
+        if (jobsOptions is not null)
+        {
+            var reservation = jobsOptions.DispatchMode == Koan.Jobs.JobDispatchMode.Reservation;
+            builder.AddElection(
+                Constants.Diagnostics.Subjects.Dispatch,
+                reservation ? Constants.Diagnostics.Selections.Reservation : Constants.Diagnostics.Selections.Pull,
+                reservation ? Constants.Diagnostics.Reasons.ReservationOptIn : Constants.Diagnostics.Reasons.DefaultPull,
+                source: source,
+                factCode: Constants.Diagnostics.Codes.DispatchSelected);
         }
 
         var segmentation = services.GetService<SegmentationPlan>();

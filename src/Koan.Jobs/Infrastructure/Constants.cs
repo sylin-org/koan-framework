@@ -26,6 +26,7 @@ internal static class Constants
             public const string LedgerSelected = "koan.jobs.ledger.selected";
             public const string WakeSelected = "koan.jobs.wake.selected";
             public const string ContextGuarantees = "koan.jobs.context.guarantees";
+            public const string DispatchSelected = "koan.jobs.dispatch.selected";
         }
 
         internal static class Subjects
@@ -33,12 +34,15 @@ internal static class Constants
             public const string Ledger = "jobs:ledger";
             public const string Wake = "jobs:wake";
             public const string Context = "jobs:context";
+            public const string Dispatch = "jobs:dispatch";
         }
 
         internal static class Selections
         {
             public const string InMemory = "in-memory";
             public const string DurableData = "durable-data";
+            public const string Pull = "pull-cas";
+            public const string Reservation = "reservation-roster";
         }
 
         internal static class Reasons
@@ -47,6 +51,8 @@ internal static class Constants
             public const string DurableAdapter = "durable-data-adapter";
             public const string CommunicationSignal = "ledger-backed-latency-hint";
             public const string DurableContext = "durable-context-carriage";
+            public const string DefaultPull = "default-dispatch-mode";
+            public const string ReservationOptIn = "reservation-opt-in";
         }
 
         internal static class Capabilities

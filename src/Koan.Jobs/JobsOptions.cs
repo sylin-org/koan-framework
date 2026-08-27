@@ -9,11 +9,36 @@ public enum JobMode
     Inline = 1,
 }
 
+/// <summary>The dispatch regime a fleet runs under (PMC-056). Assignment is always ledger-verifiable: it lives on
+/// the JobRecord row itself, and every claim stays CAS-fenced in both modes.</summary>
+public enum JobDispatchMode
+{
+    /// <summary>Pull/CAS only (default): each worker competes for the next ready row through the shared ledger.
+    /// No coordinator exists — correctness comes from the conditional claim write alone.</summary>
+    Pull = 0,
+    /// <summary>Reservation ("the jar hands a cookie to a named hand"): the senior live roster node actively
+    /// assigns due work to specific fleet members, and a fresh reservation binds the named hand. Strictly opt-in —
+    /// an active coordinator is reintroduced by design; peers' seniority is derived from the shared roster, so no
+    /// election protocol exists to fail.</summary>
+    Reservation = 1,
+}
+
 /// <summary>Knobs for the Jobs pillar. Per-action policy lives on <c>[JobAction]</c>; these are the
 /// type-/host-level defaults and engine settings (JOBS-0005).</summary>
 public sealed class JobsOptions
 {
     public JobMode Mode { get; set; } = JobMode.Normal;
+
+    /// <summary>The dispatch regime (PMC-056): <see cref="JobDispatchMode.Pull"/> (default) or
+    /// <see cref="JobDispatchMode.Reservation"/>. Reservation requires <see cref="Mode"/> = Normal — an inline host
+    /// has no fleet to reserve against, and the boot refuses the combination correctively.</summary>
+    public JobDispatchMode DispatchMode { get; set; } = JobDispatchMode.Pull;
+
+    /// <summary>How long a reservation stays bound to its named hand (<see cref="JobDispatchMode.Reservation"/>) before
+    /// it lapses and any hand may claim the row. The coordinator also releases a confirmed-dead hand's reservations at
+    /// the death timeout, so this is the hand-loss bound when no roster evidence exists. Comfortably above
+    /// <see cref="WorkerDeathTimeout"/> keeps a live-but-slow hand from having its cookie stolen.</summary>
+    public TimeSpan ReservationDuration { get; set; } = TimeSpan.FromMinutes(2);
 
     /// <summary>How long a claim's lease is held before the reaper may reclaim it.</summary>
     public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(1);

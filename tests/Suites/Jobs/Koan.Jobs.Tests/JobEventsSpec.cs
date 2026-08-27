@@ -119,4 +119,59 @@ public sealed class JobEventsSpec
 
         fired.Should().Be(0);
     }
+
+    /// <summary>PMC-056 proof: every observer is a projection of the persisted transition audit, so its firing
+    /// count must equal the matching transitions exactly — once per claim on a retrying job, once per completion,
+    /// zero otherwise. Double-projection (or none) means the event layer has its own write path, which it must not.</summary>
+    [Fact]
+    public async Task each_transition_projects_its_observer_exactly_once()
+    {
+        FlakyJob.Reset();
+        FlakyJob.SucceedAtAttempt = 2;   // attempt 1 fails → retry; attempt 2 completes
+        GreetJob.Reset();
+        FlakyJob.Jobs.ResetEvents();
+        GreetJob.Jobs.ResetEvents();
+        var flakyClaimed = 0;
+        var flakyFailed = 0;
+        var flakyCompleted = 0;
+        var flakyStalled = 0;
+        var flakyAbandoned = 0;
+        var flakyRescheduled = 0;
+        FlakyJob.Jobs.OnClaimed(_ => flakyClaimed++);
+        FlakyJob.Jobs.OnFailed(_ => flakyFailed++);
+        FlakyJob.Jobs.OnCompleted(_ => flakyCompleted++);
+        FlakyJob.Jobs.OnStalled(_ => flakyStalled++);
+        FlakyJob.Jobs.OnAbandoned(_ => flakyAbandoned++);
+        FlakyJob.Jobs.OnRescheduled(_ => flakyRescheduled++);
+
+        await using var host = await JobsHarness.StartInMemoryAsync();
+        var f = new FlakyJob();
+        var id = f.Id;
+        await f.Job.Submit("");
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            await host.Drain();
+            host.Advance(TimeSpan.FromMinutes(1));   // release the retry's VisibleAt
+            await host.Drain();
+        }
+
+        (await host.StatusOf<FlakyJob>(id)).Should().Be(JobStatus.Completed);
+        var record = (await host.JobFor<FlakyJob>(id))!;
+
+        // The audit for one failing-then-succeeding run: two claims, one retry re-queue, one completion.
+        // (Submit itself seeds a Created→Queued row; the re-queue is isolated by its Running origin.)
+        record.Transitions.Count(t => t.Note!.StartsWith("claimed by")).Should().Be(2, "two real claims happened");
+        record.Transitions.Count(t => t.To == JobStatus.Queued && t.From == JobStatus.Running)
+            .Should().Be(1, "the single retry re-queue");
+        record.Transitions.Count(t => t.To == JobStatus.Completed).Should().Be(1);
+
+        flakyClaimed.Should().Be(record.Transitions.Count(t => t.Note!.StartsWith("claimed by")),
+            "the claimed projection mirrors the claim audit exactly");
+        flakyCompleted.Should().Be(record.Transitions.Count(t => t.To == JobStatus.Completed));
+        flakyFailed.Should().Be(0, "the job recovered; no terminal failure ever existed");
+        flakyRescheduled.Should().Be(0, "a plain retry is not a cooperative reschedule");
+        flakyStalled.Should().Be(0);
+        flakyAbandoned.Should().Be(0);
+    }
 }

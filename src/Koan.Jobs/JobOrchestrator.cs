@@ -30,6 +30,7 @@ internal sealed class JobOrchestrator
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _unregisteredWorkTypeWarnings = new(StringComparer.Ordinal);
     private readonly JobMetricsRecorder _metrics;
+    private DateTimeOffset _lastAssignAt = DateTimeOffset.MinValue;
 
     public JobOrchestrator(
         IJobLedger ledger, JobTypeRegistry registry, IOptions<JobsOptions> options,
@@ -45,6 +46,14 @@ internal sealed class JobOrchestrator
         _poolResolvers = poolResolvers.ToList();
         _contextPlan = contextPlan;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
+
+        // PMC-056 corrective boundary: an inline host executes jobs on the caller — there is no fleet roster to
+        // reserve against, so reservation dispatch cannot be honored and must refuse rather than silently degrade.
+        if (_options.DispatchMode == JobDispatchMode.Reservation && _options.Mode == JobMode.Inline)
+            throw new InvalidOperationException(
+                "Koan Jobs cannot honor DispatchMode.Reservation because the host runs Mode.Inline — submission " +
+                "executes synchronously on the caller and there is no fleet roster to reserve against. Remove the " +
+                "DispatchMode override, or set Mode.Normal.");
     }
 
     /// <summary>Fold this node's accumulated throughput deltas into its internal metric shard rows (§20.2).
@@ -62,6 +71,8 @@ internal sealed class JobOrchestrator
         {
             while (!ct.IsCancellationRequested)
             {
+                await AssignReservationsAsync(ct);
+
                 // Global cap: don't claim more work than this node can run concurrently.
                 if (_options.WorkerConcurrency > 0 && inflight.Count >= _options.WorkerConcurrency)
                 {
@@ -353,6 +364,8 @@ internal sealed class JobOrchestrator
 
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastError = null;
         rec.DeferReason = null;
         rec.LastSettledAt = now;
@@ -378,6 +391,8 @@ internal sealed class JobOrchestrator
         var now = _clock.GetUtcNow();
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastError = ex.Message;
         rec.LastSettledAt = now;
 
@@ -415,6 +430,8 @@ internal sealed class JobOrchestrator
         var now = _clock.GetUtcNow();
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastError = ex.Message;
         rec.LastSettledAt = now;
         rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
@@ -430,6 +447,8 @@ internal sealed class JobOrchestrator
         var now = _clock.GetUtcNow();
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastError = $"No job binding is registered for work type '{rec.WorkType}'.";
         rec.LastSettledAt = now;
         rec.DeadReason = DeadReason.UnregisteredWorkType.ToString();
@@ -461,6 +480,8 @@ internal sealed class JobOrchestrator
         var maxHit = policy.MaxReschedules >= 0 && rec.Reschedules > policy.MaxReschedules;
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastSettledAt = now;
 
         if (deadlineHit || maxHit)
@@ -493,6 +514,8 @@ internal sealed class JobOrchestrator
         var now = _clock.GetUtcNow();
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.LastSettledAt = now;
         rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
         SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
@@ -507,6 +530,8 @@ internal sealed class JobOrchestrator
         rec.Attempt = Math.Max(0, rec.Attempt - 1); // worker stopped before completing; don't penalize
         rec.Owner = null;
         rec.LeaseUntil = null;
+        rec.ReservedFor = null;
+        rec.ReservedUntil = null;
         rec.VisibleAt = now;
         SetStatus(rec, JobStatus.Queued, now, "requeued (worker shutdown)");
         if (!await SettleOwnedAsync(rec, claimedOwner)) return;
@@ -553,6 +578,8 @@ internal sealed class JobOrchestrator
         {
             stuck.Owner = null;
             stuck.LeaseUntil = null;
+            stuck.ReservedFor = null;
+            stuck.ReservedUntil = null;
             stuck.VisibleAt = now;
             SetStatus(stuck, JobStatus.Queued, now, "reclaimed (lease lapsed)");
             Notify(stuck.WorkType, JobEventKind.Stalled, null, stuck);
@@ -575,6 +602,8 @@ internal sealed class JobOrchestrator
             {
                 orphan.Owner = null;
                 orphan.LeaseUntil = null;
+                orphan.ReservedFor = null;
+                orphan.ReservedUntil = null;
                 orphan.VisibleAt = now;
                 SetStatus(orphan, JobStatus.Queued, now, "reclaimed (worker confirmed dead)");
                 Notify(orphan.WorkType, JobEventKind.Stalled, null, orphan);
@@ -613,6 +642,89 @@ internal sealed class JobOrchestrator
         var node = await WorkerNode.Get(_owner, ct);
         if (node is not null)
             await node.Remove(ct);
+    }
+
+    /// <summary>PMC-056 reservation dispatch ("the jar hands a cookie to a named hand"). In
+    /// <see cref="JobDispatchMode.Reservation"/> only, the senior live roster node — derived from the shared roster,
+    /// no election protocol — releases reservations whose hand died or whose stamp lapsed, then assigns the oldest
+    /// due unreserved work onto the least-loaded live hands, bounded by fleet concurrency. Self-throttled to
+    /// <c>WorkerHeartbeatInterval</c>; a no-op in <see cref="JobDispatchMode.Pull"/>.
+    ///
+    /// <para>Safety: assignment is ledger-verifiable dispatch metadata on the row itself (<see cref="JobRecord.ReservedFor"/>);
+    /// stamps are guarded writes that apply only while the row is Queued and unreserved; claims still CAS and respect a
+    /// fresh foreign reservation; releases re-verify the stored row immediately before writing. A lost release race is the
+    /// same at-least-once window the optimistic claim floor already carries. No transition rows and no events: assignment is
+    /// not lifecycle.</para></summary>
+    public async Task AssignReservationsAsync(CancellationToken ct = default)
+    {
+        if (_options.DispatchMode != JobDispatchMode.Reservation) return;
+        if (_options.WorkerDeathTimeout <= TimeSpan.Zero) return;
+
+        var now = _clock.GetUtcNow();
+        if (now - _lastAssignAt < _options.WorkerHeartbeatInterval) return;
+        _lastAssignAt = now;
+
+        // The hands: fresh roster entries plus me (my heartbeat may be pending; I am alive by definition).
+        var cutoff = now - _options.WorkerDeathTimeout;
+        var alive = (await WorkerNode.Query(w => w.LastSeenAt >= cutoff, ct))
+            .Select(w => w.Id)
+            .Append(_owner)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var aliveSet = alive.ToHashSet(StringComparer.Ordinal);
+
+        // Seniority before action: exactly one node coordinates per pass. Oldest join wins; ties break by owner id.
+        // Concurrent-seniority windows (between heartbeats) are absorbed by the guarded TryReserve stamps.
+        var nodes = await WorkerNode.Query(w => w.LastSeenAt >= cutoff, ct);
+        var seniorId = nodes
+            .OrderBy(n => n.StartedAt)
+            .ThenBy(n => n.Id, StringComparer.Ordinal)
+            .Select(n => n.Id)
+            .DefaultIfEmpty(_owner)     // empty roster → I coordinate (single-node host or pending beats)
+            .First();
+        if (!string.Equals(seniorId, _owner, StringComparison.Ordinal)) return;
+
+        // 1. Release: lapsed stamps return to the shelf; so do confirmed-dead hands' assignments.
+        foreach (var reserved in await _ledger.Reservations(ct))
+        {
+            var handLive = reserved.ReservedFor is { } hand && aliveSet.Contains(hand);
+            var lapsed = reserved.ReservedUntil is { } until && until < now;
+            if (handLive && !lapsed) continue;
+
+            // Re-verify against the stored row so we never overwrite a claim that landed since the read.
+            var stored = await _ledger.Get(reserved.Id!, ct);
+            if (stored is not { Status: JobStatus.Queued }
+                || !string.Equals(stored.ReservedFor, reserved.ReservedFor, StringComparison.Ordinal)) continue;
+            _logger.LogDebug("Koan.Jobs released job {JobId} from reservation for {Hand} ({Reason}).",
+                stored.Id, stored.ReservedFor, lapsed ? "reservation lapsed" : "hand confirmed dead");
+            stored.ReservedFor = null;
+            stored.ReservedUntil = null;
+            await _ledger.Update(stored, ct);
+        }
+
+        // 2. Assign: oldest due first, least-loaded hand wins ties by roster order. Outstanding cookies cap at
+        //    fleet capacity (hands × WorkerConcurrency) and one scan batch per pass.
+        var load = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var runningRow in await _ledger.Running(ct))
+            if (runningRow.Owner is { } o) load[o] = load.GetValueOrDefault(o) + 1;
+        foreach (var res in await _ledger.Reservations(ct))
+            if (res.ReservedFor is { } hand && aliveSet.Contains(hand)) load[hand] = load.GetValueOrDefault(hand) + 1;
+
+        var capacity = alive.Sum(h => Math.Max(0, _options.WorkerConcurrency - load.GetValueOrDefault(h)));
+        if (capacity <= 0) return;
+        var limit = Math.Min(capacity, Math.Max(1, _options.ClaimScanBatch));
+        foreach (var candidate in await _ledger.ReservationCandidates(now, limit, ct))
+        {
+            if (candidate.Id is null) continue;
+            var hand = alive
+                .Where(h => load.GetValueOrDefault(h) < _options.WorkerConcurrency)
+                .OrderBy(h => load.GetValueOrDefault(h))
+                .ThenBy(h => h, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (hand is null) break;   // every hand is at capacity
+            if (await _ledger.TryReserve(candidate.Id, hand, now + _options.ReservationDuration, now, ct))
+                load[hand] = load.GetValueOrDefault(hand) + 1;
+        }
     }
 
     // --- helpers ---

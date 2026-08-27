@@ -24,12 +24,18 @@ The retained module's `JobsCompositionFacts` projector publishes this decision i
 | `jobs:ledger` | `in-memory` | `no-durable-data-adapter` |
 | `jobs:ledger` | `durable-data` | `durable-data-adapter` |
 | `jobs:wake` | elected Communication provider | `ledger-backed-latency-hint` |
+| `jobs:dispatch` | `pull-cas` | `default-dispatch-mode` |
+| `jobs:dispatch` | `reservation-roster` | `reservation-opt-in` |
 
 These are semantic tiers, not CLR implementation names. They describe the running host without
 claiming provider-fleet certification. Cross-node discovery with only a durable Data reference rides
 the framework-owned `WakeStamp` sentinel (JOBS-0009): submissions bump it inside the submission
 transaction and durable-tier workers probe it every `WakeProbeInterval`; the full claim scan still
 runs at most one `PollInterval` apart.
+
+Dispatch-mode composition has one corrective boundary (PMC-056): `JobsOptions.DispatchMode.Reservation`
+with `JobsOptions.Mode.Inline` throws at orchestrator construction — an inline host executes on the
+caller and owns no fleet roster, so reservation cannot be honored and is never silently degraded to pull.
 
 ## Authoring and persistence
 
@@ -80,6 +86,26 @@ another claimant won: execution cancels and settles nothing, so no write can clo
 The renewal loop swallows its own cancellation; transient store errors retry next tick with the
 reaper as the bound.
 
+### Dispatch modality (PMC-056)
+
+Pull/CAS is the only default. `DispatchMode.Reservation` layers an active coordinator over the same
+ledger, strictly opt-in:
+
+- Assignment state is ledger-verifiable dispatch metadata on the row itself — `JobRecord.ReservedFor`
+  / `ReservedUntil` while Queued. No side queues, no routing tables, no membership primitive of its
+  own; assignment writes no transition and raises no lifecycle event.
+- Stamp: a guarded narrow write (`IJobLedger.TryReserve`) applying only while the row is Queued and
+  unreserved — capability-graded exactly like `TrySettle`. Claim eligibility converges across tiers:
+  unreserved / reserved-for-me / lapsed; stamping at claim consumes the cookie.
+- Coordinator duty runs on the senior live roster member (oldest alive `StartedAt`, id tie-break) as a
+  derived fact of the shared roster — no election protocol exists to split or fail. It self-throttles
+  to `WorkerHeartbeatInterval`, releases reservations whose hand is confirmed dead or whose stamp
+  lapsed (re-verifying the stored row immediately before each write), then assigns oldest-due work to
+  the least-loaded live hand bounded by hands × `WorkerConcurrency` and one scan batch per pass.
+- Coordinator loss self-heals: seniority migrates at the death timeout, lapsed stamps re-open rows,
+  and pull behavior returns automatically for never-reserved work. In Pull mode the entire machinery
+  is inert.
+
 Jobs does not own a transport provider or application-visible message contract. Connector election,
 health, wire encoding, and local/network delivery belong exclusively to Communication. The wake
 stamp is an ordinary Jobs-owned Entity — carriage needs no adapter surface. Hints carry no job or
@@ -111,9 +137,10 @@ Koan does not imply cross-provider transactions.
 ## Inspection
 
 - startup provenance reports the number of discovered job types;
-- runtime facts report ledger selection, the wake provider, Communication's framework-signal election,
-  the Jobs segmentation realization, and a guarantee statement that names host-trusted restoration,
-  shared control-plane ledger, Data-owned state isolation, at-least-once execution, and context-free wake;
+- runtime facts report ledger selection, the dispatch regime, the wake provider, Communication's
+  framework-signal election, the Jobs segmentation realization, and a guarantee statement that names
+  host-trusted restoration, shared control-plane ledger, Data-owned state isolation, at-least-once
+  execution, and context-free wake;
 - `/health/ready` reports bounded aggregate queue facts in Development and aggregate status in production;
 - `JobRecord` queries provide per-work-item transitions, progress, and failure text;
 - optional `JobMetrics.Summary(...)` reads an internal node-sharded rollup that preserves aggregate
