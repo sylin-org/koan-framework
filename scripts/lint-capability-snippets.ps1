@@ -162,7 +162,7 @@ $usingBlock
 
 public static class Snippet
 {
-    public static async System.Threading.Tasks.Task Run()
+    public static async System.Threading.Tasks.Task Run(System.Threading.CancellationToken ct = default)
     {
 $stmtBlock
     }
