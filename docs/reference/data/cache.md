@@ -55,6 +55,9 @@ Koan does not silently select a different store or weaken network reach.
 `[Cacheable]` is the normal entry point:
 
 ```csharp
+using Koan.Cache.Abstractions.Policies;   // Cacheable
+using Koan.Data.Core.Model;               // Entity<T>
+
 [Cacheable(300)]
 public sealed class Todo : Entity<Todo>;
 

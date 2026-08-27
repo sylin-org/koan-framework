@@ -12,6 +12,10 @@ dotnet add package Sylin.Koan.Cache
 Keep the normal Koan boot and declare the policy where the business type lives:
 
 ```csharp
+using Koan.Core;                          // AddKoan()
+using Koan.Cache.Abstractions.Policies;   // Cacheable
+using Koan.Data.Core.Model;               // Entity<T>
+
 builder.Services.AddKoan();
 
 [Cacheable(300)]
