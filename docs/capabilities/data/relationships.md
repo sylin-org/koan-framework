@@ -45,3 +45,17 @@ set, or a stream without adding a repository layer.
 - **Pasteable, source-verified build:** [model things that relate](../../recipes/model-things-that-relate.md)
 - **Runnable exemplar:** [TaskGraph](https://github.com/sylin-org/koan-framework/blob/main/samples/fundamentals/TaskGraph/README.md)
 - **Provider and relationship contract:** [Data reference](../../reference/data/index.md#relationships-stay-in-the-model)
+
+## Count, and expand over HTTP
+
+To answer "how many lines belong to this recipe," query the child by its foreign key — the same
+governed surface, filtered. Count and existence questions are answered by the data layer's query
+surface; reach into the relationship executor only when the governed query cannot express the ask.
+
+Governed reads also expand declared edges on request: `GET /api/todos/{id}?with=user` returns the
+todo with its parent inlined, gated by `Koan:Web:AllowRelationshipExpansion` (on by default; disable per app in `Koan:Web` configuration) and the relationship query policy. Write hooks run inside the same pipeline — use a `BeforeSave`-class hook to
+canonicalize human units at the edge (store milliliters, accept "2 glasses", filter and compare in
+canonical space), so expansions and comparisons always see the stored shape.
+
+See also: [the entity verb map](../web/entity-api.md) and [agent surfaces](../agents.md) — the
+same relationships projected to MCP tools.
