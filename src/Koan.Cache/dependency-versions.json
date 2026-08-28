@@ -1,8 +1,8 @@
 {
   "Sylin.Koan.Cache.Abstractions": "1.0.11",
   "Sylin.Koan.Core": "1.0.27",
-  "Sylin.Koan.Data.Abstractions": "1.0.23",
-  "Sylin.Koan.Data.Core": "1.0.41",
-  "Sylin.Koan.Communication": "1.0.15",
-  "$transitive": "EAFCBE9FD138421054E95B7F0B81A7002E7A0A77C298E777787FC32CB9378758"
+  "Sylin.Koan.Data.Abstractions": "1.0.24",
+  "Sylin.Koan.Data.Core": "1.0.42",
+  "Sylin.Koan.Communication": "1.0.16",
+  "$transitive": "186FE30294966053F22E05C43207D4F8C6E259666C36B1A39F4A87831BE6A7F1"
 }

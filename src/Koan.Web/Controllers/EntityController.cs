@@ -440,13 +440,67 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
     public virtual async Task<IActionResult> Upsert([FromBody][ValidateNever] TEntity model, CancellationToken ct)
     {
         if (model is null) return BadRequest(new { error = "Request body is required" });
+        return await ExecuteUpsert(model, ct);
+    }
+
+    // WEB-0073: governed full-replace shim. The verb adds no authority of its own - the body travels
+    // the identical Upsert choke point (validation, [Access], hooks, stamps, audit, facts). The only
+    // PUT-specific rule is id authority: the route wins. The body's id is checked at the JSON level
+    // (the Entity constructor assigns an id at bind time, so the bound model cannot reveal whether
+    // the client sent one), then the route id is forced before materialization.
+    [HttpPut("{id}")]
+    public virtual async Task<IActionResult> Put([FromRoute] TKey id, CancellationToken ct)
+    {
+        Microsoft.AspNetCore.Http.HttpRequestRewindExtensions.EnableBuffering(HttpContext.Request);
+        string raw;
+        using (var reader = new System.IO.StreamReader(HttpContext.Request.Body, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true))
+        {
+            raw = await reader.ReadToEndAsync(ct);
+            HttpContext.Request.Body.Position = 0;
+        }
+
+        if (string.IsNullOrWhiteSpace(raw))
+            return BadRequest(new { error = "Request body is required" });
+
+        Newtonsoft.Json.Linq.JObject body;
+        try
+        {
+            body = Newtonsoft.Json.Linq.JObject.Parse(raw);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = $"Invalid PUT body: {ex.Message}" });
+        }
+
+        // Defense-in-depth, mirroring PATCH: a body that states an id must agree with the route.
+        if (body["id"] is not null)
+        {
+            var bodyId = body["id"]!.ToObject<TKey>();
+            if (bodyId is not null && !EqualityComparer<TKey>.Default.Equals(bodyId, id))
+            {
+                return Conflict(new { code = Infrastructure.KoanWebConstants.Codes.Put.IdMismatch, message = "Route id does not match body id.", routeId = id, bodyId });
+            }
+        }
+        body["id"] = JValue.FromObject(id);
+
+        var model = body.ToObject<TEntity>();
+        if (model is null) return BadRequest(new { error = "Request body could not be bound to the entity" });
+        return await ExecuteUpsert(model, ct, id);
+    }
+
+    private Task<IActionResult> ExecuteUpsert(TEntity model, CancellationToken ct)
+        => ExecuteUpsert(model, ct, default!);
+
+    private async Task<IActionResult> ExecuteUpsert(TEntity model, CancellationToken ct, TKey routeId)
+    {
         var options = BuildOptions();
         var context = CreateRequestContext(options, ct);
         var query = HttpContext.Request.Query;
-        var request = new EntityUpsertRequest<TEntity>
+        var request = new EntityUpsertRequest<TEntity, TKey>
         {
             Context = context,
             Model = model,
+            RouteId = routeId,
             Set = query.TryGetValue("set", out var setVal) ? setVal.ToString() : null,
             Accept = HttpContext.Request.Headers["Accept"].ToString()
         };

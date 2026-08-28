@@ -484,7 +484,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return new EntityModelResult<TEntity>(context, model, payload);
     }
 
-    public async Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity> request)
+    public async Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity, TKey> request)
     {
         var context = request.Context;
         if (await Gate(context, EntityAuthorizeActions.Write).ConfigureAwait(false) is { } denied) return ModelDenied(context, denied);
@@ -495,6 +495,20 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var hookContext = _hookPipeline.CreateContext(context);
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
+
+        // WEB-0073: route-id authority. A verb that pins the id to the route (PUT) delivers it via
+        // RouteId; the model carries it before the create-vs-update split so replace-by-id cannot
+        // drift into create. Applied only onto a default id - a disagreeing body id is rejected by
+        // the controller before the request is built.
+        if (request.RouteId is not null && !EqualityComparer<TKey>.Default.Equals(request.RouteId, default!)
+            && EqualityComparer<TKey>.Default.Equals(request.Model.Id, default!))
+        {
+            if (typeof(TEntity).GetProperty(nameof(IEntity<TKey>.Id), System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.SetProperty) is not { } idProperty || !idProperty.CanWrite)
+            {
+                throw new InvalidOperationException($"Entity type '{typeof(TEntity).Name}' does not expose a writable id; a route-pinned write (PUT) is not supported for it.");
+            }
+            idProperty.SetValue(request.Model, request.RouteId);
+        }
 
         // AN11 delta + SEC-0004 Constrain both need the pre-mutation row. Read it ONCE when either asks (MCP and
         // dry-run always want the delta; a constrained entity always needs the create-vs-update split). A plain,

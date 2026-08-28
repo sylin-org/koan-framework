@@ -51,10 +51,16 @@ public sealed class EntityGetByIdRequest<TKey>
     public string? Accept { get; init; }
 }
 
-public sealed class EntityUpsertRequest<TEntity> where TEntity : class
+public sealed class EntityUpsertRequest<TEntity, TKey>
+    where TEntity : class
+    where TKey : notnull
 {
     public required EntityRequestContext Context { get; init; }
     public required TEntity Model { get; init; }
+
+    // WEB-0073: route-id authority. Set by verbs whose contract pins the id to the route (PUT);
+    // the endpoint service applies it to the model before the create-vs-update split.
+    public TKey? RouteId { get; init; }
     public string? Set { get; init; }
     public string? Accept { get; init; }
     // AN11: rehearse the mutation — run the hook/validation pipeline + project the delta, commit nothing.

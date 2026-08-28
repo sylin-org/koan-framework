@@ -684,6 +684,107 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         await UpsertWidget("id3", name: "Bravo");
     }
 
+    // WEB-0073: governed PUT + the PATCH content-type dialects. These are web-layer faces over the
+    // same upsert/patch pipeline, so they run against every adapter without capability gating.
+
+    [Fact]
+    public async Task Put_with_route_id_creates_entity()
+    {
+        SkipIfUnavailable();
+
+        var response = await Client.PutAsJsonAsync("/api/widgets/put-new", new { name = "PutCreated", priority = 7 });
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var got = await Client.GetAsync("/api/widgets/put-new");
+        got.IsSuccessStatusCode.Should().BeTrue();
+        var doc = await got.Content.ReadFromJsonAsync<JsonElement>();
+        IdOf(doc).Should().Be("put-new");
+        NameOf(doc).Should().Be("PutCreated");
+        doc.GetProperty("priority").GetInt32().Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Put_replaces_existing_entity()
+    {
+        SkipIfUnavailable();
+        await UpsertWidget("put-replace", name: "Before", priority: 1);
+
+        var response = await Client.PutAsJsonAsync("/api/widgets/put-replace", new { name = "After", priority = 42 });
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var got = await Client.GetAsync("/api/widgets/put-replace");
+        var doc = await got.Content.ReadFromJsonAsync<JsonElement>();
+        IdOf(doc).Should().Be("put-replace");
+        NameOf(doc).Should().Be("After");
+        doc.GetProperty("priority").GetInt32().Should().Be(42);
+    }
+
+    [Fact]
+    public async Task Put_body_id_disagreeing_with_route_fails_409()
+    {
+        SkipIfUnavailable();
+        await UpsertWidget("put-mismatch", name: "Anchor");
+
+        var response = await Client.PutAsJsonAsync("/api/widgets/put-mismatch", new { id = "other-widget", name = "Clash" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("web.put.idMismatch");
+        // the corrective rejects the request; the anchored entity is untouched
+        var got = await Client.GetAsync("/api/widgets/put-mismatch");
+        NameOf((await got.Content.ReadFromJsonAsync<JsonElement>())).Should().Be("Anchor");
+    }
+
+    [Fact]
+    public async Task Put_body_id_matching_route_is_accepted()
+    {
+        SkipIfUnavailable();
+
+        var response = await Client.PutAsJsonAsync("/api/widgets/put-agree", new { id = "put-agree", name = "Agreed", priority = 3 });
+
+        response.IsSuccessStatusCode.Should().BeTrue();
+        var got = await Client.GetAsync("/api/widgets/put-agree");
+        NameOf((await got.Content.ReadFromJsonAsync<JsonElement>())).Should().Be("Agreed");
+    }
+
+    [Fact]
+    public async Task Patch_merge_patch_null_clears_optional_field()
+    {
+        SkipIfUnavailable();
+        await UpsertWidget("patch-clear", name: "ToClear");
+
+        using var req = new HttpRequestMessage(HttpMethod.Patch, "/api/widgets/patch-clear")
+        {
+            Content = new StringContent("""{"name": null}""", Encoding.UTF8, "application/merge-patch+json")
+        };
+        var response = await Client.SendAsync(req);
+        response.IsSuccessStatusCode.Should().BeTrue();
+
+        var got = await Client.GetAsync("/api/widgets/patch-clear");
+        var doc = await got.Content.ReadFromJsonAsync<JsonElement>();
+        (doc.TryGetProperty("name", out var n) ? n.ValueKind : JsonValueKind.Undefined)
+            .Should().BeOneOf(JsonValueKind.Null, JsonValueKind.Undefined);
+    }
+
+    [Fact]
+    public async Task Patch_partial_json_sets_provided_fields_only()
+    {
+        SkipIfUnavailable();
+        await UpsertWidget("patch-partial", name: "KeepName", priority: 5);
+
+        using var req = new HttpRequestMessage(HttpMethod.Patch, "/api/widgets/patch-partial")
+        {
+            Content = new StringContent("""{"priority": 6}""", Encoding.UTF8, "application/json")
+        };
+        var response = await Client.SendAsync(req);
+        response.IsSuccessStatusCode.Should().BeTrue();
+
+        var got = await Client.GetAsync("/api/widgets/patch-partial");
+        var doc = await got.Content.ReadFromJsonAsync<JsonElement>();
+        NameOf(doc).Should().Be("KeepName");
+        doc.GetProperty("priority").GetInt32().Should().Be(6);
+    }
+
     private async Task SeedWidgetsWithSightings()
     {
         await UpsertWidget("a", name: "Alpha", sightings:

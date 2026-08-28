@@ -9,7 +9,7 @@ public interface IEntityEndpointService<TEntity, TKey>
     Task<EntityCollectionResult<TEntity>> Query(EntityQueryRequest request);
     Task<EntityModelResult<TEntity>> GetNew(EntityGetNewRequest request);
     Task<EntityModelResult<TEntity>> GetById(EntityGetByIdRequest<TKey> request);
-    Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity> request);
+    Task<EntityModelResult<TEntity>> Upsert(EntityUpsertRequest<TEntity, TKey> request);
     Task<EntityEndpointResult> UpsertMany(EntityUpsertManyRequest<TEntity> request);
     Task<EntityModelResult<TEntity>> Delete(EntityDeleteRequest<TKey> request);
     Task<EntityEndpointResult> DeleteMany(EntityDeleteManyRequest<TKey> request);

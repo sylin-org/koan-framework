@@ -1,6 +1,6 @@
 {
-  "Sylin.Koan.Storage": "1.0.14",
-  "Sylin.Koan.Storage.Abstractions": "1.0.12",
+  "Sylin.Koan.Storage": "1.0.15",
+  "Sylin.Koan.Storage.Abstractions": "1.0.13",
   "Sylin.Koan.ZenGarden.Contracts": "1.0.10",
-  "$transitive": "DE60AD60E95EC8450D7BEABF88B85EBF2E9CCAD64AC6AA53833448AEC3F7BA6E"
+  "$transitive": "527C6FEE9093559A548DC0F1DC246775846A0E7E783828F2D8246C5D34B1B43A"
 }

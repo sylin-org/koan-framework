@@ -1,7 +1,7 @@
 {
   "Sylin.Koan.Testing.Hosting": "1.0.9",
   "Sylin.Koan.Core": "1.0.27",
-  "Sylin.Koan.Data.Core": "1.0.41",
-  "Sylin.Koan.Data.Abstractions": "1.0.23",
-  "$transitive": "0975D99E47DACB8C51E5B5A81C5D0F87E277F88EDBA9863949BA475C17869522"
+  "Sylin.Koan.Data.Core": "1.0.42",
+  "Sylin.Koan.Data.Abstractions": "1.0.24",
+  "$transitive": "8C25785204DEAF301C7374720A210D03B0538959A29571776E40A2120C91ECBC"
 }

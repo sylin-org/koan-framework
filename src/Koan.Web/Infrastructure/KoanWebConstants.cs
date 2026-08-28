@@ -18,6 +18,10 @@ public static class KoanWebConstants
         {
             public const string IdMismatch = "web.patch.idMismatch";
         }
+        public static class Put
+        {
+            public const string IdMismatch = "web.put.idMismatch";
+        }
         public static class Moderation
         {
             // Stable error codes for moderation flows
