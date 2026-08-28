@@ -1,6 +1,6 @@
 {
-  "Sylin.Koan.Mcp": "1.0.22",
-  "Sylin.Koan.Jobs": "1.0.23",
-  "Sylin.Koan.Cache": "1.0.20",
-  "$transitive": "0CCA22C738B4AFC628636C8006B5B5D3C7D1A46ABF5740DB4B59B1CF46782F38"
+  "Sylin.Koan.Mcp": "1.0.24",
+  "Sylin.Koan.Jobs": "1.0.24",
+  "Sylin.Koan.Cache": "1.0.21",
+  "$transitive": "E2BC2D8F477BB4A43E101EF3F381A5E54F59B3C11E22A56034FE76951F787030"
 }
