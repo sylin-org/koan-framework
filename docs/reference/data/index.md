@@ -301,6 +301,8 @@ carries no product claim, so it does not belong in the application path above.
 
 - [Entity lifecycle](entity-lifecycle.md) — enforce persistence invariants.
 - [Entity access and streaming](../../guides/data/entity-access-and-streaming.md) — process large sets
+- [Entity analytics](../../guides/data/entity-analytics.md) — declared, named aggregation questions with materialized projections and an agent surface
+- [DuckDB engine](../../guides/data/duckdb-engine.md) — the embedded analytical engine behind materialized projections
   without disguising provider cost.
 - [Adapter diagnostics and readiness](adapter-diagnostics.md) — operate or author a connector.
 - [Testing your app](../../guides/testing-your-app.md) — prove the application-facing contract.

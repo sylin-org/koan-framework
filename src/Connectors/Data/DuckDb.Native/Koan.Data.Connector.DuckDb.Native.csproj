@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Native DuckDB engine (per-RID libduckdb) for Sylin.Koan.Data.Connector.DuckDb. Reference alongside the connector; the connector alone carries only the managed ADO.NET bindings.</Description>
+    <PackageTags>$(CommonPackageTags);data;duckdb;native;olap</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- This package is the RID payload: it exists so the connector stays managed-only and a host chooses
+         its native footprint explicitly (DATA-0123 split packaging). -->
+    <PackageReference Include="DuckDB.NET.Bindings.Full" />
+  </ItemGroup>
+</Project>

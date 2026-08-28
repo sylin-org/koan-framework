@@ -49,7 +49,8 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     IDataOperationGate,
     IDataRouteBoundRepository,
     IDataMutationOutcomes<TEntity, TKey>,
-    IDataQueryBoundary<TEntity, TKey>
+    IDataQueryBoundary<TEntity, TKey>,
+    Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -1459,5 +1460,24 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
                     correction,
                     DataCommitOutcome.Unknown);
         }
+    }
+
+    /// <summary>
+    /// Analytics composition forwards to the adapter repository that owns the mapping and dialect; the
+    /// facade has no words of its own. Stores that cannot compose refuse with a corrective.
+    /// </summary>
+    bool Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>.TryCompose(
+        Koan.Data.Abstractions.Analytics.AnalyticsQuestion question,
+        out Koan.Data.Abstractions.Analytics.AnalyticsSql sql,
+        out string? corrective)
+    {
+        if (_inner is Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity> composer)
+            return composer.TryCompose(question, out sql, out corrective);
+        sql = null!;
+        corrective =
+            "Analytics questions need a record store that can compose aggregate asks. " +
+            $"This entity is routed to '{_inner.GetType().Name}', which offers none. " +
+            "Reference a relational connector (for example Sylin.Koan.Data.Connector.Sqlite) for the entity's store.";
+        return false;
     }
 }

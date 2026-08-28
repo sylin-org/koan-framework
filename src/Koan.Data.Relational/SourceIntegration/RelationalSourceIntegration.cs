@@ -90,7 +90,10 @@ public sealed class RelationalSourceIntegration(
         foreach (var value in parameters)
         {
             var parameter = command.CreateParameter();
-            parameter.ParameterName = value.Name.StartsWith('@') ? value.Name : "@" + value.Name;
+            // Bind by the logical name only. ADO.NET providers match a bare parameter name to whatever
+            // prefix their dialect spells in the SQL (`@x` for SQLite/SqlServer, `$x` for DuckDB); forcing
+            // a prefix here would be one dialect's convention leaking into every other adapter.
+            parameter.ParameterName = value.Name.TrimStart('@', '$');
             parameter.Value = value.Value ?? DBNull.Value;
             command.Parameters.Add(parameter);
         }

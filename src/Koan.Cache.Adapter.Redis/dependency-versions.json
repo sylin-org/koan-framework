@@ -4,5 +4,5 @@
   "Sylin.Koan.Communication": "1.0.13",
   "Sylin.Koan.Redis.Abstractions": "1.0.8",
   "Sylin.Koan.Redis": "1.0.9",
-  "$transitive": "55992ED9E78F681965DBB73D0473DAB96BCFA3A54BF6EC496EB81EC94101C87B"
+  "$transitive": "78EAFADC8F83C8F788B376AD5DAF16101725D063EE3F34CA04F8B493065E07F7"
 }

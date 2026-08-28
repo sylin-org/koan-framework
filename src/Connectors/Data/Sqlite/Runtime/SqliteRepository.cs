@@ -7,6 +7,7 @@ using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Abstractions.Sorting;
+using Koan.Data.Abstractions.Analytics;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Core;
@@ -32,7 +33,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IInstructionExecutor<TEntity>,
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
-    IBulkDelete<TKey>
+    IBulkDelete<TKey>,
+    IAnalyticsQueryComposer<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -979,5 +981,127 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             TEntity? Entity,
             TKey? Id,
             Action<TEntity>? Mutate);
+    }
+
+    /// <summary>
+    /// Compose a declared analytics question in this store's own dialect. LIMIT is deliberately absent —
+    /// the execution layer adds the cap (+1) so a capped answer can say so.
+    /// </summary>
+    public bool TryCompose(AnalyticsQuestion question, out AnalyticsSql sql, out string? corrective)
+    {
+        sql = null!;
+        corrective = null;
+        var plan = Plan();
+
+        var dialect = plan.Dialect;
+        var parameters = new Dictionary<string, object?>(StringComparer.Ordinal);
+        string? where = null;
+        if (question.Filter is not null)
+        {
+            var translated = new SqlFilterTranslator(dialect, plan.Mapping, plan.ManagedPath).Translate(question.Filter);
+            where = translated.whereSql;
+            for (var index = 0; index < translated.parameters.Count; index++)
+                parameters[dialect.Parameter(index).TrimStart('@', '$')] = translated.parameters[index];
+        }
+
+        if (!TryComposeMeasure(plan, question, out var measureExpr, out var measureAlias, out corrective)) return false;
+
+        var from = $" FROM {plan.QualifiedTable} AS koan_row" + (where is null ? string.Empty : $" WHERE {where}");
+        string text;
+        var outputs = new List<string>(2);
+        if (question.GroupMember is { } group)
+        {
+            if (!TryComposeMember(plan, group, out var groupExpr, out corrective)) return false;
+            text = $"SELECT {groupExpr} AS {SqliteDialect.Quote(group)}, {measureExpr} AS {SqliteDialect.Quote(measureAlias)}" +
+                   from + $" GROUP BY {groupExpr} ORDER BY {SqliteDialect.Quote(group)}";
+            outputs.Add(group);
+            outputs.Add(measureAlias);
+        }
+        else
+        {
+            text = $"SELECT {measureExpr} AS {SqliteDialect.Quote(measureAlias)}" + from;
+            outputs.Add(measureAlias);
+        }
+        sql = new AnalyticsSql(text, parameters, outputs, Infrastructure.Constants.Provider);
+        return true;
+    }
+
+    private bool TryComposeMeasure(
+        SqliteEntityPlan<TEntity, TKey> plan,
+        AnalyticsQuestion question,
+        out string measureExpr,
+        out string measureAlias,
+        out string? corrective)
+    {
+        if (question.MeasureKind == AnalyticsMeasureKind.Count)
+        {
+            measureExpr = "COUNT(1)";
+            measureAlias = "count";
+            corrective = null;
+            return true;
+        }
+        if (question.MeasureMember is null)
+        {
+            measureExpr = null!;
+            measureAlias = null!;
+            corrective = $"Measure '{question.MeasureKind}' needs a member to aggregate.";
+            return false;
+        }
+        if (!TryComposeMember(plan, question.MeasureMember, out var read, out corrective))
+        {
+            measureExpr = null!;
+            measureAlias = null!;
+            return false;
+        }
+        if (question.MeasureKind is AnalyticsMeasureKind.Sum or AnalyticsMeasureKind.Average &&
+            !IsNumericMember(plan, question.MeasureMember))
+        {
+            measureExpr = null!;
+            measureAlias = null!;
+            corrective = $"Sum/Average needs a numeric member; '{question.MeasureMember}' is not one.";
+            return false;
+        }
+        var verb = question.MeasureKind switch
+        {
+            AnalyticsMeasureKind.Sum => "SUM",
+            AnalyticsMeasureKind.Min => "MIN",
+            AnalyticsMeasureKind.Max => "MAX",
+            AnalyticsMeasureKind.Average => "AVG",
+            _ => "COUNT"
+        };
+        measureExpr = $"{verb}({read})";
+        measureAlias = $"{question.MeasureKind.ToString().ToLowerInvariant()}_{question.MeasureMember}";
+        corrective = null;
+        return true;
+    }
+
+    private bool TryComposeMember(SqliteEntityPlan<TEntity, TKey> plan, string member, out string expression, out string? corrective)
+    {
+        try
+        {
+            var binding = plan.Mapping.Use(MappingPath.Of([member]), MappingConsumer.Projection).Bindings.Single();
+            expression = plan.Dialect.Read(binding.PhysicalPath, binding.Shape, binding.PhysicalType);
+            corrective = null;
+            return true;
+        }
+        catch (Exception error) when (error is MappingValueException or InvalidOperationException)
+        {
+            expression = null!;
+            corrective = $"Analytics cannot read member '{member}' on '{typeof(TEntity).Name}': {error.Message}";
+            return false;
+        }
+    }
+
+    private static bool IsNumericMember(SqliteEntityPlan<TEntity, TKey> plan, string member)
+    {
+        try
+        {
+            var binding = plan.Mapping.Use(MappingPath.Of([member]), MappingConsumer.Projection).Bindings.Single();
+            var type = Nullable.GetUnderlyingType(binding.PhysicalType) ?? binding.PhysicalType;
+            return type == typeof(byte) || type == typeof(sbyte) || type == typeof(short) || type == typeof(ushort) ||
+                   type == typeof(int) || type == typeof(uint) || type == typeof(long) || type == typeof(ulong) ||
+                   type == typeof(float) || type == typeof(double) || type == typeof(decimal) || type.IsEnum;
+        }
+        catch { return false; }
     }
 }

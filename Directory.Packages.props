@@ -41,6 +41,8 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.2" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageVersion Include="DuckDB.NET.Bindings.Full" Version="1.5.5" />
+    <PackageVersion Include="DuckDB.NET.Data" Version="1.5.5" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.8.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.10" />

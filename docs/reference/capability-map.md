@@ -104,6 +104,8 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 | JSON (file-backed) | `Sylin.Koan.Data.Connector.Json` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Json/README.md) |
 | InMemory | `Sylin.Koan.Data.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/InMemory/README.md) |
 | SQLite | `Sylin.Koan.Data.Connector.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Sqlite/README.md) |
+| DuckDB (embedded analytics) | `Sylin.Koan.Data.Connector.DuckDb` + `Sylin.Koan.Data.Connector.DuckDb.Native` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/DuckDb/README.md) |
+| Declared analytics questions (named aggregations, materialized projections, agent asks) | `Sylin.Koan.Data.Analytics` + `Sylin.Koan.Data.Analytics.Web` | **one elected engine** — `Sylin.Koan.Data.Connector.DuckDb` (+ `.Native`) | [How-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) · [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/entity-analytics.md) |
 | MongoDB | `Sylin.Koan.Data.Connector.Mongo` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Mongo/README.md) |
 | PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Postgres/README.md) |
 | MySQL | `Sylin.Koan.Data.Connector.MySql` — **not assessed** | **a reachable MySQL server** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/MySql/README.md) |
@@ -223,6 +225,7 @@ not supply it on their own.
 | Remote HTTP/SSE transport | `Sylin.Koan.Mcp` | — | [HTTP/SSE recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-http-sse-howto.md) |
 | Human MCP console | `Sylin.Koan.Mcp.Explorer` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
 | Operational agent tools | `Sylin.Koan.Mcp.Operations` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
+| Agents ask declared analytics questions | `Sylin.Koan.Data.Analytics.Web` | `Sylin.Koan.Data.Analytics` + engine (`Sylin.Koan.Data.Connector.DuckDb`) | [Entity analytics how-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) |
 
 ## Trusted records
 

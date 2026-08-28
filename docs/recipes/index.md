@@ -4,7 +4,7 @@ domain: framework
 title: "Koan recipes"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-24
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
   status: generated
@@ -32,7 +32,7 @@ application and say what each would cost, rather than naming a package.
 
 **Costs** — The local path needs disk you must back up. Derivatives cost CPU on first request or on ingest.
 
-**Needs** — Entity-owned files · somewhere to put the bytes, user's choice · recipes and derivatives over HTTP (optional) · durable ingest and processing (optional)
+**Needs** — Entity-owned files · somewhere to put the bytes, user's choice · durable metadata row for the owning Entity · recipes and derivatives over HTTP (optional) · durable ingest and processing (optional)
 
 [Open the recipe](accept-and-serve-files.md)
 
@@ -58,9 +58,21 @@ application and say what each would cost, rather than naming a package.
 
 **Costs** — Adds no service. Adds a decision you must make per operation, which is the work.
 
-**Needs** — HTTP conventions and EntityController · authentication and authorization · shaping and projection add-ons (optional)
+**Needs** — HTTP conventions and EntityController · authentication and authorization · durable rows the rules protect - without a store there is no Entity to govern · shaping and projection add-ons (optional)
 
 [Open the recipe](control-who-can-do-what.md)
+
+## Ask analytics questions about my own entities
+
+**Gets you** — Declared, named questions over your entities — runnable from code, listed over HTTP, and askable by agents — where every answer says which store produced it and how old it is.
+
+**Works if** — Entities live on a relational store (SQLite on the local path), and the questions are aggregations — counts, sums, min/max/average — optionally grouped by a property.
+
+**Costs** — On-demand asks are free to operate; they run against the store that owns the data. Materialized projections add a per-host engine file under .koan/analytics/ that rebuilds from the record store, plus a background refresh loop.
+
+**Needs** — declared questions, catalog, and the analytics grammar · HTTP catalog, read-model door, and agent tools · elected analytics engine (materialization store) · the record store the entities live on
+
+[Open the recipe](entity-analytics.md)
 
 ## Harden for production and scale
 
@@ -268,7 +280,7 @@ application and say what each would cost, rather than naming a package.
 
 **Costs** — Embedded static files cost nothing. A client build adds a node toolchain to every build and CI. CDN scripts add a runtime network dependency and third-party script running on your origin.
 
-**Needs** — the web layer this UI talks to · entity-owned files behind upload UIs (optional)
+**Needs** — the web layer this UI talks to · durable rows behind the API - without it every Entity call fails with \"Koan Data has no provider candidates. Reference a Data connector and call AddKoan().\" · entity-owned files behind upload UIs (optional)
 
 [Open the recipe](serve-a-web-frontend.md)
 

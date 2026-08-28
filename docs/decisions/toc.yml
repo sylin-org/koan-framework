@@ -340,6 +340,8 @@
       href: DATA-0121-repairable-schema-drift.md
     - name: DATA-0122 Adapters classify a failure, the framework decides what it earns
       href: DATA-0122-adapters-classify-failures-the-framework-decides.md
+    - name: DATA-0123 An embedded analytics pillar, carried first by a DuckDB connector
+      href: DATA-0123-embedded-analytics-and-duckdb-connector.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

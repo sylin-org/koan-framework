@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Embedded DuckDB provider for Koan Entity data: an in-process analytical engine for aggregation, bulk load, and lakehouse file queries, with full Entity CRUD over local storage.</Description>
+    <PackageTags>$(CommonPackageTags);data;duckdb;olap;relational;analytics</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Analytics\Koan.Data.Analytics.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Managed ADO.NET bindings only; the native engine ships in Sylin.Koan.Data.Connector.DuckDb.Native
+         (DATA-0123 split packaging) so the floor stays lean and hosts choose their RID payload. -->
+    <PackageReference Include="DuckDB.NET.Data" />
+  </ItemGroup>
+</Project>

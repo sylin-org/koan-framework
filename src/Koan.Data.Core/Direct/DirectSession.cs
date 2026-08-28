@@ -358,7 +358,9 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             foreach (var kv in parameters)
             {
                 var p = cmd.CreateParameter();
-                p.ParameterName = kv.Key.StartsWith("@") ? kv.Key : "@" + kv.Key;
+                // Bind by the logical name: providers match a bare name to their own dialect prefix
+                // (`@x` SQLite/SqlServer, `$x` DuckDB), so no single convention is forced on all adapters.
+                p.ParameterName = kv.Key.TrimStart('@', '$');
                 p.Value = kv.Value ?? DBNull.Value;
                 cmd.Parameters.Add(p);
             }

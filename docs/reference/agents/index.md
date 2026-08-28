@@ -60,6 +60,7 @@ An agent sees only what you deliberately expose and what its identity may use.
 | `[McpEntity]` | The applicable Entity operations and schema |
 | `[Access(...)]` and `EntityAccess<T>` | The same gate and row boundaries used by other Entity surfaces |
 | `[McpTool]` | One business action beyond Entity operations |
+| `analytics.list_questions` / `analytics.ask` | Declared analytics questions over entities (no free-form SQL) |
 | `[McpDescription]` and `[McpIgnore]` | A clearer schema with only the fields you intend |
 | `[McpReadOnly]`, `[McpDestructive]`, and `[McpIdempotent]` | Useful behavioral hints on a custom tool |
 | `IMcpResourceProvider` | An inspectable `koan://...` resource |
