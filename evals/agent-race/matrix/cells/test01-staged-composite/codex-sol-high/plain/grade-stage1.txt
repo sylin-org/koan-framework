@@ -1,0 +1,11 @@
+CHECK pass build
+CHECK pass start
+CHECK pass health
+CHECK pass create
+CHECK pass list
+CHECK pass get-by-id
+CHECK pass update
+CHECK pass delete
+CHECK pass persistence
+
+SCORE 9/9

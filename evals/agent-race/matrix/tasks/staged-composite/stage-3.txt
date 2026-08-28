@@ -1,0 +1,11 @@
+Extend the application again. Add semantic search:
+
+- GET /api/recipes/search?q=<phrase> must return recipes ranked by meaning, not keyword overlap. A query sharing no words with a recipe can still return it first.
+- Embeddings must come from the local Ollama model `nomic-embed-text` at http://localhost:11434. No cloud services, no API keys.
+- All existing behavior must keep working exactly as before.
+
+Unattended run: nobody can approve plans or answer questions. Do not pause for plan approval or confirmation; proceed directly through implementation, verification, and completion.
+
+Timebox: if you cannot finish within 30 minutes, stop and write an ABORTED.md file in the current directory explaining the rationale and where you got to.
+
+When finished, print a final summary of what changed.

@@ -1,0 +1,60 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "RecipeApi",
+    "koan": "1.0",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Communication",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Connector.Json",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "1.0"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.App"
+    },
+    {
+      "kind": "package",
+      "id": "Sylin.Koan.Data.Connector.Sqlite"
+    }
+  ]
+}

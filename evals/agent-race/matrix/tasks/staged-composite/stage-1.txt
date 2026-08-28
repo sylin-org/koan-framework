@@ -1,0 +1,24 @@
+Build a small REST API system for cooking recipes. It must exercise all operations: create, get, update, remove, and check.
+
+Requirements:
+- REST API (JSON): GET /api/recipes, POST /api/recipes, GET /api/recipes/{id}, PUT /api/recipes/{id}, DELETE /api/recipes/{id}.
+- A recipe has: id (string), title (string), ingredients (array of strings), instructions (string).
+- A health check must be available over HTTP and report that the application is ready.
+- Data must persist to a SQLite database file inside the project folder and survive an application restart.
+- The application must start with `dotnet run` from the folder containing the .csproj file and listen on http://localhost:5099.
+- Target framework: net10.0.
+
+Constraints:
+- Create your project in the current directory (it is empty).
+- Work only inside the current directory.
+- Everything must build and run offline except NuGet package restores.
+- No authentication, no multi-tenancy, no pagination, no uploads, no frontend.
+- Do not modify anything outside the current directory.
+
+Definition of success: after `dotnet run`, a client can create a recipe, list recipes, get one, update it, remove it, ask the health check, and the data is still present after the application is restarted.
+
+Unattended run: nobody can approve plans or answer questions. Do not pause for plan approval or confirmation; proceed directly through implementation, verification, and completion.
+
+Timebox: if you cannot finish within 30 minutes, stop and write an ABORTED.md file in the current directory explaining the rationale and where you got to.
+
+When finished, print a final summary: what you built, the exact command to start it, and any caveats.

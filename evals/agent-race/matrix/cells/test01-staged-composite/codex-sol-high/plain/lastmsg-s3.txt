@@ -1,0 +1,16 @@
+Added semantic search at:
+
+```text
+GET /api/recipes/search?q=<phrase>
+```
+
+Changes:
+
+- Uses local Ollama at `http://localhost:11434`
+- Uses the `nomic-embed-text` model
+- Embeds the query and complete recipe content
+- Ranks all recipes using cosine similarity
+- Returns the existing recipe JSON shape
+- Returns 400 when `q` is missing and 503 when Ollama is unavailable
+
+Verified meaning-based ranking with a query sharing no words with the first-ranked recipe. Existing CRUD, keyword filters, health checks, and restart persistence still pass. Build completes with zero warnings and no new NuGet dependencies.

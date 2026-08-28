@@ -1,0 +1,21 @@
+Extended `GET /api/recipes` with optional:
+
+- `title`
+- `ingredient`
+- `instructions`
+
+Each performs a case-insensitive contains match. Ingredient searches individual array entries, and combined parameters use AND semantics. Unfiltered behavior remains unchanged.
+
+Verified:
+
+- Individual and combined filters
+- Existing CRUD operations
+- Health endpoints
+- SQLite persistence across restart
+- Clean build with zero warnings
+
+No database schema or dependency changes were required. Start remains:
+
+```powershell
+dotnet run
+```

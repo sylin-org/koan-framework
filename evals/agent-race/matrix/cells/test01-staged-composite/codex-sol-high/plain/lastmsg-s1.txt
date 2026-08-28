@@ -1,0 +1,17 @@
+Built and verified a plain ASP.NET Core `net10.0` recipe API with:
+
+- Full CRUD at `/api/recipes`
+- SQLite persistence in `recipes.db` beside the project
+- Readiness checks at `/health` and `/health/ready`
+- Fixed listener: `http://localhost:5099`
+- No Koan or `Sylin.*` dependencies
+
+Start it from the project directory:
+
+```powershell
+dotnet run
+```
+
+Verification passed with zero build warnings: create, list, get, update, delete, health check, and persistence after a process restart.
+
+Caveat: the first run may restore `Microsoft.EntityFrameworkCore.Sqlite` from NuGet.

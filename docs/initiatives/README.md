@@ -4,8 +4,8 @@ domain: framework
 title: "Koan Initiatives"
 audience: [architects, maintainers, ai-agents]
 status: current
-last_updated: 2026-07-27
-framework_version: v0.20.0
+last_updated: 2026-08-27
+framework_version: v1.0.12
 validation:
   date_last_tested: 2026-07-27
   status: verified
@@ -30,6 +30,7 @@ architecture canon:
 |---|---|---|
 | [Koan V1 reorganization](koan-v1/README.md) | Move Koan toward an Entity-centered V1 through meaningful, gated increments | Active — R09 Semantic Composition Kernel |
 | [Connector fleet](connector-fleet/README.md) | Make stores an application already operates do more, so a capability stops requiring a new service | Active — T1 not started |
+| [Announcement](announcement/README.md) | Take Koan 1.0 public with receipt-backed claims: agent-race receipts, launch artifacts, community surfaces | Active — T0 Receipts (A01 next) |
 
 ## Initiative contract
 

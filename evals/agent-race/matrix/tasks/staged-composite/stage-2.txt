@@ -1,0 +1,12 @@
+Extend the application. The list endpoint must support querying on every field:
+
+- GET /api/recipes must accept optional query parameters: title, ingredient, and instructions.
+- Each parameter is a case-insensitive "contains" match against the corresponding field. For ingredient, match when any entry in the ingredients array contains the value.
+- Combining parameters ANDs the matches. Without parameters, behavior is unchanged.
+- All existing behavior must keep working exactly as before.
+
+Unattended run: nobody can approve plans or answer questions. Do not pause for plan approval or confirmation; proceed directly through implementation, verification, and completion.
+
+Timebox: if you cannot finish within 30 minutes, stop and write an ABORTED.md file in the current directory explaining the rationale and where you got to.
+
+When finished, print a final summary of what changed.

@@ -1,0 +1,18 @@
+Built a plain ASP.NET Core `net10.0` recipe API with SQLite persistence.
+
+- Implements all five required CRUD endpoints.
+- Listens on `http://localhost:5099`.
+- Stores data in `recipes.db` inside the project folder.
+- Uses no Koan or `Sylin.*` packages.
+- Build completes with zero warnings and errors.
+- CRUD and restart persistence were successfully verified.
+
+Start it from the project directory:
+
+```powershell
+dotnet run
+```
+
+Key files: [Program.cs](F:\Replica\NAS\Files\repo\github\sylin-org\_agent-race-neutral\scenario01\Program.cs), [RecipeApi.csproj](F:\Replica\NAS\Files\repo\github\sylin-org\_agent-race-neutral\scenario01\RecipeApi.csproj).
+
+Caveats: the first run may restore NuGet packages. POST accepts an optional `id`; when omitted, a string ID is generated. Verification recipes were deleted afterward, leaving the database empty but initialized.

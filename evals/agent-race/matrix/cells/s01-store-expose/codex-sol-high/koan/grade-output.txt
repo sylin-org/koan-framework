@@ -1,0 +1,9 @@
+CHECK pass build
+CHECK pass start
+CHECK pass create
+CHECK pass list
+CHECK pass update
+CHECK pass delete
+CHECK pass persistence
+
+SCORE 7/7

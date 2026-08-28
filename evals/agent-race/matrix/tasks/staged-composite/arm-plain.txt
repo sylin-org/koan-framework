@@ -1,0 +1,1 @@
+Build this as a plain ASP.NET Core web API. Do not use Koan or any Sylin.* packages.

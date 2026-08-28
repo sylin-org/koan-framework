@@ -7,6 +7,66 @@ description: Build, extend, repair, and prove greenfield or current Koan applica
 
 Turn the requested outcome into the smallest coherent Koan application change, then prove it. Act as one front door: choose the pieces internally and describe the stack in business language.
 
+## Greenfield: one block to a running app
+
+Start every from-nothing request from this block and descend only when the task names something it does not cover. It is a complete application: one Entity, HTTP projection, durable SQLite persistence, health, and facts.
+
+```xml
+<!-- RecipeApi.csproj -->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Sylin.Koan.App" Version="1.*" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="1.*" />
+  </ItemGroup>
+</Project>
+```
+
+```csharp
+// Program.cs
+using Koan.Core;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddKoan();
+var app = builder.Build();
+await app.RunAsync();
+```
+
+```csharp
+// Recipe.cs — the Entity is the vocabulary; this file is the whole data model
+using Koan.Data.Core.Model;
+
+public sealed class Recipe : Entity<Recipe>
+{
+    public string Title { get; set; } = "";
+    public string[] Ingredients { get; set; } = [];
+    public string Instructions { get; set; } = "";
+}
+```
+
+```csharp
+// RecipesController.cs — governed CRUD at the route; no implementation body
+using Koan.Web.Controllers;
+using Microsoft.AspNetCore.Mvc;
+
+[Route("api/recipes")]
+public sealed class RecipesController : EntityController<Recipe>;
+```
+
+```json
+// appsettings.json — the whole provider negotiation when one connector is referenced
+{
+  "Koan": { "Data": { "Sources": { "Default": {
+    "Adapter": "sqlite", "ConnectionString": "Data Source=recipes.db" } } } }
+}
+```
+
+`dotnet run` serves CRUD at the route plus `/health/live`, `/health/ready`, and `/.well-known/Koan/facts`. Updates arrive as `POST` (upsert — create or update) or `PUT /{id}` (replace; the route wins, and a disagreeing body id fails `409`); `PATCH /{id}` is a delta whose dialect follows the content type. In a truly empty directory the template produces this same shape: `dotnet new install Sylin.Koan.Templates`, then `dotnet new koan-web -o MyApp`. Changing stores is a connector-package swap plus configuration intent — none of the code above changes. Capabilities beyond CRUD (jobs, embeddings, MCP, tenancy, cache) attach additively; route through the sections below once the request names one. Write the complete draft before verifying anything — proof runs against a finished application, never a plan.
+
 ## The Koan grammar
 
 Teach and preserve Koan's semantic shape:

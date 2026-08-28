@@ -1,0 +1,18 @@
+CHECK pass build
+CHECK pass start
+CHECK pass health
+CHECK pass create
+CHECK pass list
+CHECK pass get-by-id
+CHECK pass update
+CHECK pass delete
+CHECK pass persistence
+CHECK pass q-title-case-insensitive
+CHECK pass q-ingredient
+CHECK pass q-ingredient-array
+CHECK pass q-instructions
+CHECK pass q-and-combine
+CHECK pass q-and-exclude
+CHECK pass q-no-params-passthrough
+
+SCORE 16/16

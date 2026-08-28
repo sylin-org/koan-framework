@@ -1,0 +1,5 @@
+bin/
+obj/
+recipes.db
+recipes.db-shm
+recipes.db-wal

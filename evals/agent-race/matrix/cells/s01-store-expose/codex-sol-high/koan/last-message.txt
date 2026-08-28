@@ -1,0 +1,20 @@
+Built a net10.0 Koan recipe API with SQLite persistence and all requested REST endpoints.
+
+Start it from the project directory:
+
+```powershell
+dotnet run
+```
+
+It listens on `http://localhost:5099` and stores data in `recipes.db`.
+
+Verified:
+
+- Create, list, fetch, update, and delete
+- Updated data survived a full application restart
+- SQLite was selected in Koan runtime facts
+- Health endpoints returned 200
+- Clean build with zero warnings/errors
+- Invalid provider configuration failed with corrective diagnostics
+
+Caveat: NuGet access is required for the initial restore. The verification recipe was deleted afterward, so the database currently starts empty.

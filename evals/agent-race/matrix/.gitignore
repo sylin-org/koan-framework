@@ -1,0 +1,8 @@
+# Agent-generated artifacts stay local; results and records are the committed truth.
+cells/**/code/
+cells/**/transcripts/
+archive/
+*.db
+*.sqlite
+*.log
+.codex/
