@@ -28,12 +28,12 @@ supersedes it.
 | Write-surface decision | **Resolved by design** — `AnalyticsController` stands alone (no inherited CRUD verbs); the only mutating route is the fail-closed refresh POST | DATA-0123 + controller docs |
 | Parameterized questions (ANL-4 grammar) | **Implemented** — `Analytics.P<T>(name)` marker + `WithParameter<T>`; `AnalyticsParameterBinder` substitutes ask-time values before filter compile (no shared-compiler change was needed — binding happens at the analytics layer); missing/undeclared values refuse before compute; all three doors bind (HTTP query, MCP `parametersJson`, `Run(name, parameters)`) | `AnalyticsParameterSpec`; analytics suite green |
 | Facet + delta doors (ANL-5) | **Implemented** — `{recipe}/facets?by=` distribution/movement, `{recipe}/delta?since=` with handed-back `wm1.` cursors, per-row sink stamps, `IAnalyticsChangeTracking` capability, MCP mirrors | `AnalyticsFacetDeltaSpec`; card `cards/analytics-facet-delta-doors.md` |
+| Delight doors (ANL-6): explain, history, shape, freshness | **Implemented** — `{recipe}/explain` (serve/compute/refuse + composed SQL + capabilities, never executes), `{recipe}/history` (ledger ring with trigger column), `{recipe}/shape` (declaration-only answer shape), `?maxAge=` freshness negotiation + `MaterializedUtc` envelope + ETag/`Last-Modified`/`Cache-Control: no-cache` with 304 revalidation. Declared defaults (`WithParameterDefault<T>`) let parameterized projections refresh. | `AnalyticsDelightDoorsSpec`; card `cards/analytics-explain-history-shape-freshness.md` |
 
 ## Open, with owners and gates
 
 | Item | State | Gate to close |
 |---|---|---|
-| Delight doors, next tier (`explain`, refresh `history`, answer `shape`, freshness negotiation + policy-derived HTTP caching headers) | Designed in the ANL-5 dialogue, not built: all four expose facts the surface already owns (envelope, refresh state, declared columns, `ServeWithin`). ETag/Last-Modified/Cache-Control derived from the projection policy gives dashboards 304s for free. | One door per pass, envelope-first, MCP mirror in the same stroke |
 | Window functions in the typed grammar | Not built. Raw-SQL lanes cover them today. | A dialect-expressible window-function shape in the recipe grammar, or explicit permanent v-cut |
 | Cron spelling for refresh cadence | `Every(TimeSpan)` ships. Cron arrives with the scheduler pillar (its first consumer may be this module). | Scheduler pillar decision |
 | DuckDB 2.0 storage bump | External dependency. Materializations are derived state — the bump is a delete-and-rebuild, not a migration. | Upstream 2.0 release; then bump the floor and re-run the suite |

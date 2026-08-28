@@ -48,9 +48,22 @@ public sealed class AnalyticsResult
     /// decision is visible on every answer, never silent (the documented #1 trust-killer is invisible staleness).</summary>
     public required string ServedFrom { get; init; }
 
+    /// <summary>When the materialization backing a served answer was last refreshed; null for live answers. The freshness a caching layer may derive from.</summary>
+    public DateTimeOffset? MaterializedUtc { get; init; }
+
     public required int RowCap { get; init; }
     public required AnalyticsCompletion Completion { get; init; }
     public required IReadOnlyList<AnalyticsRow> Rows { get; init; }
+}
+
+/// <summary>Per-ask knobs that tune the answering path without touching the declaration. Null everywhere means "as declared".</summary>
+public sealed class AnalyticsAskOptions
+{
+    /// <summary>
+    /// The caller's freshness tolerance for this ask: a materialization within it is served, anything
+    /// older computes live (labeled so). Null means the declared <c>ServeWithin</c> governs.
+    /// </summary>
+    public TimeSpan? MaxAge { get; init; }
 }
 
 /// <summary>
@@ -120,13 +133,33 @@ public abstract class AnalyticsQuestion
         IServiceProvider services,
         int rowCap,
         IReadOnlyDictionary<string, object?>? parameterValues,
+        AnalyticsAskOptions? ask,
+        CancellationToken cancellationToken);
+
+    /// <summary>Run as declared — the common shape of every call site that has no per-ask knobs.</summary>
+    public Task<AnalyticsResult> ExecuteAsync(
+        IServiceProvider services,
+        int rowCap,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(services, rowCap, parameterValues, null, cancellationToken);
+
+    /// <summary>
+    /// Compose without executing: what this question would answer, refuse, serve, or compute — with
+    /// the facts a caller needs to understand it. Side-effect-free by contract: no compute, no rows
+    /// written, no projection table created.
+    /// </summary>
+    public abstract Task<AnalyticsExplanation> ExplainAsync(
+        IServiceProvider services,
+        IReadOnlyDictionary<string, object?>? parameterValues,
         CancellationToken cancellationToken);
 
     /// <summary>
     /// Re-materialize a projection: compute over the record store, replace the engine's rows, stamp the
-    /// refresh state. On-demand questions refuse — there is nothing to refresh.
+    /// refresh state. On-demand questions refuse — there is nothing to refresh. The trigger names what
+    /// caused the refresh and lands in the ledger.
     /// </summary>
-    public abstract Task<ProjectionRefreshReceipt> RefreshAsync(IServiceProvider services, CancellationToken cancellationToken);
+    public abstract Task<ProjectionRefreshReceipt> RefreshAsync(IServiceProvider services, CancellationToken cancellationToken, string trigger = "programmatic");
 }
 
 /// <summary>What one projection refresh did — the receipt for triggers, loops, and facts.</summary>
@@ -220,6 +253,82 @@ public sealed class AnalyticsDeltaResult
     public required IReadOnlyList<AnalyticsRow> Rows { get; init; }
 }
 
+/// <summary>The shape door's answer: everything about the answer's shape, none of the compute.</summary>
+public sealed class AnalyticsShape
+{
+    public required string Name { get; init; }
+    public required string Entity { get; init; }
+    public required string MeasureKind { get; init; }
+    public string? MeasureMember { get; init; }
+    public string? GroupMember { get; init; }
+
+    /// <summary>The output columns in declaration order (group first, then the measure).</summary>
+    public required IReadOnlyList<AnalyticsProjectionColumn> Columns { get; init; }
+
+    /// <summary>The ask-time values this question accepts, by name and type.</summary>
+    public required IReadOnlyList<AnalyticsParameterDeclaration> Parameters { get; init; }
+
+    public required int RowCap { get; init; }
+
+    /// <summary>Whether the question materializes — the flag that decides which doors answer it.</summary>
+    public bool Materialized { get; init; }
+
+    public AnalyticsProjectionPolicy? Policy { get; init; }
+}
+
+/// <summary>What an explain door concluded, without executing anything.</summary>
+public sealed class AnalyticsExplanation
+{
+    public required string Question { get; init; }
+    public required string Entity { get; init; }
+
+    /// <summary>The elected engine for materialized questions; the composed store's provider otherwise.</summary>
+    public required string Engine { get; init; }
+
+    public bool Materialized { get; init; }
+    public AnalyticsProjectionPolicy? Policy { get; init; }
+
+    /// <summary>What execution would do — <c>serve</c>, <c>compute</c>, or <c>refuse</c>.</summary>
+    public required string Would { get; init; }
+
+    /// <summary>The rationale: the refusal corrective, or why this path was chosen.</summary>
+    public string? Reason { get; init; }
+
+    public required int RowCap { get; init; }
+
+    /// <summary>The parameters the question declares.</summary>
+    public required IReadOnlyList<AnalyticsParameterDeclaration> Parameters { get; init; }
+
+    /// <summary>The parameter names the caller supplied.</summary>
+    public required IReadOnlyList<string> SuppliedParameters { get; init; }
+
+    /// <summary>The composed SQL and its named parameters, when composition succeeded — a select over aggregates, never a secret.</summary>
+    public AnalyticsSql? Composed { get; init; }
+
+    /// <summary>Materialization facts, for materialized questions only.</summary>
+    public DateTimeOffset? LastRefreshUtc { get; init; }
+    public int? MaterializedRows { get; init; }
+    public long? LastRefreshDurationMs { get; init; }
+
+    /// <summary>What the elected sink can also do — <c>facets</c>, <c>delta</c>, <c>parquet</c>, <c>history</c>.</summary>
+    public required IReadOnlyList<string> Capabilities { get; init; }
+}
+
+/// <summary>One re-materialization in the refresh ledger.</summary>
+public sealed record AnalyticsRefreshLedgerEntry(
+    string Recipe,
+    DateTimeOffset RanUtc,
+    int RowCount,
+    long DurationMs,
+    string Trigger);
+
+/// <summary>The history door's answer: the projection's recent refreshes, newest first.</summary>
+public sealed class AnalyticsHistory
+{
+    public required string Question { get; init; }
+    public required IReadOnlyList<AnalyticsRefreshLedgerEntry> Entries { get; init; }
+}
+
 /// <summary>
 /// The connector-side half of the analytics grammar: the repository that owns an entity's physical
 /// mapping and dialect composes its own SQL for a declared question. The framework owns the question,
@@ -279,8 +388,12 @@ public sealed record AnalyticsProjectionPolicy
 /// <summary>One column of a materialization, as it is written into and read from the engine.</summary>
 public sealed record AnalyticsProjectionColumn(string Name, Type ClrType);
 
-/// <summary>A declared ask-time value for one question — name and type.</summary>
-public sealed record AnalyticsParameterDeclaration(string Name, Type ClrType);
+/// <summary>
+/// A declared ask-time value for one question — name and type, plus an optional default that binds
+/// when no ask-time value arrives (which is exactly how a parameterized projection refreshes: there
+/// is no ask-time value at refresh time).
+/// </summary>
+public sealed record AnalyticsParameterDeclaration(string Name, Type ClrType, object? Default = null, bool HasDefault = false);
 
 /// <summary>
 /// The parameter marker used inside analytics Where clauses
@@ -310,7 +423,7 @@ public static class AnalyticsParameterBinder
         where TEntity : class
     {
         corrective = null;
-        var visitor = new Binder(declarations, values);
+        var visitor = new Binder(declarations, values ?? new Dictionary<string, object?>(StringComparer.Ordinal));
         var body = visitor.Visit(where.Body);
         if (visitor.Missing.Count > 0)
         {
@@ -346,8 +459,14 @@ public static class AnalyticsParameterBinder
                 }
                 if (!values.TryGetValue(name, out var value))
                 {
-                    Missing.Add(name);
-                    return node;
+                    // A declared default binds when no ask-time value arrives — that is exactly how a
+                    // parameterized projection refreshes (there is no ask-time value at refresh).
+                    if (declaration.HasDefault) value = declaration.Default;
+                    else
+                    {
+                        Missing.Add(name);
+                        return node;
+                    }
                 }
                 var converted = value is null || declaration.ClrType.IsInstanceOfType(value)
                     ? value
@@ -400,13 +519,18 @@ public interface IAnalyticsProjectionSink
     /// <summary>Create the materialization table when absent.</summary>
     Task EnsureAsync(string recipe, IReadOnlyList<AnalyticsProjectionColumn> columns, CancellationToken cancellationToken);
 
-    /// <summary>Replace the materialization's rows with <paramref name="rows"/> and stamp the refresh state.</summary>
+    /// <summary>
+    /// Replace the materialization's rows with <paramref name="rows"/> and stamp the refresh state.
+    /// <paramref name="trigger"/> names what caused the refresh and is recorded in the ledger — a
+    /// refresh without its history entry is an adapter defect.
+    /// </summary>
     Task WriteRowsAsync(
         string recipe,
         IReadOnlyList<AnalyticsProjectionColumn> columns,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
         DateTimeOffset refreshUtc,
         long durationMs,
+        string trigger,
         CancellationToken cancellationToken);
 
     /// <summary>Read materialized rows, optionally equality-filtered on declared columns.</summary>
@@ -425,6 +549,12 @@ public interface IAnalyticsProjectionSink
         string recipe,
         string column,
         int limit,
+        CancellationToken cancellationToken);
+
+    /// <summary>The projection's recent refreshes, newest first — the ledger the history door reads.</summary>
+    Task<IReadOnlyList<AnalyticsRefreshLedgerEntry>> ReadHistoryAsync(
+        string recipe,
+        int take,
         CancellationToken cancellationToken);
 }
 

@@ -65,6 +65,19 @@ public sealed class AnalyticsRecipe<TEntity, TKey>
         return this;
     }
 
+    /// <summary>
+    /// Declare a parameter with a default: ask-time values still override it, and a materialized
+    /// question refreshes through the default (there is no ask-time value at refresh time).
+    /// </summary>
+    public AnalyticsRecipe<TEntity, TKey> WithParameterDefault<T>(string name, T value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (ParameterDeclarations.Any(p => p.Name == name))
+            throw new InvalidOperationException($"Analytics parameter '{name}' is declared more than once on this question.");
+        ParameterDeclarations.Add(new AnalyticsParameterDeclaration(name, typeof(T), value, HasDefault: true));
+        return this;
+    }
+
     public AnalyticsRecipe<TEntity, TKey> By<TMember>(Expression<Func<TEntity, TMember>> member)
     {
         GroupMember = MemberOf(member, nameof(By));

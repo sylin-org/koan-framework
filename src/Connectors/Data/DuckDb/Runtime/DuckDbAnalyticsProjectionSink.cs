@@ -20,7 +20,20 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
     /// </summary>
     internal const string StampColumn = "_koan_stamp";
 
+    /// <summary>How many ledger entries the history door keeps per projection — the refresh-cost curve, bounded.</summary>
+    internal const int LedgerCapacity = 50;
+
     private readonly string _connectionString;
+
+    /// <summary>
+    /// Schema is ensured once per recipe per sink instance, never per call: every door ensure-reads,
+    /// and rapid autocommit DDL through pooled connections races the engine's catalog versioning
+    /// (write-write conflict on CREATE). A store that rebuilds from the record store never needs its
+    /// schema re-proved mid-flight.
+    /// </summary>
+    private readonly SemaphoreSlim _ensureGate = new(1, 1);
+    private readonly HashSet<string> _ensuredRecipes = new(StringComparer.Ordinal);
+    private bool _bookkeepingEnsured;
 
     public DuckDbAnalyticsProjectionSink(IOptions<AnalyticsOptions> options)
     {
@@ -33,20 +46,9 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         try { await connection.OpenAsync(cancellationToken).ConfigureAwait(false); }
         catch (DuckDB.NET.Data.DuckDBException) { return null; }
 
-        // A never-refreshed projection has no state table yet; the read creates it (idempotent) and
+        // A never-refreshed projection has no state table yet; the first read creates it and
         // answers null, which is the honest state: nothing materialized, nothing stale.
-        await using (var ensure = connection.CreateCommand())
-        {
-            ensure.CommandText = """
-                CREATE TABLE IF NOT EXISTS koan_analytics_refresh (
-                    recipe VARCHAR PRIMARY KEY,
-                    last_run_utc TIMESTAMPTZ,
-                    row_count BIGINT,
-                    duration_ms BIGINT
-                )
-                """;
-            await ensure.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await EnsureBookkeepingAsync(connection, cancellationToken).ConfigureAwait(false);
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
@@ -66,7 +68,62 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         };
     }
 
+    /// <summary>The refresh-state and ledger tables, created once per sink instance on first touch.</summary>
+    private Task EnsureBookkeepingAsync(DuckDB.NET.Data.DuckDBConnection connection, CancellationToken cancellationToken)
+        => EnsureBookkeepingAsync(connection, ownGate: true, cancellationToken);
+
+    /// <summary>Callers already inside the ensure gate pass ownGate: false — the gate is not reentrant.</summary>
+    private async Task EnsureBookkeepingAsync(
+        DuckDB.NET.Data.DuckDBConnection connection, bool ownGate, CancellationToken cancellationToken)
+    {
+        if (_bookkeepingEnsured) return;
+        if (ownGate) await _ensureGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_bookkeepingEnsured) return;
+            await using (var ensure = connection.CreateCommand())
+            {
+                ensure.CommandText = """
+                    CREATE TABLE IF NOT EXISTS koan_analytics_refresh (
+                        recipe VARCHAR PRIMARY KEY,
+                        last_run_utc TIMESTAMPTZ,
+                        row_count BIGINT,
+                        duration_ms BIGINT
+                    );
+                    CREATE TABLE IF NOT EXISTS koan_analytics_history (
+                        recipe VARCHAR,
+                        ran_utc TIMESTAMPTZ,
+                        row_count BIGINT,
+                        duration_ms BIGINT,
+                        trigger VARCHAR
+                    )
+                    """;
+                await ensure.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            _bookkeepingEnsured = true;
+        }
+        finally
+        {
+            if (ownGate) _ensureGate.Release();
+        }
+    }
+
     public async Task EnsureAsync(string recipe, IReadOnlyList<AnalyticsProjectionColumn> columns, CancellationToken cancellationToken)
+    {
+        await _ensureGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_ensuredRecipes.Contains(recipe)) return;
+            await EnsureCoreAsync(recipe, columns, cancellationToken).ConfigureAwait(false);
+            _ensuredRecipes.Add(recipe);
+        }
+        finally
+        {
+            _ensureGate.Release();
+        }
+    }
+
+    private async Task EnsureCoreAsync(string recipe, IReadOnlyList<AnalyticsProjectionColumn> columns, CancellationToken cancellationToken)
     {
         var table = ProjectionTable(recipe);
         var definitions = columns.Select(static column => $"{Quote(column.Name)} {StorageType(column.ClrType)}").ToList();
@@ -89,6 +146,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         await using var command = connection.CreateCommand();
         command.CommandText = $"CREATE TABLE IF NOT EXISTS {table} ({string.Join(", ", definitions)})";
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureBookkeepingAsync(connection, ownGate: false, cancellationToken).ConfigureAwait(false);
         await EnsureStampColumnAsync(connection, table, cancellationToken).ConfigureAwait(false);
     }
 
@@ -119,6 +177,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
         DateTimeOffset refreshUtc,
         long durationMs,
+        string trigger,
         CancellationToken cancellationToken)
     {
         var table = ProjectionTable(recipe);
@@ -180,6 +239,29 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
             stamp.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("rows", (long)rows.Count));
             stamp.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("duration", durationMs));
             await stamp.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        // The ledger lands in the same transaction as the stamp: a refresh without its history entry
+        // is an adapter defect, and a history entry without the rows is impossible. DDL stays out of
+        // the transaction (Ensure created the ledger table) — CREATE inside a write transaction trips
+        // the engine's catalog write-write conflict detection.
+        await using (var ledger = connection.CreateCommand())
+        {
+            ledger.Transaction = transaction;
+            ledger.CommandText = $"""
+                INSERT INTO koan_analytics_history (recipe, ran_utc, row_count, duration_ms, trigger)
+                VALUES ($recipe, $ran, $rows, $duration, $trigger);
+                DELETE FROM koan_analytics_history WHERE rowid IN (
+                    SELECT rowid FROM koan_analytics_history WHERE recipe = $recipe
+                    ORDER BY ran_utc DESC, rowid DESC OFFSET {LedgerCapacity}
+                );
+                """;
+            ledger.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("recipe", recipe));
+            ledger.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("ran", refreshUtc));
+            ledger.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("rows", (long)rows.Count));
+            ledger.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("duration", durationMs));
+            ledger.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("trigger", trigger));
+            await ledger.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -254,6 +336,37 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
             buckets.RemoveAt(buckets.Count - 1);
         }
         return new AnalyticsFacetPage(buckets, capped);
+    }
+
+    /// <summary>The projection's recent refreshes, newest first — what the history door and explain read.</summary>
+    public async Task<IReadOnlyList<AnalyticsRefreshLedgerEntry>> ReadHistoryAsync(
+        string recipe, int take, CancellationToken cancellationToken)
+    {
+        var entries = new List<AnalyticsRefreshLedgerEntry>();
+        await using var connection = Open();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        // A projection that has never refreshed has no ledger rows; the first read creates the table
+        // (autocommit — DDL never inside a data transaction) and answers empty.
+        await EnsureBookkeepingAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT ran_utc, row_count, duration_ms, trigger
+            FROM koan_analytics_history
+            WHERE recipe = $recipe
+            ORDER BY ran_utc DESC, rowid DESC
+            LIMIT $take
+            """;
+        command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("recipe", recipe));
+        command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("take", take));
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            entries.Add(new AnalyticsRefreshLedgerEntry(
+                recipe,
+                reader.GetFieldValue<DateTimeOffset>(0),
+                reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+                reader.IsDBNull(2) ? 0 : reader.GetInt64(2),
+                reader.IsDBNull(3) ? "programmatic" : reader.GetString(3)));
+        return entries;
     }
 
     /// <inheritdoc />

@@ -48,20 +48,114 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
     }
 
     /// <summary>
-    /// THE door: serve-or-compute per the recipe's policy and return up to
-    /// <paramref name="n"/> results with the full envelope — question, engine, age, served-from,
-    /// completion. The address never leaks the posture; the answer states it.
+    /// THE door: serve-or-compute per the recipe's policy — or the caller's <paramref name="maxAge"/>
+    /// tolerance when tighter — and return up to <paramref name="n"/> results with the full envelope.
+    /// Materialized serves carry freshness-derived caching headers: an <c>ETag</c> over the answer's
+    /// inputs and <c>Cache-Control: no-cache</c>, so a polling dashboard revalidates cheaply and takes
+    /// 304s. The address never leaks the posture; the answer states it.
     /// </summary>
     [HttpGet("{recipe}")]
-    public async Task<IActionResult> Results(string recipe, [FromQuery] int n = 100, CancellationToken ct = default)
+    public async Task<IActionResult> Results(string recipe, [FromQuery] int n = 100, [FromQuery] string? maxAge = null, CancellationToken ct = default)
     {
         n = Math.Clamp(n, 1, MaxResults);
         if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+
+        TimeSpan? tolerance = null;
+        if (maxAge is not null)
+        {
+            if (!AnalyticsDuration.TryParse(maxAge, out var parsed) || parsed < TimeSpan.Zero)
+                return BadRequest(new
+                {
+                    Error = "invalid-max-age",
+                    Message = $"'{maxAge}' is not a duration. Spell it as 90s / 15m / 2h / 1d, or plain seconds."
+                });
+            if (question.Projection is null)
+                return BadRequest(new
+                {
+                    Error = "max-age-on-demand",
+                    Message = $"Question '{recipe}' is an on-demand question and computes live on every ask — maxAge negotiates the freshness of materializations."
+                });
+            tolerance = parsed;
+        }
+
         var parameterValues = Request.Query
-            .Where(static pair => pair.Key is not ("n" or "format"))
+            .Where(static pair => pair.Key is not ("n" or "format" or "maxAge"))
             .ToDictionary(static pair => pair.Key.TrimStart('@', '$'), static pair => (object?)pair.Value.ToString(), StringComparer.Ordinal);
-        var answer = await question.ExecuteAsync(HttpContext.RequestServices, n, parameterValues, ct);
+        var answer = await question.ExecuteAsync(
+            HttpContext.RequestServices, n, parameterValues,
+            tolerance is null ? null : new AnalyticsAskOptions { MaxAge = tolerance }, ct);
+
+        if (answer.ServedFrom == "materialization" && answer.MaterializedUtc is { } materializedUtc)
+        {
+            var etag = $"\"{EtagOf(recipe, n, parameterValues, materializedUtc, tolerance ?? question.Projection?.ServeWithin)}\"";
+            Response.Headers.LastModified = materializedUtc.ToString("R");
+            Response.Headers.ETag = etag;
+            // no-cache (revalidate-every-time) over no-store: a 304 still answers "is it fresh" without
+            // shipping rows, and a cached body can never outlive its materialization.
+            Response.Headers.CacheControl = "no-cache";
+            if (Request.Headers.IfNoneMatch.Count > 0 &&
+                Request.Headers.IfNoneMatch.ToString().Contains(etag, StringComparison.Ordinal))
+                return StatusCode(StatusCodes.Status304NotModified);
+        }
+
         return Ok(answer);
+    }
+
+    /// <summary>A stable digest of everything the answer depends on — the materialization stamp makes it change exactly when the data does.</summary>
+    private static string EtagOf(string recipe, int n, Dictionary<string, object?> parameters, DateTimeOffset materializedUtc, TimeSpan? tolerance)
+    {
+        var inputs = string.Join('|', recipe, n,
+            string.Join(';', parameters.OrderBy(static p => p.Key, StringComparer.Ordinal).Select(static p => $"{p.Key}={p.Value}")),
+            materializedUtc.UtcTicks, tolerance?.Ticks ?? 0);
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(inputs));
+        return Convert.ToHexString(bytes)[..32];
+    }
+
+    /// <summary>
+    /// The explanation door: what this question would do — serve, compute, or refuse — with the
+    /// composed SQL, bounds, parameters, and the sink's capabilities. Never executes anything: a
+    /// never-refreshed projection still reads as never-refreshed afterwards.
+    /// </summary>
+    [HttpGet("{recipe}/explain")]
+    public async Task<IActionResult> Explain(string recipe, CancellationToken ct = default)
+    {
+        if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+        var parameterValues = Request.Query
+            .Where(static pair => pair.Key is not ("n" or "format" or "maxAge"))
+            .ToDictionary(static pair => pair.Key.TrimStart('@', '$'), static pair => (object?)pair.Value.ToString(), StringComparer.Ordinal);
+        return Ok(await question.ExplainAsync(HttpContext.RequestServices, parameterValues, ct));
+    }
+
+    /// <summary>
+    /// The history door: the projection's refresh ledger, newest first — when, how many rows, how
+    /// long, and what triggered it. "Stale or broken" is one call; on-demand questions have nothing
+    /// to look back on and refuse.
+    /// </summary>
+    [HttpGet("{recipe}/history")]
+    public async Task<IActionResult> History(string recipe, [FromQuery] int take = 20, CancellationToken ct = default)
+    {
+        if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+        if (question.Projection is null)
+            return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; it has never refreshed and never will — history reads materializations." });
+        try
+        {
+            return Ok(await Analytics.History(recipe, take, ct));
+        }
+        catch (NotSupportedException refusal)
+        {
+            return BadRequest(new { Error = "history-refused", Message = refusal.Message });
+        }
+    }
+
+    /// <summary>
+    /// The shape door: the answer's columns, parameters, bounds, and posture — from the declaration
+    /// alone. Works for on-demand questions too, with Materialized false saying which doors apply.
+    /// </summary>
+    [HttpGet("{recipe}/shape")]
+    public IActionResult Shape(string recipe)
+    {
+        if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+        return Ok(Analytics.Shape(question.Name));
     }
 
     /// <summary>
@@ -201,7 +295,7 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
         if (question.Projection is null)
             return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; it computes live and has nothing to refresh." });
 
-        return Ok(await question.RefreshAsync(HttpContext.RequestServices, ct));
+        return Ok(await question.RefreshAsync(HttpContext.RequestServices, ct, "http"));
     }
 
     private bool TryGetQuestion(string recipe, out AnalyticsQuestion question, out IActionResult? notFound)

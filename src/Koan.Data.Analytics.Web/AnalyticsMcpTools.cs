@@ -149,4 +149,93 @@ public static class AnalyticsMcpTools
             return new { Error = "delta-refused", Message = refusal.Message };
         }
     }
+
+    /// <param name="name">The declared question to explain.</param>
+    /// <param name="parametersJson">Optional JSON object of parameter values, as in analytics.ask.</param>
+    [McpTool(Name = "analytics.explain",
+        Description = "What a declared analytics question would do — serve, compute, or refuse — with its composed query, bounds, parameters, and capabilities. Never executes: safe to call before asking.")]
+    public static async Task<object> Explain(
+        string name,
+        IServiceProvider services,
+        CancellationToken cancellationToken,
+        string? parametersJson = null)
+    {
+        _ = services;
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            return UnknownQuestion(name);
+        }
+        var (error, values) = BindParameters(parametersJson);
+        if (error is not null) return new { Error = "invalid-parameters", Message = error };
+        return await question.ExplainAsync(services, values, cancellationToken);
+    }
+
+    /// <param name="name">The declared materialized question whose refreshes to list.</param>
+    /// <param name="take">Ledger depth, newest first (max 100).</param>
+    [McpTool(Name = "analytics.history",
+        Description = "A materialized question's refresh ledger, newest first: when each refresh ran, how many rows it wrote, how long it took, and what triggered it. On-demand questions refuse.")]
+    public static object History(string name, IServiceProvider services, int take = 20)
+    {
+        _ = services;
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            return UnknownQuestion(name);
+        }
+        if (question.Projection is null)
+            return new { Error = "not-materialized", Message = $"Question '{name}' is an on-demand question; it has never refreshed and never will." };
+        return Analytics.History(name, take);
+    }
+
+    /// <param name="name">The declared question to describe.</param>
+    [McpTool(Name = "analytics.shape",
+        Description = "A declared analytics question's answer shape — output columns with types, declared parameters, bounds, and whether it materializes — without computing anything. Use it to bind before asking.")]
+    public static object Shape(string name, IServiceProvider services)
+    {
+        _ = services;
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            return UnknownQuestion(name);
+        }
+        return Analytics.Shape(name);
+    }
+
+    private static object UnknownQuestion(string name) => new
+    {
+        Error = "unknown-question",
+        Message = $"No analytics question named '{name}' is declared. This tool only answers declared questions.",
+        Catalog = AnalyticsCatalog.Names()
+    };
+
+    private static (string? Error, IReadOnlyDictionary<string, object?>? Values) BindParameters(string? parametersJson)
+    {
+        if (string.IsNullOrWhiteSpace(parametersJson))
+            return (null, null);
+        try
+        {
+            using var document = JsonDocument.Parse(parametersJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                return ("parameters must be a JSON object of { name: value }.", null);
+            var bound = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                bound[property.Name] = property.Value.ValueKind switch
+                {
+                    JsonValueKind.String => property.Value.GetString(),
+                    JsonValueKind.Number => property.Value.GetDouble(),
+                    JsonValueKind.True => true,
+                    JsonValueKind.False => false,
+                    JsonValueKind.Null => null,
+                    _ => property.Value.GetRawText()
+                };
+            }
+            return (null, bound);
+        }
+        catch (JsonException error)
+        {
+            return (error.Message, null);
+        }
+    }
 }

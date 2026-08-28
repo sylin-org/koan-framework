@@ -163,7 +163,8 @@ internal static class AnalyticsExecution
         IServiceProvider services,
         int rowCap,
         IReadOnlyDictionary<string, object?>? parameterValues,
-        CancellationToken callerToken)
+        CancellationToken callerToken,
+        AnalyticsAskOptions? ask = null)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -201,13 +202,14 @@ internal static class AnalyticsExecution
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(callerToken);
         timeout.CancelAfter(options.Timeout);
 
-        // Serve-or-compute: a materialized question prefers its projection within the declared tolerance;
-        // anything staler (or colder) computes live — and backfills when the question says so.
+        // Serve-or-compute: a materialized question prefers its projection within the declared tolerance —
+        // or the caller's maxAge when tighter; anything staler (or colder) computes live — and backfills
+        // when the question says so.
         if (question.Projection is not null)
         {
-                var sink = GetSink(services, question);
+            var sink = GetSink(services, question);
             return await RunMaterializedAsync(
-                question, sql, executor, sink, options, ceiling, timeout.Token).ConfigureAwait(false);
+                question, sql, executor, sink, options, ceiling, timeout.Token, ask?.MaxAge).ConfigureAwait(false);
         }
 
         return await ComputeLiveAsync(question, sql, executor, ceiling, timeout.Token).ConfigureAwait(false);
@@ -220,14 +222,20 @@ internal static class AnalyticsExecution
         IAnalyticsProjectionSink sink,
         AnalyticsOptions options,
         int ceiling,
-        CancellationToken token)
+        CancellationToken token,
+        TimeSpan? callerMaxAge = null)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
         var policy = question.Projection!;
         var state = await sink.ReadStateAsync(question.Name, token).ConfigureAwait(false);
+        // The caller's maxAge is a per-ask tightening of the declared tolerance, never a loosening:
+        // a fresher-than-declared demand simply computes live (labeled so) instead of being served.
+        var tolerance = callerMaxAge is { } max && (policy.ServeWithin is null || max < policy.ServeWithin)
+            ? max
+            : policy.ServeWithin;
         var fresh = state?.LastRefreshUtc is { } last &&
-                    (policy.ServeWithin is null || DateTimeOffset.UtcNow - last <= policy.ServeWithin);
+                    (tolerance is null || DateTimeOffset.UtcNow - last <= tolerance);
 
         if (fresh)
         {
@@ -240,6 +248,7 @@ internal static class AnalyticsExecution
                 Engine = EngineName(sink),
                 Age = $"{Math.Max(0, (int)age.TotalSeconds)}s",
                 ServedFrom = "materialization",
+                MaterializedUtc = state.LastRefreshUtc,
                 RowCap = ceiling,
                 Completion = capped ? AnalyticsCompletion.RowCapped : AnalyticsCompletion.Complete,
                 Rows = served.Take(ceiling).Select(static row => new AnalyticsRow { Values = row }).ToArray()
@@ -261,7 +270,8 @@ internal static class AnalyticsExecution
     public static async Task<ProjectionRefreshReceipt> RefreshAsync<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
         IServiceProvider services,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string trigger = "programmatic")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -275,7 +285,7 @@ internal static class AnalyticsExecution
         var sink = GetSink(services, question);
         if (!composer.TryCompose(question, null, out var composed, out var corrective))
             throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
-        return await RefreshAsync(question, composed, executor, sink, cancellationToken).ConfigureAwait(false);
+        return await RefreshAsync(question, composed, executor, sink, cancellationToken, trigger).ConfigureAwait(false);
     }
 
     public static async Task<ProjectionRefreshReceipt> RefreshAsync<TEntity, TKey>(
@@ -283,7 +293,8 @@ internal static class AnalyticsExecution
         AnalyticsSql composed,
         IInstructionExecutor<TEntity> executor,
         IAnalyticsProjectionSink sink,
-        CancellationToken token)
+        CancellationToken token,
+        string trigger = "programmatic")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -306,7 +317,7 @@ internal static class AnalyticsExecution
         await sink.EnsureAsync(question.Name, question.Columns, token).ConfigureAwait(false);
         var refreshUtc = DateTimeOffset.UtcNow;
         await sink.WriteRowsAsync(question.Name, question.Columns, raw, refreshUtc,
-            (long)(DateTimeOffset.UtcNow - started).TotalMilliseconds, token).ConfigureAwait(false);
+            (long)(DateTimeOffset.UtcNow - started).TotalMilliseconds, trigger, token).ConfigureAwait(false);
         return new ProjectionRefreshReceipt(question.Name, raw.Count, refreshUtc);
     }
 
@@ -321,7 +332,7 @@ internal static class AnalyticsExecution
         where TKey : notnull
     {
         _ = options;
-        await RefreshAsync(question, composed, executor, sink, token).ConfigureAwait(false);
+        await RefreshAsync(question, composed, executor, sink, token, "backfill-on-read").ConfigureAwait(false);
     }
 
     private static async Task<AnalyticsResult> ComputeLiveAsync<TEntity, TKey>(
@@ -375,6 +386,160 @@ internal static class AnalyticsExecution
             RowCap = ceiling,
             Completion = capped ? AnalyticsCompletion.RowCapped : AnalyticsCompletion.Complete,
             Rows = result
+        };
+    }
+
+    /// <summary>
+    /// The explain path: compose without executing. Reports what the ask would do — serve, compute, or
+    /// refuse, with the same corrective execution would raise — plus the composed SQL, the bounds, and
+    /// the elected sink's capabilities. Side-effect-free by contract: no compute, no rows written, no
+    /// projection table created.
+    /// </summary>
+    public static async Task<AnalyticsExplanation> Explain<TEntity, TKey>(
+        AnalyticsQuestion<TEntity, TKey> question,
+        IServiceProvider services,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        CancellationToken token)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        var supplied = parameterValues is { Count: > 0 }
+            ? parameterValues.Keys.OrderBy(static k => k, StringComparer.Ordinal).ToArray()
+            : Array.Empty<string>();
+
+        string engine = "(not elected)";
+        var capabilities = new List<string>();
+        ProjectionMaterializationState? state = null;
+        AnalyticsSql? composed = null;
+        string would;
+        string? reason = null;
+
+        if (question.Projection is not null)
+        {
+            IAnalyticsProjectionSink sink;
+            try { sink = GetSink(services, question); }
+            catch (NotSupportedException refusal)
+            {
+                return Refused(question, supplied, refusal.Message);
+            }
+            capabilities.Add("facets");
+            capabilities.Add("history");
+            if (sink is IAnalyticsChangeTracking) capabilities.Add("delta");
+            if (sink is IAnalyticsParquetExport) capabilities.Add("parquet");
+            state = await sink.ReadStateAsync(question.Name, token).ConfigureAwait(false);
+        }
+
+        // The same parameter guard execution applies — explain reports the refusal instead of raising it.
+        if (parameterValues is { Count: > 0 })
+        {
+            var declared = question.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+            var undeclared = parameterValues.Keys.Where(k => !declared.Contains(k)).ToList();
+            if (undeclared.Count > 0)
+                return Refused(question, supplied,
+                    "Values were supplied for parameter(s) the question does not declare: " +
+                    string.Join(", ", undeclared) + ".");
+        }
+
+        var data = services.GetRequiredService<IDataService>();
+        var repository = data.GetRepository<TEntity, TKey>();
+        if (repository is not IAnalyticsQueryComposer<TEntity> composer)
+            return Refused(question, supplied,
+                $"'{typeof(TEntity).Name}' is routed to '{repository.GetType().Name}', which cannot compose aggregate asks. " +
+                "Reference a relational connector (for example Sylin.Koan.Data.Connector.Sqlite) for the entity's store.");
+
+        if (!composer.TryCompose(question, parameterValues, out var sql, out var corrective))
+            return Refused(question, supplied, corrective ?? "The store cannot answer this question honestly.");
+        composed = sql;
+        // The elected engine: the sink that would serve a materialization, or the store that would compute.
+        engine = question.Projection is not null ? EngineName(GetSink(services, question)) : sql.Provider;
+
+        if (question.Projection is null)
+        {
+            would = "compute";
+        }
+        else
+        {
+            var tolerance = question.Projection.ServeWithin;
+            var fresh = state?.LastRefreshUtc is { } last &&
+                        (tolerance is null || DateTimeOffset.UtcNow - last <= tolerance);
+            would = fresh ? "serve" : "compute";
+            reason = would == "serve"
+                ? "the materialization is within the declared tolerance"
+                : state is null
+                    ? "nothing is materialized yet"
+                    : "the materialization is older than the declared tolerance";
+            if (would == "compute" && question.Projection.BackfillOnRead)
+                reason += "; the read would also backfill the materialization";
+        }
+
+        return new AnalyticsExplanation
+        {
+            Question = question.Name,
+            Entity = question.EntityType.Name,
+            Engine = engine,
+            Materialized = question.Projection is not null,
+            Policy = question.Projection,
+            Would = would,
+            Reason = reason,
+            RowCap = question.RowCap,
+            Parameters = question.Parameters,
+            SuppliedParameters = supplied,
+            Composed = composed,
+            LastRefreshUtc = state?.LastRefreshUtc,
+            MaterializedRows = state?.RowCount,
+            LastRefreshDurationMs = state?.DurationMs,
+            Capabilities = capabilities
+        };
+
+        static AnalyticsExplanation Refused(
+            AnalyticsQuestion question, string[] supplied, string message) =>
+            new()
+            {
+                Question = question.Name,
+                Entity = question.EntityType.Name,
+                Engine = "(not elected)",
+                Materialized = question.Projection is not null,
+                Policy = question.Projection,
+                Would = "refuse",
+                Reason = message,
+                RowCap = question.RowCap,
+                Parameters = question.Parameters,
+                SuppliedParameters = supplied,
+                Capabilities = []
+            };
+    }
+
+    /// <summary>The history door: the projection's refresh ledger, newest first.</summary>
+    public static async Task<AnalyticsHistory> ReadHistoryAsync(
+        string name, int take, CancellationToken cancellationToken)
+    {
+        take = Math.Clamp(take, 1, 100);
+        var question = ResolveMaterialized(name, "the history door reads materializations", "Run it instead, or add Materialize to the declaration.");
+        var sink = GetSink(AmbientHost(), question);
+        var entries = await sink.ReadHistoryAsync(name, take, cancellationToken).ConfigureAwait(false);
+        return new AnalyticsHistory { Question = name, Entries = entries };
+    }
+
+    /// <summary>
+    /// The shape door: everything about the answer's shape, from the declaration alone — no sink, no
+    /// compute. On-demand questions shape too, with Materialized false saying which doors apply.
+    /// </summary>
+    public static AnalyticsShape Shape(string name)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+            throw new KeyNotFoundException($"No analytics question named '{name}' is declared.");
+        return new AnalyticsShape
+        {
+            Name = question.Name,
+            Entity = question.EntityType.Name,
+            MeasureKind = question.MeasureKind.ToString().ToLowerInvariant(),
+            MeasureMember = question.MeasureMember,
+            GroupMember = question.GroupMember,
+            Columns = question.Columns,
+            Parameters = question.Parameters,
+            RowCap = question.RowCap,
+            Materialized = question.Projection is not null,
+            Policy = question.Projection
         };
     }
 

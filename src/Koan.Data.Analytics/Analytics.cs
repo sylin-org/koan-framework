@@ -128,12 +128,65 @@ public static class Analytics
             recipe.MeasureMember,
             recipe.Projection,
             recipe.ComputeColumns(),
-            (services, q, cap, values, token) =>
-                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token),
-            (services, token) =>
-                AnalyticsExecution.RefreshAsync<TEntity, TKey>(question, services, token));
+            (services, q, cap, values, ask, token) =>
+                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token, ask),
+            (services, values, token) =>
+                AnalyticsExecution.Explain<TEntity, TKey>(question, services, values, token),
+            (services, trigger, token) =>
+                AnalyticsExecution.RefreshAsync<TEntity, TKey>(question, services, token, trigger));
         AnalyticsCatalog.Register(question);
         return question;
+    }
+
+    /// <summary>
+    /// The shape door: everything about the answer's shape, from the declaration alone — columns,
+    /// parameters, bounds, posture. No sink, no compute.
+    /// </summary>
+    public static AnalyticsShape Shape(string name)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            throw new KeyNotFoundException(
+                $"No analytics question named '{name}' is declared. Declared questions: " +
+                (AnalyticsCatalog.Names() is { Count: > 0 } declared ? string.Join(", ", declared) : "(none)") + ".");
+        }
+        return AnalyticsExecution.Shape(name);
+    }
+
+    /// <summary>The explanation door: what this question would do, without executing anything.</summary>
+    public static Task<AnalyticsExplanation> Explain(
+        string name,
+        IReadOnlyDictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            throw new KeyNotFoundException(
+                $"No analytics question named '{name}' is declared. Declared questions: " +
+                (AnalyticsCatalog.Names() is { Count: > 0 } declared ? string.Join(", ", declared) : "(none)") + ".");
+        }
+        return question.ExplainAsync(
+            AppHost.Current ?? throw new InvalidOperationException(
+                "No Koan host is active; analytics resolves through the ambient host."),
+            parameters, ct);
+    }
+
+    /// <summary>The history door: the projection's refresh ledger, newest first.</summary>
+    public static Task<AnalyticsHistory> History(
+        string name,
+        int take = 20,
+        CancellationToken ct = default)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            throw new KeyNotFoundException(
+                $"No analytics question named '{name}' is declared. Declared questions: " +
+                (AnalyticsCatalog.Names() is { Count: > 0 } declared ? string.Join(", ", declared) : "(none)") + ".");
+        }
+        return AnalyticsExecution.ReadHistoryAsync(name, take, ct);
     }
 }
 
@@ -147,6 +200,18 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
         string name,
         IReadOnlyDictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
+        => Run(name, parameters, maxAge: null, ct);
+
+    /// <summary>
+    /// Run with a per-ask freshness tolerance: a materialization within <paramref name="maxAge"/> is
+    /// served, anything older computes live (labeled so). Materialized questions only — the parameter
+    /// would lie on an on-demand question, which is always age zero.
+    /// </summary>
+    public Task<AnalyticsResult> Run(
+        string name,
+        IReadOnlyDictionary<string, object?>? parameters,
+        TimeSpan? maxAge,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!AnalyticsCatalog.TryGet(name, out var question))
@@ -158,11 +223,16 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
             throw new KeyNotFoundException(
                 $"Analytics question '{name}' is declared for '{question.EntityType.Name}', not " +
                 $"'{typeof(TEntity).Name}'. Ask it through that entity's surface or the catalog door.");
+        if (maxAge is not null && question.Projection is null)
+            throw new NotSupportedException(
+                $"Question '{name}' is an on-demand question and computes live on every ask — maxAge " +
+                "negotiates the freshness of materializations, so there is nothing for it to do here.");
         return question.ExecuteAsync(
             AppHost.Current ?? throw new InvalidOperationException(
                 "No Koan host is active; analytics questions resolve through the ambient host."),
             question.RowCap,
             parameters,
+            maxAge is null ? null : new AnalyticsAskOptions { MaxAge = maxAge },
             ct);
     }
 
@@ -187,9 +257,11 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
             recipe.MeasureMember,
             recipe.Projection,
             recipe.ComputeColumns(),
-            static (services, q, cap, values, token) =>
-                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token),
-            static (services, token) =>
+            static (services, q, cap, values, ask, token) =>
+                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token, ask),
+            static (services, values, token) =>
+                throw new NotSupportedException("An ephemeral ask is never materialized; there is nothing to explain cold or warm — ask it."),
+            static (services, trigger, token) =>
                 throw new NotSupportedException("An ephemeral ask is never materialized; there is nothing to refresh."));
         return question.ExecuteAsync(
             AppHost.Current ?? throw new InvalidOperationException(

@@ -129,6 +129,22 @@ blind spot (`DeletesInvisible`: deleted source rows leave no trace in a derived 
 cursor plus the next cursor; consumers never construct watermarks, they pass back what the last
 response handed over. In code: `Analytics.Facets(name, by, since)` and
 `Analytics.Delta(name, since)`; for agents, `analytics.facets` and `analytics.delta`.
+Four more doors expose facts the declaration and refresh state already own. **Explain** —
+`GET /analytics/{name}/explain` — says what the ask *would* do (serve, compute, or refuse, with the
+exact corrective), the composed SQL, bounds, parameters, and the engine's capabilities — without
+executing anything. **History** — `GET /analytics/{name}/history` — is the refresh ledger, newest
+first: when, how many rows, how long, and what triggered it (`loop`, `http`, `programmatic`,
+`backfill-on-read`). **Shape** — `GET /analytics/{name}/shape` — is the answer's columns,
+parameters, and posture from the declaration alone; bind before asking. **Freshness** —
+`GET /analytics/{name}?maxAge=15m` — states the caller's tolerance per ask: within it the
+materialization is served, older computes live (labeled so). Materialized answers carry `ETag`,
+`Last-Modified`, and `Cache-Control: no-cache`, so a polling dashboard revalidates and takes 304s.
+In code: `Analytics.Explain(name, parameters)`, `Analytics.History(name)`, `Analytics.Shape(name)`,
+`Run(name, parameters, maxAge: TimeSpan.FromMinutes(15))`; for agents, `analytics.explain`,
+`analytics.history`, `analytics.shape`.
+
+A parameterized projection refreshes through its **declared defaults**
+(`WithParameterDefault<T>(name, value)`); ask-time values still override them.
 
 ## Costs and limits
 

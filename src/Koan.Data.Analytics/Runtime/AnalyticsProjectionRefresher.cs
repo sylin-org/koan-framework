@@ -11,7 +11,7 @@ namespace Koan.Data.Analytics.Runtime;
 /// </summary>
 public sealed class AnalyticsProjectionRefresher(IOptions<AnalyticsOptions> options)
 {
-    public async Task<ProjectionRefreshReceipt> RefreshAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<ProjectionRefreshReceipt> RefreshAsync(string name, CancellationToken cancellationToken = default, string trigger = "programmatic")
     {
         if (!AnalyticsCatalog.TryGet(name, out var question))
             throw new KeyNotFoundException(
@@ -25,6 +25,6 @@ public sealed class AnalyticsProjectionRefresher(IOptions<AnalyticsOptions> opti
         var services = Koan.Core.Hosting.App.AppHost.Current
             ?? throw new InvalidOperationException("No Koan host is active; projections refresh through the ambient host.");
         _ = options;
-        return await question.RefreshAsync(services, cancellationToken).ConfigureAwait(false);
+        return await question.RefreshAsync(services, cancellationToken, trigger).ConfigureAwait(false);
     }
 }

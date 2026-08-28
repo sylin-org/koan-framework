@@ -191,6 +191,35 @@ after the cursor* — refreshes rewrite wholesale, so every re-materialized row 
 The response always carries `Watermark: { given, current }`: the consumer holds the cursor, the
 door hands back the next one, and the server keeps no per-consumer state.
 
+## Explain, history, shape: the facts without the compute
+
+    var explanation = await Analytics.Explain("done-by-week");   // would it serve, compute, or refuse?
+    var ledger      = await Analytics.History("done-by-week");   // refresh ledger, newest first
+    var shape       = Analytics.Shape("done-by-week");           // columns, parameters, posture
+
+- **Explain** composes without executing: the elected engine, whether the ask would serve or
+  compute (or refuse, with the same corrective execution would raise), the composed SQL, the
+  declared vs. supplied parameters, the materialization's age and last-refresh cost, and the
+  sink's capabilities (`facets`, `delta`, `parquet`). Side-effect-free by contract: a
+  never-refreshed projection still reads as never-refreshed afterwards.
+- **History** is the refresh ledger: timestamp, row count, duration, and the trigger:
+  `loop`, `http`, `programmatic`, or `backfill-on-read`. "Stale or broken" is one call.
+- **Shape** is pure declaration: output columns with CLR types, parameters by name and type,
+  bounds, and `Materialized` saying which doors answer. On-demand questions shape too.
+
+## Freshness you can negotiate
+
+`GET /analytics/done-by-week?maxAge=15m` (or `Run(name, parameters, maxAge: ...)`) — durations
+parse as `90s` / `15m` / `2h` / `1d` or plain seconds. Within the tolerance the materialization is
+served; older computes live, labeled so. A served answer carries `MaterializedUtc`, and the HTTP
+door derives `ETag` + `Last-Modified` + `Cache-Control: no-cache` from it, so pollers revalidate
+and take 304s: a dashboard's 30-second loop costs nothing when nothing changed. Live answers
+carry no caching headers, because they are always fresh and caching them would be a lie.
+
+A parameterized projection refreshes through its declared defaults:
+`.WithParameterDefault<int>("min-priority", 0)`. Ask-time values still win; the default is what a
+scheduled refresh, which has no ask-time values, binds.
+
 Every path — query, filter, export — passes the same tenant scoping as the semantic door.
 
 ## Agents

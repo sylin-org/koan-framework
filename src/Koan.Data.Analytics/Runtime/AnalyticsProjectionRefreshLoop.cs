@@ -58,7 +58,7 @@ internal sealed class AnalyticsProjectionRefreshLoop(
             _lastSweep[question.Name] = DateTimeOffset.UtcNow;
             try
             {
-                var receipt = await question.RefreshAsync(services, ct).ConfigureAwait(false);
+                var receipt = await question.RefreshAsync(services, ct, "loop").ConfigureAwait(false);
                 logger.LogInformation(
                     "analytics projection {Recipe} refreshed: {Rows} row(s) in {Duration}ms",
                     receipt.Recipe, receipt.RowCount,
