@@ -137,14 +137,14 @@ public sealed class RequestTranslator
 
     private object BuildUpsertRequest(McpEntityRegistration registration, EntityRequestContext context, JObject args)
     {
-        var requestType = typeof(EntityUpsertRequest<>).MakeGenericType(registration.EntityType);
+        var requestType = typeof(EntityUpsertRequest<,>).MakeGenericType(registration.EntityType, registration.KeyType);
         var request = Activator.CreateInstance(requestType)!;
-        SetProperty(request, nameof(EntityUpsertRequest<object>.Context), context);
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Context), context);
         var modelNode = TryGet(args, "model") ?? throw new JsonException("Missing required 'model' payload.");
-        SetProperty(request, nameof(EntityUpsertRequest<object>.Model), ConvertEntity(modelNode, registration.EntityType));
-        SetProperty(request, nameof(EntityUpsertRequest<object>.Set), ReadString(args, "set"));
-        SetProperty(request, nameof(EntityUpsertRequest<object>.Accept), ReadString(args, "accept"));
-        SetProperty(request, nameof(EntityUpsertRequest<object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Model), ConvertEntity(modelNode, registration.EntityType));
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Set), ReadString(args, "set"));
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.Accept), ReadString(args, "accept"));
+        SetProperty(request, nameof(EntityUpsertRequest<object, object>.DryRun), ReadBool(args, McpDryRun.ArgumentName) ?? false);
         return request;
     }
 
