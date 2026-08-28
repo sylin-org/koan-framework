@@ -1468,11 +1468,12 @@ internal sealed class RepositoryFacade<TEntity, TKey> :
     /// </summary>
     bool Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>.TryCompose(
         Koan.Data.Abstractions.Analytics.AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
         out Koan.Data.Abstractions.Analytics.AnalyticsSql sql,
         out string? corrective)
     {
         if (_inner is Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity> composer)
-            return composer.TryCompose(question, out sql, out corrective);
+            return composer.TryCompose(question, parameterValues, out sql, out corrective);
         sql = null!;
         corrective =
             "Analytics questions need a record store that can compose aggregate asks. " +

@@ -17,7 +17,8 @@ public sealed class AnalyticsRecipe<TEntity, TKey>
 {
     private const string DirectMemberOnly = "only direct property expressions are expressible in this grammar version";
 
-    internal Filter? Filter { get; private set; }
+    internal Expression<Func<TEntity, bool>>? WhereExpression { get; private set; }
+    internal List<AnalyticsParameterDeclaration> ParameterDeclarations { get; } = [];
     internal string? GroupMember { get; private set; }
     internal AnalyticsMeasureKind MeasureKind { get; private set; } = AnalyticsMeasureKind.Count;
     internal string? MeasureMember { get; private set; }
@@ -43,10 +44,24 @@ public sealed class AnalyticsRecipe<TEntity, TKey>
 
     internal AnalyticsRecipe() { }
 
+    /// <summary>
+    /// The predicate is kept as an expression, not compiled: ask-time parameter values are substituted
+    /// before compilation, so a declared question is one artifact answering a family of slices.
+    /// </summary>
     public AnalyticsRecipe<TEntity, TKey> Where(Expression<Func<TEntity, bool>> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);
-        Filter = LinqFilterCompiler.Compile(predicate);
+        WhereExpression = predicate;
+        return this;
+    }
+
+    /// <summary>Declare an ask-time value this question accepts. The name must appear in the Where clause.</summary>
+    public AnalyticsRecipe<TEntity, TKey> WithParameter<T>(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (ParameterDeclarations.Any(p => p.Name == name))
+            throw new InvalidOperationException($"Analytics parameter '{name}' is declared more than once on this question.");
+        ParameterDeclarations.Add(new AnalyticsParameterDeclaration(name, typeof(T)));
         return this;
     }
 

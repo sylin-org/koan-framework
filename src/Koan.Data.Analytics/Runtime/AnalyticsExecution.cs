@@ -64,6 +64,7 @@ internal static class AnalyticsExecution
         AnalyticsQuestion<TEntity, TKey> question,
         IServiceProvider services,
         int rowCap,
+        IReadOnlyDictionary<string, object?>? parameterValues,
         CancellationToken callerToken)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
@@ -82,7 +83,20 @@ internal static class AnalyticsExecution
             throw new NotSupportedException(
                 $"The store for '{typeof(TEntity).Name}' does not execute raw asks; analytics cannot run there.");
 
-        if (!composer.TryCompose(question, out var sql, out var corrective))
+        // Values for parameters the question never declares are a caller mistake, not extra data. Refusing
+        // here — before any composition — keeps the guard for questions with no Where clause too, where the
+        // binder never runs.
+        if (parameterValues is { Count: > 0 })
+        {
+            var declared = question.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+            var undeclared = parameterValues.Keys.Where(k => !declared.Contains(k)).ToList();
+            if (undeclared.Count > 0)
+                throw new NotSupportedException(
+                    "Values were supplied for parameter(s) the question does not declare: " +
+                    string.Join(", ", undeclared) + ".");
+        }
+
+        if (!composer.TryCompose(question, parameterValues, out var sql, out var corrective))
             throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
 
         var ceiling = rowCap > 0 ? rowCap : options.RowCap;
@@ -161,7 +175,7 @@ internal static class AnalyticsExecution
                 $"Analytics projection refresh needs a record store that composes and executes aggregate asks; " +
                 $"'{typeof(TEntity).Name}' is routed to one that offers neither.");
         var sink = GetSink(services, question);
-        if (!composer.TryCompose(question, out var composed, out var corrective))
+        if (!composer.TryCompose(question, null, out var composed, out var corrective))
             throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
         return await RefreshAsync(question, composed, executor, sink, cancellationToken).ConfigureAwait(false);
     }

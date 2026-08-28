@@ -52,17 +52,26 @@ public static class AnalyticsMcpTools
 
         // Declared parameters are v0-optional: a question that declares none accepts no arguments, and an
         // attempt to pass any is refused rather than ignored.
+        var bound = new Dictionary<string, object?>(StringComparer.Ordinal);
         if (!string.IsNullOrWhiteSpace(parametersJson))
         {
             try
             {
                 using var document = JsonDocument.Parse(parametersJson);
-                if (document.RootElement.ValueKind == JsonValueKind.Object && document.RootElement.EnumerateObject().Any())
-                    return new
+                if (document.RootElement.ValueKind != JsonValueKind.Object)
+                    return new { Error = "invalid-parameters", Message = "parameters must be a JSON object of { name: value }." };
+                foreach (var property in document.RootElement.EnumerateObject())
+                {
+                    bound[property.Name] = property.Value.ValueKind switch
                     {
-                        Error = "parameters-not-accepted",
-                        Message = "This question takes no parameters in this grammar version; declare a parameterized question instead."
+                        JsonValueKind.String => property.Value.GetString(),
+                        JsonValueKind.Number => property.Value.GetDouble(),
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Null => null,
+                        _ => property.Value.GetRawText()
                     };
+                }
             }
             catch (JsonException error)
             {
@@ -70,6 +79,6 @@ public static class AnalyticsMcpTools
             }
         }
 
-        return await question.ExecuteAsync(services, rowCap ?? question.RowCap, cancellationToken);
+        return await question.ExecuteAsync(services, rowCap ?? question.RowCap, bound, cancellationToken);
     }
 }

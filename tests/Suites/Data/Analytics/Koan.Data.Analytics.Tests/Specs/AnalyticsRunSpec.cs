@@ -36,7 +36,7 @@ public sealed class AnalyticsRunSpec(SqliteFixture fixture)
             q => q.Where(p => p.Name.StartsWith(tag)).Count());
         var services = await BootAndSeedAsync(tag, [("a", 1, 10m), ("b", 2, 20m), ("c", 3, 30m)]);
 
-        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-count", CancellationToken.None);
+        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-count", ct: CancellationToken.None);
 
         answer.Engine.Should().Be("sqlite");
         answer.Age.Should().Be("live");
@@ -53,7 +53,7 @@ public sealed class AnalyticsRunSpec(SqliteFixture fixture)
             q => q.Where(p => p.Name.StartsWith(tag)).Sum(p => p.Score));
         var services = await BootAndSeedAsync(tag, [("a", 1, 10m), ("b", 2, 20m), ("c", 3, 70m)]);
 
-        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-sum", CancellationToken.None);
+        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-sum", ct: CancellationToken.None);
 
         Convert.ToDecimal(answer.Rows[0].Values["sum_Score"]).Should().Be(100m);
     }
@@ -67,8 +67,8 @@ public sealed class AnalyticsRunSpec(SqliteFixture fixture)
         var services = await BootAndSeedAsync(tag,
             [("alpha", 1, 10m), ("alpha", 2, 20m), ("beta", 3, 5m), ("gamma", 1, 1m)]);
 
-        var first = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-by-name", CancellationToken.None);
-        var second = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-by-name", CancellationToken.None);
+        var first = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-by-name", ct: CancellationToken.None);
+        var second = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-by-name", ct: CancellationToken.None);
 
         first.Rows.Select(r => r.Values["Name"]).Should().Equal(
             new object[] { $"{tag}-alpha", $"{tag}-beta", $"{tag}-gamma" },
@@ -88,7 +88,7 @@ public sealed class AnalyticsRunSpec(SqliteFixture fixture)
         var services = await BootAndSeedAsync(tag,
             [("a", 1, 1m), ("b", 1, 2m), ("c", 1, 3m), ("d", 1, 4m)]);
 
-        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-capped", CancellationToken.None);
+        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"run-{tag}-capped", ct: CancellationToken.None);
 
         answer.Completion.Should().Be(AnalyticsCompletion.RowCapped);
         answer.Rows.Should().HaveCount(2);

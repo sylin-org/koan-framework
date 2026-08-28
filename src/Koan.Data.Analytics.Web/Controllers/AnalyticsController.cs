@@ -55,7 +55,10 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
     {
         n = Math.Clamp(n, 1, MaxResults);
         if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
-        var answer = await question.ExecuteAsync(HttpContext.RequestServices, n, ct);
+        var parameterValues = Request.Query
+            .Where(static pair => pair.Key is not ("n" or "format"))
+            .ToDictionary(static pair => pair.Key.TrimStart('@', '$'), static pair => (object?)pair.Value.ToString(), StringComparer.Ordinal);
+        var answer = await question.ExecuteAsync(HttpContext.RequestServices, n, parameterValues, ct);
         return Ok(answer);
     }
 

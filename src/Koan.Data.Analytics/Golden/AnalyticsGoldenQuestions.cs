@@ -48,7 +48,7 @@ public static class AnalyticsHarness
             AnalyticsResult answer;
             try
             {
-                answer = await question.ExecuteAsync(services, question.RowCap, ct).ConfigureAwait(false);
+                answer = await question.ExecuteAsync(services, question.RowCap, null, ct).ConfigureAwait(false);
             }
             catch (Exception error)
             {

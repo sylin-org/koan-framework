@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Filtering;
+using System.Linq.Expressions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Abstractions.Analytics;
@@ -64,7 +65,8 @@ public abstract class AnalyticsQuestion
         string name,
         Type entityType,
         int rowCap,
-        Filter? filter,
+        LambdaExpression? where,
+        IReadOnlyList<AnalyticsParameterDeclaration> parameters,
         string? groupMember,
         AnalyticsMeasureKind measureKind,
         string? measureMember,
@@ -74,7 +76,8 @@ public abstract class AnalyticsQuestion
         Name = name;
         EntityType = entityType;
         RowCap = rowCap;
-        Filter = filter;
+        WhereExpression = where;
+        Parameters = parameters;
         GroupMember = groupMember;
         MeasureKind = measureKind;
         MeasureMember = measureMember;
@@ -86,8 +89,14 @@ public abstract class AnalyticsQuestion
     public Type EntityType { get; }
     public int RowCap { get; }
 
-    /// <summary>The optional predicate the answer respects, in the framework's filter model.</summary>
-    public Filter? Filter { get; }
+    /// <summary>
+    /// The declared predicate as an expression — uncompiled, so ask-time parameter values substitute
+    /// before compilation (the declared question is one artifact answering a family of slices).
+    /// </summary>
+    public LambdaExpression? WhereExpression { get; }
+
+    /// <summary>The ask-time values this question accepts, by name and type.</summary>
+    public IReadOnlyList<AnalyticsParameterDeclaration> Parameters { get; }
 
     /// <summary>The member answers are grouped by, when the question groups.</summary>
     public string? GroupMember { get; }
@@ -107,7 +116,11 @@ public abstract class AnalyticsQuestion
     public IReadOnlyList<AnalyticsProjectionColumn> Columns { get; }
 
     /// <summary>Run the question — the closed-generic door captured at declaration.</summary>
-    public abstract Task<AnalyticsResult> ExecuteAsync(IServiceProvider services, int rowCap, CancellationToken cancellationToken);
+    public abstract Task<AnalyticsResult> ExecuteAsync(
+        IServiceProvider services,
+        int rowCap,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Re-materialize a projection: compute over the record store, replace the engine's rows, stamp the
@@ -137,10 +150,14 @@ public interface IAnalyticsQueryComposer<TEntity>
     where TEntity : class
 {
     /// <summary>
-    /// Compose the bounded ask. <paramref name="corrective"/> explains the refusal when the question —
-    /// or the store it would run against — cannot answer it honestly.
+    /// Compose the bounded ask with the ask's parameter values. <paramref name="corrective"/> explains
+    /// the refusal when the question — or the store it would run against — cannot answer it honestly.
     /// </summary>
-    bool TryCompose(AnalyticsQuestion question, out AnalyticsSql sql, out string? corrective);
+    bool TryCompose(
+        AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        out AnalyticsSql sql,
+        out string? corrective);
 }
 
 /// <summary>
@@ -181,6 +198,105 @@ public sealed record AnalyticsProjectionPolicy
 
 /// <summary>One column of a materialization, as it is written into and read from the engine.</summary>
 public sealed record AnalyticsProjectionColumn(string Name, Type ClrType);
+
+/// <summary>A declared ask-time value for one question — name and type.</summary>
+public sealed record AnalyticsParameterDeclaration(string Name, Type ClrType);
+
+/// <summary>
+/// The parameter marker used inside analytics Where clauses
+/// (<c>Analytics.P&lt;T&gt;("name")</c>). Never invoke it — declaration captures it as an expression
+/// node; ask-time binding substitutes the value.
+/// </summary>
+public static class AnalyticsParameter
+{
+    public static T Value<T>(string name) =>
+        throw new InvalidOperationException(
+            $"Analytics parameter '{name}' is a marker and is only valid inside a Where clause.");
+}
+
+/// <summary>
+/// Substitutes parameter markers inside a declared question's Where expression with the ask's bound
+/// values, before the filter is compiled. Substitution happens here — at the analytics layer — so the
+/// shared filter compiler never learns about parameters, and every relational adapter composes
+/// parameterized questions through the exact code path it already trusts.
+/// </summary>
+public static class AnalyticsParameterBinder
+{
+    public static Expression<Func<TEntity, bool>> Bind<TEntity>(
+        Expression<Func<TEntity, bool>> where,
+        IReadOnlyList<AnalyticsParameterDeclaration> declarations,
+        IReadOnlyDictionary<string, object?> values,
+        out string? corrective)
+        where TEntity : class
+    {
+        corrective = null;
+        var visitor = new Binder(declarations, values);
+        var body = visitor.Visit(where.Body);
+        if (visitor.Missing.Count > 0)
+        {
+            corrective = "Missing parameter value(s): " + string.Join(", ", visitor.Missing) + ".";
+            return where;
+        }
+        if (visitor.Undeclared.Count > 0)
+        {
+            corrective = "Values were supplied for parameter(s) the question does not declare: " +
+                         string.Join(", ", visitor.Undeclared) + ".";
+            return where;
+        }
+        return Expression.Lambda<Func<TEntity, bool>>(body, where.Parameters);
+    }
+
+    private sealed class Binder(
+        IReadOnlyList<AnalyticsParameterDeclaration> declarations,
+        IReadOnlyDictionary<string, object?> values) : ExpressionVisitor
+    {
+        public readonly List<string> Missing = [];
+        public readonly List<string> Undeclared = [];
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            if (IsMarker(node))
+            {
+                var name = (string)((ConstantExpression)node.Arguments[0]).Value!;
+                var declaration = declarations.FirstOrDefault(d => d.Name == name);
+                if (declaration is null)
+                {
+                    Undeclared.Add(name);
+                    return node;
+                }
+                if (!values.TryGetValue(name, out var value))
+                {
+                    Missing.Add(name);
+                    return node;
+                }
+                var converted = value is null || declaration.ClrType.IsInstanceOfType(value)
+                    ? value
+                    : Convert.ChangeType(value, declaration.ClrType, System.Globalization.CultureInfo.InvariantCulture);
+                return Expression.Constant(converted, declaration.ClrType);
+            }
+            return base.VisitMethodCall(node);
+        }
+
+        /// <summary>
+        /// The marker set is a closed contract: the Abstractions spelling
+        /// (<c>AnalyticsParameter.Value&lt;T&gt;</c>) and the module's ergonomic spelling
+        /// (<c>Analytics.P&lt;T&gt;</c>, which this assembly cannot reference). A call is a marker when it
+        /// is static, takes exactly one string literal, and comes from one of those two types. An unknown
+        /// spelling is never substituted — the marker's own throw surfaces loudly at filter compile time.
+        /// </summary>
+        private static bool IsMarker(MethodCallExpression node)
+        {
+            if (!node.Method.IsStatic ||
+                node.Arguments.Count != 1 ||
+                node.Arguments[0] is not ConstantExpression literal ||
+                literal.Value is not string)
+                return false;
+            return node.Method.DeclaringType?.FullName is "Koan.Data.Abstractions.Analytics.AnalyticsParameter"
+                or "Koan.Data.Analytics.Analytics"
+                && node.Method.Name is nameof(AnalyticsParameter.Value) or "P";
+        }
+    }
+}
 
 /// <summary>What the engine knows about one materialization's last refresh.</summary>
 public sealed class ProjectionMaterializationState

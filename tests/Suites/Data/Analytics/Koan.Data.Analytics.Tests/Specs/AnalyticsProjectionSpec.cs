@@ -57,7 +57,7 @@ public sealed class AnalyticsProjectionSpec(SqliteFixture fixture)
         var services = await BootAsync(tag);
 
         // Cold: nothing has refreshed the projection, so the ask computes live and says so.
-        var live = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", CancellationToken.None);
+        var live = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", ct: CancellationToken.None);
         live.ServedFrom.Should().Be("live");
         live.Age.Should().Be("live");
         SumFor(live, $"{tag}-alpha").Should().Be(40m);
@@ -71,7 +71,7 @@ public sealed class AnalyticsProjectionSpec(SqliteFixture fixture)
         var receipt = await refresher.RefreshAsync($"proj-{tag}-by-name");
         receipt.RowCount.Should().Be(2);
 
-        var served = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", CancellationToken.None);
+        var served = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", ct: CancellationToken.None);
         served.ServedFrom.Should().Be("materialization");
         served.Age.Should().NotBe("live", "a served answer is labeled with its age");
         SumFor(served, $"{tag}-alpha").Should().Be(40m, "the materialization matches the record store");
@@ -91,7 +91,7 @@ public sealed class AnalyticsProjectionSpec(SqliteFixture fixture)
         var sink = services.GetRequiredService<IAnalyticsProjectionSink>();
         (await sink.ReadStateAsync($"proj-{tag}-by-name", CancellationToken.None)).Should().BeNull();
 
-        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", CancellationToken.None);
+        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", ct: CancellationToken.None);
         answer.ServedFrom.Should().Be("live", "a zero tolerance is never served from the materialization");
         SumFor(answer, $"{tag}-alpha").Should().Be(40m);
 
@@ -115,7 +115,7 @@ public sealed class AnalyticsProjectionSpec(SqliteFixture fixture)
         // The hosted loop's catch-up-on-boot refreshes due projections; give it its first tick.
         await Task.Delay(1500);
 
-        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", CancellationToken.None);
+        var answer = await Analytics.Of<AnalyticsProbe, string>().Run($"proj-{tag}-by-name", ct: CancellationToken.None);
         answer.ServedFrom.Should().Be("materialization", "a fresh materialization within tolerance is served");
         answer.Age.Should().NotBe("live");
         SumFor(answer, $"{tag}-alpha").Should().Be(40m);

@@ -14,6 +14,15 @@ namespace Koan.Data.Analytics;
 /// </summary>
 public static class Analytics
 {
+    /// <summary>
+    /// A parameter marker for use inside a question's Where clause. Declared via
+    /// <c>WithParameter&lt;T&gt;(name)</c>; bound at ask time from the results door, the ask tools, or
+    /// <c>Run(name, parameters)</c>.
+    /// </summary>
+    public static T P<T>(string name) =>
+        throw new InvalidOperationException(
+            $"Analytics parameter '{name}' is a marker and is only valid inside a Where clause.");
+
     /// <summary>The typed surface for one entity — the entry point for fluid asks and named runs.</summary>
     public static AnalyticsSurface<TEntity, TKey> Of<TEntity, TKey>()
         where TEntity : class, IEntity<TKey>
@@ -42,6 +51,15 @@ public static class Analytics
     }
 
     /// <summary>
+    /// A parameter marker for use inside a question's Where clause. At declaration this is a node in the
+    /// expression tree; at ask time the bound value is substituted before compilation. Never invoke it
+    /// outside an expression — it is a marker, not a method.
+    /// </summary>
+    public static T Parameter<T>(string name) =>
+        throw new InvalidOperationException(
+            $"Analytics parameter '{name}' is a marker and is only valid inside a Where clause.");
+
+    /// <summary>
     /// Declare a named question. Declaration is active and startup-visible: names are unique, and the
     /// question joins the shared catalog that endpoints and agents read.
     /// </summary>
@@ -60,14 +78,15 @@ public static class Analytics
         question = new AnalyticsQuestion<TEntity, TKey>(
             name.Trim(),
             recipe.RowCap ?? rowCap ?? 0,
-            recipe.Filter,
+            recipe.WhereExpression,
+            recipe.ParameterDeclarations,
             recipe.GroupMember,
             recipe.MeasureKind,
             recipe.MeasureMember,
             recipe.Projection,
             recipe.ComputeColumns(),
-            static (services, q, cap, token) =>
-                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, token),
+            (services, q, cap, values, token) =>
+                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token),
             (services, token) =>
                 AnalyticsExecution.RefreshAsync<TEntity, TKey>(question, services, token));
         AnalyticsCatalog.Register(question);
@@ -81,7 +100,10 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
     where TKey : notnull
 {
     /// <summary>Run a declared question by name — the one-line door the whole grammar exists for.</summary>
-    public Task<AnalyticsResult> Run(string name, CancellationToken ct = default)
+    public Task<AnalyticsResult> Run(
+        string name,
+        IReadOnlyDictionary<string, object?>? parameters = null,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!AnalyticsCatalog.TryGet(name, out var question))
@@ -97,6 +119,7 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
             AppHost.Current ?? throw new InvalidOperationException(
                 "No Koan host is active; analytics questions resolve through the ambient host."),
             question.RowCap,
+            parameters,
             ct);
     }
 
@@ -114,20 +137,22 @@ public readonly struct AnalyticsSurface<TEntity, TKey>
         var question = new AnalyticsQuestion<TEntity, TKey>(
             "(ephemeral)",
             recipe.RowCap ?? 0,
-            recipe.Filter,
+            recipe.WhereExpression,
+            recipe.ParameterDeclarations,
             recipe.GroupMember,
             recipe.MeasureKind,
             recipe.MeasureMember,
             recipe.Projection,
             recipe.ComputeColumns(),
-            static (services, q, cap, token) =>
-                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, token),
+            static (services, q, cap, values, token) =>
+                AnalyticsExecution.Run((AnalyticsQuestion<TEntity, TKey>)q, services, cap, values, token),
             static (services, token) =>
                 throw new NotSupportedException("An ephemeral ask is never materialized; there is nothing to refresh."));
         return question.ExecuteAsync(
             AppHost.Current ?? throw new InvalidOperationException(
                 "No Koan host is active; analytics questions resolve through the ambient host."),
             question.RowCap,
+            null,
             ct);
     }
 

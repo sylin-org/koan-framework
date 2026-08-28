@@ -1026,7 +1026,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
     /// and the bounds; the adapter owns the words. LIMIT is deliberately absent — the execution layer adds
     /// the cap (+1) so a capped answer can say so.
     /// </summary>
-    public bool TryCompose(AnalyticsQuestion question, out AnalyticsSql sql, out string? corrective)
+    public bool TryCompose(AnalyticsQuestion question, IReadOnlyDictionary<string, object?>? parameterValues, out AnalyticsSql sql, out string? corrective)
     {
         sql = null!;
         corrective = null;
@@ -1035,9 +1035,18 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         var dialect = plan.Dialect;
         var parameters = new Dictionary<string, object?>(StringComparer.Ordinal);
         string? where = null;
-        if (question.Filter is not null)
+        if (question.WhereExpression is not null)
         {
-            var translated = new SqlFilterTranslator(dialect, plan.Mapping, plan.ManagedPath).Translate(question.Filter);
+            var typedWhere = (Expression<Func<TEntity, bool>>)question.WhereExpression;
+            var bound = Koan.Data.Abstractions.Analytics.AnalyticsParameterBinder.Bind(
+                typedWhere, question.Parameters, parameterValues, out var bindCorrective);
+            if (bindCorrective is not null)
+            {
+                corrective = bindCorrective;
+                return false;
+            }
+            var filter = LinqFilterCompiler.Compile(bound);
+            var translated = new SqlFilterTranslator(dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
             where = translated.whereSql;
             for (var index = 0; index < translated.parameters.Count; index++)
                 parameters[dialect.Parameter(index).TrimStart('@', '$')] = translated.parameters[index];
