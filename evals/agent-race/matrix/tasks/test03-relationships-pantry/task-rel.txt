@@ -1,0 +1,33 @@
+Build a small web application for a cooking club that manages recipes and ingredients.
+
+Requirements:
+- REST API (JSON) for recipes at /api/recipes and for ingredients at /api/ingredients.
+  A recipe has: id (string), title (string), instructions (string), and a list of ingredient lines, each referencing an ingredient by name with a quantity and a unit. An ingredient has: id (= its name, lowercase), and optional metadata.
+- Ingredients are shared across recipes: "milk" is one ingredient that many recipe lines may reference by name.
+- Quantities may be expressed in different units. Conversion table: glass = 240 ml, tbsp = 15 ml, piece = 1. Comparisons and filters must work correctly across units (2 glasses of milk = 480 ml, and must satisfy a "more than 300 ml" filter).
+- An ingredient line may have quantity null, meaning "some" — presence matters, amount does not.
+- Endpoints that must exist:
+  - Standard CRUD for recipes: GET/POST/PUT/DELETE /api/recipes and /api/recipes/{id}.
+  - GET /api/ingredients/{name}/usage-count -> {"count": N} — how many recipes use that ingredient.
+  - GET /api/recipes/using?ingredient={name}&minQuantity={q}&unit={u} -> recipes using at least that canonical amount of the ingredient.
+  - GET /api/stats -> includes "recipesWithMoreThan10Ingredients": the count of recipes with more than 10 ingredient lines.
+  - POST /api/recipes/match with {"pantry":[{"name":"milk","quantity":480,"unit":"ml"},{"name":"salt"},{"name":"onions","quantity":2,"unit":"piece"}]} -> recipes ranked by how well the pantry covers them: fully-covered recipes first, then by fewest missing ingredients; every item includes the list of missing ingredient names.
+  - GET /api/recipes/search?q=<phrase> -> recipes ranked by semantic similarity to the phrase, not keyword overlap. Embeddings come from the local Ollama model "nomic-embed-text" at http://localhost:11434. No cloud services.
+- The application must start with `dotnet run` from the folder containing the .csproj file and listen on http://localhost:5099.
+- Data must persist to a SQLite database file inside the project folder and survive an application restart.
+- Target framework: net10.0.
+
+Constraints:
+- Create your project in the current directory (it is empty).
+- Work only inside the current directory.
+- Everything must build and run offline except NuGet package restores.
+- No authentication, no multi-tenancy, no uploads, no frontend.
+- Do not modify anything outside the current directory.
+
+Definition of success: after `dotnet run`, a client can manage recipes and ingredients, the usage-count and stats endpoints return correct counts, the "using" filter compares quantities correctly across units, the pantry match ranks fully-covered recipes first with missing lists, the semantic search returns relevant recipes for phrases that share no words with them, and the data survives a restart.
+
+Unattended run: nobody can approve plans or answer questions. Do not pause for plan approval or confirmation; proceed directly through implementation, verification, and completion.
+
+Timebox: if you cannot finish within 45 minutes, stop and write an ABORTED.md file in the current directory explaining the rationale and where you got to.
+
+When finished, print a final summary: what you built, the exact command to start it, and any caveats.
