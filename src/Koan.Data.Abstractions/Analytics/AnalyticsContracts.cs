@@ -140,6 +140,86 @@ public sealed class AnalyticsReadModelResult
     public required IReadOnlyList<AnalyticsRow> Rows { get; init; }
 }
 
+/// <summary>Which facet question a facet door answered — they are different questions, and the envelope says which ran.</summary>
+public enum AnalyticsFacetMode
+{
+    /// <summary>Counts over every materialized row: "what is the distribution?"</summary>
+    Distribution,
+    /// <summary>Counts over rows written after a watermark: "what has been moving?" Not a distribution — updates count once at their new value, and deletions are invisible.</summary>
+    Movement
+}
+
+/// <summary>One distinct value of a facet column with its row count. A null value buckets as null.</summary>
+public sealed record AnalyticsFacetBucket(object? Value, long Count);
+
+/// <summary>A page of facet buckets — the sink's mechanical GROUP BY answer.</summary>
+public sealed record AnalyticsFacetPage(IReadOnlyList<AnalyticsFacetBucket> Buckets, bool Capped);
+
+/// <summary>The movement-mode facet page: buckets over changed rows, with the coverage the envelope must state.</summary>
+public sealed record AnalyticsMovementFacetPage(
+    IReadOnlyList<AnalyticsFacetBucket> Buckets,
+    bool Capped,
+    long ChangesConsidered,
+    long CurrentStamp);
+
+/// <summary>A page of changed rows — the sink's mechanical delta answer, stamps already stripped.</summary>
+public sealed record AnalyticsDeltaPage(
+    IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows,
+    bool Capped,
+    long CurrentStamp);
+
+/// <summary>
+/// A change cursor for the delta doors: opaque to consumers, monotonic in the engine. Every
+/// response hands back the cursor for the next poll, so no consumer ever constructs one and the
+/// server keeps no per-consumer state.
+/// </summary>
+public sealed record AnalyticsWatermark(string? Given, string Current)
+{
+    /// <summary>The issued shape. Versioned so a future cursor encoding can refuse old cursors loudly instead of misreading them.</summary>
+    public const string Prefix = "wm1.";
+
+    public static string Encode(long stamp) =>
+        Prefix + stamp.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Decode a cursor handed back by a previous response. Null means "from the beginning"; anything else that is not a cursor refuses.</summary>
+    public static bool TryDecode(string? watermark, out long stamp)
+    {
+        stamp = 0;
+        return watermark is null ||
+               (watermark.StartsWith(Prefix, StringComparison.Ordinal) &&
+                long.TryParse(watermark.AsSpan(Prefix.Length), System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out stamp));
+    }
+}
+
+/// <summary>The facet door's envelope — which question ran, the buckets, and the movement-mode coverage facts.</summary>
+public sealed class AnalyticsFacetResult
+{
+    public required string Question { get; init; }
+    public required string Column { get; init; }
+    public required AnalyticsFacetMode Mode { get; init; }
+    public required IReadOnlyList<AnalyticsFacetBucket> Buckets { get; init; }
+    public AnalyticsCompletion Completion { get; init; }
+
+    /// <summary>Movement mode only: how many changed rows the movement summarizes.</summary>
+    public long? ChangesConsidered { get; init; }
+
+    /// <summary>Movement mode only: the cursor this answer consumed and the cursor for the next poll.</summary>
+    public AnalyticsWatermark? Watermark { get; init; }
+
+    /// <summary>Movement mode only, stated so it can never be implied: deleted source rows leave no trace in a derived store's stamps.</summary>
+    public bool? DeletesInvisible { get; init; }
+}
+
+/// <summary>The delta door's envelope: changed rows plus the cursor for the next poll.</summary>
+public sealed class AnalyticsDeltaResult
+{
+    public required string Question { get; init; }
+    public required AnalyticsWatermark Watermark { get; init; }
+    public required AnalyticsCompletion Completion { get; init; }
+    public required IReadOnlyList<AnalyticsRow> Rows { get; init; }
+}
+
 /// <summary>
 /// The connector-side half of the analytics grammar: the repository that owns an entity's physical
 /// mapping and dialect composes its own SQL for a declared question. The framework owns the question,
@@ -335,5 +415,40 @@ public interface IAnalyticsProjectionSink
         int limit,
         int offset,
         IReadOnlyDictionary<string, object?>? equalityFilters,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Distinct values of one materialized column with counts — the filter-building shape. Any
+    /// tabular sink can answer this; the movement variant lives on <see cref="IAnalyticsChangeTracking"/>.
+    /// </summary>
+    Task<AnalyticsFacetPage> ReadFacetsAsync(
+        string recipe,
+        string column,
+        int limit,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Optional engine capability: per-row change stamps under the delta doors. The same pattern as
+/// <see cref="IAnalyticsParquetExport"/> — doors advertise what the elected engine actually offers
+/// and refuse what it does not, so an engine without stamps degrades loudly, not wrongly. "Changed"
+/// means "written by a materialization after the given stamp": refreshes rewrite wholesale, so the
+/// stamp is the refresh's time, not a source-side modification feed.
+/// </summary>
+public interface IAnalyticsChangeTracking
+{
+    /// <summary>Rows written after <paramref name="sinceStamp"/>, oldest first, plus the current stamp for the next poll.</summary>
+    Task<AnalyticsDeltaPage> ReadDeltaAsync(
+        string recipe,
+        long sinceStamp,
+        int limit,
+        CancellationToken cancellationToken);
+
+    /// <summary>Facet buckets over changed rows, with the count of rows the movement summarizes.</summary>
+    Task<AnalyticsMovementFacetPage> ReadFacetsChangedSinceAsync(
+        string recipe,
+        string column,
+        long sinceStamp,
+        int limit,
         CancellationToken cancellationToken);
 }

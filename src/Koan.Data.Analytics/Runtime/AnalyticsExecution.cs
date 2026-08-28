@@ -29,14 +29,8 @@ internal static class AnalyticsExecution
     {
         limit = Math.Clamp(limit, 1, 1000);
         offset = Math.Max(0, offset);
-        if (!AnalyticsCatalog.TryGet(name, out var question))
-            throw new KeyNotFoundException($"No analytics question named '{name}' is declared.");
-        if (question.Projection is null)
-            throw new NotSupportedException(
-                $"Question '{name}' is an on-demand question; the read-model door serves materialized rows. " +
-                "Run it instead, or add Materialize to the declaration.");
-        var services = Koan.Core.Hosting.App.AppHost.Current
-            ?? throw new InvalidOperationException("No Koan host is active; analytics resolves through the ambient host.");
+        var question = ResolveMaterialized(name, "the read-model door serves materialized rows", "Run it instead, or add Materialize to the declaration.");
+        var services = AmbientHost();
         var sink = GetSink(services, question);
         await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
         var raw = await sink.ReadRowsAsync(name, limit + 1, offset, filters, cancellationToken).ConfigureAwait(false);
@@ -51,6 +45,110 @@ internal static class AnalyticsExecution
             Rows = rows
         };
     }
+
+    /// <summary>
+    /// The facet door. Without <paramref name="since"/>: the distribution of one materialized column.
+    /// With it: the movement — counts over rows a materialization wrote after the cursor, which is a
+    /// different question, and the envelope says so (updates count once at their new value; deletions
+    /// are invisible in a derived store's stamps).
+    /// </summary>
+    public static async Task<AnalyticsFacetResult> ReadFacetsAsync(
+        string name, string by, string? since, int limit, CancellationToken cancellationToken)
+    {
+        limit = Math.Clamp(limit, 1, 200);
+        ArgumentException.ThrowIfNullOrWhiteSpace(by);
+        var question = ResolveMaterialized(name, "the facet door reads materializations", "Run it instead, or add Materialize to the declaration.");
+        var column = question.Columns.FirstOrDefault(c => c.Name.Equals(by, StringComparison.OrdinalIgnoreCase));
+        if (column is null)
+            throw new NotSupportedException(
+                $"Column '{by}' is not a declared column of projection '{name}'. " +
+                "Declared columns: " + string.Join(", ", question.Columns.Select(static c => c.Name)) + ".");
+        var sink = GetSink(AmbientHost(), question);
+        await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
+
+        if (since is null)
+        {
+            var page = await sink.ReadFacetsAsync(name, column.Name, limit, cancellationToken).ConfigureAwait(false);
+            return new AnalyticsFacetResult
+            {
+                Question = name,
+                Column = column.Name,
+                Mode = AnalyticsFacetMode.Distribution,
+                Buckets = page.Buckets,
+                Completion = page.Capped ? AnalyticsCompletion.RowCapped : AnalyticsCompletion.Complete
+            };
+        }
+
+        if (!AnalyticsWatermark.TryDecode(since, out var stamp))
+            throw new NotSupportedException(
+                $"'{since}' is not a watermark this door issued. Watermarks look like " +
+                $"'{AnalyticsWatermark.Prefix}<milliseconds>' and come from a previous facets or delta response — " +
+                "pass the cursor back unchanged, or omit it for the full distribution.");
+        if (sink is not IAnalyticsChangeTracking tracking)
+            throw new NotSupportedException(
+                "Movement facets need a sink that tracks changes; the elected engine's sink does not. " +
+                "Distribution facets (no since) remain available.");
+        var movement = await tracking.ReadFacetsChangedSinceAsync(name, column.Name, stamp, limit, cancellationToken).ConfigureAwait(false);
+        return new AnalyticsFacetResult
+        {
+            Question = name,
+            Column = column.Name,
+            Mode = AnalyticsFacetMode.Movement,
+            Buckets = movement.Buckets,
+            Completion = movement.Capped ? AnalyticsCompletion.RowCapped : AnalyticsCompletion.Complete,
+            ChangesConsidered = movement.ChangesConsidered,
+            Watermark = new AnalyticsWatermark(since, AnalyticsWatermark.Encode(movement.CurrentStamp)),
+            DeletesInvisible = true
+        };
+    }
+
+    /// <summary>
+    /// The delta door: rows written after a cursor, plus the cursor for the next poll — the consumer
+    /// holds it, the door hands it back, the server keeps no per-consumer state.
+    /// </summary>
+    public static async Task<AnalyticsDeltaResult> ReadDeltaAsync(
+        string name, string? since, int limit, CancellationToken cancellationToken)
+    {
+        limit = Math.Clamp(limit, 1, 1000);
+        var question = ResolveMaterialized(name, "the delta door reads materializations", "Run it instead, or add Materialize to the declaration.");
+        if (!AnalyticsWatermark.TryDecode(since, out var stamp))
+            throw new NotSupportedException(
+                $"'{since}' is not a watermark this door issued. Watermarks look like " +
+                $"'{AnalyticsWatermark.Prefix}<milliseconds>' and come from a previous delta response — " +
+                "pass the cursor back unchanged, or omit it to start from the beginning.");
+        var sink = GetSink(AmbientHost(), question);
+        if (sink is not IAnalyticsChangeTracking tracking)
+            throw new NotSupportedException(
+                "The delta door needs a sink that tracks changes; the elected engine's sink does not. " +
+                "The read-model door (rows) remains available.");
+        await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
+        var page = await tracking.ReadDeltaAsync(name, stamp, limit, cancellationToken).ConfigureAwait(false);
+        var rows = new List<AnalyticsRow>(page.Rows.Count);
+        foreach (var row in page.Rows)
+            rows.Add(new AnalyticsRow { Values = row });
+        return new AnalyticsDeltaResult
+        {
+            Question = name,
+            Watermark = new AnalyticsWatermark(since, AnalyticsWatermark.Encode(page.CurrentStamp)),
+            Completion = page.Capped ? AnalyticsCompletion.RowCapped : AnalyticsCompletion.Complete,
+            Rows = rows
+        };
+    }
+
+    /// <summary>Resolve a declared question and insist it materializes — the shared gate of every read-model door.</summary>
+    private static AnalyticsQuestion ResolveMaterialized(string name, string posture, string remedy)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+            throw new KeyNotFoundException($"No analytics question named '{name}' is declared.");
+        if (question.Projection is null)
+            throw new NotSupportedException(
+                $"Question '{name}' is an on-demand question; {posture}. {remedy}");
+        return question;
+    }
+
+    private static IServiceProvider AmbientHost() =>
+        Koan.Core.Hosting.App.AppHost.Current
+        ?? throw new InvalidOperationException("No Koan host is active; analytics resolves through the ambient host.");
 
     private static IAnalyticsProjectionSink GetSink(IServiceProvider services, AnalyticsQuestion question)
     {

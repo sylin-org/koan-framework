@@ -26,12 +26,14 @@ supersedes it.
 | Linux file-lock semantics | **Confirmed** — one writer excludes all other opens (even read-only); conflict error names the holding PID | Spike evidence §Linux |
 | Parquet export | **Implemented** — engine-side `COPY` through `IAnalyticsParquetExport`; `?format=parquet` on the rows door; magic-byte tested | AnalyticsControllerSpec |
 | Write-surface decision | **Resolved by design** — `AnalyticsController` stands alone (no inherited CRUD verbs); the only mutating route is the fail-closed refresh POST | DATA-0123 + controller docs |
+| Parameterized questions (ANL-4 grammar) | **Implemented** — `Analytics.P<T>(name)` marker + `WithParameter<T>`; `AnalyticsParameterBinder` substitutes ask-time values before filter compile (no shared-compiler change was needed — binding happens at the analytics layer); missing/undeclared values refuse before compute; all three doors bind (HTTP query, MCP `parametersJson`, `Run(name, parameters)`) | `AnalyticsParameterSpec`; analytics suite green |
+| Facet + delta doors (ANL-5) | **Implemented** — `{recipe}/facets?by=` distribution/movement, `{recipe}/delta?since=` with handed-back `wm1.` cursors, per-row sink stamps, `IAnalyticsChangeTracking` capability, MCP mirrors | `AnalyticsFacetDeltaSpec`; card `cards/analytics-facet-delta-doors.md` |
 
 ## Open, with owners and gates
 
 | Item | State | Gate to close |
 |---|---|---|
-| Parameterized questions (ANL-4 grammar) | Designed, not built: `Parameter<T>(name)` in `Where`, bound at ask time. Needs a parameter-environment hook in `LinqFilterCompiler` (shared compiler — regression surface spans all relational adapters). | Compiler change + conformance cells for binding, missing-value, and injection-refusal |
+| Delight doors, next tier (`explain`, refresh `history`, answer `shape`, freshness negotiation + policy-derived HTTP caching headers) | Designed in the ANL-5 dialogue, not built: all four expose facts the surface already owns (envelope, refresh state, declared columns, `ServeWithin`). ETag/Last-Modified/Cache-Control derived from the projection policy gives dashboards 304s for free. | One door per pass, envelope-first, MCP mirror in the same stroke |
 | Window functions in the typed grammar | Not built. Raw-SQL lanes cover them today. | A dialect-expressible window-function shape in the recipe grammar, or explicit permanent v-cut |
 | Cron spelling for refresh cadence | `Every(TimeSpan)` ships. Cron arrives with the scheduler pillar (its first consumer may be this module). | Scheduler pillar decision |
 | DuckDB 2.0 storage bump | External dependency. Materializations are derived state — the bump is a delete-and-rebuild, not a migration. | Upstream 2.0 release; then bump the floor and re-run the suite |

@@ -154,14 +154,53 @@ Over HTTP: `GET /analytics/done-by-week/rows?limit=100&Priority=2` — paging pl
 on declared columns, CSV or Parquet via `?format=csv` / `?format=parquet` (JSON default). On-demand questions have no rows; the
 door refuses with `not-materialized` and points at Run.
 
+### Facets: the distribution, and the movement
+
+```csharp
+// Distinct values with counts — the filter-dropdown shape.
+var facets = await Analytics.Facets("done-by-week", "Week");
+var capped = await Analytics.Facets("done-by-week", "Week", limit: 20); // capped answers say so
+```
+
+`GET /analytics/done-by-week/facets?by=Week&limit=20`. Facet counts enumerate materialized
+tuples; a projection grouped by one column lists its distinct values, one tuple each.
+
+Pass a **watermark** and the question flips from *what is the distribution?* to *what has been
+moving since?* — buckets over rows a materialization wrote after the cursor:
+
+```csharp
+var movement = await Analytics.Facets("done-by-week", "Week", since: cursor);
+// movement.Mode == Movement; movement.ChangesConsidered says what the counts cover;
+// movement.DeletesInvisible states the blind spot; movement.Watermark.Current is the next cursor.
+```
+
+Honesty notes the envelope carries so they are never implied: a movement answer is not a
+distribution (updates count once, at their new value), and deletions are invisible in a derived
+store. A malformed watermark refuses with the expected `wm1.<milliseconds>` shape instead of
+silently rewinding to the beginning.
+
+### Delta: incremental consumption
+
+```csharp
+var page = await Analytics.Delta("done-by-week");                 // first poll: everything + cursor
+var next = await Analytics.Delta("done-by-week", since: page.Watermark.Current);  // next poll
+```
+
+`GET /analytics/done-by-week/delta?since=wm1.…`. "Changed" means *written by a materialization
+after the cursor* — refreshes rewrite wholesale, so every re-materialized row counts as movement.
+The response always carries `Watermark: { given, current }`: the consumer holds the cursor, the
+door hands back the next one, and the server keeps no per-consumer state.
+
 Every path — query, filter, export — passes the same tenant scoping as the semantic door.
 
 ## Agents
 
-The catalog is the agent's vocabulary. Two MCP tools, read-only by construction:
+The catalog is the agent's vocabulary. Four MCP tools, read-only by construction:
 
 - `analytics.list_questions` — the catalog: names, measures, groupings, bounds.
 - `analytics.ask(name)` — run a declared question; the answer carries question, engine, age, bounds.
+- `analytics.facets(name, by, since?)` — a column's distribution, or movement since a watermark.
+- `analytics.delta(name, since?)` — changed rows plus the next watermark, for incremental consumption.
 
 Free-form SQL is not offered to agents: an unanswerable ask returns `unknown-question` with the
 catalog, and the ask is recorded so the gap can close as a new declaration. Hallucinated joins and

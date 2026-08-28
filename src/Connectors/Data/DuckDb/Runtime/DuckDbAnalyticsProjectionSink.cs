@@ -12,8 +12,14 @@ namespace Koan.Data.Connector.DuckDb.Runtime;
 /// rebuilds from the record store wants exactly that topology. Rows are replaced wholesale on refresh;
 /// the refresh stamp rides alongside, so a stale answer is a labeled answer, never a mystery.
 /// </summary>
-internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, IAnalyticsParquetExport
+internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, IAnalyticsChangeTracking, IAnalyticsParquetExport
 {
+    /// <summary>
+    /// The per-row change stamp backing the delta doors: unix milliseconds of the refresh that wrote
+    /// the row. Operational — never a declared column, stripped from every row the doors return.
+    /// </summary>
+    internal const string StampColumn = "_koan_stamp";
+
     private readonly string _connectionString;
 
     public DuckDbAnalyticsProjectionSink(IOptions<AnalyticsOptions> options)
@@ -64,6 +70,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
     {
         var table = ProjectionTable(recipe);
         var definitions = columns.Select(static column => $"{Quote(column.Name)} {StorageType(column.ClrType)}").ToList();
+        definitions.Add($"{Quote(StampColumn)} BIGINT");
         PrepareStore();
         await using var connection = Open();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -82,6 +89,28 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         await using var command = connection.CreateCommand();
         command.CommandText = $"CREATE TABLE IF NOT EXISTS {table} ({string.Join(", ", definitions)})";
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await EnsureStampColumnAsync(connection, table, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Tables created before change tracking carried no stamp; back-fitting is additive, and the next
+    /// refresh (which rewrites wholesale) stamps every row.
+    /// </summary>
+    private static async Task EnsureStampColumnAsync(
+        DuckDB.NET.Data.DuckDBConnection connection, string table, CancellationToken cancellationToken)
+    {
+        await using var check = connection.CreateCommand();
+        check.CommandText = """
+            SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_name = $table AND column_name = $column
+            """;
+        check.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("table", table));
+        check.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("column", StampColumn));
+        var present = Convert.ToInt64(await check.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) > 0;
+        if (present) return;
+        await using var alter = connection.CreateCommand();
+        alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {Quote(StampColumn)} BIGINT";
+        await alter.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task WriteRowsAsync(
@@ -108,6 +137,9 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         if (rows.Count > 0)
         {
             // One multi-row INSERT per chunk of 500 — the engine's bulk shape, mirrored from the connector.
+            // Every row carries the refresh's stamp: refreshes rewrite wholesale, so "changed since W"
+            // means exactly "written by a materialization after W".
+            var stamp = refreshUtc.ToUnixTimeMilliseconds();
             const int chunkSize = 500;
             for (var offset = 0; offset < rows.Count; offset += chunkSize)
             {
@@ -118,7 +150,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
                 for (var local = 0; local < count; local++)
                 {
                     var row = rows[offset + local];
-                    var values = new string[columns.Count];
+                    var values = new string[columns.Count + 1];
                     for (var column = 0; column < columns.Count; column++)
                     {
                         var parameter = $"p{offset + local}_{column}";
@@ -126,9 +158,12 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
                         command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter(parameter, value ?? DBNull.Value));
                         values[column] = $"${parameter}";
                     }
+                    var stampParameter = $"p{offset + local}_stamp";
+                    command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter(stampParameter, stamp));
+                    values[columns.Count] = $"${stampParameter}";
                     tuples.Add($"({string.Join(", ", values)})");
                 }
-                command.CommandText = $"INSERT INTO {table} ({string.Join(", ", columns.Select(static c => Quote(c.Name)))}) VALUES {string.Join(", ", tuples)}";
+                command.CommandText = $"INSERT INTO {table} ({string.Join(", ", columns.Select(static c => Quote(c.Name)))}, {Quote(StampColumn)}) VALUES {string.Join(", ", tuples)}";
                 await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
             }
         }
@@ -182,10 +217,111 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         {
             var values = new Dictionary<string, object?>(StringComparer.Ordinal);
             for (var index = 0; index < reader.FieldCount; index++)
+            {
+                if (reader.GetName(index).Equals(StampColumn, StringComparison.Ordinal)) continue;
                 values[reader.GetName(index)] = reader.IsDBNull(index) ? null : Materialize(reader.GetValue(index));
+            }
             rows.Add(values);
         }
         return rows;
+    }
+
+    /// <summary>
+    /// Distinct values of one materialized column with counts, engine-side. Buckets order by count
+    /// descending (then value), so a dashboard dropdown leads with what is common; one row beyond the
+    /// limit lets the caller state a cap instead of truncating silently. NULL buckets as a null value —
+    /// a distribution that hides its nulls is not a distribution.
+    /// </summary>
+    public async Task<AnalyticsFacetPage> ReadFacetsAsync(
+        string recipe, string column, int limit, CancellationToken cancellationToken)
+    {
+        var buckets = new List<AnalyticsFacetBucket>();
+        var capped = false;
+        await using (var connection = Open())
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT {Quote(column)}, COUNT(*) AS n FROM {ProjectionTable(recipe)} " +
+                                  $"GROUP BY {Quote(column)} ORDER BY n DESC, 1 NULLS LAST LIMIT {limit + 1}";
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                buckets.Add(new AnalyticsFacetBucket(
+                    reader.IsDBNull(0) ? null : Materialize(reader.GetValue(0)), reader.GetInt64(1)));
+        }
+        if (buckets.Count > limit)
+        {
+            capped = true;
+            buckets.RemoveAt(buckets.Count - 1);
+        }
+        return new AnalyticsFacetPage(buckets, capped);
+    }
+
+    /// <inheritdoc />
+    public async Task<AnalyticsDeltaPage> ReadDeltaAsync(
+        string recipe, long sinceStamp, int limit, CancellationToken cancellationToken)
+    {
+        var table = ProjectionTable(recipe);
+        List<IReadOnlyDictionary<string, object?>> rows;
+        long current;
+        await using (var connection = Open())
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT * FROM {table} WHERE {Quote(StampColumn)} > $since ORDER BY {Quote(StampColumn)} LIMIT {limit + 1}";
+            command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("since", sinceStamp));
+            rows = [];
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+                for (var index = 0; index < reader.FieldCount; index++)
+                {
+                    if (reader.GetName(index).Equals(StampColumn, StringComparison.Ordinal)) continue;
+                    values[reader.GetName(index)] = reader.IsDBNull(index) ? null : Materialize(reader.GetValue(index));
+                }
+                rows.Add(values);
+            }
+            await using var max = connection.CreateCommand();
+            max.CommandText = $"SELECT COALESCE(MAX({Quote(StampColumn)}), 0) FROM {table}";
+            current = Convert.ToInt64(await max.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+        }
+        var capped = rows.Count > limit;
+        if (capped) rows.RemoveAt(rows.Count - 1);
+        return new AnalyticsDeltaPage(rows, capped, current);
+    }
+
+    /// <inheritdoc />
+    public async Task<AnalyticsMovementFacetPage> ReadFacetsChangedSinceAsync(
+        string recipe, string column, long sinceStamp, int limit, CancellationToken cancellationToken)
+    {
+        var table = ProjectionTable(recipe);
+        List<AnalyticsFacetBucket> buckets;
+        long considered;
+        long current;
+        await using (var connection = Open())
+        {
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT {Quote(column)}, COUNT(*) AS n FROM {table} WHERE {Quote(StampColumn)} > $since " +
+                                  $"GROUP BY {Quote(column)} ORDER BY n DESC, 1 NULLS LAST LIMIT {limit + 1}";
+            command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("since", sinceStamp));
+            buckets = [];
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+                buckets.Add(new AnalyticsFacetBucket(
+                    reader.IsDBNull(0) ? null : Materialize(reader.GetValue(0)), reader.GetInt64(1)));
+
+            await using var counts = connection.CreateCommand();
+            counts.CommandText = $"SELECT COUNT(*), COALESCE(MAX({Quote(StampColumn)}), 0) FROM {table} WHERE {Quote(StampColumn)} > $since";
+            counts.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter("since", sinceStamp));
+            await using var countReader = await counts.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            await countReader.ReadAsync(cancellationToken).ConfigureAwait(false);
+            considered = countReader.GetInt64(0);
+            current = countReader.IsDBNull(1) ? 0 : countReader.GetInt64(1);
+        }
+        var capped = buckets.Count > limit;
+        if (capped) buckets.RemoveAt(buckets.Count - 1);
+        return new AnalyticsMovementFacetPage(buckets, capped, considered, current);
     }
 
     private static object? Materialize(object? value) =>
@@ -284,7 +420,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
             var where = equalityFilters is { Count: > 0 }
                 ? " WHERE " + string.Join(" AND ", equalityFilters.Keys.Select((key, index) => $"{Quote(key)} = $f{index}"))
                 : string.Empty;
-            command.CommandText = $"COPY (SELECT * FROM {table}{where}) TO '{target.Replace("'", "''")}' (FORMAT PARQUET)";
+            command.CommandText = $"COPY (SELECT * EXCLUDE ({Quote(StampColumn)}) FROM {table}{where}) TO '{target.Replace("'", "''")}' (FORMAT PARQUET)";
             for (var index = 0; index < equalityFilters?.Count; index++)
                 command.Parameters.Add(new DuckDBParameter($"f{index}", equalityFilters.Values.ElementAt(index)));
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);

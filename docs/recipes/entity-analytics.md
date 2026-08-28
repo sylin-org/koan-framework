@@ -119,6 +119,17 @@ Analytics.Question<Todo, Guid>("done-by-week", q => q
 Materialized rows read back through the read-model door: `GET /analytics/{name}/rows?limit=100`,
 with CSV export via `?format=csv` and equality filters on declared columns.
 
+Two more doors read the same materializations. The **facet door** —
+`GET /analytics/{name}/facets?by=column` — lists distinct values with counts: filter dropdowns
+without declaring a recipe per facet. With a watermark from a previous response
+(`&since=wm1.…`), it answers a different question — *what has been moving since* — and the
+envelope names the mode, how many changed rows it summarizes (`ChangesConsidered`), and the
+blind spot (`DeletesInvisible`: deleted source rows leave no trace in a derived store). The
+**delta door** — `GET /analytics/{name}/delta?since=wm1.…` — returns rows written after the
+cursor plus the next cursor; consumers never construct watermarks, they pass back what the last
+response handed over. In code: `Analytics.Facets(name, by, since)` and
+`Analytics.Delta(name, since)`; for agents, `analytics.facets` and `analytics.delta`.
+
 ## Costs and limits
 
 - On-demand asks compute over the record store — bounded by the question's row cap and the host
@@ -128,8 +139,11 @@ with CSV export via `?format=csv` and equality filters on declared columns.
 - The refresh loop is an in-host background service. Cron spelling arrives with the scheduler pillar;
   today's cadence is `Every(TimeSpan)`, and any external scheduler can drive
   `POST /analytics/refresh/{name}`.
-- Questions are parameter-free in this grammar version. A question that needs a different slice is a
-  second declared question, not an argument.
+- Questions take declared parameters (`WithParameter<T>(name)` + `Analytics.P<T>(name)`), bound at
+  ask time. Undeclared or missing values refuse loudly — they never silently widen the question.
+- Facet counts enumerate **materialized tuples**. A projection grouped by one column yields one
+  tuple per distinct group, so distribution facets list the values (the dropdown); counts grow
+  meaningful as materializations carry more rows per value.
 
 ## Full manual
 

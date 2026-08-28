@@ -81,4 +81,72 @@ public static class AnalyticsMcpTools
 
         return await question.ExecuteAsync(services, rowCap ?? question.RowCap, bound, cancellationToken);
     }
+
+    /// <param name="name">The declared materialized question to facet.</param>
+    /// <param name="by">A declared column of the materialization.</param>
+    /// <param name="since">Optional watermark from a previous facets or delta response; omit for the full distribution.</param>
+    /// <param name="limit">Bucket ceiling; capped answers say so.</param>
+    [McpTool(Name = "analytics.facets",
+        Description = "Distinct values of one materialized analytics column with counts — the distribution, or with a watermark, what has been moving since. Refuses on-demand questions and undeclared columns.")]
+    public static async Task<object> Facets(
+        string name,
+        string by,
+        IServiceProvider services,
+        CancellationToken cancellationToken,
+        string? since = null,
+        int limit = 100)
+    {
+        _ = services;
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            return new
+            {
+                Error = "unknown-question",
+                Message = $"No analytics question named '{name}' is declared. This tool only answers declared questions.",
+                Catalog = AnalyticsCatalog.Names()
+            };
+        }
+        try
+        {
+            return await Analytics.Facets(name, by, since, limit, cancellationToken);
+        }
+        catch (NotSupportedException refusal)
+        {
+            return new { Error = "facets-refused", Message = refusal.Message };
+        }
+    }
+
+    /// <param name="name">The declared materialized question to consume incrementally.</param>
+    /// <param name="since">Optional watermark from a previous response; omit to start from the beginning.</param>
+    /// <param name="limit">Row ceiling; capped answers say so.</param>
+    [McpTool(Name = "analytics.delta",
+        Description = "Rows a materialization wrote after a watermark, plus the next watermark — incremental consumption for agents. Pass back the cursor from the previous response unchanged.")]
+    public static async Task<object> Delta(
+        string name,
+        IServiceProvider services,
+        CancellationToken cancellationToken,
+        string? since = null,
+        int limit = 100)
+    {
+        _ = services;
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            return new
+            {
+                Error = "unknown-question",
+                Message = $"No analytics question named '{name}' is declared. This tool only answers declared questions.",
+                Catalog = AnalyticsCatalog.Names()
+            };
+        }
+        try
+        {
+            return await Analytics.Delta(name, since, limit, cancellationToken);
+        }
+        catch (NotSupportedException refusal)
+        {
+            return new { Error = "delta-refused", Message = refusal.Message };
+        }
+    }
 }

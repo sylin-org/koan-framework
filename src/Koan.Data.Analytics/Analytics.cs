@@ -51,6 +51,49 @@ public static class Analytics
     }
 
     /// <summary>
+    /// The facet door: distinct values of one materialized column with counts. Without
+    /// <paramref name="since"/>, the distribution; with it, the movement since that cursor — a
+    /// different question, and the envelope says which ran.
+    /// </summary>
+    public static Task<AnalyticsFacetResult> Facets(
+        string name,
+        string by,
+        string? since = null,
+        int limit = 100,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(by);
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            throw new KeyNotFoundException(
+                $"No analytics question named '{name}' is declared. Declared questions: " +
+                (AnalyticsCatalog.Names() is { Count: > 0 } declared ? string.Join(", ", declared) : "(none)") + ".");
+        }
+        return AnalyticsExecution.ReadFacetsAsync(name, by, since, limit, ct);
+    }
+
+    /// <summary>
+    /// The delta door: materialized rows written after a cursor, plus the cursor for the next poll.
+    /// Consumers never construct watermarks — pass back what the last response handed over.
+    /// </summary>
+    public static Task<AnalyticsDeltaResult> Delta(
+        string name,
+        string? since = null,
+        int limit = 100,
+        CancellationToken ct = default)
+    {
+        if (!AnalyticsCatalog.TryGet(name, out var question))
+        {
+            AnalyticsGapLog.Record(name);
+            throw new KeyNotFoundException(
+                $"No analytics question named '{name}' is declared. Declared questions: " +
+                (AnalyticsCatalog.Names() is { Count: > 0 } declared ? string.Join(", ", declared) : "(none)") + ".");
+        }
+        return AnalyticsExecution.ReadDeltaAsync(name, since, limit, ct);
+    }
+
+    /// <summary>
     /// A parameter marker for use inside a question's Where clause. At declaration this is a node in the
     /// expression tree; at ask time the bound value is substituted before compilation. Never invoke it
     /// outside an expression — it is a marker, not a method.

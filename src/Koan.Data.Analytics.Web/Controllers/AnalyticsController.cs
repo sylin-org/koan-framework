@@ -11,13 +11,15 @@ using Microsoft.Extensions.Options;
 namespace Koan.Data.Analytics.Web.Controllers;
 
 /// <summary>
-/// The analytics surface for one entity. Four doors, one vocabulary:
+/// The analytics surface for one entity. One vocabulary, six doors:
 /// <c>recipes</c> lists what is answerable, <c>{recipe}</c> answers it (serve-or-compute, envelope on
-/// every response), <c>{recipe}/rows</c> descends into the materialized rows (CSV-exportable), and
+/// every response), <c>{recipe}/rows</c> descends into the materialized rows (CSV-exportable),
+/// <c>{recipe}/facets</c> summarizes a column (distribution, or movement since a watermark),
+/// <c>{recipe}/delta</c> serves rows a materialization wrote after a cursor, and
 /// <c>{recipe}/refresh</c> is the explicit mutating verb — the only POST in the surface, and the one
 /// hosts should gate.
 ///
-/// Deliberately not an <c>EntityController</c>: <c>GET {recipe}</c> occupies the address position the
+/// Deliberately not an <c>EntityController</c>: <c>GET &#123;recipe&#125;</c> occupies the address position the
 /// entity's <c>GET &#123;id&#125;</c> would claim, so inheriting the CRUD surface would make every
 /// request ambiguous. The entity keeps its own controller; this one speaks answers.
 /// </summary>
@@ -124,6 +126,58 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
             Completion = rows.Count > limit ? "RowCapped" : "Complete",
             Rows = rows.Take(limit)
         });
+    }
+
+    /// <summary>
+    /// The facet door: distinct values of one materialized column with counts — filter dropdowns
+    /// without declaring a recipe per facet. Without <paramref name="since"/>, the distribution;
+    /// with it, the movement since that watermark, and the envelope names which question ran.
+    /// </summary>
+    [HttpGet("{recipe}/facets")]
+    public async Task<IActionResult> Facets(string recipe, [FromQuery] string? by = null, [FromQuery] string? since = null,
+        [FromQuery] int limit = 100, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(by))
+            return BadRequest(new
+            {
+                Error = "facet-column-required",
+                Message = "The facets door needs ?by=column — a declared column of the materialization."
+            });
+        if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+        if (question.Projection is null)
+            return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; facets read materializations — run it instead." });
+
+        try
+        {
+            return Ok(await Analytics.Facets(recipe, by, since, limit, ct));
+        }
+        catch (NotSupportedException refusal)
+        {
+            return BadRequest(new { Error = "facets-refused", Message = refusal.Message });
+        }
+    }
+
+    /// <summary>
+    /// The delta door: materialized rows written after a watermark, plus the next watermark on every
+    /// response — the consumer holds the cursor, the door hands it back, the server keeps no
+    /// per-consumer state.
+    /// </summary>
+    [HttpGet("{recipe}/delta")]
+    public async Task<IActionResult> Delta(string recipe, [FromQuery] string? since = null,
+        [FromQuery] int limit = 100, CancellationToken ct = default)
+    {
+        if (!TryGetQuestion(recipe, out var question, out var notFound)) return notFound;
+        if (question.Projection is null)
+            return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; deltas read materializations — run it instead." });
+
+        try
+        {
+            return Ok(await Analytics.Delta(recipe, since, limit, ct));
+        }
+        catch (NotSupportedException refusal)
+        {
+            return BadRequest(new { Error = "delta-refused", Message = refusal.Message });
+        }
     }
 
     /// <summary>
