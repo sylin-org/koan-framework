@@ -41,6 +41,40 @@ internal sealed class DuckDbOptionsSetup(IConfiguration configuration) : IConfig
             Constants.Configuration.Keys.ProviderSchemaMatching,
             Constants.Configuration.Keys.SchemaMatching);
         options.AllowProductionDdl = options.DdlPolicy == RelationalDdlPolicy.AutoCreate;
+
+        // Engine settings: the record-store path and the materialization sink both derive their engine
+        // instances from these, so they bind from the provider section (scalar or nested Engine: form).
+        options.MemoryLimit = First(
+            "Koan:Data:DuckDb:MemoryLimit",
+            "Koan:Data:DuckDb:Engine:MemoryLimit") ?? options.MemoryLimit;
+        if (int.TryParse(First(
+                "Koan:Data:DuckDb:Threads",
+                "Koan:Data:DuckDb:Engine:Threads"), out var threads))
+            options.Threads = threads;
+        var extensions = ReadList(
+            "Koan:Data:DuckDb:Extensions",
+            "Koan:Data:DuckDb:Engine:Extensions");
+        if (extensions is { Count: > 0 }) options.Extensions = extensions;
+    }
+
+    /// <summary>A list option binds either from a comma-separated scalar or from indexed children.</summary>
+    private List<string>? ReadList(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (configuration[key] is { } scalar && !string.IsNullOrWhiteSpace(scalar))
+                return scalar.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                             .ToList();
+            var section = configuration.GetSection(key);
+            if (!section.Exists()) continue;
+            var values = section.GetChildren()
+                .Select(static child => child.Value)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(static value => value!.Trim())
+                .ToList();
+            if (values.Count > 0) return values;
+        }
+        return null;
     }
 
     private T ReadEnum<T>(T fallback, params string[] keys) where T : struct, Enum =>

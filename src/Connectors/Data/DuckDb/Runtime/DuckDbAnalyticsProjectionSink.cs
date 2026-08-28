@@ -181,9 +181,19 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         CancellationToken cancellationToken)
     {
         var table = ProjectionTable(recipe);
+        var staging = table + "_staging";
         PrepareStore();
         await using var connection = Open();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // The staging swap: refresh is the hottest write loop in the pillar, so the rows enter through
+        // the engine's Appender into a sibling table and move into the live table inside the refresh
+        // transaction. Any column type without an appender mapping - or any appender failure - falls
+        // back to the chunked INSERT; the live table is never touched by a half-written swap.
+        var appendable = rows.Count > 0 && columns.All(static c => AppendTarget(c.ClrType) is not null);
+        if (appendable)
+            await PrepareStagingAsync(connection, staging, columns, cancellationToken).ConfigureAwait(false);
+
         await using var transaction = (DuckDB.NET.Data.DuckDBTransaction)await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         await using (var clear = connection.CreateCommand())
@@ -193,12 +203,22 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
             await clear.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        if (rows.Count > 0)
+        if (appendable)
         {
-            // One multi-row INSERT per chunk of 500 — the engine's bulk shape, mirrored from the connector.
-            // Every row carries the refresh's stamp: refreshes rewrite wholesale, so "changed since W"
-            // means exactly "written by a materialization after W".
-            var stamp = refreshUtc.ToUnixTimeMilliseconds();
+            AppendStaged(connection, staging, columns, rows, refreshUtc, cancellationToken);
+            await using var move = connection.CreateCommand();
+            move.Transaction = transaction;
+            var columnList = string.Join(", ", columns.Select(static c => Quote(c.Name)));
+            move.CommandText = $"INSERT INTO {table} ({columnList}, {Quote(StampColumn)}) " +
+                               $"SELECT {columnList}, {Quote(StampColumn)} FROM {staging}";
+            await move.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else if (rows.Count > 0)
+        {
+            // One multi-row INSERT per chunk of 500 - the fallback bulk shape. Every row carries the
+            // refresh's stamp: refreshes rewrite wholesale, so "changed since W" means exactly
+            // "written by a materialization after W".
+            var stampValue = refreshUtc.ToUnixTimeMilliseconds();
             const int chunkSize = 500;
             for (var offset = 0; offset < rows.Count; offset += chunkSize)
             {
@@ -218,7 +238,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
                         values[column] = $"${parameter}";
                     }
                     var stampParameter = $"p{offset + local}_stamp";
-                    command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter(stampParameter, stamp));
+                    command.Parameters.Add(new DuckDB.NET.Data.DuckDBParameter(stampParameter, stampValue));
                     values[columns.Count] = $"${stampParameter}";
                     tuples.Add($"({string.Join(", ", values)})");
                 }
@@ -243,7 +263,7 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
 
         // The ledger lands in the same transaction as the stamp: a refresh without its history entry
         // is an adapter defect, and a history entry without the rows is impossible. DDL stays out of
-        // the transaction (Ensure created the ledger table) — CREATE inside a write transaction trips
+        // the transaction (Ensure created the ledger table) - CREATE inside a write transaction trips
         // the engine's catalog write-write conflict detection.
         await using (var ledger = connection.CreateCommand())
         {
@@ -265,6 +285,107 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
         }
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        if (appendable)
+        {
+            try
+            {
+                await using var drop = connection.CreateCommand();
+                drop.CommandText = $"DROP TABLE {staging}";
+                await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DuckDBException) { /* tidy-up only; the next refresh drops it before recreating */ }
+        }
+    }
+
+    /// <summary>Creates the staging sibling (declared columns + stamp) for an appender-driven swap.</summary>
+    private static async Task PrepareStagingAsync(
+        DuckDBConnection connection, string staging,
+        IReadOnlyList<AnalyticsProjectionColumn> columns, CancellationToken cancellationToken)
+    {
+        await using var drop = connection.CreateCommand();
+        drop.CommandText = $"DROP TABLE IF EXISTS {staging}";
+        await drop.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        var definitions = columns.Select(static c => $"{Quote(c.Name)} {StorageType(c.ClrType)}").ToList();
+        definitions.Add($"{Quote(StampColumn)} BIGINT");
+        await using var create = connection.CreateCommand();
+        create.CommandText = $"CREATE TABLE {staging} ({string.Join(", ", definitions)})";
+        await create.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Appends the refresh's rows into staging through the engine's bulk path.</summary>
+    private static void AppendStaged(
+        DuckDBConnection connection, string staging,
+        IReadOnlyList<AnalyticsProjectionColumn> columns,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
+        DateTimeOffset refreshUtc, CancellationToken cancellationToken)
+    {
+        var targets = columns.Select(static c => AppendTarget(c.ClrType)!).ToArray();
+        var stamp = refreshUtc.ToUnixTimeMilliseconds();
+        using var appender = connection.CreateAppender(staging);
+        foreach (var row in rows)
+        {
+            var target = appender.CreateRow();
+            for (var column = 0; column < columns.Count; column++)
+            {
+                row.TryGetValue(columns[column].Name, out var value);
+                AppendConverted(target, targets[column], value);
+            }
+            target.AppendValue(stamp);
+            target.EndRow();
+        }
+    }
+
+    /// <summary>
+    /// The appender mapping for a column's CLR type, or null when none applies - the fallback signal.
+    /// The engine's appender is typed per column, so each value converts to exactly the storage kind.
+    /// </summary>
+    private static Type? AppendTarget(Type clrType)
+    {
+        var type = Nullable.GetUnderlyingType(clrType) ?? clrType;
+        if (type == typeof(string) || type == typeof(Guid) || type.IsEnum) return typeof(string);
+        if (type == typeof(long) || type == typeof(ulong) || type == typeof(uint)) return typeof(long);
+        if (type == typeof(int) || type == typeof(ushort)) return typeof(int);
+        if (type == typeof(short) || type == typeof(byte) || type == typeof(sbyte)) return typeof(short);
+        if (type == typeof(double) || type == typeof(decimal)) return typeof(double);
+        if (type == typeof(float)) return typeof(float);
+        if (type == typeof(bool)) return typeof(bool);
+        if (type == typeof(DateTime)) return typeof(DateTime);
+        if (type == typeof(DateTimeOffset)) return typeof(DateTimeOffset);
+        if (type == typeof(byte[])) return typeof(byte[]);
+        return null;
+    }
+
+    private static void AppendConverted(DuckDB.NET.Data.IDuckDBAppenderRow row, Type target, object? value)
+    {
+        if (value is null || value is DBNull)
+        {
+            row.AppendNullValue();
+            return;
+        }
+        if (target == typeof(string))
+        {
+            row.AppendValue(value is string text
+                ? text
+                : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture)!);
+            return;
+        }
+        if (target == typeof(long)) { row.AppendValue(Convert.ToInt64(value)); return; }
+        if (target == typeof(int)) { row.AppendValue(Convert.ToInt32(value)); return; }
+        if (target == typeof(short)) { row.AppendValue(Convert.ToInt16(value)); return; }
+        if (target == typeof(double)) { row.AppendValue(Convert.ToDouble(value)); return; }
+        if (target == typeof(float)) { row.AppendValue(Convert.ToSingle(value)); return; }
+        if (target == typeof(bool)) { row.AppendValue(Convert.ToBoolean(value)); return; }
+        if (target == typeof(DateTime)) { row.AppendValue(Convert.ToDateTime(value)); return; }
+        if (target == typeof(DateTimeOffset))
+        {
+            row.AppendValue(value is DateTimeOffset offset
+                ? offset
+                : new DateTimeOffset(Convert.ToDateTime(value)));
+            return;
+        }
+        if (target == typeof(byte[])) { row.AppendValue((byte[])value); return; }
+        throw new NotSupportedException($"No appender conversion for '{target.Name}'.");
     }
 
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadRowsAsync(
@@ -470,7 +591,10 @@ internal sealed class DuckDbAnalyticsProjectionSink : IAnalyticsProjectionSink, 
             var directory = Path.GetDirectoryName(Path.GetFullPath(path));
             if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
         }
-        return new DuckDBConnection(_connectionString);
+        // The entity path strips local keys (Pooling/Cache) before the engine sees a string; the
+        // materialization store applies the same rule — instances are shared per path, and a pooling
+        // layer is a second set of physical connections racing the engine's catalog versioning.
+        return new DuckDBConnection(DuckDbConnections.StripLocalKeys(_connectionString));
     }
 
     private static string? DataSourceOf(string connectionString)

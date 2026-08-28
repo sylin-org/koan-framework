@@ -1,3 +1,5 @@
+using System.Data;
+using System.Data.Common;
 using System.Security.Cryptography;
 using System.Text;
 using DuckDB.NET.Data;
@@ -57,6 +59,9 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
             if (nonCreating && !Exists(normalized))
                 throw new FileNotFoundException(
                     "The DuckDB database does not exist yet and the caller declined creation.", normalized);
+            var extensions = _settings.Value.Extensions;
+            if (extensions is { Count: > 0 })
+                return new ExtensionLoadingConnection(normalized, [.. extensions]);
             return Validated(normalized);
         }
     }
@@ -93,13 +98,13 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
 
     private string Normalize(string connectionString, string source)
     {
-        var (stripped, modeMemory) = StripSqliteOnlyKeys(connectionString);
+        var (stripped, modeMemory, readOnly) = StripSqliteOnlyKeys(connectionString);
         var path = DataSourceOf(stripped);
         var settings = _settings.Value;
         var normalized = IsMemory(path) || modeMemory ? Memory(stripped, source) : WithAnchoredPath(stripped, path);
 
         // Engine settings ride the instance key (see type comment), so they are appended to every string.
-        var config = EngineConfig(settings);
+        var config = EngineConfig(settings, readOnly);
         return config.Length == 0 ? normalized : normalized + ";" + config;
     }
 
@@ -110,9 +115,10 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
         return connectionString.Replace(path, anchored, StringComparison.OrdinalIgnoreCase);
     }
 
-    private string EngineConfig(DuckDbOptions settings)
+    private string EngineConfig(DuckDbOptions settings, bool readOnly)
     {
         var parts = new List<string>(4);
+        if (readOnly) parts.Add("access_mode=read_only");
         if (!string.IsNullOrWhiteSpace(settings.MemoryLimit)) parts.Add($"memory_limit={settings.MemoryLimit}");
         if (settings.Threads is { } threads) parts.Add($"threads={threads}");
         if (!string.IsNullOrWhiteSpace(settings.ExtensionDirectory)) parts.Add($"extension_directory={settings.ExtensionDirectory}");
@@ -170,10 +176,11 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
     /// Segments split on <c>;</c> outside double quotes, so a quoted value that contains a separator —
     /// a secret, most commonly — stays whole and can only ever reach the engine's own validator.
     /// </summary>
-    private static (string ConnectionString, bool ModeMemory) StripSqliteOnlyKeys(string connectionString)
+    private static (string ConnectionString, bool ModeMemory, bool ReadOnly) StripSqliteOnlyKeys(string connectionString)
     {
         var kept = new List<string>();
         var modeMemory = false;
+        var readOnly = false;
         foreach (var part in SplitSegments(connectionString))
         {
             var separator = part.IndexOf('=');
@@ -183,6 +190,7 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
             if (key.Equals("Mode", StringComparison.OrdinalIgnoreCase))
             {
                 if (value.Equals("Memory", StringComparison.OrdinalIgnoreCase)) modeMemory = true;
+                else if (value.Equals("ReadOnly", StringComparison.OrdinalIgnoreCase)) readOnly = true;
                 else kept.Add(part);
                 continue;
             }
@@ -191,11 +199,35 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
                 continue;
             kept.Add(part);
         }
-        return (string.Join(';', kept), modeMemory);
+        return (string.Join(';', kept), modeMemory, readOnly);
+    }
+
+    /// <summary>
+    /// The entity path strips SQLite-shaped local keys before the engine sees a string; the analytics
+    /// materialization store builds connections from a raw options string and must apply the same rule.
+    /// Engine instances are shared per path within the process — a pooling layer on top is not a cache,
+    /// it is a second set of physical connections racing the engine's catalog versioning.
+    /// </summary>
+    internal static string StripLocalKeys(string connectionString)
+    {
+        var kept = new List<string>();
+        foreach (var part in SplitSegments(connectionString))
+        {
+            var separator = part.IndexOf('=');
+            if (separator > 0)
+            {
+                var key = part[..separator].Trim();
+                if (key.Equals("Cache", StringComparison.OrdinalIgnoreCase) ||
+                    key.Equals("Pooling", StringComparison.OrdinalIgnoreCase))
+                    continue;
+            }
+            kept.Add(part);
+        }
+        return string.Join(';', kept);
     }
 
     /// <summary>Splits on <c>;</c> outside double quotes; quoted values stay whole.</summary>
-    private static List<string> SplitSegments(string connectionString)
+    internal static List<string> SplitSegments(string connectionString)
     {
         var segments = new List<string>();
         var current = new System.Text.StringBuilder();
@@ -239,6 +271,59 @@ internal sealed class DuckDbConnections : IDisposable, IAsyncDisposable
             _logger.LogWarning("duckdb.connection parse-failed connection={Connection} error={Error}",
                 Koan.Core.Redaction.DeIdentify(normalized), Koan.Core.Redaction.DeIdentify(error.Message));
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Extensions load PER CONNECTION in DuckDB.NET - a LOAD on one connection does not carry to the
+    /// next, even on the same engine instance. A declared allow-list therefore rides every connection
+    /// this class hands out: the wrapper loads the names at Open, before any caller statement, and a
+    /// load that fails refuses with the extension named and the pre-install/autoinstall choice. A
+    /// declared extension that is not there is configuration truth, not a silent skip.
+    /// </summary>
+    private sealed class ExtensionLoadingConnection : DuckDBConnection
+    {
+        private readonly string[] _extensions;
+
+        public ExtensionLoadingConnection(string connectionString, string[] extensions) : base(connectionString)
+        {
+            _extensions = extensions;
+            foreach (var extension in _extensions)
+                if (string.IsNullOrWhiteSpace(extension) || !extension.All(c => char.IsLetterOrDigit(c) || c == '_'))
+                    throw new InvalidOperationException(
+                        $"DuckDB extension name '{extension}' is not a plain identifier. Extensions are declared as names (sqlite_scanner, httpfs, iceberg), not expressions.");
+        }
+
+        public override void Open()
+        {
+            base.Open();
+            try { Load(); }
+            catch { Dispose(); throw; }
+        }
+
+        public override async Task OpenAsync(CancellationToken cancellationToken)
+        {
+            await base.OpenAsync(cancellationToken).ConfigureAwait(false);
+            try { Load(); }
+            catch { await DisposeAsync().ConfigureAwait(false); throw; }
+        }
+
+        private void Load()
+        {
+            foreach (var extension in _extensions)
+            {
+                using var command = CreateCommand();
+                command.CommandText = $"LOAD {extension}";
+                try { command.ExecuteNonQuery(); }
+                catch (Exception error)
+                {
+                    throw new InvalidOperationException(
+                        $"DuckDB could not load the declared extension '{extension}': {error.Message}. " +
+                        "Pre-install the extension and point Koan:Data:DuckDb:ExtensionDirectory at the binaries, " +
+                        "or set Koan:Data:DuckDb:AutoInstallExtensions=true to allow runtime downloads (an air-gap decision).",
+                        error);
+                }
+            }
         }
     }
 

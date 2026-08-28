@@ -41,6 +41,7 @@ them is a coherent outcome.
 | T2 | [Redis vector](tasks/T2-redis-vector.md) | vector | `pwsh scripts/forge-verify.ps1 -Adapter RedisVector -Plane vector` |
 | T3 | [MySQL / MariaDB](tasks/T3-mysql.md) | record | `pwsh scripts/forge-verify.ps1 -Adapter MySql -Plane record` |
 | T4 | [Mongo Atlas Vector](tasks/T4-mongo-atlas-vector.md) | vector | `pwsh scripts/forge-verify.ps1 -Adapter MongoAtlasVector -Plane vector` |
+| D1 | [DuckDB delight pass](cards/duckdb-delight-pass.md) | record/analytics | DuckDb suite 54/54, SQLite sibling 49/49, analytics suite 36/36 |
 
 T1 is first because it is the smallest, has the widest container support, and sets the pattern the
 other vector tasks follow. T4 is last because its container story is the least certain and it is the

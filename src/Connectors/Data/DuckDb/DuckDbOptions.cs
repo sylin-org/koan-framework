@@ -36,4 +36,13 @@ public sealed class DuckDbOptions : IAdapterOptions
 
     /// <summary>Local directory preloaded with extension binaries, forwarded as <c>extension_directory</c>.</summary>
     public string? ExtensionDirectory { get; set; }
+
+    /// <summary>
+    /// Extensions to <c>LOAD</c> into the engine instance before first use — <c>sqlite</c>,
+    /// <c>httpfs</c>, <c>iceberg</c>, ... — declared, not discovered. Each name must be a plain
+    /// identifier; an extension that cannot load refuses with a corrective naming it and the
+    /// pre-install/autoinstall choice. Loaded once per engine instance; the load persists for every
+    /// later connection in the process.
+    /// </summary>
+    public List<string> Extensions { get; set; } = [];
 }

@@ -122,3 +122,47 @@ rebuilds anyway.
   explicit rebuild instead of pretending to alter.
 - Document-expression mapped indexes are declined until planner matching is demonstrated — the
   honest envelope beats an index the engine may ignore.
+
+## Files as tables
+
+DuckDB reads Parquet and CSV natively — globs, hive partitioning, schema sniffing — and the
+connector declares it: any statement through the direct lane can address files directly.
+
+```sql
+SELECT COUNT(*) FROM 'events/events-*.parquet';                          -- glob as one table
+SELECT DISTINCT year FROM read_parquet('lake/*/*.parquet', hive_partitioning = true);
+SELECT * FROM 'people.csv';                                              -- typed by sniffing
+```
+
+No configuration, no ingest step. The conformance cells in the connector suite pin glob counts,
+partition columns, and CSV typing so the capability stays a contract rather than a party trick.
+
+## Declared extensions
+
+Extensions are declared, not discovered:
+
+```json
+{ "Koan": { "Data": { "DuckDb": { "Extensions": [ "sqlite_scanner" ] } } } }
+```
+
+Declaring a name loads it on every connection before your statements run (loads do not persist
+across connections in DuckDB.NET). An extension that cannot load refuses with its name and the
+air-gap choice: pre-install into `ExtensionDirectory`, or set
+`Koan:Data:DuckDb:AutoInstallExtensions = true` and accept runtime downloads. `sqlite_scanner`
+is not statically bundled — pairing it with autoinstall is the tested path; `ATTACH ... (TYPE
+sqlite)` and `sqlite_scan(path, table)` then make foreign stores addressable (connection-scoped,
+so combine ATTACH and use in one transaction scope).
+
+## Read-only posture
+
+`Mode=ReadOnly` in the connection string opens the engine read-only. A read-only open never
+creates a file, reads existing stores, and refuses writes. DuckDB is single-writer per file —
+even read-only opens from another process are excluded while a writer holds it, so a locked
+store is its own condition, not generic unavailability.
+
+## Connection and file hygiene
+
+`Pooling` and `Cache` connection-string keys are **dropped, not honored**: engine instances are
+shared per path within the process, and a pooling layer is a second set of physical connections
+racing the engine's catalog. Connections close per operation, and DuckDB checkpoints on the last
+close — a clean stop leaves no `.wal` beside the file, so *back up the app = copy the file*.
