@@ -1,7 +1,7 @@
 {
-  "Sylin.Koan.Classification.Contracts": "1.0.8",
-  "Sylin.Koan.Core": "1.0.26",
-  "Sylin.Koan.Data.Abstractions": "1.0.19",
-  "Sylin.Koan.Data.Core": "1.0.38",
-  "$transitive": "ECA956E65183DA0A14081FE25899B11693A2463848848C3DB46850812E04CF71"
+  "Sylin.Koan.Classification.Contracts": "1.0.9",
+  "Sylin.Koan.Core": "1.0.27",
+  "Sylin.Koan.Data.Abstractions": "1.0.21",
+  "Sylin.Koan.Data.Core": "1.0.40",
+  "$transitive": "768FA678E2D9B4B27875A2C2A754646C5CD7F2ED8EED27AFA874676C9C3C038C"
 }
