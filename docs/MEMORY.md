@@ -512,3 +512,54 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   trust-leaf blind runs 2026-08-27 (`Sylin.Koan.Web.Auth.Connector.Test` 1.0.9 → fixed in 1.0.10).
   Related: nuget clients cache flatcontainer indexes ~30 min — a just-published fix resolves as the old
   version unless the consumer pins it. (2026-08-27)
+
+- **A fix that compiles is not a fix that ships — reflection call sites bypass the compiler.** The
+  `EntityUpsertRequest` arity change built with 0 errors while `Koan.Mcp`'s `RequestTranslator`
+  constructed it via `typeof(EntityUpsertRequest<>).MakeGenericType(EntityType)` — one type
+  argument, broken at runtime for every MCP upsert tool call. Found only when "do we have
+  regressions?" forced a repo-wide sweep. The rule: on any changed contract, sweep repo-wide for
+  reflection/`MakeGenericType`/string-based activation of it, and "verified" means full
+  unfiltered suites plus a solution-wide build — filtered runs and single-project builds are
+  assumptions, not verification. (2026-08-28)
+
+- **Two agent sessions on one working tree will fuse each other's work.** The announcement and
+  analytics sessions shared `dev`: staged files vanished between commands, an orphaned commit
+  held the only copy of a fix, and the other session's cascade committed it under its own
+  message — which is also why recovery was possible: that session narrated the race in its
+  commit message. The rule: serialize sessions per working tree (lockfile or turn-taking),
+  re-check `git log`/`status` immediately before staging, and never assume staged state survives
+  a tool-call boundary. (2026-08-28)
+
+- **Agents transcribe artifacts; they do not obey advice.** Adding a complete one-block skeleton
+  to the skill cut a build's wall time 31% and input tokens 44% (404→279 s, 2.44 M→1.36 M); a
+  sequencing *sentence* ("verify once, not twelve times") changed nothing — build/run cycles
+  stayed 12/12 and wall rose. The durable rule: to change agent behavior, ship a mechanical
+  artifact it can copy or execute; prose discipline is filtered out. (2026-08-28)
+
+- **Unattended agent runs need the no-pause contract in the prompt, and globally installed skills
+  are visible to every run in every directory.** The global `explore` skill's plan-approval gate
+  stalled an unattended benchmark control arm at 33 seconds — zero code, waiting for a human who
+  did not exist; one sentence in the prompt fixed it. Corollary: benchmark treatments must never
+  ride on globally installed skills (they contaminate both arms) — deliver treatment through a
+  pointer in the prompt. (2026-08-28)
+
+- **Environment fixtures are traps for smaller models; sign every fixture.** A `local-feed/`
+  folder of 0.8.x nupkgs (an offline-restore test fixture) redirected qwen38-27b's entire budget
+  into hunting cache hits while frontier models ignored it; the stall vanished when the fixture
+  was deleted. The rule: any directory that resembles a package source but is not one carries a
+  README stating what it is and that public projects restore from nuget.org. (2026-08-28)
+
+- **Grader bugs fabricate results in both directions — gate on the score line existing.** An
+  empty grade file made a gate's score comparison vacuously true (a false ALL-STAGES-PASSED), and
+  a `set -u` unbound-variable crash zeroed scores mid-run. The rule: a gate fails when the score
+  line is absent, graders are smoke-tested against a known-good and a known-bad artifact before
+  first use, and grader-defect classes found during a campaign are recorded beside the results
+  they almost corrupted. (2026-08-28)
+
+- **Local-tier agent failures must name their layer: transport, sustainment, or commitment.**
+  The same "0/9, 0/1" outcome sat at three different layers: opencode↔Ollama dropped tool calls
+  on real tasks (transport); qwen38 `daily` ended turns mid-research (sustainment); `max`
+  researched for the full 45-minute cap and never wrote a file (commitment). The fix differs per
+  layer — a "fails locally" datapoint without the layer named is uninterpretable, and the levers
+  (different harness, auto-continue, task scaling) are operator decisions, never silent
+  substitutions. (2026-08-28)

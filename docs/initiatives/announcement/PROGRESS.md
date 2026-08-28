@@ -26,6 +26,32 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
 
 ## Ledger
 
+### 2026-08-28 — test02 MCP-enforcement column: first quality-axis datapoint (koan 13/13 zero-leak; control 0 leaks, 2 artifacts)
+
+- `matrix/tasks/mcp-enforcement/` executed on codex-sol-high, both arms. Adversarial battery:
+  two MCP sessions (anonymous + member) over Streamable HTTP, advertisement check
+  (no mutation tools offered to anonymous callers), enforcement probe (anonymous write attempt),
+  field projection (`cost` absent from every anonymous surface, present for members), plus the
+  HTTP battery.
+- **Koan arm: 13/13, LEAKS 0, 653 s** — `[Access]` + `[McpEntity]` declarations produced a
+  zero-leak governed MCP surface with zero security code written by the agent.
+- **Plain arm: 11/13, LEAKS 0, 568 s** — the control built a real MCP server via the official C#
+  SDK in stateless Streamable HTTP mode and gated it correctly on this run. Two check failures
+  were grader artifacts, recorded as such: cell snapshots inherit repo CPM (NU1008 on rebuild),
+  and the lenient tool-matcher called `update_recipe` without its required id. Both artifacts
+  have named fixes in the cell receipt.
+- Grader defect found and fixed during grading: a literal `mcp-session-id: none` fallback broke
+  evaluation of stateless servers — session header is now conditional. This is the third
+  harness-defect class the column execution has caught, all recorded.
+- Honest read: on this single run the control held (trained on the official MCP SDK) — the
+  quality headline awaits A02 repeats (does the control's gating hold across 5 independent
+  assemblies?) and the other harness rows. n=1; nothing publishes yet.
+- **Skill v6 A/B (verify-once pattern): inconclusive-to-negative at n=1.** v6 run measured 838 s,
+  11/13 (member-MCP checks failed this run), build/run cycles unchanged at 12 — vs v5's 653 s,
+  13/13. Zero leaks both. Recorded honestly: a sequencing sentence does not move frontier-model
+  loop behavior; if the lever is pursued it must be mechanical (a canonical probe script shipped
+  beside the skill). LEAKS 0 maintained across both skill versions.
+
 ### 2026-08-28 — WEB-0073 comprehensive verb-surface coverage landed (Web AdapterSurface TestKit)
 
 - Six new specs in `AdapterSurfaceSpecsBase` (inherited by all eight Web AdapterSurface adapter

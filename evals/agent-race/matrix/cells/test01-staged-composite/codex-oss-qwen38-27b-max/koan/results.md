@@ -1,38 +1,29 @@
-# Results — test01 staged composite · codex-oss-qwen38-27b-max · koan arm (attempt 1)
+# Results — test01 staged composite · codex-oss-qwen38-27b-max · koan arm (skill v5)
 
-- Harness: codex-cli 0.150.0 over Ollama, model `local-code-candidate:qwen38-27b-q4-max`,
-  loaded 100% GPU (20 GB into 24 GB VRAM, 98K context); cap 45 min; per-run overrides only
-- Treatment: prompt v3 arm line (koan skill pointer) + SKILL.md v4
+- Harness: codex-cli 0.150.0 over Ollama (`qwen38-27b-q4-max`, 100% GPU); cap 45 min/stage
+- Treatment: **skill v5** (verb surface in the one-block + draft-before-verify sequencing)
+- Outcome: **0/1 — cap hit at stage 1; code/ empty**
 
-| Stage | Battery | Wall clock | Outcome |
-|---|---|---|---|
-| 1 | 0/1 (no csproj produced; code/ empty) | 2701 s (cap hit) | sustained loop, no artifact |
+## v4 → v5 A/B verdict (koan arm)
 
-## Finding
+**v5 did not flip this cell.** Under v5 the agent ran the full budget again — but this time it
+got *further before stalling*: the `local-feed` trap is gone (deleted), the packages resolved
+(transcript shows it enumerating the correct `Sylin.Koan.* 1.0.x` versions from the public feed —
+the verb surface it stalled on in v4 is now native and documented in the one-block it read). The
+remaining blocker is budget arithmetic: a 27B local model at GPU speed turns slowly, and the
+composite's stage 1 (multi-file scaffold + build + verify) exceeds 45 min before the loop
+commitment point. The plain arm failed the same cap while *actively writing* — its apply-patches
+repeatedly died on a PowerShell parser error (diff-formatted lines pasted into the shell), a
+codex-on-Windows tooling friction independent of the task.
 
-The `max` tuning behaves differently from `daily` and better in one dimension: it **sustained
-the agentic loop for the entire 45-minute budget** (events grew steadily throughout) and its
-research was genuine — it independently discovered that `EntityController<T>` exposes PATCH
-rather than PUT and was verifying the governed path to add a PUT delegator, which is exactly the
-seam the successful frontier run subclassed. But it never committed a file: zero writes, empty
-workspace at cap.
+## Recorded for the next local-tier attempt
 
-Combined with `daily` (ends turns early during research) and the opencode cells (tool calls
-dropped), the local-tier picture is now:
+1. **Tier cap is the binding constraint, not skill content**: success-rate questions for this tier
+   need a longer budget (90–120 min) recorded as a tier-specific harness parameter — never mixed
+   into speed comparisons.
+2. **The apply-loop friction is real**: the plain arm's visible failure was diff-lines-in-shell
+   parsing. An auto-continue/apply-retry harness loop attacks this directly.
+3. v5's sequencing line did not induce earlier file writes at this scale — the model never
+   reached the write phase to benefit from it.
 
-| Model / pipe | Loop sustainment | Tool execution | Artifact produced |
-|---|---|---|---|
-| qwen35-9b · opencode | no | no | none |
-| qwen38-27b daily · opencode | no | dropped on real tasks | none |
-| qwen38-27b daily · codex-OSS | short turns | yes | none |
-| qwen38-27b max · codex-OSS | **yes, to cap** | yes | **none** |
-
-**Verdict: the local tier (qwen38-27b, both tunings, GPU-resident) cannot yet produce this
-application through any tested pipe.** The failure moved from tool transport (fixed) through
-loop sustainment (varies by tuning) to *research-without-commitment* — the model verifies
-indefinitely and never crosses into writing. This is recorded as the matrix's local-tier floor.
-Promising observation for a future attempt: the max tuning's behavior suggests a nudge-tolerant
-model exists here; a continuation-tolerant harness (auto-continuing turns until a file appears)
-or a direct "scaffold from the one-block skeleton now, verify after" instruction variant are the
-next levers — but as prompts must stay byte-identical across arms, those levers belong to the
-harness, not the prompt.
+Attempt 1 (skill v4) archived at `attempt1-skillv4/`.

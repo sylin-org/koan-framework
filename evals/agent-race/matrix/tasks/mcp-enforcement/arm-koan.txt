@@ -1,0 +1,1 @@
+Build this as a Koan application (the Koan .NET framework). A coding-agent skill for Koan is available in this repository: read F:\Replica\NAS\Files\repo\github\sylin-org\koan-framework\.agents\skills\koan\SKILL.md and follow it.

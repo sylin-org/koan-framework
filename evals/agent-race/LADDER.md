@@ -45,15 +45,20 @@ the grader author's material and are never quoted into the agent's prompt.
 | Staged composite | plain (agy-gemini) | 1 | 259 (93+34+132) | ~195 K/turn cum. | — | 9/9 → 16/16 → 22/22 |
 | Staged composite | koan (opencode-qwen35-9b) | 1 | 71 (stage 1) | ~32 K/turn | 97 | **0/9 — agent never engaged tools** |
 | Staged composite | plain (opencode-qwen35-9b) | 1 | 218 (stage 1) | — | — | **0/9 — partial scaffold, no build, no running app** |
+| MCP enforcement | koan (codex-sol-high) | 2 (skill v5 + v6) | 653 / 838 | — | — | **13/13 · 11/13 — LEAKS 0 both** |
+| MCP enforcement | plain (codex-sol-high) | 1 | 568 | — | — | 11/13 (2 grader artifacts), **LEAKS 0** |
 | Staged composite | koan (opencode-qwen38-27b) | 1 | 634 (stage 1) | — | — | **harness-blocked — tool calls emitted but never executed** |
 | Staged composite | koan (codex-oss-qwen38-27b) | 2 attempts | 634 / 665 (stage 1) | — | — | **0/1 ×2 — pipe works; model ends turn before writing** |
-| Staged composite | koan (codex-oss-qwen38-27b-max, 100% GPU) | 1 | 2701 (cap) | — | — | **0/1 — sustained loop to cap, researched the real PATCH/PUT seam, wrote nothing** |
+| Staged composite | koan (codex-oss-qwen38-27b-max, 100% GPU) | 2 (v4 ×1, v5 ×1) | 2701 both (cap) | — | — | **0/1 both — v4: fixture-stalled; v5: budget-bound research, no artifact** |
+| Staged composite | plain (codex-oss-qwen38-27b-max, v5) | 1 | 2701 (cap) | — | — | **0/1 — active writing; apply-patches died on PowerShell diff parsing** |
 
 Single-run results, not medians; A02 requires ≥5 per arm before any median publishes. The Koan
 arm's treatment is the `koan` skill (read-and-follow pointer in the prompt), current at **skill
-v4** — the greenfield one-block skeleton added 2026-08-27. Prior skill versions' runs are
-archived under `attempts/` and excluded. S01 honest reading: the one-block skeleton halved the
-cold-start cost (404→279 s, −44% input tokens vs v3); the control still leads plain CRUD.
+v5** (verb surface + draft-before-verify sequencing, 2026-08-28). The frontier S01 and staged
+composite rows were measured under v4 and re-baseline under v5 per the standing rule; earlier
+skill versions' runs are archived under `attempts/` and excluded. S01 honest reading under v4:
+the one-block skeleton halved the cold-start cost (404→279 s, −44% input tokens vs v3); the
+control still leads plain CRUD.
 
 **Staged composite honest reading (2026-08-28):** both codex arms passed all 22 checks, including
 the three keyword-disjoint semantic probes; the control was faster at every stage and ~4–5×
@@ -70,3 +75,12 @@ waits on transcript analysis. opencode + local qwen35-9b (≤12 GB) produced the
 datapoint yet: the model never engaged its tools — one turn, ~97 output tokens, no files, 0/9 —
 at this tier the question is not speed but whether an application exists at all (caveat: an
 opencode↔Ollama tool-calling gap cannot be separated from model ceiling in this run).
+
+**Local-tier verdict (2026-08-28, skill v5 A/B):** qwen38-27b-max at a 45-min/stage cap cannot
+complete stage 1 on **either arm**. The koan arm got further than v4 — the local-feed trap is
+gone, packages resolved correctly — but stayed budget-bound in research; the plain arm was
+actively writing and died on codex-on-Windows apply-patch friction (diff lines pasted into the
+shell). The tier's binding constraint is the budget/apply-loop, not framework knowledge.
+Success-rate comparisons for this tier need a 90–120-min cap recorded as a harness parameter, an
+apply-retry/auto-continue loop, or an S1-lite task — operator decisions, never silent
+substitutions.

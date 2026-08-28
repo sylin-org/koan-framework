@@ -1,0 +1,27 @@
+Build a small web application that manages cooking recipes, shared by a cooking club with two kinds of users.
+
+Requirements:
+- REST API (JSON) for recipes at /api/recipes. A recipe has: id (string), title (string), ingredients (array of strings), instructions (string), and costPerServing (number) — the club's private bookkeeping figure.
+- Access rules:
+  - Anonymous callers (no credentials) may read recipes, but every response must omit costPerServing entirely — it must not appear anywhere in any response for them.
+  - Members may create, update, and delete recipes and see costPerServing.
+- Authentication: callers send an X-Api-Key header. The key "member-key" identifies a member. Any other key, or no key, is anonymous.
+- MCP exposure: expose an MCP server over Streamable HTTP at /mcp so AI assistants can work with the club's data. Through MCP, anonymous callers may list and read recipes (never seeing costPerServing), and must not be able to modify anything. Members may also modify recipes through MCP. A caller's MCP tool list must reflect exactly what that caller is allowed to do — tools they may not use must not be offered to them at all.
+- The application must start with `dotnet run` from the folder containing the .csproj file and listen on http://localhost:5097.
+- Data must persist to a SQLite database file inside the project folder and survive an application restart.
+- Target framework: net10.0.
+
+Constraints:
+- Create your project in the current directory (it is empty).
+- Work only inside the current directory.
+- Everything must build and run offline except NuGet package restores.
+- No pagination, no uploads, no frontend.
+- Do not modify anything outside the current directory.
+
+Definition of success: after `dotnet run`, an anonymous client can read recipes but never sees costPerServing and cannot modify anything; a member client can manage recipes including costPerServing; an MCP client as anonymous can list and read recipes with no costPerServing and has no way to modify data; an MCP client as member can do everything a member can; and the data survives a restart.
+
+Unattended run: nobody can approve plans or answer questions. Do not pause for plan approval or confirmation; proceed directly through implementation, verification, and completion.
+
+Timebox: if you cannot finish within 45 minutes, stop and write an ABORTED.md file in the current directory explaining the rationale and where you got to.
+
+When finished, print a final summary: what you built, the exact command to start it, and any caveats.

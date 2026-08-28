@@ -2,50 +2,56 @@
 type: HANDOFF
 domain: announcement
 status: current
-last_updated: 2026-08-27
-framework_version: v1.0.12
+last_updated: 2026-08-28
+framework_version: v1.0.30
 ---
 
 # Announcement Initiative — current handoff
 
 ## Current state
 
-A01's harness is built and its smoke acceptance is met: scenario S01 has one canonical run per arm
-recorded with transcripts, wall clock, tokens, and 7/7 grader verdicts under
-`evals/agent-race/`.
+WEB-0073 (governed PUT + the entity verb map) is **implemented, proven, committed, and published**
+(Sylin.Koan.Web 1.0.30 / Sylin.Koan.Mcp 1.0.24 via the SignPath release pipeline on push to dev).
+The matrix (test01 staged composite) has receipts for five harness/model rows; the skill is at
+**v5** (verb surface + draft-before-verify sequencing).
 
-- Koan arm 321 s / 7/7; control arm 203 s / 7/7 — the control is faster on plain CRUD, so the
-  campaign's crossover hypothesis now rests on S02–S06. Do not publish any S01-only claim.
-- The unattended-run contract sentence is mandatory in every future prompt (the global `explore`
-  skill stalls unattended sessions that lack it).
-- The Koan-arm treatment is frozen as prompt v3: name Koan + point at
-  `.agents/skills/koan/SKILL.md` ("read it and follow it"). Do not widen the pointer back to the
-  repo root, and do not install the skill globally (control contamination). The skill itself is
-  at **v4** (greenfield one-block opening); any further skill edit is a new treatment version and
-  re-runs the paired S01 before more ladder data is collected.
-- A02's full execution (≥5 runs per arm per scenario) has not started.
+- Frontier/mid verdict (measured, robust): the plain control wins every timed stage — codex-sol
+  22/22 both arms (plain 2.2× faster, 4–5× cheaper in context); agy-gemini 22/22 both arms (plain
+  ~8× faster); claude-default koan 22/22 ($12.37), plain blocked on the operator's monthly spend
+  cap.
+- Local-tier verdict: qwen35-9b (opencode) and qwen38-27b-max (codex-OSS, both tunings) **fail at
+  task existence** — 0/1/0/9 at the caps. Binding constraint is budget + apply-loop friction
+  (PowerShell diff parsing), not framework knowledge. `local-feed/` fixture deleted (it trapped
+  the v4 attempt).
+- The full story, including the concurrent-session collision and its recovery, is in
+  [PROGRESS.md](PROGRESS.md).
 
 ## Next session
 
-1. Read `evals/agent-race/matrix/MATRIX.md` and the scoreboard in `LADDER.md`, then this ledger:
+1. Read `evals/agent-race/matrix/MATRIX.md`, the scoreboard + verdicts in `LADDER.md`, then
    [PROGRESS.md](PROGRESS.md).
-2. **test01 (staged composite) cell state**: complete pairs for codex-sol-high (both 22/22;
-   plain ~2.2× faster, ~4–5× cheaper) and agy-gemini (both 22/22; plain ~8× faster, koan S1
-   cap-hit during skill reading); opencode-qwen35-9b pair both **0/9 — task-existence failure**
-   at the local 9B tier (tool-engagement caveat recorded). claude-default koan 22/22 ($12.37);
-   **claude-plain blocked on the operator's monthly spend cap** — rerun after the raise.
-3. Priority experiments, in order: (a) the local-tier verdict is now **model-loop sustainment**:
-   the codex↔Ollama pipe works (`wire_api="responses"`, per-run overrides only, global config
-   untouched) but qwen38-27b ended both attempts mid-research without writing files — probe the
-   `max` tuning or another local family next; the `local-feed/` fixture was deleted on operator
-   order after attempt 1's confound (it was untracked and unreferenced); (b) A02 execution — ≥5
-   runs per arm on the headline cells (codex-sol-high pair, claude pair); (c) then the
-   MCP-enforcement and media-lifecycle tests as the next columns of the matrix.
-4. Standing rules: identical prompts across arms; unattended sentence mandatory; skill pinned at
-   v4 (a skill change re-baselines headline cells); no public claim from any cell with n<5.
+2. Priority experiments: (a) **local-tier second lap** — operator decision between a 90–120-min
+   tier cap (success-rate only), an apply-retry/auto-continue harness loop, or an S1-lite local
+   task; (b) **MCP-enforcement column** — task, README, and the two-session adversarial grader
+   are ready in `matrix/tasks/mcp-enforcement/`; materialize its runner (port 5097) and execute;
+   (c) **claude-plain** after the spend-cap raise; (d) **A02** — ≥5 runs per arm on headline
+   cells, re-baselined under skill v5.
+3. Then: the crossover graph (`coalesce` from `results.jsonl`), and the announcement written from
+   the chart — wins and losses both.
+
+## Standing rules
+
+- Identical task bodies across arms; only the arm line differs. Unattended-run sentence mandatory
+  in every prompt.
+- Skill is at **v5**; any skill edit is a new treatment version and re-baselines headline cells.
+- No public claim from any cell with n<5; verify means full unfiltered suites + solution-wide
+  build; every `MakeGenericType` on a changed contract gets swept repo-wide (the MCP translator
+  arity break was found exactly there).
 
 ## Validation
 
-- Docs-only change so far; no framework code touched.
-- If promoted public documents are edited along the way, run `pwsh scripts/public-docs-lint.ps1`
-  before commit.
+- Framework change (WEB-0073): build 0 errors; PatchOps 14/14; Web AdapterSurface InMemory 81/81
+  and Sqlite 59/59 full suites (incl. six new verb-surface specs); Mcp conformance 84/84 +
+  Operations 5/5 (the MCP translator arity regression was found and fixed in this pass).
+- Two pre-existing docs-lint errors await launch hygiene: README's missing `1.0` public-experience
+  anchor, and the `embedded-analytics-duckdb` promoted claim resolving to zero capability homes.
