@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Redis.Tests.Specs.Capabilities;
@@ -27,6 +28,11 @@ public sealed class RedisCapabilitiesSpec(RedisFixture fixture, ITestOutputHelpe
         caps.Has(DataCaps.Write.ConditionalReplace).Should().BeTrue();
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
         caps.Has(DataCaps.Query.ProviderBoundedPaging).Should().BeFalse();
+
+        // The Redis scan posture evaluates the whole filter AST over materialized records, so
+        // FilterSupport.Full must include the collection-element substring operator too.
+        var filterSupport = caps.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        filterSupport.CollectionOperators.Should().Contain(FilterOperator.HasContains);
 
         var partition = NewPartition();
         using var lease = Lease(partition);

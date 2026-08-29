@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Core.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,6 +26,11 @@ public sealed class JsonCapabilitiesSpec(JsonFixture fixture, ITestOutputHelper 
         caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
         caps.Has(DataCaps.Write.FastRemove).Should().BeFalse();
+
+        // The KeyValue family evaluates the whole filter AST over loaded records and declares
+        // FilterSupport.Full on that basis, so the collection-element substring operator is claimed too.
+        var filterSupport = caps.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        filterSupport.CollectionOperators.Should().Contain(FilterOperator.HasContains);
 
         var published = new ClaimCapture();
         new JsonAdapterFactory().DescribeClaims(published);

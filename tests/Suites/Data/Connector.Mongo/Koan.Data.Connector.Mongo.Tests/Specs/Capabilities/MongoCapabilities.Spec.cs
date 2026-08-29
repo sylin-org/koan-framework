@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Mongo.Tests.Specs.Capabilities;
@@ -24,6 +25,10 @@ public sealed class MongoCapabilitiesSpec(MongoFixture fixture, ITestOutputHelpe
         caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
         caps.Has(DataCaps.Write.AtomicBatch).Should().BeFalse();
         caps.Has(DataCaps.Write.FastRemove).Should().BeFalse();
+
+        // Mongo lowers collection-element substring natively ($elemMatch + $regex) and says so.
+        var filterSupport = caps.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        filterSupport.CollectionOperators.Should().Contain(FilterOperator.HasContains);
 
         var partition = NewPartition();
         using var lease = Lease(partition);

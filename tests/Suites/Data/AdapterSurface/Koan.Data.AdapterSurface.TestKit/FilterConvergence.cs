@@ -134,12 +134,13 @@ public static class FilterConvergence
     /// residual is expected. That is a declared limit, so the adapter's FilterSupport is what must say so:
     /// this fails when work lands in memory that the declaration implied the store would do.</para>
     /// </summary>
-    public static async Task AssertPushesDownAsync(IServiceProvider services)
+    public static async Task AssertPushesDownAsync(IServiceProvider services, bool expectsHasContainsPushdown = true)
     {
         await PushdownGuard.NothingFallsBack(services, "the shared filter corpus", AssertConvergesAsync);
         // The $like battery rides every suite that proves pushdown, with the receipt each adapter earned:
-        // store-executed where declared, residual-and-recorded where not.
-        await AssertHasContainsPostureAsync(services);
+        // store-executed where declared, residual-and-recorded where not. The expectation is pinned by
+        // the calling suite so a silently dropped (or silently added) advertisement fails here.
+        await AssertHasContainsPostureAsync(services, expectsHasContainsPushdown);
     }
 
     // --- the $like battery: same oracle, separate corpus, posture-aware receipts ---
@@ -205,12 +206,17 @@ public static class FilterConvergence
     /// that declares <see cref="FilterOperator.HasContains"/> must have the store execute the whole
     /// battery (no fallback fact), and one that does not must leave the residual recorded — the honest
     /// answer in both directions. A silent adapter is a defect in the silent adapter.
+    /// <paramref name="expectsPushdown"/> is the advertisement the suite promises on the adapter's
+    /// behalf; the facts advertisement itself is asserted against it.
     /// </summary>
-    public static async Task AssertHasContainsPostureAsync(IServiceProvider services)
+    public static async Task AssertHasContainsPostureAsync(IServiceProvider services, bool expectsPushdown)
     {
         var repo = services.GetRequiredService<IDataService>().GetRepository<HasContainsProbe, string>();
         var caps = DataCaps.Describe(repo, repo.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
         var declared = caps.CollectionOperators.Contains(FilterOperator.HasContains);
+
+        declared.Should().Be(expectsPushdown,
+            "the DataCaps.Query.Filter facts must advertise HasContains exactly where the suite pins it");
 
         if (declared)
         {

@@ -46,7 +46,8 @@ Every verb is a face of the same governed write/read pipeline — none of them b
 | `DELETE /api/todos/{id}` | Remove | |
 
 Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
-reference. When an external contract needs an exotic verb, subclass and delegate to the same
+reference. The `?filter=` payload speaks the closed query filter vocabulary —
+[the query filter vocabulary](../data/entities.md#the-query-filter-vocabulary) is the operator table. When an external contract needs an exotic verb, subclass and delegate to the same
 endpoint service — never to the data layer directly.
 
 ## The whole application declaration

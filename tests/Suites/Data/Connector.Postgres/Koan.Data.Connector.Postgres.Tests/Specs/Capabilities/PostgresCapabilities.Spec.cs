@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Core.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -26,6 +27,10 @@ public sealed class PostgresCapabilitiesSpec(PostgresFixture fixture, ITestOutpu
         caps.Has(DataCaps.Write.BulkDelete).Should().BeTrue();
         caps.Has(DataCaps.Write.FastRemove).Should().BeTrue();
         caps.Has(DataCaps.Write.BulkUpsert).Should().BeTrue();
+
+        // Postgres lowers collection-element substring natively (jsonb_array_elements_text LIKE) and says so.
+        var filterSupport = caps.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        filterSupport.CollectionOperators.Should().Contain(FilterOperator.HasContains);
 
         var factory = new PostgresAdapterFactory();
         factory.ReferenceIdentities.Should().Contain("Koan.Data.Connector.Postgres");
