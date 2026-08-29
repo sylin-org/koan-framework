@@ -30,20 +30,24 @@ The matrix (test01 staged composite) has receipts for five harness/model rows; t
 
 1. Read `evals/agent-race/matrix/MATRIX.md`, the scoreboard + verdicts in `LADDER.md`, then
    [PROGRESS.md](PROGRESS.md).
-2. Priority experiments: (a) **local-tier second lap** — operator decision between a 90–120-min
-   tier cap (success-rate only), an apply-retry/auto-continue harness loop, or an S1-lite local
-   task; (b) **MCP-enforcement column** — task, README, and the two-session adversarial grader
-   are ready in `matrix/tasks/mcp-enforcement/`; materialize its runner (port 5097) and execute;
-   (c) **claude-plain** after the spend-cap raise; (d) **A02** — ≥5 runs per arm on headline
-   cells, re-baselined under skill v5.
-3. Then: the crossover graph (`coalesce` from `results.jsonl`), and the announcement written from
-   the chart — wins and losses both.
+2. Priority experiments: (a) **test03 contract-v3 pair** — v3 written, v2 attempts archived
+   in-cell, grader smoke-proven both directions (v2-plain 11/14: carried checks reproduce, two
+   new ingredient checks fail exactly, one inherited-CPM build artifact; v2-koan 7/14: hollow
+   signature verbatim); fire the codex-sol pair (Ollama up, arms sequential on 5099, GPU-gated on
+   operator confirmation) and grade — the answer routes skill v7; (b) **MCP leak-rate
+   repeats** — test02's zero-leak pair needs A02's five assemblies before the quality claim
+   publishes; (c) **claude pair is complete** (plain 22/22, $6.21 — the cap did not bite) and is
+   the leading A02 candidate; (d) **local-tier second lap** — operator decision pending
+   (90–120-min cap, apply-retry loop, or S1-lite).
+3. Then: **A02** — ≥5 runs per arm on headline pairs under skill v6; `coalesce` + crossover graph;
+   announcement from the chart.
 
 ## Standing rules
 
 - Identical task bodies across arms; only the arm line differs. Unattended-run sentence mandatory
   in every prompt.
-- Skill is at **v5**; any skill edit is a new treatment version and re-baselines headline cells.
+- Skill is at **v6** (verify-once probe pattern); any skill edit is a new treatment version and
+  re-baselines headline cells.
 - No public claim from any cell with n<5; verify means full unfiltered suites + solution-wide
   build; every `MakeGenericType` on a changed contract gets swept repo-wide (the MCP translator
   arity break was found exactly there).

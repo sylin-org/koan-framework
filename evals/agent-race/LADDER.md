@@ -47,6 +47,9 @@ the grader author's material and are never quoted into the agent's prompt.
 | Staged composite | plain (opencode-qwen35-9b) | 1 | 218 (stage 1) | — | — | **0/9 — partial scaffold, no build, no running app** |
 | MCP enforcement | koan (codex-sol-high) | 2 (skill v5 + v6) | 653 / 838 | — | — | **13/13 · 11/13 — LEAKS 0 both** |
 | MCP enforcement | plain (codex-sol-high) | 1 | 568 | — | — | 11/13 (2 grader artifacts), **LEAKS 0** |
+| Relationships/pantry | koan (codex-sol-high) | 1 | 780 | — | — | **7/12 — hollow relational layer** (v1 contract: 9/12 with working queries) |
+| Relationships/pantry | plain (codex-sol-high) | 1 | 597 | — | — | **12/12 — complete incl. relational queries** |
+| Staged composite | plain (claude-default) | 1 | 1,209 (232+250+727) | cost: $6.21 | — | **9/9 → 16/16 → 22/22** |
 | Staged composite | koan (opencode-qwen38-27b) | 1 | 634 (stage 1) | — | — | **harness-blocked — tool calls emitted but never executed** |
 | Staged composite | koan (codex-oss-qwen38-27b) | 2 attempts | 634 / 665 (stage 1) | — | — | **0/1 ×2 — pipe works; model ends turn before writing** |
 | Staged composite | koan (codex-oss-qwen38-27b-max, 100% GPU) | 2 (v4 ×1, v5 ×1) | 2701 both (cap) | — | — | **0/1 both — v4: fixture-stalled; v5: budget-bound research, no artifact** |

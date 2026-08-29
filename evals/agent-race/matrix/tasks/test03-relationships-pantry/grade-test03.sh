@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test03 grader — HTTP only. usage: grade-test03.sh <project-dir>
+# test03 grader (contract v3) — HTTP only. usage: grade-test03.sh <project-dir>
 set -u
 PROJ="$(cd "$1" && pwd)"
 PORT="${GRADE_PORT:-5099}"; BASE="http://localhost:$PORT"
@@ -15,22 +15,27 @@ start_app() { (cd "$APPDIR" && exec dotnet "$DLL" --urls "$BASE" > "$PROJ/app.lo
   for i in $(seq 1 60); do curl -s -o /dev/null --max-time 2 "$BASE/api/recipes" && return 0; sleep 2; done; return 1; }
 stop_app() { kill "$APP_PID" 2>/dev/null; sleep 3; }
 start_app && note "CHECK pass start" || note "CHECK fail start"
-# seed: 12 ingredients, then 6 recipes with join lines
+# seed: 12 ingredients as first-class entities (contract v3), then 6 recipes with join lines
 mk() { curl -s -o /dev/null -w '%{http_code}' --max-time 15 -X POST "$BASE/api/ingredients" -H 'Content-Type: application/json' -d "{\"id\":\"$1\",\"name\":\"$1\"}"; }
 ING="milk salt onions garlic tomato pasta flour egg butter sugar chicken cream"
 SEED_OK=1
 for i in $ING; do c=$(mk "$i"); [[ "$c" == 2* || "$c" == 409* || "$c" == 400* ]] || SEED_OK=0; done
 [ $SEED_OK = 1 ] && note "CHECK pass seed-ingredients" || note "CHECK fail seed-ingredients"
+INGLIST=$(curl -s --max-time 15 "$BASE/api/ingredients" 2>/dev/null)
+echo "$INGLIST" | grep -q milk && echo "$INGLIST" | grep -q salt \
+  && note "CHECK pass list-ingredients" || note "CHECK fail list-ingredients"
 rec() { curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST "$BASE/api/recipes" -H 'Content-Type: application/json' -d "$1"; }
-LINES_M480='{"name":"milk","quantity":480,"unit":"ml"}'; LINES_M300='{"name":"milk","quantity":300,"unit":"ml"}'; LINES_M15='{"name":"milk","quantity":15,"unit":"tbsp"}'
-rec "{\"title\":\"Pancakes\",\"instructions\":\"Fry.\",\"ingredients\":[$LINES_M480,{\"name\":\"flour\"},{\"name\":\"egg\"}]}" > /dev/null
-rec "{\"title\":\"Cream Sauce\",\"instructions\":\"Stir.\",\"ingredients\":[$LINES_M300,{\"name\":\"butter\"},{\"name\":\"pasta\"}]}" > /dev/null
-rec "{\"title\":\"Big Feast\",\"instructions\":\"Feast.\",\"ingredients\":[$LINES_M15,{\"name\":\"onions\"},{\"name\":\"salt\"},{\"name\":\"garlic\"},{\"name\":\"tomato\"},{\"name\":\"pasta\"},{\"name\":\"flour\"},{\"name\":\"egg\"},{\"name\":\"butter\"},{\"name\":\"sugar\"},{\"name\":\"chicken\"},{\"name\":\"cream\"}]}" > /dev/null
-rec "{\"title\":\"Onion Soup\",\"instructions\":\"Simmer.\",\"ingredients\":[{\"name\":\"onions\"},{\"name\":\"salt\"},{\"name\":\"garlic\"}]}" > /dev/null
-rec "{\"title\":\"Salted Pasta\",\"instructions\":\"Boil.\",\"ingredients\":[{\"name\":\"pasta\"},{\"name\":\"salt\"}]}" > /dev/null
-rec "{\"title\":\"Veggie Mix\",\"instructions\":\"Toss.\",\"ingredients\":[{\"name\":\"onions\"},{\"name\":\"tomato\"},{\"name\":\"garlic\"}]}" > /dev/null
-titles | grep -q "Big Feast" && note "CHECK pass create-join" || note "CHECK fail create-join"
-UC=$(curl -s --max-time 15 "$BASE/api/ingredients/milk/usage-count" | jq -r '.. | .count? // empty' 2>/dev/null | head -1)
+M480='{"name":"milk","quantity":480,"unit":"ml"}'; M300='{"name":"milk","quantity":300,"unit":"ml"}'; M15='{"name":"milk","quantity":15,"unit":"tbsp"}'
+C1=$(rec '{"title":"Pancakes","instructions":"Fry.","ingredients":['"$M480"',{"name":"flour"},{"name":"egg"}]}')
+C2=$(rec '{"title":"Cream Sauce","instructions":"Stir.","ingredients":['"$M300"',{"name":"butter"},{"name":"pasta"}]}')
+C3=$(rec '{"title":"Big Feast","instructions":"Feast.","ingredients":['"$M15"',{"name":"onions"},{"name":"salt"},{"name":"garlic"},{"name":"tomato"},{"name":"pasta"},{"name":"flour"},{"name":"egg"},{"name":"butter"},{"name":"sugar"},{"name":"chicken"},{"name":"cream"}]}')
+C4=$(rec '{"title":"Onion Soup","instructions":"Simmer.","ingredients":[{"name":"onions"},{"name":"salt"},{"name":"garlic"}]}')
+C5=$(rec '{"title":"Salted Pasta","instructions":"Boil.","ingredients":[{"name":"pasta"},{"name":"salt"}]}')
+C6=$(rec '{"title":"Veggie Mix","instructions":"Toss.","ingredients":[{"name":"onions"},{"name":"tomato"},{"name":"garlic"}]}')
+ALLC="$C1$C2$C3$C4$C5$C6"
+N200=$(grep -o 2 <<< "$ALLC" | wc -l)
+[ "$N200" = "6" ] && note "CHECK pass create-recipes" || note "CHECK fail create-recipes (codes $ALLC)"
+UC=$(curl -s --max-time 15 "$BASE/api/ingredients/milk/usage-count" | jq -r '.count? // empty' 2>/dev/null | head -1)
 [ "$UC" = "3" ] && note "CHECK pass usage-count-milk" || note "CHECK fail usage-count-milk (got $UC)"
 CONV=$(curl -s --max-time 20 "$BASE/api/recipes/using?ingredient=milk&minQuantity=300&unit=ml" | jq -r '.. | .title? // empty' 2>/dev/null)
 echo "$CONV" | grep -q "Pancakes" && echo "$CONV" | grep -q "Cream Sauce" && ! echo "$CONV" | grep -q "Big Feast" \
@@ -39,15 +44,16 @@ STAT=$(curl -s --max-time 15 "$BASE/api/stats" | jq -r '.recipesWithMoreThan10In
 [ "$STAT" = "1" ] && note "CHECK pass stat-over10" || note "CHECK fail stat-over10 (got $STAT)"
 MATCH=$(curl -s --max-time 20 -X POST "$BASE/api/recipes/match" -H 'Content-Type: application/json' \
   -d '{"pantry":[{"name":"milk","quantity":480,"unit":"ml"},{"name":"salt"},{"name":"onions","quantity":2,"unit":"piece"},{"name":"pasta","quantity":1,"unit":"piece"}]}')
-FIRST=$(echo "$MATCH" | jq -r '([.[]?] | .[0]) // empty' 2>/dev/null)
-FIRST_TITLE=$(echo "$FIRST" | jq -r '.. | .title? // empty' 2>/dev/null | head -1)
-FIRST_MISSING=$(echo "$FIRST" | jq -r '.. | .missing? // empty | length' 2>/dev/null | head -1)
+FIRST_TITLE=$(echo "$MATCH" | jq -r '.[0].title? // empty' 2>/dev/null)
+FIRST_MISSING=$(echo "$MATCH" | jq -r '.[0].missingCount? // empty' 2>/dev/null)
 [ "$FIRST_TITLE" = "Salted Pasta" ] && [ "$FIRST_MISSING" = "0" ] \
-  && note "CHECK pass pantry-full-match-first" || note "CHECK fail pantry-full-match-first"
-LAST_TITLE=$(echo "$MATCH" | jq -r '[.. | .title? // empty] | map(select(length>0)) | last' 2>/dev/null)
-LAST_MISSING=$(echo "$MATCH" | jq -r '[.. | objects | select(has("missing")) | .missing | length] | last' 2>/dev/null)
-[ "$LAST_TITLE" = "Big Feast" ] && [ "${LAST_MISSING:-0}" -ge 8 ] \
+  && note "CHECK pass pantry-full-match-first" || note "CHECK fail pantry-full-match-first (first=$FIRST_TITLE missing=$FIRST_MISSING)"
+LAST_TITLE=$(echo "$MATCH" | jq -r '.[-1].title? // empty' 2>/dev/null)
+LAST_MISSING=$(echo "$MATCH" | jq -r '.[-1].missingCount? // empty' 2>/dev/null)
+[ "$LAST_TITLE" = "Big Feast" ] && [ "$LAST_MISSING" = "8" ] \
   && note "CHECK pass pantry-rank-last" || note "CHECK fail pantry-rank-last (last=$LAST_TITLE missing=$LAST_MISSING)"
+echo "$MATCH" | jq -e '.[0].missing? == []' >/dev/null 2>&1 \
+  && note "CHECK pass pantry-missing-empty-list" || note "CHECK fail pantry-missing-empty-list"
 stop_app
 start_app && note "CHECK pass restart-persistence" || note "CHECK fail restart-persistence"
 probe() { local q titles3

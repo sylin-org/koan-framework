@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# MCP-enforcement cell runner — single task, one stage. usage: run-test03.sh <koan|plain>
+# test03 relationships-pantry cell runner — single task, one stage. usage: run-test03.sh <koan|plain>
 # Mirrors the staged-composite runners: identical task body, arm line differs only.
-# No Ollama anywhere in this task (pure web + MCP), so it is GPU-free by design.
+# Execution requires Ollama up (semantic search embeds through the app) — confirm the GPU is
+# free with the operator before firing; arms run sequential on the shared 5099 grading port.
 set -u
 cd "$(dirname "$0")"
 ARM="${1:?usage: run-test03.sh <koan|plain>}"
 REPO="$(cd ../../../../.. && pwd)"
 G="$PWD"
 MODEL="${MCP_HARNESS:-codex-sol-high}"
-CELL="$REPO/evals/agent-race/matrix/cells/test03-rel-enforcement/$MODEL/$ARM"
+CELL="$REPO/evals/agent-race/matrix/cells/test03-relationships-pantry/$MODEL/$ARM"
 ART="$CELL/transcripts"
 mkdir -p "$ART"
 

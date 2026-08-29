@@ -21,10 +21,78 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
 
 - Overall: `active`
 - Current tranche: `T0 — Receipts`
-- Active work item: none (A01 is next and fully specified)
+- Active work item: test03 contract-v3 pair re-fire (codex-sol-high, both arms)
 - Active child: none
 
 ## Ledger
+
+### 2026-08-28 — Contract v3 written: v1's first-class Ingredient structure + v2's earned shape pins; v2 attempts archived; grader smoke-proven both directions
+
+- **Design.** v3 restores what v2 removed — Ingredient as a first-class entity with required
+  endpoints (`GET/POST /api/ingredients`, id = lowercase name; recipe lines reference by name) —
+  because v2's "ingredients do not need their own endpoints" line removed the structure that led
+  the koan arm to model the join at all. Every v2 pin is kept byte-verbatim: match envelope
+  `{title, missingCount, missing[]}` best-first, stats key, `{"count":N}` usage shape, conversion
+  table (glass=240 ml, tbsp=15 ml, piece=1), presence-only lines, both semantic probes. The task
+  text states HTTP observables only — endpoints and shapes, never a modeling approach — so it
+  stays arm-neutral. Battery grows 12 → 14 checks (seed-ingredients, list-ingredients added).
+- **Smoke receipts (standing rule: known-good AND known-bad before first use).** Graded the
+  preserved v2 apps under the v3 grader. v2-plain app: 11/14 — every carried check reproduced its
+  v2 pass, and the two new checks failed exactly (no ingredient endpoints exist); the extra
+  `build` fail is the recorded inherited-repo-CPM artifact (NU1008) that only fires when a plain
+  snapshot builds inside the repo tree — real plain-arm runs grade from the neutral folder, as in
+  v2. v2-koan app: 7/14 — the hollow signature reproduced verbatim (usage-count got 0, stat got
+  0, pantry "first=Big Feast missing=0") plus the two new fails. The grader discriminates in both
+  directions before any agent time is spent.
+- **v2 attempts archived in-cell**: `cells/test03-relationships-pantry/codex-sol-high/<arm>/
+  attempt2-contract-v2/` (beside `attempt1-contract-v1/`), preserving both apps for exactly this
+  kind of re-grading.
+- **The re-run's question:** contract v3 + unchanged skill v6. If the koan arm now builds real
+  relationship queries, the v2 hollow layer was contract-steering; if it hollows again, it is a
+  skill gap and v7 (relationship compound in the one-block) is the measured counter. Either
+  answer feeds the announcement chart. Pair firing is GPU-gated on operator confirmation
+  (Ollama up, arms sequential on 5099).
+
+### 2026-08-28 — Contract v2 pair: plain 12/12 perfect; koan 7/12 hollow relational layer — the campaign's sharpest negative
+
+- **Plain arm: 12/12 in 597 s** — join modeling, usage-count (=3), cross-unit conversion filter,
+  >10 stat, fully-ranked pantry match (Salted Pasta first missing-0, Big Feast last missing-8),
+  restart persistence, both semantic probes. A complete, correct implementation of the whole
+  contract.
+- **Koan arm: 7/12 — the relational layer is hollow.** CRUD, semantic probes, restart pass; but
+  usage-count = 0, conversion filter wrong, pantry match reports every recipe fully covered (the
+  matcher does not compare). The agent modeled ingredient lines as unindexed embedded data rather
+  than declaring `[Parent]` join entities — the relationship grammar it needed was one
+  skill-descent away, and it never descended.
+- **Root-cause chain (recorded, not speculated):** contract v2's "ingredients do not need their
+  own endpoints; auto-register by name" is textually arm-neutral but not effect-neutral — it
+  removed the structure that leads the koan arm to model Ingredient as a first-class entity, and
+  without that entity there is no `[Parent]` edge and no relationship query to hollow out. The
+  plain arm has no relationship surface to under-use, so it simply built the join correctly.
+- **Standing consequence:** the skill's one-block (v6) does not mention `[Parent]` or the
+  relationship query pattern, and the promoted leaf only landed during this campaign. Skill v7
+  (relationship compound in the one-block) is the direct counter, to be measured as its own
+  treatment version — WEB-0073's lesson one level up: capabilities an agent cannot find do not
+  exist.
+- Framework backlog candidate from the same evidence: a scaffold/analyzer-level guard or template
+  that surfaces the relationship query pattern whenever lines reference other entities by name.
+  Filed as a dogfood-loop output.
+
+### 2026-08-28 — Chain day: claude pair completed ($6.21 plain, 22/22); test03 column run — grader/contract shape investigation opened
+
+- **Claude pair is complete.** plain arm: 22/22 in ≈20.2 min for **$6.21** (vs koan arm 22/22,
+  ≈30.9 min, $12.37). Both claude rows are the strongest A02 candidates: demonstrated, cheap to
+  repeat, harness-reported cost.
+- **test03 (relationships/pantry) ran on codex-sol-high, both arms — and stopped honestly.**
+  Koan 9/12, plain 8/12. The relational queries the task probes **passed on both arms**:
+  usage-count by name (=3), the cross-unit conversion filter (≥300 ml caught 480/300 and
+  excluded 15 tbsp), the >10-ingredients stat, restart persistence, and semantic probe 1 on both
+  arms (probe 2 missed on plain only). The shared failure signature — create-with-embedded-lines
+  and the pantry-match response shape, on both arms — redirects suspicion to the task contract's
+  create-shape clarity and the grader's match parsing. Investigation queued before re-grade;
+  neither attempt counts as a model verdict.
+- Chain also re-confirmed: claude's staged-composite stage-2 battery (16/16) matches the
+  test03-adjacent q-and-* checks, and semantic probes held on the koan arm under skill v6.
 
 ### 2026-08-28 — test02 MCP-enforcement column: first quality-axis datapoint (koan 13/13 zero-leak; control 0 leaks, 2 artifacts)
 
