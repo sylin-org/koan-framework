@@ -31,6 +31,9 @@ public sealed class TodosController : EntityController<Todo>;
 
 - `Entity<T>` is the first-class application language and IntelliSense discovery surface.
 - References make capabilities available; `AddKoan()` compiles generated semantic modules once.
+- Capability accessors (`.Job`, `.Ai`) follow one anatomy (ARCH-0135): C# 14 extension members
+  delivering a stateless verb struct; verbs are short inside the facade, qualified in the flat
+  namespace; an operation whose subject is the instance reads as the entity's own verb.
 - A functional assembly normally owns one domain-named `KoanModule`. Identity derives from standard
   package/assembly identity; do not invent a second Koan ID.
 - Contracts consumed across modules live in isolated Core, Abstractions, or Contracts assemblies

@@ -20,8 +20,9 @@ public sealed class Note : Entity<Note>
     public string Title { get; set; } = "";
 }
 
-/// <summary>Rollout item 3: the type-scoped AI gateway — Note.AI.Search/Embed/Similar —
-/// bound to the kind's declared embedding configuration, proven over the in-memory stack.</summary>
+/// <summary>Rollout item 3: the type-scoped AI gateway — Note.Ai.Search/Embed — and the instance
+/// twin note.Similar(), bound to the kind's declared embedding configuration, proven over the
+/// in-memory stack.</summary>
 public sealed class EntityAiGatewaySpec
 {
 
@@ -44,10 +45,10 @@ public sealed class EntityAiGatewaySpec
         return host;
     }
 
-    private sealed class FixedWidthPipeline(int width) : IAiPipeline
+    private sealed class FixedWidthPipeline(int width, float[]? vector = null) : IAiPipeline
     {
         public Task<AiEmbeddingsResponse> Embed(AiEmbeddingsRequest request, CancellationToken ct = default) =>
-            Task.FromResult(new AiEmbeddingsResponse { Vectors = [new float[width]], Model = "measured-embed" });
+            Task.FromResult(new AiEmbeddingsResponse { Vectors = [vector ?? new float[width]], Model = "measured-embed" });
 
         public Task<AiChatResponse> Prompt(AiChatRequest request, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<string> Prompt(string message, string? model = null, AiPromptOptions? opts = null, CancellationToken ct = default) => throw new NotSupportedException();
@@ -64,7 +65,21 @@ public sealed class EntityAiGatewaySpec
         var note = await new Note { Title = "sunset over the harbor" }.Save();
         await Vector<Note>.Save(note.Id, new float[5]);
 
-        var hits = await Note.AI.Search("sunset", limit: 5);
+        var hits = await Note.Ai.Search("sunset", s => s.Top(5));
+
+        hits.Should().ContainSingle(e => e.Id == note.Id);
+    }
+
+    [Fact]
+    public async Task search_without_configuration_uses_defaults()
+    {
+        using var host = await StartHostAsync();
+        using var pipeline = Client.With(new FixedWidthPipeline(5));
+
+        var note = await new Note { Title = "sunset over the harbor" }.Save();
+        await Vector<Note>.Save(note.Id, new float[5]);
+
+        var hits = await Note.Ai.Search("sunset");
 
         hits.Should().ContainSingle(e => e.Id == note.Id);
     }
@@ -78,10 +93,30 @@ public sealed class EntityAiGatewaySpec
         var note = await new Note { Title = "dawn over the hills" }.Save();
         await Vector<Note>.Save(note.Id, new float[5]);
 
-        var scored = await Note.AI.SearchScored("dawn", limit: 5);
+        var scored = await Note.Ai.SearchScored("dawn", s => s.Top(5));
 
         scored.Should().ContainSingle(m => m.Entity.Id == note.Id);
         scored[0].Similarity.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task threshold_filters_scored_matches()
+    {
+        using var host = await StartHostAsync();
+        using var pipeline = Client.With(new FixedWidthPipeline(5, [1f, 0, 0, 0, 0]));
+
+        var aligned = await new Note { Title = "aligned" }.Save();
+        await Vector<Note>.Save(aligned.Id, [1f, 0, 0, 0, 0]);
+        var orthogonal = await new Note { Title = "orthogonal" }.Save();
+        await Vector<Note>.Save(orthogonal.Id, [0f, 1, 0, 0, 0]);
+
+        var scored = await Note.Ai.SearchScored("aligned", s => s.Top(5).Threshold(0.75));
+
+        scored.Should().ContainSingle(m => m.Entity.Id == aligned.Id);
+        scored.Should().NotContain(m => m.Entity.Id == orthogonal.Id);
+
+        var unfiltered = await Note.Ai.SearchScored("aligned", s => s.Top(5));
+        unfiltered.Should().HaveCount(2);
     }
 
     [Fact]
@@ -90,7 +125,7 @@ public sealed class EntityAiGatewaySpec
         using var host = await StartHostAsync();
         using var pipeline = Client.With(new FixedWidthPipeline(5));
 
-        var vector = await Note.AI.Embed(new Note { Title = "embed me" });
+        var vector = await Note.Ai.Embed(new Note { Title = "embed me" });
 
         vector.Should().HaveCount(5);
     }
@@ -104,7 +139,7 @@ public sealed class EntityAiGatewaySpec
         var note = await new Note { Title = "the source" }.Save();
         await Vector<Note>.Save(note.Id, new float[5]);
 
-        var similar = await Note.AI.Similar(note, limit: 5);
+        var similar = await note.Similar(limit: 5);
 
         similar.Should().NotContain(n => n.Id == note.Id, "find-similar excludes the source by default");
     }

@@ -6,7 +6,7 @@ namespace Koan.Data.AI.Tests;
 /// <summary>
 /// Tests for Phase 2: Query Extensions
 ///
-/// IMPORTANT: SemanticSearch and FindSimilar methods require actual AI/vector infrastructure
+/// IMPORTANT: SemanticSearch and Similar methods require actual AI/vector infrastructure
 /// to test their behavior. These cannot be meaningfully unit tested without:
 /// - AI embedding service (Ai.Embed)
 /// - Vector database (Vector.Search)

@@ -66,6 +66,7 @@ public static class EntityEmbeddingExtensions
     public static async Task<List<(TEntity Entity, double Similarity)>> SemanticSearchScored<TEntity>(
         string query,
         int limit = 10,
+        double threshold = 0.0,
         string? partition = null,
         CancellationToken ct = default)
         where TEntity : class, IEntity<string>, new()
@@ -88,6 +89,9 @@ public static class EntityEmbeddingExtensions
         var matches = new List<(TEntity Entity, double Similarity)>();
         foreach (var match in vectorResults.Items)
         {
+            if (match.Similarity < threshold)
+                continue;
+
             var entity = await LoadEntity<TEntity>(match.Id, partition, ct);
             if (entity != null)
             {
@@ -99,10 +103,11 @@ public static class EntityEmbeddingExtensions
     }
 
     /// <summary>
-    /// Finds entities similar to the current entity based on embedding similarity.
+    /// The entities most similar to this one, by embedding similarity — the instance twin of the
+    /// type-scoped <c>Todo.Ai.Search</c>. Excludes the source entity by default.
     /// Works by convention - no [Embedding] attribute required for on-demand use.
     /// </summary>
-    public static async Task<List<TEntity>> FindSimilar<TEntity>(
+    public static async Task<List<TEntity>> Similar<TEntity>(
         this TEntity entity,
         int limit = 10,
         double threshold = 0.7,

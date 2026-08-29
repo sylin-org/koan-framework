@@ -245,7 +245,7 @@ if (capabilities.Has(VectorCaps.Knn))
 
 ---
 
-## 3.5 The Type-Scoped Gateway - Entity.AI
+## 3.5 The Type-Scoped Gateway - Entity.Ai
 
 Sections 1-3 are the primitives. When you want the shortcut - search and embed scoped to one
 Entity kind, bound to its declared embedding configuration - the gateway collapses the dance:
@@ -254,21 +254,26 @@ Entity kind, bound to its declared embedding configuration - the gateway collaps
 using Koan.Data.AI;
 
 // embed the query, search, load entities - one call:
-var media = await Media.AI.Search("sunset beach", limit: 20);
+var media = await Media.Ai.Search("sunset beach", s => s.Top(20));
 
 // with similarity scores:
-var scored = await Media.AI.SearchScored("sunset beach", limit: 20);
+var scored = await Media.Ai.SearchScored("sunset beach", s => s.Top(20));
 
 // embed one instance through its declared model/source:
-var vector = await Media.AI.Embed(media);
+var vector = await Media.Ai.Embed(media);
 
-// similar entities, excluding the source itself:
-var similar = await Media.AI.Similar(media, limit: 10);
+// entities similar to one instance, excluding the source itself - the instance verb:
+var similar = await media.Similar(limit: 10);
 ```
 
-Routing honors the kind's `[Embedding]` declaration (model + source) automatically, so queries
-and indexing stay on the same model by construction. Convention-first: `Search` works even
-without the attribute. Requires `Sylin.Koan.Data.AI` 1.0.13 or newer.
+The declaration lambda carries `Top`, `Threshold`, and `Partition`; omit it for the defaults
+(top 10, no threshold). Routing honors the kind's `[Embedding]` declaration (model + source)
+automatically, so queries and indexing stay on the same model by construction. Convention-first:
+`Search` works even without the attribute.
+
+> Published packages through 1.0.23 spell this `Media.AI.Search("sunset beach", limit: 20)` with
+> a static `Media.AI.Similar(media)`; the `.Ai` spelling and instance `Similar` land in the next
+> `Sylin.Koan.Data.AI` release.
 
 ## 4. Hybrid Search – Semantic + Keyword
 

@@ -4,7 +4,7 @@ domain: ai
 title: "Semantic search"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-24
+last_updated: 2026-08-28
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-24
@@ -63,11 +63,11 @@ Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.
   supported path; if saves report "no declared space", the owned flow above owns the fix.
 - Do not hand-write embedding pipelines beside `Client.Embed`.
 
-## The type-scoped shortcut: `Entity.AI`
+## The type-scoped shortcut: `Entity.Ai`
 
 For applications that just want semantic search over one Entity kind, the four-step dance —
 embed the query, `Vector<T>.Search`, fan out `Get`, map results — collapses into the type
-gateway. `Sylin.Koan.Data.AI` 1.0.13 or newer delivers `YourEntity.AI.*` to every Entity kind:
+gateway. `Sylin.Koan.Data.AI` delivers `YourEntity.Ai.*` to every Entity kind:
 
 ```csharp
 using Koan.Core;                       // AddKoan()
@@ -80,23 +80,31 @@ using Koan.Data.AI.Attributes;         // [Embedding]
 await new Produce { Name = "Cherry tomatoes", Description = "sweet, quick" }.Save(ct);
 
 // Search by meaning - embeds the query, finds nearest vectors, loads the entities.
-var produce = await Produce.AI.Search("something quick before the game", limit: 10);
+var produce = await Produce.Ai.Search("something quick before the game", s => s.Top(10));
 
 // With similarity scores attached:
-var scored = await Produce.AI.SearchScored("something quick", limit: 10);
+var scored = await Produce.Ai.SearchScored("something quick", s => s.Top(10).Threshold(0.7));
 // scored[i].Entity / scored[i].Similarity
 
 // Embed one instance through the kind's declared model + source:
-var vector = await Produce.AI.Embed(produce);
+var vector = await Produce.Ai.Embed(produce);
 
-// Find entities similar to one instance (excludes itself by default):
-var similar = await Produce.AI.Similar(produce, limit: 10);
+// Entities similar to one instance (excludes itself by default) - the instance verb:
+var similar = await produce.Similar(limit: 10);
 ```
+
+The declaration lambda carries `Top`, `Threshold`, and `Partition`; omit it for the defaults
+(top 10, no threshold).
 
 The gateway is bound to the same `[Embedding]` declaration as indexing — model, source and
 dimensions route automatically, so the one-model constraint above is enforced by construction.
 `Search` is convention-first (works without the attribute); the attribute remains the authority
 for indexing behavior. Usings: `Koan.Data.AI` for the gateway; your model's regular usings.
+
+> **Feed boundary.** Published packages through 1.0.23 spell the gateway
+> `Produce.AI.Search(query, limit: 10)` with a static `Produce.AI.Similar(produce)`. The `.Ai`
+> spelling, the `s => s.Top(...)` declaration, and the instance `produce.Similar(...)` verb land
+> in the next `Sylin.Koan.Data.AI` release.
 
 ## Leaves
 

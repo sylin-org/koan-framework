@@ -4,13 +4,14 @@ domain: framework
 title: "Entity capability gateways"
 audience: [maintainers, framework-authors, module-authors]
 status: proposed
-last_updated: 2026-08-25
+last_updated: 2026-08-28
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-25
+  date_last_tested: 2026-08-28
   status: reviewed
   scope: platform pattern ratified by Leo 2026-08-25; Canon ships the reference implementation
-    (Person.Canon). Jobs and AI are the next pilots; remaining pillars follow the rollout order below.
+    (Person.Canon). Jobs pilot conformant (2026-08-25); AI pilot shipped (2026-08-28) as `.Ai`
+    with the accessor anatomy codified in ARCH-0135; remaining pillars follow the rollout order below.
 ---
 
 # Entity capability gateways
@@ -20,7 +21,7 @@ One place per entity type where each capability's surface lives:
 ```csharp
 Person.Canon.*      // reconciliation rules, stages, rebuild        (Sylin.Koan.Canon)
 Person.Jobs.*       // schedule, queue, inspect this kind's jobs    (Sylin.Koan.Jobs)
-Person.AI.*         // embed, semantic search helpers               (capability packages)
+Person.Ai.*         // embed, semantic search helpers               (Sylin.Koan.Data.AI)
 Person.Events.*     // raise/observe this kind's events             (Sylin.Koan.Communication)
 ```
 
@@ -69,7 +70,14 @@ the pipeline ahead of user Validation contributors.
      (queue item 3), so it lands with or after that slice, not before.
    - Discovery relocation of `IKoanJob<T>.Execute` is thereby CLOSED without code: the interface
      remains the authoring contract (it owns the handler); the capability surface is the gateway.
-3. **AI** — `Person.AI.Embed/Search` bound to the model's declared embedding configuration.
+3. **AI** — SHIPPED (2026-08-28): `EntityAiGatewayExtensions` delivers `.Ai` (`AiStatics<T>`:
+   `Search` / `SearchScored` with a `SemanticSearchQuery` declaration builder, plus `Embed`) via
+   C# 14 static extension members constrained on `Entity<T>` — thin router over `EntityAi` and
+   the vector facade, bound to the kind's declared `[Embedding]` configuration, absent without the
+   package reference. Instance similarity ships as the entity's own verb (`note.Similar()`) per
+   ARCH-0135's subject rule, which now codifies the whole accessor anatomy. (Published packages
+   through 1.0.23 spell the gateway `.AI` with positional parameters; the rename rides the next
+   release.)
 4. **Events/Communication** — mirror the instance-side `order.Events.Raise` as type-scoped
    subscription/handler registration.
 5. Remaining pillars case-by-case; capabilities without per-type semantics keep their pillar facades

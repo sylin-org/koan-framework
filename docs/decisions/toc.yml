@@ -208,6 +208,8 @@
       href: ARCH-0133-client-steered-cache-is-a-gate-not-a-pipeline-call.md
     - name: ARCH-0134 A capabilities tree routes agent knowledge by intent
       href: ARCH-0134-a-capabilities-tree-routes-agent-knowledge-by-intent.md
+    - name: ARCH-0135 Capability accessors follow one anatomy
+      href: ARCH-0135-capability-accessors-follow-one-anatomy.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

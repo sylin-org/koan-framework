@@ -4,7 +4,7 @@ recipe: search-by-meaning
 title: "Search by meaning"
 domain: ai
 status: current
-last_updated: 2026-08-24
+last_updated: 2026-08-28
 audience: [ai-agents, developers]
 framework_version: v1.0.0
 validation:
@@ -123,7 +123,38 @@ addition breaks:
 Each category takes `Source`, `Model`, `Via`, and `Fallback` independently.
 
 Expose a bounded search by embedding the query with that same configured model, searching the Entity's
-vector space, and loading the matching Entities:
+vector space, and loading the matching Entities. Referencing `Sylin.Koan.Data.AI` composes those three
+moves into one Entity gateway:
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/articles/search")]
+public sealed class ArticleSearchController : ControllerBase
+{
+    public sealed record Hit(string Id, string Title, double Score);
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Hit>>> Search(
+        [FromQuery] string q,
+        [FromQuery] int k = 5,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest("Query parameter 'q' is required.");
+
+        var matches = await Article.Ai.SearchScored(q, s => s.Top(Math.Clamp(k, 1, 20)), ct);
+        return Ok(matches.Select(m => new Hit(m.Entity.Id, m.Entity.Title, m.Similarity)));
+    }
+}
+```
+
+`s => s.Top(...)` is a `SemanticSearchQuery` declaration (`Top`, `Threshold`, `Partition`); omit the
+lambda to take the defaults (top 10, no threshold). The gateway is current in the dev source and
+proven by `EntityAiGatewaySpec`; published 1.0.x packages may predate it, and on those the long form
+below is the path this page verified against the feed. The long form also stays the right shape when
+you need the vector execution receipt or the raw match list:
 
 ```csharp
 using Koan.AI;           // Client.Embed lives here

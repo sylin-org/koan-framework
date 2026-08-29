@@ -25,12 +25,26 @@ an operation runs; they are not retained by the metadata cache.
 
 ### On-demand semantic search (no attributes required)
 
+Referencing this package gives every Entity kind an `.Ai` gateway — search, scores, embed — and
+every instance a `Similar` verb:
+
+```csharp
+var results = await Article.Ai.Search("machine learning basics", s => s.Top(10));
+var scored  = await Article.Ai.SearchScored("quick wins", s => s.Top(10).Threshold(0.7));
+var similar = await someArticle.Similar(limit: 5);
+```
+
+The declaration lambda is optional (`Article.Ai.Search("…")` takes the defaults: top 10, no
+threshold) and carries `Top`, `Threshold`, and `Partition` — see `SemanticSearchQuery`.
+
+The static surface underneath remains for code that is not standing on an Entity kind:
+
 ```csharp
 using static Koan.Data.AI.EntityEmbeddingExtensions;
 
 // Embed and search without any attribute decoration
 var results = await SemanticSearch<Article>("machine learning basics", limit: 10);
-var similar  = await someArticle.FindSimilar(limit: 5);
+var similar  = await someArticle.Similar(limit: 5);
 ```
 
 ### Auto-embed on save (opt-in with `[Embedding]`)
