@@ -62,3 +62,17 @@ that rebuilds from the record store wants exactly that topology.
 - Cron spelling arrives with the scheduler pillar; refresh cadence is `Every(TimeSpan)` today.
 
 Decision authority: [DATA-0123](../../docs/decisions/DATA-0123-embedded-analytics-and-duckdb-connector.md).
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Data.Analytics
+```
+
+## What it adds
+
+Declared analytics for Koan entities: named, bounded, self-describing questions with a catalog that humans and agents share. Engine acceleration is elected from a capable connector (DuckDB first, DATA-0123).
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.

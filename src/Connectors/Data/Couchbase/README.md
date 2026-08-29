@@ -102,3 +102,7 @@ applied to every KV mutation. Invalid values fail during route construction. `Sc
 - External queries require externally managed indexes. Koan does not create them as a side effect.
 
 See [TECHNICAL.md](TECHNICAL.md) for the complete implementation contract and evidence.
+
+## What it adds
+
+Couchbase provider for Koan Data with direct KV, SQL++, CAS, compact mappings, and neutral source integration.

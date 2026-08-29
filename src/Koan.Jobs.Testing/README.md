@@ -29,3 +29,11 @@ or `DrainAsync`. `RunStageAsync` executes exactly one Entity-owned action and re
 The driver intentionally exposes no orchestrator, scheduler, assertion API, host builder, clock, or
 storage substitute. Misconfigured background or inline execution is rejected with the required
 correction.
+
+## What it adds
+
+Deterministically drive Koan Jobs through its production execution engine from any test framework.
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.

@@ -117,3 +117,7 @@ streaming is not snapshot-consistent or resumable and concurrent writes can caus
 - License: Apache-2.0
 - [Technical reference](TECHNICAL.md)
 - [Data adapter development primer](../../../../docs/architecture/data-adapter-development-primer.md)
+
+## What it adds
+
+MongoDB data provider for Koan: options binding and repository integration for document databases.

@@ -60,3 +60,9 @@ expansion. Dimensions, metric, visibility, placement policy, and space name rema
 - [Technical reference](./TECHNICAL.md)
 - [Vector reference](../../../../../docs/reference/ai/vector.md)
 - [Data adapter development primer](../../../../../docs/architecture/data-adapter-development-primer.md)
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Data.Vector.Connector.SqliteVec
+```

@@ -126,3 +126,7 @@ produce startup warnings; add `[McpDescription]` only when richer agent guidance
 - `Koan.Mcp.Operations` — optional, explicitly enabled Jobs/Cache control-plane tools with grants and audit.
 
 See [TECHNICAL.md](TECHNICAL.md) for composition and transport details.
+
+## What it adds
+
+Model Context Protocol integration for Koan entity endpoints: discovery, schema, execution, and transports.

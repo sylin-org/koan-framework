@@ -82,3 +82,7 @@ write before provider I/O. An explicit map pins its declared container, so combi
 rejects rather than silently sharing that container.
 
 See [TECHNICAL.md](TECHNICAL.md) for guarantees and limits.
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.

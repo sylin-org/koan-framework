@@ -65,3 +65,7 @@ also delivered to `ARGV` in declaration order.
 - Bulk and managed-query limits are correctness boundaries, not tuning hints.
 
 See [TECHNICAL.md](TECHNICAL.md) for key layout, options, and operational constraints.
+
+## What it adds
+
+Redis keyed Entity persistence for Koan with native TTL, bounded managed sets, compact JSON mapping, read-only Functions, and shared connection ownership.

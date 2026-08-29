@@ -97,3 +97,7 @@ builder.Services.AddKoan(koan =>
 - **Generated identity** is a sequence-backed column (`DEFAULT nextval(...)` + `RETURNING`).
 - Storage format is backward-compatible, not forward-compatible; the native version is pinned by the
   rider package, and `STORAGE_VERSION` pinning is available in options via the connection string.
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.

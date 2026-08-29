@@ -82,3 +82,7 @@ Operator budgets are available through `QdrantOptions`: request timeout, per-poi
 search candidates, and response bytes. They bound work; they do not redefine vector semantics.
 
 See [TECHNICAL.md](./TECHNICAL.md) for the provider realization and failure contract.
+
+## What it adds
+
+Qdrant vector provider for Koan: plan-bound Entity vector search, native payload filtering, and session-visible mutations over REST.

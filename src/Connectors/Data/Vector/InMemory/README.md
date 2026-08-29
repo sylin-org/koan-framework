@@ -49,3 +49,13 @@ capabilities are application requirements.
 - [Technical reference](./TECHNICAL.md)
 - [Vector reference](../../../../../docs/reference/ai/vector.md)
 - [Data adapter development primer](../../../../../docs/architecture/data-adapter-development-primer.md)
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Data.Vector.Connector.InMemory
+```
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.

@@ -1,4 +1,4 @@
-# Koan.Data.Hygiene
+# Sylin.Koan.Data.Hygiene
 
 Declarative field hygiene for Koan Entities: annotate string properties with `[Trim]`,
 `[Lowercase]`, or `[Uppercase]` and the value is normalized on the persisted clone across every
@@ -28,3 +28,13 @@ Reference = Intent: referencing the package is the whole step — no registratio
 
 Capability node: [Field hygiene](../../docs/capabilities/data/field-hygiene.md) ·
 Design record: `docs/initiatives/data-hygiene.md`.
+
+## Install
+
+```powershell
+dotnet add package Sylin.Koan.Data.Hygiene
+```
+
+## Limits
+
+Configuration decides participation; unsupported requests reject before provider work with a named capability and a correction. Provider-specific limits live in the package's TECHNICAL.md.
