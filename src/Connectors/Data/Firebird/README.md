@@ -1,4 +1,4 @@
-# Koan Data Connector: Firebird
+# Sylin.Koan.Data.Connector.Firebird
 
 Firebird 5 relational storage for Koan. Reference the package, call `AddKoan()`, and `Entity<T>`
 persistence runs against a Firebird server — same `Save`/`Get`/`Query`/`Page` vocabulary as every
@@ -24,7 +24,7 @@ A `firebird://user:password@host:port/database` URI is accepted and normalized t
 The database is a file on the server; under managed lifecycle policy the adapter creates it when
 absent (`FbConnection.CreateDatabase`) before the first table DDL.
 
-## What it declares
+## What it adds
 
 | Capability | State |
 |---|---|

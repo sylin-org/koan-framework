@@ -1,4 +1,4 @@
-# Koan Data Connector: CouchDB
+# Sylin.Koan.Data.Connector.CouchDb
 
 Apache CouchDB document storage for Koan. Reference the package, call `AddKoan()`, and `Entity<T>`
 persistence runs against CouchDB over plain HTTP — no driver package, no vendor client, just
@@ -33,7 +33,7 @@ prefix (`Database` defaults to `koan`; `Todo` lives in `koan_todo_<namesuffix>`)
 partitions resolve to distinct physical databases; database-scoped routing selects the prefix per
 source.
 
-## What it declares
+## What it adds
 
 | Capability | State |
 |---|---|
@@ -43,7 +43,7 @@ source.
 | Atomic batch | **not declared** — `_bulk_docs` commits per document; item outcomes are complete |
 | Provider-bounded paging (streams) | **not declared** — Mango has no server-side cursor; streaming rejects |
 
-## Store notes (learned the hard way)
+## Limits and store notes (learned the hard way)
 
 - Any top-level document member starting with `_` is rejected ("Bad special document member"). The
   framework-managed isolation discriminators (underscore-prefixed by convention) therefore ride in a

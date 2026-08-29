@@ -62,14 +62,15 @@ Findings already gathered (save the next session the recon):
   requires rows for assessed pieces); the matrix is generated — note for regeneration (run
   `scripts/build-connector-matrix.ps1` at a boundary; pre-existing shelf failure
   `Sylin.Koan.Data.Hygiene` is NOT this task's and predates it).
-- AOT publish attempt (DONE 2026-08-29): a `PublishAot=true` win-x64 consumer referencing BOTH
-  Firebird and CouchDb publishes clean (single binary) but fails AT STARTUP:
-  `HealthProbeScheduler` (Koan.Core.Observability.Health) has "no suitable constructor" under ILC —
-  a Koan.Core AOT gap that blocks ANY adapter's consumer proof, independent of the adapters
-  (CouchDB is pure BCL; FirebirdClient's wire-level AOT compatibility remains unverified past that
-  point). The AOT guide's publish-and-run rule caught exactly what a publish-success proxy would
-  have hidden. Next session: fix HealthProbeScheduler's ILC constructor visibility (likely
-  [DynamicallyAccessedMembers] or explicit ctor registration in Koan.Core), rerun this probe.
+- AOT publish attempt (DONE, FIXED 2026-08-29): the `PublishAot=true` win-x64 consumer over
+  Firebird+CouchDb published clean and died at startup on `HealthProbeScheduler` ("no suitable
+  constructor" under ILC). FIXED at the seam: `[param:/property: DynamicallyAccessedMembers(
+  PublicConstructors)]` on `KoanRegistry`'s `BackgroundServiceDescriptor.ServiceType` and
+  `ServiceDiscoveryAdapterDescriptor.ServiceType` — the Types reach DI by reflection through the
+  generated registry, so their ctors needed rooting. Probe binary now boots and serves HTTP 200;
+  Koan.Tests.Core.Unit 119/119 green. Remaining AOT surface (out of scope, recorded): trim warnings
+  IL2026/IL3050 in `KoanLockfileSerializer` (System.Text.Json reflection), and FirebirdClient's
+  wire-level AOT behavior past boot is still unverified.
 - `MakeGenericType` sweep: done per seam (clean); re-run after vector/AI.
 
 ### 4. Final report

@@ -4,7 +4,7 @@ domain: framework
 title: "Koan durable working memory"
 audience: [maintainers, architects, ai-agents]
 status: current
-last_updated: 2026-08-20
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-20
@@ -563,3 +563,31 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   layer — a "fails locally" datapoint without the layer named is uninterpretable, and the levers
   (different harness, auto-continue, task scaling) are operator decisions, never silent
   substitutions. (2026-08-28)
+- **A discovered-descriptor Type needs its constructors rooted, and only the run finds the gap.**
+  An adapter consumer published clean as a single NativeAOT binary and died at startup:
+  `ValidateOnBuild` could not find "a suitable constructor" for `HealthProbeScheduler`, whose Type
+  reaches DI through the generated `KoanRegistry` descriptors and is activated by
+  `Describe(type, type, ...)` — nothing static, so ILC trimmed every ctor. The fix is
+  `[param:|property: DynamicallyAccessedMembers(PublicConstructors)]` on the descriptor's Type
+  (BOTH targets: a positional record's `[property:]` alone does not cover the ctor param the
+  trimmer flows through). Publish-success would have hidden it forever; the binary's first run is
+  the authority, and the same probe now serves 200. (2026-08-29)
+- **A container fixture whose engine image ships no HEALTHCHECK hangs forever on the default wait.**
+  `UntilContainerIsHealthy` waits for a status nothing will ever report — the Firebird suite sat
+  27 minutes with zero output and an idle test process. Wait on the internal port instead
+  (`UntilInternalTcpPortIsAvailable`) or a real endpoint, and when a run stalls with no output,
+  stack the test process (`dotnet-stack report -p <pid>`): no test thread running means the fixture
+  never finished, not that a spec is slow. Prefer running the xunit v3 exe directly for live output.
+  (2026-08-29)
+- **Regenerate generated truth at the boundary, and know which command owns the file.**
+  `package-quality.json` (102) had drifted to 105 projects — `Hygiene` shipped but was absent, so
+  the shelf check read a stale world; the connector matrix likewise. The writer is
+  `dotnet run --project tools/Koan.Packaging -- quality --output docs/reference/package-quality.json`
+  (plain `inventory` prints a raw dump with trailing garbage, not the file), then
+  `scripts/build-connector-matrix.ps1`. After regeneration the deeper latent defects surface (a
+  shelf row missing its **not assessed** marker) — fix those, don't re-stale the file. (2026-08-29)
+- **The package quality gate greps README shape, not intent**: the title line must be the exact
+  `# <PackageId>`, install must be a real `dotnet add` expression, meaningful use and boundaries are
+  recognized by heading keywords ("what it adds", "limits", "unsupported", "guarantees"...). Write
+  the headings the gate can see; two new connectors went review-required → structurally-ready on
+  nothing but title and heading spelling. (2026-08-29)

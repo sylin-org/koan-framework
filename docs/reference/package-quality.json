@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 98,
-    "repairRequired": 0,
-    "reviewRequired": 10,
-    "structurallyReady": 88,
-    "ownedReadmes": 98,
-    "technicalCompanions": 98,
-    "findings": 18
+    "packages": 105,
+    "repairRequired": 2,
+    "reviewRequired": 14,
+    "structurallyReady": 89,
+    "ownedReadmes": 103,
+    "technicalCompanions": 101,
+    "findings": 32
   },
   "findingDefinitions": [
     {
@@ -30,10 +30,22 @@
       "correction": "Show the smallest honest result and explain what referencing the package makes available."
     },
     {
+      "code": "docs.readme.owned.missing",
+      "severity": "error",
+      "summary": "The package falls back to the framework root README.",
+      "correction": "Add a package-owned README that explains this reference intent and its smallest meaningful result."
+    },
+    {
       "code": "docs.readme.package-title.missing",
       "severity": "warning",
       "summary": "The README does not use the exact package ID as its primary title.",
       "correction": "Use the exact package ID as the primary title so the NuGet page and source companion identify the same product."
+    },
+    {
+      "code": "docs.technical.missing",
+      "severity": "warning",
+      "summary": "No package-owned technical companion describes runtime or build ownership.",
+      "correction": "Add TECHNICAL.md when this package owns non-trivial activation, lifecycle, provider, projection, or build behavior; otherwise confirm during R11 review that the README contains the complete contract."
     }
   ],
   "packages": [
@@ -84,7 +96,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity<T> with ReAct reasoning.",
+      "description": "Entity-aware autonomous agents for Koan AI: auto-generated tools from Entity\u003CT\u003E with ReAct reasoning.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -171,7 +183,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "In-process embedding generation for Koan via ONNX Runtime. Runs a local sentence-embedding model (e.g. all-MiniLM-L6-v2) with a WordPiece tokenizer entirely in-process — no model server, no network. The embeddings rung of the single-binary tier.",
+      "description": "In-process embedding generation for Koan via ONNX Runtime. Runs a local sentence-embedding model (e.g. all-MiniLM-L6-v2) with a WordPiece tokenizer entirely in-process \u2014 no model server, no network. The embeddings rung of the single-binary tier.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -195,7 +207,9 @@
       "targetFrameworks": [
         "net10.0"
       ],
-      "dependencies": [],
+      "dependencies": [
+        "Sylin.Koan.AI.Contracts.Shared"
+      ],
       "readme": "src/Koan.AI.Contracts/README.md",
       "technicalDocumentation": "src/Koan.AI.Contracts/TECHNICAL.md",
       "packageIcon": "icon.png",
@@ -410,7 +424,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "Redis-backed Remote Cache and layered every-node invalidation, using Koan's shared Redis backend without activating Data.",
+      "description": "Redis-backed Remote Cache and layered every-node invalidation, using Koan\u0027s shared Redis backend without activating Data.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -458,7 +472,8 @@
       ],
       "dependencies": [
         "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core"
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Jobs"
       ],
       "readme": "src/Koan.Canon/README.md",
       "technicalDocumentation": "src/Koan.Canon/TECHNICAL.md",
@@ -602,7 +617,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Entity-aware AI operations for Koan: EntityAi.Embed/Chat/Ocr, [Embedding] convention defaults, [MediaAnalysis] auto-processing pipeline, and cross-modal search via the MediaAnalysisEmbeddingBridge.",
+      "description": "Entity-aware AI operations for Koan: the Entity.Ai gateway (Search/SearchScored/Embed), the instance Similar verb, EntityAi chat/OCR helpers, [Embedding] convention defaults, [MediaAnalysis] auto-processing pipeline, and cross-modal search via the MediaAnalysisEmbeddingBridge.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -618,6 +633,57 @@
       "technicalDocumentation": "src/Koan.Data.AI/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Analytics",
+      "projectPath": "src/Koan.Data.Analytics/Koan.Data.Analytics.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "review-required",
+      "description": "Declared analytics for Koan entities: named, bounded, self-describing questions with a catalog that humans and agents share. Engine acceleration is elected from a capable connector (DuckDB first, DATA-0123).",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational"
+      ],
+      "readme": "src/Koan.Data.Analytics/README.md",
+      "technicalDocumentation": null,
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.install.missing",
+        "docs.readme.meaningful-use.missing",
+        "docs.technical.missing"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Analytics.Web",
+      "projectPath": "src/Koan.Data.Analytics.Web/Koan.Data.Analytics.Web.csproj",
+      "shape": "library",
+      "role": "projection",
+      "status": "repair-required",
+      "description": "The analytics catalog and ask surface over HTTP and MCP: one vocabulary served to browsers, services, and agents.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Analytics",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Mcp",
+        "Sylin.Koan.Web"
+      ],
+      "readme": null,
+      "technicalDocumentation": null,
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.owned.missing",
+        "docs.technical.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Backup",
@@ -670,7 +736,7 @@
       "shape": "library",
       "role": "provider",
       "status": "review-required",
-      "description": "Couchbase provider for Koan Data with direct KV, SQL++, CAS, compact mappings, and neutral source integration.",
+      "description": "Couchbase provider for Koan Data with direct KV, SQL\u002B\u002B, CAS, compact mappings, and neutral source integration.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -684,6 +750,68 @@
       "packageIcon": "icon.png",
       "findings": [
         "docs.readme.meaningful-use.missing"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Connector.CouchDb",
+      "projectPath": "src/Connectors/Data/CouchDb/Koan.Data.Connector.CouchDb.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "Apache CouchDB provider for Koan data: document persistence over plain HTTP with Mango filter pushdown and governed source routing.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core"
+      ],
+      "readme": "src/Connectors/Data/CouchDb/README.md",
+      "technicalDocumentation": "src/Connectors/Data/CouchDb/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Connector.DuckDb",
+      "projectPath": "src/Connectors/Data/DuckDb/Koan.Data.Connector.DuckDb.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "review-required",
+      "description": "Embedded DuckDB provider for Koan Entity data: an in-process analytical engine for aggregation, bulk load, and lakehouse file queries, with full Entity CRUD over local storage.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Analytics",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational"
+      ],
+      "readme": "src/Connectors/Data/DuckDb/README.md",
+      "technicalDocumentation": "src/Connectors/Data/DuckDb/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.boundaries.missing"
+      ]
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Connector.DuckDb.Native",
+      "projectPath": "src/Connectors/Data/DuckDb.Native/Koan.Data.Connector.DuckDb.Native.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "repair-required",
+      "description": "Native DuckDB engine (per-RID libduckdb) for Sylin.Koan.Data.Connector.DuckDb. Reference alongside the connector; the connector alone carries only the managed ADO.NET bindings.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [],
+      "readme": null,
+      "technicalDocumentation": null,
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.owned.missing",
+        "docs.technical.missing"
       ]
     },
     {
@@ -705,6 +833,27 @@
       ],
       "readme": "src/Connectors/Data/ElasticSearch/README.md",
       "technicalDocumentation": "src/Connectors/Data/ElasticSearch/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Connector.Firebird",
+      "projectPath": "src/Connectors/Data/Firebird/Koan.Data.Connector.Firebird.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "Firebird provider for Koan relational data with managed schema lifecycle, atomic writes, and governed source routing.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Relational"
+      ],
+      "readme": "src/Connectors/Data/Firebird/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Firebird/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },
@@ -820,7 +969,7 @@
       "shape": "library",
       "role": "provider",
       "status": "structurally-ready",
-      "description": "PostgreSQL provider for Koan relational data: Dapper-based SQL integration with guardrails and governance.",
+      "description": "PostgreSQL provider for Koan relational data: raw-ADO SQL integration with guardrails and governance.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -872,6 +1021,7 @@
       ],
       "dependencies": [
         "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Analytics",
         "Sylin.Koan.Data.Core",
         "Sylin.Koan.Data.Relational"
       ],
@@ -941,6 +1091,31 @@
       "technicalDocumentation": "src/Koan.Data.Cutover/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Hygiene",
+      "projectPath": "src/Koan.Data.Hygiene/Koan.Data.Hygiene.csproj",
+      "shape": "library",
+      "role": "capability",
+      "status": "review-required",
+      "description": "Declarative field hygiene for Koan Entities - [Trim], [Lowercase] and [Uppercase] normalize annotated string properties on the persisted clone across every write path.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core"
+      ],
+      "readme": "src/Koan.Data.Hygiene/README.md",
+      "technicalDocumentation": null,
+      "packageIcon": "icon.png",
+      "findings": [
+        "docs.readme.boundaries.missing",
+        "docs.readme.install.missing",
+        "docs.readme.package-title.missing",
+        "docs.technical.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Data.Relational",
@@ -1203,7 +1378,7 @@
       "shape": "library",
       "role": "provider",
       "status": "review-required",
-      "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite's local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
+      "description": "Durable in-process vector adapter for Koan over sqlite-vec (asg017 vec0 v0.1.9) as a loadable SQLite extension. It can share SQLite\u0027s local database while k-NN runs in-process with no server. Native vec0 binaries for win-x64/linux-x64/linux-arm64 ship embedded and extract on first use.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1250,7 +1425,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "SEC-0007 — the durable person (Identity) and the sign-in → identity reconciliation seam. Implements Koan.Web.Auth's IUserStore / IExternalIdentityStore with Entity<>-backed durable stores, upserts an Identity from claims on every sign-in, and gives Membership.IdentityId a real backing entity. Reference = Intent.",
+      "description": "SEC-0007 \u2014 the durable person (Identity) and the sign-in \u2192 identity reconciliation seam. Implements Koan.Web.Auth\u0027s IUserStore / IExternalIdentityStore with Entity\u003C\u003E-backed durable stores, upserts an Identity from claims on every sign-in, and gives Membership.IdentityId a real backing entity. Reference = Intent.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1351,7 +1526,7 @@
       "projectPath": "src/Koan.Mcp/Koan.Mcp.csproj",
       "shape": "library",
       "role": "capability",
-      "status": "structurally-ready",
+      "status": "review-required",
       "description": "Model Context Protocol integration for Koan entity endpoints: discovery, schema, execution, and transports.",
       "targetFrameworks": [
         "net10.0"
@@ -1366,7 +1541,9 @@
       "readme": "src/Koan.Mcp/README.md",
       "technicalDocumentation": "src/Koan.Mcp/TECHNICAL.md",
       "packageIcon": "icon.png",
-      "findings": []
+      "findings": [
+        "docs.readme.meaningful-use.missing"
+      ]
     },
     {
       "packageId": "Sylin.Koan.Mcp.Explorer",
@@ -1629,7 +1806,7 @@
       "shape": "template",
       "role": "template",
       "status": "structurally-ready",
-      "description": "`dotnet new` templates for the Koan Framework: koan-web (minimal Entity + EntityController web API) and koan-console (Entity CRUD console app), both over Sqlite and ready to run.",
+      "description": "\u0060dotnet new\u0060 templates for the Koan Framework: koan-web (minimal Entity \u002B EntityController web API), koan-semsearch (semantic search over your Entities via [Embedding] \u002B SqliteVec \u002B Ollama), koan-review (human-in-the-loop review queue over IReviewable Entities), and koan-console (Entity CRUD console app), all ready to run.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1670,6 +1847,7 @@
         "net10.0"
       ],
       "dependencies": [
+        "Sylin.Koan.Identity.Tenancy",
         "Sylin.Koan.Tenancy",
         "Sylin.Koan.Web"
       ],
@@ -1684,7 +1862,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Koan conformance kit — your app inherits a test suite. Subclass EntityConformanceSpecs<T> (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.",
+      "description": "Koan conformance kit \u2014 your app inherits a test suite. Subclass EntityConformanceSpecs\u003CT\u003E (one method per entity); trait-gated batteries run round-trip, pushdown-vs-reference-oracle, paging, partition isolation, caching and embedding conformance automatically.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1705,7 +1883,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Koan test harness — xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.",
+      "description": "Koan test harness \u2014 xUnit v3 Testcontainers fixtures (KoanContainerFixture / KoanDataSpec) for engine-backed integration tests.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1725,7 +1903,7 @@
       "shape": "library",
       "role": "capability",
       "status": "structurally-ready",
-      "description": "Koan test harness — the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app's tests.",
+      "description": "Koan test harness \u2014 the AddKoan() integration host (KoanIntegrationHost), xUnit-agnostic. Boot a real compiled Koan composition in your app\u0027s tests.",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -1898,7 +2076,7 @@
       "shape": "library",
       "role": "projection",
       "status": "structurally-ready",
-      "description": "SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code + PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).",
+      "description": "SEC-0006 embedded OAuth 2.1 Authorization Server for Koan: the MCP auth on-ramp. Mints asymmetric (ES256) access tokens for OAuth clients via Authorization Code \u002B PKCE and the Device Authorization Grant, advertises itself per the MCP authorization spec, and reuses the trust fabric for issuance. Opt-in leaf (Reference = Intent).",
       "targetFrameworks": [
         "net10.0"
       ],
@@ -2030,78 +2208,6 @@
       "technicalDocumentation": "src/Koan.ZenGarden.Contracts/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
-    },
-    {
-      "packageId": "Sylin.Koan.Data.Connector.DuckDb",
-      "projectPath": "src/Connectors/Data/DuckDb/Koan.Data.Connector.DuckDb.csproj",
-      "shape": "library",
-      "role": "provider",
-      "status": "structurally-ready",
-      "description": "Embedded DuckDB provider for Koan Entity data: an in-process analytical engine for aggregation, bulk load, and lakehouse file queries, with full Entity CRUD over local storage. Carries managed bindings only; pair with the Native rider for the engine binary. The elected analytics engine (DATA-0123).",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Sylin.Koan.Data.Analytics",
-        "DuckDB.NET.Data"
-      ],
-      "readme": "src/Connectors/Data/DuckDb/README.md"
-    },
-    {
-      "packageId": "Sylin.Koan.Data.Connector.DuckDb.Native",
-      "projectPath": "src/Connectors/Data/DuckDb.Native/Koan.Data.Connector.DuckDb.Native.csproj",
-      "shape": "library",
-      "role": "provider",
-      "status": "structurally-ready",
-      "description": "Native DuckDB engine (per-RID libduckdb, pinned to the connector's engine version) for Sylin.Koan.Data.Connector.DuckDb. Reference alongside the connector; the connector alone carries only the managed ADO.NET bindings.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "DuckDB.NET.Bindings.Full"
-      ],
-      "readme": "src/Connectors/Data/DuckDb/README.md"
-    },
-    {
-      "packageId": "Sylin.Koan.Data.Analytics",
-      "projectPath": "src/Koan.Data.Analytics/Koan.Data.Analytics.csproj",
-      "shape": "library",
-      "role": "capability",
-      "status": "structurally-ready",
-      "description": "Declared analytics for Koan entities: named, bounded, self-describing questions with a catalog shared by code, HTTP, and agents. Execution composes over the entity's relational record store; materialized projections land in the elected analytics engine (DATA-0123).",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Abstractions",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Relational",
-        "Microsoft.Extensions.Hosting.Abstractions"
-      ],
-      "readme": "src/Koan.Data.Analytics/README.md"
-    },
-    {
-      "packageId": "Sylin.Koan.Data.Analytics.Web",
-      "projectPath": "src/Koan.Data.Analytics.Web/Koan.Data.Analytics.Web.csproj",
-      "shape": "library",
-      "role": "surface",
-      "status": "structurally-ready",
-      "description": "The analytics catalog and ask surface over HTTP and MCP: /analytics/catalog, /analytics/run/{name}, the materialized read-model door, the refresh trigger, and the analytics.list_questions / analytics.ask agent tools.",
-      "targetFrameworks": [
-        "net10.0"
-      ],
-      "dependencies": [
-        "Sylin.Koan.Core",
-        "Sylin.Koan.Data.Core",
-        "Sylin.Koan.Data.Analytics",
-        "Sylin.Koan.Web",
-        "Sylin.Koan.Mcp"
-      ],
-      "readme": "src/Koan.Data.Analytics/README.md"
     }
   ]
 }

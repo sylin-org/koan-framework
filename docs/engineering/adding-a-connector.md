@@ -4,7 +4,7 @@ domain: framework
 title: "Adding a connector"
 audience: [maintainers, contributors]
 status: current
-last_updated: 2026-08-14
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-17
@@ -268,6 +268,14 @@ public sealed class AcmeConnectorFixture : IAsyncLifetime
 }
 ```
 
+Two fixture facts that cost this tree a 27-minute silent hang: if the engine image ships **no
+HEALTHCHECK** (the official `firebirdsql/firebird`, for one), the default
+`Wait.ForUnixContainer().UntilContainerIsHealthy()` waits forever — wait on the internal port
+(`UntilInternalTcpPortIsAvailable`) or a real endpoint instead. And when a suite stalls with no
+output, stack the test process (`dotnet-stack report -p <pid>`): an idle process with no test thread
+means the fixture never finished. `dotnet test` buffers everything; running the xunit v3 test exe
+directly (under the shared output root) streams results live.
+
 The specs:
 
 ```csharp
@@ -294,6 +302,13 @@ dotnet run --project tools/Koan.Packaging -- inventory
 
 dotnet test tests/Suites/Data/Connector.Acme/Koan.Data.Connector.Acme.Tests/Koan.Data.Connector.Acme.Tests.csproj
 #   At least one passing spec.
+
+# Regenerate the evaluated truth your package just changed:
+dotnet run --project tools/Koan.Packaging -- quality --output docs/reference/package-quality.json
+pwsh scripts/build-connector-matrix.ps1
+pwsh scripts/skills-verify.ps1 -Structure
+#   The inventory must list the new package; the matrix gains the provider with the ⚠ (unassessed)
+#   marker; the skills gate must pass before the PR.
 ```
 
 ### Step 9 — Open a pull request to `dev`

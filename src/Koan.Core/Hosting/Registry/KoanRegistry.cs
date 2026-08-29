@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.ComponentModel;
 using Koan.Core.Semantics;
 using Koan.Core.Semantics.Contributions;
@@ -115,8 +116,12 @@ public static partial class KoanRegistry
         _discoveredImplementors.Clear();
     }
 
+    // The ServiceType of a discovered descriptor reaches DI as a bare Type (Describe/TryAddSingleton by
+    // typeof), so ILC must keep its constructors alive or ValidateOnBuild dies with "no suitable
+    // constructor" in an AOT binary that published clean — the annotation is what roots them.
     public readonly record struct BackgroundServiceDescriptor(
-        Type ServiceType,
+        [param: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        [property: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type ServiceType,
         bool Enabled,
         string? ConfigurationSection,
         ServiceLifetime Lifetime,
@@ -129,7 +134,9 @@ public static partial class KoanRegistry
         bool IsPokable,
         bool ImplementsHealthContributor);
 
-    public readonly record struct ServiceDiscoveryAdapterDescriptor(Type ServiceType);
+    public readonly record struct ServiceDiscoveryAdapterDescriptor(
+        [param: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)]
+        [property: DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type ServiceType);
 
     private sealed class TypeEqualityComparer : IEqualityComparer<Type>
     {
