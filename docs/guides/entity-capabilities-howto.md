@@ -4,7 +4,7 @@ domain: data
 title: "Entity Capabilities How-To"
 audience: [developers, architects]
 status: current
-last_updated: 2026-07-24
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
   status: not-yet-tested
@@ -1199,33 +1199,36 @@ await new ArchiveOldTodosJob
 
 **Concepts**
 
-Store embeddings directly on entities and integrate with shipped vector providers such as Weaviate
-and Qdrant. The same `Entity<T>` patterns apply.
+Index entities by meaning and query them by intent. The `Entity.Ai` gateway — delivered by
+`Sylin.Koan.Data.AI` — embeds, searches, and loads over the entity's declared vector space;
+vector providers such as Weaviate and Qdrant hold the index. The same `Entity<T>` patterns apply.
 
 **Recipe**
 
-```xml
-<PackageReference Include="Koan.Data.Vector.Abstractions" Version="0.6.3" />
-<PackageReference Include="Koan.Data.Vector.Connector.Weaviate" Version="0.6.3" />
+```powershell
+dotnet add package Sylin.Koan.Data.AI
+dotnet add package Sylin.Koan.Data.Vector.Connector.Weaviate
 ```
 
 **Sample**
 
 ```csharp
+using Koan.AI;              // Client.Embed lives here
+using Koan.Data.AI;         // the Entity.Ai gateway and [Embedding] live here
+using Koan.Data.Vector;     // Vector<T> lives here
+
 public class MediaItem : Entity<MediaItem>
 {
     public string Title { get; set; } = "";
     public string Description { get; set; } = "";
-    public float[]? Embedding { get; set; }
 }
 
-// Generate and store embedding
+// Store a vector for one entity, computed with the configured embedding model:
 var media = await MediaItem.Get(mediaId, ct);
-media.Embedding = await Koan.AI.Client.Embed($"{media.Title}\n\n{media.Description}", ct);
-await media.Save(ct);
+await Vector<MediaItem>.Save(media.Id, await Client.Embed($"{media.Title}\n\n{media.Description}", ct), ct);
 
-// Semantic search
-var similar = await MediaItem.Query("vectorDistance < 0.15", ct);
+// Semantic search - one call embeds the query, finds the nearest vectors, loads the entities:
+var similar = await MediaItem.Ai.Search("underwater footage", s => s.Top(10), ct);
 ```
 
 **For full AI/Vector guidance:** See [AI & Vector How-To](ai-vector-howto.md)

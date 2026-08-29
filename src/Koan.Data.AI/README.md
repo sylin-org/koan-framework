@@ -143,7 +143,8 @@ if (meta is not null)
 
 - Reference plus the host's existing `AddKoan()` activates embedding/media-analysis lifecycle discovery; there is no
   Data.AI registration method.
-- On-demand `EntityAi` and semantic-search operations require a running host plus compatible AI and Vector providers.
+- On-demand AI operations (the `Entity.Ai` gateway and the `Similar` verb) require a running host plus
+  compatible AI and Vector providers.
   `[Embedding]` and `[MediaAnalysis]` opt an Entity into automatic lifecycle work; undecorated Entities are unchanged.
 - Deferred embedding uses durable Koan Jobs/Data state, restores the captured logical context, reloads the current
   Entity, and writes only the vector/state records. Provider, mixed-model, persistence, and retry-exhaustion failures

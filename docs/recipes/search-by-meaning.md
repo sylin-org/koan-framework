@@ -151,9 +151,9 @@ public sealed class ArticleSearchController : ControllerBase
 ```
 
 `s => s.Top(...)` is a `SemanticSearchQuery` declaration (`Top`, `Threshold`, `Partition`); omit the
-lambda to take the defaults (top 10, no threshold). The gateway is current in the dev source and
-proven by `EntityAiGatewaySpec`; published 1.0.x packages may predate it, and on those the long form
-below is the path this page verified against the feed. The long form also stays the right shape when
+lambda to take the defaults (top 10, no threshold). The gateway ships in `Sylin.Koan.Data.AI`
+**1.0.24 and newer** and is proven by `EntityAiGatewaySpec`; on older published packages the long
+form below is the path this page verified against the feed. The long form also stays the right shape when
 you need the vector execution receipt or the raw match list:
 
 ```csharp

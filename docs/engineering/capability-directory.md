@@ -123,7 +123,7 @@ not cold-run · `not assessed` = capability-map label · `shipped?` = source exi
 | AI HTTP projection | `Sylin.Koan.AI.Web` → `/ai/chat[/stream]`, `/ai/embeddings`, `/ai/capabilities`… | no auth/quotas added by design | not assessed |
 | Vector spaces on sources | `koan.Data.Source("Semantic").Vector<Media>(s => s.Dimensions(1536).Metric(Cosine))` | immutable plans; `Top/Where/AtLeast/Text/SemanticWeight`; execution diagnostics | blind-run (search); clauses per-adapter |
 | Vector stores | SqliteVec · Qdrant · Weaviate ✅ · PgVector/Redis/Atlas/Mongo ⚠️ | no silent fallback ever | partial |
-| Entity embeddings | `[Embedding]` + `EntityAi` via `Sylin.Koan.Data.AI` | save-time indexing | blind-run |
+| Entity embeddings | `[Embedding]` + the `Entity.Ai` gateway via `Sylin.Koan.Data.AI` | save-time indexing | blind-run |
 | RAG / structured output | `Sylin.Koan.AI.Orchestration` | answer-from-own-entities, branch, parse-to-type, stream | **rung validated** (Ollama path; citation-fidelity defect found + fixed same cycle, pending release) |
 | Bounded entity agents | `Sylin.Koan.AI.Agents` (`WithSearch<T>()`) | tools generated from Entity shape | **not assessed** |
 | Model artifact lifecycle | `Sylin.Koan.AI.Models` | acquire/convert/deploy/version | **not assessed** |

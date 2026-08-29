@@ -4,7 +4,7 @@ domain: ai
 title: "Store and search Entity vectors"
 audience: [developers, operators, architects, ai-agents]
 status: current
-last_updated: 2026-07-28
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-28
@@ -36,6 +36,11 @@ VectorSearchResult<string> related = await Vector<Media>.Search(
         .AtLeast(.80),
     ct);
 ```
+
+`Vector<T>.Search` is the primitive — it returns matches with similarities and leaves loading to you.
+When the outcome is simply "entities like this phrase", the `Entity.Ai` gateway composes embed, search,
+and load in one call: `Media.Ai.Search("science fiction", s => s.Top(20), ct)` — see
+[Semantic search](../../capabilities/ai/semantic-search.md).
 
 `Name`, `Dimensions`, `Metric`, and `Visibility` are immutable source-owned decisions. Koan binds them before adapter
 creation, applies source access and lifecycle policy at the first execution boundary, and gives the selected adapter one

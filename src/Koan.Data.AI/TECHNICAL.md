@@ -13,6 +13,9 @@ source: src/Koan.Data.AI/
 - `EmbeddingMetadata.Resolve<TEntity>()` is convention-first and always returns metadata.
 - `[Embedding]` enables persistence lifecycle behavior; undecorated entities retain on-demand AI
   operations without automatic processing.
+- The `Entity.Ai` gateway (`Search`, `SearchScored`, `Embed`) and the instance `Similar` verb are
+  C# 14 extension members delivered by the package reference (ARCH-0135) and route over the same
+  ambient host context as every other operation here.
 - Entity and vector operations resolve adapters, configuration, logging, and storage through the
   current `AppHost` execution context.
 
@@ -67,4 +70,5 @@ the active host; the hook definition does not capture them.
 
 - Entity semantics contract: `/docs/architecture/entity-semantics-contract.md`
 - Host-scope decision: `/docs/decisions/DATA-0095-data-layer-simplification.md`
-- AI integration guide: `/docs/guides/ai-integration.md`
+- Accessor anatomy: `/docs/decisions/ARCH-0135-capability-accessors-follow-one-anatomy.md`
+- AI and vector guide: `/docs/guides/ai-vector-howto.md`

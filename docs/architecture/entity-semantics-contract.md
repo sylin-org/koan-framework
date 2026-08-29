@@ -372,7 +372,8 @@ therefore `[Embedding]` + `Save()`, owned by Lifecycle. Explicit finite-set and 
 rebuilds are migration control-plane operations with aggregate outcomes.
 
 There is no generic source `.Index()` or `.Embed()` terminal in the current contract. Scalar
-`EntityAi.Embed(entity)` remains an on-demand transform, not a persistence synonym. Any source
+`Media.Ai.Embed(entity)` (the `Entity.Ai` gateway) remains an on-demand transform, not a
+persistence synonym. Any source
 operation must first prove a distinct application intent, bounded source behavior, provider
 negotiation, partial outcomes, and a real consumer; IntelliSense symmetry alone is insufficient.
 

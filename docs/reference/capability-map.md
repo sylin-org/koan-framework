@@ -73,7 +73,7 @@ without one — they are installable and documented, but nothing has been promis
 | `Sylin.Koan.Storage.Connector.S3` — **not assessed** | Remote object storage; its own README calls it shelved — prefer the local path |
 | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | The only hosted-model connector; the local providers are assessed |
 | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | The only shared cache; the durable local adapter is assessed |
-| `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and `EntityAi`, which the AI/vector recipe teaches as the shortest path to vector indexing |
+| `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and the `Entity.Ai` gateway — type-scoped semantic search and embed — which the search-by-meaning recipe teaches as the shortest path to vector indexing |
 | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | Reuses an application's PostgreSQL service for exact vector search when the `vector` extension is available |
 | `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | Reuses an application's Atlas deployment for exact vector search without adding another service |
 
@@ -198,7 +198,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Acquire, convert, deploy, and version model artifacts | `Sylin.Koan.AI.Models` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Models/README.md) |
 | Human approve/reject/edit queues over AI output | `Sylin.Koan.AI.Review` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Review/README.md) |
 | Measure results, gate on metrics, detect drift | `Sylin.Koan.AI.Eval` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Eval/README.md) |
-| `[Embedding]` on an Entity, and `EntityAi` operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.AI/README.md) |
+| `[Embedding]` on an Entity, and `Entity.Ai` search/embed operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.AI/README.md) |
 | Entity vector semantics | `Sylin.Koan.Data.Vector` | **one vector connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Vector.Abstractions/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/ai/vector.md) |
 | In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/InMemory/README.md) |
 | Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/SqliteVec/README.md) |
@@ -211,7 +211,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Elasticsearch vectors | `Sylin.Koan.Data.Connector.ElasticSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/ElasticSearch/README.md) |
 | OpenSearch vectors | `Sylin.Koan.Data.Connector.OpenSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/OpenSearch/README.md) |
 
-`[Embedding]` and `EntityAi` live in `Sylin.Koan.Data.AI`, and nothing else brings it in. Reference it
+`[Embedding]` and the `Entity.Ai` gateway live in `Sylin.Koan.Data.AI`, and nothing else brings it in. Reference it
 explicitly whenever an Entity save should produce a vector — the AI connector and the vector store do
 not supply it on their own.
 

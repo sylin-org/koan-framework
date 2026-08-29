@@ -38,7 +38,7 @@ remain compositional patterns.
 Reference one embedding provider and one vector provider. Provider packages bring their functional runtimes; do not
 manually assemble the abstraction packages.
 
-`Sylin.Koan.Data.AI` owns `[Embedding]` and the `EntityAi` operations this guide teaches, and nothing else brings it in
+`Sylin.Koan.Data.AI` owns `[Embedding]` and the `Entity.Ai` gateway this guide teaches, and nothing else brings it in
 transitively — reference it explicitly whenever an Entity save should produce a vector.
 
 ```powershell
@@ -596,7 +596,7 @@ the migration control plane.
 using Koan.Core;                       // AddKoan()
 using Koan.Data.Core;                  // Save/Query extensions
 using Koan.Data.Core.Model;            // Entity<T>
-using Koan.Data.AI;                    // EntityAi, lifecycle indexing
+using Koan.Data.AI;                    // the Entity.Ai gateway, lifecycle indexing
 using Koan.Data.AI.Attributes;   // [Embedding]
 [Embedding(Async = true, Template = "{Title}\n\n{Description}")]
 public sealed class Media : Entity<Media>

@@ -4,7 +4,7 @@ domain: ai
 title: "Add model-powered operations"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-22
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-18
@@ -82,8 +82,9 @@ pretend every referenced provider supports every verb.
 
 For Entity-aware embeddings and nearest-neighbor retrieval, continue to
 [Vector search](vector.md). `[Embedding]` adds vector synchronization to ordinary Entity saves;
-`EntityAi.Embed(entity)` remains the explicit one-off transformation. AI inference and vector storage
-are separate provider choices even when one application workflow uses both.
+the `Entity.Ai` gateway delivers type-scoped `Search`, `SearchScored`, and `Embed` to every
+Entity kind, and `Media.Ai.Embed(media)` remains the explicit one-off transformation. AI inference
+and vector storage are separate provider choices even when one application workflow uses both.
 
 ## Inspectable prompts
 
