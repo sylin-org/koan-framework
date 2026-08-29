@@ -271,9 +271,9 @@ The declaration lambda carries `Top`, `Threshold`, and `Partition`; omit it for 
 automatically, so queries and indexing stay on the same model by construction. Convention-first:
 `Search` works even without the attribute.
 
-> Published packages through 1.0.23 spell this `Media.AI.Search("sunset beach", limit: 20)` with
-> a static `Media.AI.Similar(media)`; the `.Ai` spelling and instance `Similar` land in the next
-> `Sylin.Koan.Data.AI` release.
+> Published packages 1.0.13–1.0.23 spell this `Media.AI.Search("sunset beach", limit: 20)` with
+> a static `Media.AI.Similar(media)`; from **1.0.24** the `.Ai` spelling and the instance
+> `Similar` verb are the delivered surface.
 
 ## 4. Hybrid Search – Semantic + Keyword
 

@@ -76,8 +76,7 @@ the pipeline ahead of user Validation contributors.
    the vector facade, bound to the kind's declared `[Embedding]` configuration, absent without the
    package reference. Instance similarity ships as the entity's own verb (`note.Similar()`) per
    ARCH-0135's subject rule, which now codifies the whole accessor anatomy. (Published packages
-   through 1.0.23 spell the gateway `.AI` with positional parameters; the rename rides the next
-   release.)
+   1.0.13–1.0.23 spell the gateway `.AI` with positional parameters; 1.0.24 carries the rename.)
 4. **Events/Communication** — mirror the instance-side `order.Events.Raise` as type-scoped
    subscription/handler registration.
 5. Remaining pillars case-by-case; capabilities without per-type semantics keep their pillar facades

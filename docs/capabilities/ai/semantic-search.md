@@ -101,10 +101,10 @@ dimensions route automatically, so the one-model constraint above is enforced by
 `Search` is convention-first (works without the attribute); the attribute remains the authority
 for indexing behavior. Usings: `Koan.Data.AI` for the gateway; your model's regular usings.
 
-> **Feed boundary.** Published packages through 1.0.23 spell the gateway
-> `Produce.AI.Search(query, limit: 10)` with a static `Produce.AI.Similar(produce)`. The `.Ai`
-> spelling, the `s => s.Top(...)` declaration, and the instance `produce.Similar(...)` verb land
-> in the next `Sylin.Koan.Data.AI` release.
+> **Feed boundary.** Published packages 1.0.13–1.0.23 spell the gateway
+> `Produce.AI.Search(query, limit: 10)` with a static `Produce.AI.Similar(produce)`. From
+> **1.0.24** the `.Ai` spelling, the `s => s.Top(...)` declaration, and the instance
+> `produce.Similar(...)` verb are the delivered surface.
 
 ## Leaves
 
