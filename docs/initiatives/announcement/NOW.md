@@ -29,8 +29,10 @@ re-measure shows NuGet family deltas are self-traffic.
 2. Wave-0 preparation, in parallel where independent: A08 (Discussions + `SUPPORT.md`), A07
    (registrations), GitHub About + topics with the name-collision phrase, A05 and A06 drafts,
    A03 demo app + recording.
-3. A11 terseness receipt: build the plain twin of the demo outcome under stock guidance, count
-   both apps with the stated method, commit `LOC.md` with the one-command reproduction.
+3. A11 terseness receipt: first-cut numbers are in (`artifacts/LOC-receipt-draft.md` — graded
+   pairs 152 vs 608 and 74 vs 384 application LoC); the remaining work is the committed curated
+   pair (A03's demo app + the stock-guidance plain twin) that supersedes the provisional
+   numbers and satisfies A11's acceptance.
 4. A04 copy from the receipts; then A09 Wave 0 (rehearsal), Wave 1 (r/dotnet + article).
 
 ## Standing rules
