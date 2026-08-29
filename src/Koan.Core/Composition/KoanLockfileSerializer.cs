@@ -30,13 +30,13 @@ internal static class KoanLockfileSerializer
     public static string Serialize(KoanLockfile lockfile)
     {
         ArgumentNullException.ThrowIfNull(lockfile);
-        return JsonSerializer.Serialize(lockfile, Options);
+        return JsonSerializer.Serialize(lockfile, KoanLockfileJsonContext.Default.KoanLockfile);
     }
 
     public static KoanLockfile? Deserialize(string json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
-        return JsonSerializer.Deserialize<KoanLockfile>(json, Options);
+        return JsonSerializer.Deserialize(json, KoanLockfileJsonContext.Default.KoanLockfile);
     }
 
     /// <summary>Read and parse a lockfile from disk, or <c>null</c> if absent/unreadable/malformed.</summary>
