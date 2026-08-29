@@ -34,16 +34,47 @@ is config-penalized or config-favored.
 ## What the difference is made of (claude pair, counted)
 
 - The koan app is five `.cs` files: a 6-line `Program.cs`, a 46-line `Recipe` (entity +
-  `[Embedding]` declaration), a 175-line controller (the full governed REST surface + search
-  endpoint), 35 lines of search wiring, the csproj.
+  `[Embedding]` declaration), the controller, 35 lines of search wiring, the csproj. The REST
+  surface itself is the grammar's one line — the controller inherits
+  `EntityController<Recipe>`, and CRUD, paging, shaping, and headers are never written. The
+  controller's remaining mass is the task contract's own custom surface (decomposed below),
+  not scaffolding.
 - The plain app needed 23 `.cs` files to reach grader parity. The telling block is
   `Embeddings/`: eight files — client interface, Ollama HTTP client, options, embedding
   document, vector math, scored-record and unavailable-exception types — about 204 counted
   lines whose only job is to rebuild what `Sylin.Koan.AI` + the `[Embedding]` attribute own.
   The rest is the conventional stack: DTO contracts, an input validator, `DbContext`, queryable
-  helpers, a schema bootstrapper, split endpoint classes, and a 117-line search service.
+  helpers, a schema bootstrapper, split endpoint classes, and a 117-line search service. The
+  same task-mandated custom surface the koan controller carries costs the plain arm ~168
+  counted lines (`RecipeSearchEndpoints` + `RecipeSearchService`) against the koan side's ~65.
 - Neither arm shipped a `wwwroot` (both served the graded frontend inline), so no static-asset
   lines appear on either side.
+
+### What the 175-line koan controller actually is
+
+- **One line of REST** — `public sealed class RecipesController : EntityController<Recipe>`.
+  Everything CRUD-shaped rides the base class.
+- **The search endpoint** (~20 counted lines) — stage 3 of the contract. No framework removes
+  this; it is the application's own business surface.
+- **A collection-filter override** (~35 counted lines incl. two helpers) — stage 2's
+  title/ingredient/instructions substring criteria. Koan's filter vocabulary is deliberately
+  closed, and `$contains` on a collection lowers to element equality, not substring — so the
+  agent composed the matcher itself and handed the base pipeline an id-set `$in` filter, which
+  keeps paging, sorting, shaping, and Link headers working unchanged. Custom behavior,
+  expressed through the framework's extension seam rather than beside it.
+- **A 7-line PUT override** — binds the route id onto the governed upsert because POST is
+  create-or-replace. This was a workaround for a real framework gap that WEB-0073 has since
+  closed: governed `PUT /{id}` create-by-route-id shipped in 1.0.30. On current packages this
+  override is dead weight, so the curated A03 app should land below the measured 152. Whether
+  the cell predates the shipped verb map or the agent missed it is a note for the local skill
+  campaign.
+- XML doc comments are present in the file and excluded from every number here.
+
+One suspicion checked and cleared: the search endpoint calls `Recipe.Get` per vector hit, which
+looks like waste. It is not — `VectorMatch<TKey>` carries `Id + Similarity + Metadata` and no
+entity hydration, so the loop is required by the current `Koan.Data.Vector` API. (Whether the
+vector surface should offer a hydrating search is a framework-backlog question, not an agent
+error.)
 
 ## Method (mirrors the A11 card)
 

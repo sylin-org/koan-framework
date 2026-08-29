@@ -33,8 +33,18 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
   LoC, same 22-check battery passed on both arms of each pair — behavioral equivalence is
   grader-attested. A third pair (codex-sol-high) is plain-side-countable only (318); its koan
   code was not preserved.
+- Maintainer review corrected the receipt's framing (the first draft called the controller
+  "the full governed REST surface" — wrong): the REST surface IS the grammar's one line
+  (`EntityController<Recipe>` inheritance); the controller's remaining mass is the task
+  contract's own custom surface — search endpoint, a collection-filter override composed
+  through the base pipeline (~65 counted lines vs the plain arm's ~168 for the same job) —
+  plus a 7-line PUT route-id workaround for the gap WEB-0073 has since closed, which is dead
+  weight on 1.0.30 and should not appear in the curated A03 app. The per-hit `Recipe.Get` in
+  search was checked and is required: `VectorMatch<TKey>` carries id + similarity only, no
+  hydration (framework-backlog question, not agent error). Receipt decomposition added.
 - The composition carries the claim better than the ratio: the koan app is five `.cs` files
-  (Program.cs 6 lines; entity 46; controller 175; search 35), while the plain arm spent an
+  (Program.cs 6 lines; entity 46; controller ~65 of custom task surface over the one-line
+  REST grammar; search wiring 35), while the plain arm spent an
   eight-file, ~204-line hand-rolled `Embeddings/` stack (client, options, vector math,
   documents) plus the conventional DTO/DbContext/validator/schema-bootstrapper scaffolding to
   reach parity. Zero migrations both sides; config keys in the same band (koan 13–15, plain
