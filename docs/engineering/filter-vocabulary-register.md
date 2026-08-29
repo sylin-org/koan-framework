@@ -46,12 +46,16 @@ case-sensitive ordinal substring over string elements; null, missing, and empty 
 | InMemory / Json | yes (scan, KeyValue family) | `KeyValueStore` declares `FilterSupport.Full` and evaluates the AST through `InMemoryFilterEvaluator`/`KvFilterEvaluator`, so the operator is served by the same honest floor |
 | Vector adapters (Milvus, PgVector, Qdrant, RedisVector, Weaviate, MongoAtlasVector) | absent | no faithful element-substring lowering exists there; refusal is loud (vector path hard-errors on residual) |
 
-**Evidence.** Commit `f74f30f12` + this register's commit. Suites executed on the recording machine:
-Filtering 107/107, Sqlite 49/49, InMemory 56/56, Json 41/41, Relational 26/26, Data.Core 492/492,
-plus the container convergence suites recorded in the task report. The shared TestKit `$like`
-battery (8 cases over a corpus with LIKE metacharacters and null arrays) runs inside every
-convergence suite with posture-aware receipts: an adapter that declares the operator must show no
-fallback fact; one that does not must record the residual.
+**Evidence.** Commits `f74f30f12`, `c59ff3f69`, `7020d5ffb` (the last fixes three stores the
+convergence oracle caught live: Postgres jsonb-null scalar refusal, SqlServer ESCAPE swallowing a
+literal backslash, Couchbase ANY-over-NULL in three-valued logic). Suites executed on the recording
+machine, all green: Filtering 107, Sqlite 49, InMemory 56, Json 41, Relational 26, Data.Core 492,
+Postgres 29, SqlServer 41, MySql 12, Mongo 41, Redis 17, Couchbase 27, DuckDb 54, Cockroach 19,
+ElasticSearch 28, OpenSearch 28. The shared TestKit `$like` battery (8 cases over a corpus with LIKE
+metacharacters and null arrays) runs inside every convergence suite with posture-aware receipts: an
+adapter that declares the operator must show no fallback fact; one that does not must record the
+residual. The ES/OpenSearch 28-cell conformance kits are green with the operator declared, but the
+NEVER-touch kit has no dedicated `$like` cell yet — adding one is an owner call.
 
 **Owner calls left open.**
 1. `$like` is a working name. Alternatives the owner may prefer: `$hasContains` (matches the enum),
