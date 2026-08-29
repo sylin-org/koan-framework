@@ -33,8 +33,9 @@ The matrix (test01 staged composite) has receipts for five harness/model rows; t
 2. Priority experiments: (a) **test03 contract-v3 pair** — v3 written, v2 attempts archived
    in-cell, grader smoke-proven both directions (v2-plain 11/14: carried checks reproduce, two
    new ingredient checks fail exactly, one inherited-CPM build artifact; v2-koan 7/14: hollow
-   signature verbatim); fire the codex-sol pair (Ollama up, arms sequential on 5099, GPU-gated on
-   operator confirmation) and grade — the answer routes skill v7; (b) **MCP leak-rate
+   signature verbatim); fire the codex-sol pair (Ollama up, arms sequential on 5099) — **the
+   operator deferred the fire on 2026-08-28 (GPU window); everything is committed and
+   pre-flight-verified, fire unchanged** — then grade; the answer routes skill v7; (b) **MCP leak-rate
    repeats** — test02's zero-leak pair needs A02's five assemblies before the quality claim
    publishes; (c) **claude pair is complete** (plain 22/22, $6.21 — the cap did not bite) and is
    the leading A02 candidate; (d) **local-tier second lap** — operator decision pending

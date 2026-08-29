@@ -51,7 +51,9 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
   relationship queries, the v2 hollow layer was contract-steering; if it hollows again, it is a
   skill gap and v7 (relationship compound in the one-block) is the measured counter. Either
   answer feeds the announcement chart. Pair firing is GPU-gated on operator confirmation
-  (Ollama up, arms sequential on 5099).
+  (Ollama up, arms sequential on 5099). **Blocked 2026-08-28: the operator deferred the fire
+  (GPU not free for the ~2 h window). Everything is committed and pre-flight-verified — fire
+  `run-test03.sh koan` then `plain` unchanged when the window opens.**
 
 ### 2026-08-28 — Contract v2 pair: plain 12/12 perfect; koan 7/12 hollow relational layer — the campaign's sharpest negative
 
