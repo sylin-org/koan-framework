@@ -18,6 +18,10 @@ internal sealed class DuckDbDialect : IRelationalMappingDialect
     public string JsonArrayContains(string columnSql, string parameter) =>
         $"EXISTS (SELECT 1 FROM json_each({columnSql}, '$') AS koan_element WHERE koan_element.value = to_json({parameter}))";
     public string JsonArrayLength(string columnSql) => $"json_array_length({columnSql})";
+    // json_each yields JSON values, so the element is extracted to text (->>) first; DuckDB's LIKE is
+    // case-sensitive, so the escaped pattern rides as-is.
+    public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
+        $"EXISTS (SELECT 1 FROM json_each({columnSql}, '$') AS koan_element WHERE (koan_element.value ->> '$') LIKE {patternParameter} ESCAPE '\\')";
 
     public string Read(PhysicalPath path, MappingValueShape shape, Type physicalType)
     {

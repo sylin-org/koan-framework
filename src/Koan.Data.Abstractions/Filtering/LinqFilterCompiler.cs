@@ -7,8 +7,9 @@ namespace Koan.Data.Abstractions.Filtering;
 /// Lowers a raw LINQ predicate into the normalized <see cref="Filter"/> AST so hand-written
 /// <c>x =&gt; x.Games.Contains("ffxiv")</c> converges with the JSON DSL onto identical nodes
 /// (same pushdown, same fallback, same results). Recognized shapes — logical
-/// <c>&amp;&amp;/||/!</c>, the six comparisons, string <c>StartsWith/EndsWith/Contains</c>, and
-/// collection/scalar <c>Contains</c> — become structured nodes; anything else (arbitrary
+/// <c>&amp;&amp;/||/!</c>, the six comparisons, string <c>StartsWith/EndsWith/Contains</c>,
+/// collection/scalar <c>Contains</c>, and <c>collection.Any(i =&gt; i.Contains(s))</c> (lifted to
+/// <see cref="FilterOperator.HasContains"/>) — become structured nodes; anything else (arbitrary
 /// method calls, computed expressions) becomes a <see cref="ClrFilter"/> that the evaluator
 /// runs in memory and translators treat as residual. A member chain is only treated as a
 /// <see cref="FieldPath"/> when it actually resolves against the entity, so expressions like
@@ -122,6 +123,28 @@ public static class LinqFilterCompiler
                     return true;
                 }
             }
+        }
+
+        // collection.Any(i => i.Contains(constantString)) -> HasContains (some element contains the value).
+        // The element receiver must be the lambda parameter itself and the argument a closed string
+        // constant; any other body (StartsWith/EndsWith, computed, captured, nested member) stays an
+        // un-lifted ClrFilter, exactly as before.
+        if (mc.Method.Name == nameof(Enumerable.Any) && mc.Method.DeclaringType == typeof(Enumerable)
+            && mc.Arguments.Count == 2
+            && Unwrap(mc.Arguments[1]) is LambdaExpression lambda && lambda.Parameters.Count == 1
+            && Unwrap(lambda.Body) is MethodCallExpression inner
+            && inner.Method.DeclaringType == typeof(string) && inner.Object is not null
+            && inner.Method.Name == nameof(string.Contains) && inner.Arguments.Count == 1
+            && inner.Arguments[0].Type == typeof(string)
+            && ReferenceEquals(Unwrap(inner.Object), lambda.Parameters[0])
+            && IsCollectionType(mc.Arguments[0].Type)
+            && TryMemberPath(mc.Arguments[0], param, rootType, out var anyPath)
+            && FieldPathResolver.Resolve(rootType, anyPath).ComparableType == typeof(string)
+            && !ReferencesParam(inner.Arguments[0], param)
+            && !ReferencesParam(inner.Arguments[0], lambda.Parameters[0]))
+        {
+            filter = new FieldFilter(anyPath, FilterOperator.HasContains, FilterValue.Of(Eval(inner.Arguments[0])));
+            return true;
         }
 
         return false;

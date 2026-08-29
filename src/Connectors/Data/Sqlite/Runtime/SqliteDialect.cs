@@ -14,6 +14,9 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
     public string JsonArrayContains(string columnSql, string parameter) =>
         $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE value = {parameter})";
     public string JsonArrayLength(string columnSql) => $"json_array_length({columnSql})";
+    public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
+        // SQLite's LIKE folds ASCII case, which the case-sensitive floor does not; instr() is exact.
+        $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE instr(value, {literalParameter}) > 0)";
 
     public string Read(PhysicalPath path, MappingValueShape shape, Type physicalType)
     {

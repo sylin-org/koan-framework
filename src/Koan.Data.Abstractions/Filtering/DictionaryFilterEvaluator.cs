@@ -83,7 +83,8 @@ public static class DictionaryFilterEvaluator
             return b => CountOf(Resolve(b, path)) == count;
         }
 
-        if (op is FilterOperator.Has or FilterOperator.HasAny or FilterOperator.HasAll or FilterOperator.HasNone)
+        if (op is FilterOperator.Has or FilterOperator.HasAny or FilterOperator.HasAll or FilterOperator.HasNone
+            or FilterOperator.HasContains)
         {
             var set = SetRaw(f.Value);
             var single = Scalar(f.Value);
@@ -122,6 +123,7 @@ public static class DictionaryFilterEvaluator
             FilterOperator.HasAny => items.Any(i => InSet(i, set, ic)),
             FilterOperator.HasAll => set.All(x => items.Any(i => ValEq(i, x, ic))),
             FilterOperator.HasNone => !items.Any(i => InSet(i, set, ic)), // null/empty disjoint => matches (locked)
+            FilterOperator.HasContains => items.Any(i => i is string s && single is string p && s.Contains(p, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)),
             _ => throw new NotSupportedException($"Operator '{op}' is not valid on a collection metadata field.")
         };
     }

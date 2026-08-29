@@ -37,6 +37,10 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
     public string JsonArrayContains(string columnSql, string parameter) =>
         $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE item.[value] = {parameter})";
     public string JsonArrayLength(string columnSql) => $"(SELECT COUNT(1) FROM OPENJSON({columnSql}))";
+    public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
+        // The default server collation folds case, so the comparison is forced binary to answer what
+        // the case-sensitive floor answers; the ISNULL guard mirrors JsonArrayOrderTerm.
+        $"EXISTS (SELECT 1 FROM OPENJSON(ISNULL({columnSql}, N'[]')) item WHERE item.[value] COLLATE Latin1_General_BIN2 LIKE {patternParameter} ESCAPE '\\')";
 
     public static string Quote(string value) => $"[{value.Replace("]", "]]", StringComparison.Ordinal)}]";
 

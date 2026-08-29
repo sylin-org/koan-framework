@@ -542,6 +542,7 @@ public sealed class MappingConformanceSpec
         public string Parameter(int index) => $"@p{index}";
         public string JsonArrayContains(string columnSql, string parameter) => $"contains({columnSql},{parameter})";
         public string JsonArrayLength(string columnSql) => $"length({columnSql})";
+        public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) => $"elementlike({columnSql},{patternParameter},{literalParameter})";
     }
 
     private sealed class ShapeFeatures : IRelationalStoreFeatures

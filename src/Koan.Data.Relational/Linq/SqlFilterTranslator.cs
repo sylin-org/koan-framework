@@ -190,6 +190,16 @@ public sealed class SqlFilterTranslator
                 if (preds.Count == 0) return "1=1";
                 return $"(NOT {Disjoin(preds, emptyResult: "1=0")})";
             }
+            case FilterOperator.HasContains:
+            {
+                // Some string element contains the value. Both forms are bound: the LIKE pattern
+                // (escaped exactly like the scalar Contains path, so metacharacters match literally)
+                // and the raw literal for dialects that match literally to keep the store's answer
+                // case-sensitive like the floor. Null/missing/empty arrays answer false in every emit.
+                var raw = ScalarValue(f.Value, typeof(string)) as string ?? string.Empty;
+                var pattern = "%" + _dialect.EscapeLike(raw) + "%";
+                return _dialect.JsonArrayElementLike(column, AddParam(pattern), AddParam(raw));
+            }
             default:
                 throw new NotSupportedException($"Operator '{f.Operator}' is not valid on collection field '{f.Field}'.");
         }

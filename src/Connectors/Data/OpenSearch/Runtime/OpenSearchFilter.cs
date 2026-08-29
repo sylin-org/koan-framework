@@ -17,6 +17,7 @@ internal static class OpenSearchFilter
         FilterOperator.Gt, FilterOperator.Gte, FilterOperator.Lt, FilterOperator.Lte,
         FilterOperator.In, FilterOperator.Nin,
         FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll, FilterOperator.HasNone,
+        FilterOperator.HasContains,
         FilterOperator.Size, FilterOperator.Exists);
 
     internal static void Write(Utf8JsonWriter writer, Filter? filter, string? scopeIdentity = null)
@@ -188,6 +189,9 @@ internal static class OpenSearchFilter
             case FilterOperator.HasAll:
                 AllTerms(writer, values, key, Set(filter));
                 break;
+            case FilterOperator.HasContains:
+                Wildcard(writer, values, key, Scalar(filter));
+                break;
             case FilterOperator.Size:
                 var count = Convert.ToInt32(Scalar(filter), CultureInfo.InvariantCulture);
                 if (count < 0) throw Unsupported(filter.Operator, filter.Field.ToString(), "negative size");
@@ -262,6 +266,32 @@ internal static class OpenSearchFilter
         writer.WriteEndArray();
         writer.WriteEndObject();
         writer.WriteEndObject();
+    }
+
+    /// <summary>
+    /// Substring against one projected value: a case-sensitive wildcard over the canonical token with
+    /// the literal's wildcard metacharacters escaped, so the value matches literally. A null value is
+    /// a defect in the caller's filter, not an empty match, and is refused like the range path.
+    /// </summary>
+    private static void Wildcard(Utf8JsonWriter writer, string field, string path, object? value)
+    {
+        if (value is null) throw Unsupported(FilterOperator.HasContains, path, "null substring value");
+        var literal = Canonical(value);
+        var pattern = "*" + literal.Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("*", "\\*", StringComparison.Ordinal)
+            .Replace("?", "\\?", StringComparison.Ordinal) + "*";
+        Nested(writer, field, path, nested =>
+        {
+            nested.WriteStartObject();
+            nested.WritePropertyName("wildcard");
+            nested.WriteStartObject();
+            nested.WritePropertyName($"{field}.{Infrastructure.Constants.Wire.Value}");
+            nested.WriteStartObject();
+            nested.WriteString("value", pattern);
+            nested.WriteEndObject();
+            nested.WriteEndObject();
+            nested.WriteEndObject();
+        });
     }
 
     private static void Range(

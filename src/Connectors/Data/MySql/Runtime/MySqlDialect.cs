@@ -43,6 +43,12 @@ internal sealed class MySqlDialect : IRelationalMappingDialect
     public string JsonArrayContains(string columnSql, string parameter) =>
         $"COALESCE(JSON_CONTAINS({columnSql}, JSON_ARRAY({parameter})), 0)";
     public string JsonArrayLength(string columnSql) => $"COALESCE(JSON_LENGTH({columnSql}), 0)";
+    public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
+        // JSON_SEARCH walks the whole document with LIKE semantics (% and _ wildcards, backslash escape
+        // by default — the same escape EscapeLike emits) and compares with JSON's binary collation, so
+        // the case-sensitive posture holds without coercing the column. NULL (no match, null column,
+        // or non-array document) reads as no match.
+        $"(JSON_SEARCH({columnSql}, 'one', {patternParameter}) IS NOT NULL)";
 
     public static string Quote(string value) => $"`{value.Replace("`", "``", StringComparison.Ordinal)}`";
 

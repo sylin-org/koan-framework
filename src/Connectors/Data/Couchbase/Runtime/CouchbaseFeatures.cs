@@ -16,7 +16,7 @@ internal static class CouchbaseFeatures
         ],
         [
             FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll,
-            FilterOperator.HasNone, FilterOperator.Size, FilterOperator.Exists
+            FilterOperator.HasNone, FilterOperator.Size, FilterOperator.HasContains, FilterOperator.Exists
         ],
         nestedPaths: true,
         ignoreCase: false);

@@ -11,7 +11,8 @@ public sealed class FilterParseOptions
 /// <summary>
 /// Parses the Koan JSON filter DSL into the normalized <see cref="Filter"/> AST. The DSL
 /// surface (Mongo-flavoured: <c>$and/$or/$not/$nor</c>, <c>$eq/$ne/$gt/$gte/$lt/$lte</c>,
-/// <c>$in/$nin/$all/$size/$exists/$between</c>, wildcard strings, <c>$options.ignoreCase</c>)
+/// <c>$in/$nin/$all/$size/$exists/$between</c>, <c>$like</c> on collection leaves, wildcard strings,
+/// <c>$options.ignoreCase</c>)
 /// is preserved; the keyword maps to a scalar or collection operator based on the resolved
 /// leaf type — e.g. <c>{ "Tags": { "$in": ["x"] } }</c> on a <c>List&lt;string&gt;</c> field
 /// becomes <see cref="FilterOperator.HasAny"/> (overlap), which is the fix for the original
@@ -144,6 +145,13 @@ public static class JsonFilterParser
                 });
             case "$contains":
                 return coll ? Leaf(path, FilterOperator.Has, Scalar(value), ic) : Leaf(path, FilterOperator.Contains, Scalar(value), ic);
+            case "$like":
+                // Collection-element substring, collection leaves only. On a scalar leaf the corrective
+                // names $contains, which already owns scalar substring — $like never silently widens.
+                if (!coll)
+                    throw new FilterParseException(
+                        $"'$like' requires a collection field ('{path}'); for substring inside a scalar string use '$contains'.");
+                return Leaf(path, FilterOperator.HasContains, Scalar(value), ic);
             default:
                 throw new FilterParseException($"Unknown filter operator '{op}' on field '{path}'.");
         }

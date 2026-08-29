@@ -101,6 +101,9 @@ internal sealed class MongoQueryCompiler<TEntity, TKey>(MongoEntityPlan<TEntity,
             FilterOperator.HasAny => Compare(path, "$in", Values()),
             FilterOperator.HasAll => Compare(path, "$all", Values()),
             FilterOperator.HasNone => Compare(path, "$nin", Values()),
+            // Some string element matches the (regex-escaped, case-sensitive) literal — an element
+            // substring, not a pattern. Null/missing/empty arrays fail $elemMatch, matching the floor.
+            FilterOperator.HasContains => ElemMatch(path, System.Text.RegularExpressions.Regex.Escape((string)scalar!)),
             FilterOperator.Size => Compare(
                 path,
                 "$size",
@@ -184,6 +187,9 @@ internal sealed class MongoQueryCompiler<TEntity, TKey>(MongoEntityPlan<TEntity,
 
     private static BsonDocument RegexFilter(string path, string pattern) =>
         new(path, new BsonRegularExpression(pattern));
+
+    private static BsonDocument ElemMatch(string path, string pattern) =>
+        new(path, new BsonDocument("$elemMatch", new BsonDocument("$regex", pattern)));
 
     private static BsonDocument Exists(string path, bool desired) => desired
         ? new BsonDocument("$and", new BsonArray([

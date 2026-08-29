@@ -9,7 +9,8 @@ namespace Koan.Data.Relational.Linq;
 ///
 /// Scalar operators map to native SQL (comparison, LIKE, IN/NOT IN, IS [NOT] NULL). Collection
 /// operators map to native JSON-array containment (List&lt;string&gt; stored as a JSON array): Has /
-/// HasAny / HasAll / HasNone via <c>JsonArrayContains</c>, Size via <c>JsonArrayLength</c>.
+/// HasAny / HasAll / HasNone via <c>JsonArrayContains</c>, HasContains via
+/// <c>JsonArrayElementLike</c> (some element LIKE the escaped pattern), Size via <c>JsonArrayLength</c>.
 ///
 /// Deliberately NOT declared (so the coordinator routes them to the in-memory floor):
 /// <list type="bullet">
@@ -32,7 +33,7 @@ public static class RelationalFilterSupport
         CollectionOperators: new HashSet<FilterOperator>
         {
             FilterOperator.Has, FilterOperator.HasAny, FilterOperator.HasAll,
-            FilterOperator.HasNone, FilterOperator.Size,
+            FilterOperator.HasNone, FilterOperator.Size, FilterOperator.HasContains,
         },
         NestedPaths: false,
         IgnoreCase: false);

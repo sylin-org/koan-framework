@@ -114,6 +114,9 @@ public static class InMemoryFilterEvaluator
             FilterOperator.HasAll => set.All(x => items.Any(i => ValEq(i, x, ic))),
             // null/empty collection is disjoint from any set -> HasNone matches (locked).
             FilterOperator.HasNone => !items.Any(i => InSet(i, set, ic)),
+            // substring within a string element; null/missing/empty arrays match nothing, and a
+            // non-string element never matches (the operator is declared on string collections only).
+            FilterOperator.HasContains => items.Any(i => i is string s && single is string p && s.Contains(p, ic ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)),
             _ => throw new NotSupportedException($"Operator '{op}' is not valid on a collection field.")
         };
     }

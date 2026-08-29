@@ -39,6 +39,9 @@ internal sealed class NpgsqlDialect : IRelationalMappingDialect
     public string JsonArrayContains(string columnSql, string parameter) =>
         $"EXISTS (SELECT 1 FROM jsonb_array_elements_text({columnSql}) item WHERE item = {parameter})";
     public string JsonArrayLength(string columnSql) => $"jsonb_array_length({columnSql})";
+    public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
+        // Postgres LIKE is case-sensitive regardless of locale, so the pattern rides as-is.
+        $"EXISTS (SELECT 1 FROM jsonb_array_elements_text({columnSql}) item WHERE item LIKE {patternParameter} ESCAPE '\\')";
 
     public static string Quote(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
     public static string EscapePath(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");

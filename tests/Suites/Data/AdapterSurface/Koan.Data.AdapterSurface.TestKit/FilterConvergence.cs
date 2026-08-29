@@ -1,7 +1,10 @@
 using AwesomeAssertions;
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.AdapterSurface.TestKit;
 
@@ -14,6 +17,17 @@ public sealed class ConvergenceWidget : Entity<ConvergenceWidget, string>
     public int? Score { get; set; }
     public ConvergenceTier Tier { get; set; }
     public List<string> Tags { get; set; } = new();
+}
+
+/// <summary>
+/// The $like (collection-element substring) corpus. Separate from <see cref="ConvergenceWidget"/>
+/// so the shared convergence corpus stays byte-identical while this battery covers the corners the
+/// operator adds: LIKE metacharacters inside stored elements, case mismatches, null vs empty arrays.
+/// </summary>
+public sealed class HasContainsProbe : Entity<HasContainsProbe, string>
+{
+    public string Name { get; set; } = "";
+    public List<string>? Ingredients { get; set; }
 }
 
 /// <summary>
@@ -120,6 +134,95 @@ public static class FilterConvergence
     /// residual is expected. That is a declared limit, so the adapter's FilterSupport is what must say so:
     /// this fails when work lands in memory that the declaration implied the store would do.</para>
     /// </summary>
-    public static Task AssertPushesDownAsync(IServiceProvider services)
-        => PushdownGuard.NothingFallsBack(services, "the shared filter corpus", AssertConvergesAsync);
+    public static async Task AssertPushesDownAsync(IServiceProvider services)
+    {
+        await PushdownGuard.NothingFallsBack(services, "the shared filter corpus", AssertConvergesAsync);
+        // The $like battery rides every suite that proves pushdown, with the receipt each adapter earned:
+        // store-executed where declared, residual-and-recorded where not.
+        await AssertHasContainsPostureAsync(services);
+    }
+
+    // --- the $like battery: same oracle, separate corpus, posture-aware receipts ---
+
+    public static IReadOnlyList<HasContainsProbe> HasContainsCorpus { get; } = new HasContainsProbe[]
+    {
+        new() { Id = "hc1", Name = "Broth",     Ingredients = new() { "sea salt", "butter" } },
+        new() { Id = "hc2", Name = "Caramel",   Ingredients = new() { "Salted cream" } },
+        new() { Id = "hc3", Name = "Juice",     Ingredients = new() { "100% juice", "oat_milk" } },
+        new() { Id = "hc4", Name = "Odd",       Ingredients = new() { "back\\slash", "50%off" } },
+        new() { Id = "hc5", Name = "Plain",     Ingredients = new() },
+        new() { Id = "hc6", Name = "Unset",     Ingredients = null },
+        new() { Id = "hc7", Name = "Vanilla",   Ingredients = new() { "vanilla", "milk" } },
+    };
+
+    public static IEnumerable<(string Name, string Json)> HasContainsCases() => new[]
+    {
+        ("hascontains-present",        "{ \"Ingredients\": { \"$like\": \"salt\" } }"),
+        ("hascontains-absent",         "{ \"Ingredients\": { \"$like\": \"chocolate\" } }"),
+        ("hascontains-metachars",      "{ \"Ingredients\": { \"$like\": \"oat_milk\" } }"),
+        ("hascontains-percent",        "{ \"Ingredients\": { \"$like\": \"50%off\" } }"),
+        ("hascontains-backslash",      "{ \"Ingredients\": { \"$like\": \"back\\\\slash\" } }"),
+        ("hascontains-case-mismatch",  "{ \"Ingredients\": { \"$like\": \"SALT\" } }"),
+        ("hascontains-not",            "{ \"$not\": { \"Ingredients\": { \"$like\": \"salt\" } } }"),
+        ("hascontains-and-scalar",     "{ \"$and\": [ { \"Name\": \"Broth\" }, { \"Ingredients\": { \"$like\": \"salt\" } } ] }"),
+    };
+
+    /// <summary>Clears + seeds the $like corpus, then asserts every case's adapter id-set equals the oracle.</summary>
+    public static async Task AssertHasContainsConvergesAsync()
+    {
+        foreach (var existing in await Data<HasContainsProbe, string>.Query("{}")) await existing.Remove();
+        await HasContainsProbe.UpsertMany(HasContainsCorpus);
+
+        var failures = new List<string>();
+        foreach (var (name, json) in HasContainsCases())
+        {
+            var filter = JsonFilterParser.Parse<HasContainsProbe>(json);
+            var oracle = HasContainsCorpus.Where(InMemoryFilterEvaluator.Compile<HasContainsProbe>(filter))
+                                          .Select(w => w.Id).OrderBy(x => x).ToArray();
+
+            string[] actual;
+            try
+            {
+                actual = (await Data<HasContainsProbe, string>.Query(json))
+                               .Select(w => w.Id).OrderBy(x => x).ToArray();
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"  [{name}] {json}\n      THREW {ex.GetType().Name}: {ex.Message.Split('\n')[0].Trim()}");
+                continue;
+            }
+
+            if (!actual.SequenceEqual(oracle))
+                failures.Add($"  [{name}] {json}\n      oracle:  [{string.Join(",", oracle)}]\n      adapter: [{string.Join(",", actual)}]");
+        }
+
+        failures.Should().BeEmpty(
+            "the adapter must converge with the in-memory oracle for every $like filter; divergences:\n" + string.Join("\n", failures));
+    }
+
+    /// <summary>
+    /// The pushdown receipt for the $like battery, decided by the adapter's own declaration: an adapter
+    /// that declares <see cref="FilterOperator.HasContains"/> must have the store execute the whole
+    /// battery (no fallback fact), and one that does not must leave the residual recorded — the honest
+    /// answer in both directions. A silent adapter is a defect in the silent adapter.
+    /// </summary>
+    public static async Task AssertHasContainsPostureAsync(IServiceProvider services)
+    {
+        var repo = services.GetRequiredService<IDataService>().GetRepository<HasContainsProbe, string>();
+        var caps = DataCaps.Describe(repo, repo.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        var declared = caps.CollectionOperators.Contains(FilterOperator.HasContains);
+
+        if (declared)
+        {
+            await PushdownGuard.NothingFallsBack(services, "the $like corpus (declared pushable)", AssertHasContainsConvergesAsync);
+            return;
+        }
+
+        var before = PushdownGuard.Fallbacks(services);
+        await AssertHasContainsConvergesAsync();
+        PushdownGuard.Fallbacks(services)
+            .Where(fact => !before.Contains(fact))
+            .Should().NotBeEmpty(
+                "the adapter does not declare HasContains, so the $like corpus must be finished in memory and recorded as a fallback fact");
+    }
 }
