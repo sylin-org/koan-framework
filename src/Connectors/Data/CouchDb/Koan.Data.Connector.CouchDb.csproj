@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <KoanHasPublishedBaseline>false</KoanHasPublishedBaseline>
+    <AssemblyName>Koan.Data.Connector.CouchDb</AssemblyName>
+    <RootNamespace>Koan.Data.Connector.CouchDb</RootNamespace>
+    <Description>Apache CouchDB provider for Koan data: document persistence over plain HTTP with Mango filter pushdown and governed source routing.</Description>
+    <PackageTags>$(CommonPackageTags);data;couchdb;document</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+</Project>
