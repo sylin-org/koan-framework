@@ -48,7 +48,7 @@ try {
     $failures = [System.Collections.Generic.List[string]]::new()
 
     $skillsRoot = '.agents/skills'
-    $expectedSkills = @('koan', 'koan-explain', 'koan-upgrade')
+    $expectedSkills = @('koan', 'koan-create-adapter', 'koan-explain', 'koan-upgrade')
     # DX-0050. The capability map is a public document, not skill internals: any agent fetches it
     # directly. It is also the one repository link that must NOT be pinned -- a frozen map hides every
     # capability shipped since that tag, which is the opposite of what "what can I add?" needs. So it

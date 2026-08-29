@@ -1,0 +1,6 @@
+interface:
+  display_name: "Koan Create Adapter"
+  short_description: "Author and prove a new Koan connector/adapter"
+  default_prompt: "Use $koan-create-adapter to author a conformant Koan adapter for a provider the connector matrix does not cover."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <KoanHasPublishedBaseline>false</KoanHasPublishedBaseline>
+    <AssemblyName>Koan.Data.Connector.Firebird</AssemblyName>
+    <RootNamespace>Koan.Data.Connector.Firebird</RootNamespace>
+    <Description>Firebird provider for Koan relational data with managed schema lifecycle, atomic writes, and governed source routing.</Description>
+    <PackageTags>$(CommonPackageTags);data;firebird;relational</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Data.Abstractions\Koan.Data.Abstractions.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" />
+  </ItemGroup>
+</Project>
