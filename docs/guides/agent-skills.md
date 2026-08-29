@@ -55,6 +55,7 @@ Koan has three coding-agent entry points. Choose by the outcome, not by a packag
 | `$koan` | “Build this.” “Add Mongo.” “Enable authentication.” “Use AI.” “Fix it.” “Get it ready to ship.” | Compose the smallest useful Koan stack, change only what the outcome earns, and prove the result. |
 | `$koan-explain` | “What does this app do?” “Why did this provider win?” “Why is readiness red?” | Explain observed behavior and honest unknowns without changing anything. |
 | `$koan-upgrade` | “Bring this older Koan app forward.” | Preserve application contracts while replacing obsolete Koan expressions with current ones. |
+| `$koan-create-adapter` | “Koan doesn't reach our database/vector store/model server — build the connector.” | Research, author, place, and prove a conformant adapter for a provider the matrix does not cover, shipping it not assessed. |
 
 An explicit invocation wins. Otherwise, choose `$koan-explain` for read-only work,
 `$koan-upgrade` for a framework migration, and `$koan` for implementation.
