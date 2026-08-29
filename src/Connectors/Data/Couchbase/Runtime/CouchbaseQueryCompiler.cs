@@ -85,8 +85,10 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
             FilterOperator.HasAll => $"EVERY elementValue IN {context.Add(values)} SATISFIES elementValue IN {path} END",
             FilterOperator.HasNone => $"EVERY elementValue IN {context.Add(values)} SATISFIES elementValue NOT IN {path} END",
             // Some element LIKE the escaped %value% pattern; N1QL's default LIKE escape is backslash,
-            // the same escape the shared Escape helper emits. An absent/empty array satisfies nothing.
-            FilterOperator.HasContains => $"ANY elementValue IN {path} SATISFIES elementValue LIKE {context.Add("%" + Escape(values[0]) + "%")} END",
+            // the same escape the shared Escape helper emits. IFMISSINGORNULL coalesces a null/missing
+            // array to an empty one — ANY over NULL yields NULL in N1QL's three-valued logic, which a
+            // NOT() would not restore, so the null array must answer false before negation.
+            FilterOperator.HasContains => $"ANY elementValue IN IFMISSINGORNULL({path}, []) SATISFIES elementValue LIKE {context.Add("%" + Escape(values[0]) + "%")} END",
             FilterOperator.Size => $"ARRAY_LENGTH({path}) = {context.Add(values[0])}",
             _ => throw new NotSupportedException($"Couchbase does not support operator '{filter.Operator}'.")
         };
