@@ -467,8 +467,20 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
         {
             var stable = reader.GetString(0);
             var distance = reader.GetDouble(1);
-            if (!double.IsFinite(distance) || distance < 0)
-                throw new InvalidOperationException("SqliteVec returned a non-finite or negative distance.");
+            if (!double.IsFinite(distance))
+                throw new InvalidOperationException(
+                    $"SqliteVec returned a non-finite distance ({distance:R}) for metric '{_plan.Metric}'.");
+            if (distance < 0)
+            {
+                // sqlite-vec computes cosine distance as 1 - cos in f32, which can round to a hair
+                // below zero when the query exactly matches a stored vector — the find-similar shape,
+                // which searches with an entity's own embedding by design. Clamp rounding noise;
+                // anything materially negative is store garbage, not arithmetic.
+                if (distance < -DistanceRoundoffTolerance)
+                    throw new InvalidOperationException(
+                        $"SqliteVec returned distance {distance:R} for metric '{_plan.Metric}', negative beyond f32 rounding.");
+                distance = 0;
+            }
             result.Add(new Ranked(
                 ParseKey(stable),
                 stable,
@@ -559,6 +571,10 @@ internal sealed class SqliteVecRepository<TEntity, TKey> :
         VectorMetric.Euclidean => 1d / (1d + distance),
         _ => throw new InvalidOperationException($"Unsupported SqliteVec metric '{_plan.Metric}'.")
     };
+
+    // f32 cosine accumulation noise ceiling in the store's distance column; anything more negative
+    // than this is store garbage rather than arithmetic (see the clamp in Search).
+    private const double DistanceRoundoffTolerance = 1e-5;
 
     private string CreateSql(string table) =>
         $"CREATE VIRTUAL TABLE {Quote(table)} USING vec0(" +

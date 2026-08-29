@@ -4,6 +4,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Vector;
 using Koan.Data.Vector.Abstractions;
 using Koan.Data.Vector.Abstractions.Capabilities;
+using Koan.Data.VectorAdapterSurface.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -129,6 +130,32 @@ public sealed class SqliteVecReferenceSpecs(SqliteVecTestFactory factory) : IAsy
                 new VectorSearchRequest(Point(1, 0), 100_000, Space: "euclidean"),
                 VectorScope.Unscoped));
         Assert.Contains("stable cutoff tie", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Exact_self_match_stays_within_the_distance_guard()
+    {
+        // The find-similar grammar re-embeds an entity and searches with its own vector, so the store
+        // must tolerate an exact self-match. sqlite-vec computes cosine distance as 1 - cos in f32;
+        // accumulation drift can push that a hair below zero for incommensurate components.
+        var vectors = new[]
+        {
+            new float[] { 0.1f, 0.2f, 0.3f, 0.7f, 0.11f, 0.13f, 0.17f, 0.19f },
+            new float[] { 100.1f, 100.2f, 0.3f, 0.7f, 1.1f, 1.3f, 1.7f, 1.9f },
+            new float[] { 0.1234567f, 7.654321f, 123.456f, 0.007f, 31.4f, 2.71f, 0.577f, 1.618f }
+        };
+
+        for (var index = 0; index < vectors.Length; index++)
+        {
+            var id = $"self-{index}";
+            await Vector<TodoVector>.Save(id, vectors[index]);
+            var stored = (await Vector<TodoVector>.Get(id))!.Embedding.ToArray();
+
+            var result = await Vector<TodoVector>.Search(stored, query => query.Top(1));
+
+            Assert.Equal(id, result.Items[0].Id);
+            Assert.Equal(1d, result.Items[0].Similarity, 6);
+        }
     }
 
     private static float[] Point(float x, float y) => [x, y, 0f, 0f, 0f, 0f, 0f, 0f];
