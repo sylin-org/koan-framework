@@ -10,53 +10,40 @@ framework_version: v1.0.30
 
 ## Current state
 
-WEB-0073 (governed PUT + the entity verb map) is **implemented, proven, committed, and published**
-(Sylin.Koan.Web 1.0.30 / Sylin.Koan.Mcp 1.0.24 via the SignPath release pipeline on push to dev).
-The matrix (test01 staged composite) has receipts for five harness/model rows; the skill is at
-**v5** (verb surface + draft-before-verify sequencing).
+Re-scoped 2026-08-28 (operator decision): the agent-race benchmark effort left the public
+initiative. Cards A01/A02 and the campaign ledger moved verbatim to
+`local/initiatives/announcement-benchmark/`; the eval campaign itself continues in-tree under
+`evals/agent-race/` on its own schedule (its pending action — the test03 contract-v3 pair fire
+when the GPU window opens — is recorded there, unchanged). No performance or agent-productivity
+claim publishes; charter claim 3 is now "terse, legible applications" with the terseness
+receipt (A11) as its receipt, and "agent-amplified development" is a held hypothesis.
 
-- Frontier/mid verdict (measured, robust): the plain control wins every timed stage — codex-sol
-  22/22 both arms (plain 2.2× faster, 4–5× cheaper in context); agy-gemini 22/22 both arms (plain
-  ~8× faster); claude-default koan 22/22 ($12.37), plain blocked on the operator's monthly spend
-  cap.
-- Local-tier verdict: qwen35-9b (opencode) and qwen38-27b-max (codex-OSS, both tunings) **fail at
-  task existence** — 0/1/0/9 at the caps. Binding constraint is budget + apply-loop friction
-  (PowerShell diff parsing), not framework knowledge. `local-feed/` fixture deleted (it trapped
-  the v4 attempt).
-- The full story, including the concurrent-session collision and its recovery, is in
-  [PROGRESS.md](PROGRESS.md).
+The launch stands on receipts in hand: the quickstart, the flagship demo (A03), and A11.
+Launch metrics use A09's contamination-resistant instruments — the charter's 2026-08-28
+re-measure shows NuGet family deltas are self-traffic.
 
 ## Next session
 
-1. Read `evals/agent-race/matrix/MATRIX.md`, the scoreboard + verdicts in `LADDER.md`, then
-   [PROGRESS.md](PROGRESS.md).
-2. Priority experiments: (a) **test03 contract-v3 pair** — v3 written, v2 attempts archived
-   in-cell, grader smoke-proven both directions (v2-plain 11/14: carried checks reproduce, two
-   new ingredient checks fail exactly, one inherited-CPM build artifact; v2-koan 7/14: hollow
-   signature verbatim); fire the codex-sol pair (Ollama up, arms sequential on 5099) — **the
-   operator deferred the fire on 2026-08-28 (GPU window); everything is committed and
-   pre-flight-verified, fire unchanged** — then grade; the answer routes skill v7; (b) **MCP leak-rate
-   repeats** — test02's zero-leak pair needs A02's five assemblies before the quality claim
-   publishes; (c) **claude pair is complete** (plain 22/22, $6.21 — the cap did not bite) and is
-   the leading A02 candidate; (d) **local-tier second lap** — operator decision pending
-   (90–120-min cap, apply-retry loop, or S1-lite).
-3. Then: **A02** — ≥5 runs per arm on headline pairs under skill v6; `coalesce` + crossover graph;
-   announcement from the chart.
+1. Read [CHARTER.md](CHARTER.md), [ROADMAP.md](ROADMAP.md), [PROGRESS.md](PROGRESS.md), then
+   claim a card.
+2. Wave-0 preparation, in parallel where independent: A08 (Discussions + `SUPPORT.md`), A07
+   (registrations), GitHub About + topics with the name-collision phrase, A05 and A06 drafts,
+   A03 demo app + recording.
+3. A11 terseness receipt: build the plain twin of the demo outcome under stock guidance, count
+   both apps with the stated method, commit `LOC.md` with the one-command reproduction.
+4. A04 copy from the receipts; then A09 Wave 0 (rehearsal), Wave 1 (r/dotnet + article).
 
 ## Standing rules
 
-- Identical task bodies across arms; only the arm line differs. Unattended-run sentence mandatory
-  in every prompt.
-- Skill is at **v6** (verify-once probe pattern); any skill edit is a new treatment version and
-  re-baselines headline cells.
-- No public claim from any cell with n<5; verify means full unfiltered suites + solution-wide
-  build; every `MakeGenericType` on a changed contract gets swept repo-wide (the MCP translator
-  arity break was found exactly there).
+- The receipt gates the claim. The only quotable number is A11's LoC table, with its
+  reproduction command; the recorded baseline is quotable only with its provenance stated.
+- No public response-time promises. The maintainer replies when available; skeptical engagement
+  still gets evidence and thanks, and newcomer-found defects enter the registers (A09 comment
+  policy, ACCEPTANCE §4).
+- Externally visible actions (posts, registrations) need the recorded operator decision
+  ACCEPTANCE §3 requires. None has happened yet.
 
 ## Validation
 
-- Framework change (WEB-0073): build 0 errors; PatchOps 14/14; Web AdapterSurface InMemory 81/81
-  and Sqlite 59/59 full suites (incl. six new verb-surface specs); Mcp conformance 84/84 +
-  Operations 5/5 (the MCP translator arity regression was found and fixed in this pass).
 - Two pre-existing docs-lint errors await launch hygiene: README's missing `1.0` public-experience
   anchor, and the `embedded-analytics-duckdb` promoted claim resolving to zero capability homes.

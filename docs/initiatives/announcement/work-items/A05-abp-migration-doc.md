@@ -4,10 +4,10 @@ domain: framework
 title: "A05 - Coming from ASP.NET Boilerplate / ABP"
 audience: [maintainers, ai-agents]
 status: draft
-last_updated: 2026-08-27
-framework_version: v1.0.12
+last_updated: 2026-08-28
+framework_version: v1.0.30
 validation:
-  date_last_tested: 2026-08-27
+  date_last_tested: 2026-08-28
   status: reviewed
   scope: migration-guide work-item specification
 ---
@@ -16,7 +16,7 @@ validation:
 
 - Tranche: `T1 — Artifacts`
 - Status: `draft`
-- Depends on: none (drafting); publication gated on A02
+- Depends on: none (drafting); publication gated on A06 (the honesty material it links)
 - Unlocks: A09 (launch copy links it)
 - Owner: maintainer
 

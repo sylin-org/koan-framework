@@ -4,10 +4,10 @@ domain: framework
 title: "Announcement Initiative Charter"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-08-27
-framework_version: v1.0.12
+last_updated: 2026-08-28
+framework_version: v1.0.30
 validation:
-  date_last_tested: 2026-08-27
+  date_last_tested: 2026-08-28
   status: reviewed
   scope: announcement mission, claims, baseline, and session protocol
 ---
@@ -26,6 +26,25 @@ claim is made that a repository-owned artifact cannot prove.
 Koan is free and open under Apache-2.0. This initiative spends time and artifacts, never money,
 and never changes that posture.
 
+## Positioning (what the launch must convey)
+
+Koan exists to simplify the applications themselves: it eliminates the scaffolding, setup, and
+preparation a stack usually demands before anything runs, while keeping enough control to
+fine-tune and configure as the application matures. Three consequences, in the order a user
+meets them:
+
+1. **Zero-to-POC is easy and legible.** A package reference is the intent; the first working
+   endpoint is minutes away, and every composition decision stays readable (`koan.lock.json`,
+   the facts endpoint).
+2. **Modules own the necessary concerns.** Persistence, jobs, AI, tenancy, communication — the
+   module does that work properly so the team never has to invest in it.
+3. **A prototype carries to production.** The same model and posture that started the
+   prototype is production-adjacent — health, facts, provider guarantees — so prod v1 does not
+   begin with a rewrite.
+
+The common thread is terseness: Koan is hyper-terse and semantically ergonomic, and the
+terseness receipt (A11) counts it.
+
 ## Product thesis — three claims, three receipt types
 
 1. **Composition delight.** "Entity. Controller. Done." — a package reference is the intent, and
@@ -35,13 +54,21 @@ and never changes that posture.
    under the same access rules. There is no second agent domain model; advertisement is
    enforcement.
    *Receipt: `docs/capabilities/agents.md` and its validated leaves; demonstrated in A03.*
-3. **Agent-amplified development.** A semantically expressive Koan application is materially
-   faster and cheaper for a coding agent to produce and verify than the equivalent plain
-   ASP.NET Core application: fewer degrees of freedom, exact identifiers, machine-readable
-   composition facts.
-   *Receipt: the agent-race benchmark report (A02) and nothing else. No magnitude claim — no
-   "orders of magnitude", no multiplier — may publish until A02 measures it, and the published
-   number is the measured number.*
+3. **Terse, legible applications.** Koan applications are hyper-terse and semantically
+   ergonomic: the scaffolding, setup, and preparation a stack usually demands is owned by
+   modules, and the application keeps only its business nouns. Count the lines — the same
+   observable outcome, written twice, is the whole argument.
+   *Receipt: the terseness receipt (A11) — the flagship outcome implemented as a Koan app and
+   as an equivalent plain ASP.NET Core app, with a stated counting method and a one-command
+   reproduction.*
+
+**Held hypothesis — agent-amplified development.** A semantically expressive Koan application
+may prove materially faster and cheaper for a coding agent to produce and verify than the
+equivalent plain ASP.NET Core application: fewer degrees of freedom, exact identifiers,
+machine-readable composition facts. The measuring campaign continues privately
+(maintainer-local notes; `evals/agent-race/` in-tree). No magnitude claim — no "orders of
+magnitude", no multiplier — publishes until a publishable receipt exists, and the published
+number is the measured number.
 
 ## Target audiences, ranked
 
@@ -71,6 +98,12 @@ Captured from live sources on the initiative's opening day; A10 measures against
 | `Sylin.Koan.Templates` | 1,191 downloads | `dotnet new install` onboarding runs |
 | Social footprint | none | zero HN/Reddit/dev.to/Medium discussion |
 
+Re-measured 2026-08-28: family 205 packages / 197,749 downloads; `Sylin.Koan` 2,141 (617 on
+1.0.x); Templates 1,412; GitHub signals unchanged; referrers still github.com only. A one-day
+delta of that size against a single-entry referrer table is self-traffic (release train, CI,
+eval restores) — the concrete reason NuGet velocity is not a launch metric. A09/A10 read the
+contamination-resistant instruments; eval-window self-traffic is subtractable from run records.
+
 ## Environment
 
 - Classic ASP.NET Boilerplate reached end-of-support in May 2026; ABP vNext is widely criticized
@@ -87,7 +120,9 @@ Captured from live sources on the initiative's opening day; A10 measures against
 - Zero budget: no paid placement, no sponsorships, no paid tooling.
 - Owner capacity is one maintainer plus coding agents; every work item must be executable in
   bounded sessions and produce artifacts that outlive the session.
-- Every public claim links to repository-owned code, docs, samples, or the A02 report.
+- Every public claim links to repository-owned code, docs, samples, or a repository-owned
+  receipt — today the terseness receipt (A11) and the recorded baseline; later, any report the
+  operator decides to publish.
 - Launch copy promises no features and no dates. Feedback and defects route to the normal
   registers (`docs/MEMORY.md`, work-item conventions), never to launch commitments.
 

@@ -4,10 +4,10 @@ domain: framework
 title: "A03 - Flagship demo artifact"
 audience: [maintainers, ai-agents]
 status: draft
-last_updated: 2026-08-27
-framework_version: v1.0.12
+last_updated: 2026-08-28
+framework_version: v1.0.30
 validation:
-  date_last_tested: 2026-08-27
+  date_last_tested: 2026-08-28
   status: reviewed
   scope: flagship demo work-item specification
 ---
@@ -16,7 +16,7 @@ validation:
 
 - Tranche: `T1 — Artifacts`
 - Status: `draft`
-- Depends on: A01 (task shape); publication gated on A02
+- Depends on: none (the outcome's shape is defined by the validated recipes); feeds A04, A07, A11
 - Unlocks: A07
 - Owner: maintainer
 
@@ -38,8 +38,8 @@ facts-endpoint closing shot is mandatory: it is the one move no competing framew
 - Script the shots before recording; no dead air, no debugging theater.
 - Every command typed on screen is real; the run uses published packages only (ACCEPTANCE §1).
 - The demo app is committed under `samples/` or `docs/case-studies/` so viewers can reproduce it.
-- Caption and description carry the measured A02 number with a link to `REPORT.md`, or no number
-  at all.
+- Caption and description may quote only the terseness receipt's LoC table (A11) with its
+  reproduction link; no other numbers exist to publish.
 
 ## Evidence to read first
 
@@ -51,7 +51,7 @@ facts-endpoint closing shot is mandatory: it is the one move no competing framew
 - [ ] Recording + GIF exist; total ≤5 minutes; every claim in it linked or inline-proven.
 - [ ] Demo app committed and runnable from documented commands.
 - [ ] Closing shot shows the facts endpoint and `koan.lock.json`.
-- [ ] ACCEPTANCE §0 and §1 pass; publication waited for A02.
+- [ ] ACCEPTANCE §0 and §1 pass; A09's Wave-0 rehearsal passed on the recording machine.
 
 ## Proof
 

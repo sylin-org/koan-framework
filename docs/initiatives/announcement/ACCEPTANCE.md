@@ -4,10 +4,10 @@ domain: framework
 title: "Announcement Initiative Acceptance Gate"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-08-27
-framework_version: v1.0.12
+last_updated: 2026-08-28
+framework_version: v1.0.30
 validation:
-  date_last_tested: 2026-08-27
+  date_last_tested: 2026-08-28
   status: reviewed
   scope: initiative work-item acceptance criteria
 ---
@@ -27,8 +27,9 @@ claim-provenance, honesty, or reproducibility requirements.
 
 ## 0. Claim provenance — mandatory
 
-- No quantitative claim publishes without tracing to the A02 report or another repository-owned
-  measurement. If the receipt does not exist, the claim does not exist.
+- No quantitative claim publishes without tracing to a repository-owned measurement — the
+  terseness receipt (A11), the recorded baseline, or a later published report. If the receipt
+  does not exist, the claim does not exist.
 - Superlatives ("fastest", "simplest", "orders of magnitude") publish only as the measured number
   with its reproduction instructions beside it.
 - Criticism of other frameworks states verifiable facts (end-of-support dates, published
@@ -44,8 +45,13 @@ claim-provenance, honesty, or reproducibility requirements.
 
 ## 2. Reproducibility — mandatory
 
-- The benchmark (A01/A02) must be rerunnable from a fresh checkout by documented commands alone.
-- Run records (transcripts, logs, grader output) are retained beside the report.
+- Any measurement that publishes must be rerunnable from a fresh checkout by documented
+  commands alone.
+- Run records (transcripts, logs, grader output, counting output) are retained beside the
+  report.
+- The agent-race benchmark campaign lives in maintainer-local notes
+  (`local/initiatives/announcement-benchmark/`) and publishes only after a recorded operator
+  decision re-charters it into this initiative.
 
 ## 3. Provenance and privacy — mandatory
 
