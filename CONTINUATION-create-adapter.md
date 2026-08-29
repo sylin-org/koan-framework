@@ -68,9 +68,12 @@ Findings already gathered (save the next session the recon):
   PublicConstructors)]` on `KoanRegistry`'s `BackgroundServiceDescriptor.ServiceType` and
   `ServiceDiscoveryAdapterDescriptor.ServiceType` — the Types reach DI by reflection through the
   generated registry, so their ctors needed rooting. Probe binary now boots and serves HTTP 200;
-  Koan.Tests.Core.Unit 119/119 green. Remaining AOT surface (out of scope, recorded): trim warnings
-  IL2026/IL3050 in `KoanLockfileSerializer` (System.Text.Json reflection), and FirebirdClient's
-  wire-level AOT behavior past boot is still unverified.
+  Koan.Tests.Core.Unit 119/119 green. Remaining AOT surface: CLOSED 2026-08-29. `KoanLockfileSerializer` now rides a source-generated
+  `KoanLockfileJsonContext` (IL2026/IL3050 gone; schema spec 119/119 green). FirebirdClient verified
+  WIRE-FUNCTIONAL under NativeAOT: a publish of the probe binary ran connect/DDL/UPDATE-OR-INSERT/
+  select/delete against real firebirdsql/firebird:5.0.4, exit 0. The framework's single-binary AOT
+  claim holds end-to-end for a Firebird+CouchDb referencing application. (Fleet quality: 105/105
+  structurally-ready, 0 findings.)
 - `MakeGenericType` sweep: done per seam (clean); re-run after vector/AI.
 
 ### 4. Final report
