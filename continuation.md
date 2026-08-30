@@ -1,185 +1,84 @@
-# continuation.md — `koan-create-adapter` skill + proven adapters
+# continuation.md — `koan-create-adapter` skill + four proven adapters — SESSION COMPLETE
 
-Handoff for a fresh session. Read `agent-prompts/koan-create-adapter-skill.md` (the task brief),
-then this file. Phase 1, Phase 2, and the document seam of Phase 3 are complete, committed on
-`dev`, and green at their boundaries. Remaining: the **vector** and **AI** seams, their playbooks,
-and their obligations. Everything needed to finish is below; nothing needs re-discovery.
+The task brief (`agent-prompts/koan-create-adapter-skill.md`) is fully executed: the skill exists,
+all four seams are proven through it, and every obligation landed. Nothing is left to resume; this
+file is now the completion record. The analytics pillar's handoff remains preserved, unchanged, as
+`continuation-analytics-2026-08-28.md` (superseded per its own header).
 
-(The analytics pillar's handoff that previously lived here is preserved, unchanged, as
-`continuation-analytics-2026-08-28.md` — that session's work shipped and this file superseded it.)
+## What shipped, phase by phase (all committed on `dev`)
 
-## Current state (all committed on `dev`)
+| Phase | Commit(s) | What |
+|---|---|---|
+| 1 — skill | `650c67581` | `.agents/skills/koan-create-adapter/` (SKILL.md, references/data.md, agents/openai.yaml) |
+| 2 — relational | `650c67581` | **Firebird** (`Sylin.Koan.Data.Connector.Firebird`), AODB record-plane oracle 14/14 green ×2 |
+| 3 — document | `67c5518ef` | **CouchDB** (`Sylin.Koan.Data.Connector.CouchDb`), record-plane oracle 12/12 green ×2, `references/document.md` |
+| 3 — vector | this session | **Chroma** (`Sylin.Koan.Data.Vector.Connector.Chroma`), vector AODB oracle 28/28 green ×2, `references/vector.md` |
+| 3 — AI | this session | **llama.cpp** (`Sylin.Koan.AI.Connector.LlamaCpp`), wire-contract suite 13/13 green ×2, `references/ai.md` |
+| framework | this session | `AddKoanOptions` options-ctor rooting for NativeAOT + MEMORY.md lessons |
 
-| Commit | What |
-|---|---|
-| `650c67581` | Phase 1 skill (`.agents/skills/koan-create-adapter/`: SKILL.md, references/data.md, references/document.md, agents/openai.yaml) + Phase 2 **Firebird** adapter |
-| `67c5518ef` | Phase 3 document seam: **CouchDB** adapter + `references/document.md` |
-| `508cdaa80` | Framework amendments: AOT ctor rooting on `KoanRegistry` descriptors, generated truth regenerated, MEMORY.md learnings, workbook run-book, `docs/guides/agent-skills.md` chooser row |
-| `d58ab2f4d` | Fleet quality sweep — **105/105 structurally-ready, 0 findings** |
-| `9e896fd8a` | `KoanLockfileSerializer` on source-generated `KoanLockfileJsonContext` (IL2026/IL3050 gone) |
-| `6e9debb57` | AOT surface closed: FirebirdClient verified wire-functional under NativeAOT |
+Framework closures this session inherited from the prior one: AOT single-binary end-to-end,
+fleet quality 0 findings, lockfile source-gen.
 
-Proven by suites run **twice**, green:
+## Oracle numbers
 
-- **Firebird** (`Sylin.Koan.Data.Connector.Firebird`): 14/14 — AODB record-plane oracle
-  (isolation modes declared+realized, streaming fail-closed, polymorphic roots), full
-  filter-convergence corpus, scalar pushdown guard, residual-fact honesty, scalar ordering, paged
-  windows, capability truth, boot provenance. Real `firebirdsql/firebird:5.0.4`.
-- **CouchDB** (`Sylin.Koan.Data.Connector.CouchDb`): 12/12 — AODB record-plane oracle, full filter
-  corpus WITH strict pushdown guard (`$like` posture pinned residual-and-recorded), paged windows
-  through the declared sort fallback, capability truth, boot provenance. Pure HttpClient, no
-  driver. Real `couchdb:3.5`.
+- **Chroma** — `Koan.Data.VectorAdapterSurface.Chroma.Tests` vs real `chromadb/chroma:1.5.9`:
+  28/28 = the shared `VectorAodbConformanceSpecsBase` (G-09 declaration + Shared/Container/Database
+  isolation) + 24 annex cells of which 18 proven live and 6 declined with reasons (V-12 Eventual,
+  V-14 Hybrid, V-15 named spaces, V-16 continuation, V-18 atomic batch, V-19 export — declining is
+  conformant). Filter pushdown proven for Eq/Ne/ranges/In/Nin/AllOf/AnyOf with absent-key semantics
+  agreeing with the neutral evaluator; Not/nested paths/Exists/Has*/Size/ignore-case/Eq(null)/
+  non-numeric ranges fail closed before provider I/O.
+- **llama.cpp** — `Koan.AI.Connector.LlamaCpp.Tests` vs a deterministic Kestrel llama-server
+  wire-contract service (ARCH-0120 posture; HuggingFace is download-gated in this environment, so a
+  real-weights run was impossible and model-inference behavior is out of scope by nature — stated
+  in README/TECHNICAL/report): 13/13 covering chat payload+auth, SSE streaming (order, `[DONE]`,
+  malformed-line tolerance, cancellation), embeddings (+no-`--embedding` refusal), unknown-model
+  404 mapping, readiness (503-while-loading → Failed, absent default model → Degraded), trailing-
+  `/v1` normalization, model listing.
 
-Both pack verified (`Sylin.` ids, release-train `version.json`), both **not assessed** (⚠ in the
-matrix — merging grants nothing, ARCH-0120).
+## Playbooks fixed while dogfooding
 
-Framework side, closed: NativeAOT single-binary story holds **end-to-end** (consumer over both
-adapters boots, serves 200, and FirebirdClient does a full DDL/upsert/select/delete wire
-round-trip in the 7.7 MB binary, exit 0). `skills-verify -Structure` passes fully. Package fleet
-0 findings.
+`references/vector.md` was written first from Qdrant + the TestKit and corrected against the live
+store (probe-first facts that contradicted the recon: tenant/database path prefix required, item
+routes address the collection UUID only, `hnsw.dimensions` not a create field, single-key
+where-dicts only, numeric-only ranges, empty-where refusal → always-true Clear predicate,
+unreliable `deleted` counts, and a live-observed WAL bug that forbids `null` metadata entries).
+`references/ai.md` derives the no-kit posture (ARCH-0127) and declares the two proof postures.
 
-## Remaining work (in brief order)
+## AOT
 
-### 1. Vector seam → Chroma
+Probe recipe extended and run: scratch Web-SDK project + `PublishAot` + ProjectReferences to
+Chroma and LlamaCpp. Three findings (all fixed or worked around, recorded in MEMORY.md):
 
-Recon already done (do not redo):
+1. **Framework fix (committed):** `AddKoanOptions<TOptions>` generic parameter now carries
+   `[DynamicallyAccessedMembers(PublicParameterlessConstructor|PublicProperties|
+   NonPublicProperties)]` — without it the binary died at `ValidateOnStart` with
+   `MissingMethodException` on `DirectOptions`. Core unit suite 119/119.
+2. **Probe recipe gap:** a scratch ProjectReference consumer must import
+   `src/Koan.Core/build/Sylin.Koan.Core.targets` itself, or no `koan.modules.manifest` /
+   `koan.trimroots.xml` are embedded and boot discovers no adapters.
+3. **Metadata:** pass `IDictionary` (not anonymous objects) to `Vector<T>.Save` under ILC.
 
-- Oracle: `tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.TestKit/` —
-  `VectorAodbConformanceSpecsBase` (isolation modes + V-01..V-24 annex via `ProveVectorAnnexCellAsync`),
-  `VectorFilterConvergenceSpecsBase`, `VectorPartitionSpecsBase`, `EmbeddingFactory`, `TodoVector`,
-  `VectorAdapterTestServices`, `IVectorAdapterTestFactory`.
-- Exemplar: **Qdrant** (`src/Connectors/Data/Vector/Qdrant/`, client/filter/repository split,
-  ~1400 lines) and its test class
-  `Koan.Data.VectorAdapterSurface.Qdrant.Tests/QdrantVectorAodbConformanceSpec.cs`, which
-  implements the ~24 annex proof methods and DECLINES earned-but-unclaimed cells (V-12 eventual,
-  V-14 hybrid, V-15 named spaces, V-16 continuation, V-18 atomic batch, V-19 export) — declining
-  with reasons is conformant. SqliteVec is the in-process exemplar.
-- Chroma mapping: REST v2 (`/api/v2`); collection = Koan vector container; create collection
-  (cosine/l2/ip) under managed lifecycle; `POST /collections/{name}/upsert` (ids, embeddings,
-  metadatas, documents); `POST /query` (query_embeddings, n_results, where, include); get/delete
-  by ids; metadata `where` dict for filter pushdown (V-13). Testcontainers image
-  `chromadb/chroma`; wait on `/api/v2/heartbeat` (check the image's HEALTHCHECK before trusting
-  the default wait — see run-book).
-- Vector-plane peculiarity: Database mode is the NAME-FOLD floor on HTTP adapters (routed source →
-  distinct collection name, no fail-closed throw) — see the kit's class comment.
-- Write `references/vector.md` FIRST from Qdrant + the kit, fix it while building (same dogfood
-  loop as data/document). Then implement `src/Connectors/Data/Vector/Chroma/` + test project
-  `Koan.Data.VectorAdapterSurface.Chroma.Tests`, modelled on the Qdrant pair.
+Result: the probe binary (single file, ~38 MB) boots with both adapters composed and performs a
+full Chroma save/get/search/delete wire round-trip against the live container. LlamaCpp composes
+at boot with its source inactive (dead endpoint by design). Known pre-existing gap, reported not
+fixed: `AppBootstrapper.EmitAssemblySummary` uses reflection JsonSerializer and throws only under
+`KOAN_VERBOSE_ASSEMBLIES=1` in an AOT binary.
 
-### 2. AI seam → llama.cpp (`llama-server`)
+## Obligations sweep (both adapters)
 
-- No shared AI conformance kit exists (ARCH-0127 — a missing kit is a STOP for kit-building, not
-  for the adapter). Construct the strongest behavioral proof from the exemplar's test shape.
-- Exemplar: LMStudio or Ollama under `src/Connectors/AI/`. llama-server exposes OpenAI-style
-  `/v1/chat/completions`, `/v1/embeddings` plus native `/completion`, `/health`.
-- If a real model is impractical, prove the wire contract with a deterministic fake HTTP server
-  (the ARCH-0120 "wire-contract service" posture) and say so in the report.
-- Write `references/ai.md` from the exemplar, fix while building.
+- Connector matrix regenerated (`38→39` providers; Chroma + llamacpp carry the **not assessed** ⚠
+  marker); package-quality regenerated — fleet **107/107 structurally-ready, 0 findings**;
+  `skills-verify -Structure` passes with both new playbooks.
+- READMEs written to the quality-gate shape on the first write (exact `# <PackageId>`, install
+  expression, what-it-adds/limits headings); TECHNICAL companions carry the probed provider facts.
+- Pack verified (`Sylin.` ids, release-train `version.json`, offset 0 for new packages).
+- `MakeGenericType` sweep over both adapters and their tests: 0 hits.
+- Not-assessed adapters owe no capability-map rows and no recipe ingredients (ARCH-0120).
 
-### 3. Obligations (per adapter, after it is green)
+## Selection rationale (recorded)
 
-- Capability map / matrix: not-assessed packages are **not owed rows**; matrix is generated — run
-  the regeneration commands below and commit the ⚠ diff.
-- AOT: extend the probe recipe (below) with the new adapter; publish **and run**; record result.
-- `MakeGenericType` sweep on changed contracts:
-  `grep -rn "MakeGenericType" src tests --include="*.cs"`.
-- README must satisfy the quality gate on first write (see run-book) — Firebird/CouchDb needed a
-  second pass; don't repeat that.
-
-### 4. Final report
-
-Phase-by-phase: what shipped, oracle numbers, playbook fixes, selection rationale, deviations.
-
-## Selection rationale (recorded, do not re-litigate)
-
-- Firebird: free, absent from matrix, managed ADO.NET provider, official container, SQL-standard
-  dialect. Lost: libSQL (immature .NET clients), ClickHouse (async-mutation model conflicts with
-  delete/upsert outcome semantics), H2 (Java-only).
-- CouchDB: Apache-2.0, absent (Couchbase ≠ CouchDB), REST/JSON → zero driver dependency, Mango
-  filters. Lost: RavenDB Community (heavy client, license constraints).
-- Chroma: Apache-2.0, absent, REST. Lost: LanceDB (prerelease .NET bindings, native deps).
-- llama.cpp: MIT, local runtime (same class as shipped Ollama/LMStudio; ARCH-0127 gates *hosted*
-  AI only), OpenAI-compatible endpoints.
-
-## Run-book (hard-won; all verified this session)
-
-**Build/test**
-- The repo builds into ONE shared output root OUTSIDE the working tree, e.g.
-  `%TEMP%/Koan-framework/tests/<Project>/bin/Debug/net10.0/`. One build at a time, always.
-- For live test output run the xunit v3 exe directly:
-  `<output-root>/<TestProject>/bin/Debug/net10.0/<Name>.Tests.exe -noColor` (optionally
-  `-class <FullClassName>`). `dotnet test` buffers everything and hides hangs.
-- If a suite stalls: `dotnet-stack report -p <pid>` (install: `dotnet tool install -g
-  dotnet-stack`). An idle process with NO test thread = the fixture never finished, not a slow
-  spec.
-
-**Docker**
-- Git Bash mangles absolute POSIX paths in `-e`/args. ALWAYS prefix container commands that carry
-  paths with `MSYS_NO_PATHCONV=1`. This killed two container starts silently.
-- An engine image with no HEALTHCHECK hangs `UntilContainerIsHealthy()` forever. Wait on the
-  internal port (`UntilInternalTcpPortIsAvailable`) or a real endpoint (`/_up`,
-  `/api/v2/heartbeat`). Check `docker inspect <image> --format '{{.Config.Healthcheck}}'` before
-  trusting the default.
-
-**Firebird container (reference invocation)**
-```
-MSYS_NO_PATHCONV=1 docker run -d --name koan-fb-probe \
-  -e FIREBIRD_ROOT_PASSWORD=masterkey \
-  -e FIREBIRD_DATABASE=/var/lib/firebird/data/probe.fdb \
-  -e FIREBIRD_CONF_WireCrypt=Enabled \
-  -e FIREBIRD_CONF_AuthServer="Srp256, Srp" \
-  -e FIREBIRD_CONF_AuthClient="Srp256, Srp" \
-  -p 3055:3050 firebirdsql/firebird:5.0.4
-```
-`FIREBIRD_CONF_*` keys are written into `firebird.conf` verbatim — they must match the file's
-exact casing (`WireCrypt`, not `WIRECRYPT`). The image ignores `ISC_PASSWORD`; the SYSDBA
-password is `FIREBIRD_ROOT_PASSWORD`. The .NET client cannot negotiate `WireCrypt=Required` or an
-Srp256-only auth set.
-
-**CouchDB container**: `couchdb:3.5`, `-e COUCHDB_USER -e COUCHDB_PASSWORD`, port 5984; admin
-party disabled by default in 3.x. The fixture in `Koan.Data.Connector.CouchDb.Tests` is the
-reference (generic Testcontainers builder + `/ _up` HTTP wait).
-
-**Generated truth (regenerate + commit when the package set changes)**
-```
-dotnet run --project tools/Koan.Packaging -- quality --output docs/reference/package-quality.json
-pwsh scripts/build-connector-matrix.ps1
-pwsh scripts/skills-verify.ps1 -Structure
-```
-(`inventory` is a raw dump with trailing garbage — not the file's writer.) Not-assessed packages
-get the ⚠ marker in the matrix and are NOT owed capability-map rows; a shelf row that names a
-package must carry `**not assessed**` if unassessed.
-
-**Package quality gate (README shape it greps for)**
-- Title line exactly `# <PackageId>`; a real `dotnet add package <id>` expression; meaningful-use
-  heading from the recognized keyword list ("what it adds", "usage", "behavior", "contract",
-  ...); boundaries heading ("limits", "unsupported", "guarantees", ...). Write it right the first
-  time.
-
-**NativeAOT probe recipe (extend per adapter)**
-```
-scratch console (Microsoft.NET.Sdk.Web) + <PublishAot>true</PublishAot>
-  + ProjectReferences to the adapters
-dotnet publish -c Release -r win-x64
-run the single binary against the real backend; publish success is NOT the claim — the run is
-```
-Status: consumer boots + serves 200; FirebirdClient wire round-trip (connect/DDL/UPDATE OR
-INSERT/select/delete) exit 0. If new IL2026/IL3050 appear, prefer a source-generated
-`JsonSerializerContext` or `[DynamicallyAccessedMembers]` at the flow source (see `KoanRegistry`
-descriptors for the pattern; positional records need BOTH `[param:]` and `[property:]`).
-
-**AOT-relevant framework facts**
-- Discovered-descriptor Types are rooted via `DynamicallyAccessedMembers(PublicConstructors)` on
-  `KoanRegistry`'s descriptor records — keep that pattern for any new registry surface.
-- Lockfile JSON is source-generated (`KoanLockfileJsonContext`); keep new closed JSON shapes on
-  source-gen, never reflection `JsonSerializer`.
-
-## Standalone debug lessons (full versions live in docs/MEMORY.md dated 2026-08-29)
-
-Probe before you build — the Firebird/CouchDB provider-fact logs live in each connector's
-TECHNICAL.md. Divergence between sibling adapters is decided by reading the member, not majority
-rule. Fallback facts are snapshot-keyed by code+subject, so a spec asserting "the fact appears"
-must use a query shape no earlier spec ran. CouchDB stores managed discriminators under a legal
-`koan.` subdocument (top-level `_`-prefixed members are rejected). `_bulk_docs` needs explicit
-`_id` per doc or CouchDB assigns uuids silently. Mango bare equality on a collection is
-parser-lowered to element-match (`$all`) — probe the composite path, not the raw operator.
+- Chroma: Apache-2.0, absent from the matrix, pure REST (no driver), containerized. Lost: LanceDB
+  (prerelease .NET bindings, native deps).
+- llama.cpp: MIT, local runtime — the same class as shipped Ollama/LMStudio; ARCH-0127 gates
+  *hosted* AI only. OpenAI-compatible surface shared with the LMStudio exemplar.
