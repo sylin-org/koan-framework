@@ -639,3 +639,15 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   per-entry exactly-once holder because Lazy's trim metadata demands a public parameterless ctor
   its values never use); zero IL2091s on republish, Core 119/119, Data.Core 492/492. Remaining
   unmeasured: linux/arm64 (PMC-051). (2026-08-29/30)
+- **Zero configuration is a claim to prove, not a phrase to write.** The connector-forge adoption
+  audited each new adapter with a bare package reference + `AddKoan()` against a conventionally
+  started container. Two failed: Firebird discovery health-checked by ATTACHING koan.fdb, so a
+  fresh container (database not yet created by managed lifecycle) was "unhealthy" and auto refused
+  to resolve — health now treats isc_io_error as reachable-and-authenticated. CouchDB 3.x refuses
+  to start without an admin user, so a null credential default is a guaranteed 401 — credentials
+  now layer config keys > the official image's COUCHDB_USER/COUCHDB_PASSWORD env > the
+  Testcontainers/official-docs default admin/password (prior art: Testcontainers modules and the
+  image docs both use admin/password; Aspire generates because it owns the container — Koan does
+  not, so the stable convention is the honest default). Also: stale consumer builds will lie about
+  a fix — ProjectReference consumers do not rebuild referenced projects under `--no-build`.
+  (2026-08-30)

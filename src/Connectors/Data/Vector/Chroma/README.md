@@ -29,6 +29,18 @@ builder.Services.AddKoan(koan =>
 { "Koan": { "Data": { "Chroma": { "Endpoint": "http://localhost:8000" } } } }
 ```
 
+## Zero configuration
+
+```powershell
+docker run -d -p 8000:8000 chromadb/chroma:1.5.9
+```
+
+No configuration and no credentials: the adapter resolves `auto` to the conventional local
+endpoint (`http://localhost:8000`, default tenant and database), creates collections under managed
+lifecycle, and Chroma itself is unauthenticated by default. Point elsewhere with
+`Koan:Data:Chroma:Endpoint` (or a `CHROMA_URL`/`CHROMA_ENDPOINT` environment variable, which
+discovery also honors).
+
 The adapter speaks the Chroma REST v2 API under the configured tenant/database
 (`default_tenant`/`default_database` on a standalone server). Collections are created and
 shape-validated under the framework's managed lifecycle: metric at creation, dimension pinned by the

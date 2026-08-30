@@ -78,6 +78,38 @@ Per ARCH-0120 §3, each adoption satisfies the five conditions:
    (product surface, package quality, connector matrix) is regenerated in the adoption change; the
    release pipeline's own API/coherence checks run at publication.
 
+## Zero-configuration audit (2026-08-30)
+
+Adoption is developer-facing, so each adapter was proven with ZERO application configuration —
+package reference + `AddKoan()` only, server on its conventional address:
+
+| Adapter | Conventional start | Default credentials | Zero-config proof |
+|---|---|---|---|
+| Chroma | `docker run -p 8000:8000 chromadb/chroma:1.5.9` | none (server unauthenticated) | save/get/search/delete round-trip PASS |
+| CouchDB | `docker run -p 5984:5984 -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=password couchdb:3.5` | `admin`/`password`, then the image's own `COUCHDB_USER`/`COUCHDB_PASSWORD` env, then config keys | Entity save/get round-trip PASS |
+| Firebird | `docker run -p 3050:3050 -e FIREBIRD_ROOT_PASSWORD=masterkey firebirdsql/firebird:5.0.4` | engine-shipped `SYSDBA`/`masterkey`; `koan.fdb` created by managed lifecycle | Entity save/get round-trip PASS |
+| llama.cpp (AI) | start `llama-server` on localhost:8080 | none by default (`--api-key` optional) | composes and boots; wire suite proves the contract |
+
+Two defects surfaced and were fixed in this change:
+
+1. **Firebird discovery refused a fresh container.** Health validation attached `koan.fdb`, which
+   does not exist until managed lifecycle creates it — so the conventional candidate failed its
+   health probe and `auto` refused to resolve. Health now treats isc_io_error (database absent) as
+   healthy: the server answered and the credentials work. Pinned by `FirebirdDiscoveryHealthSpec`
+   (absent-database and existing-database cells against the live container); suite 16/16.
+2. **CouchDB had no viable credential default.** CouchDB 3.x refuses to start without an admin
+   user, so an unset default is a guaranteed 401. Prior art: Testcontainers CouchDB modules ship
+   `admin`/`password`, Aspire generates and injects (it owns the container), and the official
+   image documentation's own examples use `admin`/`password` with `COUCHDB_USER`/`COUCHDB_PASSWORD`.
+   Credentials now layer most-specific-first: configuration keys, then the image's environment
+   convention (the operator typed them for `docker run` already), then `admin`/`password`. Pinned
+   by `CouchDbDefaultsSpec`; suite 22/22.
+
+Chroma needed nothing (unauthenticated server, conventional port). The no-server boot posture is
+fail-closed by design: `auto` with no discoverable deployment refuses at startup with a corrective
+naming the remedy, while a concrete-default adapter (Chroma) composes and fails correctively at
+the first operation.
+
 ## NativeAOT machine evidence
 
 `scripts/aot-verify.ps1` extended from six to eight cells and run green with adapter receipts on

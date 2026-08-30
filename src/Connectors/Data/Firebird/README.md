@@ -9,6 +9,20 @@ Koan store.
 > and the connector is machine-checked under NativeAOT by `scripts/aot-verify.ps1`. The Limits below are
 > part of the claim.
 
+## Zero configuration
+
+Start Firebird with its root password and use the app unchanged — the adapter resolves `auto` to
+the conventional local endpoint, composes the engine's shipped `SYSDBA`/`masterkey` credentials,
+and creates `koan.fdb` on first use (managed lifecycle) if the file does not exist yet:
+
+```powershell
+docker run -d -p 3050:3050 -e FIREBIRD_ROOT_PASSWORD=masterkey firebirdsql/firebird:5.0.4
+```
+
+Discovery health-checks the server, not the database: a fresh container where `koan.fdb` does not
+exist yet is discoverable. Point at a different database or credentials with
+`Koan:Data:Firebird:Database` / `UserId` / `Password` or a full connection string.
+
 ## Install
 
 ```powershell

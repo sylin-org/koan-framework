@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.Firebird.Discovery;
 
-internal sealed class FirebirdDiscoveryAdapter(
+internal class FirebirdDiscoveryAdapter(
     IConfiguration configuration,
     ILogger<FirebirdDiscoveryAdapter> logger) : ServiceDiscoveryAdapterBase(configuration, logger)
 {
@@ -46,11 +46,21 @@ internal sealed class FirebirdDiscoveryAdapter(
     protected override async Task<bool> ValidateServiceHealth(
         string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        await using var connection = new FbConnection(serviceUrl);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1 FROM RDB$DATABASE";
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        try
+        {
+            await using var connection = new FbConnection(serviceUrl);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT 1 FROM RDB$DATABASE";
+            return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        }
+        catch (FbException error) when (Runtime.FirebirdDdlExecutor.IsDatabaseAbsent(error))
+        {
+            // The server answered and the credentials work; the Koan database file just does not
+            // exist yet. Managed lifecycle creates it before the first DDL, so this is healthy —
+            // a fresh zero-configuration container must be discoverable, not refused.
+            return true;
+        }
     }
 
     private static string? Value(IDictionary<string, object> parameters, string key) =>

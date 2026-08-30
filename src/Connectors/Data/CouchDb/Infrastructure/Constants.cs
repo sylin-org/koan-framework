@@ -16,6 +16,8 @@ public static class Constants
     {
         public const string Section = "Koan:Data:CouchDb";
         public const string Endpoint = Section + ":Endpoint";
+        public const string DefaultUserId = "admin";
+        public const string DefaultPassword = "password";
         public const string ConnectionString = Section + ":ConnectionString";
         public const string Database = Section + ":Database";
         public const string UserId = Section + ":UserId";

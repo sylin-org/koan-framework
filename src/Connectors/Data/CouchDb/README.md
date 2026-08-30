@@ -22,6 +22,23 @@ dotnet add package Sylin.Koan.Data.Connector.CouchDb
   "CouchDb": { "UserId": "admin", "Password": "..." } } } } } }
 ```
 
+
+## Zero configuration
+
+Start CouchDB with its documented development credentials and use the app unchanged — the adapter
+resolves `auto` to the conventional local endpoint and the credential layering fills the rest:
+
+```powershell
+docker run -d -p 5984:5984 -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=password couchdb:3.5
+```
+
+Credentials resolve most-specific-first: configuration keys (`Koan:Data:CouchDb:UserId` /
+`Password`), then the official image's own environment convention (`COUCHDB_USER` /
+`COUCHDB_PASSWORD` — the ones `docker run` already received), then the development default
+`admin`/`password` (the same defaults the Testcontainers CouchDB modules and the image
+documentation use; CouchDB 3.x refuses to start without an admin user, so an empty default is not
+viable). The endpoint and database default to `localhost:5984` and `koan`; the database is created
+on first use under managed lifecycle.
 A `couchdb://user:password@host:port` URI is also accepted. Under managed lifecycle policy the
 adapter creates each entity's database on first use; under `StorageLifecycle: External` it never
 creates anything and an absent database reports as absent.

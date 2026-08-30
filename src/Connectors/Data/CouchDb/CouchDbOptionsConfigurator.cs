@@ -29,11 +29,23 @@ internal sealed class CouchDbOptionsConfigurator : AdapterOptionsConfigurator<Co
         options.Endpoint = configured ?? Discover();
         options.Database = ReadProviderConfiguration(
             options.Database, Infrastructure.Constants.Configuration.Database);
-        options.UserId = ReadProviderConfiguration(
-            options.UserId, Infrastructure.Constants.Configuration.UserId);
-        options.Password = ReadProviderConfiguration(
-            options.Password, Infrastructure.Constants.Configuration.Password);
+        // Credential layering, most specific wins: configuration keys, then the official image's
+        // own environment convention (COUCHDB_USER/COUCHDB_PASSWORD - the operator typed them for
+        // `docker run` already), then the Testcontainers/official-docs development default
+        // admin/password. CouchDB 3.x refuses to start without an admin user, so "no credentials"
+        // is not a viable default and zero configuration must still be able to connect.
+        options.UserId = FirstNonEmpty(
+            ReadProviderConfiguration(options.UserId, Infrastructure.Constants.Configuration.UserId),
+            Environment.GetEnvironmentVariable("COUCHDB_USER"),
+            Infrastructure.Constants.Configuration.DefaultUserId);
+        options.Password = FirstNonEmpty(
+            ReadProviderConfiguration(options.Password, Infrastructure.Constants.Configuration.Password),
+            Environment.GetEnvironmentVariable("COUCHDB_PASSWORD"),
+            Infrastructure.Constants.Configuration.DefaultPassword);
     }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
 
     private string Discover()
     {
