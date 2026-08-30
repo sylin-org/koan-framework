@@ -1,5 +1,5 @@
 {
-  "Sylin.Koan.Storage": "1.0.16",
-  "Sylin.Koan.Storage.Abstractions": "1.0.14",
-  "$transitive": "8077C1A713BB006477BAA834E74175AEA8DDCB6B6F903493951D7D135491F1EB"
+  "Sylin.Koan.Storage": "1.0.18",
+  "Sylin.Koan.Storage.Abstractions": "1.0.15",
+  "$transitive": "991AB5947A85CFDEFBC6C699C1C9B803C4C57C1BF8147C195DE89E3823BFBE1D"
 }
