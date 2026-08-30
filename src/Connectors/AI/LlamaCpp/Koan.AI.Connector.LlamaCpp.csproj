@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>llama.cpp (llama-server) provider for Koan AI: chat, streaming, and embeddings over the OpenAI-compatible REST surface.</Description>
+    <PackageTags>$(CommonPackageTags);ai;llamacpp;llama;provider</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI\Koan.AI.csproj" />
+    <ProjectReference Include="..\..\..\Koan.AI.Contracts\Koan.AI.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- IHttpClientFactory. Declared explicitly per ARCH-0088 (see LMStudio connector). -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+</Project>

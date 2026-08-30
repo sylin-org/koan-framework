@@ -22,7 +22,7 @@ the capability map. Once the answer is yes, the map carries the exact package an
 |---|---|
 | Entity store | Cockroach · Couchbase · CouchDb ⚠ · DuckDb · Elasticsearch · Firebird ⚠ · InMemory · Json · Mongo · MySql ⚠ · OpenSearch · Postgres · Redis · SQL Server · SQLite |
 | Vector index | Chroma ⚠ · InMemory · Milvus · MongoAtlasVector ⚠ · PgVector ⚠ · Qdrant · RedisVector ⚠ · SqliteVec · Weaviate |
-| AI runtime | Hugging Face ⚠ · LM Studio · Ollama · ONNX |
+| AI runtime | Hugging Face ⚠ · LlamaCpp ⚠ · LM Studio · Ollama · ONNX |
 | Object storage | Local · S3 ⚠ |
 | Cache tier | Redis ⚠ · SQLite |
 | Sign-in provider | Discord · Google · Microsoft · Test |

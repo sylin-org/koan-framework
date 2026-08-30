@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 106,
+    "packages": 107,
     "repairRequired": 0,
     "reviewRequired": 0,
-    "structurallyReady": 106,
-    "ownedReadmes": 106,
-    "technicalCompanions": 106,
+    "structurallyReady": 107,
+    "ownedReadmes": 107,
+    "technicalCompanions": 107,
     "findings": 0
   },
   "findingDefinitions": [],
@@ -96,6 +96,26 @@
       ],
       "readme": "src/Connectors/AI/HuggingFace/README.md",
       "technicalDocumentation": "src/Connectors/AI/HuggingFace/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.AI.Connector.LlamaCpp",
+      "projectPath": "src/Connectors/AI/LlamaCpp/Koan.AI.Connector.LlamaCpp.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "llama.cpp (llama-server) provider for Koan AI: chat, streaming, and embeddings over the OpenAI-compatible REST surface.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.AI",
+        "Sylin.Koan.AI.Contracts",
+        "Sylin.Koan.Core"
+      ],
+      "readme": "src/Connectors/AI/LlamaCpp/README.md",
+      "technicalDocumentation": "src/Connectors/AI/LlamaCpp/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },
