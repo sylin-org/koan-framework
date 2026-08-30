@@ -90,7 +90,11 @@ source-generated `JsonSerializerContext` — the last reflection-JSON call site 
 ## Exit state
 
 All four packages ship as supported with claims in `product/claims.json`, capability-map rows, and
-family-reference entries. Their exact first publication versions become immutable API floors in
-the following slice, same as every train release. Merging `dev` into `main` (fast-forward)
-triggers the shared release pipeline, which plans, packs, proves, and publishes the changed
-packages — including the four adapters and the framework fixes this program landed.
+family-reference entries. Publication happened through the shared release pipeline: `dev` pushed, `main` fast-forwarded
+(f371f848f → 76e7a5c83), release run `33293020568` green (plan/pack/prove 12m59s, publish 2m54s).
+First publication versions, indexed on NuGet.org 2026-08-30 and immutable API floors from here:
+
+- `Sylin.Koan.Data.Connector.Firebird` **1.0.349**
+- `Sylin.Koan.Data.Connector.CouchDb` **1.0.350**
+- `Sylin.Koan.Data.Vector.Connector.Chroma` **1.0.357**
+- `Sylin.Koan.AI.Connector.LlamaCpp` **1.0.358**
