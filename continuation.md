@@ -61,9 +61,11 @@ Chroma and LlamaCpp. Three findings (all fixed or worked around, recorded in MEM
 
 Result: the probe binary (single file, ~38 MB) boots with both adapters composed and performs a
 full Chroma save/get/search/delete wire round-trip against the live container. LlamaCpp composes
-at boot with its source inactive (dead endpoint by design). Known pre-existing gap, reported not
-fixed: `AppBootstrapper.EmitAssemblySummary` uses reflection JsonSerializer and throws only under
-`KOAN_VERBOSE_ASSEMBLIES=1` in an AOT binary.
+at boot with its source inactive (dead endpoint by design). The verbose boot's
+`EmitAssemblySummary` reflection-JsonSerializer crash (only under `KOAN_VERBOSE_ASSEMBLIES=1`) was
+found by this probe and subsequently fixed on a source-generated `AssemblyScanJsonContext` — the
+last reflection-JSON call site in Koan.Core; the verbose AOT boot now emits the payload and the
+full round-trip passes with the flag set.
 
 ## Obligations sweep (both adapters)
 

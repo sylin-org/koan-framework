@@ -334,14 +334,13 @@ public static class AppBootstrapper
             KoanStandardStreams.Diagnostics.WriteLine($"ASSEMBLIES|new={delta}");
         }
 
-        var payload = new
-        {
-            @event = "assembly-scan",
-            loaded = assemblies.Count,
-            categories = breakdown,
-            discovered = discoveredAssemblies.Select(a => a.GetName().Name ?? "").ToArray()
-        };
-        KoanStandardStreams.Diagnostics.WriteLine(JsonSerializer.Serialize(payload));
+        var payload = new AssemblyScanSummary(
+            Event: "assembly-scan",
+            Loaded: assemblies.Count,
+            Categories: breakdown,
+            Discovered: discoveredAssemblies.Select(a => a.GetName().Name ?? "").ToArray());
+        KoanStandardStreams.Diagnostics.WriteLine(
+            JsonSerializer.Serialize(payload, AssemblyScanJsonContext.Default.AssemblyScanSummary));
 
         // TIER A counts (fail-fast.json): absent/unloadable references skipped during closure are
         // no longer silent — surface them here alongside the assembly listing.
