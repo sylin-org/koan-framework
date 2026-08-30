@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "source": "evaluated-msbuild-package-graph",
   "summary": {
-    "packages": 105,
+    "packages": 106,
     "repairRequired": 0,
     "reviewRequired": 0,
-    "structurallyReady": 105,
-    "ownedReadmes": 105,
-    "technicalCompanions": 105,
+    "structurallyReady": 106,
+    "ownedReadmes": 106,
+    "technicalCompanions": 106,
     "findings": 0
   },
   "findingDefinitions": [],
@@ -1162,6 +1162,28 @@
       ],
       "readme": "src/Koan.Data.Vector.Abstractions/README.md",
       "technicalDocumentation": "src/Koan.Data.Vector.Abstractions/TECHNICAL.md",
+      "packageIcon": "icon.png",
+      "findings": []
+    },
+    {
+      "packageId": "Sylin.Koan.Data.Vector.Connector.Chroma",
+      "projectPath": "src/Connectors/Data/Vector/Chroma/Koan.Data.Vector.Connector.Chroma.csproj",
+      "shape": "library",
+      "role": "provider",
+      "status": "structurally-ready",
+      "description": "Chroma vector provider for Koan: plan-bound Entity vector search, scalar metadata filter pushdown, and session-visible mutations over REST v2.",
+      "targetFrameworks": [
+        "net10.0"
+      ],
+      "dependencies": [
+        "Sylin.Koan.Core",
+        "Sylin.Koan.Data.Abstractions",
+        "Sylin.Koan.Data.Core",
+        "Sylin.Koan.Data.Vector",
+        "Sylin.Koan.Data.Vector.Abstractions"
+      ],
+      "readme": "src/Connectors/Data/Vector/Chroma/README.md",
+      "technicalDocumentation": "src/Connectors/Data/Vector/Chroma/TECHNICAL.md",
       "packageIcon": "icon.png",
       "findings": []
     },

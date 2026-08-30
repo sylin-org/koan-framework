@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);NU1902;NU1903</NoWarn>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1902;NU1903</WarningsNotAsErrors>
+    <!-- ARCH-0091: xUnit v3 runs as a self-executing test assembly (VSTest-compatible mode keeps `dotnet test`). -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Koan.Data.VectorAdapterSurface.TestKit\Koan.Data.VectorAdapterSurface.TestKit.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Vector\Chroma\Koan.Data.Vector.Connector.Chroma.csproj" />
+    <!-- V-22 is the one Framework cell that coordinates an Entity write with a vector write, so this host
+         needs a record store as well as the vector adapter under test. JSON is the Data pillar floor: it
+         composes from a bare reference and registers no vector adapter, so the single-vector-adapter
+         conformance rule still holds. -->
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Json\Koan.Data.Connector.Json.csproj" />
+    <!-- The production-adapter AODB isolation spec boots a real AddKoan() host (tenancy + a Database-mode axis)
+         against the live Chroma container, beyond the custom-SP surface harness. -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Tenancy\Koan.Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Testcontainers" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+</Project>
