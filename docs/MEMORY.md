@@ -591,3 +591,37 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   recognized by heading keywords ("what it adds", "limits", "unsupported", "guarantees"...). Write
   the headings the gate can see; two new connectors went review-required → structurally-ready on
   nothing but title and heading spelling. (2026-08-29)
+- **A scratch NativeAOT probe must import the Koan AOT substrate targets itself.**
+  A `ProjectReference` consumer does not receive the package's buildTransitive targets, so a probe
+  project in `%TEMP%` publishes with NO `koan.modules.manifest` and NO `koan.trimroots.xml` —
+  Reference=Intent connectors are then invisible to boot discovery (ILC trims the whole assembly)
+  and the app answers "No vector adapter is available" while everything looks installed. Import
+  `src/Koan.Core/build/Sylin.Koan.Core.targets` explicitly in the probe csproj (samples get it
+  centrally from Directory.Build.targets). Same family: anonymous-object metadata passed to
+  `Vector<T>.Save` loses its properties under ILC — pass a dictionary. With both, the vector
+  probe's full save/get/search/delete wire round-trip ran inside the single-file binary.
+  (2026-08-29)
+- **Options ctors need rooting at the registration chokepoint, not at the options type.**
+  The AOT vector probe booted and died at `ValidateOnStart` with
+  `MissingMethodException: Constructor on type 'Koan.Data.Core.Options.DirectOptions' not found` —
+  ILC trimmed every `AddKoanOptions`-registered options ctor because nothing annotated the flow.
+  The compile-time IL2091s were pointing at it the whole time. Fix at the flow source:
+  `[DynamicallyAccessedMembers(PublicParameterlessConstructor | PublicProperties |
+  NonPublicProperties)]` on `AddKoanOptions<TOptions>`'s generic parameter
+  (`Koan.Core/Modules/OptionsExtensions.cs`), the options-twin of the KoanRegistry descriptor
+  rooting. The publish log's trim warnings are the checklist; the run is the verdict. (2026-08-29)
+- **A Kestrel wire-contract fixture must serialize with Newtonsoft, not `Results.Json`.**
+  `Results.Json` runs System.Text.Json, which serializes `JObject`/`JArray` graphs as nested
+  arrays of key/value pairs — the adapter then fails deserialization on responses that "look"
+  right. Build the JObject and return `Results.Text(doc.ToString(Formatting.None),
+  "application/json")`. And `deleted`-style counts from real stores can lie (Chroma counts
+  requested ids, not removed rows): derive mutation outcomes from a pre-fetch, never from the
+  wire receipt. (2026-08-29)
+- **Chroma 1.5.9 quietly changed its wire**: REST v2 lives under
+  `/api/v2/tenants/<t>/databases/<db>/`, item routes take the collection UUID only,
+  `hnsw.dimensions` is not a create field (dimension pins from the first upsert), where-clauses are
+  single-key dicts or explicit `$and`/`$or` (multi-key implicit AND is rejected), ranges are
+  numeric-only, and a live-observed WAL bug corrupts null-metadata upserts around collection
+  deletion — always write `{}` metadata entries. Probed facts live in the Chroma adapter's
+  TECHNICAL.md; the reusable rules are in `references/vector.md` of the create-adapter skill.
+  (2026-08-29)

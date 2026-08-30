@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,8 +9,16 @@ namespace Koan.Core.Modules;
 // Centralized helpers for binding and validating options across modules
 public static class OptionsExtensions
 {
-    // Bind options from a configuration path (optional) and enforce DataAnnotations + ValidateOnStart
-    public static OptionsBuilder<TOptions> AddKoanOptions<TOptions>(this IServiceCollection services, string? configPath = null, bool validateOnStart = true)
+    // Bind options from a configuration path (optional) and enforce DataAnnotations + ValidateOnStart.
+    // The annotation flows the parameterless-ctor requirement into M.E.Options (OptionsFactory /
+    // ValidateOnStart) so ILC keeps every AddKoanOptions-registered options constructor; without it
+    // an AOT binary dies at ValidateOnStart with MissingMethodException (the DirectOptions failure).
+    public static OptionsBuilder<TOptions> AddKoanOptions<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties)]
+        TOptions>(this IServiceCollection services, string? configPath = null, bool validateOnStart = true)
         where TOptions : class
     {
         var builder = services.AddOptions<TOptions>();
