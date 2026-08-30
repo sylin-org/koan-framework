@@ -80,22 +80,8 @@ public sealed class CouchDbAdapterFactory : IDataAdapterFactory
 
         static (string Endpoint, string? User, string? Password) Split(string value)
         {
-            // couchdb://user:password@host:port normalizes to an http URL plus credentials; an http(s)
-            // URL carries any credentials in its user-info the same way.
-            if (Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
-                uri.Scheme is "couchdb" or "http" or "https")
-            {
-                var scheme = uri.Scheme == "couchdb" ? "http" : uri.Scheme;
-                var builder = new UriBuilder(uri) { Scheme = scheme, UserName = string.Empty, Password = string.Empty };
-                if (uri.Scheme == "couchdb" && uri.Port < 0) builder.Port = 5984;
-                var user = string.IsNullOrEmpty(uri.UserInfo) ? null : Uri.UnescapeDataString(uri.UserInfo.Split(':', 2)[0]);
-                var password = string.IsNullOrEmpty(uri.UserInfo)
-                    ? null
-                    : (uri.UserInfo.Split(':', 2) is { Length: 2 } parts ? Uri.UnescapeDataString(parts[1]) : null);
-                return (builder.Uri.ToString().TrimEnd('/'), user, password);
-            }
-            throw new ArgumentException(
-                $"The CouchDB endpoint '{value}' is neither a couchdb:// URI nor an http(s) URL.", nameof(value));
+            var (endpoint, user, password) = CouchDbEndpoint.Parse(value);
+            return (endpoint.ToString().TrimEnd('/'), user, password);
         }
     }
 

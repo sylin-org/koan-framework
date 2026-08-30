@@ -4,7 +4,7 @@ namespace Koan.Data.Core.Runtime;
 internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnull
 {
     private readonly object _gate = new();
-    private readonly Dictionary<TKey, Lazy<TValue>> _entries;
+    private readonly Dictionary<TKey, Pending> _entries;
     private readonly int _capacity;
     private readonly string _name;
 
@@ -14,13 +14,13 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         _capacity = capacity;
         _name = name;
-        _entries = new Dictionary<TKey, Lazy<TValue>>(comparer);
+        _entries = new Dictionary<TKey, Pending>(comparer);
     }
 
     public TValue GetOrAdd(TKey key, Func<TValue> create)
     {
         ArgumentNullException.ThrowIfNull(create);
-        Lazy<TValue> entry;
+        Pending entry;
         lock (_gate)
         {
             if (!_entries.TryGetValue(key, out entry!))
@@ -32,14 +32,14 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
                         "Reduce the admitted application shape or increase the corresponding Koan Data runtime bound.");
                 }
 
-                entry = new Lazy<TValue>(create, LazyThreadSafetyMode.ExecutionAndPublication);
+                entry = new Pending(create);
                 _entries.Add(key, entry);
             }
         }
 
         try
         {
-            return entry.Value;
+            return entry.Value();
         }
         catch
         {
@@ -55,5 +55,32 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
     internal int Count
     {
         get { lock (_gate) return _entries.Count; }
+    }
+
+    // Lazy<TValue> would demand a public parameterless ctor of every TValue under ILC (a trim
+    // annotation on Lazy's generic parameter) - a requirement these values never meet and the
+    // factory-delegate form never uses. This holder keeps Lazy's exactly-once semantics: the
+    // first caller runs the factory under the entry gate; racers that found the same entry block
+    // on it and read the produced value.
+    private sealed class Pending
+    {
+        private readonly object _gate = new();
+        private Func<TValue>? _factory;
+        private TValue _value = default!;
+
+        public Pending(Func<TValue> create) => _factory = create;
+
+        public TValue Value()
+        {
+            lock (_gate)
+            {
+                if (_factory is { } create)
+                {
+                    _value = create();
+                    _factory = null;
+                }
+                return _value;
+            }
+        }
     }
 }

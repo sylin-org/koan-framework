@@ -38,11 +38,7 @@ internal sealed class CouchDbClient : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
         var value = endpoint.Equals("auto", StringComparison.OrdinalIgnoreCase) ? "http://localhost:5984" : endpoint;
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
-            uri.Scheme is not ("http" or "https"))
-            throw new ArgumentException(
-                "The CouchDB endpoint must be an http(s) URL, e.g. http://localhost:5984.", nameof(endpoint));
-        return uri;
+        return CouchDbEndpoint.Parse(value).HttpEndpoint;
     }
 
     // ---- server ----

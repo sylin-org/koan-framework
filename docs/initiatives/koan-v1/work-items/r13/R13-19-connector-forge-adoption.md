@@ -68,9 +68,12 @@ Per ARCH-0120 §3, each adoption satisfies the five conditions:
    - `CHROMA|PACKAGE-CONSUMER|PASS` — Vector save/get/search/delete round-trip
      (`chromadb/chroma:1.5.9`).
    - `LLAMACPP|PACKAGE-CONSUMER|PASS` — `Client.Chat` through a llama-server wire stub.
-   - Observed, not blocking: CouchDB's discovery adapter debug-logs a health-validation refusal for
-     the `couchdb://` URI scheme that the connection path itself accepts; the operation completes.
-     Cosmetic noise for explicitly-configured sources, filed here for a later pass.
+   - Observed during evidence and fixed in the same change: discovery used to debug-log a
+     health-validation refusal for the `couchdb://` URI scheme the connection path itself accepted.
+     The endpoint grammar now lives in one shared reader (`CouchDbEndpoint.Parse`) used by the
+     factory, the client, and discovery alike — discovery health-checks a `couchdb://` source with
+     its credentials, pinned by `CouchDbEndpointSpec` (5 cells) and
+     `CouchDbDiscoveryHealthSpec` (2 live cells); suite 19/19.
 5. **Package integrity** — the fleet quality gate reports 0 findings; generated product truth
    (product surface, package quality, connector matrix) is regenerated in the adoption change; the
    release pipeline's own API/coherence checks run at publication.
@@ -85,7 +88,12 @@ save/get/search/delete round-trip with `adapter=ChromaVectorAdapterFactory`, and
 the llama.cpp connector composes and boots under ILC (inactive without an endpoint — the correct
 posture). The AOT adoption also fixed `AddKoanOptions` options-ctor rooting in the framework
 (options-twin of the KoanRegistry descriptor fix) and the assembly-scan verbose payload on a
-source-generated `JsonSerializerContext` — the last reflection-JSON call site in Koan.Core.
+source-generated `JsonSerializerContext` — the last reflection-JSON call site in Koan.Core. The
+remaining IL2091s from the first AotVector publish are since annotated away at their flow
+sources: the other `AddKoanOptions` overloads (options + configurator), `FixedOptionsMonitor<T>`,
+and `BoundedSingleFlightCache` — whose `Lazy<TValue>` field became a per-entry exactly-once
+holder because Lazy's metadata demands a public parameterless ctor its values never use. AotVector
+now publishes with zero IL2091s; Core 119/119 and Data.Core 492/492 confirm behavior unchanged.
 
 ## Exit state
 

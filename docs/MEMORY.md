@@ -633,7 +633,9 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   lived only in a one-off scratch probe, and the vector claim had no durable artifact. All three
   closed 2026-08-29: aot-verify gained Firebird and CouchDb cells (green with receipts,
   win-x64), and `samples/fundamentals/AotVector` carries the vector/AI-composition proof as a
-  runnable sample. Remaining unmeasured: linux/arm64 (PMC-051), and the AotVector publish still
-  shows IL2091s on `FixedOptionsMonitor<T>`, `BoundedSingleFlightCache<T,TKey>` and the other
-  `AddKoanOptions` overloads — annotation hardening, not run defects (the binary ran green).
-  (2026-08-29)
+  runnable sample. The AotVector IL2091s were
+  annotated away at their flow sources the next day (the other `AddKoanOptions` overloads,
+  `FixedOptionsMonitor<T>`, and `BoundedSingleFlightCache` — whose `Lazy<TValue>` became a
+  per-entry exactly-once holder because Lazy's trim metadata demands a public parameterless ctor
+  its values never use); zero IL2091s on republish, Core 119/119, Data.Core 492/492. Remaining
+  unmeasured: linux/arm64 (PMC-051). (2026-08-29/30)

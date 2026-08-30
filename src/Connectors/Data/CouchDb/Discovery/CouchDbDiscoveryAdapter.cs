@@ -40,7 +40,10 @@ internal sealed class CouchDbDiscoveryAdapter(
     protected override async Task<bool> ValidateServiceHealth(
         string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        using var client = new Runtime.CouchDbClient(serviceUrl, userId: null, password: null);
+        // The same tolerant reader the connection path uses: a couchdb:// URI health-validates
+        // against its http form, carrying its credentials instead of pinging unauthenticated.
+        var (endpoint, userId, password) = CouchDbEndpoint.Parse(serviceUrl);
+        using var client = new Runtime.CouchDbClient(endpoint.ToString(), userId, password);
         return await client.PingAsync(cancellationToken).ConfigureAwait(false);
     }
 

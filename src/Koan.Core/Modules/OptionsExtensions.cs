@@ -41,8 +41,15 @@ public static class OptionsExtensions
         return builder;
     }
 
-    // Overload with configurator type - eliminates manual TryAddEnumerable boilerplate
-    public static OptionsBuilder<TOptions> AddKoanOptions<TOptions, TConfigurator>(
+    // Overload with configurator type - eliminates manual TryAddEnumerable boilerplate.
+    // The annotations restate the flow requirements of the targets below: the first overload's
+    // options contract, and DI activation of the configurator.
+    public static OptionsBuilder<TOptions> AddKoanOptions<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties)]
+        TOptions, [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TConfigurator>(
         this IServiceCollection services,
         string? configPath = null,
         bool validateOnStart = true,
@@ -68,7 +75,12 @@ public static class OptionsExtensions
     }
 
     // Convenience: bind from section and allow post-configure tweaks
-    public static OptionsBuilder<TOptions> AddKoanOptions<TOptions>(this IServiceCollection services, IConfiguration cfg, string sectionPath, Action<TOptions>? postConfigure = null, bool validateOnStart = true)
+    public static OptionsBuilder<TOptions> AddKoanOptions<
+        [DynamicallyAccessedMembers(
+            DynamicallyAccessedMemberTypes.PublicParameterlessConstructor |
+            DynamicallyAccessedMemberTypes.PublicProperties |
+            DynamicallyAccessedMemberTypes.NonPublicProperties)]
+        TOptions>(this IServiceCollection services, IConfiguration cfg, string sectionPath, Action<TOptions>? postConfigure = null, bool validateOnStart = true)
         where TOptions : class
     {
         var builder = services.AddOptions<TOptions>().Bind(cfg.GetSection(sectionPath));

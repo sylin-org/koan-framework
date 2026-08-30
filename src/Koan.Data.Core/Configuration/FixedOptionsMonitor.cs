@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.ComponentModel;
 using Microsoft.Extensions.Options;
 
@@ -8,7 +9,7 @@ namespace Koan.Data.Core.Configuration;
 /// provider connection and readiness mechanics. A routed source is compiled once and never reloads.
 /// </summary>
 [EditorBrowsable(EditorBrowsableState.Never)]
-public sealed class FixedOptionsMonitor<T>(T value) : IOptionsMonitor<T>
+public sealed class FixedOptionsMonitor<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor)] T>(T value) : IOptionsMonitor<T>
     where T : class
 {
     public T CurrentValue => value;
