@@ -11,6 +11,7 @@ using Koan.Data.Core.Configuration;
 using Koan.Data.Connector.SqlServer.Discovery;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
@@ -21,6 +22,7 @@ public sealed class SqlServerModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<SqlServerOptions>();
+        services.AddSingleton<IConfigureOptions<SqlServerOptions>, SqlServerOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<SqlServerAdapterFactory>();
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<SqlServerAdapterFactory>());

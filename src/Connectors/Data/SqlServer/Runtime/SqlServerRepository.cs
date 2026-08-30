@@ -327,7 +327,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 
     private async Task Provision(SqlServerEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var connection = await OpenOrCreate(ct).ConfigureAwait(false);
         await _schema.EnsureCreatedAsync(
             plan.Mapping,
             new SqlServerDdlExecutor(connection, plan.Dialect),
@@ -587,6 +587,32 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private static void Add(SqlParameters parameters, IReadOnlyList<object?> values, string prefix)
     {
         for (var index = 0; index < values.Count; index++) parameters.Add($"{prefix}{index}", values[index]);
+    }
+
+    // The server answered and the credentials work; the Koan database does not exist yet. Managed
+    // lifecycle creates it against master before the first schema DDL, so a fresh
+    // zero-configuration server provisions instead of failing (SqlError 4060).
+    private async Task<SqlConnection> OpenOrCreate(CancellationToken ct)
+    {
+        try
+        {
+            return await Open(ct).ConfigureAwait(false);
+        }
+        // A missing database surfaces as 4060 (cannot open) or as login failure 18456/State 38
+        // (explicitly specified database could not be opened) depending on where TDS rejects it.
+        catch (SqlException error) when (error.Number == 4060 || (error.Number == 18456 && error.State == 38))
+        {
+            var builder = new SqlConnectionStringBuilder(_options.ConnectionString);
+            var catalog = builder.InitialCatalog;
+            builder.InitialCatalog = "master";
+            await using var maintenance = new SqlConnection(builder.ConnectionString);
+            await maintenance.OpenAsync(ct).ConfigureAwait(false);
+            await using var create = new SqlCommand(
+                $"IF DB_ID(N'{catalog.Replace("'", "''")}') IS NULL CREATE DATABASE [{catalog.Replace("]", "]]")}];",
+                maintenance);
+            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await Open(ct).ConfigureAwait(false);
+        }
     }
 
     private async Task<SqlConnection> Open(CancellationToken ct)

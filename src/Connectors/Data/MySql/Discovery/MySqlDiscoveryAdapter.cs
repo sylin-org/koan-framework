@@ -46,10 +46,20 @@ internal sealed class MySqlDiscoveryAdapter(
     protected override async Task<bool> ValidateServiceHealth(
         string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        await using var connection = new MySqlConnection(serviceUrl);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new MySqlCommand("SELECT 1", connection);
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        try
+        {
+            await using var connection = new MySqlConnection(serviceUrl);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = new MySqlCommand("SELECT 1", connection);
+            return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        }
+        catch (MySqlException error) when (error.Number == 1049)
+        {
+            // The server answered and the credentials work; the Koan database does not exist
+            // yet. Managed lifecycle creates it before the first schema DDL, so this is
+            // healthy - a fresh zero-configuration server must be discoverable, not refused.
+            return true;
+        }
     }
 
     private static string? Value(IDictionary<string, object> parameters, string key) =>

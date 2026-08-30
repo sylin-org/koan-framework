@@ -50,10 +50,20 @@ internal sealed class CockroachDiscoveryAdapter(
         DiscoveryContext context,
         CancellationToken cancellationToken)
     {
+        try
+        {
         await using var connection = new NpgsqlConnection(serviceUrl);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = new NpgsqlCommand("SELECT 1", connection);
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        }
+        catch (PostgresException error) when (error.SqlState == "3D000")
+        {
+            // The server answered and the credentials work; the Koan database does not exist
+            // yet. Managed lifecycle creates it before the first schema DDL, so this is
+            // healthy - a fresh zero-configuration server must be discoverable, not refused.
+            return true;
+        }
     }
 
     private static NpgsqlConnectionStringBuilder Build(string value)

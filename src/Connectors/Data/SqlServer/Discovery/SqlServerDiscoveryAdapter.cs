@@ -48,10 +48,20 @@ internal sealed class SqlServerDiscoveryAdapter(
     protected override async Task<bool> ValidateServiceHealth(
         string serviceUrl, DiscoveryContext context, CancellationToken cancellationToken)
     {
-        await using var connection = new SqlConnection(serviceUrl);
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new SqlCommand("SELECT 1", connection);
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        try
+        {
+            await using var connection = new SqlConnection(serviceUrl);
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = new SqlCommand("SELECT 1", connection);
+            return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false)) == 1;
+        }
+        catch (SqlException error) when (error.Number == 4060 || (error.Number == 18456 && error.State == 38))
+        {
+            // The server answered and the credentials work; the Koan database does not exist
+            // yet. Managed lifecycle creates it before the first schema DDL, so this is
+            // healthy - a fresh zero-configuration server must be discoverable, not refused.
+            return true;
+        }
     }
 
     private static SqlConnectionStringBuilder Build(string value)
@@ -60,7 +70,10 @@ internal sealed class SqlServerDiscoveryAdapter(
             return new SqlConnectionStringBuilder(value);
         var builder = new SqlConnectionStringBuilder
         {
-            DataSource = $"{uri.Host},{(uri.Port > 0 ? uri.Port : 1433)}"
+            // Numeric loopback, never "localhost": SqlClient's pre-login handshake stalls for the
+            // dual-stack resolution delay over ::1 (observed 15s connect timeouts), while 127.0.0.1
+            // answers immediately.
+            DataSource = $"{(uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? "127.0.0.1" : uri.Host)},{(uri.Port > 0 ? uri.Port : 1433)}"
         };
         var user = uri.UserInfo.Split(':', 2);
         if (user.Length > 0 && user[0].Length > 0) builder.UserID = Uri.UnescapeDataString(user[0]);

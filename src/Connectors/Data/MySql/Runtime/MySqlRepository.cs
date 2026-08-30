@@ -306,7 +306,7 @@ internal sealed class MySqlRepository<TEntity, TKey> :
 
     private async Task Provision(MySqlEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var connection = await OpenOrCreate(ct).ConfigureAwait(false);
         await _schema.EnsureCreatedAsync(
             plan.Mapping,
             new MySqlDdlExecutor(connection, plan.Dialect),
@@ -616,6 +616,29 @@ internal sealed class MySqlRepository<TEntity, TKey> :
             return connection;
         }
         catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
+    }
+
+    // The server answered and the credentials work; the Koan database does not exist yet. Managed
+    // lifecycle creates it before the first schema DDL, so a fresh zero-configuration server
+    // provisions instead of failing (ER_BAD_DB_ERROR).
+    private async Task<MySqlConnection> OpenOrCreate(CancellationToken ct)
+    {
+        try
+        {
+            return await Open(ct).ConfigureAwait(false);
+        }
+        catch (MySqlException error) when (error.Number == 1049)
+        {
+            var builder = new MySqlConnectionStringBuilder(_options.ConnectionString);
+            var database = builder.Database;
+            builder.Database = null;
+            await using var maintenance = new MySqlConnection(builder.ConnectionString);
+            await maintenance.OpenAsync(ct).ConfigureAwait(false);
+            await using var create = new MySqlCommand(
+                $"CREATE DATABASE IF NOT EXISTS `{database.Replace("`", "``")}`", maintenance);
+            await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return await Open(ct).ConfigureAwait(false);
+        }
     }
 
     private async Task<TResult> ExecuteSql<TResult>(Instruction instruction, CancellationToken ct)

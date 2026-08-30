@@ -58,10 +58,20 @@ internal sealed class CouchbaseDiscoveryAdapter(
     {
         var trimmed = value.Trim();
         if (trimmed.StartsWith("couchbase://", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase)) return trimmed;
-        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) return "couchbase://" + trimmed[7..];
-        if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return "couchbases://" + trimmed[8..];
+            trimmed.StartsWith("couchbases://", StringComparison.OrdinalIgnoreCase))
+            return trimmed.EndsWith(":8091", StringComparison.Ordinal) ? trimmed[..^":8091".Length] : trimmed;
+        if (trimmed.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            return "couchbase://" + StripConsolePort(trimmed[7..]);
+        if (trimmed.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return "couchbases://" + StripConsolePort(trimmed[8..]);
         return "couchbase://" + trimmed;
+
+        // 8091 is the web-console port, not an SDK bootstrap port: a port-qualified
+        // couchbase://host:8091 connection string never receives a config stream (0 nodes).
+        // The conventional candidate is the console URL, so the console port is dropped and the
+        // SDK falls back to its own bootstrap ports.
+        static string StripConsolePort(string hostPort) =>
+            hostPort.EndsWith(":8091", StringComparison.Ordinal) ? hostPort[..^":8091".Length] : hostPort;
     }
 
     private static string? Value(IDictionary<string, object>? values, string key) =>

@@ -262,7 +262,7 @@ internal sealed class PgVectorRepository<TEntity, TKey> :
         try
         {
             if (_readyShapes.ContainsKey(table)) return;
-            await using var connection = await Open(ct).ConfigureAwait(false);
+            await using var connection = await OpenOrCreate(ct).ConfigureAwait(false);
             var shape = await InspectShape(connection, null, table, ct).ConfigureAwait(false);
             if (shape is null)
             {
@@ -784,6 +784,45 @@ internal sealed class PgVectorRepository<TEntity, TKey> :
             throw;
         }
     }
+
+    // The server answered and the credentials work; the Koan database does not exist yet. Managed
+    // lifecycle creates it against the server's always-present postgres database before the first
+    // vector write — extension and table provisioning then run inside EnsureShape.
+    private async Task<NpgsqlConnection> OpenOrCreate(CancellationToken ct)
+    {
+        try
+        {
+            return await Open(ct).ConfigureAwait(false);
+        }
+        catch (PostgresException error) when (error.SqlState == "3D000")
+        {
+            var builder = new NpgsqlConnectionStringBuilder(_route.ConnectionString);
+            var database = builder.Database;
+            builder.Database = "postgres";
+            await using var maintenance = new NpgsqlConnection(builder.ConnectionString);
+            await maintenance.OpenAsync(ct).ConfigureAwait(false);
+            await using var check = new NpgsqlCommand(
+                "SELECT 1 FROM pg_database WHERE datname = $1", maintenance)
+            { Parameters = { new NpgsqlParameter { Value = database } } };
+            if (await check.ExecuteScalarAsync(ct).ConfigureAwait(false) is null)
+            {
+                try
+                {
+                    await using var create = new NpgsqlCommand(
+                        $"CREATE DATABASE {QuoteIdentifier(database)}", maintenance);
+                    await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+                catch (PostgresException race) when (race.SqlState == "42P04")
+                {
+                    // Another provisioner created it concurrently.
+                }
+            }
+            return await Open(ct).ConfigureAwait(false);
+        }
+    }
+
+    private static string QuoteIdentifier(string identifier) =>
+        '"' + identifier.Replace("\"", "\"\"") + '"';
 
     private NpgsqlCommand Command(
         NpgsqlConnection connection,

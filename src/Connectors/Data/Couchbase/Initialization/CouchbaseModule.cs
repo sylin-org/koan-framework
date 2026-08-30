@@ -10,6 +10,7 @@ using Koan.Data.Connector.Couchbase.Runtime;
 using Koan.Data.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
@@ -20,6 +21,7 @@ public sealed class CouchbaseModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<CouchbaseOptions>();
+        services.AddSingleton<IConfigureOptions<CouchbaseOptions>, CouchbaseOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.TryAddSingleton<CouchbaseResourcePool>();
         services.AddSingleton<CouchbaseAdapterFactory>();

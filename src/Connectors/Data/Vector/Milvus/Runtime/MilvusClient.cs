@@ -78,7 +78,8 @@ internal sealed class MilvusClient : IDisposable
             if (code == 0 || code == 200) return new MilvusResponse(document, false);
             if (allowMissing && IsMissing(code, root)) return new MilvusResponse(document, true);
             document.Dispose();
-            throw new InvalidOperationException($"Milvus {operation} was rejected with provider code {code}.");
+            throw new MilvusRejectedException(operation, code,
+                $"Milvus {operation} was rejected with provider code {code}.");
         }
     }
 
@@ -102,4 +103,13 @@ internal sealed record MilvusResponse(JsonDocument Document, bool IsMissing) : I
 {
     internal JsonElement Data => Document.RootElement.TryGetProperty("data", out var data) ? data : default;
     public void Dispose() => Document.Dispose();
+}
+
+/// <summary>A Milvus provider rejection carrying the wire error code, so callers can distinguish
+/// transient provider states (e.g. 1804 collection-not-loaded right after load) from hard failures.</summary>
+internal sealed class MilvusRejectedException(string operation, long code, string message)
+    : InvalidOperationException(message)
+{
+    public string Operation { get; } = operation;
+    public long Code { get; } = code;
 }

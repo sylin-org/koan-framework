@@ -59,12 +59,21 @@ internal sealed class PgVectorDiscoveryAdapter(
         DiscoveryContext context,
         CancellationToken cancellationToken)
     {
-        await using var connection = new NpgsqlConnection(PgVectorRoute.NormalizeConnectionString(serviceUrl));
-        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new NpgsqlCommand(
-            "SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector')",
-            connection);
-        return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+        try
+        {
+            await using var connection = new NpgsqlConnection(PgVectorRoute.NormalizeConnectionString(serviceUrl));
+            await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = new NpgsqlCommand(
+                "SELECT EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'vector')",
+                connection);
+            return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false));
+        }
+        catch (PostgresException error) when (error.SqlState == "3D000")
+        {
+            // The server answered and the credentials work; the Koan database does not exist yet.
+            // Managed lifecycle creates it before the first vector write, so this is healthy.
+            return true;
+        }
     }
 
     protected override IEnumerable<DiscoveryCandidate> GetEnvironmentCandidates()

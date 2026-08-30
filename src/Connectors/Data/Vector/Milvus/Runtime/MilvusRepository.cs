@@ -447,7 +447,27 @@ internal sealed class MilvusRepository<TEntity, TKey> :
         return new PreparedPoint(point, StorageId(point.Id, scope), logical, metadata);
     }
 
+    // Milvus reports 1804 (collection not loaded) briefly after a collection reports loaded on
+    // freshly-provisioned standalone deployments. Retry within the visibility window by re-awaiting
+    // the load — the same bounded barrier Sync/Ensure use — rather than failing the write.
     private async Task Upsert(string collection, IReadOnlyList<PreparedPoint> points, CancellationToken ct)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(_options.VisibilityTimeoutSeconds);
+        while (true)
+        {
+            try
+            {
+                await UpsertCore(collection, points, ct).ConfigureAwait(false);
+                return;
+            }
+            catch (MilvusRejectedException error) when (error.Code == 1804 && DateTime.UtcNow < deadline)
+            {
+                await AwaitLoaded(collection, allowLoad: true, ct).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task UpsertCore(string collection, IReadOnlyList<PreparedPoint> points, CancellationToken ct)
     {
         using var response = await _client.Post("v2/vectordb/entities/upsert", Json(writer =>
         {

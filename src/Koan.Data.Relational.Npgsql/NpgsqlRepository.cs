@@ -340,7 +340,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     private async Task Provision(CancellationToken ct)
     {
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var connection = await OpenOrCreate(ct).ConfigureAwait(false);
         await _schema.EnsureCreatedAsync(
             _plan.Mapping, new NpgsqlDdlExecutor(connection, _plan.Dialect), _features, _schemaPolicy, ct)
             .ConfigureAwait(false);
@@ -572,6 +572,45 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private static void Add(SqlParameters parameters, IReadOnlyList<object?> values, string prefix)
     {
         for (var index = 0; index < values.Count; index++) parameters.Add($"{prefix}{index}", values[index]);
+    }
+
+    // The server answered and the credentials work; the Koan database does not exist yet. Managed
+    // lifecycle creates it against the server's always-present maintenance database before the
+    // first schema DDL, so a fresh zero-configuration server provisions instead of failing.
+    private static string QuoteIdentifier(string identifier) =>
+        '"' + identifier.Replace("\"", "\"\"") + '"';
+
+    private async Task<NpgsqlConnection> OpenOrCreate(CancellationToken ct)
+    {
+        try
+        {
+            return await Open(ct).ConfigureAwait(false);
+        }
+        catch (PostgresException error) when (error.SqlState == "3D000")
+        {
+            var builder = new NpgsqlConnectionStringBuilder(_options.ConnectionString);
+            var database = builder.Database;
+            builder.Database = "postgres";
+            await using var maintenance = new NpgsqlConnection(builder.ConnectionString);
+            await maintenance.OpenAsync(ct).ConfigureAwait(false);
+            await using var check = new NpgsqlCommand(
+                "SELECT 1 FROM pg_database WHERE datname = $1", maintenance)
+            { Parameters = { new NpgsqlParameter { Value = database } } };
+            if (await check.ExecuteScalarAsync(ct).ConfigureAwait(false) is null)
+            {
+                try
+                {
+                    await using var create = new NpgsqlCommand(
+                        $"CREATE DATABASE {QuoteIdentifier(database)}", maintenance);
+                    await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+                }
+                catch (PostgresException race) when (race.SqlState == "42P04")
+                {
+                    // Another provisioner created it concurrently.
+                }
+            }
+            return await Open(ct).ConfigureAwait(false);
+        }
     }
 
     private async Task<NpgsqlConnection> Open(CancellationToken ct)

@@ -68,8 +68,14 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIn
             configuration, registry, Provider, resolvedSource, defaults.ConnectionString, this);
         var bucket = Setting(configuration, registry, resolvedSource, "Bucket", defaults.Bucket);
         var scope = Setting(configuration, registry, resolvedSource, "Scope", defaults.Scope);
-        var username = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Username", defaults.Username ?? ""));
-        var password = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Password", defaults.Password ?? ""));
+        // Credential layering, most specific wins: configuration keys, then the cluster's own
+        // environment convention, then the de-facto development default (the same credentials
+        // discovery health-validates against). Couchbase clusters are created with an admin user,
+        // so "no credentials" is not a viable default for zero configuration.
+        var username = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Username",
+            FirstNonEmpty(defaults.Username, Environment.GetEnvironmentVariable("COUCHBASE_USERNAME")) ?? "Administrator"));
+        var password = EmptyAsNull(Setting(configuration, registry, resolvedSource, "Password",
+            FirstNonEmpty(defaults.Password, Environment.GetEnvironmentVariable("COUCHBASE_PASSWORD")) ?? "password"));
         var definition = registry.GetSource(resolvedSource);
         var lanes = definition?.ReadLanes?
             .Where(static lane => !string.IsNullOrWhiteSpace(lane.Value.ConnectionString))
@@ -135,6 +141,8 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIn
     }
 
     private static string? EmptyAsNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
 
     private static DurabilityLevel ResolveDurability(string? value)
     {

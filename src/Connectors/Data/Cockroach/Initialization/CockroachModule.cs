@@ -10,6 +10,7 @@ using Koan.Data.Core.Configuration;
 using Koan.Data.Connector.Cockroach.Discovery;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
@@ -20,6 +21,7 @@ public sealed class CockroachModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<CockroachOptions>();
+        services.AddSingleton<IConfigureOptions<CockroachOptions>, CockroachOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<CockroachAdapterFactory>();
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<CockroachAdapterFactory>());
