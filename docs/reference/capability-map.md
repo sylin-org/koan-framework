@@ -113,6 +113,8 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 | Redis | `Sylin.Koan.Data.Connector.Redis` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Redis/README.md) |
 | Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Couchbase/README.md) |
 | CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Cockroach/README.md) |
+| CouchDB (document store) | `Sylin.Koan.Data.Connector.CouchDb` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/CouchDb/README.md) |
+| Firebird | `Sylin.Koan.Data.Connector.Firebird` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Firebird/README.md) |
 
 Additive data behavior:
 
@@ -191,6 +193,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Ollama | `Sylin.Koan.AI.Connector.Ollama` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) |
 | LM Studio | `Sylin.Koan.AI.Connector.LMStudio` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/LMStudio/README.md) |
 | ONNX (in-process) | `Sylin.Koan.AI.Connector.Onnx` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Onnx/README.md) |
+| llama.cpp (llama-server) | `Sylin.Koan.AI.Connector.LlamaCpp` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/LlamaCpp/README.md) |
 | Hugging Face | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/HuggingFace/README.md) |
 | Inspectable prompts and HTTP projection | `Sylin.Koan.AI.Prompt` · `Sylin.Koan.AI.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Prompt/README.md) |
 | Answer from your own Entities (RAG), branch, parse to a type, stream | `Sylin.Koan.AI.Orchestration` — **not assessed** | **a chat provider**; retrieval steps also need the Entity's embedding and vector path | [RAG recipe](../guides/ai-rag-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Orchestration/README.md) |
@@ -208,6 +211,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Qdrant/README.md) |
 | Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Weaviate/README.md) |
 | Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Milvus/README.md) |
+| Chroma | `Sylin.Koan.Data.Vector.Connector.Chroma` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Chroma/README.md) |
 | Elasticsearch vectors | `Sylin.Koan.Data.Connector.ElasticSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/ElasticSearch/README.md) |
 | OpenSearch vectors | `Sylin.Koan.Data.Connector.OpenSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/OpenSearch/README.md) |
 

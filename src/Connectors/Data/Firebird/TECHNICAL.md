@@ -1,6 +1,6 @@
 # Firebird adapter — provider contract and operations
 
-Technical reference for maintainers. Status: **not assessed**; conformance proven against
+Technical reference for maintainers. Status: **supported** (`firebird-data-provider`); conformance proven against
 `firebirdsql/firebird:5.0.4` with `FirebirdSql.Data.FirebirdClient` 10.3.4, .NET 10, Windows host,
 2026-08-29. The adapter rides `Koan.Data.Relational` (mapping compilation, filter translation,
 schema orchestration, readiness coordination, `AdoCommands`/`SqlParameters`) and owns only Firebird

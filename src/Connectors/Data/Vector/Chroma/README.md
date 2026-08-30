@@ -4,10 +4,9 @@ Chroma vector storage for Koan. Reference the package, call `AddKoan()`, and `Ve
 runs against a Chroma server over REST v2 — plan-bound spaces, metadata filter pushdown, and
 session-visible mutations with no client driver dependency.
 
-> **Status: not assessed.** The package is installable and its behavioral suite is green (vector-plane
-> AODB isolation conformance and the V-01..V-24 provider annex, filter convergence, capability truth),
-> and nothing has been promised about it. Claims are decided by the product claim ledger (ARCH-0120),
-> not by this README.
+> **Supported provider** (member of `external-vector-providers`): the vector-plane conformance suite
+> passes against a real Chroma 1.5.9 server — AODB isolation cells and the V-01..V-24 provider annex,
+> filter convergence, capability truth. The "not declared" rows below are part of the claim.
 
 ## Install
 

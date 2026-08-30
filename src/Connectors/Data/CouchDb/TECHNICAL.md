@@ -1,6 +1,6 @@
 # CouchDB adapter — provider contract and operations
 
-Technical reference for maintainers. Status: **not assessed**; conformance proven against
+Technical reference for maintainers. Status: **supported** (`couchdb-data-provider`); conformance proven against
 `couchdb:3.5` (3.5.2) over the HTTP API with `System.Net.Http` only, .NET 10, Windows host,
 2026-08-29. No driver dependency. The adapter implements the document repository contracts directly
 (the document seam has no shared substrate) following the Mongo exemplar's shape.

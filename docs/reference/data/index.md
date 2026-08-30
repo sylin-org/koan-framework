@@ -141,6 +141,8 @@ owns its setup and backend-specific limits.
 | SQL Server | `Sylin.Koan.Data.Connector.SqlServer` | External service and provider-owned schema/operations apply |
 | MongoDB | `Sylin.Koan.Data.Connector.Mongo` | Document-store query and consistency limits apply |
 | Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | Bucket, query-service, and consistency limits apply |
+| CouchDB (document store) | `Sylin.Koan.Data.Connector.CouchDb` | Mango query, index, and MVCC consistency limits apply |
+| Firebird | `Sylin.Koan.Data.Connector.Firebird` | Scalar pushdown via shadow columns; collection filters ride the framework floor |
 | CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | Cockroach-specific routing and schema policy apply |
 | Redis-backed keyed state | `Sylin.Koan.Data.Connector.Redis` | Queries may scan; Entity streams reject |
 

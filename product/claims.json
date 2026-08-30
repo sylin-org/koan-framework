@@ -402,7 +402,8 @@
       "maturity": "supported-foundation",
       "packages": [
         "Sylin.Koan.AI.Contracts",
-        "Sylin.Koan.AI"
+        "Sylin.Koan.AI",
+        "Sylin.Koan.AI.Contracts.Shared"
       ],
       "documentation": [
         "docs/reference/ai/index.md",
@@ -438,24 +439,27 @@
     {
       "id": "local-ai-provider-composition",
       "title": "Local AI provider composition",
-      "summary": "Ollama, LM Studio, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
+      "summary": "Ollama, LM Studio, llama.cpp, and in-process ONNX providers join one compiled AddKoan topology with explicit-intent precedence, provider-owned discovery mechanics, DI-owned lifetime, and source routing within their stated runtime and model boundaries.",
       "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.AI.Connector.Ollama",
         "Sylin.Koan.AI.Connector.LMStudio",
-        "Sylin.Koan.AI.Connector.Onnx"
+        "Sylin.Koan.AI.Connector.Onnx",
+        "Sylin.Koan.AI.Connector.LlamaCpp"
       ],
       "documentation": [
         "docs/reference/ai/index.md",
         "src/Connectors/AI/Ollama/README.md",
         "src/Connectors/AI/LMStudio/README.md",
-        "src/Connectors/AI/Onnx/README.md"
+        "src/Connectors/AI/Onnx/README.md",
+        "src/Connectors/AI/LlamaCpp/README.md"
       ],
       "evidence": [
         "tests/Suites/AI/Unit/Koan.Tests.AI.Unit",
         "tests/Suites/AI/ProviderActivation/Koan.AI.ProviderActivation.Tests",
         "tests/Suites/Integration/Bootstrap/Koan.Tests.Integration.Bootstrap.Infrastructure/Specs/OnnxEmbeddingsPillarBootstrapSpec.cs",
-        "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md"
+        "docs/initiatives/koan-v1/work-items/r13/R13-15-ai-runtime-provider-promotion.md",
+        "tests/Suites/AI/Connector.LlamaCpp/Koan.AI.Connector.LlamaCpp.Tests"
       ]
     },
     {
@@ -520,25 +524,28 @@
     },
     {
       "id": "external-vector-providers",
-      "title": "Qdrant, Milvus, and Weaviate vector providers",
-      "summary": "Qdrant, Milvus, and Weaviate preserve Koan's Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
+      "title": "Qdrant, Milvus, Weaviate, and Chroma vector providers",
+      "summary": "Qdrant, Milvus, Weaviate, and Chroma preserve Koan's Entity vector intent while owning their native schema, filter, consistency, discovery, and wire guarantees; query cardinality, selected-provider naming, and participation readiness remain framework-owned.",
       "maturity": "supported-extension",
       "packages": [
         "Sylin.Koan.Data.Vector.Connector.Qdrant",
         "Sylin.Koan.Data.Vector.Connector.Milvus",
-        "Sylin.Koan.Data.Vector.Connector.Weaviate"
+        "Sylin.Koan.Data.Vector.Connector.Weaviate",
+        "Sylin.Koan.Data.Vector.Connector.Chroma"
       ],
       "documentation": [
         "src/Connectors/Data/Vector/Qdrant/README.md",
         "src/Connectors/Data/Vector/Milvus/README.md",
         "src/Connectors/Data/Vector/Weaviate/README.md",
-        "docs/reference/ai/vector.md"
+        "docs/reference/ai/vector.md",
+        "src/Connectors/Data/Vector/Chroma/README.md"
       ],
       "evidence": [
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Qdrant.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Milvus.Tests",
         "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Weaviate.Tests",
-        "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md"
+        "docs/initiatives/koan-v1/work-items/r13/R13-14-external-vector-search-promotion.md",
+        "tests/Suites/Data/VectorAdapterSurface/Koan.Data.VectorAdapterSurface.Chroma.Tests"
       ]
     },
     {
@@ -894,6 +901,42 @@
         "tests/Suites/Data/Connector.DuckDb/Koan.Data.Connector.DuckDb.Tests",
         "docs/assessment/evidence/duckdb-connector-spike.md",
         "docs/decisions/DATA-0123-embedded-analytics-and-duckdb-connector.md"
+      ]
+    },
+    {
+      "id": "firebird-data-provider",
+      "title": "Firebird Entity persistence",
+      "summary": "Firebird preserves Koan Entity CRUD, scalar filter and sort pushdown through shadow columns, framework-owned collection semantics, batch and conditional writes, managed database creation, source-aware routing, readiness, and declared isolation semantics while optional layered connection intent remains inert unless explicitly activated.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.Firebird"
+      ],
+      "documentation": [
+        "src/Connectors/Data/Firebird/README.md",
+        "src/Connectors/Data/Firebird/TECHNICAL.md",
+        "docs/reference/data/index.md"
+      ],
+      "evidence": [
+        "tests/Suites/Data/Connector.Firebird",
+        "docs/initiatives/koan-v1/work-items/r13/R13-19-connector-forge-adoption.md"
+      ]
+    },
+    {
+      "id": "couchdb-data-provider",
+      "title": "CouchDB Entity persistence",
+      "summary": "CouchDB preserves Koan Entity CRUD with Mango filter pushdown, store-executed paging under declared sort limits, MVCC-correct upsert and delete outcomes, batch writes, one database per Entity container, source-aware routing, readiness, and declared isolation semantics while optional layered connection intent remains inert unless explicitly activated.",
+      "maturity": "supported-extension",
+      "packages": [
+        "Sylin.Koan.Data.Connector.CouchDb"
+      ],
+      "documentation": [
+        "src/Connectors/Data/CouchDb/README.md",
+        "src/Connectors/Data/CouchDb/TECHNICAL.md",
+        "docs/reference/data/index.md"
+      ],
+      "evidence": [
+        "tests/Suites/Data/Connector.CouchDb",
+        "docs/initiatives/koan-v1/work-items/r13/R13-19-connector-forge-adoption.md"
       ]
     }
   ]

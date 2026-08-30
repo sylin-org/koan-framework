@@ -18,7 +18,7 @@ Use Koan AI when application code needs chat, embedding, OCR, image generation, 
 declared capability—while referenced providers own native protocol and model mechanics. `AddKoan()` compiles the
 provider topology and reports which providers and sources became active.
 
-> **Maturity:** The provider-neutral runtime/contracts and the Ollama, LM Studio, and ONNX providers are supported
+> **Maturity:** The provider-neutral runtime/contracts and the Ollama, LM Studio, llama.cpp, and ONNX providers are supported
 > within the capability and deployment boundaries below. Prompt persistence and the HTTP projection
 > remain separately demonstrated surfaces.
 

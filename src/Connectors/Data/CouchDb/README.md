@@ -4,10 +4,10 @@ Apache CouchDB document storage for Koan. Reference the package, call `AddKoan()
 persistence runs against CouchDB over plain HTTP — no driver package, no vendor client, just
 `System.Net.Http`.
 
-> **Status: not assessed.** The package is installable and its behavioral suite is green (record-plane
-> conformance, the full filter-convergence corpus plus its pushdown guard, paging windows, capability
-> truth), and nothing has been promised about it. Claims are decided by the product claim ledger
-> (ARCH-0120), not by this README.
+> **Supported provider** (`couchdb-data-provider`): the record-plane conformance suite passes against a
+> real CouchDB 3.5 server — conformance, the full filter-convergence corpus plus its pushdown guard,
+> paging windows, capability truth — and the connector is machine-checked under NativeAOT by
+> `scripts/aot-verify.ps1`. The Limits below are part of the claim.
 
 ## Install
 

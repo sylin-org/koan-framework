@@ -3,9 +3,10 @@
 llama.cpp (`llama-server`) provider for Koan AI: OpenAI-compatible chat, streaming, embeddings, model
 listing, and readiness against a locally served GGUF model.
 
-> **Status: not assessed.** The package is installable and its behavioral suite is green (a
-> deterministic wire-contract server speaking llama-server's REST contract), and nothing has been
-> promised about it. Claims are decided by the product claim ledger (ARCH-0120), not by this README.
+> **Supported provider** (member of `local-ai-provider-composition`): the wire contract is proven
+> against a deterministic llama-server wire-contract service — real sockets, SSE, status codes, recorded
+> requests. Model-inference behavior (generation quality, tokenizer drift) belongs to the model and the
+> server build, not to this claim.
 
 ## Install
 

@@ -46,3 +46,5 @@ the run is.
   discovers no adapters.
 - Machine-checked by `scripts/aot-verify.ps1` is the *relational* matrix; this sample is the
   vector-plane evidence, verified the same way (publish **and run**, adapter receipt required).
+
+**Working with a coding agent?** [AGENTS.md](../../../AGENTS.md) at the repository root orients any agent on the Koan conventions this sample follows.
