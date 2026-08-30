@@ -4,7 +4,7 @@ domain: data
 title: "Persist and query business state"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-08-06
+last_updated: 2026-08-30
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-06
@@ -145,6 +145,13 @@ owns its setup and backend-specific limits.
 | Firebird | `Sylin.Koan.Data.Connector.Firebird` | Scalar pushdown via shadow columns; collection filters ride the framework floor |
 | CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | Cockroach-specific routing and schema policy apply |
 | Redis-backed keyed state | `Sylin.Koan.Data.Connector.Redis` | Queries may scan; Entity streams reject |
+
+**Zero configuration is the default posture, not a luxury.** Every networked provider in the
+table discovers a conventional local endpoint and resolves sensible development credentials —
+start the server, reference the package, and run. Credential resolution layers most-specific-first:
+your configuration keys, then the server image's own environment convention, then the documented
+development default. Databases, buckets, and collections are created on first use under managed
+lifecycle.
 
 Search and vector stores solve different needs. Start from the [AI pillar](../ai/index.md) for
 embedding/vector retrieval and from each search connector's package documentation for indexed search.

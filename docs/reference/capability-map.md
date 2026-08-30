@@ -4,7 +4,7 @@ domain: framework
 title: "Koan Capability Map"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-30
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-19

@@ -60,7 +60,8 @@ capability genuinely needs an escape hatch, that capability documents it.
 - Add Koan to an existing ASP.NET Core app: docs/getting-started/adopt-existing-app.md
 - Drive Koan through your coding agent: docs/getting-started/agent-prompts.md
 - Choose a coding skill: docs/guides/agent-skills.md (`koan` to build, extend, repair, or prove;
-  `koan-explain` for read-only explanation; `koan-upgrade` for framework migration)
+  `koan-explain` for read-only explanation; `koan-upgrade` for framework migration;
+  `koan-create-adapter` to extend the framework with a new connector)
 - Engineer or migrate an application with an agent: docs/guides/agent-application-engineering.md
 - Foundation/composition/configuration: docs/reference/core/index.md
 - Entity persistence/query/providers: docs/reference/data/index.md

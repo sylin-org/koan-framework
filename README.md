@@ -94,7 +94,7 @@ Add only what the application needs. **The code keeps saying `Todo`.**
 | `Sylin.Koan.Canon` | Multi-source record reconciliation with staged review | `Person.Canon.OnIntake(...)` |
 | `Sylin.Koan.Tenancy` | Tenant-scoped everything, carried ambiently | nothing changes |
 | `Sylin.Koan.Cache` / `.Storage` | Layered caching; local or S3 media | `[CachePolicy]` |
-| `Sylin.Koan.AI` (+ `.Connector.Ollama` / `.Onnx`) | Embeddings, semantic search, local models | `[Embedding]` |
+| `Sylin.Koan.AI` (+ `.Connector.Ollama` / `.LlamaCpp` / `.Onnx`) | Embeddings, semantic search, local models | `[Embedding]` |
 
 Underneath, it's still ASP.NET Core. Reach for a normal controller or service whenever you want
 one. Want to look behind the magic? Koan tells you what it chose and why — every boot publishes

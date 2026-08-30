@@ -4,10 +4,10 @@ domain: framework
 title: "What you can make with Koan today"
 audience: [developers, architects, technical-leads, ai-agents]
 status: current
-last_updated: 2026-07-23
+last_updated: 2026-08-30
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-07-23
+  date_last_tested: 2026-08-30
   status: reviewed
   scope: human-readable outcome map over the generated 1.0 product surface
 ---
@@ -32,7 +32,9 @@ about `Todo`.
 
 Entities can save, query, page, stream where the provider supports it, and travel through
 conventional HTTP APIs. Start with durable local SQLite, or bring PostgreSQL, SQL Server,
-CockroachDB, MongoDB, Couchbase, or Redis when the application needs their reach.
+CockroachDB, MySQL, MongoDB, CouchDB, Couchbase, Firebird, or Redis when the application needs
+their reach. Every one of them resolves a conventional local endpoint with sensible development
+defaults — start the server, reference the package, run.
 
 [Explore data](data/index.md) · [Explore HTTP APIs](web/index.md)
 
@@ -57,11 +59,12 @@ The same access declaration can govern what HTTP callers and agents are allowed 
 ## Teach it to understand meaning
 
 Chat, stream responses, or create embeddings through one application-facing client when an active
-provider supports the operation. Koan works locally with Ollama, LM Studio, and in-process ONNX
-within their model and runtime limits.
+provider supports the operation. Koan works locally with Ollama, LM Studio, llama.cpp, and
+in-process ONNX within their model and runtime limits.
 
 Use Koan's Entity vector API for semantic search. Begin in memory or with embedded `sqlite-vec`;
-move to Qdrant, Milvus, Weaviate, Elasticsearch, or OpenSearch when external reach makes sense.
+move to Qdrant, Milvus, Weaviate, Chroma, Elasticsearch, or OpenSearch when external reach makes
+sense.
 
 [Explore AI and vector search](ai/index.md)
 

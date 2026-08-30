@@ -53,6 +53,19 @@ For one endpoint, `ConnectionStrings:LlamaCpp` is supported instead of `Endpoint
 Environment configuration uses ordinary .NET key mapping, for example
 `Koan__Ai__LlamaCpp__ApiKey` and `ConnectionStrings__LlamaCpp`.
 
+## Zero configuration
+
+Start `llama-server` the way you always do and the adapter finds it — no configuration:
+
+```powershell
+llama-server -m model.gguf --port 8080 --embedding
+```
+
+In Development, Koan probes the conventional local endpoint (`localhost:8080`), health-checks
+`/health`, and adopts the model catalog from `/v1/models`. `--embedding` (or `--embeddings`) is
+needed only when the application serves embeddings. If several models are loaded, name the one a
+request wants; otherwise set `DefaultModel` once and stop thinking about it.
+
 Explicit placement works in every environment. Automatic discovery follows `Koan:Ai:AutoDiscoveryEnabled` and,
 outside Development, `Koan:Ai:AllowDiscoveryInNonDev`. Discovery validates `/v1/models` and, when a default model is
 declared, requires that model to appear in the catalog.
