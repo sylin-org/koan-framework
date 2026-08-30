@@ -19,6 +19,10 @@
       "version": "1.0"
     },
     {
+      "id": "Koan.Communication",
+      "version": "1.0"
+    },
+    {
       "id": "Koan.Core",
       "version": "1.0"
     },
@@ -32,6 +36,10 @@
     },
     {
       "id": "Koan.Data.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Jobs",
       "version": "1.0"
     },
     {

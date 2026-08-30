@@ -23,6 +23,10 @@
       "version": "1.0"
     },
     {
+      "id": "Koan.Data.Analytics",
+      "version": "1.0"
+    },
+    {
       "id": "Koan.Data.Connector.Json",
       "version": "1.0"
     },

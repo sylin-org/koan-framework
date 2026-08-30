@@ -39,6 +39,10 @@
       "version": "1.0"
     },
     {
+      "id": "Koan.Data.Analytics",
+      "version": "1.0"
+    },
+    {
       "id": "Koan.Data.Connector.Sqlite",
       "version": "1.0"
     },

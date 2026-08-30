@@ -88,3 +88,4 @@ mcp-sdk/
 # Session-scoped working memory (see local/README.md); the README itself is tracked.
 local/*
 !local/README.md
+samples\recipes.db

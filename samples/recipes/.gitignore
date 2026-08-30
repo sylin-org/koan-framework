@@ -1,0 +1,8 @@
+recipes.db
+*.usero
+*.suo
+*.user
+project.lock.json
+.vs/
+bin/
+obj/
