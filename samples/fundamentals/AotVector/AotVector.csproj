@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <StripSymbols>true</StripSymbols>
+    <AssemblyName>AotVector</AssemblyName>
+    <RootNamespace>AotVector</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Koan.Data.Core\Koan.Data.Core.csproj" />
+    <!-- The vector store under test. Pure HttpClient, no driver — the whole point of proving it
+         under NativeAOT is that nothing here can hide behind a native dependency story. -->
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Vector\Chroma\Koan.Data.Vector.Connector.Chroma.csproj" />
+    <!-- The AI seam rides along to prove it composes and boots under ILC (it stays inactive
+         without an endpoint, which is the correct inactive posture, not a failure). -->
+    <ProjectReference Include="..\..\..\src\Connectors\AI\LlamaCpp\Koan.AI.Connector.LlamaCpp.csproj" />
+  </ItemGroup>
+
+  <!-- AOT is opt-in so it never perturbs the ordinary solution build (ARCH-0093 §2). -->
+  <PropertyGroup Condition="'$(KoanAot)' == 'true'">
+    <PublishAot>true</PublishAot>
+  </PropertyGroup>
+</Project>

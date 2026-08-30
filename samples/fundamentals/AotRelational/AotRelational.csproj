@@ -33,6 +33,12 @@
   <ItemGroup Condition="'$(Connector)' == 'Cockroach'">
     <ProjectReference Include="..\..\..\src\Connectors\Data\Cockroach\Koan.Data.Connector.Cockroach.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'Firebird'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\Firebird\Koan.Data.Connector.Firebird.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Connector)' == 'CouchDb'">
+    <ProjectReference Include="..\..\..\src\Connectors\Data\CouchDb\Koan.Data.Connector.CouchDb.csproj" />
+  </ItemGroup>
 
   <!--
     Microsoft.Data.SqlClient refuses to open a connection in globalization-invariant mode

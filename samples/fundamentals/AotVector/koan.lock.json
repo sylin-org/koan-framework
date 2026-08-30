@@ -1,0 +1,68 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "AotVector",
+    "koan": "1.0",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.AI",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.AI.Connector.LlamaCpp",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.AI.Contracts",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.AI.Contracts.Shared",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Vector",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Vector.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Vector.Connector.Chroma",
+      "version": "1.0"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Koan.AI.Connector.LlamaCpp"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Core"
+    },
+    {
+      "kind": "project",
+      "id": "Koan.Data.Vector.Connector.Chroma"
+    }
+  ]
+}

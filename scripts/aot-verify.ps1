@@ -26,9 +26,11 @@
                            rather than of the thing under test.
     OK                     the value read back equalled the value written
 
-  Sqlite needs nothing external. The four server cells each start their own container, so they run
-  where Docker is available -- a developer machine or a certification boundary -- rather than in the
-  per-PR gate.
+  Sqlite needs nothing external. The other cells (Postgres, Cockroach, MySql, Firebird, CouchDb,
+  SqlServer) each start their own container, so they run where Docker is available -- a developer
+  machine or a certification boundary -- rather than in the per-PR gate. Firebird and CouchDb were
+  added 2026-08-29 after their adapters shipped: Firebird had been verified once through a scratch
+  probe (commit 6e9debb57) and CouchDb had never been AOT-run at all.
 
 .PARAMETER Connectors
   Which cells to run. Defaults to Sqlite: it is the container-free floor, and it is what the daily
@@ -99,6 +101,37 @@ $cells = [ordered]@{
         Setting       = 'Koan__Data__MySql__ConnectionString'
         Conn          = 'Server=localhost;Port=53306;Database=koanaot;User Id=root;Password=koanpw'
     }
+    # The engine image ships no HEALTHCHECK, so readiness is a host-side TCP probe of the mapped
+    # port -- the documented container env contract (FIREBIRD_CONF_* keys are written into
+    # firebird.conf verbatim and must match the file's casing; the image ignores ISC_PASSWORD).
+    Firebird = @{
+        Adapter       = 'FirebirdRepository`2'
+        Image         = 'firebirdsql/firebird:5.0.4'
+        Port          = 55305
+        ContainerPort = 3050
+        Env           = @(
+            'FIREBIRD_ROOT_PASSWORD=koanpw'
+            'FIREBIRD_DATABASE=/var/lib/firebird/data/koanaot.fdb'
+            'FIREBIRD_CONF_WireCrypt=Enabled'
+            'FIREBIRD_CONF_AuthServer=Srp256, Srp'
+            'FIREBIRD_CONF_AuthClient=Srp256, Srp'
+        )
+        Ready         = { param($n) Test-KoanTcpPort -Port 55305 }
+        Setting       = 'Koan__Data__Firebird__ConnectionString'
+        Conn          = 'DataSource=localhost;Port=55305;Database=/var/lib/firebird/data/koanaot.fdb;User=SYSDBA;Password=koanpw;Charset=UTF8'
+    }
+    # Pure HttpClient, no driver -- if this cell ever goes red, the wire path itself broke, not a
+    # native dependency. Readiness is the documented `/_up` endpoint from the host.
+    CouchDb = @{
+        Adapter       = 'CouchDbRepository`2'
+        Image         = 'couchdb:3.5'
+        Port          = 55984
+        ContainerPort = 5984
+        Env           = @('COUCHDB_USER=koan', 'COUCHDB_PASSWORD=koanpw')
+        Ready         = { param($n) (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://localhost:55984/_up).StatusCode -eq 200 }
+        Setting       = 'Koan__Data__CouchDb__ConnectionString'
+        Conn          = 'couchdb://koan:koanpw@localhost:55984'
+    }
     # A cell whose expected outcome is a refusal, and the only guard for the third PMC-049 defect.
     #
     # `AppBootstrapper` used to call Assembly.GetName() on every assembly, which materializes the
@@ -154,6 +187,19 @@ function Import-VcEnvironment {
     cmd /c "`"$batch`" >nul 2>&1 && set" | ForEach-Object {
         if ($_ -match '^([^=]+)=(.*)$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] }
     }
+}
+
+function Test-KoanTcpPort {
+    param([int]$Port)
+    $client = New-Object System.Net.Sockets.TcpClient
+    try
+    {
+        $task = $client.ConnectAsync('localhost', $Port)
+        if (-not $task.Wait(2000)) { return $false }
+        return $client.Connected
+    }
+    catch { return $false }
+    finally { $client.Dispose() }
 }
 
 function Start-CellContainer {
