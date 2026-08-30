@@ -625,3 +625,15 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   deletion — always write `{}` metadata entries. Probed facts live in the Chroma adapter's
   TECHNICAL.md; the reusable rules are in `references/vector.md` of the create-adapter skill.
   (2026-08-29)
+- **Re-check the ledger before re-running a campaign: PMC-049 was already answered when re-asked.**
+  The 2026-08-21 MEMORY note ("carried as PMC-049", server adapters unexamined) predates its own
+  resolution — `aot-verify.ps1` measured all six cells (Sqlite, Postgres, Cockroach, MySql,
+  SqlServer, SqlServerInvariant) and DATA-0120/ARCH-0093 record it. The genuine gaps after the
+  create-adapter session were narrower: CouchDb had never been AOT-run at all, Firebird's proof
+  lived only in a one-off scratch probe, and the vector claim had no durable artifact. All three
+  closed 2026-08-29: aot-verify gained Firebird and CouchDb cells (green with receipts,
+  win-x64), and `samples/fundamentals/AotVector` carries the vector/AI-composition proof as a
+  runnable sample. Remaining unmeasured: linux/arm64 (PMC-051), and the AotVector publish still
+  shows IL2091s on `FixedOptionsMonitor<T>`, `BoundedSingleFlightCache<T,TKey>` and the other
+  `AddKoanOptions` overloads — annotation hardening, not run defects (the binary ran green).
+  (2026-08-29)

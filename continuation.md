@@ -69,6 +69,11 @@ full round-trip passes with the flag set.
 
 ## Obligations sweep (both adapters)
 
+- The AOT proof is durable, not scratch-only: `samples/fundamentals/AotVector` (Chroma +
+  llama.cpp composition, publish-and-run, adapter receipt) and two new `aot-verify.ps1` cells —
+  Firebird and CouchDb, both green with receipts — extended the machine-checked matrix to eight
+  connectors (PMC-049 had answered the original server question on 2026-08-21; these closed the
+  adapters this session added).
 - Connector matrix regenerated (`38→39` providers; Chroma + llamacpp carry the **not assessed** ⚠
   marker); package-quality regenerated — fleet **107/107 structurally-ready, 0 findings**;
   `skills-verify -Structure` passes with both new playbooks.
