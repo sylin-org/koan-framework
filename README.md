@@ -4,7 +4,7 @@
 
 **Write with intent. Koan makes it real.**
 
-[![Release](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml/badge.svg)](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml)
+[![Release](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/sylin-org/koan-framework/actions/workflows/release.yml)
 [![NuGet](https://img.shields.io/nuget/v/Sylin.Koan.App.svg?label=NuGet&color=004880)](https://www.nuget.org/packages/Sylin.Koan.App)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4)
