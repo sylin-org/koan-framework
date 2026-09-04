@@ -13,9 +13,6 @@ An opinionated .NET meta-framework for agentic, data-driven applications.
 A package reference is the intent — referencing a capability makes it available, and
 `AddKoan()` composes everything referenced, once.
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org) — see the [code signing policy](CODE_SIGNING_POLICY.md).
-
 </div>
 
 ---
@@ -111,7 +108,6 @@ code review.
 - [See what works today](docs/reference/what-works.md)
 - [Capability map — every package, assessed](docs/reference/capability-map.md)
 - [Agent retrieval map (llms.txt)](llms.txt)
-- [Code signing policy](CODE_SIGNING_POLICY.md)
 
 ## Community
 

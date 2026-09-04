@@ -32,8 +32,7 @@ We credit reporters in the release notes by default — say so if you prefer oth
 ## Scope notes
 
 - **Supply chain**: releases are built only by the GitHub Actions `Release` workflow from the
-  fast-forwarded `main` commit; packages are publisher-signed via SignPath (see
-  [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md)) and carry nuget.org repository signatures.
+  fast-forwarded `main` commit and carry nuget.org repository signatures.
   Report anything that suggests a build or publish path outside that boundary.
 - **Agent surfaces** (MCP): advertisement is enforcement — a caller's tool list contains only
   what its identity may use. Reports about access-rule bypass on MCP or Web surfaces are high

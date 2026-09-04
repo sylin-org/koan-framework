@@ -55,23 +55,6 @@ foreach ($package in $selected) {
     })
 }
 
-# When this release was publisher-signed, re-verify signatures at the publish boundary: the certified
-# artifact crossed job and storage boundaries between signing and here, and this is the last place a
-# tampered package can be caught before it reaches nuget.org.
-$statusPath = Join-Path (Split-Path $planFile -Parent) 'code-signing.json'
-if (Test-Path -LiteralPath $statusPath -PathType Leaf) {
-    $signing = Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json
-    if ([bool]$signing.signed) {
-        foreach ($push in $pushes) {
-            dotnet nuget verify $push.Primary --all-signatures 2>&1 | ForEach-Object { Write-Host $_ }
-            if ($LASTEXITCODE -ne 0) {
-                throw "Publisher signature verification failed for '$($push.PackageId) $($push.Version)'; refusing to publish."
-            }
-            Write-Host "PUBLISH|SIGNATURE-OK|$($push.PackageId) $($push.Version)"
-        }
-    }
-}
-
 # The feed must contain nothing beyond what is being published.
 $staged = @(Get-ChildItem -LiteralPath $feedPath -File | Where-Object { $_.Name -match '\.(s)?nupkg$' })
 $allowed = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)

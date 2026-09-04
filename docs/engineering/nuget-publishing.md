@@ -190,26 +190,9 @@ pushing over a version that exists but is not yet indexed.
 See [Package versioning](versioning.md), [Packaging](packaging.md), and
 [ARCH-0125](../decisions/ARCH-0125-per-project-package-versions.md).
 
-## Code signing policy
+## Package trust
 
-Primary packages are prepared for publisher signing through SignPath Foundation after packing and
-before the package-only consumer proof. The signed package set must match the release plan exactly;
-the publication job receives only that certified feed. Symbol packages keep their existing path.
-
-Signing remains transitional while the open-source subscription is under review. With repository
-variable `SIGNPATH_ENABLED` unset or false, publication continues with unsigned publisher packages.
-After it is set to true, missing SignPath configuration or an incomplete, invalid, or rejected
-signed package set stops the release. Every package release note links the policy; the SignPath
-attribution is added only when signing is enabled.
-
-The repository requires these values when signing is enabled:
-
-- secret `SIGNPATH_API_TOKEN`;
-- variables `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`,
-  `SIGNPATH_SIGNING_POLICY_SLUG`, and `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG`;
-- the artifact configuration in
-  [`signpath-artifact-configuration.xml`](signpath-artifact-configuration.xml), copied into the
-  corresponding SignPath project.
-
-See the public [Code signing policy](../../CODE_SIGNING_POLICY.md) for roles, scope, privacy,
-removal, and verification.
+Koan publishes packages without a publisher signature. The release workflow builds only from the
+fast-forwarded `main` commit, proves the exact planned feed through a package-only consumer, and
+hands that certified feed to the isolated publication job. NuGet.org adds its repository signature
+after publication.
