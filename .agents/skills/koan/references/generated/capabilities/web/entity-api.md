@@ -33,6 +33,23 @@ endpoints with no repository or endpoint mapping layer.
 > paging, streaming, and relationship expansion; HTTP cannot manufacture a capability the store did
 > not declare.
 
+## The verb map
+
+Every verb is a face of the same governed write/read pipeline — none of them bypasses validation,
+`[Access]`, hooks, stamps, audit, or facts:
+
+| Verb | Meaning | Notes |
+|---|---|---|
+| `POST /api/todos` | **Upsert** — create or update through the governed pipeline | the canonical write; id absent/new = create |
+| `PUT /api/todos/{id}` | **Replace by id** — route id wins; a body id that disagrees fails `409 web.put.idMismatch` | added by [WEB-0073](../../decisions/WEB-0073-entity-controller-governed-put.md); the body's id is normalized at the JSON level (the entity constructor assigns an id at bind time) |
+| `PATCH /api/todos/{id}` | **Delta** — content type picks the dialect: `application/merge-patch+json` (RFC 7396, `null` clears), `application/json-patch+json` (RFC 6902 ops), or plain `application/json` (partial; `null` sets null) | one action dispatches by media type |
+| `DELETE /api/todos/{id}` | Remove | |
+
+Query-style verbs (`POST /query`, `GET /new`, bulk forms) exist beside these; see the surface
+reference. The `?filter=` payload speaks the closed query filter vocabulary —
+[the query filter vocabulary](../data/entities.md#the-query-filter-vocabulary) is the operator table. When an external contract needs an exotic verb, subclass and delegate to the same
+endpoint service — never to the data layer directly.
+
 ## The whole application declaration
 
 | Application concern | Expression |

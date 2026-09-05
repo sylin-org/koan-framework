@@ -4,11 +4,12 @@ domain: operations
 title: "Proof and observability"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/operations/proof-and-observability.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against the published coherent set - real-host conformance batteries 4 passed / 2 capability-gated-skipped / 0 failed, facts and lockfile receipts exact, red-then-green readiness transition observed, and an unavailable explicitly selected adapter rejected verbatim at the Entity boundary
 ---
 
 # Proof and observability

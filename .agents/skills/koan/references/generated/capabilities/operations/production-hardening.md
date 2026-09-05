@@ -4,11 +4,12 @@ domain: operations
 title: "Production hardening"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/operations/production-hardening.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: claims-validated by an external agent against live dev-branch content and nuget.org - all links resolve, all five named packages exist under exact ids, and the cutover/backup/field-protection/observability/soft-delete posture claims agree with their linked contracts
 ---
 
 # Production hardening

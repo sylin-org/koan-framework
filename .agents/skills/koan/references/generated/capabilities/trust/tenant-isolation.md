@@ -4,11 +4,12 @@ domain: security
 title: "Tenant isolation"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/trust/tenant-isolation.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Tenancy 1.0.9, Data.Connector.Sqlite) — cross-tenant read/write denial matrix, fail-closed unscoped query with the verbatim SegmentationRequiredException, koan.lock.json composition proof
 ---
 
 # Tenant isolation
@@ -22,10 +23,10 @@ scope through every active capability.
 |---|---|---|
 | Ambient tenant isolation | `Sylin.Koan.Tenancy` | contributes segmentation to active pillars |
 | Authentication | `Sylin.Koan.Web.Auth` | establishes the trusted caller from which tenancy may resolve |
-
-Verified against: `Sylin.Koan.Tenancy` 1.0.8 or newer, `Sylin.Koan.Identity.Tenancy` 1.0.6 or newer, `Sylin.Koan.Web.Auth.Connector.Test` 1.0.7 or newer (patch releases compatible).
 | Durable person-to-tenant membership (optional) | `Sylin.Koan.Identity.Tenancy` · `Sylin.Koan.Identity` | supports people who belong to several tenants |
 | Operator lifecycle surface (optional) | `Sylin.Koan.Tenancy.Web` | separates administration exposure from authority |
+
+Verified against: `Sylin.Koan.Tenancy` 1.0.8 or newer, `Sylin.Koan.Identity.Tenancy` 1.0.6 or newer, `Sylin.Koan.Web.Auth.Connector.Test` 1.0.7 or newer (patch releases compatible).
 
 ## The constraint box
 

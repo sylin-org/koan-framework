@@ -26,9 +26,9 @@ Keep every raw arrival, decide whether it matches an existing real-world thing, 
 
 | Piece | Package | Note |
 |---|---|---|
-| Canonical Entity and pipeline | `Sylin.Koan.Canon` | model the trusted record as `CanonEntity<T>` |
+| Canonical Entity and pipeline | `Sylin.Koan.Canon` | model the trusted record as `CanonEntity<T>`; staged receipts ride the Jobs engine (Canon composes `Sylin.Koan.Jobs` itself) |
 | Review and commit over HTTP (optional) | `Sylin.Koan.Canon.Web` | projects discovered Canon models |
-| Durable arrival ingestion (optional) | `Sylin.Koan.Jobs` | make the arrival and processing receipt survive restart |
+| Durable arrival ingestion | `Sylin.Koan.Data.Connector.*` | a durable connector makes staged receipts and holds survive restart |
 
 ## The constraint box
 

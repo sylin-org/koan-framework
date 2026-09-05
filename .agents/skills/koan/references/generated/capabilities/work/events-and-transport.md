@@ -4,11 +4,12 @@ domain: jobs
 title: "Entity events and transport"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/work/events-and-transport.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the local provider against published packages (Communication) - Events.Raise reached a discovered subscriber and settled one delivery, Transport.Send delivered an isolated snapshot copy with settlement, and direct RabbitMQ reference with an unreachable broker failed startup without local fallback
 ---
 
 # Entity events and transport

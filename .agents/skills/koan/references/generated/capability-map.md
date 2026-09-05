@@ -1,10 +1,10 @@
-﻿---
+---
 type: REFERENCE
 domain: framework
 title: "Koan Capability Map"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-08-19
+last_updated: 2026-08-30
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-19
@@ -73,7 +73,7 @@ without one — they are installable and documented, but nothing has been promis
 | `Sylin.Koan.Storage.Connector.S3` — **not assessed** | Remote object storage; its own README calls it shelved — prefer the local path |
 | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | The only hosted-model connector; the local providers are assessed |
 | `Sylin.Koan.Cache.Adapter.Redis` — **not assessed** | The only shared cache; the durable local adapter is assessed |
-| `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and `EntityAi`, which the AI/vector recipe teaches as the shortest path to vector indexing |
+| `Sylin.Koan.Data.AI` — **not assessed** | Owns `[Embedding]` and the `Entity.Ai` gateway — type-scoped semantic search and embed — which the search-by-meaning recipe teaches as the shortest path to vector indexing |
 | `Sylin.Koan.Data.Vector.Connector.PgVector` — **not assessed** | Reuses an application's PostgreSQL service for exact vector search when the `vector` extension is available |
 | `Sylin.Koan.Data.Vector.Connector.MongoAtlasVector` — **not assessed** | Reuses an application's Atlas deployment for exact vector search without adding another service |
 
@@ -104,6 +104,8 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 | JSON (file-backed) | `Sylin.Koan.Data.Connector.Json` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Json/README.md) |
 | InMemory | `Sylin.Koan.Data.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/InMemory/README.md) |
 | SQLite | `Sylin.Koan.Data.Connector.Sqlite` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Sqlite/README.md) |
+| DuckDB (embedded analytics) | `Sylin.Koan.Data.Connector.DuckDb` + `Sylin.Koan.Data.Connector.DuckDb.Native` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/DuckDb/README.md) |
+| Declared analytics questions (named aggregations, materialized projections, agent asks) | `Sylin.Koan.Data.Analytics` + `Sylin.Koan.Data.Analytics.Web` | **one elected engine** — `Sylin.Koan.Data.Connector.DuckDb` (+ `.Native`) | [How-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) · [Recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/recipes/entity-analytics.md) |
 | MongoDB | `Sylin.Koan.Data.Connector.Mongo` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Mongo/README.md) |
 | PostgreSQL | `Sylin.Koan.Data.Connector.Postgres` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Postgres/README.md) |
 | MySQL | `Sylin.Koan.Data.Connector.MySql` — **not assessed** | **a reachable MySQL server** | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/MySql/README.md) |
@@ -111,6 +113,8 @@ Pick exactly one Entity store unless the application genuinely owns more than on
 | Redis | `Sylin.Koan.Data.Connector.Redis` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Redis/README.md) |
 | Couchbase | `Sylin.Koan.Data.Connector.Couchbase` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Couchbase/README.md) |
 | CockroachDB | `Sylin.Koan.Data.Connector.Cockroach` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Cockroach/README.md) |
+| CouchDB (document store) | `Sylin.Koan.Data.Connector.CouchDb` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/CouchDb/README.md) |
+| Firebird | `Sylin.Koan.Data.Connector.Firebird` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Firebird/README.md) |
 
 Additive data behavior:
 
@@ -151,6 +155,7 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 | Tenant operator console | `Sylin.Koan.Tenancy.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Tenancy.Web/README.md) |
 | Identity-bound tenancy | `Sylin.Koan.Identity.Tenancy` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Identity.Tenancy/README.md) |
 | Field-at-rest classification | `Sylin.Koan.Classification` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Classification/README.md) |
+| Field hygiene (trim/casing on write) | `Sylin.Koan.Data.Hygiene` **not assessed** | [capability node](../capabilities/data/field-hygiene.md) | - |
 
 ## Work and integration
 
@@ -188,6 +193,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Ollama | `Sylin.Koan.AI.Connector.Ollama` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Ollama/README.md) |
 | LM Studio | `Sylin.Koan.AI.Connector.LMStudio` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/LMStudio/README.md) |
 | ONNX (in-process) | `Sylin.Koan.AI.Connector.Onnx` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/Onnx/README.md) |
+| llama.cpp (llama-server) | `Sylin.Koan.AI.Connector.LlamaCpp` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/LlamaCpp/README.md) |
 | Hugging Face | `Sylin.Koan.AI.Connector.HuggingFace` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/AI/HuggingFace/README.md) |
 | Inspectable prompts and HTTP projection | `Sylin.Koan.AI.Prompt` · `Sylin.Koan.AI.Web` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Prompt/README.md) |
 | Answer from your own Entities (RAG), branch, parse to a type, stream | `Sylin.Koan.AI.Orchestration` — **not assessed** | **a chat provider**; retrieval steps also need the Entity's embedding and vector path | [RAG recipe](../guides/ai-rag-howto.md) · [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Orchestration/README.md) |
@@ -195,7 +201,7 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Acquire, convert, deploy, and version model artifacts | `Sylin.Koan.AI.Models` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Models/README.md) |
 | Human approve/reject/edit queues over AI output | `Sylin.Koan.AI.Review` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Review/README.md) |
 | Measure results, gate on metrics, detect drift | `Sylin.Koan.AI.Eval` — **not assessed** | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.AI.Eval/README.md) |
-| `[Embedding]` on an Entity, and `EntityAi` operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.AI/README.md) |
+| `[Embedding]` on an Entity, and `Entity.Ai` search/embed operations | `Sylin.Koan.Data.AI` — **not assessed** | **an AI connector** to compute embeddings and **a vector connector** to store them | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.AI/README.md) |
 | Entity vector semantics | `Sylin.Koan.Data.Vector` | **one vector connector** from the rows below | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Vector.Abstractions/README.md) · [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/ai/vector.md) |
 | In-memory vector index | `Sylin.Koan.Data.Vector.Connector.InMemory` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/InMemory/README.md) |
 | Durable local vector index | `Sylin.Koan.Data.Vector.Connector.SqliteVec` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/SqliteVec/README.md) |
@@ -205,10 +211,11 @@ connectors are local-first, and there is no OpenAI, Anthropic, or Gemini connect
 | Qdrant | `Sylin.Koan.Data.Vector.Connector.Qdrant` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Qdrant/README.md) |
 | Weaviate | `Sylin.Koan.Data.Vector.Connector.Weaviate` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Weaviate/README.md) |
 | Milvus | `Sylin.Koan.Data.Vector.Connector.Milvus` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Milvus/README.md) |
+| Chroma | `Sylin.Koan.Data.Vector.Connector.Chroma` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/Vector/Chroma/README.md) |
 | Elasticsearch vectors | `Sylin.Koan.Data.Connector.ElasticSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/ElasticSearch/README.md) |
 | OpenSearch vectors | `Sylin.Koan.Data.Connector.OpenSearch` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Connectors/Data/OpenSearch/README.md) |
 
-`[Embedding]` and `EntityAi` live in `Sylin.Koan.Data.AI`, and nothing else brings it in. Reference it
+`[Embedding]` and the `Entity.Ai` gateway live in `Sylin.Koan.Data.AI`, and nothing else brings it in. Reference it
 explicitly whenever an Entity save should produce a vector — the AI connector and the vector store do
 not supply it on their own.
 
@@ -222,6 +229,7 @@ not supply it on their own.
 | Remote HTTP/SSE transport | `Sylin.Koan.Mcp` | — | [HTTP/SSE recipe](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/mcp-http-sse-howto.md) |
 | Human MCP console | `Sylin.Koan.Mcp.Explorer` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
 | Operational agent tools | `Sylin.Koan.Mcp.Operations` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/agents/index.md) |
+| Agents ask declared analytics questions | `Sylin.Koan.Data.Analytics.Web` | `Sylin.Koan.Data.Analytics` + engine (`Sylin.Koan.Data.Connector.DuckDb`) | [Entity analytics how-to](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/entity-analytics.md) |
 
 ## Trusted records
 

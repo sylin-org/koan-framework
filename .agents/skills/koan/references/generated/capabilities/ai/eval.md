@@ -49,8 +49,11 @@ Verified against: `Sylin.Koan.AI.Eval` 1.0.6 or newer (patch releases compatible
 
 ```csharp
 using Koan.AI.Contracts.Shared;
+using System.Security.Cryptography;
 using Koan.AI.Eval;
 using Koan.Core;
+using Microsoft.AspNetCore.Builder;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
@@ -60,6 +63,7 @@ From a running host:
 
 ```csharp
 using Koan.AI.Contracts.Shared;
+using System.Security.Cryptography;
 using Koan.AI.Eval;
 
 // Compare two held-back results - works everywhere, no adapters involved.

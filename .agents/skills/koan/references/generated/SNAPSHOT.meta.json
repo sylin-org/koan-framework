@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "generatedUtc": "2026-08-25T12:10:30Z",
-  "sourceCommit": "b684f57cd7e71b5e39fff605aa5fe09153f2c611",
+  "generatedUtc": "2026-09-05T05:14:57Z",
+  "sourceCommit": "2c31688dcc88c0afc8836fc9ec2158216921926d",
   "note": "Verbatim copies of the named docs at main. Relative links inside a snapshot may point back into docs/reference and can 404 from this location; treat paths as repo-relative text.",
   "files": [
     ".agents/skills/koan/references/generated/capability-map.md",
@@ -19,6 +19,7 @@
     ".agents/skills/koan/references/generated/capabilities/data/backups.md",
     ".agents/skills/koan/references/generated/capabilities/data/entities.md",
     ".agents/skills/koan/references/generated/capabilities/data/entity-stores.md",
+    ".agents/skills/koan/references/generated/capabilities/data/field-hygiene.md",
     ".agents/skills/koan/references/generated/capabilities/data/named-sources.md",
     ".agents/skills/koan/references/generated/capabilities/data/recoverable-deletion.md",
     ".agents/skills/koan/references/generated/capabilities/data/relationships.md",
