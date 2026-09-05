@@ -20,8 +20,8 @@ with links to the actual deliverable and evidence.
 ## Initiative state
 
 - Overall: active; shared-foundation milestone proved locally.
-- Active implementation card: none; AE-01 complete within its recorded local-package boundary.
-- Next: AE-02 task contracts on this baseline, followed by governed identity/tenancy work in AE-03.
+- Active implementation card: AE-01a, release the Core repair and remove local preparation.
+- Next: prove published-package consumption, then AE-02 task contracts and AE-03 caller boundaries.
 - Independent participants: none recruited; results and productivity measurements unavailable.
 
 ## Work ledger
@@ -29,6 +29,7 @@ with links to the actual deliverable and evidence.
 | Card | Status | Deliverable / evidence / next condition |
 |---|---|---|
 | [AE-01 Shared foundation](work-items/01-shared-foundation.md) | done | [Applications](../../../samples/applications/SharedApprovals/README.md), [163-check receipt and limits](evidence/AE-01.md); requires locally repaired Core until publication |
+| [AE-01a Published consumption](work-items/01a-published-foundation.md) | in-progress | Release existing Core repair, advance dependent floors, then remove local sample preparation and prove a fresh NuGet restore |
 | [AE-02 Application evolution](work-items/02-application-evolution.md) | planned | Requires AE-01's reproducible consumer baseline |
 | [AE-03 Governed agent workflow](work-items/03-governed-agent-workflow.md) | planned | Requires AE-01's shared policy and application boundary |
 | [AE-04 Change review](work-items/04-change-review.md) | planned | Requires changes and behavior evidence from AE-02 and AE-03 |
