@@ -205,6 +205,7 @@ foreach ($path in @(
 $capabilityHomes = @(
     'docs/reference/core/index.md',
     'docs/reference/data/index.md',
+    'docs/guides/data/entity-analytics.md',
     'docs/reference/data/cache.md',
     'docs/reference/web/index.md',
     'docs/reference/identity/index.md',
@@ -418,7 +419,7 @@ foreach ($entry in $packageCompanionFiles) {
 # Protect the experience at the public front door. Exact package maturity remains the generated
 # ledger's job; these pages must preserve the short intent -> application -> growth journey.
 $frontDoorRequirements = [ordered]@{
-    'README.md' = @('Write with intent. Koan makes it real.', 'Entity. Controller. Done.', 'Sylin.Koan.Templates', 'McpEntity', '1.0')
+    'README.md' = @('Write with intent. Koan makes it real.', 'Entity<Todo>', 'AddKoan()', 'Sylin.Koan.Templates', 'McpEntity', '.NET 10', 'docs/capabilities/index.md', 'Shared expertise can become an application foundation.')
     'docs/index.md' = @('Bring an idea', 'Entity<', 'what-works.md', 'agents/index.md', '1.0')
     'docs/getting-started/quickstart.md' = @('Make it real', 'Sylin.Koan.Templates', 'Entity. Controller. Done.', 'AddKoan()')
     'docs/getting-started/adopt-existing-app.md' = @('Bring Koan into the app you already have', 'one Koan line', 'EntityController<Todo>', 'what-works.md')
