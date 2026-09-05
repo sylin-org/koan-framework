@@ -4,7 +4,7 @@ domain: ai
 title: "Semantic search"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-24
+last_updated: 2026-08-28
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-24
@@ -24,8 +24,10 @@ finds the right chores without a keyword in common.
 | Piece | Package | Note |
 |---|---|---|
 | The `[Embedding]` attribute and save-time indexing | `Sylin.Koan.Data.AI` | nothing else brings it in |
+| One embedding AI connector | `Sylin.Koan.AI.Connector.Ollama` (local model server) or `Sylin.Koan.AI.Connector.Onnx` (portable in-process) | the source that produces embeddings; without it, first save throws "No source found with capability 'Embedding'" |
 | One embedding-capable adapter | scale table below | in-process, no service |
 | One vector store | scale table below | pairs with your data store's engine where possible |
+| One vector store connector | e.g. `Sylin.Koan.Data.Vector.Connector.InMemory` (probe) or SqliteVec | without it, first save throws "No vector adapter is available" |
 
 Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.Connector.SqliteVec` 1.0.6 or newer, `Sylin.Koan.AI.Connector.Onnx` 1.0.4 or newer, `Sylin.Koan.AI.Connector.Ollama` 1.0.8 or newer (patch releases compatible).
 
@@ -60,6 +62,49 @@ Verified against: `Sylin.Koan.Data.AI` 1.0.11 or newer, `Sylin.Koan.Data.Vector.
 - Do not add vector-space wiring lambdas "to be safe" - attribute-only composition is the
   supported path; if saves report "no declared space", the owned flow above owns the fix.
 - Do not hand-write embedding pipelines beside `Client.Embed`.
+
+## The type-scoped shortcut: `Entity.Ai`
+
+For applications that just want semantic search over one Entity kind, the four-step dance —
+embed the query, `Vector<T>.Search`, fan out `Get`, map results — collapses into the type
+gateway. `Sylin.Koan.Data.AI` delivers `YourEntity.Ai.*` to every Entity kind:
+
+```csharp
+using Koan.Core;                       // AddKoan()
+using Koan.Data.Core;                  // Save/Query extensions
+using Koan.Data.Core.Model;            // Entity<T>
+using Koan.Data.AI;                    // the gateway lives here
+using Koan.Data.AI.Attributes;         // [Embedding]
+
+// Save as usual - the [Embedding] attribute indexes it (see above).
+await new Produce { Name = "Cherry tomatoes", Description = "sweet, quick" }.Save(ct);
+
+// Search by meaning - embeds the query, finds nearest vectors, loads the entities.
+var produce = await Produce.Ai.Search("something quick before the game", s => s.Top(10));
+
+// With similarity scores attached:
+var scored = await Produce.Ai.SearchScored("something quick", s => s.Top(10).Threshold(0.7));
+// scored[i].Entity / scored[i].Similarity
+
+// Embed one instance through the kind's declared model + source:
+var vector = await Produce.Ai.Embed(produce);
+
+// Entities similar to one instance (excludes itself by default) - the instance verb:
+var similar = await produce.Similar(limit: 10);
+```
+
+The declaration lambda carries `Top`, `Threshold`, and `Partition`; omit it for the defaults
+(top 10, no threshold).
+
+The gateway is bound to the same `[Embedding]` declaration as indexing — model, source and
+dimensions route automatically, so the one-model constraint above is enforced by construction.
+`Search` is convention-first (works without the attribute); the attribute remains the authority
+for indexing behavior. Usings: `Koan.Data.AI` for the gateway; your model's regular usings.
+
+> **Feed boundary.** Published packages 1.0.13–1.0.23 spell the gateway
+> `Produce.AI.Search(query, limit: 10)` with a static `Produce.AI.Similar(produce)`. From
+> **1.0.24** the `.Ai` spelling, the `s => s.Top(...)` declaration, and the instance
+> `produce.Similar(...)` verb are the delivered surface.
 
 ## Leaves
 

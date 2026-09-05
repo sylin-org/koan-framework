@@ -4,11 +4,12 @@ domain: data
 title: "Move the active Entity store"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/store-cutover.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on a SQLite-to-SQLite envelope against published packages (Cutover) - digest-verified copy of the default store into an empty target, durable activation pointer honored after restart, nonempty target visibly rejected with the old default left active
 ---
 
 # Move the active Entity store

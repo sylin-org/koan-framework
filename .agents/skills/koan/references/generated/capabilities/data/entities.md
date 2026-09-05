@@ -4,11 +4,12 @@ domain: data
 title: "Entity capability hooks"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-29
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/entities.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (App + Data.Connector.Sqlite) via store-and-expose — create/query/get over HTTP with persistence across restart, plus the fail-fast correction when a configured adapter is unavailable
 ---
 
 # Entity capability hooks
@@ -41,6 +42,7 @@ var open = await Todo.Query(item => !item.Done, ct);
 | Need | Hook on or around the Entity | Continue at |
 |---|---|---|
 | Save, get, query, page, stream, or remove | `Save`, `Get`, `Query`, `Page`, `AllStream`, `Remove` | [choose an Entity store](entity-stores.md) |
+| Normalize string fields before persistence (trim, casing) | `[Trim]`, `[Lowercase]`, `[Uppercase]` | [field hygiene](field-hygiene.md) |
 | Use a non-string identifier | `Entity<T, TKey>` | [Data reference](../../reference/data/index.md#the-application-vocabulary) |
 | Keep several runtime shapes in one searchable set | one `Entity<TRoot>` plus generated root variants | [polymorphic Entity family](../../reference/data/index.md#keep-a-polymorphic-family-in-one-set) |
 | Relate a child to a parent | `[Parent(typeof(ParentType))]`, `GetParent`, `GetChildren` | [Entity relationships](relationships.md) |
@@ -60,6 +62,32 @@ var open = await Todo.Query(item => !item.Done, ct);
 | Own bytes | derive from `StorageEntity<T>` and add `[StorageBinding]` | [Entity-owned files](../state/entity-files.md) |
 | Own an original plus reproducible derivatives | derive from `MediaEntity<T>` and declare recipes | [media derivatives](../state/media-derivatives.md) |
 | Reconcile imperfect arrivals into one trusted result | derive from `CanonEntity<T>` | [Canon reconciliation](../records/canon.md) |
+
+## The query filter vocabulary
+
+`Todo.Query(predicate)` and the HTTP `?filter=` surface accept the same closed operator vocabulary.
+A filter names a field and one operator; the framework pushes what the selected store declared and
+finishes the rest in memory, so answers converge across stores.
+
+| Ask | DSL (`?filter=`) | LINQ |
+|---|---|---|
+| Equals / differs | `{"Done": false}`, `{"Level": {"$ne": 3}}` | `t => !t.Done`, `t => t.Level != 3` |
+| Compare | `{"Level": {"$gte": 2}}` (also `$gt`, `$lt`, `$lte`, `$between`) | `t => t.Level >= 2` |
+| In a set | `{"Tier": {"$in": ["Free","Pro"]}}` (`$nin` inverse) | `t => tiers.Contains(t.Tier)` |
+| String starts/ends/substring | `{"Name": "ab*"}`, `{"Name": "*ab"}`, `{"Name": "*ab*"}` or `{"Name": {"$contains": "ab"}}` | `t => t.Name.StartsWith("ab")` / `EndsWith` / `Contains` |
+| Element in a collection | `{"Tags": "urgent"}`, `{"Tags": {"$in": ["a","b"]}}`, `{"Tags": {"$all": ["a","b"]}}` | `t => t.Tags.Contains("urgent")` |
+| **Substring inside a collection element** | `{"Ingredients": {"$like": "salt"}}` | `t => t.Ingredients.Any(i => i.Contains("salt"))` |
+| Collection shape | `{"Tags": {"$size": 2}}`, `{"Tags": {"$nin": ["x"]}}` | — |
+| Presence | `{"Score": {"$exists": true}}` | — |
+| Combine | `{"$and": [...]}`, `{"$or": [...]}`, `{"$not": {...}}`, `{"$nor": [...]}` | `&&`, `\|\|`, `!` |
+
+`$like` is valid only on a collection field (an element contains the substring); on a scalar string
+the parser refuses it and names `$contains` as the correction. `$contains` keeps two meanings it
+already had: substring on a scalar string, exact element match on a collection. String matching is
+case-sensitive unless the filter carries `"$options": {"ignoreCase": true}`; stores that cannot
+answer case-insensitively finish that part in memory. A store that cannot lower an operator still
+answers correctly — the framework completes the filter after the store's part — and every adapter's
+exact pushdown set is readable at runtime facts (`DataCaps.Query.Filter`).
 
 ## Context hooks
 

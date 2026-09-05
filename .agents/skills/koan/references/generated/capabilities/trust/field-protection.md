@@ -4,11 +4,12 @@ domain: security
 title: "Field-at-rest protection"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/trust/field-protection.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (Classification 1.0.11, Data.Connector.Sqlite) — [Pii] envelope proven at rest (raw db bytes contain no plaintext), materialization returns plaintext, restart continuity through the local Development keyring
 ---
 
 # Field-at-rest protection
@@ -21,6 +22,7 @@ Koan encrypts the provider-bound copy.
 | Piece | Package | Note |
 |---|---|---|
 | Field classification and transforms | `Sylin.Koan.Classification` | supports writable string properties |
+| Durable rows the declarations protect | a Koan Data connector, e.g. `Sylin.Koan.Data.Connector.Sqlite` | without one, Entity verbs fail: `Koan Data has no provider candidates. Reference a Data connector and call AddKoan().` |
 | Local key custody | supplied automatically for Development | persists beside the application for restart continuity |
 | Production key custody | application implementation | register the trusted key provider before `AddKoan()` |
 

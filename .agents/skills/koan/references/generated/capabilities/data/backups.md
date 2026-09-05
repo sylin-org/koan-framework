@@ -4,11 +4,12 @@ domain: data
 title: "Backups and recovery"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/backups.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: claims-validated by an external agent against live dev-branch content and nuget.org - all links resolve, the shelved Data.Backup README and product-surface maturity agree, the active-route state path matches the cutover guide, and the You-need table names no nonexistent packages
 ---
 
 # Backups and recovery

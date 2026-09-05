@@ -4,11 +4,12 @@ domain: data
 title: "Recoverable Entity deletion"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/recoverable-deletion.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path against published packages (SoftDelete) - remove hides from ordinary reads while the type-scoped recycle bin retains, restore returns the same payload, purge is physical, restart-durable, and a misconfigured adapter fails closed at startup
 ---
 
 # Recoverable Entity deletion

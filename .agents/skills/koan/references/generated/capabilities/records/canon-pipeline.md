@@ -7,13 +7,14 @@ status: current
 last_updated: 2026-08-25
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-25
+  date_last_tested: 2026-08-26
   status: passed
-  scope: docs/capabilities/records/canon-pipeline.md - mechanics verified by code read of
-    src/Koan.Canon (runtime, matching, reconcile, persistence, stage) against the live journey in
-    canon.md (Sylin.Koan.Canon 1.0.7): create, same-key merge, replay idempotency, 422 refusal.
+  scope: docs/capabilities/records/canon-pipeline.md - cold subagent journey on published feed
+    (Sylin.Koan.Canon 1.0.12 / App 1.0.8 / Sqlite 1.0.14): StageOnly → engine → Completed;
+    OnRule veto → Refused hold at Distribution with justification; Counts; Recover-with-fix →
+    Completed. PASS 6m00s.
     Declarations on this page use the current language ([MatchKey] / [Reconcile] / OnIntake);
-    published 1.0.x packages spell them [AggregationKey] / [AggregationPolicy(Kind)] with identical
+    Canon 1.0.12+ ships the current spellings; older published 1.0.x packages spelled them [AggregationKey] / [AggregationPolicy(Kind)] with identical
     semantics until the next release. Multi-channel claims state the shipped surface, not aspiration -
     see Channels.
 ---
@@ -50,7 +51,7 @@ ends at the same funnel:
 
 ```csharp
 var result = await person.Canonize(ct: ct);                       // immediate
-var result = await person.Canonize(o => o.WithOrigin("crm-sync"), ct: ct);
+var result = await person.Canonize(configure: o => o.WithOrigin("crm-sync"), ct: ct);
 ```
 
 Shipped channels:
@@ -63,13 +64,51 @@ with `WithOrigin("mq:{queue}")`; a Jobs worker ingests a batch the same way. For
 durable *before* processing, stage them instead of canonizing immediately:
 
 ```csharp
-var parked = await person.Canonize(o => o.WithStageBehavior(CanonStageBehavior.StageOnly), ct: ct);
-// result.Outcome == Parked; payload persisted as a CanonStage receipt with transition history
+var parked = await person.Canonize(configure: o => o.WithStageBehavior(CanonStageBehavior.StageOnly), ct: ct);
+// result.Outcome == Parked; the receipt is enqueued and the engine processes it at-least-once.
 ```
 
-A staged payload waits as data — `Pending → Processing → Completed | Parked | Failed`, full transition
-log, correlation id — until something promotes it back through `.Canonize()` and marks the stage
-completed. There is no built-in sweeper or retry clock; the queue is yours to work.
+A staged receipt is a job (the receipt *is* the work item): the engine claims it, re-enters the funnel at Intake — `OnIntake` and business rules apply — and settles the receipt by outcome. A business-rule veto (`ctx.Hold(why)` or `OnRule`) parks it as **Refused** at the business checkpoint (Distribution); a mechanical block parks it as **Stalled**. Held records wait in `Person.Canon.Hold`. Recovery re-enters at Intake — a fix is a hypothesis, not a pass.
+
+The hold surface, in full:
+
+```csharp
+// Register a business rule (chaining; runs at the business checkpoint, post-Projection):
+Person.Canon.OnRule(async candidate =>
+    await Crm.Exists(candidate.Email) ? null : "user not found in CRM");
+
+// Inside a pipeline contributor — deterministic veto (exceptions remain the transient channel):
+return ctx.Hold("user not found in CRM");
+
+// The scoreboard — held totals, index-served:
+_ = await Person.Canon.Hold.Counts.All();
+_ = await Person.Canon.Hold.Counts.Refused();      // business vetoes, any phase
+_ = await Person.Canon.Hold.Counts.Intake();       // per ratified phase
+
+// Recovery — scope × decision; re-enters at Intake. Returns at release (receipt Pending);
+// the engine settles it asynchronously to Completed / re-parked.
+_ = await Person.Canon.Hold.Recover();                                   // everything, unrepaired
+_ = await Person.Canon.Hold.Recover(CanonPipelinePhase.Intake);          // one phase
+_ = await Person.Canon.Hold.Recover(stageId, h =>                        // one receipt, repaired
+{
+    h.Model.Email = "fixed@example.com";
+    return h;                                                            // non-null ⇒ recover; null ⇒ stays held
+});
+```
+
+**Bulk recovery sweep.** After fixing a systemic cause, resubmit a phase's holds on a cadence with an ordinary scheduled job:
+
+```csharp
+[JobAction("RecoverOnboarding", Schedule = "00:30:00")]
+public sealed class OnboardingRecovery : Entity<OnboardingRecovery>, IKoanJob<OnboardingRecovery>
+{
+    public static async Task Execute(OnboardingRecovery job, JobContext ctx, CancellationToken ct)
+        => _ = await Person.Canon.Hold.Recover(CanonPipelinePhase.Intake, ct);
+}
+```
+
+The sweep's summary (attempted / recovered / re-parked) is the telemetry: records whose blocking
+condition persists re-park with their reason — the loop is corrective, never silent.
 
 ## The six phases
 
@@ -120,6 +159,13 @@ Person.Canon
     .OnParked(result => reviewQueue.Enqueue(result));
 ```
 
+For pure token-shape preparation you can also declare what persistence-tier hygiene would do —
+`[Trim]`, `[Lowercase]`, `[Uppercase]` on string properties (from `Koan.Data.Abstractions.Annotations`).
+The intake sweep applies them after the override and before composed rules, so match keys see prepared
+values with no hand-written normalization; explicit rules still win final say over a declared case.
+The semantics live in one shared owner (`HygieneTransform` in Data.Abstractions), identical to what
+Data.Hygiene applies at save — intake and stored rows cannot disagree on a token's shape.
+
 Grammar: **base-form hooks intervene** (`OnIntake` may mutate the candidate); **past-participle hooks
 observe** (`OnCommitted`, `OnParked`, `OnFailed` fire after the operation resolves, with the result
 envelope). Registrations chain; operations terminate. Observer exceptions surface to the caller after
@@ -164,7 +210,7 @@ per-property footprints, reconcile decisions, lineage changes, lifecycle and rea
 
 - Do not call entity Save/Delete beside the pipeline for canonical models — writes belong through
   `Canonize()` so indexes and provenance stay truthful.
-- Do not treat Parked stages as processed; someone (or some job) must promote them.
+- Do not treat held (Parked) stages as processed; Person.Canon.Hold.Recover(...) releases them back through the funnel at Intake.
 - Do not assume a fuzzy-matcher exists: identity is exactly your declared keys.
 
 ## Glossary (MDM bridge)

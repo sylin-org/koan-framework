@@ -4,11 +4,12 @@ domain: storage
 title: "Entity cache"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/state/cache.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the memory floor + SQLite store path against published packages - miss populates, hit serves, write invalidation observed on the layered provider, and a nonexistent provider pin fails boot with the registered candidates named
 ---
 
 # Entity cache

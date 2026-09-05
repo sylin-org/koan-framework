@@ -4,11 +4,12 @@ domain: web
 title: "Web frontend topology"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/web/frontend-topology.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the embedded-static posture (same origin) against published packages - browser-served UI calling the Entity API, liveness/ready verified, and the malformed-filter 400 negative contract proven with no unfiltered fallback
 ---
 
 # Web frontend topology

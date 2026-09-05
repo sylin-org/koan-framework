@@ -60,6 +60,9 @@ using Koan.AI.Contracts.Shared;
 using Koan.AI.Models;
 using Koan.Core;
 using Koan.Data.Core;
+using Microsoft.AspNetCore.Builder;
+using System.Security.Cryptography;
+using Koan.Data.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddKoan();
@@ -69,6 +72,7 @@ From a running host (`app.StartAsync()` or later):
 
 ```csharp
 using Koan.AI.Contracts.Shared;
+using Koan.Data.Core;
 using Koan.AI.Models;
 
 var installed = await Model.List(null);                       // runtime + catalog, deduped by id

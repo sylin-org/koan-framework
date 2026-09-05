@@ -4,11 +4,12 @@ domain: data
 title: "Named publication source"
 audience: [ai-agents, developers]
 status: current
-last_updated: 2026-08-23
+last_updated: 2026-08-27
 framework_version: v1.0.0
 validation:
-  status: not-yet-tested
-  scope: docs/capabilities/data/named-sources.md
+  date_last_tested: 2026-08-27
+  status: passed
+  scope: cold-executed by an external agent on the SQLite path (two physically distinct stores) against published packages - scoped publish identity-stable across re-runs, default untouched, absent source fails closed with "Source 'Absent' is not configured"
 ---
 
 # Named publication source
