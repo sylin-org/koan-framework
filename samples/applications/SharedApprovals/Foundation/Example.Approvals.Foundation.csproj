@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Example.Approvals.Foundation</PackageId>
+    <Description>A local demonstration of shared approval policy for Koan applications.</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Sylin.Koan.Core" Version="[$(KoanCoreVersion)]" />
+    <PackageReference Include="Sylin.Koan.App" Version="1.0.22" />
+    <PackageReference Include="Sylin.Koan.Data.Connector.Sqlite" Version="1.0.29" />
+    <PackageReference Include="Sylin.Koan.Mcp" Version="1.0.28" />
+    <PackageReference Include="Nerdbank.GitVersioning" Version="3.10.91" PrivateAssets="all" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="TECHNICAL.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

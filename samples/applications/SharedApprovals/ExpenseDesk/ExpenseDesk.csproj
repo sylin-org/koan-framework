@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup Condition="'$(UsePackagedFoundation)' != 'true'">
+    <ProjectReference Include="../Foundation/Example.Approvals.Foundation.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UsePackagedFoundation)' == 'true'">
+    <PackageReference Include="Example.Approvals.Foundation" Version="$(ApprovalFoundationVersion)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

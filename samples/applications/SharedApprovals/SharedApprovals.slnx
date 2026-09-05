@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Foundation/Example.Approvals.Foundation.csproj" />
+  <Project Path="ApprovalDesk/ApprovalDesk.csproj" />
+  <Project Path="ExpenseDesk/ExpenseDesk.csproj" />
+</Solution>

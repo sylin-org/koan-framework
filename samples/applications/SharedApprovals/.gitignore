@@ -1,0 +1,11 @@
+bin/
+obj/
+.koan/
+*.db
+*.db-shm
+*.db-wal
+artifacts/
+.local/
+mcp-sdk/
+**/wwwroot/app.js
+**/wwwroot/site.css

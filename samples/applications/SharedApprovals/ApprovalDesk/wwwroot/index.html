@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approval desk · Purchasing</title>
+  <link rel="stylesheet" href="/site.css"><script src="/app.js" defer></script>
+</head>
+<body data-kind="purchases">
+  <header><a class="brand" href="/"><span class="mark">a</span> approval desk</a><span class="workspace">PURCHASING</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">FROM REQUEST TO ORDER</p><h1>Good decisions.<br><em>Clear next steps.</em></h1><p>Give every purchase a purpose, an approval, and a place in the record.</p></section>
+    <section class="policy" aria-label="Approval policy"><span class="policy-dot"></span><p id="policy">Loading approval policy…</p></section>
+    <div class="layout">
+      <section class="compose"><p class="eyebrow">START SOMETHING</p><h2>Request a purchase</h2>
+        <form id="request-form">
+          <label for="subject">What do you need?</label><input id="subject" name="subject" placeholder="A monitor for the design studio" maxlength="160" required>
+          <div class="pair"><div><label for="amount">Amount · USD</label><input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="250.00" required></div><div><label for="costCenter">Cost center</label><input id="costCenter" name="costCenter" placeholder="Design" required></div></div>
+          <label for="supplier">Supplier</label><input id="supplier" name="supplier" placeholder="Who are we buying from?" required>
+          <button class="primary" type="submit">Submit purchase <span aria-hidden="true">↗</span></button>
+          <p class="form-note">Approval comes first. Place the order when the request is ready.</p>
+        </form>
+      </section>
+      <section class="queue"><div class="queue-heading"><div><p class="eyebrow">THE WORK IN FRONT OF YOU</p><h2>Purchase requests <span id="count" class="count">0</span></h2></div><button id="refresh" class="quiet" type="button">Refresh ↻</button></div>
+        <p id="error" class="error" role="alert" hidden></p><p id="notice" class="notice" role="status" hidden></p>
+        <div id="requests" aria-live="polite"></div><div id="empty" class="empty" hidden><span aria-hidden="true">↗</span><h3>A clear desk. A fresh start.</h3><p>Your first purchase request will appear here.</p></div>
+        <p class="pagination-note">Showing up to 20 requests.</p>
+      </section>
+    </div>
+  </main>
+  <footer><span>Every request has a next step.</span><span>Shared policy. Purchasing's own workflow.</span></footer>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'ApprovalDesk' or '$(MSBuildProjectName)' == 'ExpenseDesk'">
+    <_SharedApprovalAsset Include="$(MSBuildThisFileDirectory)Web/*" />
+    <Content Remove="wwwroot/app.js;wwwroot/site.css" />
+    <Content Include="wwwroot/app.js;wwwroot/site.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!-- Static-file middleware needs physical files during dotnet run as well as publish. -->
+  <Target Name="CopySharedApprovalAssets" BeforeTargets="PrepareForBuild" Condition="'@(_SharedApprovalAsset)' != ''">
+    <Copy SourceFiles="@(_SharedApprovalAsset)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot" SkipUnchangedFiles="true" />
+    <ItemGroup><FileWrites Include="@(_SharedApprovalAsset->'$(MSBuildProjectDirectory)/wwwroot/%(Filename)%(Extension)')" /></ItemGroup>
+  </Target>
+  <!-- Koan build assets arrive through the published packages, as in a downstream application. -->
+  <Target Name="RequireFoundationManifestRepair" BeforeTargets="CollectPackageReferences"
+          Condition="'$(KoanCoreVersion)' == ''">
+    <Error Text="This demonstration needs the local Core manifest repair. Run pwsh samples/applications/SharedApprovals/prepare-framework.ps1 from the repository root, then retry." />
+  </Target>
+</Project>
