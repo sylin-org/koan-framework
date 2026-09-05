@@ -21,10 +21,20 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
 
 - Overall: `active`
 - Current tranche: `T1 — Artifacts` (Wave-0 preparation may start in parallel)
-- Active work item: A03 remaining flagship scenes and recording; local baseline available
+- Active work item: A03 remaining flagship scenes and recording; published dependency baseline available
 - Active child: none
 
 ## Ledger
+
+### 2026-09-05 — Core released; published dependency prerequisite cleared
+
+- [AE-01a](../application-evolution/evidence/AE-01a.md) records the certified CI release of
+  Core 1.0.34 and its dependents, followed by 168 passing consumer checks using a fresh cache.
+  Every Koan package came from nuget.org; both desks no longer need local Core preparation.
+- Published dependency baseline: `3956b6aca3ebd9a556ee0ac3b89d0520c72db2f2`, at the existing
+  SharedApprovals paths. The original local receipt remains historical evidence.
+- This clears the local Core prerequisite. Jobs, semantic-search scenes, recording, GIF, A11,
+  and the existing recording/launch checks remain outstanding; no adoption claim is added.
 
 ### 2026-09-05 — A03 local baseline delivered; publication prerequisite found
 

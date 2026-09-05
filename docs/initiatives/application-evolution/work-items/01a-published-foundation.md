@@ -8,13 +8,15 @@ last_updated: 2026-09-05
 framework_version: v1.0.0
 validation:
   status: reviewed
-  scope: release and consumer cleanup specification; published-consumer proof pending
+  scope: completed release and consumer cleanup; 168 published-consumer assertions passed
 ---
 
 # AE-01a — Remove the local Core prerequisite
 
 The maintainer requested fixing the remaining local-package limitation after AE-01. Execution
 status lives in [PROGRESS](../PROGRESS.md); preserve the original local receipt as historical evidence.
+
+Completed evidence: [published release and fresh-cache consumption](../evidence/AE-01a.md).
 
 **Task:** Release the existing Core identity repair and return Shared Approvals to ordinary NuGet consumption.
 

@@ -14,18 +14,19 @@ validation:
 # Resume application evolution
 
 Read the [charter](README.md) and [live ledger](PROGRESS.md), then
-[AE-01 evidence](evidence/AE-01.md). The ledger is authoritative if this handoff ages.
+[published-package evidence](evidence/AE-01a.md). The ledger is authoritative if this handoff ages.
 
 ## Next implementation session
 
 1. Check the working tree and owners, then claim [AE-02](work-items/02-application-evolution.md).
-   AE-01 is complete locally; do not rebuild its applications elsewhere or rerun its discovery.
+   AE-01 and AE-01a are complete; do not rebuild their applications elsewhere or rerun discovery.
 2. Use `samples/applications/SharedApprovals/ApprovalDesk` and `ExpenseDesk`, with their shared
    `Foundation`. Read the workspace README and AGENTS.md. A03 owns the first app and recording;
-   its published-only recording criteria still require the Core repair to be released.
-3. For a fresh checkout, run `pwsh samples/applications/SharedApprovals/prepare-framework.ps1`.
-   It packs Core locally at its computed version and writes ignored `.local` configuration.
-   The normal `dotnet run` commands and `verify.ps1` then work. Never publish from the workstation.
+   its published Koan dependency prerequisite is now proved, while the remaining scenes and recording
+   retain A03's existing criteria.
+3. Use the normal `dotnet run` commands and `verify.ps1` directly. The foundation references
+   published App 1.0.23, SQLite connector 1.0.30, and MCP 1.0.29, bringing Core 1.0.34 transitively.
+   There is no local Core preparation step. Never publish from the workstation.
 4. Commit AE-02 task contracts before attempts: semantic search, durable background work, and
    shared-policy evolution, with explicit preserved contracts and measurements. Reuse the existing
    evaluation runner where applicable; the AE-01 fixture is not an independent agent campaign.
