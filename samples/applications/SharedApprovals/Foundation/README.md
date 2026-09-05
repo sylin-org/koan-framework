@@ -27,3 +27,6 @@ published Core 1.0.33 rejects ordinary organization-owned foundation identities 
 This sample supplies business policy, not production authentication, authorization, tenant
 isolation, payment processing, or procurement integrations. Its local development MCP exposure
 is for exercising the shared Entity boundary.
+
+When working in this sample workspace, coding agents should read [AGENTS.md](../AGENTS.md)
+for shared-policy and consumer ownership.
