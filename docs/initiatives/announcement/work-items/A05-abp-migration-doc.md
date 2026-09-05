@@ -45,9 +45,9 @@ a migration guide that admits gaps converts skeptics better than any launch post
 
 ## Evidence to read first
 
-- [`../../../docs/getting-started/adopt-existing-app.md`](../../../docs/getting-started/adopt-existing-app.md)
+- [`../../../getting-started/adopt-existing-app.md`](../../../getting-started/adopt-existing-app.md)
   — the existing adoption path this doc complements.
-- [`../../../docs/reference/capability-map.md`](../../../docs/reference/capability-map.md) —
+- [`../../../reference/capability-map.md`](../../../reference/capability-map.md) —
   maturity statements the doc must not overstate.
 
 ## Acceptance criteria
