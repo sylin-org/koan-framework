@@ -1,6 +1,6 @@
 {
-  "Sylin.Koan.Core": "1.0.33",
-  "Sylin.Koan.AI.Contracts": "1.0.17",
+  "Sylin.Koan.Core": "1.0.34",
+  "Sylin.Koan.AI.Contracts": "1.0.18",
   "Sylin.Koan.ZenGarden.Contracts": "1.0.11",
-  "$transitive": "4E5C1F9D32BD497AB4B2F0ECEA5477763C12CBB9C24B78903C837C1DFC186CB8"
+  "$transitive": "4279FA0127C159892050F18B8997CAA70DA946C37913D4DA55A3F030C72A3975"
 }
