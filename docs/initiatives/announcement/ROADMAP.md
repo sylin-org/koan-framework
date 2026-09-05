@@ -4,7 +4,7 @@ domain: framework
 title: "Announcement Initiative Roadmap"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-08-28
+last_updated: 2026-09-05
 framework_version: v1.0.30
 validation:
   date_last_tested: 2026-08-28
@@ -51,7 +51,7 @@ earlier exit gate satisfied without updating the earlier artifact and evidence.
 
 **Exit gate:**
 
-- flagship demo (A03) records the recipe-box outcome end to end, including the facts endpoint;
+- flagship demo (A03) records the approval-desk outcome end to end, including the facts endpoint;
 - terseness receipt (A11) carries the LoC table, the stated counting method, and a one-command
   reproduction from a fresh checkout;
 - copy pack (A04) quotes only A11's table where numbers are needed, carries the

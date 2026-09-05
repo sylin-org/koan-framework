@@ -1,0 +1,1193 @@
+{
+  "generatedUtc": "2026-09-05T12:30:05.1206265-04:00",
+  "passed": true,
+  "failure": null,
+  "scope": "Two package consumers; shared policy tightening; isolated rollback; HTTP business and negative paths; MCP approval boundary; persisted SQLite state",
+  "independentParticipants": 0,
+  "framework": {
+    "version": "1.0.34",
+    "sha256": "DCC50BD18298D016227CF18D35B41079BCE8B237E2FA4D03F352E65AB4493BB9",
+    "published": false
+  },
+  "sourceFiles": [
+    {
+      "path": ".gitignore",
+      "sha256": "F9CE87BD2EA1AB1807B4F6BBD22EB43FEBF97A6F5A14E9A7F780FBCDB7415B44"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "C84B59D3EBA809D4B724F61BD924687C0776D548D026DA617CC8788FCE70D6FB"
+    },
+    {
+      "path": "ApprovalDesk/ApprovalDesk.csproj",
+      "sha256": "ECACF904BFA3994922379DDC08036CEFF6F240AE90158795833283B726A089DF"
+    },
+    {
+      "path": "ApprovalDesk/appsettings.json",
+      "sha256": "8A8272C5D9389353C439B2DAB3DC77B701B0252EA4D1C1E32BC6A6E8AA3D681D"
+    },
+    {
+      "path": "ApprovalDesk/Domain/PurchaseRequest.cs",
+      "sha256": "6C37EE0634BD0C5ACBA13271CE7E36E5FFE19598483DAEA78995DF39E389CF75"
+    },
+    {
+      "path": "ApprovalDesk/Infrastructure/PurchaseConstants.cs",
+      "sha256": "D68A67CB9316F2D2CD1F1F50253DE72F21D5392891861EA6856E0C081F8D6A74"
+    },
+    {
+      "path": "ApprovalDesk/Initialization/PurchaseModule.cs",
+      "sha256": "38E7C077F19C2B305A484E67452F86743741F84D37D9E81FE37AD508130063C8"
+    },
+    {
+      "path": "ApprovalDesk/koan.lock.json",
+      "sha256": "D18EAD92465548F90583B06F215F00AFEB3341463CA255DBCFF35FCFC08C5295"
+    },
+    {
+      "path": "ApprovalDesk/Program.cs",
+      "sha256": "FD3071CC266A76A8D651E89E1E5FD911E3E567A32DDAD2C2437D530DC89A2D53"
+    },
+    {
+      "path": "ApprovalDesk/README.md",
+      "sha256": "9596C4B9D3A7931505466460196E0E41B0435738BE49713626727FC60DCD4ED5"
+    },
+    {
+      "path": "ApprovalDesk/start.bat",
+      "sha256": "5A479737342E7F7C82D13E5236F8E17F3631245A3FDB731682866D93DC59629A"
+    },
+    {
+      "path": "ApprovalDesk/Web/PurchasesController.cs",
+      "sha256": "0D5677A8DCD3A204442DE08BFF440AC448FB5504189D35864F1FC6D82B3BC1B1"
+    },
+    {
+      "path": "ApprovalDesk/wwwroot/index.html",
+      "sha256": "08D14CBEFB1A8CFE3C61EF1CBFB9211849A74896C4E06893290E81179ADA9C7E"
+    },
+    {
+      "path": "Directory.Build.props",
+      "sha256": "F63500B14E4318AD3D4CF17E5DF829B5A6A7250D94C28766FBCD0438DCF82374"
+    },
+    {
+      "path": "Directory.Build.targets",
+      "sha256": "67C4BF05C68A0701D56CD57D3D518492100D6CD5115DF34E71EDADEC62BC1ED3"
+    },
+    {
+      "path": "Directory.Packages.props",
+      "sha256": "AF799A176BF7BE0DE5E660924F4BDE3444170788E9633399A1F65F0B72C9602F"
+    },
+    {
+      "path": "ExpenseDesk/appsettings.json",
+      "sha256": "460895B5648638DA7385B5F25098423100530F2FD5A53872648016E1A7F9AB4D"
+    },
+    {
+      "path": "ExpenseDesk/Domain/ExpenseClaim.cs",
+      "sha256": "176585B8FAA2B4DA48A407912F7783EDB3A103F9FA6744E4C83A73533EA720ED"
+    },
+    {
+      "path": "ExpenseDesk/ExpenseDesk.csproj",
+      "sha256": "ECACF904BFA3994922379DDC08036CEFF6F240AE90158795833283B726A089DF"
+    },
+    {
+      "path": "ExpenseDesk/Infrastructure/ExpenseConstants.cs",
+      "sha256": "2889AC361FC709B698C7452C74BB1198885CCA02F7360D18734365421FB9917F"
+    },
+    {
+      "path": "ExpenseDesk/Initialization/ExpenseModule.cs",
+      "sha256": "D33E7EDB378DD35324B9786CE769193593481ADBE02DED1D3CFE08E6EFFFBDBF"
+    },
+    {
+      "path": "ExpenseDesk/koan.lock.json",
+      "sha256": "F83F8CF8A1F66F7910F3D81205257E971D16E21A6602D7EF3B417DFF544BA15D"
+    },
+    {
+      "path": "ExpenseDesk/Program.cs",
+      "sha256": "FD3071CC266A76A8D651E89E1E5FD911E3E567A32DDAD2C2437D530DC89A2D53"
+    },
+    {
+      "path": "ExpenseDesk/README.md",
+      "sha256": "3184A2B229B48548EEBEB99EB7C7AD0267FB3C6D5FD4BA2AEE2B4DF6135F60B4"
+    },
+    {
+      "path": "ExpenseDesk/start.bat",
+      "sha256": "0F8974F52BD3935DE3B32E21AF5044710F65F3309836A678BD1B331525A55A50"
+    },
+    {
+      "path": "ExpenseDesk/Web/ExpensesController.cs",
+      "sha256": "AB4D70E6A876FC062594C70603375591D8DCE554408CF7CCB69FE43E4EDE0884"
+    },
+    {
+      "path": "ExpenseDesk/wwwroot/index.html",
+      "sha256": "66A36E1B17C6B9551C19CEC8B97946A231D635A36F600A46D67F73149FBDF9D6"
+    },
+    {
+      "path": "Foundation/Domain/ApprovalRequest.cs",
+      "sha256": "F7E1F24BA687359C7B25A5C9FDC50EDA1395130A4B2CA3C9A60F5179A6202DB6"
+    },
+    {
+      "path": "Foundation/Domain/ApprovalState.cs",
+      "sha256": "E76E43DAC1F3C95E48E5DFD19B1A33E2F946181F172ABFC66042A26FBC4894DA"
+    },
+    {
+      "path": "Foundation/Example.Approvals.Foundation.csproj",
+      "sha256": "0B600A880EE24EB670986E3941705692B983F9DFFFAD590B184381E6EC724772"
+    },
+    {
+      "path": "Foundation/Infrastructure/ApprovalConstants.cs",
+      "sha256": "FA70E1DF69F68EE71D0A11514115E0658BBA77138B2E8E72EE50CF353134F8F3"
+    },
+    {
+      "path": "Foundation/Initialization/ApprovalPolicyModule.cs",
+      "sha256": "5879B37DA8D9A81EB1D6F8C6F58F46D2997436606117DD53E0F11E9BFDC265BC"
+    },
+    {
+      "path": "Foundation/Policy/ApprovalPolicy.cs",
+      "sha256": "A529217ED2B03C106B7D615CA0A24E4B664E0714946CDE3614D7C913C423C153"
+    },
+    {
+      "path": "Foundation/Policy/ApprovalPolicyOptions.cs",
+      "sha256": "7517FD363F23C9D2BD46A1829E9D5B4FDB623679B1E22B0CC3F6989953B68AF9"
+    },
+    {
+      "path": "Foundation/README.md",
+      "sha256": "7A703A38D1901D7C704FF80C8F8FF210354E5DFB2925D688AFC8FBDA18FC014A"
+    },
+    {
+      "path": "Foundation/TECHNICAL.md",
+      "sha256": "67C9ADCC6877709AF260A9AE621CCF12C75E3DB5DFDF5FB6D7A41DB765478C94"
+    },
+    {
+      "path": "Foundation/version.json",
+      "sha256": "EE46B95B4A5F14531207D874C3719F1AD922DE72B8507C9335EC2654A2CC9810"
+    },
+    {
+      "path": "Foundation/Web/ApprovalController.cs",
+      "sha256": "4D0833A9FFEA521187A17970555A34CE02D2BFC0D3058EA29B8560AEADBD40C8"
+    },
+    {
+      "path": "Foundation/Web/ApprovalExceptionFilter.cs",
+      "sha256": "0E70548C135811519C2BB4DC66CF475C309D4607D7AEBFA15BC54F8492767741"
+    },
+    {
+      "path": "Foundation/Web/ApprovalPolicyController.cs",
+      "sha256": "F8256BD87EC9911F52E75858830DB7396D8218A578C778B93304B90F2B539904"
+    },
+    {
+      "path": "prepare-framework.ps1",
+      "sha256": "3C4A5EC971224302AE4352A5FED894CE6DC64B3388BBADA92499E17EE78D6064"
+    },
+    {
+      "path": "README.md",
+      "sha256": "4846AA81280132DCC0BA825B031DC7EDD5D1A34F0AAF2A9B8689F8F8189D5311"
+    },
+    {
+      "path": "SharedApprovals.slnx",
+      "sha256": "4B0C9D334D20C0A99061957D50D1E6F6269EC118D9D4BEF27EF0AE4181DF826F"
+    },
+    {
+      "path": "verify.ps1",
+      "sha256": "F41F8FB226669DFCFE4EDFBEB3D23BC84427F63E4CB8A40965951CA566298C89"
+    },
+    {
+      "path": "Web/app.js",
+      "sha256": "A8BE73B743CF4AB0488B91DEA64AF587BF14129F9381619B57B9275FE9AF04F2"
+    },
+    {
+      "path": "Web/site.css",
+      "sha256": "F97FB1DF5D7087BDB41EE5E14E309E750867404361F0AAB629C5D2619C4F53BD"
+    }
+  ],
+  "packages": [
+    {
+      "phase": "baseline",
+      "version": "1.0.1",
+      "sha256": "42B7F3C3599D40EBD5BDF8E2FB55FC15B5D1DB90E86870CD3F958A5AE25D65FC"
+    },
+    {
+      "phase": "upgraded",
+      "version": "1.0.2",
+      "sha256": "4A93241337CE6D82DEC463597A48B2D8E22AF3F8F0B52AA38DCB42116CE781B8"
+    }
+  ],
+  "consumerGraphs": [
+    {
+      "phase": "baseline",
+      "app": "ApprovalDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.1",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    },
+    {
+      "phase": "baseline",
+      "app": "ExpenseDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.1",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    },
+    {
+      "phase": "upgraded",
+      "app": "ApprovalDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.2",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    },
+    {
+      "phase": "upgraded",
+      "app": "ExpenseDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.2",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    },
+    {
+      "phase": "rollback",
+      "app": "ApprovalDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.1",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    },
+    {
+      "phase": "rollback",
+      "app": "ExpenseDesk",
+      "libraries": [
+        "Acornima/1.6.2",
+        "Example.Approvals.Foundation/1.0.1",
+        "Jint/4.13.0",
+        "MessagePack.Annotations/3.1.8",
+        "MessagePack/3.1.8",
+        "MessagePackAnalyzer/3.1.8",
+        "Microsoft.AspNetCore.Authentication.JwtBearer/10.0.10",
+        "Microsoft.AspNetCore.JsonPatch/10.0.10",
+        "Microsoft.AspNetCore.Mvc.NewtonsoftJson/10.0.10",
+        "Microsoft.Bcl.Cryptography/10.0.2",
+        "Microsoft.Data.Sqlite.Core/10.0.10",
+        "Microsoft.Data.Sqlite/10.0.10",
+        "Microsoft.IdentityModel.Abstractions/8.19.2",
+        "Microsoft.IdentityModel.JsonWebTokens/8.19.2",
+        "Microsoft.IdentityModel.Logging/8.19.2",
+        "Microsoft.IdentityModel.Protocols.OpenIdConnect/8.19.2",
+        "Microsoft.IdentityModel.Protocols/8.19.2",
+        "Microsoft.IdentityModel.Tokens/8.19.2",
+        "Microsoft.NET.StringTools/18.4.0",
+        "Microsoft.VisualStudio.Threading.Only/17.14.15",
+        "Microsoft.VisualStudio.Validation/17.13.22",
+        "Nerdbank.MessagePack/1.2.4",
+        "Nerdbank.Streams/2.13.16",
+        "Newtonsoft.Json.Bson/1.0.2",
+        "Newtonsoft.Json/13.0.4",
+        "PolyType/1.3.1",
+        "SQLitePCLRaw.bundle_e_sqlite3/2.1.11",
+        "SQLitePCLRaw.core/2.1.11",
+        "SQLitePCLRaw.lib.e_sqlite3/3.53.3",
+        "SQLitePCLRaw.provider.e_sqlite3/2.1.11",
+        "StreamJsonRpc/2.25.29",
+        "Sylin.Koan.App/1.0.22",
+        "Sylin.Koan.Cache.Abstractions/1.0.13",
+        "Sylin.Koan.Communication/1.0.20",
+        "Sylin.Koan.Core/1.0.34",
+        "Sylin.Koan.Data.Abstractions/1.0.27",
+        "Sylin.Koan.Data.Analytics/1.0.10",
+        "Sylin.Koan.Data.Connector.Json/1.0.18",
+        "Sylin.Koan.Data.Connector.Sqlite/1.0.29",
+        "Sylin.Koan.Data.Core/1.0.46",
+        "Sylin.Koan.Data.Relational.Abstractions/1.0.26",
+        "Sylin.Koan.Data.Relational/1.0.34",
+        "Sylin.Koan.Mcp/1.0.28",
+        "Sylin.Koan.Security.Trust/1.0.13",
+        "Sylin.Koan.Web.Sse/1.0.19",
+        "Sylin.Koan.Web/1.0.33",
+        "Sylin.Koan/1.0.20",
+        "System.IdentityModel.Tokens.Jwt/8.19.2"
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "local-core-package-provenance",
+      "passed": true
+    },
+    {
+      "name": "current-policy-fixture-starts-at-500",
+      "passed": true
+    },
+    {
+      "name": "baseline-package-identity",
+      "passed": true
+    },
+    {
+      "name": "baseline-package-guidance",
+      "passed": true
+    },
+    {
+      "name": "baseline-package-guidance-matches-policy",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-earlier-limit-allows-750",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-approved-record-left-for-upgrade",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "baseline-ApprovalDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-earlier-limit-allows-750",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-approved-record-left-for-upgrade",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "baseline-ExpenseDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "upgraded-package-identity",
+      "passed": true
+    },
+    {
+      "name": "upgraded-package-guidance",
+      "passed": true
+    },
+    {
+      "name": "upgraded-package-guidance-matches-policy",
+      "passed": true
+    },
+    {
+      "name": "policy-change-advances-computed-package-version",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-old-approved-record-readable",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-old-business-outcome-preserved",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-old-approval-awaits-business-action",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-old-over-limit-approval-can-finish",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-tightened-rule-enforced",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-direct-upsert-cannot-bypass-rule",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-denied-approval-stays-pending",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ApprovalDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-old-approved-record-readable",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-old-business-outcome-preserved",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-old-approval-awaits-business-action",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-old-over-limit-approval-can-finish",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-tightened-rule-enforced",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-direct-upsert-cannot-bypass-rule",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-denied-approval-stays-pending",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "upgraded-ExpenseDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-earlier-limit-allows-750",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "rollback-ApprovalDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-consumes-package",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-ready",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-policy-limit",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-ui-/",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-ui-/app.js",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-ui-/site.css",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-sqlite-facts",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-lifecycle-facts",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-requires-prior-approval",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-business-outcome",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-repeat-action-preserves-receipt",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-approved-fields-final",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-denied-write-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-anonymous-http-removal-unavailable",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-cannot-insert-approved",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-positive-amount-required",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-earlier-limit-allows-750",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-mcp-entity-discovered",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-mcp-approval-at-limit-allowed",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-mcp-approval-persisted",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-mcp-over-limit-rejected-correctively",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-mcp-rejection-did-not-persist",
+      "passed": true
+    },
+    {
+      "name": "rollback-ExpenseDesk-real-database",
+      "passed": true
+    },
+    {
+      "name": "earlier-package-bytes-unchanged",
+      "passed": true
+    },
+    {
+      "name": "consumer-source-unchanged-between-packages",
+      "passed": true
+    }
+  ],
+  "artifactRun": "6022c0d405ec4d58bc9de46396ae8e7f",
+  "coreRepairCommit": "6e2aafc56",
+  "applicationBaselineCommit": "157f9053ec10cce86154c433be119f9a2d624e0e"
+}

@@ -4,7 +4,7 @@ domain: framework
 title: "Announcement Initiative"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-08-28
+last_updated: 2026-09-05
 framework_version: v1.0.30
 validation:
   date_last_tested: 2026-08-28
@@ -44,3 +44,12 @@ operator decision that re-charters it.
 | T1 Artifacts | every launch asset exists with linked claims | A03, A04, A05, A06, A11 |
 | T2 Launch | live community surfaces, registrations, staged-wave rollout | A07, A08, A09 |
 | T3 Sustain | 30-day retro against baseline; archive or re-charter | A10 |
+
+## Shared application work
+
+[Application evolution](../application-evolution/README.md) uses A03's approval desk as its
+first consumer. A03 owns the flagship application and recording; AE-01 owns the shared
+foundation and second consumer. Record one canonical application path and pin A11's receipt
+revision. The evolution experiments, independent pilots, and Aspire investigation add no
+launch prerequisites; only demonstrated findings enter announcement copy under this
+initiative's existing acceptance contract.
