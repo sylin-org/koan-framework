@@ -9,5 +9,4 @@
     <UseKoanSource>false</UseKoanSource>
     <UsePackagedFoundation Condition="'$(UsePackagedFoundation)' == ''">false</UsePackagedFoundation>
   </PropertyGroup>
-  <Import Project="$(MSBuildThisFileDirectory).local/Framework.props" Condition="Exists('$(MSBuildThisFileDirectory).local/Framework.props')" />
 </Project>
