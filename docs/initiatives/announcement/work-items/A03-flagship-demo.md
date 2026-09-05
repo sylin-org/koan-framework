@@ -72,7 +72,8 @@ do not gate A03 or add launch requirements.
 
 ## Proof
 
-The [local application baseline](../../../../samples/applications/SharedApprovals/ApprovalDesk/README.md)
-and [AE-01 proof](../../application-evolution/evidence/AE-01.md) are available. Its Core repair is
-locally packed, so the published-only recording requirement remains open. Recording and baseline
-revision ownership stay in `PROGRESS.md`.
+The [application baseline](../../../../samples/applications/SharedApprovals/ApprovalDesk/README.md)
+uses published Koan packages. [AE-01a proof](../../application-evolution/evidence/AE-01a.md)
+records the Core release and 168 passing checks with a fresh NuGet cache; local Core preparation
+is removed. Remaining capability scenes and the recording still need their own evidence.
+Recording and baseline revision ownership stay in `PROGRESS.md`.

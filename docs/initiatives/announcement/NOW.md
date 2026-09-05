@@ -26,8 +26,9 @@ A03 now uses the approval-desk domain and supplies the first application for
 [application evolution](../application-evolution/README.md). A03 keeps the canonical application
 and recording; AE-01 owns the shared foundation and second consumer. Read A03's coordination
 section before application work. Evolution experiments and pilots add no launch prerequisite.
-The local application baseline is available; use its path and revision from PROGRESS. Its Core
-manifest repair must be released before A03 can meet the existing published-only recording gate.
+The application baseline now uses published Koan dependencies; use its path and revision from
+PROGRESS. [AE-01a](../application-evolution/evidence/AE-01a.md) records the release and fresh-cache
+proof. A03's remaining scenes and recording still need their own published-package evidence.
 
 ## Next session
 

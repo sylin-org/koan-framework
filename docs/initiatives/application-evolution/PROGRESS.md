@@ -8,7 +8,7 @@ last_updated: 2026-09-05
 framework_version: v1.0.0
 validation:
   status: reviewed
-  scope: AE-01 local package, HTTP, MCP, and browser proof; independent adoption unmeasured
+  scope: AE-01 and AE-01a package, HTTP, MCP, and published dependency proof; independent adoption unmeasured
 ---
 
 # Application evolution progress
@@ -19,17 +19,17 @@ with links to the actual deliverable and evidence.
 
 ## Initiative state
 
-- Overall: active; shared-foundation milestone proved locally.
-- Active implementation card: AE-01a, release the Core repair and remove local preparation.
-- Next: prove published-package consumption, then AE-02 task contracts and AE-03 caller boundaries.
+- Overall: active; shared-foundation milestone proved with published Koan dependencies.
+- Active implementation card: none; AE-01a complete.
+- Next: AE-02 task contracts and AE-03 caller boundaries.
 - Independent participants: none recruited; results and productivity measurements unavailable.
 
 ## Work ledger
 
 | Card | Status | Deliverable / evidence / next condition |
 |---|---|---|
-| [AE-01 Shared foundation](work-items/01-shared-foundation.md) | done | [Applications](../../../samples/applications/SharedApprovals/README.md), [163-check receipt and limits](evidence/AE-01.md); requires locally repaired Core until publication |
-| [AE-01a Published consumption](work-items/01a-published-foundation.md) | in-progress | Release existing Core repair, advance dependent floors, then remove local sample preparation and prove a fresh NuGet restore |
+| [AE-01 Shared foundation](work-items/01-shared-foundation.md) | done | [Applications](../../../samples/applications/SharedApprovals/README.md), [original 163-check receipt and limits](evidence/AE-01.md); published dependency follow-up in AE-01a |
+| [AE-01a Published consumption](work-items/01a-published-foundation.md) | done | [Release and 168-check fresh-cache receipt](evidence/AE-01a.md); both apps use published Koan dependencies without local preparation |
 | [AE-02 Application evolution](work-items/02-application-evolution.md) | planned | Requires AE-01's reproducible consumer baseline |
 | [AE-03 Governed agent workflow](work-items/03-governed-agent-workflow.md) | planned | Requires AE-01's shared policy and application boundary |
 | [AE-04 Change review](work-items/04-change-review.md) | planned | Requires changes and behavior evidence from AE-02 and AE-03 |
@@ -41,6 +41,21 @@ missing input and useful restart point; stopped work retains its findings. Front
 the charter and cards describes document status, not successful implementation.
 
 ## Decisions and history
+
+### 2026-09-05 — Published dependency path proved; local preparation removed
+
+- [PR #139](https://github.com/sylin-org/koan-framework/pull/139) passed the required gate and
+  was promoted through dev to main. [Release 33979924764](https://github.com/sylin-org/koan-framework/actions/runs/33979924764)
+  certified and published 99 packages, including Core 1.0.34 and its updated dependents.
+- The foundation now references App 1.0.23, SQLite connector 1.0.30, and MCP 1.0.29. Core arrives
+  transitively. The preparation script, local build import, gate, and direct Core override are removed.
+- [AE-01a evidence](evidence/AE-01a.md) records 168 passing checks with a fresh cache and every
+  Koan package restored from nuget.org. Original HTTP/MCP, persistence, update, and rollback
+  contracts passed. Normal authoring built with zero warnings and errors; 35 Core tests passed.
+- Verified sample revision: `3956b6aca3ebd9a556ee0ac3b89d0520c72db2f2`. Use the current
+  published dependency baseline for AE-02/AE-03, retaining the original AE-01 receipt as history.
+- A03's local Core prerequisite is cleared. Remaining scenes, recording, and existing launch
+  criteria remain with A03. Independent participants and productivity measurements remain absent.
 
 ### 2026-09-05 — Shared foundation proved across two real consumers
 
