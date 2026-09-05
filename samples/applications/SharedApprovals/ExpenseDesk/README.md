@@ -20,3 +20,5 @@ The shared lifecycle rule governs approval even through direct Entity upserts.
 
 See the [workspace guide](../README.md) for the package-update proof, SQLite configuration,
 local operating limits, and instructions for coding agents.
+
+Coding agents: read the workspace [AGENTS.md](../AGENTS.md) before extending this application.

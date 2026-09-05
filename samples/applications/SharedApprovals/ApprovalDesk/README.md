@@ -26,3 +26,5 @@ the same Entity; use the workspace verification before making cross-surface clai
 This is the A03 flagship application's baseline. Identity, tenancy, search, background work,
 and the recording have separate work items. Read the [workspace guide](../README.md) for the
 versioned foundation experiment and the demonstration's operating limits.
+
+Coding agents: read the workspace [AGENTS.md](../AGENTS.md) before extending this application.
