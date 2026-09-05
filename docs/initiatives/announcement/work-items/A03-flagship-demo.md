@@ -44,7 +44,7 @@ facts-endpoint closing shot is mandatory: it is the one move no competing framew
 ## Evidence to read first
 
 - [`../CHARTER.md`](../CHARTER.md) — claims and their receipt types.
-- [`../../../docs/getting-started/quickstart.md`](../../../docs/getting-started/quickstart.md).
+- [`../../../getting-started/quickstart.md`](../../../getting-started/quickstart.md).
 
 ## Acceptance criteria
 

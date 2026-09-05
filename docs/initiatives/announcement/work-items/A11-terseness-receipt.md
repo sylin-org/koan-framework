@@ -61,7 +61,7 @@ that carries to production in the same terse model.
 ## Evidence to read first
 
 - [`../CHARTER.md`](../CHARTER.md) — positioning and claim 3's receipt type.
-- [`../../../docs/getting-started/quickstart.md`](../../../docs/getting-started/quickstart.md).
+- [`../../../getting-started/quickstart.md`](../../../getting-started/quickstart.md).
 
 ## Acceptance criteria
 
