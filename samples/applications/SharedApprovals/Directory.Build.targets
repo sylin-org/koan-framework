@@ -9,9 +9,4 @@
     <Copy SourceFiles="@(_SharedApprovalAsset)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot" SkipUnchangedFiles="true" />
     <ItemGroup><FileWrites Include="@(_SharedApprovalAsset->'$(MSBuildProjectDirectory)/wwwroot/%(Filename)%(Extension)')" /></ItemGroup>
   </Target>
-  <!-- Koan build assets arrive through the published packages, as in a downstream application. -->
-  <Target Name="RequireFoundationManifestRepair" BeforeTargets="CollectPackageReferences"
-          Condition="'$(KoanCoreVersion)' == ''">
-    <Error Text="This demonstration needs the local Core manifest repair. Run pwsh samples/applications/SharedApprovals/prepare-framework.ps1 from the repository root, then retry." />
-  </Target>
 </Project>

@@ -2,9 +2,6 @@
 
 Submit a supplier purchase, approve it within the shared spending limit, then place its order.
 
-First run `pwsh samples/applications/SharedApprovals/prepare-framework.ps1` from this checkout.
-The [workspace guide](../README.md) explains the local Core repair prerequisite.
-
 ```powershell
 dotnet run --project samples/applications/SharedApprovals/ApprovalDesk -- --urls http://127.0.0.1:5101
 ```

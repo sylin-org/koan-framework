@@ -2,9 +2,6 @@
 
 Submit an employee expense with its receipt, approve it, then record reimbursement.
 
-First run `pwsh samples/applications/SharedApprovals/prepare-framework.ps1` from this checkout.
-The [workspace guide](../README.md) explains the local Core repair prerequisite.
-
 ```powershell
 dotnet run --project samples/applications/SharedApprovals/ExpenseDesk -- --urls http://127.0.0.1:5102
 ```

@@ -110,6 +110,23 @@ function Test-Application([string]$App, [string]$Phase, [string]$Version, [decim
     $assets = Get-Content -LiteralPath (Join-Path $fixture "$App/obj/project.assets.json") -Raw | ConvertFrom-Json -AsHashtable
     Check ($assets.libraries["Example.Approvals.Foundation/$Version"].type -eq 'package') "$Phase-$App-consumes-package"
     $graphs.Add([ordered]@{ phase = $Phase; app = $App; libraries = @($assets.libraries.Keys | Sort-Object) })
+    $koanLibraries = @($assets.libraries.Keys | Where-Object { $_ -match '^Sylin\.Koan[./]' })
+    $unpublished = @()
+    foreach ($library in $koanLibraries) {
+        $cachePath = Join-Path (Join-Path $runRoot 'packages') $library.ToLowerInvariant()
+        $metadata = Get-Content -LiteralPath (Join-Path $cachePath '.nupkg.metadata') -Raw | ConvertFrom-Json -AsHashtable
+        if ($metadata.source -ne 'https://api.nuget.org/v3/index.json') { $unpublished += $library }
+        if ($library.StartsWith('Sylin.Koan.Core/')) {
+            $coreVersion = $library.Split('/')[1]
+            $corePackage = Join-Path $cachePath "sylin.koan.core.$coreVersion.nupkg"
+            $script:frameworkReceipt = [ordered]@{
+                packageId = 'Sylin.Koan.Core'; version = $coreVersion; source = $metadata.source
+                sha256 = (Get-FileHash -LiteralPath $corePackage).Hash
+                published = $metadata.source -eq 'https://api.nuget.org/v3/index.json'
+            }
+        }
+    }
+    Check ($koanLibraries.Count -gt 0 -and $unpublished.Count -eq 0 -and $null -ne $script:frameworkReceipt) "$Phase-$App-all-koan-packages-from-nuget-org"
 
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
     $listener.Start()
@@ -251,17 +268,13 @@ function Test-Application([string]$App, [string]$Phase, [string]$Version, [decim
 }
 
 try {
-    $frameworkReceiptPath = Join-Path $PSScriptRoot '.local/framework.json'
-    if (-not (Test-Path -LiteralPath $frameworkReceiptPath)) { throw 'Run prepare-framework.ps1 before this package proof.' }
-    $frameworkReceipt = Get-Content -LiteralPath $frameworkReceiptPath -Raw | ConvertFrom-Json -AsHashtable
-    Check ((Get-FileHash -LiteralPath $frameworkReceipt.package).Hash -eq $frameworkReceipt.sha256) 'local-core-package-provenance'
     foreach ($file in Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File -Force) {
         $relative = [IO.Path]::GetRelativePath($PSScriptRoot, $file.FullName).Replace('\', '/')
-        if ($relative -match '(^|/)(bin|obj|artifacts|\.git|\.koan|mcp-sdk)(/|$)' -or $relative -match '\.db(-wal|-shm)?$' -or $relative -match '/wwwroot/(app\.js|site\.css)$') { continue }
+        if ($relative -match '(^|/)(bin|obj|artifacts|\.git|\.koan|\.local|mcp-sdk)(/|$)' -or $relative -match '\.db(-wal|-shm)?$' -or $relative -match '/wwwroot/(app\.js|site\.css)$') { continue }
         $destination = Join-Path $fixture $relative
         [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination)) | Out-Null
         Copy-Item -LiteralPath $file.FullName -Destination $destination
-        if ($relative -notlike '.local/*') { $sourceFiles.Add(@{ path = $relative; sha256 = (Get-FileHash -LiteralPath $file.FullName).Hash }) }
+        $sourceFiles.Add(@{ path = $relative; sha256 = (Get-FileHash -LiteralPath $file.FullName).Hash })
     }
     $feedXml = [Security.SecurityElement]::Escape($feed)
     [IO.File]::WriteAllText((Join-Path $fixture 'NuGet.Config'), "<configuration><packageSources><clear/><add key=`"fixture`" value=`"$feedXml`"/><add key=`"nuget.org`" value=`"https://api.nuget.org/v3/index.json`"/></packageSources></configuration>")

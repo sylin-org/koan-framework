@@ -22,10 +22,9 @@ The spending limit is intentionally an organization-owned package default. Each 
 configures its own SQLite file; neither overrides the limit. Adopting a previous package can restore
 earlier policy behavior, but it does not reverse stored business decisions or migrate data.
 
-The workspace uses published Koan capabilities and a locally packed Core manifest repair,
-with local Directory.Build and Directory.Packages
+The workspace uses published Koan capabilities, with local Directory.Build and Directory.Packages
 boundaries to reproduce downstream builds without repository-only generators or version pinning.
 The sample is non-packable by default. The verifier enables packing for this foundation only,
 uses an isolated Git history for NBGV, and writes exclusively to a local feed. It publishes nothing.
-Run `prepare-framework.ps1` at the workspace root before building; `.local/framework.json` records
-the computed Core version and package hash. This prerequisite remains until the fix is released.
+The verifier uses a fresh NuGet cache and checks every Koan package's nuget.org source. Core
+arrives through the capabilities' dependency floors; there is no local framework override.
