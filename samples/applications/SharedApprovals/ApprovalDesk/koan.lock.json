@@ -1,0 +1,72 @@
+{
+  "schema": 2,
+  "app": {
+    "name": "ApprovalDesk",
+    "koan": "1.0",
+    "tfm": "net10.0"
+  },
+  "modules": [
+    {
+      "id": "Koan.Cache.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Communication",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Analytics",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Connector.Json",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Connector.Sqlite",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Core",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Relational",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Data.Relational.Abstractions",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Mcp",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Security.Trust",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Web",
+      "version": "1.0"
+    },
+    {
+      "id": "Koan.Web.Sse",
+      "version": "1.0"
+    }
+  ],
+  "directReferences": [
+    {
+      "kind": "project",
+      "id": "Example.Approvals.Foundation"
+    }
+  ]
+}

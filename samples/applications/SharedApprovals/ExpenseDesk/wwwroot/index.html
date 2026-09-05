@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expense desk · Reimbursements</title>
+  <link rel="stylesheet" href="/site.css"><script src="/app.js" defer></script>
+</head>
+<body data-kind="expenses">
+  <header><a class="brand" href="/"><span class="mark">e</span> expense desk</a><span class="workspace">REIMBURSEMENTS</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">FROM RECEIPT TO REIMBURSEMENT</p><h1>Small expenses.<br><em>Nothing overlooked.</em></h1><p>Keep the receipt, record the decision, and close the loop with your team.</p></section>
+    <section class="policy" aria-label="Approval policy"><span class="policy-dot"></span><p id="policy">Loading approval policy…</p></section>
+    <div class="layout">
+      <section class="compose"><p class="eyebrow">KEEP A GOOD RECORD</p><h2>Submit an expense</h2>
+        <form id="request-form">
+          <label for="subject">What was the expense?</label><input id="subject" name="subject" placeholder="Train tickets for the client visit" maxlength="160" required>
+          <div class="pair"><div><label for="amount">Amount · USD</label><input id="amount" name="amount" type="number" min="0.01" step="0.01" placeholder="85.00" required></div><div><label for="receiptNumber">Receipt number</label><input id="receiptNumber" name="receiptNumber" placeholder="R-1042" required></div></div>
+          <label for="employee">Team member</label><input id="employee" name="employee" placeholder="Who paid for it?" required>
+          <button class="primary" type="submit">Submit expense <span aria-hidden="true">↗</span></button>
+          <p class="form-note">Approve the claim, then record its reimbursement.</p>
+        </form>
+      </section>
+      <section class="queue"><div class="queue-heading"><div><p class="eyebrow">CLOSE THE LOOP</p><h2>Expense claims <span id="count" class="count">0</span></h2></div><button id="refresh" class="quiet" type="button">Refresh ↻</button></div>
+        <p id="error" class="error" role="alert" hidden></p><p id="notice" class="notice" role="status" hidden></p>
+        <div id="requests" aria-live="polite"></div><div id="empty" class="empty" hidden><span aria-hidden="true">✓</span><h3>Everything accounted for.</h3><p>Submit a receipt to start your first claim.</p></div>
+        <p class="pagination-note">Showing up to 20 claims.</p>
+      </section>
+    </div>
+  </main>
+  <footer><span>The details deserve a home.</span><span>Shared policy. Expenses' own workflow.</span></footer>
+</body>
+</html>
