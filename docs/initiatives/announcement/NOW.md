@@ -2,7 +2,7 @@
 type: HANDOFF
 domain: announcement
 status: current
-last_updated: 2026-08-28
+last_updated: 2026-09-05
 framework_version: v1.0.30
 ---
 
@@ -22,13 +22,20 @@ The launch stands on receipts in hand: the quickstart, the flagship demo (A03), 
 Launch metrics use A09's contamination-resistant instruments — the charter's 2026-08-28
 re-measure shows NuGet family deltas are self-traffic.
 
+A03 now uses the approval-desk domain and supplies the first application for
+[application evolution](../application-evolution/README.md). A03 keeps the canonical application
+and recording; AE-01 owns the shared foundation and second consumer. Read A03's coordination
+section before application work. Evolution experiments and pilots add no launch prerequisite.
+The local application baseline is available; use its path and revision from PROGRESS. Its Core
+manifest repair must be released before A03 can meet the existing published-only recording gate.
+
 ## Next session
 
 1. Read [CHARTER.md](CHARTER.md), [ROADMAP.md](ROADMAP.md), [PROGRESS.md](PROGRESS.md), then
    claim a card.
 2. Wave-0 preparation, in parallel where independent: A08 (Discussions + `SUPPORT.md`), A07
    (registrations), GitHub About + topics with the name-collision phrase, A05 and A06 drafts,
-   A03 demo app + recording.
+   A03's remaining app scenes + recording on the existing ApprovalDesk baseline.
 3. A11 terseness receipt: first-cut numbers are in (`artifacts/LOC-receipt-draft.md` — graded
    pairs 152 vs 608 and 74 vs 384 application LoC); the remaining work is the committed curated
    pair (A03's demo app + the stock-guidance plain twin) that supersedes the provisional
@@ -47,5 +54,5 @@ re-measure shows NuGet family deltas are self-traffic.
 
 ## Validation
 
-- Two pre-existing docs-lint errors await launch hygiene: README's missing `1.0` public-experience
-  anchor, and the `embedded-analytics-duckdb` promoted claim resolving to zero capability homes.
+- The stale README assertion and Entity analytics capability-home check were corrected in
+  [PR #138](https://github.com/sylin-org/koan-framework/pull/138); they no longer block launch hygiene.

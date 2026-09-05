@@ -4,7 +4,7 @@ domain: framework
 title: "A03 - Flagship demo artifact"
 audience: [maintainers, ai-agents]
 status: draft
-last_updated: 2026-08-28
+last_updated: 2026-09-05
 framework_version: v1.0.30
 validation:
   date_last_tested: 2026-08-28
@@ -22,8 +22,8 @@ validation:
 
 ## Meaningful outcome
 
-One flagship recording, ≤5 minutes, that performs the charter's claims in order: the recipe-box
-outcome (or an equivalent small outcome) built live — REST API from `Entity<T>` +
+One flagship recording, ≤5 minutes, that performs the charter's claims in order: the approval-desk
+outcome built live — REST API from `Entity<T>` +
 `EntityController<T>`; jobs added by package reference; `[Embedding]` semantic search; `[McpEntity]`
 exposing the same model to an MCP client; closing on `/.well-known/Koan/facts` and
 `koan.lock.json` as the anti-magic proof. A short GIF cutdown exists for README and posts.
@@ -31,7 +31,24 @@ exposing the same model to an MCP client; closing on `/.well-known/Koan/facts` a
 ## Why now
 
 Every channel (Show HN, r/dotnet, YouTube pitches, listings) consumes this single artifact. The
-facts-endpoint closing shot is mandatory: it is the one move no competing framework can mirror.
+facts-endpoint closing shot connects the terse application code to inspectable runtime composition.
+
+## Application evolution coordination
+
+The maintainer selected the approval desk as the working domain on 2026-09-05 when approving
+the [application evolution initiative](../../application-evolution/README.md). This is the
+small equivalent business outcome allowed by the original demo scope.
+
+A03 owns the flagship application source and recording.
+[AE-01](../../application-evolution/work-items/01-shared-foundation.md) owns the reusable
+foundation and expense-request consumer; it extends the same flagship source as its first
+consumer. Record the canonical application path and baseline revision in the announcement
+ledger before building on it. The runnable baseline may be delivered before the recording;
+AE-01 needs that baseline, not a finished video.
+
+Pin the application revision used by A11's comparison. Later evolution tasks reuse the source
+with their own starting revisions. Independent pilots, review trials, and Aspire findings
+do not gate A03 or add launch requirements.
 
 ## Shape
 
@@ -55,4 +72,7 @@ facts-endpoint closing shot is mandatory: it is the one move no competing framew
 
 ## Proof
 
-Recording and demo-app path recorded in `PROGRESS.md`.
+The [local application baseline](../../../../samples/applications/SharedApprovals/ApprovalDesk/README.md)
+and [AE-01 proof](../../application-evolution/evidence/AE-01.md) are available. Its Core repair is
+locally packed, so the published-only recording requirement remains open. Recording and baseline
+revision ownership stay in `PROGRESS.md`.

@@ -4,7 +4,7 @@ domain: framework
 title: "Announcement Initiative Progress"
 audience: [maintainers, ai-agents]
 status: current
-last_updated: 2026-08-28
+last_updated: 2026-09-05
 framework_version: v1.0.30
 validation:
   date_last_tested: 2026-08-28
@@ -21,10 +21,42 @@ blocks, or completes a work item. The roadmap describes order; it does not repor
 
 - Overall: `active`
 - Current tranche: `T1 — Artifacts` (Wave-0 preparation may start in parallel)
-- Active work item: none claimed
+- Active work item: A03 remaining flagship scenes and recording; local baseline available
 - Active child: none
 
 ## Ledger
+
+### 2026-09-05 — A03 local baseline delivered; publication prerequisite found
+
+- [ApprovalDesk](../../../samples/applications/SharedApprovals/ApprovalDesk/README.md) now runs a
+  browser purchase workflow through submission, approval, and a recorded order. It is the canonical
+  flagship source, alongside AE-01's foundation and ExpenseDesk consumer.
+- [AE-01 evidence](../application-evolution/evidence/AE-01.md) records 163 package/HTTP/MCP checks
+  and the browser walkthrough. Core repair `6e2aafc56` fixes startup rejection of ordinary private
+  foundation identities; the proof used local Core 1.0.34 with published capabilities.
+- A03's published-only gate therefore remains unmet until that fix is released. The recording,
+  GIF, jobs, semantic-search scenes, and A11 comparison remain outstanding. Do not present this
+  local fixture as a completed launch artifact or as independent adoption evidence.
+- Canonical application baseline: `157f9053ec10cce86154c433be119f9a2d624e0e`.
+
+### 2026-09-05 — A03 application baseline implementation started
+
+- Canonical working path: `samples/applications/SharedApprovals/ApprovalDesk/`, within the
+  shared-foundation experiment. The first baseline covers persisted purchase approvals and
+  a usable interface; the recording and remaining flagship scenes keep A03's existing criteria.
+- AE-01 owns `Foundation/` and `ExpenseDesk/` beside it. FirstUse supplies the closest pattern
+  and retains its original first-use purpose. Baseline evidence will identify the actual revision.
+
+### 2026-09-05 — Coordinate the flagship with application evolution
+
+- Maintainer approved the [application evolution initiative](../application-evolution/README.md).
+  A03's working domain is the approval desk, the equivalent small outcome allowed by its scope.
+- A03 retains the flagship application and recording; AE-01 owns the shared foundation and
+  second consumer. Establish and record A03's canonical source and baseline revision before
+  reuse. A11's comparison pins its own application revision.
+- This records planning and ownership only; no application, recording, or experiment is marked
+  complete. Application evolution status lives in its own ledger. Existing launch gates and the
+  benchmark campaign's publication boundary remain in force.
 
 ### 2026-08-28 — A11 first cut: LoC measured on the graded matrix pairs (4.0× and 5.2× application LoC)
 

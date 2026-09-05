@@ -4,7 +4,7 @@ domain: framework
 title: "Koan durable working memory"
 audience: [maintainers, architects, ai-agents]
 status: current
-last_updated: 2026-08-29
+last_updated: 2026-09-05
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-20
@@ -33,6 +33,7 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
 | What does the framework offer today, and how proven is it? | [docs/reference/product-surface.md](reference/product-surface.md) (generated) · verb-level inventory + shaping backlog: [capability directory](engineering/capability-directory.md) |
 | Why is it this way? | [docs/decisions/](decisions/) — ADRs are dated records; a later one supersedes or amends, never edits |
 | What is deliberately deferred? | [docs/initiatives/koan-v1/POST-CYCLE-TODO.md](initiatives/koan-v1/POST-CYCLE-TODO.md) |
+| How are shared foundations and application evolution being evaluated? | [Application evolution charter](initiatives/application-evolution/README.md) · [live progress](initiatives/application-evolution/PROGRESS.md) · [restart instructions](initiatives/application-evolution/NOW.md) |
 | How does a release happen? | [docs/engineering/nuget-publishing.md](engineering/nuget-publishing.md) |
 | What does an application look like? | [samples/README.md](../samples/README.md) |
 | Before changing production code | [.codex/skills/explore/SKILL.md](../.codex/skills/explore/SKILL.md) |
