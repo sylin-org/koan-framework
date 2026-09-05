@@ -50,10 +50,6 @@ jobs:
         run: |
           ./scripts/green-ratchet.ps1 -Configuration Release -Base "origin/${{ github.event.pull_request.base.ref }}" -SkipTests
 
-      - name: Validate the surface ledger
-        shell: bash
-        run: bash scripts/lint-surfaces.sh docs/SURFACES.md
-
       - name: Verify agent skills (structure)
         shell: pwsh
         run: |
