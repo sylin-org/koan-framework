@@ -47,6 +47,29 @@ public sealed class SemanticActivationCompilerSpec
     }
 
     [Fact]
+    public void Organization_foundation_activates_only_its_reachable_capabilities()
+    {
+        const string foundation = "Example.Approvals.Foundation";
+        var lifecycle = new List<string>();
+        var manifest = Manifest(
+            $"reference|package|{foundation}|{foundation}",
+            $"dependency|{foundation}|{MemberId}");
+        var descriptors = new[]
+        {
+            Descriptor<MemberMarker>(MemberId, lifecycle),
+            Descriptor<UnrelatedMarker>(UnrelatedId, lifecycle),
+        };
+
+        var constitution = SemanticActivationCompiler.Compile(manifest, descriptors);
+
+        constitution.ActiveIds.Should().Equal(Id(MemberId));
+        constitution.InactiveIds.Should().Equal(Id(UnrelatedId));
+        constitution.Problems.Should().BeEmpty();
+        _ = SemanticModuleRuntime.Create(constitution);
+        lifecycle.Should().Equal($"factory:{MemberId}");
+    }
+
+    [Fact]
     public void Active_ids_use_deterministic_ordinal_ties_independent_of_descriptor_input_order()
     {
         const string alpha = "Sylin.Koan.alpha";

@@ -55,6 +55,24 @@ public sealed class KoanApplicationReferenceManifestSpec
     }
 
     [Fact]
+    public void Parses_organization_owned_package_and_project_foundations()
+    {
+        using var reader = new StringReader("""
+            schema|1
+            reference|package|Example.Approvals.Foundation|Example.Approvals.Foundation
+            reference|project|Expense-Policy|Example.Expense_Policy
+            dependency|Example.Approvals.Foundation|Sylin.Koan.App
+            dependency|Example.Expense_Policy|Example.Approvals.Foundation
+            """);
+
+        var manifest = KoanApplicationReferenceManifest.Parse(reader);
+
+        manifest.Contains(KoanReferenceKind.Package, "Example.Approvals.Foundation").Should().BeTrue();
+        manifest.Contains(KoanReferenceKind.Project, "Expense-Policy").Should().BeTrue();
+        manifest.Dependencies.Should().HaveCount(2);
+    }
+
+    [Fact]
     public void Parses_deduplicates_and_orders_dependencies()
     {
         using var reader = new StringReader("""
@@ -116,8 +134,11 @@ public sealed class KoanApplicationReferenceManifestSpec
     [Theory]
     [InlineData("reference|connector|Koan.Communication|Koan.Communication")]
     [InlineData("reference|package|Sylin.Koan.App")]
-    [InlineData("reference|package|Example.NotKoan|Koan.App")]
-    [InlineData("reference|project|Koan.Mcp|Example.NotKoan")]
+    [InlineData("reference|package||Example.Foundation")]
+    [InlineData("reference|package|Example/Foundation|Example.Foundation")]
+    [InlineData("reference|project|Example Policy|Example.Foundation")]
+    [InlineData("reference|project|Example.Foundation|example:foundation")]
+    [InlineData("reference|project|Example.Foundation|")]
     [InlineData("reference|project|Koan.Mcp|Koan.Mcp|extra")]
     public void Malformed_reference_fails_with_corrective_guidance(string record)
     {
@@ -131,8 +152,9 @@ public sealed class KoanApplicationReferenceManifestSpec
 
     [Theory]
     [InlineData("dependency|Sylin.Koan.App")]
-    [InlineData("dependency|Example.NotKoan|Koan.Web")]
-    [InlineData("dependency|Sylin.Koan.App|Example.NotKoan")]
+    [InlineData("dependency||Koan.Web")]
+    [InlineData("dependency|Sylin.Koan.App|Example Policy")]
+    [InlineData("dependency|Example:Foundation|Sylin.Koan.Web")]
     [InlineData("dependency|Sylin.Koan.App|Sylin.Koan.Web|extra")]
     public void Malformed_dependency_fails_with_corrective_guidance(string record)
     {
@@ -142,5 +164,13 @@ public sealed class KoanApplicationReferenceManifestSpec
 
         action.Should().Throw<InvalidDataException>()
             .WithMessage("*koan.references.manifest*line 2*Rebuild the application*");
+    }
+
+    [Fact]
+    public void Overlong_identity_fails_with_corrective_guidance()
+    {
+        using var reader = new StringReader($"schema|1\ndependency|{new string('a', 257)}|Example.Foundation");
+        var action = () => KoanApplicationReferenceManifest.Parse(reader);
+        action.Should().Throw<InvalidDataException>().WithMessage("*line 2*Rebuild the application*");
     }
 }
