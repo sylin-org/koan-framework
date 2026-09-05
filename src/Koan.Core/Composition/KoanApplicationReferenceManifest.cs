@@ -147,12 +147,9 @@ public sealed class KoanApplicationReferenceManifest
                     };
                     var rawIdentity = parts[2].Trim();
                     var canonicalIdentity = parts[3].Trim();
-                    // The canonical identity is framework-owned and must always be a Koan identity. The raw
-                    // identity of a PROJECT reference is the referenced project's own (arbitrary) application
-                    // name — provenance, not a Koan identity — so it is recorded as written. Package
-                    // references have no such free form: their raw id must itself be a Koan package.
-                    if (!IsCanonicalKoanIdentity(canonicalIdentity)
-                        || (kind == KoanReferenceKind.Package && !IsKoanIdentity(kind, rawIdentity)))
+                    // The build writer records ordinary package/project identities, including
+                    // organization-owned foundations. A framework prefix is not an activation boundary.
+                    if (!IsBuildIdentity(canonicalIdentity) || !IsBuildIdentity(rawIdentity))
                     {
                         throw InvalidLine(lineNumber);
                     }
@@ -165,7 +162,7 @@ public sealed class KoanApplicationReferenceManifest
                     if (parts.Length != 3) throw InvalidLine(lineNumber);
                     var owner = parts[1].Trim();
                     var dependency = parts[2].Trim();
-                    if (!IsCanonicalKoanIdentity(owner) || !IsCanonicalKoanIdentity(dependency))
+                    if (!IsBuildIdentity(owner) || !IsBuildIdentity(dependency))
                         throw InvalidLine(lineNumber);
                     dependencies.Add(new KoanActivationDependency(owner, dependency));
                     break;
@@ -200,20 +197,12 @@ public sealed class KoanApplicationReferenceManifest
     private static KoanApplicationReferenceManifest Unknown() =>
         new(isPresent: false, EmptyReferences, EmptyDependencies);
 
-    private static bool IsKoanIdentity(KoanReferenceKind kind, string identity) => kind switch
-    {
-        KoanReferenceKind.Package => identity.Equals("Sylin.Koan", StringComparison.OrdinalIgnoreCase)
-            || identity.StartsWith("Sylin.Koan.", StringComparison.OrdinalIgnoreCase),
-        KoanReferenceKind.Project => identity.Equals("Koan", StringComparison.OrdinalIgnoreCase)
-            || identity.StartsWith("Koan.", StringComparison.OrdinalIgnoreCase)
-            || identity.Equals("Sylin.Koan", StringComparison.OrdinalIgnoreCase)
-            || identity.StartsWith("Sylin.Koan.", StringComparison.OrdinalIgnoreCase),
-        _ => false,
-    };
-
-    private static bool IsCanonicalKoanIdentity(string identity) =>
-        identity.Equals("Sylin.Koan", StringComparison.OrdinalIgnoreCase)
-        || identity.StartsWith("Sylin.Koan.", StringComparison.OrdinalIgnoreCase);
+    // Keep the wire grammar aligned with WriteKoanReferenceManifest / WriteKoanActivationProps.
+    // SemanticId additionally accepts ':' for other kernel identities; package records do not.
+    private static bool IsBuildIdentity(string identity) =>
+        identity.Length is > 0 and <= 256
+        && identity.All(static character => char.IsLetterOrDigit(character)
+            || character is '.' or '-' or '_');
 
     private static InvalidDataException InvalidLine(int lineNumber) => new(
         $"The embedded {Constants.Composition.ReferenceManifestResourceName} resource is malformed at line {lineNumber}. " +

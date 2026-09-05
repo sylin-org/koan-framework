@@ -106,6 +106,10 @@ source: src/Koan.Core/
   negotiated elections and runtime facts belong to `obj/koan.lock.resolved.json`.
 - Lockfile `app.name` is the executable assembly identity and is excluded from `modules`; friendly
   application identity remains an operator/runtime-facts concern.
+- Foundation packages keep their own ordinary identities (for example `Example.Approvals.Foundation`).
+  Generated reference manifests accept the build writer's package/project name grammar without a
+  `Sylin.Koan` prefix requirement. Only reachable dependency edges activate available modules;
+  unrelated modules remain inactive. Malformed records still fail with corrective rebuild guidance.
 
 ## Observability & Security
 
