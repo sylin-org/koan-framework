@@ -1,6 +1,6 @@
 {
-  "Sylin.Koan.Core": "1.0.33",
-  "Sylin.Koan.Data.Core": "1.0.45",
-  "Sylin.Koan.Jobs": "1.0.26",
-  "$transitive": "C59D70D7245C7BF4B7DA7300C205BE54632AD25D1D43DA7BC7A0CB9BD8A170D0"
+  "Sylin.Koan.Core": "1.0.34",
+  "Sylin.Koan.Data.Core": "1.0.47",
+  "Sylin.Koan.Jobs": "1.0.28",
+  "$transitive": "CA65AF2E47BCDE25CE23D14000CFB058CB9E6DE9504D848E6F3A4B93A37C9088"
 }
