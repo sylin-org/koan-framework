@@ -42,6 +42,13 @@ internal static class ScopedRoleEventRegistry
 
     public static void Reset() { lock (Gate) Handlers.Clear(); }
 
+    public static void DemandMutationAllowed()
+    {
+        if (Dispatching.Value)
+            throw new ScopedRoleValidationException("role.event.recursion",
+                "Recursive role mutation from a role lifecycle handler is not supported.");
+    }
+
     public static async ValueTask Before(ScopedRoleEventKind kind, ScopedRoleChangeContext context)
     {
         if (Dispatching.Value) throw new ScopedRoleValidationException("role.event.recursion", "Recursive role mutation from a role lifecycle handler is not supported.");

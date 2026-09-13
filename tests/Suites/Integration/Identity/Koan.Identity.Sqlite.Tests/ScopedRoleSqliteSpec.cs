@@ -16,7 +16,7 @@ namespace Koan.Identity.Sqlite.Tests;
 public sealed class ScopedRoleSqliteSpec
 {
     [Fact]
-    public async Task Sqlite_pushes_scope_filter_pagination_count_and_CAS_through_one_plan()
+    public async Task Sqlite_pushes_scope_filter_pagination_count_and_membership_collections_through_one_plan()
     {
         var path = Path.Combine(Path.GetTempPath(), $"koan-scoped-role-{Guid.CreateVersion7():n}.db");
         try
@@ -44,33 +44,12 @@ public sealed class ScopedRoleSqliteSpec
             await engine.Register(new(root));
             await engine.Register(new(topic, root));
             var reader = await engine.Define(new(root, "Reader", [new("discussion.read")]));
-            var readerBinding = await engine.Assign(new(root, "participant:sqlite", reader.Id,
-                ScopedRolePropagation.Descendants));
-
-            var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            var releaseRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            Koan.Data.Core.Model.Entity.Role.MemberRemoving(async context =>
-            {
-                if (context.Subject != "participant:sqlite") return ScopedRoleChangeDecision.Continue();
-                removalEntered.TrySetResult();
-                await releaseRemoval.Task;
-                return ScopedRoleChangeDecision.Continue();
-            });
-            try
-            {
-                var staleRemoval = engine.Revoke(readerBinding.Id, readerBinding.Version);
-                await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
-                readerBinding = await engine.Reapprove(readerBinding.Id, readerBinding.Version);
-                releaseRemoval.TrySetResult();
-                await FluentActions.Awaiting(() => staleRemoval).Should().ThrowAsync<ScopedRoleConcurrencyException>();
-                (await ScopedRoleBinding.Get(readerBinding.Id))!.Version.Should().Be(readerBinding.Version,
-                    "the SQLite conditional delete must not remove a concurrently reapproved generation");
-            }
-            finally
-            {
-                releaseRemoval.TrySetResult();
-                Koan.Data.Core.Model.Entity.Role.Reset();
-            }
+            var rootMember = new ScopedRoleMember(root, "participant:sqlite", reader.Id);
+            (await engine.Add(rootMember)).Should().BeTrue();
+            (await engine.Add(rootMember)).Should().BeFalse();
+            var rootMemberships = await engine.Memberships(rootMember.Subject, root);
+            rootMemberships.Roles.Should().ContainSingle().Which.Should().Be(reader.Id);
+            rootMemberships.Groups.Should().BeEmpty();
 
             await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "one" }.Save();
             await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "two" }.Save();
@@ -98,8 +77,8 @@ public sealed class ScopedRoleSqliteSpec
                 Id: "role:sqlite:reader"));
             var sensitiveRole = await engine.Define(new(topic, "Hidden moderator", [new("discussion.moderate")],
                 Id: "role:sqlite:moderator"));
-            var allowedBinding = await engine.Assign(new(topic, "participant:visible", allowedRole.Id));
-            var sensitiveBinding = await engine.Assign(new(topic, "participant:hidden", sensitiveRole.Id));
+            await engine.Add(new(topic, "participant:visible", allowedRole.Id));
+            await engine.Add(new(topic, "participant:hidden", sensitiveRole.Id));
             await engine.Replace(new(topic, "discussion.read", [new(ScopedRoleAudienceKind.Authenticated)]));
             await engine.Replace(new(topic, "discussion.moderate", [new(ScopedRoleAudienceKind.Authenticated)]));
 
@@ -121,11 +100,14 @@ public sealed class ScopedRoleSqliteSpec
             await FluentActions.Awaiting(() => limited.Role(sensitiveRole.Id, topic))
                 .Should().ThrowAsync<ScopedRoleAuthorizationException>();
 
-            var bindings = await limited.Bindings(topic, page: 1, pageSize: 10);
-            bindings.Items.Should().ContainSingle().Which.Id.Should().Be(allowedBinding.Id);
-            bindings.TotalCount.Should().Be(1);
-            (await limited.Binding(allowedBinding.Id, topic))!.Id.Should().Be(allowedBinding.Id);
-            (await limited.Binding(sensitiveBinding.Id, topic)).Should().BeNull();
+            var members = await limited.Members(allowedRole.Id, topic, page: 1, pageSize: 10);
+            members.Items.Should().ContainSingle().Which.Subject.Should().Be("participant:visible");
+            members.TotalCount.Should().Be(1);
+            await FluentActions.Awaiting(() => limited.Members(sensitiveRole.Id, topic, page: 1, pageSize: 10))
+                .Should().ThrowAsync<ScopedRoleAuthorizationException>();
+            var visibleMemberships = await limited.Memberships("participant:visible", topic);
+            visibleMemberships.Roles.Should().ContainSingle().Which.Should().Be(allowedRole.Id);
+            (await limited.Memberships("participant:hidden", topic)).Roles.Should().BeEmpty();
 
             var policies = await limited.Policies(topic, page: 1, pageSize: 10);
             policies.Items.Should().ContainSingle().Which.Capability.Should().Be("discussion.read");
@@ -169,15 +151,20 @@ public sealed class ScopedRoleSqliteSpec
             var disjointRoles = await disjoint.Roles(topic, page: 1, pageSize: 10);
             disjointRoles.Items.Select(role => role.Id).Should().BeEquivalentTo([allowedRole.Id, sensitiveRole.Id]);
             disjointRoles.TotalCount.Should().Be(2);
-            var disjointBindings = await disjoint.Bindings(topic, page: 1, pageSize: 10);
-            disjointBindings.Items.Select(binding => binding.Id)
-                .Should().BeEquivalentTo([allowedBinding.Id, sensitiveBinding.Id]);
-            disjointBindings.TotalCount.Should().Be(2);
-            (await disjoint.Binding(sensitiveBinding.Id, topic))!.Id.Should().Be(sensitiveBinding.Id);
+            (await disjoint.Members(allowedRole.Id, topic, page: 1, pageSize: 10)).Items
+                .Should().ContainSingle().Which.Subject.Should().Be("participant:visible");
+            (await disjoint.Members(sensitiveRole.Id, topic, page: 1, pageSize: 10)).Items
+                .Should().ContainSingle().Which.Subject.Should().Be("participant:hidden");
             var disjointPolicies = await disjoint.Policies(topic, page: 1, pageSize: 10);
             disjointPolicies.Items.Select(policy => policy.Capability)
                 .Should().BeEquivalentTo(["discussion.read", "discussion.moderate"]);
             disjointPolicies.TotalCount.Should().Be(2);
+
+            (await engine.Remove(rootMember)).Should().BeTrue();
+            (await engine.Remove(rootMember)).Should().BeFalse();
+            (await ScopedRoleParticipant.Get(ScopedRoleParticipant.KeyFor(root, rootMember.Subject))).Should().BeNull(
+                "SQLite physically deletes an empty participant collection");
+            (await engine.Memberships(rootMember.Subject, root)).Roles.Should().BeEmpty();
         }
         finally
         {
@@ -228,7 +215,7 @@ public sealed class ScopedRoleSqliteSpec
             new HashSet<ScopedRoleAuthorityOperation>
             {
                 ScopedRoleAuthorityOperation.ReadDefinitions,
-                ScopedRoleAuthorityOperation.ReadAssignments,
+                ScopedRoleAuthorityOperation.ReadMembers,
                 ScopedRoleAuthorityOperation.ReadPolicies,
                 ScopedRoleAuthorityOperation.Preview,
             };

@@ -25,7 +25,7 @@ internal static class IdentityAuditHooks
         Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target);
         Hook<ScopedRoleScope>("ScopedRoleScope", e => e.ScopeId, e => e.UpdatedBy);
         Hook<ScopedRoleDefinition>("ScopedRoleDefinition", e => e.Id, e => e.UpdatedBy);
-        Hook<ScopedRoleBinding>("ScopedRoleBinding", e => e.Subject, e => e.UpdatedBy);
+        Hook<ScopedRoleParticipant>("ScopedRoleParticipant", e => e.Subject, e => e.UpdatedBy);
         Hook<ScopedRolePolicy>("ScopedRolePolicy", e => e.ScopeId, e => e.UpdatedBy);
     }
 

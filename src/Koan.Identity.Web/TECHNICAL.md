@@ -17,23 +17,25 @@ The package owns HTTP authorization and projection only. Durable records and bus
 | `koan:identity-operator` | `/api/identity/admin/identities` | bounded list/search, get, suspend, reactivate, delete |
 | `koan:identity-operator` | `/api/identity/admin/identities/{id}/access` | effective view, why/can explanation, global role grant/revoke |
 | `koan:identity-operator` | `/api/identity/admin/impersonation` | request, approve, revoke, target view, start, stop |
-| application scoped authority | `/api/identity/scoped-roles/{tenant}/{scopeType}/{scopeId}` | bounded roles, assignments, policies, effective access and preview |
+| application scoped authority | `/api/identity/scoped-roles/{tenant}/{scopeType}/{scopeId}` | bounded roles, membership collections, policies, effective access and preview |
 
 Controllers use attribute routing and ordinary ASP.NET `[Authorize]`. Self-service never accepts a subject ID from the
 request. The operator role is a global Identity-plane role; Identity Tenancy strips it from membership projection so a
 tenant role cannot unlock this host surface. Destructive operator verbs are additionally blocked while impersonating
 even if the target principal carries the operator role.
 
-The scoped-role controller accepts only operation DTOs; actor, issuer, tenant, scope, role identity and persisted version
-fields come from the authenticated request, route, provider row and `If-Match`. Reads are authorized before their
+The scoped-role controller accepts only operation DTOs; actor, tenant, scope, role identity and mutable resource version
+fields come from the authenticated request, route, provider row and `If-Match`. Membership mutations are bodyless
+member-addressed collection operations and do not use a concurrency header or return a resource. Reads are authorized before their
 provider-filtered lookup. Directory filters and pagination must be fully provider handled. Cookie-authenticated unsafe methods validate antiforgery. An actual
 non-cookie authenticated identity may use the configured bearer/other scheme without an antiforgery token.
 Current-subject effective checks return the same safe denial for an absent scope and a registered scope with no
-access. Effective and authorized preview responses intentionally omit role IDs, policy IDs, binding IDs, reasons and
+access. Effective and authorized preview responses intentionally omit role IDs, policy IDs, reasons and
 version provenance.
 
-Read ceilings have operation-specific, provider-pushable meanings. `RoleIds` is conjoined with role-definition IDs
-and binding role IDs before paging/counting; `Capabilities` is conjoined with policy capability keys and is carried
+Read ceilings have operation-specific, provider-pushable meanings. `RoleIds` constrains role definitions and
+membership projections; role-member pages push exact tenant, scope and collection-membership filters before paging
+and counting. `Capabilities` is conjoined with policy capability keys and is carried
 by preview requests. Supported alternatives union only the matching read axis; any unbounded alternative is
 unbounded, and empty or unsupported alternatives do not mask later valid authority. Grant/audience clause ceilings
 cannot be projected across stored JSON and related records, so an unsupported-only read rejects with
@@ -73,7 +75,7 @@ roles, provider links, or other personal data.
 - target-owned impersonation review/revoke self-service;
 - database-native text search/pagination across large identity sets;
 - non-MVC impersonation banner coverage.
-- cross-scope role/assignment directories and arbitrary predicate-based authority projection;
+- cross-scope role/member directories and arbitrary predicate-based authority projection;
 - assignable-role directories, pending an authority predicate that can be pushed before paging;
 - scoped audit reads, pending a non-forgeable append/read owner rather than generic `AuditEvent` access;
 - serializable cross-record authority + target commits;

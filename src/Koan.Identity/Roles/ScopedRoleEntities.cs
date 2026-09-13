@@ -41,29 +41,6 @@ public sealed class ScopedRoleDefinition : Entity<ScopedRoleDefinition>, IAmbien
     public ScopedRoleScopeRef Scope() => new(TenantId, ScopeType, ScopeId);
 }
 
-/// <summary>A revocable scoped subject-to-role assignment approved against one authority version.</summary>
-public sealed class ScopedRoleBinding : Entity<ScopedRoleBinding>, IAmbientExempt, IRequiresLifecycleEnforcement
-{
-    public string TenantId { get; set; } = "";
-    public string Subject { get; set; } = "";
-    public string RoleId { get; set; } = "";
-    public string ScopeType { get; set; } = "";
-    public string ScopeId { get; set; } = "";
-    public ScopedRolePropagation Propagation { get; set; }
-    public DateTimeOffset? ExpiresAt { get; set; }
-    public bool Revoked { get; set; }
-    public long ApprovedRoleVersion { get; set; }
-    public Dictionary<string, long> ApprovedPolicyVersions { get; set; } = new(StringComparer.Ordinal);
-    public long Version { get; set; } = 1;
-    [Timestamp] public DateTimeOffset UpdatedAt { get; set; }
-    public string IssuedBy { get; set; } = "";
-    public string UpdatedBy { get; set; } = "";
-
-    public ScopedRoleScopeRef Scope() => new(TenantId, ScopeType, ScopeId);
-    public static string KeyFor(string tenantId, string subject, string roleId, ScopedRoleScopeRef scope)
-        => DeterministicId.From(tenantId, subject, roleId, scope.Type, scope.Id);
-}
-
 /// <summary>The action policy at one scope. Replace owns the complete ordinary audience; Inherit owns none.</summary>
 public sealed class ScopedRolePolicy : Entity<ScopedRolePolicy>, IAmbientExempt, IRequiresLifecycleEnforcement
 {

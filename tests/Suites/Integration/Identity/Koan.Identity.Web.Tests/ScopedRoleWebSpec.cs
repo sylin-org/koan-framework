@@ -101,6 +101,30 @@ public sealed class ScopedRoleWebSpec
             list!.TotalCount.Should().Be(1);
             list.Items.Should().ContainSingle(item => item.Id == role.Id);
 
+            var memberPath = $"{scopePath}/roles/{role.Id}/members/participant:web";
+            (await client.PutAsync(memberPath, null)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+            (await client.PutAsync(memberPath, null)).StatusCode.Should().Be(HttpStatusCode.NoContent,
+                "a repeated collection add is an idempotent success");
+            var roleMembers = await client.GetFromJsonAsync<
+                ScopedRoleManagementController.Page<ScopedRoleManagementController.MemberResponse>>(
+                $"{scopePath}/roles/{role.Id}/members?page=1&pageSize=10", Json);
+            roleMembers!.TotalCount.Should().Be(1);
+            roleMembers.Items.Should().ContainSingle().Which.Subject.Should().Be("participant:web");
+            var membershipsResponse = await client.GetAsync($"{scopePath}/members/participant:web");
+            membershipsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            var membershipsBody = await membershipsResponse.Content.ReadAsStringAsync();
+            membershipsBody.Should().Contain(role.Id).And.NotContain("version")
+                .And.NotContain("etag").And.NotContain("id\"", "membership reads expose collections, not edge resources");
+
+            (await client.DeleteAsync(memberPath)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+            (await client.DeleteAsync(memberPath)).StatusCode.Should().Be(HttpStatusCode.NoContent,
+                "removing an absent collection member is an idempotent success");
+            var emptyMembers = await client.GetFromJsonAsync<
+                ScopedRoleManagementController.Page<ScopedRoleManagementController.MemberResponse>>(
+                $"{scopePath}/roles/{role.Id}/members?page=1&pageSize=10", Json);
+            emptyMembers!.Items.Should().BeEmpty();
+            emptyMembers.TotalCount.Should().Be(0);
+
             var missingVersion = await client.PutAsJsonAsync($"{scopePath}/roles/{role.Id}", new { name = "No version" });
             missingVersion.StatusCode.Should().Be((HttpStatusCode)428);
 

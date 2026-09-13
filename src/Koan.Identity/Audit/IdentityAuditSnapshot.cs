@@ -67,11 +67,10 @@ internal static class IdentityAuditSnapshot
             definition.Version, definition.AuthorityVersion,
             Capabilities = definition.Grants.Select(x => x.Capability).Distinct(StringComparer.Ordinal).Order(),
         }),
-        ScopedRoleBinding binding => JsonConvert.SerializeObject(new
+        ScopedRoleParticipant participant => JsonConvert.SerializeObject(new
         {
-            binding.TenantId, binding.Subject, binding.RoleId, binding.ScopeType, binding.ScopeId,
-            binding.Propagation, binding.ExpiresAt, binding.Revoked, binding.Version,
-            binding.ApprovedRoleVersion, PolicyVersions = binding.ApprovedPolicyVersions.Count,
+            participant.TenantId, participant.Subject, participant.ScopeType, participant.ScopeId,
+            Roles = participant.Roles.Count, Groups = participant.Groups.Count,
         }),
         ScopedRolePolicy policy => JsonConvert.SerializeObject(new
         {

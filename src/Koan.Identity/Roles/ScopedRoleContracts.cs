@@ -4,7 +4,6 @@ using Koan.Data.Abstractions.Filtering;
 namespace Koan.Identity.Roles;
 
 public enum ScopedRoleStatus { Active, Disabled, Retired }
-public enum ScopedRolePropagation { Local, Descendants }
 public enum ScopedRoleOverrideMode { Inherit, Replace }
 public enum ScopedRoleAudienceKind { Anonymous, Authenticated, Subject, Role }
 public enum ScopedRoleConditionOperator { Equal, LessThanOrEqual, GreaterThanOrEqual }
@@ -28,13 +27,13 @@ public enum ScopedRoleAuthorityOperation
     RegisterScope = 0,
     DefineRole = 1,
     EditRole = 2,
-    AssignRole = 3,
-    RevokeRole = 4,
+    AddMember = 3,
+    RemoveMember = 4,
     ManagePolicy = 5,
     Preview = 6,
     ReadAudit = 7,
     ReadDefinitions = 8,
-    ReadAssignments = 9,
+    ReadMembers = 9,
     ReadPolicies = 10,
     ResetPolicy = 11,
 }
@@ -121,8 +120,6 @@ public sealed record ScopedRoleAuthorityRequest(
     ScopedRoleScopeRef Target,
     string? Subject = null,
     string? RoleId = null,
-    ScopedRolePropagation? Propagation = null,
-    DateTimeOffset? ExpiresAt = null,
     IReadOnlySet<string>? EffectiveCapabilities = null,
     IReadOnlySet<string>? EffectiveRoleIds = null)
 {
@@ -137,9 +134,7 @@ public sealed record ScopedRoleAuthorityEnvelope(
     bool Descendants = false,
     IReadOnlySet<string>? RoleIds = null,
     IReadOnlySet<string>? Capabilities = null,
-    IReadOnlySet<ScopedRolePropagation>? Propagations = null,
-    DateTimeOffset? MaximumExpiry = null,
-    bool AllowSelfAssignment = false,
+    bool AllowSelfMembership = false,
     string? ProofKey = null,
     long? ProofVersion = null)
 {
@@ -212,19 +207,21 @@ public sealed record EditScopedRole(
     IReadOnlyDictionary<string, string>? Presentation = null,
     ScopedRoleStatus? Status = null);
 
-public sealed record AssignScopedRole(
+/// <summary>One role/group set member, identified only by tenant-bound scope, subject and role.</summary>
+public sealed record ScopedRoleMember(
     ScopedRoleScopeRef Scope,
     string Subject,
-    string RoleId,
-    ScopedRolePropagation Propagation = ScopedRolePropagation.Local,
-    DateTimeOffset? ExpiresAt = null);
+    string RoleId);
 
-/// <summary>Names one member of a scoped role collection. Removing an absent member is a successful no-op.</summary>
-public sealed record RemoveScopedRoleMembership(
+/// <summary>The authorized role/group collections for one participant at one exact scope.</summary>
+public sealed record ScopedRoleMemberships(
     ScopedRoleScopeRef Scope,
     string Subject,
-    string RoleId,
-    long? ExpectedVersion = null);
+    IReadOnlyList<string> Roles,
+    IReadOnlyList<string> Groups);
+
+/// <summary>One subject identifier in a bounded role/group member projection.</summary>
+public sealed record ScopedRoleMemberSubject(string Subject);
 
 public sealed record ReplaceScopedRolePolicy(
     ScopedRoleScopeRef Scope,
@@ -257,12 +254,11 @@ public sealed record ScopedRolePreview(ScopedRolePlan Plan, bool IsSimulation = 
 
 public sealed record ScopedRoleEngineLimits(
     int MaxAncestryDepth,
-    int MaxBindingsPerSubject,
+    int MaxMembersPerScope,
     int MaxPoliciesPerTenant,
     int MaxClausesPerRecord)
 {
     public int MaxDirectoryPageSize { get; init; } = 100;
-    public int MaxBindingsPerScope { get; init; } = 1024;
     public int MaxCompiledSnapshots { get; init; } = 1024;
     public int MaxDomainVersions { get; init; } = 4096;
 }
@@ -286,8 +282,7 @@ public sealed class RoleEngineOptions
 {
     public const string SectionPath = "Koan:Identity:ScopedRoles";
     public int MaxAncestryDepth { get; set; } = 16;
-    public int MaxBindingsPerSubject { get; set; } = 256;
-    public int MaxBindingsPerScope { get; set; } = 1024;
+    public int MaxMembersPerScope { get; set; } = 1024;
     public int MaxPoliciesPerTenant { get; set; } = 512;
     public int MaxClausesPerRecord { get; set; } = 64;
     public int MaxDirectoryPageSize { get; set; } = 100;

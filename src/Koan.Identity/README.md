@@ -41,7 +41,8 @@ All records use Koan's selected Data provider. There is no Identity-specific rep
 Scoped-role checks compile durable scopes, roles, memberships and policies into a bounded immutable target-scope
 snapshot. The snapshot contains both subject-to-role/capability and role-to-member indexes; warm checks apply
 parameters and live mandatory guards without rereading the role graph. Role membership is collection semantics:
-assign adds, revoke deletes, and a later assign adds the same subject again with a fresh concurrency version.
+`Add(ScopedRoleMember)` and `Remove(ScopedRoleMember)` are idempotent, and the internal participant row is deleted
+when its role and group sets are empty.
 
 Plans expose that scope-specific compiled model directly without exposing the cache:
 
@@ -72,8 +73,11 @@ Entity.Role
 Pre-events may veto. Post-events run only after durable success and compiled-snapshot invalidation. A post-handler
 failure is reported as `ScopedRolePostEventException`; the mutation remains committed. Recursive role mutation from
 a handler rejects. External domain facts publish a monotonic version after commit through
-`IScopedRoleAccessInvalidator`. Reapproval is an effective membership add and therefore runs `MemberAdding` /
-`MemberAdded`. Removal uses provider-atomic identity-and-version deletion and rejects adapters that cannot prove it.
+`IScopedRoleAccessInvalidator`. Actual membership changes run the matching `MemberAdding` / `MemberAdded` or
+`MemberRemoving` / `MemberRemoved` pair; successful no-ops emit no events.
+
+Authorized management reads are also collection-shaped: `Memberships(subject, scope)` returns the visible role and
+group sets, while `Members(roleId, scope, page, pageSize)` returns a provider-bounded subject page and exact total.
 
 The HTTP and headless management paths enforce the same bounded inputs: identifiers, names, descriptions,
 presentation metadata and scalar access parameters. Nested parameter objects/arrays reject before evaluation.
@@ -89,7 +93,7 @@ presentation metadata and scalar access parameters. Nested parameter objects/arr
       "DevUser": "local-operator",
       "HashChainAudit": true,
       "AuditSnapshotMode": "PrivacySafe",
-      "ScopedRoles": { "MaxCompiledSnapshots": 1024, "MaxBindingsPerScope": 1024 }
+      "ScopedRoles": { "MaxCompiledSnapshots": 1024, "MaxMembersPerScope": 1024 }
     }
   }
 }

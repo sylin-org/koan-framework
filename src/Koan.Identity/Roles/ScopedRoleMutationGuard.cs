@@ -24,7 +24,7 @@ internal static class ScopedRoleMutationGuard
     {
         Guard<ScopedRoleScope>();
         Guard<ScopedRoleDefinition>();
-        Guard<ScopedRoleBinding>();
+        Guard<ScopedRoleParticipant>();
         Guard<ScopedRolePolicy>();
     }
 

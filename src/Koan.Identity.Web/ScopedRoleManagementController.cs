@@ -68,32 +68,34 @@ public sealed class ScopedRoleManagementController(RoleEngine engine) : Controll
     public Task<ActionResult<RoleResponse>> Retire(string tenantId, string scopeType, string scopeId,
         string roleId, CancellationToken ct) => ChangeStatus(tenantId, scopeType, scopeId, roleId, true, ct);
 
-    [HttpGet("bindings")]
-    public async Task<ActionResult<Page<BindingResponse>>> Bindings(string tenantId, string scopeType, string scopeId,
-        [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
-        => Ok(Map(await engine.Bindings(Scope(tenantId, scopeType, scopeId), page, pageSize, ct), BindingResponse.From));
-
-    [HttpPost("bindings")]
-    public async Task<ActionResult<BindingResponse>> Assign(string tenantId, string scopeType, string scopeId,
-        [FromBody] AssignRoleRequest request, CancellationToken ct)
+    [HttpPut("roles/{roleId}/members/{subject}")]
+    public async Task<IActionResult> AddMember(string tenantId, string scopeType, string scopeId,
+        string roleId, string subject, CancellationToken ct)
     {
-        var binding = await engine.Assign(new(Scope(tenantId, scopeType, scopeId), request.Subject,
-            request.RoleId, request.Propagation, request.ExpiresAt));
-        SetEtag(binding.Version);
-        return Ok(BindingResponse.From(binding));
+        _ = await engine.Add(new(Scope(tenantId, scopeType, scopeId), subject, roleId), ct);
+        return NoContent();
     }
 
-    [HttpDelete("bindings/{bindingId}")]
-    public async Task<ActionResult<BindingResponse>> Revoke(string tenantId, string scopeType, string scopeId,
-        string bindingId, CancellationToken ct)
+    [HttpGet("roles/{roleId}/members")]
+    public async Task<ActionResult<Page<MemberResponse>>> Members(string tenantId, string scopeType, string scopeId,
+        string roleId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+        => Ok(Map(await engine.Members(roleId, Scope(tenantId, scopeType, scopeId), page, pageSize, ct),
+            item => new MemberResponse(item.Subject)));
+
+    [HttpGet("members/{subject}")]
+    public async Task<ActionResult<MembershipsResponse>> Memberships(string tenantId, string scopeType, string scopeId,
+        string subject, CancellationToken ct)
     {
-        var target = Scope(tenantId, scopeType, scopeId);
-        if (await engine.Binding(bindingId, target, ct) is null)
-            return NotFound(new Error("resource.unavailable", "The resource is unavailable."));
-        if (!TryExpectedVersion(out var version, out var failure)) return failure!;
-        var binding = await engine.Revoke(bindingId, version, ct);
-        SetEtag(binding.Version);
-        return Ok(BindingResponse.From(binding));
+        var memberships = await engine.Memberships(subject, Scope(tenantId, scopeType, scopeId), ct);
+        return Ok(new MembershipsResponse(memberships.Subject, memberships.Roles, memberships.Groups));
+    }
+
+    [HttpDelete("roles/{roleId}/members/{subject}")]
+    public async Task<IActionResult> RemoveMember(string tenantId, string scopeType, string scopeId,
+        string roleId, string subject, CancellationToken ct)
+    {
+        _ = await engine.Remove(new(Scope(tenantId, scopeType, scopeId), subject, roleId), ct);
+        return NoContent();
     }
 
     [HttpGet("policies")]
@@ -208,10 +210,6 @@ public sealed class ScopedRoleManagementController(RoleEngine engine) : Controll
         [StringLength(ScopedRoleInputLimits.NameLength)] string? Name = null,
         [StringLength(ScopedRoleInputLimits.DescriptionLength)] string? Purpose = null,
         IReadOnlyList<ScopedRoleGrantClause>? Grants = null, IReadOnlyDictionary<string, string>? Presentation = null);
-    public sealed record AssignRoleRequest(
-        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string Subject,
-        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string RoleId,
-        ScopedRolePropagation Propagation = ScopedRolePropagation.Local, DateTimeOffset? ExpiresAt = null);
     public sealed record ReplacePolicyRequest(IReadOnlyList<ScopedRoleAudienceClause>? Audience);
     public sealed record PreviewRequest(
         [StringLength(ScopedRoleInputLimits.IdentifierLength)] string Subject,
@@ -225,18 +223,14 @@ public sealed class ScopedRoleManagementController(RoleEngine engine) : Controll
             => plan.Allowed ? new(true, "access.allowed") : Denied;
     }
     public sealed record Page<T>(IReadOnlyList<T> Items, long TotalCount, int PageNumber, int PageSize);
+    public sealed record MemberResponse(string Subject);
+    public sealed record MembershipsResponse(string Subject, IReadOnlyList<string> Roles, IReadOnlyList<string> Groups);
     public sealed record RoleResponse(string Id, string Name, string? Purpose, ScopedRoleStatus Status,
         IReadOnlyList<ScopedRoleGrantClause> Grants, IReadOnlyDictionary<string, string> Presentation,
         long Version, long AuthorityVersion)
     {
         internal static RoleResponse From(ScopedRoleDefinition role) => new(role.Id, role.Name, role.Purpose,
             role.Status, role.Grants, role.Presentation, role.Version, role.AuthorityVersion);
-    }
-    public sealed record BindingResponse(string Id, string Subject, string RoleId, ScopedRolePropagation Propagation,
-        DateTimeOffset? ExpiresAt, bool Revoked, long Version)
-    {
-        internal static BindingResponse From(ScopedRoleBinding binding) => new(binding.Id, binding.Subject,
-            binding.RoleId, binding.Propagation, binding.ExpiresAt, binding.Revoked, binding.Version);
     }
     public sealed record PolicyResponse(string Id, string Capability, ScopedRoleOverrideMode Mode,
         IReadOnlyList<ScopedRoleAudienceClause> Audience, long Version)

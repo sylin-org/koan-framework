@@ -10,23 +10,19 @@ internal sealed class ScopedRoleSnapshotCache : IScopedRoleAccessInvalidator
     private readonly Dictionary<DomainVersionKey, long> _domainVersions = [];
     private readonly int _capacity;
     private readonly int _domainVersionCapacity;
-    private readonly TimeProvider _clock;
     private long _buildCount;
-    private long _membershipVersion = DateTimeOffset.UtcNow.UtcTicks;
 
     public ScopedRoleSnapshotCache(IOptions<RoleEngineOptions> options)
-        : this(options.Value, TimeProvider.System) { }
+        : this(options.Value) { }
 
-    internal ScopedRoleSnapshotCache(RoleEngineOptions options, TimeProvider clock)
+    internal ScopedRoleSnapshotCache(RoleEngineOptions options)
     {
         _capacity = options.MaxCompiledSnapshots;
         _domainVersionCapacity = options.MaxDomainVersions;
-        _clock = clock;
     }
 
     internal int Count { get { lock (_gate) return _entries.Count; } }
     internal long BuildCount => Interlocked.Read(ref _buildCount);
-    internal long NextMembershipVersion() => Interlocked.Increment(ref _membershipVersion);
 
     internal async Task<CompiledSnapshot> Get(CacheKey key,
         Func<CancellationToken, Task<CompiledSnapshot>> build, CancellationToken ct)
@@ -60,9 +56,7 @@ internal sealed class ScopedRoleSnapshotCache : IScopedRoleAccessInvalidator
             catch { Remove(entry); throw; }
             // An invalidation can race a build. Never publish that completed-but-evicted
             // snapshot to the caller; loop so the caller observes the replacement generation.
-            if (!IsCurrent(entry)) continue;
-            if (snapshot.ValidUntil is not { } expiry || expiry > _clock.GetUtcNow()) return snapshot;
-            Remove(entry);
+            if (IsCurrent(entry)) return snapshot;
         }
     }
 
@@ -75,7 +69,8 @@ internal sealed class ScopedRoleSnapshotCache : IScopedRoleAccessInvalidator
         InvalidateWhere(key => key.TenantId == tenantId, snapshot => snapshot.DependencyRoleIds.Contains(roleId));
     }
 
-    internal void InvalidateBinding(ScopedRoleBinding binding) => Invalidate(binding.Scope(), null);
+    internal void InvalidateMembership(ScopedRoleScopeRef scope)
+        => Invalidate(scope, null);
     internal void InvalidatePolicy(ScopedRoleScopeRef scope) => Invalidate(scope, null);
 
     public void Invalidate(ScopedRoleDomainVersionChange change)
@@ -153,9 +148,7 @@ internal sealed class ScopedRoleSnapshotCache : IScopedRoleAccessInvalidator
         IReadOnlyDictionary<string, CompiledPolicy> Policies, IReadOnlySet<string> DependencyRoleIds,
         IReadOnlyDictionary<string, long> ScopeVersions,
         IReadOnlyDictionary<string, long> RoleVersions,
-        IReadOnlyDictionary<string, long> PolicyVersions,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<string, long>> SubjectBindingVersions,
-        DateTimeOffset? ValidUntil);
+        IReadOnlyDictionary<string, long> PolicyVersions);
     private sealed record CacheEntry(CacheKey Key, Lazy<Task<CompiledSnapshot>> Value);
     private sealed record DomainVersionKey(ScopedRoleScopeRef Scope, string VersionKey);
 }

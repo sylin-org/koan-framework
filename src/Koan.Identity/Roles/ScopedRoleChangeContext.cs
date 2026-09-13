@@ -9,6 +9,6 @@ public sealed record ScopedRoleChangeContext(
     IReadOnlyList<ScopedRoleGrantClause> PreviousPermissions,
     IReadOnlyList<ScopedRoleGrantClause> CurrentPermissions,
     DateTimeOffset Timestamp,
-    long Version,
+    long RoleVersion,
     ScopedRoleChangePhase Phase,
     CancellationToken CancellationToken);

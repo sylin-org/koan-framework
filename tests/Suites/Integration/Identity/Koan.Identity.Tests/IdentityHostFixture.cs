@@ -96,7 +96,7 @@ internal sealed class TestScopedRoleAuthority : IScopedRoleAuthorityContributor
         if (!request.Actor.Subject.StartsWith("owner:", StringComparison.Ordinal))
             return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([]);
         return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
-            new(request.Target, Operations, Descendants: true, AllowSelfAssignment: true,
+            new(request.Target, Operations, Descendants: true, AllowSelfMembership: true,
                 ProofKey: "test-owner", ProofVersion: 1)
         ]);
     }

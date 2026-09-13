@@ -27,7 +27,7 @@ and a selected Data provider persists the identity plane.
 - `/api/identity/admin/identities/{id}/access` explains effective access and grants/revokes global roles.
 - `/api/identity/admin/impersonation` implements a reasoned, dual-control, time-boxed acting-as workflow.
 - `/api/identity/scoped-roles/{tenant}/{scopeType}/{scopeId}` exposes bounded scoped-role definitions,
-  assignments, policies, previews, and current-subject access.
+  membership collections, policies, previews, and current-subject access.
 - Startup reporting advertises both route groups and their capabilities.
 
 Every self-service action requires authentication and resolves the subject from the principal. Operator routes require
@@ -35,11 +35,12 @@ the standard `koan:identity-operator` role, grantable globally through `Identity
 Tenant membership projection strips this host role at its chokepoint.
 
 Scoped-role routes require ordinary authentication plus the application-provided authority envelopes for each
-operation; they never require or confer the global operator role. Mutable resources use quoted numeric ETags and
-require `If-Match`. Cookie-authenticated mutations require ASP.NET antiforgery validation, while authenticated
+operation; they never require or confer the global operator role. Role and policy resources use quoted numeric ETags
+and require `If-Match`; membership `PUT`/`DELETE` routes are bodyless, idempotent collection operations with no
+concurrency header or response resource. Cookie-authenticated mutations require ASP.NET antiforgery validation, while authenticated
 non-cookie schemes retain the application's configured authentication and CORS behavior. Effective and preview
-responses expose only a safe allow/deny decision; role, policy, binding and version provenance stays inside core.
-For constrained management, `RoleIds` bounds definition and assignment reads, while `Capabilities` bounds policy
+responses expose only a safe allow/deny decision; role, policy and version provenance stays inside core.
+For constrained management, `RoleIds` bounds definition and membership reads, while `Capabilities` bounds policy
 reads and previews. Multiple supported alternatives union only that operation's matching read axis, so contributor
 order cannot suppress valid authority. Resetting a local policy to inheritance requires the distinct `ResetPolicy`
 authority operation; ordinary `ManagePolicy` authority is insufficient because a reset can restore broader

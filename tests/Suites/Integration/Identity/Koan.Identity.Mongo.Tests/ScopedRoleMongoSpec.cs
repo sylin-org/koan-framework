@@ -17,7 +17,7 @@ namespace Koan.Identity.Mongo.Tests;
 public sealed class ScopedRoleMongoSpec(MongoFixture fixture)
 {
     [Fact]
-    public async Task Mongo_enforces_scoped_queries_revocation_and_lifecycle_authority_freshness()
+    public async Task Mongo_enforces_scoped_queries_membership_collections_and_lifecycle_authority_freshness()
     {
         var signals = new AuthoritySignals();
         await using var host = await KoanIntegrationHost.Configure()
@@ -49,8 +49,16 @@ public sealed class ScopedRoleMongoSpec(MongoFixture fixture)
         var reader = await engine.Define(new(root, "Reader", [new("discussion.read")]));
         await engine.Define(new(topic, "Local one", []));
         await engine.Define(new(topic, "Local two", []));
-        var binding = await engine.Assign(new(root, "participant:mongo", reader.Id,
-            ScopedRolePropagation.Descendants));
+        var membership = new ScopedRoleMember(root, "participant:mongo", reader.Id);
+        (await engine.Add(membership)).Should().BeTrue();
+        (await engine.Add(membership)).Should().BeFalse();
+        await engine.Add(new(root, "participant:mongo:second", reader.Id));
+        var participant = await engine.Memberships(membership.Subject, root);
+        participant.Roles.Should().ContainSingle().Which.Should().Be(reader.Id);
+        participant.Groups.Should().BeEmpty();
+        var memberPage = await engine.Members(reader.Id, root, page: 1, pageSize: 1);
+        memberPage.Items.Should().ContainSingle();
+        memberPage.TotalCount.Should().Be(2);
 
         await new MongoPost { TenantId = root.TenantId, TopicId = topic.Id, Body = "one" }.Save();
         await new MongoPost { TenantId = root.TenantId, TopicId = topic.Id, Body = "two" }.Save();
@@ -74,34 +82,11 @@ public sealed class ScopedRoleMongoSpec(MongoFixture fixture)
         capabilities.Has(DataCaps.Write.ConditionalDelete).Should().BeTrue();
         capabilities.Has(DataCaps.Write.InsertOnly).Should().BeTrue();
 
-        var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Koan.Data.Core.Model.Entity.Role.MemberRemoving(async context =>
-        {
-            if (context.Subject != "participant:mongo") return ScopedRoleChangeDecision.Continue();
-            removalEntered.TrySetResult();
-            await releaseRemoval.Task;
-            return ScopedRoleChangeDecision.Continue();
-        });
-        try
-        {
-            var staleRemoval = engine.Revoke(binding.Id, binding.Version);
-            await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
-            binding = await engine.Reapprove(binding.Id, binding.Version, TestContext.Current.CancellationToken);
-            releaseRemoval.TrySetResult();
-            await FluentActions.Awaiting(() => staleRemoval).Should().ThrowAsync<ScopedRoleConcurrencyException>();
-            (await ScopedRoleBinding.Get(binding.Id, TestContext.Current.CancellationToken))!.Version
-                .Should().Be(binding.Version,
-                    "the Mongo conditional delete must not remove a concurrently reapproved generation");
-        }
-        finally
-        {
-            releaseRemoval.TrySetResult();
-            Koan.Data.Core.Model.Entity.Role.Reset();
-        }
-
-        binding = await engine.Revoke(binding.Id, binding.Version);
-        binding.Revoked.Should().BeTrue();
+        (await engine.Remove(membership)).Should().BeTrue();
+        (await engine.Remove(membership)).Should().BeFalse();
+        (await ScopedRoleParticipant.Get(ScopedRoleParticipant.KeyFor(root, membership.Subject),
+            TestContext.Current.CancellationToken)).Should().BeNull(
+                "Mongo physically deletes an empty participant collection");
         await FluentActions.Awaiting(() => engine.Query<MongoPost>(ScopedRoleResourceActions.Read, topic))
             .Should().ThrowAsync<ScopedRoleAuthorizationException>();
 
