@@ -2,6 +2,6 @@
   "Sylin.Koan.Media.Abstractions": "1.0.40",
   "Sylin.Koan.Storage": "1.0.43",
   "Sylin.Koan.Storage.Abstractions": "1.0.31",
-  "Sylin.Koan.Data.Core": "1.0.71",
-  "$transitive": "6F19941F401EFB733422F5AFAC776923EC7AA5B7365B623CEB00224BCD3BB0AC"
+  "Sylin.Koan.Data.Core": "1.0.72",
+  "$transitive": "6DBA214A168688B40BABCE7B99DF6925B6B3A9220C8D3EF77522D8BEC5227AAE"
 }
