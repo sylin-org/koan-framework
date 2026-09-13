@@ -44,6 +44,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     IRawQueryRepository<TEntity, TKey>,
     IDescribesCapabilities,
     IConditionalWriteRepository<TEntity, TKey>,
+    IConditionalDeleteRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IAxisScopeDiagnostics,
     IDataOperationGate,
@@ -1261,6 +1262,48 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         if (replaced && context is not null)
             await _lifecycle!.CompleteUpsert(context, current);
         return replaced;
+    }
+
+    public async Task<bool> ConditionalDeleteAsync(TKey id, Filter guard, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        ct.ThrowIfCancellationRequested();
+        if (!StableConditionalKey(typeof(TKey)) || EqualityComparer<TKey>.Default.Equals(id, default!) ||
+            id is string text && string.IsNullOrWhiteSpace(text))
+            throw new NotSupportedException("Conditional deletion requires a non-default immutable scalar identity.");
+        if (EntityRootDescriptor.For(typeof(TEntity)).IsVariant)
+            throw new NotSupportedException("Conditional deletion of Entity variants requires an exact native membership guard and is not supported.");
+        var routing = EntityContext.Current;
+        var frozen = Filter.Snapshot(guard, requireImmutableValues: true)!;
+        Filter.RequireRowOnly(frozen, "Conditional deletion");
+        var capabilities = DataCaps.Describe(_inner, _inner.GetType().Name);
+        if (!capabilities.Has(DataCaps.Write.ConditionalDelete) ||
+            _inner is not IConditionalDeleteRepository<TEntity, TKey> conditional)
+            throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} does not support conditional deletion. Select a supporting connector; ordinary Delete cannot preserve the guard.");
+        var guardSupport = capabilities.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        if (FilterSplitter.Split(frozen, guardSupport, typeof(TEntity)).Residual is not null)
+            throw new NotSupportedException("Conditional deletion requires a complete native row predicate. CLR or residual guards are not supported.");
+        DemandConditionalFields(frozen);
+        if (routing?.TransactionCoordinator is not null)
+            throw new NotSupportedException("Conditional deletion cannot run in a deferred coordination scope.");
+
+        await using var operationScope = await Guard(DataOperationEffect.Write, "entity conditional delete", ct, ensureReadiness: false);
+        DemandUnscopedConditional(operationScope.Segmentation);
+        if (_sourcePlan.UsesLegacyProvisioningReadiness) await _inner.EnsureReady(ct);
+        var entity = await ReadOne(id, operationScope.Segmentation, ct);
+        if (entity is null) return false;
+        EntityLifecycleContext<TEntity>? context = null;
+        if (_lifecycle is { HasRemove: true }) context = await _lifecycle.BeginRemove(entity, ct);
+        if (context is not null && !EqualityComparer<TKey>.Default.Equals(context.Current.Id, id))
+            throw new InvalidOperationException("Conditional deletion lifecycle preparation cannot change the submitted identity.");
+        if (!Equals(routing, EntityContext.Current) ||
+            (_resolveRoute is not null && _resolveRoute()?.RepositoryIdentity != _routeBinding?.RepositoryIdentity))
+            throw new InvalidOperationException("Conditional deletion routing changed during preparation. Start a new operation in the intended scope.");
+        DemandUnscopedConditional(_segmentation.Bind("entity conditional delete"));
+        ct.ThrowIfCancellationRequested();
+        var deleted = await conditional.ConditionalDeleteAsync(id, frozen, ct);
+        if (deleted && context is not null) await _lifecycle!.CompleteRemove(context);
+        return deleted;
     }
 
     private void DemandUnscopedConditional(DataSegmentationBinding segmentation)

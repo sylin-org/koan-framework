@@ -99,7 +99,7 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
             var rootCapabilities = DataCaps.Describe(root, typeof(TRoot).Name);
             foreach (var token in rootCapabilities.All)
             {
-                if (token == DataCaps.Write.ConditionalReplace) continue;
+                if (token == DataCaps.Write.ConditionalReplace || token == DataCaps.Write.ConditionalDelete) continue;
                 if (rootCapabilities.Detail<object>(token) is { } detail) caps.Add(token, detail);
                 else caps.Add(token);
             }

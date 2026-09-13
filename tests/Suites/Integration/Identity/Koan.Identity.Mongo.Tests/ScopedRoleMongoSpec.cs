@@ -71,7 +71,34 @@ public sealed class ScopedRoleMongoSpec(MongoFixture fixture)
         var capabilities = Data<MongoPost, string>.Capabilities;
         capabilities.Has(DataCaps.Query.ProviderBoundedPaging).Should().BeTrue();
         capabilities.Has(DataCaps.Write.ConditionalReplace).Should().BeTrue();
+        capabilities.Has(DataCaps.Write.ConditionalDelete).Should().BeTrue();
         capabilities.Has(DataCaps.Write.InsertOnly).Should().BeTrue();
+
+        var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Koan.Data.Core.Model.Entity.Role.MemberRemoving(async context =>
+        {
+            if (context.Subject != "participant:mongo") return ScopedRoleChangeDecision.Continue();
+            removalEntered.TrySetResult();
+            await releaseRemoval.Task;
+            return ScopedRoleChangeDecision.Continue();
+        });
+        try
+        {
+            var staleRemoval = engine.Revoke(binding.Id, binding.Version);
+            await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+            binding = await engine.Reapprove(binding.Id, binding.Version, TestContext.Current.CancellationToken);
+            releaseRemoval.TrySetResult();
+            await FluentActions.Awaiting(() => staleRemoval).Should().ThrowAsync<ScopedRoleConcurrencyException>();
+            (await ScopedRoleBinding.Get(binding.Id, TestContext.Current.CancellationToken))!.Version
+                .Should().Be(binding.Version,
+                    "the Mongo conditional delete must not remove a concurrently reapproved generation");
+        }
+        finally
+        {
+            releaseRemoval.TrySetResult();
+            Koan.Data.Core.Model.Entity.Role.Reset();
+        }
 
         binding = await engine.Revoke(binding.Id, binding.Version);
         binding.Revoked.Should().BeTrue();

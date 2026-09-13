@@ -12,6 +12,7 @@ namespace Koan.Data.Connector.InMemory.Runtime;
 internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, string source)
     : KeyValueStore<TEntity, TKey>,
       IConditionalWriteRepository<TEntity, TKey>,
+      IConditionalDeleteRepository<TEntity, TKey>,
       IInsertOnlyRepository<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -49,6 +50,20 @@ internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, str
             EntityJsonSerialization.SerializeDocument(prepared.Entity), CopyManaged(prepared.Managed));
         ct.ThrowIfCancellationRequested();
         return store.TryUpdate(model.Id, replacement, observed);
+    }
+
+    public Task<bool> ConditionalDeleteAsync(TKey id, Filter guard, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        ct.ThrowIfCancellationRequested();
+        var guardFn = InMemoryFilterEvaluator.CompileConditional<TEntity>(guard);
+        var store = Current();
+        if (!store.TryGetValue(id, out var observed) || !guardFn(Materialize(observed).Entity))
+            return Task.FromResult(false);
+        ct.ThrowIfCancellationRequested();
+        var removed = ((ICollection<KeyValuePair<TKey, InMemoryState.Record>>)store)
+            .Remove(new(id, observed));
+        return Task.FromResult(removed);
     }
 
     protected override Task<KvRecord<TEntity>?> ReadAsync(TKey id, CancellationToken ct)

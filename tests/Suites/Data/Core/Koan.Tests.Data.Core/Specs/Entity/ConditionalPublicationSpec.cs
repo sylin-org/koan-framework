@@ -35,6 +35,23 @@ public sealed class ConditionalPublicationSpec
     }
 
     [Fact]
+    public async Task Root_conditional_delete_compares_the_stored_generation_atomically()
+    {
+        await using var host = await KoanIntegrationHost.Configure()
+            .ConfigureServices(services => services.AddKoan()).StartAsync(TestContext.Current.CancellationToken);
+        using var route = EntityContext.With(adapter: "inmemory", partition: Guid.NewGuid().ToString("N"));
+        var saved = await new GeneratedFamilyMedia { Kind = "generation:2" }.Save();
+
+        Data<GeneratedFamilyMedia, string>.Capabilities.Has(DataCaps.Write.ConditionalDelete).Should().BeTrue();
+        (await Data<GeneratedFamilyMedia, string>.DeleteIf(saved.Id, row => row.Kind == "generation:1"))
+            .Should().BeFalse();
+        (await GeneratedFamilyMedia.Get(saved.Id)).Should().NotBeNull();
+        (await Data<GeneratedFamilyMedia, string>.DeleteIf(saved.Id, row => row.Kind == "generation:2"))
+            .Should().BeTrue();
+        (await GeneratedFamilyMedia.Get(saved.Id)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task Variant_without_exact_membership_conditional_seam_does_not_advertise_root_capability()
     {
         await using var host = await KoanIntegrationHost.Configure()
@@ -46,6 +63,8 @@ public sealed class ConditionalPublicationSpec
         Data<GeneratedFamilyMedia, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace).Should().BeTrue();
         Data<GeneratedFamilyAnime, string>.As<IConditionalWriteRepository<GeneratedFamilyAnime, string>>()
             .Should().BeNull("an exact-variant native conditional seam is not implemented");
+        Data<GeneratedFamilyAnime, string>.As<IConditionalDeleteRepository<GeneratedFamilyAnime, string>>()
+            .Should().BeNull("an exact-variant native conditional-delete seam is not implemented");
         (await GeneratedFamilyMedia.Get(root.Id))!.Kind.Should().Be("root");
         DataCaps.Describe(variant, variant.GetType().Name).Has(DataCaps.Write.ConditionalReplace)
             .Should().BeFalse("a variant cannot advertise an unusable root capability");

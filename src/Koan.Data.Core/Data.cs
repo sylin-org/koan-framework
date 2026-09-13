@@ -70,6 +70,9 @@ public static class Data<TEntity, TKey>
         if (typeof(TCapability) == typeof(IConditionalWriteRepository<TEntity, TKey>) &&
             !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.ConditionalReplace))
             return null;
+        if (typeof(TCapability) == typeof(IConditionalDeleteRepository<TEntity, TKey>) &&
+            !DataCaps.Describe(repo, repo.GetType().Name).Has(DataCaps.Write.ConditionalDelete))
+            return null;
         return repo as TCapability;
     }
 
@@ -411,6 +414,24 @@ public static class Data<TEntity, TKey>
             var conditional = As<IConditionalWriteRepository<TEntity, TKey>>()
                 ?? throw new NotSupportedException($"The selected repository for {typeof(TEntity).Name} cannot guarantee conditional replacement. Select a supporting connector and Entity root.");
             return await conditional.ConditionalReplaceAsync(model, normalized, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Atomically delete an existing identity whose stored row matches the guard. No read/delete fallback.</summary>
+    public static Task<bool> DeleteIf(TKey id, Expression<Func<TEntity, bool>> guard,
+        string? partition = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        ct.ThrowIfCancellationRequested();
+        var normalized = LinqFilterCompiler.Compile(guard);
+        return Execute();
+
+        async Task<bool> Execute()
+        {
+            using var scope = WithPartition(partition);
+            var conditional = As<IConditionalDeleteRepository<TEntity, TKey>>()
+                ?? throw new NotSupportedException($"The selected repository for {typeof(TEntity).Name} cannot guarantee conditional deletion. Select a supporting connector and Entity root.");
+            return await conditional.ConditionalDeleteAsync(id, normalized, ct).ConfigureAwait(false);
         }
     }
 

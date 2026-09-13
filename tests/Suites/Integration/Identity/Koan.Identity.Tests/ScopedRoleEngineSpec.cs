@@ -110,6 +110,114 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
     }
 
     [Fact]
+    public async Task Reapproval_runs_member_lifecycle_veto_and_committed_success_events()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var role = await engine.Define(owner, new(root, "Reapproved reader", [new("discussion.read")]));
+        var binding = await engine.Assign(owner, new(root, "participant:reapprove", role.Id,
+            ScopedRolePropagation.Descendants));
+        role = await engine.Edit(owner, new(role.Id, role.Version,
+            Grants: [new("discussion.read"), new("discussion.reply")]));
+        (await engine.Check(new("participant:reapprove"), "discussion.read", topic)).Should().BeFalse();
+        var before = 0;
+        var after = 0;
+        var veto = true;
+        ScopedRoleChangeContext? committed = null;
+        Koan.Data.Core.Model.Entity.Role
+            .MemberAdding(context =>
+            {
+                if (context.Subject != "participant:reapprove")
+                    return ValueTask.FromResult(ScopedRoleChangeDecision.Continue());
+                Interlocked.Increment(ref before);
+                return ValueTask.FromResult(veto
+                    ? ScopedRoleChangeDecision.Veto("test.reapprove.veto", "Reapproval was vetoed.")
+                    : ScopedRoleChangeDecision.Continue());
+            })
+            .MemberAdded(context =>
+            {
+                if (context.Subject == "participant:reapprove")
+                {
+                    Interlocked.Increment(ref after);
+                    committed = context;
+                }
+                return ValueTask.CompletedTask;
+            });
+        try
+        {
+            var rejected = async () => await engine.Reapprove(owner, binding.Id, binding.Version);
+            await rejected.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+                .Where(error => error.Code == "test.reapprove.veto");
+            after.Should().Be(0);
+            (await ScopedRoleBinding.Get(binding.Id))!.Version.Should().Be(binding.Version);
+
+            veto = false;
+            var approved = await engine.Reapprove(owner, binding.Id, binding.Version);
+            before.Should().Be(2);
+            after.Should().Be(1);
+            committed.Should().NotBeNull();
+            committed!.Phase.Should().Be(ScopedRoleChangePhase.After);
+            committed.Version.Should().Be(approved.Version);
+            committed.Actor.Should().Be(owner);
+            (await engine.Check(new("participant:reapprove"), "discussion.reply", topic)).Should().BeTrue();
+        }
+        finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
+    [Fact]
+    public async Task Role_management_inputs_reject_unbounded_text_collections_and_parameter_graphs()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root,
+                new string('n', ScopedRoleInputLimits.NameLength + 1), [])))
+            .Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Bounded", [],
+                Purpose: new string('p', ScopedRoleInputLimits.DescriptionLength + 1))))
+            .Should().ThrowAsync<ArgumentException>();
+        var presentation = Enumerable.Range(0, ScopedRoleInputLimits.PresentationEntries + 1)
+            .ToDictionary(index => $"key:{index}", _ => "value", StringComparer.Ordinal);
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Bounded", [],
+                Presentation: presentation)))
+            .Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Bounded", [],
+                Presentation: new Dictionary<string, string>
+                {
+                    [new string('k', ScopedRoleInputLimits.PresentationKeyLength + 1)] = "value",
+                })))
+            .Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Bounded", [],
+                Presentation: new Dictionary<string, string>
+                {
+                    ["key"] = new string('v', ScopedRoleInputLimits.PresentationValueLength + 1),
+                })))
+            .Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Conditional", [new("discussion.approve", [
+                new("amount", ScopedRoleConditionOperator.LessThanOrEqual,
+                    new string('1', ScopedRoleInputLimits.ParameterValueLength + 1)),
+            ])])))
+            .Should().ThrowAsync<ArgumentException>();
+        await FluentActions.Awaiting(() => engine.Define(owner, new(root, "Conditional", [new("discussion.approve", [
+                new(new string('p', ScopedRoleInputLimits.ParameterNameLength + 1),
+                    ScopedRoleConditionOperator.Equal, "value"),
+            ])])))
+            .Should().ThrowAsync<ArgumentException>();
+
+        var nested = new Dictionary<string, object?> { ["amount"] = new { Value = 10 } };
+        await FluentActions.Awaiting(() => engine.Plan(new("participant:bounded"),
+                "discussion.approve", topic, nested))
+            .Should().ThrowAsync<ArgumentException>();
+        var tooManyParameters = Enumerable.Range(0, ScopedRoleInputLimits.Parameters + 1)
+            .ToDictionary(index => $"parameter:{index}", index => (object?)index, StringComparer.Ordinal);
+        await FluentActions.Awaiting(() => engine.Plan(new("participant:bounded"),
+                "discussion.approve", topic, tooManyParameters))
+            .Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
     public async Task Cosmetic_edit_preserves_authority_and_stale_writes_are_rejected()
     {
         using var scope = _fixture.Services.CreateScope();
@@ -645,6 +753,44 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
             after.Memberships.Contains(ScopedRoleTokens.RoleOrGroup(role.Id)).Should().BeFalse();
         }
         finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
+    [Fact]
+    public async Task Stale_revoke_cannot_delete_a_concurrently_reapproved_membership_generation()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var role = await engine.Define(owner, new(root, "CAS reader", [new("discussion.read")]));
+        var binding = await engine.Assign(owner, new(root, "participant:delete-cas", role.Id,
+            ScopedRolePropagation.Descendants));
+        var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Koan.Data.Core.Model.Entity.Role.MemberRemoving(async context =>
+        {
+            if (context.Subject != "participant:delete-cas") return ScopedRoleChangeDecision.Continue();
+            removalEntered.TrySetResult();
+            await releaseRemoval.Task;
+            return ScopedRoleChangeDecision.Continue();
+        });
+        try
+        {
+            var staleRemoval = engine.Revoke(owner, binding.Id, binding.Version);
+            await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var reapproved = await engine.Reapprove(owner, binding.Id, binding.Version);
+            releaseRemoval.TrySetResult();
+
+            await FluentActions.Awaiting(() => staleRemoval).Should().ThrowAsync<ScopedRoleConcurrencyException>();
+            var stored = await ScopedRoleBinding.Get(binding.Id);
+            stored.Should().NotBeNull();
+            stored!.Version.Should().Be(reapproved.Version);
+            (await engine.Check(new("participant:delete-cas"), "discussion.read", topic)).Should().BeTrue();
+        }
+        finally
+        {
+            releaseRemoval.TrySetResult();
+            Koan.Data.Core.Model.Entity.Role.Reset();
+        }
     }
 
     [Fact]

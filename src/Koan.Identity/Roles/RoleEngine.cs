@@ -126,7 +126,11 @@ public sealed class RoleEngine
         var scope = Normalize(command.Scope);
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
         var grants = NormalizeGrants(command.Grants, scope.Type);
-        var id = string.IsNullOrWhiteSpace(command.Id) ? Guid.NewGuid().ToString("N") : command.Id.Trim();
+        var id = string.IsNullOrWhiteSpace(command.Id) ? Guid.NewGuid().ToString("N")
+            : BoundedRequired(command.Id, nameof(command.Id), ScopedRoleInputLimits.IdentifierLength);
+        var name = BoundedRequired(command.Name, nameof(command.Name), ScopedRoleInputLimits.NameLength);
+        var purpose = BoundedOptional(command.Purpose, nameof(command.Purpose), ScopedRoleInputLimits.DescriptionLength);
+        var presentation = NormalizePresentation(command.Presentation);
         ValidateRoleShape(id, grants);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.DefineRole, scope, RoleId: id,
             EffectiveCapabilities: grants.Select(x => x.Capability).ToHashSet(StringComparer.Ordinal))
@@ -138,8 +142,8 @@ public sealed class RoleEngine
         var role = new ScopedRoleDefinition
         {
             Id = id, TenantId = scope.TenantId, ScopeType = scope.Type, ScopeId = scope.Id,
-            Name = ScopedRoleScopeRef.Require(command.Name, nameof(command.Name)), Purpose = command.Purpose?.Trim(),
-            Grants = grants, Presentation = Copy(command.Presentation), Version = 1, AuthorityVersion = 1,
+            Name = name, Purpose = purpose,
+            Grants = grants, Presentation = presentation, Version = 1, AuthorityVersion = 1,
             Status = ScopedRoleStatus.Active, UpdatedAt = Now, UpdatedBy = actor.StableSubject,
         };
         return await Insert(role, proof, ct).ConfigureAwait(false);
@@ -159,6 +163,11 @@ public sealed class RoleEngine
         var grants = command.Grants is null ? role.Grants : NormalizeGrants(command.Grants, scope.Type);
         ValidateRoleShape(role.Id, grants);
         var status = command.Status ?? role.Status;
+        var name = command.Name is null ? role.Name
+            : BoundedRequired(command.Name, nameof(command.Name), ScopedRoleInputLimits.NameLength);
+        var purpose = command.Purpose is null ? role.Purpose
+            : BoundedOptional(command.Purpose, nameof(command.Purpose), ScopedRoleInputLimits.DescriptionLength);
+        var presentation = command.Presentation is null ? role.Presentation : NormalizePresentation(command.Presentation);
         var authorityChanged = status != role.Status || !GrantSetsEqual(role.Grants, grants);
         var approval = await ApprovalFor(role.Id, role.TenantId, grants, ct).ConfigureAwait(false);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.EditRole, scope, RoleId: role.Id,
@@ -177,9 +186,9 @@ public sealed class RoleEngine
                 ChangeContext(role, null, actor, priorPermissions, currentPermissions,
                     role.Version, ScopedRoleChangePhase.Before, ct)).ConfigureAwait(false);
 
-        role.Name = command.Name is null ? role.Name : ScopedRoleScopeRef.Require(command.Name, nameof(command.Name));
-        role.Purpose = command.Purpose ?? role.Purpose;
-        role.Presentation = command.Presentation is null ? role.Presentation : Copy(command.Presentation);
+        role.Name = name;
+        role.Purpose = purpose;
+        role.Presentation = presentation;
         role.Grants = grants;
         role.Status = status;
         role.Version++;
@@ -223,7 +232,7 @@ public sealed class RoleEngine
             throw new ScopedRoleValidationException("binding.expiry.invalid", "A new binding must expire in the future.");
 
         var approval = await ApprovalFor(role.Id, role.TenantId, role.Grants, ct).ConfigureAwait(false);
-        var subject = ScopedRoleScopeRef.Require(command.Subject, nameof(command.Subject));
+        var subject = BoundedRequired(command.Subject, nameof(command.Subject), ScopedRoleInputLimits.IdentifierLength);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.AssignRole, scope, subject, role.Id,
             command.Propagation, command.ExpiresAt, approval.Capabilities)
         {
@@ -254,8 +263,17 @@ public sealed class RoleEngine
         {
             using var cleanup = ScopedRoleMutationGuard.Allow<ScopedRoleBinding>(existing.Id,
                 Koan.Data.Core.Lifecycle.EntityLifecycleOperation.Remove, proof.Revalidate);
-            if (!await existing.Remove(ct).ConfigureAwait(false))
+            var existingId = existing.Id;
+            var existingVersion = existing.Version;
+            if (!await Data<ScopedRoleBinding, string>.DeleteIf(existingId,
+                    row => row.Id == existingId && row.Version == existingVersion, ct: ct).ConfigureAwait(false))
+            {
+                var winner = await ScopedRoleBinding.Get(id, ct).ConfigureAwait(false);
+                if (winner is not null && !winner.Revoked && (winner.ExpiresAt is null || winner.ExpiresAt > Now) &&
+                    SameMembership(winner, binding))
+                    return winner;
                 throw new ScopedRoleConcurrencyException("The expired role membership changed before renewal.");
+            }
             _snapshots.InvalidateBinding(existing);
         }
         ScopedRoleBinding inserted;
@@ -283,7 +301,7 @@ public sealed class RoleEngine
         CancellationToken ct = default)
     {
         var scope = Normalize(command.Scope);
-        var subject = ScopedRoleScopeRef.Require(command.Subject, nameof(command.Subject));
+        var subject = BoundedRequired(command.Subject, nameof(command.Subject), ScopedRoleInputLimits.IdentifierLength);
         var role = await DemandRole(command.RoleId, ct).ConfigureAwait(false);
         DemandSameTenant(scope.TenantId, role.TenantId);
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
@@ -321,12 +339,17 @@ public sealed class RoleEngine
             EffectiveGrants = approval.Grants,
         };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
+        var reapproving = ChangeContext(role, binding.Subject, actor, [], role.Grants, binding.Version,
+            ScopedRoleChangePhase.Before, ct);
+        await ScopedRoleEventRegistry.Before(ScopedRoleEventKind.MemberAdding, reapproving).ConfigureAwait(false);
         binding.ApprovedRoleVersion = role.AuthorityVersion;
         binding.ApprovedPolicyVersions = approval.PolicyVersions;
         binding.Version++;
         binding.UpdatedAt = Now;
         binding.UpdatedBy = actor.StableSubject;
         await Replace(binding, expectedVersion, proof, ct).ConfigureAwait(false);
+        await ScopedRoleEventRegistry.After(ScopedRoleEventKind.MemberAdded,
+            reapproving with { Phase = ScopedRoleChangePhase.After, Version = binding.Version }).ConfigureAwait(false);
         return binding;
     }
 
@@ -357,7 +380,8 @@ public sealed class RoleEngine
     {
         var scope = Normalize(command.Scope);
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
-        var capability = _catalog.DemandCapability(command.Capability, scope.Type);
+        var capabilityKey = BoundedRequired(command.Capability, nameof(command.Capability), ScopedRoleInputLimits.IdentifierLength);
+        var capability = _catalog.DemandCapability(capabilityKey, scope.Type);
         var audience = NormalizeAudience(command.Audience, capability);
         var selectedRoles = audience.Where(x => x.Kind == ScopedRoleAudienceKind.Role).Select(x => x.Value!).Distinct(StringComparer.Ordinal).ToArray();
         foreach (var roleId in selectedRoles)
@@ -409,6 +433,7 @@ public sealed class RoleEngine
     {
         scope = Normalize(scope);
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
+        capability = BoundedRequired(capability, nameof(capability), ScopedRoleInputLimits.IdentifierLength);
         _catalog.DemandCapability(capability, scope.Type);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.ResetPolicy, scope,
             EffectiveCapabilities: new HashSet<string>([capability], StringComparer.Ordinal));
@@ -439,7 +464,7 @@ public sealed class RoleEngine
 
     public Task<ScopedRolePreview> Preview(string subject, string capability, ScopedRoleScopeRef target,
         IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)
-        => Preview(CurrentAdministrativeActor(), new ScopedRoleActor(ScopedRoleScopeRef.Require(subject, nameof(subject))),
+        => Preview(CurrentAdministrativeActor(), new ScopedRoleActor(BoundedRequired(subject, nameof(subject), ScopedRoleInputLimits.IdentifierLength)),
             capability, target, parameters, ct);
 
     internal async Task<ScopedRolePreview> Preview(ScopedRoleActor actor, ScopedRoleActor subject, string capability,
@@ -461,6 +486,10 @@ public sealed class RoleEngine
         IReadOnlyDictionary<string, object?>? parameters = null, CancellationToken ct = default)
     {
         target = Normalize(target);
+        capability = BoundedRequired(capability, nameof(capability), ScopedRoleInputLimits.IdentifierLength);
+        ValidateParameters(parameters);
+        if (subject.IsAuthenticated)
+            _ = BoundedRequired(subject.StableSubject, nameof(subject), ScopedRoleInputLimits.IdentifierLength);
         var descriptor = _catalog.DemandCapability(capability, target.Type);
         var snapshotKey = new ScopedRoleSnapshotCache.CacheKey(target.TenantId, target.Type, target.Id);
         ScopedRoleSnapshotCache.CompiledSnapshot snapshot;
@@ -1066,7 +1095,8 @@ public sealed class RoleEngine
         if (grants.Count > _options.MaxClausesPerRecord) throw new ScopedRoleValidationException("clauses.bound.exceeded", "The role has too many grant clauses.");
         return grants.Select(grant =>
         {
-            var capability = _catalog.DemandCapability(grant.Capability, scopeType);
+            var key = BoundedRequired(grant.Capability, nameof(grant.Capability), ScopedRoleInputLimits.IdentifierLength);
+            var capability = _catalog.DemandCapability(key, scopeType);
             var conditions = NormalizeConditions(grant.Conditions, capability);
             return new ScopedRoleGrantClause(capability.Key, conditions);
         }).ToList();
@@ -1082,7 +1112,7 @@ public sealed class RoleEngine
             {
                 ScopedRoleAudienceKind.Anonymous when !capability.AllowsAnonymous => throw new ScopedRoleValidationException("audience.anonymous.unsupported", "This capability does not allow an anonymous audience."),
                 ScopedRoleAudienceKind.Anonymous or ScopedRoleAudienceKind.Authenticated => null,
-                _ => ScopedRoleScopeRef.Require(item.Value ?? "", nameof(item.Value)),
+                _ => BoundedRequired(item.Value ?? "", nameof(item.Value), ScopedRoleInputLimits.IdentifierLength),
             };
             return new ScopedRoleAudienceClause(item.Kind, value, NormalizeConditions(item.Conditions, capability));
         }).ToList();
@@ -1091,24 +1121,29 @@ public sealed class RoleEngine
     private IReadOnlyList<ScopedRoleCondition> NormalizeConditions(IReadOnlyList<ScopedRoleCondition>? conditions,
         ScopedRoleCapabilityDescriptor capability)
     {
-        var normalized = conditions?.ToArray() ?? [];
-        if (normalized.Length > _options.MaxClausesPerRecord)
+        var source = conditions?.ToArray() ?? [];
+        if (source.Length > _options.MaxClausesPerRecord)
             throw new ScopedRoleValidationException("conditions.bound.exceeded", "A clause has more conditions than the configured evaluation bound.");
-        foreach (var condition in normalized)
+        var normalized = new ScopedRoleCondition[source.Length];
+        for (var index = 0; index < source.Length; index++)
         {
-            if (capability.Parameters is null || !capability.Parameters.Contains(condition.Parameter))
+            var condition = source[index];
+            var parameter = BoundedRequired(condition.Parameter, nameof(condition.Parameter),
+                ScopedRoleInputLimits.ParameterNameLength);
+            var value = BoundedRequired(condition.Value, nameof(condition.Value), ScopedRoleInputLimits.ParameterValueLength);
+            if (capability.Parameters is null || !capability.Parameters.Contains(parameter))
                 throw new ScopedRoleValidationException("condition.parameter.unknown", $"Parameter '{condition.Parameter}' is not declared for capability '{capability.Key}'.");
-            _ = ScopedRoleScopeRef.Require(condition.Value, nameof(condition.Value));
+            normalized[index] = new(parameter, condition.Operator, value);
         }
         return normalized;
     }
 
     private async Task<ScopedRoleDefinition> DemandRole(string id, CancellationToken ct)
-        => await ScopedRoleDefinition.Get(ScopedRoleScopeRef.Require(id, nameof(id)), ct).ConfigureAwait(false)
+        => await ScopedRoleDefinition.Get(BoundedRequired(id, nameof(id), ScopedRoleInputLimits.IdentifierLength), ct).ConfigureAwait(false)
             ?? throw new ScopedRoleValidationException("role.unknown", "The role does not exist or is unavailable.");
 
     private async Task<ScopedRoleBinding> DemandBinding(string id, CancellationToken ct)
-        => await ScopedRoleBinding.Get(ScopedRoleScopeRef.Require(id, nameof(id)), ct).ConfigureAwait(false)
+        => await ScopedRoleBinding.Get(BoundedRequired(id, nameof(id), ScopedRoleInputLimits.IdentifierLength), ct).ConfigureAwait(false)
             ?? throw new ScopedRoleValidationException("binding.unknown", "The binding does not exist or is unavailable.");
 
     private async Task<TEntity> Insert<TEntity>(TEntity entity, AuthorityProof proof, CancellationToken ct)
@@ -1133,7 +1168,10 @@ public sealed class RoleEngine
         using (ScopedRoleMutationGuard.Allow<ScopedRoleBinding>(binding.Id,
                    Koan.Data.Core.Lifecycle.EntityLifecycleOperation.Remove, proof.Revalidate))
         {
-            removed = await binding.Remove(ct).ConfigureAwait(false);
+            var id = binding.Id;
+            var expectedVersion = binding.Version;
+            removed = await Data<ScopedRoleBinding, string>.DeleteIf(id,
+                row => row.Id == id && row.Version == expectedVersion, ct: ct).ConfigureAwait(false);
         }
         if (!removed && await ScopedRoleBinding.Get(binding.Id, ct).ConfigureAwait(false) is not null)
             throw new ScopedRoleConcurrencyException("The role membership changed before removal.");
@@ -1218,9 +1256,71 @@ public sealed class RoleEngine
         long version, ScopedRoleChangePhase phase, CancellationToken ct)
         => new(role.TenantId, role.Scope(), role.Id, subject, actor, previous.Select(Clone).ToArray(),
             current.Select(Clone).ToArray(), Now, version, phase, ct);
-    private static Dictionary<string, string> Copy(IReadOnlyDictionary<string, string>? values)
-        => values is null ? new(StringComparer.Ordinal) : new(values, StringComparer.Ordinal);
-    private static ScopedRoleScopeRef Normalize(ScopedRoleScopeRef scope) => scope.Normalize();
+    private static Dictionary<string, string> NormalizePresentation(IReadOnlyDictionary<string, string>? values)
+    {
+        if (values is null) return new(StringComparer.Ordinal);
+        if (values.Count > ScopedRoleInputLimits.PresentationEntries)
+            throw new ArgumentException($"Presentation cannot contain more than {ScopedRoleInputLimits.PresentationEntries} entries.", nameof(values));
+        var normalized = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var pair in values)
+        {
+            var key = BoundedRequired(pair.Key, "presentation key", ScopedRoleInputLimits.PresentationKeyLength);
+            var value = pair.Value ?? "";
+            if (value.Length > ScopedRoleInputLimits.PresentationValueLength)
+                throw new ArgumentException($"presentation value cannot exceed {ScopedRoleInputLimits.PresentationValueLength} characters.", nameof(values));
+            if (!normalized.TryAdd(key, value)) throw new ArgumentException("Presentation keys must be unique after normalization.", nameof(values));
+        }
+        return normalized;
+    }
+
+    private static void ValidateParameters(IReadOnlyDictionary<string, object?>? parameters)
+    {
+        if (parameters is null) return;
+        if (parameters.Count > ScopedRoleInputLimits.Parameters)
+            throw new ArgumentException($"No more than {ScopedRoleInputLimits.Parameters} access parameters are supported.", nameof(parameters));
+        foreach (var pair in parameters)
+        {
+            _ = BoundedRequired(pair.Key, "parameter name", ScopedRoleInputLimits.ParameterNameLength);
+            if (pair.Value is null) continue;
+            if (pair.Value is System.Text.Json.JsonElement json)
+            {
+                if (json.ValueKind is System.Text.Json.JsonValueKind.Array or System.Text.Json.JsonValueKind.Object ||
+                    json.GetRawText().Length > ScopedRoleInputLimits.ParameterValueLength)
+                    throw new ArgumentException("Access parameters must be bounded scalar values.", nameof(parameters));
+                continue;
+            }
+            var type = pair.Value.GetType();
+            var scalar = type.IsPrimitive || type.IsEnum || pair.Value is string or decimal or Guid or
+                DateTime or DateTimeOffset or DateOnly or TimeOnly or TimeSpan;
+            if (!scalar || Convert.ToString(pair.Value, System.Globalization.CultureInfo.InvariantCulture)?.Length >
+                ScopedRoleInputLimits.ParameterValueLength)
+                throw new ArgumentException("Access parameters must be bounded scalar values.", nameof(parameters));
+        }
+    }
+
+    private static string BoundedRequired(string value, string name, int maxLength)
+    {
+        var normalized = ScopedRoleScopeRef.Require(value, name);
+        return normalized.Length <= maxLength ? normalized
+            : throw new ArgumentException($"{name} cannot exceed {maxLength} characters.", name);
+    }
+
+    private static string? BoundedOptional(string? value, string name, int maxLength)
+    {
+        if (value is null) return null;
+        var normalized = value.Trim();
+        return normalized.Length <= maxLength ? normalized
+            : throw new ArgumentException($"{name} cannot exceed {maxLength} characters.", name);
+    }
+
+    private static ScopedRoleScopeRef Normalize(ScopedRoleScopeRef scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        return new(
+            BoundedRequired(scope.TenantId, nameof(scope.TenantId), ScopedRoleInputLimits.IdentifierLength),
+            BoundedRequired(scope.Type, nameof(scope.Type), ScopedRoleInputLimits.IdentifierLength),
+            BoundedRequired(scope.Id, nameof(scope.Id), ScopedRoleInputLimits.IdentifierLength));
+    }
     private static bool SameScope(ScopedRoleScopeRef left, ScopedRoleScopeRef right)
         => StringComparer.Ordinal.Equals(left.TenantId, right.TenantId) && StringComparer.Ordinal.Equals(left.Type, right.Type) && StringComparer.Ordinal.Equals(left.Id, right.Id);
     private static bool ContainsScope(IEnumerable<ScopedRoleScopeRef> ancestry, ScopedRoleScopeRef scope)
@@ -1246,13 +1346,14 @@ public sealed class RoleEngine
     {
         var subject = _actorAccessor?.CurrentActorSubject;
         return !string.IsNullOrWhiteSpace(subject)
-            ? new ScopedRoleActor(subject.Trim())
+            ? new ScopedRoleActor(BoundedRequired(subject, nameof(subject), ScopedRoleInputLimits.IdentifierLength))
             : throw new ScopedRoleAuthorizationException("actor.unavailable", "No verified actor is bound to the current operation.");
     }
 
     private ScopedRoleActor CurrentSubject()
     {
         var subject = _subjectAccessor?.CurrentSubject ?? _actorAccessor?.CurrentActorSubject;
-        return string.IsNullOrWhiteSpace(subject) ? ScopedRoleActor.Anonymous : new ScopedRoleActor(subject.Trim());
+        return string.IsNullOrWhiteSpace(subject) ? ScopedRoleActor.Anonymous
+            : new ScopedRoleActor(BoundedRequired(subject, nameof(subject), ScopedRoleInputLimits.IdentifierLength));
     }
 }

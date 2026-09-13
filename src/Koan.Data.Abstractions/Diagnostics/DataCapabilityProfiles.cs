@@ -22,6 +22,7 @@ public static class DataCapabilityProfiles
             [DataCaps.Write.MutationOutcomes] = DataClaimProfiles.EntityPersistence,
             [DataCaps.Write.FastRemove] = DataClaimProfiles.EntityPersistence,
             [DataCaps.Write.ConditionalReplace] = DataClaimProfiles.ConditionalReplace,
+            [DataCaps.Write.ConditionalDelete] = DataClaimProfiles.ConditionalDelete,
             [DataCaps.Isolation.RowScoped] = DataClaimProfiles.Isolation,
             [DataCaps.Isolation.ContainerScoped] = DataClaimProfiles.Isolation,
             [DataCaps.Isolation.DatabaseScoped] = DataClaimProfiles.Isolation,

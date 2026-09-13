@@ -27,6 +27,7 @@ public static class DataClaimProfiles
     public const string ProviderBoundedPaging = "Provider-bounded paging";
     public const string AtomicBatch = "Atomic batch";
     public const string ConditionalReplace = "Conditional replace";
+    public const string ConditionalDelete = "Conditional delete";
     public const string Durability = "Durability";
     public const string Isolation = "Isolation";
     public const string ProviderNativeInspection = "Provider-native inspection";

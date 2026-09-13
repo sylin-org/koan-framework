@@ -30,6 +30,7 @@ internal static class MongoFeatures
         DataCaps.Write.BulkUpsert,
         DataCaps.Write.BulkDelete,
         DataCaps.Write.ConditionalReplace,
+        DataCaps.Write.ConditionalDelete,
         DataCaps.Retention.TtlIndex,
         DataCaps.Isolation.RowScoped,
         DataCaps.Isolation.ContainerScoped,
@@ -46,7 +47,8 @@ internal static class MongoFeatures
     public static void Describe(ICapabilities capabilities, bool supportsSameIdIn = false, bool supportsConditionalReplace = true)
     {
         foreach (var capability in All)
-            if (supportsConditionalReplace || capability != DataCaps.Write.ConditionalReplace) capabilities.Add(capability);
+            if (supportsConditionalReplace || capability != DataCaps.Write.ConditionalReplace &&
+                capability != DataCaps.Write.ConditionalDelete) capabilities.Add(capability);
         capabilities
             .Add(DataCaps.Query.Filter, Filters with { SupportsSameIdIn = supportsSameIdIn })
             .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native));

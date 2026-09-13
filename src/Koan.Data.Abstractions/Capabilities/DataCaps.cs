@@ -54,6 +54,9 @@ public static class DataCaps
         /// <summary>Provider supports an atomic conditional replace (compare-and-set by Id) — see
         /// <see cref="IConditionalWriteRepository{TEntity,TKey}"/>. Enables contention-free claiming (JOBS-0005 §20.3).</summary>
         public static readonly Capability ConditionalReplace = new("write.conditionalReplace");
+        /// <summary>Provider supports atomic delete by immutable identity plus a stored-row guard — see
+        /// <see cref="IConditionalDeleteRepository{TEntity,TKey}"/>.</summary>
+        public static readonly Capability ConditionalDelete = new("write.conditionalDelete");
     }
 
     /// <summary>Isolation negotiation tokens — the AODB three-mode conformance suite (ARCH-0103 §6; DATA-0105 /

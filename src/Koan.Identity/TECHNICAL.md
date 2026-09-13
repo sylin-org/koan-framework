@@ -68,7 +68,8 @@ rather than receiving the completed stale object. `ScopedRolePlan.Memberships` a
 immutable hash-set projections. `role:*` tokens identify capability-bearing roles, `group:*` tokens are audience-only,
 and `permission:*` tokens are derived candidates rather than persisted membership facts.
 
-`Entity.Role` pre-events run after delegation admission but before provider dispatch and may veto. Their context
+`Entity.Role` pre-events run after delegation admission but before provider dispatch and may veto. Assignment,
+reapproval, removal and capability changes all cross the same lifecycle family. Their context
 includes tenant, scope, real actor, subject, role, old/new capability clauses, generation, timestamp and cancellation.
 Successful writes
 invalidate the compiled snapshot before post-events run. Post-handler failure therefore means “committed and
@@ -76,6 +77,12 @@ invalidated, projection callback failed,” surfaced by `ScopedRolePostEventExce
 Dispatch is sequential and recursive role mutation from a handler rejects. The POC cache and event delivery are
 process-local. Multi-process applications must broadcast `ScopedRoleDomainVersionChange` to every process after the
 external fact commits.
+
+Membership removal is a provider-atomic conditional delete over binding identity and expected generation. InMemory,
+SQLite and MongoDB prove the primitive; an adapter that does not advertise `Write.ConditionalDelete` rejects instead
+of performing a stale read/delete sequence. Management inputs also have fixed semantic caps for identifiers, role
+names/descriptions, presentation entries/keys/values and access parameter scalars. Clause and condition counts retain
+their configurable `RoleEngineOptions` bounds; nested parameter graphs are not accepted.
 
 `SessionService` records, lists, and revokes cookie sessions. `IdentityLifecycleService` suspends/reactivates in
 partial-failure-tolerant batches. `PreviewErasureAsync` folds every discovered `IIdentityErasureContributor` without

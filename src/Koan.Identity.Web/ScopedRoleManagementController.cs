@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Koan.Identity.Roles;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -198,14 +199,23 @@ public sealed class ScopedRoleManagementController(RoleEngine engine) : Controll
     private static Page<TResponse> Map<TEntity, TResponse>(ScopedRolePage<TEntity> page,
         Func<TEntity, TResponse> map) => new(page.Items.Select(map).ToArray(), page.TotalCount, page.Page, page.PageSize);
 
-    public sealed record DefineRoleRequest(string Name, IReadOnlyList<ScopedRoleGrantClause>? Grants,
-        string? Purpose = null, IReadOnlyDictionary<string, string>? Presentation = null);
-    public sealed record EditRoleRequest(string? Name = null, string? Purpose = null,
+    public sealed record DefineRoleRequest(
+        [StringLength(ScopedRoleInputLimits.NameLength)] string Name,
+        IReadOnlyList<ScopedRoleGrantClause>? Grants,
+        [StringLength(ScopedRoleInputLimits.DescriptionLength)] string? Purpose = null,
+        IReadOnlyDictionary<string, string>? Presentation = null);
+    public sealed record EditRoleRequest(
+        [StringLength(ScopedRoleInputLimits.NameLength)] string? Name = null,
+        [StringLength(ScopedRoleInputLimits.DescriptionLength)] string? Purpose = null,
         IReadOnlyList<ScopedRoleGrantClause>? Grants = null, IReadOnlyDictionary<string, string>? Presentation = null);
-    public sealed record AssignRoleRequest(string Subject, string RoleId,
+    public sealed record AssignRoleRequest(
+        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string Subject,
+        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string RoleId,
         ScopedRolePropagation Propagation = ScopedRolePropagation.Local, DateTimeOffset? ExpiresAt = null);
     public sealed record ReplacePolicyRequest(IReadOnlyList<ScopedRoleAudienceClause>? Audience);
-    public sealed record PreviewRequest(string Subject, string Capability,
+    public sealed record PreviewRequest(
+        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string Subject,
+        [StringLength(ScopedRoleInputLimits.IdentifierLength)] string Capability,
         IReadOnlyDictionary<string, object?>? Parameters = null);
     public sealed record Error(string Code, string Message);
     public sealed record DecisionResponse(bool Allowed, string Code)

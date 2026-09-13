@@ -31,6 +31,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     IBoundedQueryRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
+    IConditionalDeleteRepository<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IDescribesCapabilities,
@@ -353,6 +354,24 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var (condition, values) = Where(plan, guard);
         AddParameters(command, values, "p");
         command.CommandText = $"UPDATE {plan.QualifiedTable} AS koan_row SET {set} WHERE {identity} AND ({condition})";
+        return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
+    }
+
+    public async Task<bool> ConditionalDeleteAsync(
+        TKey id,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        var plan = Plan();
+        await Ready(plan, ct).ConfigureAwait(false);
+        _route.Policy.Demand(DataOperationEffect.Write, "conditional delete");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        var identity = IdentityPredicate(command, plan.Commands.Delete(id).Identity, "key_");
+        var (condition, values) = Where(plan, guard);
+        AddParameters(command, values, "p");
+        command.CommandText = $"DELETE FROM {plan.QualifiedTable} AS koan_row WHERE {identity} AND ({condition})";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
     }
 

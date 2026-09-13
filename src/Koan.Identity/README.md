@@ -72,7 +72,11 @@ Entity.Role
 Pre-events may veto. Post-events run only after durable success and compiled-snapshot invalidation. A post-handler
 failure is reported as `ScopedRolePostEventException`; the mutation remains committed. Recursive role mutation from
 a handler rejects. External domain facts publish a monotonic version after commit through
-`IScopedRoleAccessInvalidator`.
+`IScopedRoleAccessInvalidator`. Reapproval is an effective membership add and therefore runs `MemberAdding` /
+`MemberAdded`. Removal uses provider-atomic identity-and-version deletion and rejects adapters that cannot prove it.
+
+The HTTP and headless management paths enforce the same bounded inputs: identifiers, names, descriptions,
+presentation metadata and scalar access parameters. Nested parameter objects/arrays reject before evaluation.
 
 ## Configuration
 

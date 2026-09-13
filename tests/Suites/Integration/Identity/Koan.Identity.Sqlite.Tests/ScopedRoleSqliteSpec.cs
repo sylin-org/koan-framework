@@ -44,7 +44,33 @@ public sealed class ScopedRoleSqliteSpec
             await engine.Register(new(root));
             await engine.Register(new(topic, root));
             var reader = await engine.Define(new(root, "Reader", [new("discussion.read")]));
-            await engine.Assign(new(root, "participant:sqlite", reader.Id, ScopedRolePropagation.Descendants));
+            var readerBinding = await engine.Assign(new(root, "participant:sqlite", reader.Id,
+                ScopedRolePropagation.Descendants));
+
+            var removalEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var releaseRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Koan.Data.Core.Model.Entity.Role.MemberRemoving(async context =>
+            {
+                if (context.Subject != "participant:sqlite") return ScopedRoleChangeDecision.Continue();
+                removalEntered.TrySetResult();
+                await releaseRemoval.Task;
+                return ScopedRoleChangeDecision.Continue();
+            });
+            try
+            {
+                var staleRemoval = engine.Revoke(readerBinding.Id, readerBinding.Version);
+                await removalEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                readerBinding = await engine.Reapprove(readerBinding.Id, readerBinding.Version);
+                releaseRemoval.TrySetResult();
+                await FluentActions.Awaiting(() => staleRemoval).Should().ThrowAsync<ScopedRoleConcurrencyException>();
+                (await ScopedRoleBinding.Get(readerBinding.Id))!.Version.Should().Be(readerBinding.Version,
+                    "the SQLite conditional delete must not remove a concurrently reapproved generation");
+            }
+            finally
+            {
+                releaseRemoval.TrySetResult();
+                Koan.Data.Core.Model.Entity.Role.Reset();
+            }
 
             await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "one" }.Save();
             await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "two" }.Save();
@@ -60,6 +86,7 @@ public sealed class ScopedRoleSqliteSpec
             var capabilities = Data<SqlitePost, string>.Capabilities;
             capabilities.Has(DataCaps.Query.ProviderBoundedPaging).Should().BeTrue();
             capabilities.Has(DataCaps.Write.ConditionalReplace).Should().BeTrue();
+            capabilities.Has(DataCaps.Write.ConditionalDelete).Should().BeTrue();
             capabilities.Has(DataCaps.Write.InsertOnly).Should().BeTrue();
 
             var staleVersion = reader.Version;

@@ -187,13 +187,17 @@ a reusable permission or provider snapshot-isolation receipt.
 ReadEvidence metadata is ignored by System.Text.Json and by serializers honoring IgnoreDataMember,
 including the default Newtonsoft.Json contract. It must not be exposed as application JSON.
 
-## Conditional write guard
+## Conditional mutation guards
 
 IConditionalWriteRepository.ConditionalReplaceAsync accepts the normalized Filter, not an
 Expression. The low-level seam carries no adapter-local lambda capture; low-level callers compile
 expressions with LinqFilterCompiler.Compile explicitly. Required Entity
 ReplaceIf intent has no read-then-save fallback. Strict snapshot, complete native support and row-only
 qualification belong to Data admission. Binary atoms are copied; unsupported opaque atoms refuse.
+
+`IConditionalDeleteRepository.ConditionalDeleteAsync` and Entity `DeleteIf` apply the same admission
+contract to deletion by immutable identity plus stored-row guard. The provider must execute one native
+conditional delete; a prior read followed by ordinary identity deletion is explicitly not a fallback.
 
 Document CAS implementations using the CLR evaluator call CompileConditional. That bounded
 entrypoint rejects managed, binary and DateTime fields rather than claiming unproved comparison

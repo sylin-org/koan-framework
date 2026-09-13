@@ -8,6 +8,21 @@ public enum ScopedRolePropagation { Local, Descendants }
 public enum ScopedRoleOverrideMode { Inherit, Replace }
 public enum ScopedRoleAudienceKind { Anonymous, Authenticated, Subject, Role }
 public enum ScopedRoleConditionOperator { Equal, LessThanOrEqual, GreaterThanOrEqual }
+
+/// <summary>Fixed semantic input bounds for scoped-role management contracts.</summary>
+public static class ScopedRoleInputLimits
+{
+    public const int IdentifierLength = 256;
+    public const int NameLength = 160;
+    public const int DescriptionLength = 1024;
+    public const int PresentationEntries = 32;
+    public const int PresentationKeyLength = 64;
+    public const int PresentationValueLength = 512;
+    public const int Parameters = 32;
+    public const int ParameterNameLength = 128;
+    public const int ParameterValueLength = 512;
+}
+
 public enum ScopedRoleAuthorityOperation
 {
     RegisterScope = 0,

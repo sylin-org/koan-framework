@@ -74,6 +74,28 @@ public sealed class ScopedRoleWebSpec
             role.Id.Should().NotBe("attacker-selected-global-id");
             create.Headers.ETag!.Tag.Should().Be("\"1\"");
 
+            var oversizedName = await client.PostAsJsonAsync($"{scopePath}/roles", new
+            {
+                name = new string('n', ScopedRoleInputLimits.NameLength + 1),
+                grants = Array.Empty<object>(),
+            });
+            oversizedName.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var oversizedPresentation = await client.PostAsJsonAsync($"{scopePath}/roles", new
+            {
+                name = "Too much presentation",
+                grants = Array.Empty<object>(),
+                presentation = Enumerable.Range(0, ScopedRoleInputLimits.PresentationEntries + 1)
+                    .ToDictionary(index => $"key:{index}", _ => "value"),
+            });
+            oversizedPresentation.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            var nestedPreview = await client.PostAsJsonAsync($"{scopePath}/preview", new
+            {
+                subject = "participant:web",
+                capability = "discussion.read",
+                parameters = new { nested = new { value = "not-scalar" } },
+            });
+            nestedPreview.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
             var list = await client.GetFromJsonAsync<ScopedRoleManagementController.Page<ScopedRoleManagementController.RoleResponse>>(
                 $"{scopePath}/roles?page=1&pageSize=10", Json);
             list!.TotalCount.Should().Be(1);

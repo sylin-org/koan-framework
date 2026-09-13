@@ -23,6 +23,7 @@ internal sealed class MongoRepository<TEntity, TKey> :
     IBoundedQueryRepository<TEntity, TKey>,
     IOptimizedDataRepository<TEntity, TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
+    IConditionalDeleteRepository<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
     ICounterpartQueryRepository,
     IInstructionExecutor<TEntity>,
@@ -289,6 +290,24 @@ internal sealed class MongoRepository<TEntity, TKey> :
             .ConfigureAwait(false);
         DemandAcknowledged(result.IsAcknowledged);
         return result.MatchedCount == 1;
+    }
+
+    public async Task<bool> ConditionalDeleteAsync(
+        TKey id,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        if (_entity.IsMapped)
+            throw new NotSupportedException("MongoDB conditional deletion requires native _id identity. Mapped key uniqueness has not been qualified.");
+        var filter = Builders<BsonDocument>.Filter.And(
+            _entity.Identity(id),
+            _queries.Predicate(guard),
+            _entity.WriteGuard());
+        var collection = await Collection(ct).ConfigureAwait(false);
+        var result = await collection.DeleteOneAsync(filter, ct).ConfigureAwait(false);
+        DemandAcknowledged(result.IsAcknowledged);
+        return result.DeletedCount == 1;
     }
     public IBatchSet<TEntity, TKey> CreateBatch() => new MongoBatch<TEntity, TKey>(CommitBatch);
 
