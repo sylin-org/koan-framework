@@ -166,6 +166,64 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
     }
 
     [Fact]
+    public async Task Reapproval_lifecycle_sees_policy_derived_effective_grants()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var badge = await engine.Define(owner, new(root, "Policy badge", []));
+        var binding = await engine.Assign(owner, new(root, "participant:policy-badge", badge.Id,
+            ScopedRolePropagation.Descendants));
+        await engine.Replace(owner, new(root, "discussion.reply", [
+            new(ScopedRoleAudienceKind.Role, badge.Id),
+        ]));
+        (await engine.Check(new("participant:policy-badge"), "discussion.reply", topic)).Should().BeFalse(
+            "the new policy authority remains unavailable until the stale binding is explicitly reapproved");
+
+        var veto = true;
+        var after = 0;
+        ScopedRoleChangeContext? committed = null;
+        Koan.Data.Core.Model.Entity.Role
+            .MemberAdding(context =>
+            {
+                if (context.Subject != "participant:policy-badge")
+                    return ValueTask.FromResult(ScopedRoleChangeDecision.Continue());
+                context.CurrentPermissions.Select(grant => grant.Capability)
+                    .Should().Contain("discussion.reply");
+                return ValueTask.FromResult(veto
+                    ? ScopedRoleChangeDecision.Veto("test.policy-grant.veto", "Policy-derived authority was vetoed.")
+                    : ScopedRoleChangeDecision.Continue());
+            })
+            .MemberAdded(context =>
+            {
+                if (context.Subject == "participant:policy-badge")
+                {
+                    Interlocked.Increment(ref after);
+                    committed = context;
+                }
+                return ValueTask.CompletedTask;
+            });
+        try
+        {
+            var rejected = async () => await engine.Reapprove(owner, binding.Id, binding.Version);
+            await rejected.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+                .Where(error => error.Code == "test.policy-grant.veto");
+            after.Should().Be(0, "a vetoed reapproval cannot emit the committed lifecycle event");
+            (await ScopedRoleBinding.Get(binding.Id))!.Version.Should().Be(binding.Version);
+
+            veto = false;
+            var approved = await engine.Reapprove(owner, binding.Id, binding.Version);
+            after.Should().Be(1);
+            committed.Should().NotBeNull();
+            committed!.CurrentPermissions.Select(grant => grant.Capability)
+                .Should().Contain("discussion.reply");
+            committed.Version.Should().Be(approved.Version);
+            (await engine.Check(new("participant:policy-badge"), "discussion.reply", topic)).Should().BeTrue();
+        }
+        finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
+    [Fact]
     public async Task Role_management_inputs_reject_unbounded_text_collections_and_parameter_graphs()
     {
         using var scope = _fixture.Services.CreateScope();

@@ -339,7 +339,7 @@ public sealed class RoleEngine
             EffectiveGrants = approval.Grants,
         };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
-        var reapproving = ChangeContext(role, binding.Subject, actor, [], role.Grants, binding.Version,
+        var reapproving = ChangeContext(role, binding.Subject, actor, [], approval.Grants, binding.Version,
             ScopedRoleChangePhase.Before, ct);
         await ScopedRoleEventRegistry.Before(ScopedRoleEventKind.MemberAdding, reapproving).ConfigureAwait(false);
         binding.ApprovedRoleVersion = role.AuthorityVersion;
