@@ -27,6 +27,7 @@ public sealed class SecIdentityWebModule : KoanModule
         // Audit attribution: resolve the acting subject from the request principal (actor when impersonating).
         services.AddHttpContextAccessor();
         services.TryAddSingleton<Koan.Identity.IIdentityActorAccessor, HttpContextActorAccessor>();
+        services.TryAddSingleton<Koan.Identity.Roles.IScopedRoleSubjectAccessor, HttpContextScopedRoleSubjectAccessor>();
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

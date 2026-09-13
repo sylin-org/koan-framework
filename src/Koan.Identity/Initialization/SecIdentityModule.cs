@@ -12,6 +12,7 @@ using Koan.Core.Provenance;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Erasure;
 using Koan.Identity.Reconciliation;
+using Koan.Identity.Roles;
 using Koan.Web.Auth.Domain;
 
 namespace Koan.Identity.Initialization;
@@ -45,6 +46,18 @@ public sealed class SecIdentityModule : KoanModule
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
 
+        // Scoped roles remain in Identity's operative access owner. Structural vocabulary and delegation
+        // authority are application contributions; absence means an empty catalog / deny-all administration.
+        services.AddKoanOptions<RoleEngineOptions>(RoleEngineOptions.SectionPath);
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleCatalogContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IScopedRoleCatalogContributor), type));
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleAuthorityContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IScopedRoleAuthorityContributor), type));
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleGuardContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IScopedRoleGuardContributor), type));
+        services.TryAddSingleton<ScopedRoleCatalog>();
+        services.TryAddScoped<RoleEngine>();
+
         // SEC-0009 — semantic owners compose one privacy erasure plan. Scoped registration permits an
         // application-owned contributor to use its ordinary scoped dependencies without special wiring.
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IIdentityErasureContributor)))
@@ -54,6 +67,7 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Impersonation.ImpersonationService>();
         services.TryAddSingleton<Management.JitGrantService>();
         services.TryAddSingleton<Audit.AuditChain>();
+        ScopedRoleMutationGuard.Register();
         Audit.IdentityAuditHooks.Register();
 
         // Replace the in-memory stubs with durable Entity<>-backed stores. This is order-independent: Web Auth uses

@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Identity.Roles;
 
 namespace Koan.Identity.Audit;
 
@@ -22,11 +23,16 @@ internal static class IdentityAuditHooks
         Hook<Session>("Session", e => e.IdentityId);
         Hook<IdentityRole>("IdentityRole", e => e.IdentityId);
         Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target);
+        Hook<ScopedRoleScope>("ScopedRoleScope", e => e.ScopeId, e => e.UpdatedBy);
+        Hook<ScopedRoleDefinition>("ScopedRoleDefinition", e => e.Id, e => e.UpdatedBy);
+        Hook<ScopedRoleBinding>("ScopedRoleBinding", e => e.Subject, e => e.UpdatedBy);
+        Hook<ScopedRolePolicy>("ScopedRolePolicy", e => e.ScopeId, e => e.UpdatedBy);
     }
 
     private const string BeforeKey = "__koan_identity_audit_before";
 
-    private static void Hook<TEntity>(string entityName, Func<TEntity, string> subjectOf)
+    private static void Hook<TEntity>(string entityName, Func<TEntity, string> subjectOf,
+        Func<TEntity, string?>? actorOf = null)
         where TEntity : Entity<TEntity>
     {
         var verb = entityName.ToLowerInvariant();
@@ -42,19 +48,22 @@ internal static class IdentityAuditHooks
         {
             var before = ctx.Items.TryGetValue(BeforeKey, out var b) ? b as TEntity : null;
             await EmitAsync(before is null ? $"{verb}.created" : $"{verb}.updated",
-                entityName, ctx.Current.Id, subjectOf(ctx.Current), before, ctx.Current, ctx.CancellationToken).ConfigureAwait(false);
+                entityName, ctx.Current.Id, subjectOf(ctx.Current), actorOf?.Invoke(ctx.Current), before, ctx.Current,
+                ctx.CancellationToken).ConfigureAwait(false);
         });
 
         Entity<TEntity>.Lifecycle.AfterRemove(async ctx =>
         {
             var before = ctx.Prior;
             await EmitAsync($"{verb}.deleted",
-                entityName, ctx.Current.Id, subjectOf(ctx.Current), before ?? ctx.Current, null, ctx.CancellationToken).ConfigureAwait(false);
+                entityName, ctx.Current.Id, subjectOf(ctx.Current), actorOf?.Invoke(ctx.Current), before ?? ctx.Current, null,
+                ctx.CancellationToken).ConfigureAwait(false);
         });
     }
 
     private static async Task EmitAsync(
-        string action, string entityName, string id, string subject, object? before, object? after, CancellationToken ct)
+        string action, string entityName, string id, string subject, string? actor,
+        object? before, object? after, CancellationToken ct)
     {
         try
         {
@@ -62,7 +71,7 @@ internal static class IdentityAuditHooks
             var snapshotMode = options?.AuditSnapshotMode ?? IdentityAuditSnapshotMode.PrivacySafe;
             var e = new AuditEvent
             {
-                Actor = AppHost.Current?.GetService<IIdentityActorAccessor>()?.CurrentActorSubject,
+                Actor = actor ?? AppHost.Current?.GetService<IIdentityActorAccessor>()?.CurrentActorSubject,
                 Subject = subject,
                 Action = action,
                 Target = $"{entityName}/{id}",

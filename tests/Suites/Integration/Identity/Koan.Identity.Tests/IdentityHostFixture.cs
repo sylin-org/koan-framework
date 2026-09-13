@@ -3,6 +3,7 @@ using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Koan.Identity.Erasure;
+using Koan.Identity.Roles;
 using Xunit;
 
 namespace Koan.Identity.Tests;
@@ -21,6 +22,7 @@ public sealed class IdentityHostFixture : IAsyncLifetime
     public const string DevUser = "devboss";
 
     private IntegrationHost? _host;
+    public TestIdentityActorAccessor Actor { get; } = new();
 
     public IServiceProvider Services =>
         _host?.Services ?? throw new InvalidOperationException("Host not started.");
@@ -31,6 +33,10 @@ public sealed class IdentityHostFixture : IAsyncLifetime
             .ConfigureServices(s =>
             {
                 s.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityErasureContributor, TestIdentityErasureContributor>());
+                s.TryAddEnumerable(ServiceDescriptor.Singleton<IScopedRoleCatalogContributor, TestScopedRoleCatalog>());
+                s.TryAddEnumerable(ServiceDescriptor.Scoped<IScopedRoleAuthorityContributor, TestScopedRoleAuthority>());
+                s.TryAddEnumerable(ServiceDescriptor.Scoped<IScopedRoleGuardContributor, TestScopedRoleGuard>());
+                s.TryAddSingleton<IScopedRoleSubjectAccessor>(Actor);
                 s.AddKoan();
             })
             .StartAsync();
@@ -40,4 +46,62 @@ public sealed class IdentityHostFixture : IAsyncLifetime
     {
         if (_host is not null) await _host.DisposeAsync();
     }
+}
+
+public sealed class TestIdentityActorAccessor : IScopedRoleSubjectAccessor
+{
+    private readonly AsyncLocal<string?> _subject = new();
+    public string? CurrentSubject => _subject.Value;
+    public IDisposable Use(string? subject)
+    {
+        var prior = _subject.Value;
+        _subject.Value = subject;
+        return new Restore(() => _subject.Value = prior);
+    }
+    private sealed class Restore(Action restore) : IDisposable
+    {
+        private bool _done;
+        public void Dispose() { if (!_done) { _done = true; restore(); } }
+    }
+}
+
+internal sealed class TestScopedRoleCatalog : IScopedRoleCatalogContributor
+{
+    public void Describe(ScopedRoleCatalogBuilder catalog)
+    {
+        catalog.Scope("space");
+        catalog.Scope("topic", "space");
+        catalog.Scope("folder");
+        catalog.Scope("document", "folder");
+        catalog.Capability("discussion.read", ["space", "topic"], allowsAnonymous: true);
+        catalog.Capability("discussion.reply", ["space", "topic"]);
+        catalog.Capability("discussion.approve", ["space", "topic"], parameters: ["amount", "department"]);
+        catalog.Capability("docs.read", ["folder", "document"]);
+    }
+}
+
+internal sealed class TestScopedRoleAuthority : IScopedRoleAuthorityContributor
+{
+    private static readonly IReadOnlySet<ScopedRoleAuthorityOperation> Operations =
+        Enum.GetValues<ScopedRoleAuthorityOperation>().ToHashSet();
+
+    public ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
+        ScopedRoleAuthorityRequest request,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (!request.Actor.Subject.StartsWith("owner:", StringComparison.Ordinal))
+            return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([]);
+        return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
+            new(request.Target, Operations, Descendants: true, AllowSelfAssignment: true)
+        ]);
+    }
+}
+
+internal sealed class TestScopedRoleGuard : IScopedRoleGuardContributor
+{
+    public ValueTask<ScopedRoleGuardResult> Evaluate(ScopedRoleGuardRequest request, CancellationToken ct = default)
+        => ValueTask.FromResult(request.Parameters.TryGetValue("blocked", out var value) && value is true
+            ? ScopedRoleGuardResult.Deny("guard.blocked", "The application guard blocks this action.", "test", 1)
+            : ScopedRoleGuardResult.Permit());
 }

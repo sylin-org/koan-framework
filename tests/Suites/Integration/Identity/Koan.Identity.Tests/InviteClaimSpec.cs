@@ -14,11 +14,14 @@ namespace Koan.Identity.Tests;
 /// reserved roles each fail closed without consuming anything.
 /// </summary>
 [Collection("identity")]
-public sealed class InviteClaimSpec(IdentityHostFixture fixture)
+public sealed class InviteClaimSpec : IdentityHostScopedSpec
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
+    private readonly IdentityHostFixture _fixture;
 
-    private IServiceProvider Services => fixture.Services;
+    public InviteClaimSpec(IdentityHostFixture fixture) : base(fixture) => _fixture = fixture;
+
+    private IServiceProvider Services => _fixture.Services;
 
     private static async Task<(string IdentityId, string Email)> NewVerifiedPersonAsync(
         IServiceProvider services, string email)

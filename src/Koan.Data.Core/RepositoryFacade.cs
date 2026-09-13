@@ -1187,6 +1187,10 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
     public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
     {
+        if (strategy == RemoveStrategy.Fast && typeof(IRequiresLifecycleEnforcement).IsAssignableFrom(typeof(TEntity)))
+            throw new NotSupportedException(
+                $"Fast removal for '{typeof(TEntity).Name}' is unavailable because the entity requires lifecycle enforcement. " +
+                "Use Safe or Optimized removal so every mutation crosses its semantic guard.");
         var effect = strategy == RemoveStrategy.Fast
             ? DataOperationEffect.SchemaOrAdmin
             : DataOperationEffect.Write;
@@ -1296,6 +1300,11 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     {
         ArgumentNullException.ThrowIfNull(instruction);
         var effect = instruction.EffectiveEffect();
+        if (typeof(IRequiresLifecycleEnforcement).IsAssignableFrom(typeof(TEntity)) &&
+            instruction.Name != DataInstructions.EnsureCreated && effect != DataOperationEffect.Read)
+            throw new NotSupportedException(
+                $"Instruction '{instruction.Name}' is unavailable for '{typeof(TEntity).Name}' because it could bypass required lifecycle enforcement. " +
+                "Use the entity's guarded domain operation instead.");
         _sourcePlan.Demand(effect, "entity instruction");
         if (!_segmentation.IsEmpty && instruction.Name != DataInstructions.EnsureCreated)
         {

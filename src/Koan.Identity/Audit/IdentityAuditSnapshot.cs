@@ -1,4 +1,5 @@
 using Koan.Identity.Impersonation;
+using Koan.Identity.Roles;
 using Newtonsoft.Json;
 
 namespace Koan.Identity.Audit;
@@ -55,6 +56,27 @@ internal static class IdentityAuditSnapshot
             grant.ExpiresAt,
             grant.Revoked,
             grant.RequestedAt,
+        }),
+        ScopedRoleScope scope => JsonConvert.SerializeObject(new
+        {
+            scope.TenantId, scope.Type, scope.ScopeId, scope.ParentType, scope.ParentScopeId, scope.Version,
+        }),
+        ScopedRoleDefinition definition => JsonConvert.SerializeObject(new
+        {
+            definition.TenantId, definition.ScopeType, definition.ScopeId, definition.Status,
+            definition.Version, definition.AuthorityVersion,
+            Capabilities = definition.Grants.Select(x => x.Capability).Distinct(StringComparer.Ordinal).Order(),
+        }),
+        ScopedRoleBinding binding => JsonConvert.SerializeObject(new
+        {
+            binding.TenantId, binding.Subject, binding.RoleId, binding.ScopeType, binding.ScopeId,
+            binding.Propagation, binding.ExpiresAt, binding.Revoked, binding.Version,
+            binding.ApprovedRoleVersion, PolicyVersions = binding.ApprovedPolicyVersions.Count,
+        }),
+        ScopedRolePolicy policy => JsonConvert.SerializeObject(new
+        {
+            policy.TenantId, policy.ScopeType, policy.ScopeId, policy.Capability, policy.Mode,
+            policy.Version, AudienceKinds = policy.Audience.Select(x => x.Kind).Distinct().Order(),
         }),
         _ => JsonConvert.SerializeObject(new { Entity = entity.GetType().Name }),
     };
