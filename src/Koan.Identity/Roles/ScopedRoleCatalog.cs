@@ -195,6 +195,7 @@ public sealed class ScopedRoleCatalog
 public class ScopedRoleException : InvalidOperationException
 {
     public ScopedRoleException(string code, string message) : base(message) => Code = code;
+    public ScopedRoleException(string code, string message, Exception innerException) : base(message, innerException) => Code = code;
     public string Code { get; }
 }
 

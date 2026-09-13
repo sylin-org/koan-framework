@@ -57,6 +57,26 @@ Caller authorization remains the projection's responsibility.
 
 ## Lifecycle and audit
 
+Scoped-role runtime evaluation uses a host-owned bounded LRU of immutable target-scope snapshots. A single-flight
+lazy build reads the bounded ancestry, per-scope membership rows, referenced role definitions and tenant policy set,
+then atomically publishes dual indexes: subject → effective roles/capability candidates and role → live members,
+plus nearest replacement audiences. Expiry is the entry validity ceiling. Mutation invalidation removes affected
+descendant snapshots before post-events; refresh failure removes the entry and rejects without stale fallback.
+Request parameters and `IScopedRoleGuardContributor` results remain live and are never stored in the snapshot.
+An invalidation that races an in-flight build evicts that generation; the waiting caller loops onto the replacement
+rather than receiving the completed stale object. `ScopedRolePlan.Memberships` and `.Audience` reuse the compiled
+immutable hash-set projections. `role:*` tokens identify capability-bearing roles, `group:*` tokens are audience-only,
+and `permission:*` tokens are derived candidates rather than persisted membership facts.
+
+`Entity.Role` pre-events run after delegation admission but before provider dispatch and may veto. Their context
+includes tenant, scope, real actor, subject, role, old/new capability clauses, generation, timestamp and cancellation.
+Successful writes
+invalidate the compiled snapshot before post-events run. Post-handler failure therefore means “committed and
+invalidated, projection callback failed,” surfaced by `ScopedRolePostEventException`; no rollback is claimed.
+Dispatch is sequential and recursive role mutation from a handler rejects. The POC cache and event delivery are
+process-local. Multi-process applications must broadcast `ScopedRoleDomainVersionChange` to every process after the
+external fact commits.
+
 `SessionService` records, lists, and revokes cookie sessions. `IdentityLifecycleService` suspends/reactivates in
 partial-failure-tolerant batches. `PreviewErasureAsync` folds every discovered `IIdentityErasureContributor` without
 mutation. `EraseAsync` closes core access first, executes all owners even after an owner-local failure, sanitizes

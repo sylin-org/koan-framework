@@ -204,6 +204,13 @@ public sealed record AssignScopedRole(
     ScopedRolePropagation Propagation = ScopedRolePropagation.Local,
     DateTimeOffset? ExpiresAt = null);
 
+/// <summary>Names one member of a scoped role collection. Removing an absent member is a successful no-op.</summary>
+public sealed record RemoveScopedRoleMembership(
+    ScopedRoleScopeRef Scope,
+    string Subject,
+    string RoleId,
+    long? ExpectedVersion = null);
+
 public sealed record ReplaceScopedRolePolicy(
     ScopedRoleScopeRef Scope,
     string Capability,
@@ -222,7 +229,14 @@ public sealed record ScopedRolePlan(
     IReadOnlyList<string> RoleIds,
     string? WinningPolicyId,
     IReadOnlyDictionary<string, long> Versions,
-    DateTimeOffset EvaluatedAt);
+    DateTimeOffset EvaluatedAt)
+{
+    /// <summary>Compiled role/group memberships plus derived permission tokens for this subject and scope.</summary>
+    public ScopedRoleMembershipSet Memberships { get; init; } = ScopedRoleMembershipSet.Empty;
+
+    /// <summary>The compiled capability audience. Matching it does not include mandatory application guards.</summary>
+    public ScopedRoleAudience Audience { get; init; } = ScopedRoleAudience.None;
+}
 
 public sealed record ScopedRolePreview(ScopedRolePlan Plan, bool IsSimulation = false);
 
@@ -233,6 +247,9 @@ public sealed record ScopedRoleEngineLimits(
     int MaxClausesPerRecord)
 {
     public int MaxDirectoryPageSize { get; init; } = 100;
+    public int MaxBindingsPerScope { get; init; } = 1024;
+    public int MaxCompiledSnapshots { get; init; } = 1024;
+    public int MaxDomainVersions { get; init; } = 4096;
 }
 
 public sealed record ScopedRolePage<TEntity>(
@@ -255,7 +272,10 @@ public sealed class RoleEngineOptions
     public const string SectionPath = "Koan:Identity:ScopedRoles";
     public int MaxAncestryDepth { get; set; } = 16;
     public int MaxBindingsPerSubject { get; set; } = 256;
+    public int MaxBindingsPerScope { get; set; } = 1024;
     public int MaxPoliciesPerTenant { get; set; } = 512;
     public int MaxClausesPerRecord { get; set; } = 64;
     public int MaxDirectoryPageSize { get; set; } = 100;
+    public int MaxCompiledSnapshots { get; set; } = 1024;
+    public int MaxDomainVersions { get; set; } = 4096;
 }

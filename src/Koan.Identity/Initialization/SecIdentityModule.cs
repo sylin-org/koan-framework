@@ -56,7 +56,18 @@ public sealed class SecIdentityModule : KoanModule
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleGuardContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IScopedRoleGuardContributor), type));
         services.TryAddSingleton<ScopedRoleCatalog>();
-        services.TryAddScoped<RoleEngine>();
+        services.TryAddSingleton<ScopedRoleSnapshotCache>();
+        services.TryAddSingleton<IScopedRoleAccessInvalidator>(provider =>
+            provider.GetRequiredService<ScopedRoleSnapshotCache>());
+        services.TryAddScoped(provider => new RoleEngine(
+            provider.GetRequiredService<ScopedRoleCatalog>(),
+            provider.GetServices<IScopedRoleAuthorityContributor>(),
+            provider.GetServices<IScopedRoleGuardContributor>(),
+            provider.GetRequiredService<IOptions<RoleEngineOptions>>(),
+            provider.GetService<IIdentityActorAccessor>(),
+            provider.GetService<IScopedRoleSubjectAccessor>(),
+            null,
+            provider.GetRequiredService<ScopedRoleSnapshotCache>()));
 
         // SEC-0009 — semantic owners compose one privacy erasure plan. Scoped registration permits an
         // application-owned contributor to use its ordinary scoped dependencies without special wiring.

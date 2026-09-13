@@ -429,6 +429,49 @@ test receipts/current source rather than copying status into additional plans.
 
 ### Selected implementation contract
 
+Compiled authorization hot-path contract: an application continues to call
+`roles.Check(capability, scope, parameters, ct)`; no cache API enters the ordinary access expression.
+`Koan.Identity` owns a bounded, host-local cache of immutable compiled role-graph snapshots keyed by
+tenant and normalized target scope. Each snapshot projects the normalized binding rows into role-member
+hash sets, retains each role's correlated capability clauses, compiles nearest policy audiences for the
+scope ancestry, and captures source versions plus the earliest live-binding expiry. All subjects and
+capabilities at that target share one atomically published snapshot. Warm `Check`, `Plan`, `Preview`
+and resource constraint calls perform no role-graph repository reads. Mandatory application guards
+remain live on every evaluation, and request parameters are applied only to immutable clauses;
+request-specific guard answers are never cached.
+
+Successful engine mutations evict only scope snapshots whose recorded ancestry or role dependency can
+be affected. In-flight entries with incomplete dependencies are conservatively evicted within the
+matching tenant boundary. A failed refresh removes its entry and
+fails closed without returning an older snapshot. Expiry is a hard validity boundary. Applications
+whose ownership, membership, restriction, admission, lock or classification versions change call the
+injected `IScopedRoleAccessInvalidator.Invalidate(new ScopedRoleDomainVersionChange(...))` after their
+domain commit; multi-node applications must deliver that version signal to every process. The versioned
+change is scope-bound and keeps the hook a business-fact boundary rather than exposing cache mechanics.
+
+Every registered scope has one automatic direct built-in Owner membership: the verified actor who first
+registers it. The compiled Owner role grants the catalog capabilities applicable at that exact scope;
+it is not inherited merely because a scope is an ancestor and it does not replace separate delegation
+authority for role administration. Owner is a framework semantic role identity, not an editable role
+label or application mirror.
+
+Revoked legacy or expired deterministic bindings are renewable by a fresh authorized `Assign`: the engine
+deletes the inactive row and inserts the same binding identity with a fresh monotonic version, new expiry,
+current approval versions and issuer/update attribution. `RemoveScopedRoleMembership` makes an absent collection
+member an authorized no-op. An identical retry against a currently live binding remains idempotent and never
+renews expiry. Prior issuance/removal states remain evidence in the Identity audit chain; no revocation tombstone
+is retained as membership truth.
+
+Coalescence and ergonomics: the existing `RoleEngine` remains the sole decision and mutation owner;
+the cache absorbs repeated graph-loading mechanics and does not create a second resolver, per-subject
+cache protocol, application mirror or public repository. The only additional public concepts are the
+invalidator and its versioned domain-change value because external facts have a lifecycle Koan cannot
+infer, plus immutable membership/audience value objects projected on each plan. `Memberships.ContainsAny`
+and `Audience.Matches` expose the compiled hash-set model without exposing cache mechanics. Membership
+tokens are namespaced: `role:*` identities carry capabilities, `group:*` identities are audience-only,
+and `permission:*` values are derived from the compiled role graph rather than accepted as direct
+membership input. Existing unprefixed role identifiers project as `role:{id}` for compatibility.
+
 Consumer boundary correction contract: `RoleIds` is the read ceiling for definition and assignment
 directories/by-id reads; `Capabilities` is the read ceiling for policy directories/by-id reads and
 preview. Supported alternative envelopes union only the operation's matching allow-list axis; an
@@ -469,6 +512,7 @@ second existing adapter before provider parity is claimed.
 | 2026-09-13 | Slice 2 headless query boundary and first real-provider receipt green | Mutation authority is re-read through the selected contributor and captured scope versions at the one-shot lifecycle boundary. `Constrain`, `Query`, `QueryWithCount`, `Get` and `Count` share one immutable plan plus provider-pushed tenant-and-scope filters; paginated access rejects adapters without provider-bounded paging. Identity is 112/112 and the isolated SQLite receipt is 1/1, proving pushed filtering, paging/count, insert-only and conditional-replace CAS. Not complete: Mongo parity, optional Web management routes/directories and W01-W18 remain open. |
 | 2026-09-13 | Mongo parity and initial optional Web boundary green on `dev` | Isolated Mongo receipt is 1/1 for pushed tenant/scope filtering and paging/count, same-scope-id cross-tenant hiding, post-revocation denial and provider-re-read authority invalidation before dispatch. TestServer + SQLite Web receipt is 1/1 for reference activation, anonymous failure, server-generated role IDs, indistinguishable absent/unauthorized responses, ETag/`If-Match`, real-cookie antiforgery despite a forged authorization header, and global-operator separation. Identity is 115/115; SQLite remains 1/1; both packages build warning-free. Exact correlated direct and policy-derived grant/audience clauses are now optional delegation-envelope ceilings. Assignable-role and scoped-audit routes were withdrawn after independent red-team because their safe provider-paged/read-owner designs are not yet proven. Directory paging remains closed on adapters without provider-bounded paging. The freshness guarantee is a lifecycle-boundary pre-dispatch recheck, not a serializable authority+target transaction. W01-W18 are only partially covered; generic trusted-code reads, consumer/document-workspace, directory-scale, preview-race, concurrent ETag and restart evidence remain open. |
 | 2026-09-13 | Consumer read/reset boundary corrections green | SQLite provider receipt proves `RoleIds`/`Capabilities` constrain same-scope role, binding and policy rows, by-id reads, exact counts and preview before paging; same-axis alternatives union, empty/unsupported-first alternatives cannot mask later valid authority, and unsupported-only clause ceilings reject instead of post-filtering. Core proves a narrow child policy remains effective when a steward has only `ManagePolicy` plus an audience ceiling, while explicit capability-scoped `ResetPolicy` restores inheritance even after an unsupported alternative. Identity is 116/116 and SQLite is 1/1. Next: concrete Speakers public-read/selected-reply journey, real concurrent ETag and restart/revocation receipts. |
+| 2026-09-13 | Compiled member-set POC and renewable membership green | `RoleEngine` now publishes a bounded immutable target-scope snapshot with forward subject/role/capability and reverse role/member/policy-candidate indexes; parameters and mandatory guards remain live. `ScopedRolePlan` projects immutable namespaced `Memberships.ContainsAny` and compiled `Audience.Matches` predicates. Engine scope/role/binding/policy mutations invalidate affected ancestry slices before post-events, including an in-flight invalidation generation check. Membership revoke deletes the normalized binding row; re-add uses the same deterministic identity with a fresh monotonic ETag generation, while a live identical add remains non-renewing. `Entity.Role` exposes veto-capable member/permission pre-events and committed-only post-events; post failure is explicitly committed/no-rollback and recursive mutation rejects. Core is 122/122; SQLite, Mongo and Web are 1/1. POC limits: process-local invalidation/event delivery, no authorized reverse-subject directory yet, and no multi-node coherence receipt. |
 
 **Current handoff:** the existing Koan task **Report framework status** owns implementation.
 The coordinating task **Polish Tangent Space UX** owns consumer adoption. Before production edits,

@@ -326,6 +326,7 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
         (await normal.Check(new("participant:reset"), "discussion.reply", topic)).Should().BeFalse();
 
         var catalog = scope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>();
+        var snapshots = scope.ServiceProvider.GetRequiredService<ScopedRoleSnapshotCache>();
         var steward = new ScopedRoleActor("steward:reset");
         var manageOnly = new ResetPolicyAuthority
         {
@@ -334,7 +335,7 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
             Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
         };
         var limited = new RoleEngine(catalog, [manageOnly], [],
-            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()), null, null, null, snapshots);
 
         var denied = async () => await limited.Inherit(steward, topic, "discussion.reply", narrowing.Version);
         await denied.Should().ThrowAsync<ScopedRoleAuthorizationException>()
@@ -351,7 +352,7 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
             Capability = "discussion.reply",
             AllowReset = true,
             Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
-        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()), null, null, null, snapshots);
         var unsupported = async () => await clauseConstrainedReset.Inherit(steward, topic,
             "discussion.reply", narrowing.Version);
         await unsupported.Should().ThrowAsync<ScopedRoleAuthorizationException>()
@@ -364,10 +365,359 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
             AllowReset = true,
             Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
             IncludeSupportedFallback = true,
-        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()), null, null, null, snapshots);
         var inherited = await reset.Inherit(steward, topic, "discussion.reply", narrowing.Version);
         inherited.Mode.Should().Be(ScopedRoleOverrideMode.Inherit);
         (await normal.Check(new("participant:reset"), "discussion.reply", topic)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Compiled_membership_sets_invalidate_on_add_remove_readd_and_role_events()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var snapshots = scope.ServiceProvider.GetRequiredService<ScopedRoleSnapshotCache>();
+        var (owner, root, topic) = await Tree(engine);
+        var reader = await engine.Define(owner, new(root, "Reader", [new("discussion.read")]));
+        var adding = 0;
+        var added = 0;
+        var removed = 0;
+        var permissionsChanged = 0;
+        var postRemovalDenied = false;
+        ScopedRoleChangeContext? addedContext = null;
+        ScopedRoleChangeContext? permissionContext = null;
+        Koan.Data.Core.Model.Entity.Role
+            .MemberAdding(context =>
+            {
+                if (context.Scope.TenantId != root.TenantId) return ValueTask.FromResult(ScopedRoleChangeDecision.Continue());
+                Interlocked.Increment(ref adding);
+                return ValueTask.FromResult(context.Subject == "participant:veto"
+                    ? ScopedRoleChangeDecision.Veto("test.role.veto", "The test vetoed this membership.")
+                    : ScopedRoleChangeDecision.Continue());
+            })
+            .MemberAdded(context =>
+            {
+                if (context.Scope.TenantId == root.TenantId)
+                {
+                    Interlocked.Increment(ref added);
+                    addedContext = context;
+                }
+                return ValueTask.CompletedTask;
+            })
+            .MemberRemoved(async context =>
+            {
+                if (context.Scope.TenantId != root.TenantId) return;
+                Interlocked.Increment(ref removed);
+                postRemovalDenied = !await engine.Check(new("participant:cycle"), "discussion.read", topic);
+            })
+            .MemberRemoved(context => context.Subject == "participant:post-fail"
+                ? ValueTask.FromException(new InvalidOperationException("post failure"))
+                : ValueTask.CompletedTask)
+            .PermissionsChanged(context =>
+            {
+                if (context.Scope.TenantId == root.TenantId)
+                {
+                    Interlocked.Increment(ref permissionsChanged);
+                    permissionContext = context;
+                }
+                return ValueTask.CompletedTask;
+            });
+        try
+        {
+            var vetoed = async () => await engine.Assign(owner, new(root, "participant:veto", reader.Id,
+                ScopedRolePropagation.Descendants));
+            await vetoed.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+                .Where(error => error.Code == "test.role.veto");
+            (await ScopedRoleBinding.Get(ScopedRoleBinding.KeyFor(root.TenantId, "participant:veto", reader.Id, root)))
+                .Should().BeNull();
+            added.Should().Be(0);
+
+            var first = await engine.Assign(owner, new(root, "participant:cycle", reader.Id,
+                ScopedRolePropagation.Descendants));
+            var eventsBeforeRetry = (adding, added);
+            var retry = await engine.Assign(owner, new(root, "participant:cycle", reader.Id,
+                ScopedRolePropagation.Descendants));
+            retry.Id.Should().Be(first.Id);
+            retry.Version.Should().Be(first.Version, "a repeated live collection add is idempotent");
+            (adding, added).Should().Be(eventsBeforeRetry, "an idempotent add is not a new lifecycle change");
+            addedContext.Should().NotBeNull();
+            addedContext!.Actor.Should().Be(owner);
+            addedContext.Subject.Should().Be("participant:cycle");
+            addedContext.Scope.Should().Be(root);
+            addedContext.Phase.Should().Be(ScopedRoleChangePhase.After);
+            addedContext.Version.Should().Be(first.Version);
+            var firstVersion = first.Version;
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeTrue();
+            var warmBuilds = snapshots.BuildCount;
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeTrue();
+            snapshots.BuildCount.Should().Be(warmBuilds, "a warm check must reuse the compiled scope snapshot");
+
+            var removedBinding = await engine.Revoke(owner, first.Id, first.Version);
+            removedBinding.Revoked.Should().BeTrue();
+            (await ScopedRoleBinding.Get(first.Id)).Should().BeNull("membership removal deletes the collection row");
+            postRemovalDenied.Should().BeTrue("cache invalidation precedes successful post-events");
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeFalse();
+
+            var second = await engine.Assign(owner, new(root, "participant:cycle", reader.Id,
+                ScopedRolePropagation.Descendants));
+            second.Id.Should().Be(first.Id);
+            second.Version.Should().BeGreaterThan(firstVersion, "re-add must not recreate a stale ETag generation");
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeTrue();
+            var beforeDomainChange = snapshots.BuildCount;
+            scope.ServiceProvider.GetRequiredService<IScopedRoleAccessInvalidator>()
+                .Invalidate(new(topic, "test:membership", 1));
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeTrue();
+            snapshots.BuildCount.Should().Be(beforeDomainChange + 1);
+
+            var failing = await engine.Assign(owner, new(root, "participant:post-fail", reader.Id,
+                ScopedRolePropagation.Descendants));
+            _ = await engine.Check(new("participant:post-fail"), "discussion.read", topic);
+            var postFailure = async () => await engine.Revoke(owner, failing.Id, failing.Version);
+            await postFailure.Should().ThrowAsync<ScopedRolePostEventException>();
+            (await ScopedRoleBinding.Get(failing.Id)).Should().BeNull("post failures happen after durable removal");
+            (await engine.Check(new("participant:post-fail"), "discussion.read", topic)).Should().BeFalse();
+
+            reader = await engine.Edit(owner, new(reader.Id, reader.Version,
+                Grants: [new("discussion.reply")]));
+            permissionsChanged.Should().Be(1);
+            permissionContext.Should().NotBeNull();
+            permissionContext!.Actor.Should().Be(owner);
+            permissionContext.PreviousPermissions.Select(grant => grant.Capability)
+                .Should().Equal("discussion.read");
+            permissionContext.CurrentPermissions.Select(grant => grant.Capability)
+                .Should().Equal("discussion.reply");
+            permissionContext.Version.Should().Be(reader.Version);
+            permissionContext.Timestamp.Should().NotBe(default);
+            (await engine.Check(new("participant:cycle"), "discussion.read", topic)).Should().BeFalse();
+
+            var postsBeforeUnauthorized = added;
+            var unauthorized = async () => await engine.Assign(new ScopedRoleActor("participant:ordinary"),
+                new(root, "participant:other", reader.Id));
+            await unauthorized.Should().ThrowAsync<ScopedRoleAuthorizationException>();
+            added.Should().Be(postsBeforeUnauthorized);
+
+            adding.Should().Be(4);
+            added.Should().Be(3);
+            removed.Should().Be(2);
+        }
+        finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
+    [Fact]
+    public async Task Private_topic_audience_matches_namespaced_gardeners_or_admin_memberships()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var admin = await engine.Define(owner, new(root, "Admin", [new("discussion.read")], Id: "role:admin"));
+        var gardeners = await engine.Define(owner, new(root, "Gardeners", [], Id: "group:gardeners"));
+        await engine.Replace(owner, new(topic, "discussion.read", [
+            new(ScopedRoleAudienceKind.Role, gardeners.Id),
+            new(ScopedRoleAudienceKind.Role, admin.Id),
+        ]));
+        await engine.Assign(owner, new(root, "alice:garden", gardeners.Id, ScopedRolePropagation.Descendants));
+        await engine.Assign(owner, new(root, "alice:admin", admin.Id, ScopedRolePropagation.Descendants));
+
+        var gardenerAtTopic = await engine.Plan(new("alice:garden"), "discussion.read", topic);
+        gardenerAtTopic.Memberships.ContainsAny("role:admin", "group:gardeners").Should().BeTrue();
+        gardenerAtTopic.Audience.Matches(gardenerAtTopic.Memberships).Should().BeTrue();
+        gardenerAtTopic.Memberships.Contains("permission:discussion.read").Should().BeFalse(
+            "group membership can match an audience but does not grant a capability");
+        gardenerAtTopic.Allowed.Should().BeTrue();
+
+        var adminAtTopic = await engine.Plan(new("alice:admin"), "discussion.read", topic);
+        adminAtTopic.Memberships.ContainsAny("role:admin", "group:gardeners").Should().BeTrue();
+        adminAtTopic.Memberships.Contains("permission:discussion.read").Should().BeTrue(
+            "permission tokens are derived from the compiled role grant");
+        adminAtTopic.Audience.Matches(adminAtTopic.Memberships).Should().BeTrue();
+        adminAtTopic.Allowed.Should().BeTrue();
+
+        var gardenerAtRoot = await engine.Plan(new("alice:garden"), "discussion.read", root);
+        gardenerAtRoot.Allowed.Should().BeFalse("the group audience is scoped to the private topic");
+        (await engine.Check(new("alice:outside"), "discussion.read", topic)).Should().BeFalse();
+
+        var forgedPermission = () => ScopedRoleMembershipSet.Create("permission:discussion.read");
+        forgedPermission.Should().Throw<ArgumentException>();
+        var capabilityGroup = async () => await engine.Define(owner,
+            new(root, "Invalid group", [new("discussion.read")], Id: "group:capability-owner"));
+        await capabilityGroup.Should().ThrowAsync<ScopedRoleValidationException>()
+            .Where(error => error.Code == "group.capabilities.unsupported");
+    }
+
+    [Fact]
+    public async Task Tangent_owner_can_be_promoted_demoted_and_promoted_with_the_same_binding_identity()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var ownerRole = await engine.Define(owner,
+            new(root, "Owner", [new("discussion.read")], Id: "role:owner"));
+
+        var firstPromotion = await engine.Assign(owner, new(root, "tangent:owner", ownerRole.Id,
+            ScopedRolePropagation.Descendants));
+        (await engine.Check(new("tangent:owner"), "discussion.read", topic)).Should().BeTrue();
+        await engine.Revoke(owner, firstPromotion.Id, firstPromotion.Version);
+        (await ScopedRoleBinding.Get(firstPromotion.Id)).Should().BeNull();
+        (await engine.Remove(owner, new(root, "tangent:owner", ownerRole.Id))).Should().BeFalse(
+            "removing an absent collection member is an idempotent no-op");
+        (await engine.Check(new("tangent:owner"), "discussion.read", topic)).Should().BeFalse();
+
+        var secondPromotion = await engine.Assign(owner, new(root, "tangent:owner", ownerRole.Id,
+            ScopedRolePropagation.Descendants));
+        secondPromotion.Id.Should().Be(firstPromotion.Id);
+        secondPromotion.Version.Should().BeGreaterThan(firstPromotion.Version);
+        (await engine.Check(new("tangent:owner"), "discussion.read", topic)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Concurrent_collection_changes_publish_one_success_and_keep_snapshots_immutable()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var snapshots = scope.ServiceProvider.GetRequiredService<ScopedRoleSnapshotCache>();
+        var (owner, root, topic) = await Tree(engine);
+        var role = await engine.Define(owner, new(root, "Concurrent reader", [new("discussion.read")]));
+        var addArrivals = 0;
+        var addSuccesses = 0;
+        var bothAdding = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removeArrivals = 0;
+        var removeSuccesses = 0;
+        var bothRemoving = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Koan.Data.Core.Model.Entity.Role
+            .MemberAdding(async context =>
+            {
+                if (context.Subject != "participant:concurrent") return ScopedRoleChangeDecision.Continue();
+                if (Interlocked.Increment(ref addArrivals) == 2) bothAdding.TrySetResult();
+                await bothAdding.Task;
+                return ScopedRoleChangeDecision.Continue();
+            })
+            .MemberAdded(context =>
+            {
+                if (context.Subject == "participant:concurrent") Interlocked.Increment(ref addSuccesses);
+                return ValueTask.CompletedTask;
+            })
+            .MemberRemoving(async context =>
+            {
+                if (context.Subject != "participant:concurrent") return ScopedRoleChangeDecision.Continue();
+                if (Interlocked.Increment(ref removeArrivals) == 2) bothRemoving.TrySetResult();
+                await bothRemoving.Task;
+                return ScopedRoleChangeDecision.Continue();
+            })
+            .MemberRemoved(context =>
+            {
+                if (context.Subject == "participant:concurrent") Interlocked.Increment(ref removeSuccesses);
+                return ValueTask.CompletedTask;
+            });
+        try
+        {
+            var additions = await Task.WhenAll(
+                engine.Assign(owner, new(root, "participant:concurrent", role.Id, ScopedRolePropagation.Descendants)),
+                engine.Assign(owner, new(root, "participant:concurrent", role.Id, ScopedRolePropagation.Descendants)));
+            additions.Select(binding => binding.Id).Distinct().Should().ContainSingle();
+            addSuccesses.Should().Be(1);
+            (await ScopedRoleBinding.Query(binding => binding.Subject == "participant:concurrent"))
+                .Should().ContainSingle();
+
+            var before = await engine.Plan(new("participant:concurrent"), "discussion.read", topic);
+            before.Allowed.Should().BeTrue();
+            before.Memberships.Contains(ScopedRoleTokens.RoleOrGroup(role.Id)).Should().BeTrue();
+            var warmBuilds = snapshots.BuildCount;
+            _ = await engine.Plan(new("participant:concurrent"), "discussion.read", topic);
+            snapshots.BuildCount.Should().Be(warmBuilds);
+            var key = new ScopedRoleSnapshotCache.CacheKey(topic.TenantId, topic.Type, topic.Id);
+            var compiled = await snapshots.Get(key, _ => throw new InvalidOperationException("warm snapshot rebuilt"),
+                CancellationToken.None);
+            compiled.SubjectRoles["participant:concurrent"].Should().Contain(role.Id);
+            compiled.RoleMembers[role.Id].Should().Contain("participant:concurrent");
+
+            var removals = await Task.WhenAll(
+                engine.Revoke(owner, additions[0].Id, additions[0].Version),
+                engine.Revoke(owner, additions[0].Id, additions[0].Version));
+            removals.Should().OnlyContain(binding => binding.Revoked);
+            removeSuccesses.Should().Be(1);
+            (await ScopedRoleBinding.Get(additions[0].Id)).Should().BeNull();
+
+            var after = await engine.Plan(new("participant:concurrent"), "discussion.read", topic);
+            after.Allowed.Should().BeFalse();
+            snapshots.BuildCount.Should().BeGreaterThan(warmBuilds, "removal forces a cold immutable rebuild");
+            before.Memberships.Contains(ScopedRoleTokens.RoleOrGroup(role.Id)).Should().BeTrue(
+                "readers holding the prior immutable snapshot are not mutated in place");
+            after.Memberships.Contains(ScopedRoleTokens.RoleOrGroup(role.Id)).Should().BeFalse();
+        }
+        finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
+    [Fact]
+    public async Task Compiled_snapshot_expires_and_an_expired_membership_can_be_added_again()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var normal = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(normal);
+        var role = await normal.Define(owner, new(root, "Temporary reader", [new("discussion.read")]));
+        var clock = new ManualTimeProvider(DateTimeOffset.UtcNow);
+        var options = Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions());
+        var snapshots = new ScopedRoleSnapshotCache(options.Value, clock);
+        var engine = new RoleEngine(scope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>(),
+            scope.ServiceProvider.GetServices<IScopedRoleAuthorityContributor>(), [], options,
+            null, null, clock, snapshots);
+        var binding = await engine.Assign(owner, new(root, "participant:expiring", role.Id,
+            ScopedRolePropagation.Descendants, clock.GetUtcNow().AddMinutes(5)));
+        (await engine.Check(new("participant:expiring"), "discussion.read", topic)).Should().BeTrue();
+        var warmBuilds = snapshots.BuildCount;
+
+        clock.Advance(TimeSpan.FromMinutes(6));
+        (await engine.Check(new("participant:expiring"), "discussion.read", topic)).Should().BeFalse();
+        snapshots.BuildCount.Should().Be(warmBuilds + 1, "expiry is a hard snapshot validity boundary");
+
+        var renewed = await engine.Assign(owner, new(root, "participant:expiring", role.Id,
+            ScopedRolePropagation.Descendants, clock.GetUtcNow().AddMinutes(5)));
+        renewed.Id.Should().Be(binding.Id);
+        renewed.Version.Should().BeGreaterThan(binding.Version);
+        (await engine.Check(new("participant:expiring"), "discussion.read", topic)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Invalidation_during_compilation_never_returns_the_evicted_generation()
+    {
+        var options = new RoleEngineOptions();
+        var cache = new ScopedRoleSnapshotCache(options, TimeProvider.System);
+        var target = Ref("tenant:compile-race", "topic");
+        var key = new ScopedRoleSnapshotCache.CacheKey(target.TenantId, target.Type, target.Id);
+        var firstBuildStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstBuild = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var generation = 0;
+
+        async Task<ScopedRoleSnapshotCache.CompiledSnapshot> Build(CancellationToken ct)
+        {
+            var current = Interlocked.Increment(ref generation);
+            if (current == 1)
+            {
+                firstBuildStarted.SetResult();
+                await releaseFirstBuild.Task.WaitAsync(ct);
+            }
+            return new(key, [target],
+                new Dictionary<string, IReadOnlyList<ScopedRoleGrantClause>>(StringComparer.Ordinal),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal),
+                new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal),
+                new Dictionary<string, ScopedRoleMembershipSet>(StringComparer.Ordinal),
+                new Dictionary<string, ScopedRoleAudience>(StringComparer.Ordinal),
+                new Dictionary<string, ScopedRoleSnapshotCache.CompiledPolicy>(StringComparer.Ordinal),
+                new HashSet<string>(StringComparer.Ordinal),
+                new Dictionary<string, long>(StringComparer.Ordinal) { ["generation"] = current },
+                new Dictionary<string, long>(StringComparer.Ordinal),
+                new Dictionary<string, long>(StringComparer.Ordinal),
+                new Dictionary<string, IReadOnlyDictionary<string, long>>(StringComparer.Ordinal), null);
+        }
+
+        var pending = cache.Get(key, Build, CancellationToken.None);
+        await firstBuildStarted.Task;
+        cache.InvalidateScope(target);
+        releaseFirstBuild.SetResult();
+
+        var snapshot = await pending;
+        generation.Should().Be(2);
+        snapshot.ScopeVersions["generation"].Should().Be(2);
     }
 
     [Fact]
@@ -592,6 +942,13 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
         public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
             ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
             => ValueTask.FromResult(envelope.ProofKey == "reset-policy" && envelope.ProofVersion == 1);
+    }
+
+    private sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
+    {
+        private DateTimeOffset _now = now;
+        public override DateTimeOffset GetUtcNow() => _now;
+        public void Advance(TimeSpan duration) => _now += duration;
     }
 }
 

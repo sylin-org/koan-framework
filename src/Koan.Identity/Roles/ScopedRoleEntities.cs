@@ -11,6 +11,7 @@ public sealed class ScopedRoleScope : Entity<ScopedRoleScope>, IAmbientExempt, I
     public string TenantId { get; set; } = "";
     public string Type { get; set; } = "";
     public string ScopeId { get; set; } = "";
+    public string OwnerSubject { get; set; } = "";
     public string? ParentType { get; set; }
     public string? ParentScopeId { get; set; }
     public long Version { get; set; } = 1;

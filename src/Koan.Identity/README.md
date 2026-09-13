@@ -38,6 +38,42 @@ does not add a second authentication flow: it consumes Web Auth's sign-in lifecy
 
 All records use Koan's selected Data provider. There is no Identity-specific repository or storage adapter.
 
+Scoped-role checks compile durable scopes, roles, memberships and policies into a bounded immutable target-scope
+snapshot. The snapshot contains both subject-to-role/capability and role-to-member indexes; warm checks apply
+parameters and live mandatory guards without rereading the role graph. Role membership is collection semantics:
+assign adds, revoke deletes, and a later assign adds the same subject again with a fresh concurrency version.
+
+Plans expose that scope-specific compiled model directly without exposing the cache:
+
+```csharp
+var aliceAtTopic = await roles.Plan(alice, "discussion.read", topic, ct: ct);
+
+var isGardenerOrAdmin = aliceAtTopic.Memberships
+    .ContainsAny("group:gardeners", "role:admin");
+var matchesPrivateTopic = aliceAtTopic.Audience
+    .Matches(aliceAtTopic.Memberships);
+```
+
+Use `role:*` definitions for capability-bearing roles and grantless `group:*` definitions for audience membership.
+Compiled membership sets may contain derived `permission:*` tokens, but callers cannot inject those tokens as
+membership truth. `Audience.Matches` evaluates the compiled ordinary audience; `Plan.Allowed` is still the final
+answer because it also intersects mandatory live guards and request parameters.
+
+Applications react through one discoverable lifecycle family:
+
+```csharp
+Entity.Role
+    .MemberAdding(context => ValidateMembership(context))
+    .MemberAdded(context => ProjectMembership(context))
+    .PermissionsChanging(context => ValidatePermissions(context))
+    .PermissionsChanged(context => ProjectPermissions(context));
+```
+
+Pre-events may veto. Post-events run only after durable success and compiled-snapshot invalidation. A post-handler
+failure is reported as `ScopedRolePostEventException`; the mutation remains committed. Recursive role mutation from
+a handler rejects. External domain facts publish a monotonic version after commit through
+`IScopedRoleAccessInvalidator`.
+
 ## Configuration
 
 ```jsonc
@@ -48,7 +84,8 @@ All records use Koan's selected Data provider. There is no Identity-specific rep
       "SeedDevUsers": false,
       "DevUser": "local-operator",
       "HashChainAudit": true,
-      "AuditSnapshotMode": "PrivacySafe"
+      "AuditSnapshotMode": "PrivacySafe",
+      "ScopedRoles": { "MaxCompiledSnapshots": 1024, "MaxBindingsPerScope": 1024 }
     }
   }
 }
@@ -93,8 +130,8 @@ are intended.
 - Session revocation governs Koan cookie sessions. It does not revoke already-issued bearer tokens.
 - Personal access tokens are not provided. Koan does not issue a credential unless a real authentication path accepts
   and enforces it.
-- Group-based access is not provided. Use global `IdentityRole` or tenant `Membership.Roles`; a group model should
-  return only with an effective-access consumer.
+- Scoped `group:*` memberships are audience-only and never grant capabilities. They do not replace global
+  `IdentityRole`, tenant `Membership.Roles`, or an application-owned organizational group directory.
 - Audit emission is best-effort after the domain mutation. Hash chaining detects tampering but does not make the
   underlying store append-only or deliver records to a SIEM.
 - An erasure receipt proves only the registered owners it lists. External IdPs, bearer-token issuers, SIEMs, backups,

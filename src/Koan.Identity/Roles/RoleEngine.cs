@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Extensions.Options;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
@@ -16,6 +15,7 @@ public sealed class RoleEngine
     private readonly IReadOnlyList<IScopedRoleGuardContributor> _guards;
     private readonly RoleEngineOptions _options;
     private readonly TimeProvider _clock;
+    private readonly ScopedRoleSnapshotCache _snapshots;
     private readonly IIdentityActorAccessor? _actorAccessor;
     private readonly IScopedRoleSubjectAccessor? _subjectAccessor;
 
@@ -27,6 +27,17 @@ public sealed class RoleEngine
         IIdentityActorAccessor? actorAccessor = null,
         IScopedRoleSubjectAccessor? subjectAccessor = null,
         TimeProvider? clock = null)
+        : this(catalog, authorities, guards, options, actorAccessor, subjectAccessor, clock, null) { }
+
+    internal RoleEngine(
+        ScopedRoleCatalog catalog,
+        IEnumerable<IScopedRoleAuthorityContributor> authorities,
+        IEnumerable<IScopedRoleGuardContributor> guards,
+        IOptions<RoleEngineOptions> options,
+        IIdentityActorAccessor? actorAccessor,
+        IScopedRoleSubjectAccessor? subjectAccessor,
+        TimeProvider? clock,
+        ScopedRoleSnapshotCache? snapshots)
     {
         _catalog = catalog;
         _authorities = authorities.ToArray();
@@ -35,11 +46,15 @@ public sealed class RoleEngine
         _actorAccessor = actorAccessor;
         _subjectAccessor = subjectAccessor;
         _clock = clock ?? TimeProvider.System;
+        _snapshots = snapshots ?? new ScopedRoleSnapshotCache(_options, _clock);
         if (_options.MaxAncestryDepth is < 1 or > 128) throw new InvalidOperationException("Scoped-role ancestry bound must be between 1 and 128.");
         if (_options.MaxBindingsPerSubject is < 1 or > 10_000) throw new InvalidOperationException("Scoped-role binding bound must be between 1 and 10000.");
+        if (_options.MaxBindingsPerScope is < 1 or > 100_000) throw new InvalidOperationException("Scoped-role per-scope binding bound must be between 1 and 100000.");
         if (_options.MaxPoliciesPerTenant is < 1 or > 10_000) throw new InvalidOperationException("Scoped-role policy bound must be between 1 and 10000.");
         if (_options.MaxClausesPerRecord is < 1 or > 1024) throw new InvalidOperationException("Scoped-role clause bound must be between 1 and 1024.");
         if (_options.MaxDirectoryPageSize is < 1 or > 1000) throw new InvalidOperationException("Scoped-role directory page bound must be between 1 and 1000.");
+        if (_options.MaxCompiledSnapshots is < 1 or > 100_000) throw new InvalidOperationException("Scoped-role compiled snapshot bound must be between 1 and 100000.");
+        if (_options.MaxDomainVersions is < 1 or > 100_000) throw new InvalidOperationException("Scoped-role domain-version bound must be between 1 and 100000.");
     }
 
     public Task<ScopedRoleEngineDescriptor> Describe(CancellationToken ct = default)
@@ -47,7 +62,13 @@ public sealed class RoleEngine
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(new ScopedRoleEngineDescriptor(_catalog.Scopes, _catalog.Capabilities, _catalog.Resources,
             new(_options.MaxAncestryDepth, _options.MaxBindingsPerSubject, _options.MaxPoliciesPerTenant,
-                _options.MaxClausesPerRecord) { MaxDirectoryPageSize = _options.MaxDirectoryPageSize }));
+                _options.MaxClausesPerRecord)
+            {
+                MaxDirectoryPageSize = _options.MaxDirectoryPageSize,
+                MaxBindingsPerScope = _options.MaxBindingsPerScope,
+                MaxCompiledSnapshots = _options.MaxCompiledSnapshots,
+                MaxDomainVersions = _options.MaxDomainVersions,
+            }));
     }
 
     public Task<ScopedRoleScope> Register(RegisterScopedRoleScope command, CancellationToken ct = default)
@@ -78,6 +99,7 @@ public sealed class RoleEngine
             var created = new ScopedRoleScope
             {
                 Id = id, TenantId = target.TenantId, Type = target.Type, ScopeId = target.Id,
+                OwnerSubject = actor.StableSubject,
                 ParentType = parent?.Type, ParentScopeId = parent?.Id, Version = 1,
                 UpdatedAt = Now, UpdatedBy = actor.StableSubject,
             };
@@ -88,6 +110,7 @@ public sealed class RoleEngine
             throw new ScopedRoleConcurrencyException("The scope changed after it was read.");
         current.ParentType = parent?.Type;
         current.ParentScopeId = parent?.Id;
+        if (string.IsNullOrWhiteSpace(current.OwnerSubject)) current.OwnerSubject = actor.StableSubject;
         current.Version++;
         current.UpdatedAt = Now;
         current.UpdatedBy = actor.StableSubject;
@@ -104,6 +127,7 @@ public sealed class RoleEngine
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
         var grants = NormalizeGrants(command.Grants, scope.Type);
         var id = string.IsNullOrWhiteSpace(command.Id) ? Guid.NewGuid().ToString("N") : command.Id.Trim();
+        ValidateRoleShape(id, grants);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.DefineRole, scope, RoleId: id,
             EffectiveCapabilities: grants.Select(x => x.Capability).ToHashSet(StringComparer.Ordinal))
         {
@@ -133,6 +157,7 @@ public sealed class RoleEngine
             throw new ScopedRoleConcurrencyException("The role changed after it was read.");
 
         var grants = command.Grants is null ? role.Grants : NormalizeGrants(command.Grants, scope.Type);
+        ValidateRoleShape(role.Id, grants);
         var status = command.Status ?? role.Status;
         var authorityChanged = status != role.Status || !GrantSetsEqual(role.Grants, grants);
         var approval = await ApprovalFor(role.Id, role.TenantId, grants, ct).ConfigureAwait(false);
@@ -142,6 +167,15 @@ public sealed class RoleEngine
             EffectiveGrants = approval.Grants,
         };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
+
+        var priorPermissions = role.Status == ScopedRoleStatus.Active
+            ? role.Grants.Select(Clone).ToArray() : [];
+        var currentPermissions = status == ScopedRoleStatus.Active
+            ? grants.Select(Clone).ToArray() : [];
+        if (authorityChanged)
+            await ScopedRoleEventRegistry.Before(ScopedRoleEventKind.PermissionsChanging,
+                ChangeContext(role, null, actor, priorPermissions, currentPermissions,
+                    role.Version, ScopedRoleChangePhase.Before, ct)).ConfigureAwait(false);
 
         role.Name = command.Name is null ? role.Name : ScopedRoleScopeRef.Require(command.Name, nameof(command.Name));
         role.Purpose = command.Purpose ?? role.Purpose;
@@ -153,6 +187,10 @@ public sealed class RoleEngine
         role.UpdatedAt = Now;
         role.UpdatedBy = actor.StableSubject;
         await Replace(role, command.ExpectedVersion, proof, ct).ConfigureAwait(false);
+        if (authorityChanged)
+            await ScopedRoleEventRegistry.After(ScopedRoleEventKind.PermissionsChanged,
+                ChangeContext(role, null, actor, priorPermissions, currentPermissions,
+                    role.Version, ScopedRoleChangePhase.After, ct)).ConfigureAwait(false);
         return role;
     }
 
@@ -199,25 +237,67 @@ public sealed class RoleEngine
             Id = id, TenantId = scope.TenantId, Subject = subject, RoleId = role.Id,
             ScopeType = scope.Type, ScopeId = scope.Id, Propagation = command.Propagation,
             ExpiresAt = command.ExpiresAt, ApprovedRoleVersion = role.AuthorityVersion,
-            ApprovedPolicyVersions = approval.PolicyVersions, Version = 1,
+            ApprovedPolicyVersions = approval.PolicyVersions, Version = _snapshots.NextMembershipVersion(),
             IssuedBy = actor.StableSubject, UpdatedBy = actor.StableSubject, UpdatedAt = Now,
         };
+        var existing = await ScopedRoleBinding.Get(id, ct).ConfigureAwait(false);
+        if (existing is not null && !existing.Revoked &&
+            (existing.ExpiresAt is null || existing.ExpiresAt > Now))
+        {
+            if (SameMembership(existing, binding)) return existing;
+            throw new ScopedRoleConcurrencyException("The role membership already exists with different terms.");
+        }
+        var adding = ChangeContext(role, subject, actor, [], role.Grants, binding.Version,
+            ScopedRoleChangePhase.Before, ct);
+        await ScopedRoleEventRegistry.Before(ScopedRoleEventKind.MemberAdding, adding).ConfigureAwait(false);
+        if (existing is not null)
+        {
+            using var cleanup = ScopedRoleMutationGuard.Allow<ScopedRoleBinding>(existing.Id,
+                Koan.Data.Core.Lifecycle.EntityLifecycleOperation.Remove, proof.Revalidate);
+            if (!await existing.Remove(ct).ConfigureAwait(false))
+                throw new ScopedRoleConcurrencyException("The expired role membership changed before renewal.");
+            _snapshots.InvalidateBinding(existing);
+        }
+        ScopedRoleBinding inserted;
         try
         {
-            return await Insert(binding, proof, ct).ConfigureAwait(false);
+            inserted = await Insert(binding, proof, ct).ConfigureAwait(false);
         }
         catch (ScopedRoleConcurrencyException)
         {
-            var existing = await ScopedRoleBinding.Get(id, ct).ConfigureAwait(false);
-            if (existing is not null && !existing.Revoked && existing.TenantId == binding.TenantId &&
-                existing.Subject == binding.Subject && existing.RoleId == binding.RoleId &&
-                existing.ScopeType == binding.ScopeType && existing.ScopeId == binding.ScopeId &&
-                existing.Propagation == binding.Propagation && existing.ExpiresAt == binding.ExpiresAt &&
-                existing.ApprovedRoleVersion == binding.ApprovedRoleVersion &&
-                DictionaryEqual(existing.ApprovedPolicyVersions, binding.ApprovedPolicyVersions))
-                return existing; // idempotent retry; importantly does not renew expiry or rewrite attribution.
+            var winner = await ScopedRoleBinding.Get(id, ct).ConfigureAwait(false);
+            if (winner is not null && !winner.Revoked && (winner.ExpiresAt is null || winner.ExpiresAt > Now) &&
+                SameMembership(winner, binding))
+                return winner; // concurrent identical insert is the same collection add; only the winner emits success.
             throw;
         }
+        await ScopedRoleEventRegistry.After(ScopedRoleEventKind.MemberAdded,
+            adding with { Phase = ScopedRoleChangePhase.After }).ConfigureAwait(false);
+        return inserted;
+    }
+
+    public Task<bool> Remove(RemoveScopedRoleMembership command, CancellationToken ct = default)
+        => Remove(CurrentAdministrativeActor(), command, ct);
+
+    internal async Task<bool> Remove(ScopedRoleActor actor, RemoveScopedRoleMembership command,
+        CancellationToken ct = default)
+    {
+        var scope = Normalize(command.Scope);
+        var subject = ScopedRoleScopeRef.Require(command.Subject, nameof(command.Subject));
+        var role = await DemandRole(command.RoleId, ct).ConfigureAwait(false);
+        DemandSameTenant(scope.TenantId, role.TenantId);
+        var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
+        if (!ContainsScope(ancestry, role.Scope()))
+            throw new ScopedRoleValidationException("role.scope.inapplicable", "The role is not defined in the target scope ancestry.");
+        var id = ScopedRoleBinding.KeyFor(scope.TenantId, subject, role.Id, scope);
+        var binding = await ScopedRoleBinding.Get(id, ct).ConfigureAwait(false);
+        var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.RevokeRole, scope, subject, role.Id,
+            binding?.Propagation, binding?.ExpiresAt);
+        var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
+        if (binding is null) return false;
+        if (command.ExpectedVersion is { } expected && binding.Version != expected)
+            throw new ScopedRoleConcurrencyException("The binding changed after it was read.");
+        return await RemoveBinding(actor, role, binding, proof, ct).ConfigureAwait(false);
     }
 
     public Task<ScopedRoleBinding> Reapprove(string bindingId, long expectedVersion, CancellationToken ct = default)
@@ -261,11 +341,12 @@ public sealed class RoleEngine
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.RevokeRole, binding.Scope(), binding.Subject,
             binding.RoleId, binding.Propagation, binding.ExpiresAt);
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
-        binding.Revoked = true;
+        var role = await DemandRole(binding.RoleId, ct).ConfigureAwait(false);
+        _ = await RemoveBinding(actor, role, binding, proof, ct).ConfigureAwait(false);
+        binding.Revoked = true; // compatibility response only; no tombstone is persisted.
         binding.Version++;
         binding.UpdatedAt = Now;
         binding.UpdatedBy = actor.StableSubject;
-        await Replace(binding, expectedVersion, proof, ct).ConfigureAwait(false);
         return binding;
     }
 
@@ -281,6 +362,7 @@ public sealed class RoleEngine
         var selectedRoles = audience.Where(x => x.Kind == ScopedRoleAudienceKind.Role).Select(x => x.Value!).Distinct(StringComparer.Ordinal).ToArray();
         foreach (var roleId in selectedRoles)
         {
+            if (roleId == ScopedRoleBuiltInRoles.Owner) continue;
             var role = await DemandRole(roleId, ct).ConfigureAwait(false);
             DemandSameTenant(scope.TenantId, role.TenantId);
             if (role.Status != ScopedRoleStatus.Active || !ContainsScope(ancestry, role.Scope()))
@@ -380,52 +462,52 @@ public sealed class RoleEngine
     {
         target = Normalize(target);
         var descriptor = _catalog.DemandCapability(capability, target.Type);
-        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        var now = Now;
-        var bindings = subject.IsAuthenticated
-            ? await LoadBindings(subject.StableSubject, target.TenantId, ct).ConfigureAwait(false)
-            : [];
-        var applicable = bindings.Where(x => !x.Revoked && (x.ExpiresAt is null || x.ExpiresAt > now) &&
-            (SameScope(x.Scope(), target) || x.Propagation == ScopedRolePropagation.Descendants && ContainsScope(ancestry, x.Scope())))
-            .ToArray();
-        var roles = new Dictionary<string, ScopedRoleDefinition>(StringComparer.Ordinal);
-        foreach (var roleId in applicable.Select(x => x.RoleId).Distinct(StringComparer.Ordinal))
+        var snapshotKey = new ScopedRoleSnapshotCache.CacheKey(target.TenantId, target.Type, target.Id);
+        ScopedRoleSnapshotCache.CompiledSnapshot snapshot;
+        try
         {
-            var role = await ScopedRoleDefinition.Get(roleId, ct).ConfigureAwait(false);
-            if (role is not null && role.TenantId == target.TenantId) roles[role.Id] = role;
+            snapshot = await _snapshots.Get(snapshotKey, token => Compile(target, token), ct).ConfigureAwait(false);
         }
-        var live = applicable.Where(x => roles.TryGetValue(x.RoleId, out var role) &&
-            role.Status == ScopedRoleStatus.Active && role.AuthorityVersion == x.ApprovedRoleVersion &&
-            ContainsScope(ancestry, role.Scope())).ToArray();
-
-        ScopedRolePolicy? winning = null;
-        foreach (var scope in ancestry)
+        catch (ScopedRoleException) { throw; }
+        catch (Exception)
         {
-            var policy = await ScopedRolePolicy.Get(ScopedRolePolicy.KeyFor(scope, capability), ct).ConfigureAwait(false);
-            if (policy is { Mode: ScopedRoleOverrideMode.Replace }) { winning = policy; break; }
+            throw new ScopedRoleAuthorizationException("snapshot.refresh.failed",
+                "Scoped-role access could not be refreshed from its authoritative store.");
         }
 
+        var stableSubject = subject.IsAuthenticated ? subject.StableSubject : "anonymous";
+        var memberRoleIds = subject.IsAuthenticated && snapshot.SubjectRoles.TryGetValue(stableSubject, out var effectiveRoles)
+            ? effectiveRoles.ToArray() : [];
+        var memberships = subject.IsAuthenticated && snapshot.SubjectMemberships.TryGetValue(stableSubject, out var compiledMemberships)
+            ? compiledMemberships
+            : ScopedRoleMembershipSet.Compile(stableSubject, subject.IsAuthenticated, [], []);
         var reasons = new List<ScopedRoleReason>();
         bool allowed;
-        if (winning is not null)
+        ScopedRoleAudience audience;
+        if (snapshot.Policies.TryGetValue(capability, out var winning))
         {
-            allowed = winning.Audience.Any(a => AudienceMatches(a, descriptor, subject, live, roles, winning, parameters));
+            audience = winning.Predicate;
+            allowed = audience.Matches(memberships, parameters);
             reasons.Add(new(allowed ? "policy.replace.matched" : "policy.replace.denied",
                 allowed ? "The nearest replacement audience matched." : "The nearest replacement audience did not match.",
                 nameof(ScopedRolePolicy), winning.Id));
         }
         else
         {
-            allowed = live.Any(binding => roles[binding.RoleId].Grants.Any(g =>
-                StringComparer.Ordinal.Equals(g.Capability, capability) && ConditionsMatch(g.Conditions, parameters)));
+            audience = snapshot.DefaultAudiences.TryGetValue(capability, out var compiledAudience)
+                ? compiledAudience : ScopedRoleAudience.None;
+            allowed = audience.Matches(memberships, parameters);
             reasons.Add(new(allowed ? "role.default.matched" : "role.default.denied",
                 allowed ? "An applicable role grant matched." : "No applicable role grant matched."));
         }
 
-        var versions = new Dictionary<string, long>(StringComparer.Ordinal);
-        foreach (var binding in live) versions[$"binding:{binding.Id}"] = binding.Version;
-        foreach (var role in roles.Values) versions[$"role:{role.Id}"] = role.Version;
-        if (winning is not null) versions[$"policy:{winning.Id}"] = winning.Version;
+        var versions = new Dictionary<string, long>(snapshot.ScopeVersions, StringComparer.Ordinal);
+        foreach (var roleId in memberRoleIds)
+            if (snapshot.RoleVersions.TryGetValue(roleId, out var version)) versions[$"role:{roleId}"] = version;
+        if (winning is not null && snapshot.PolicyVersions.TryGetValue(winning.Id, out var policyVersion))
+            versions[$"policy:{winning.Id}"] = policyVersion;
+        if (subject.IsAuthenticated && snapshot.SubjectBindingVersions.TryGetValue(stableSubject, out var bindingVersions))
+            foreach (var pair in bindingVersions) versions[$"binding:{pair.Key}"] = pair.Value;
         var safeParameters = parameters ?? new Dictionary<string, object?>(StringComparer.Ordinal);
         foreach (var guard in _guards)
         {
@@ -438,7 +520,11 @@ public sealed class RoleEngine
             }
         }
         return new(subject, target, capability, allowed, reasons,
-            live.Select(x => x.RoleId).Distinct(StringComparer.Ordinal).ToArray(), winning?.Id, versions, now);
+            memberRoleIds, winning?.Id, versions, Now)
+        {
+            Memberships = memberships,
+            Audience = audience,
+        };
     }
 
     public Task<ScopedRoleQueryPlan> Constrain<TEntity>(string action, ScopedRoleScopeRef target,
@@ -659,6 +745,135 @@ public sealed class RoleEngine
         if (requireProviderPaging && !capabilities.Has(DataCaps.Query.ProviderBoundedPaging))
             throw new NotSupportedException($"The adapter backing {typeof(TEntity).Name} cannot prove provider-bounded paging for this scoped-role query.");
     }
+
+    private async Task<ScopedRoleSnapshotCache.CompiledSnapshot> Compile(ScopedRoleScopeRef target, CancellationToken ct)
+    {
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        var now = Now;
+        var scopeVersions = new Dictionary<string, long>(StringComparer.Ordinal);
+        string? owner = null;
+        foreach (var scope in ancestry)
+        {
+            var row = await ScopedRoleScope.Get(ScopedRoleScope.KeyFor(scope), ct).ConfigureAwait(false)
+                ?? throw new ScopedRoleValidationException("scope.unknown", "The trusted target scope is not registered.");
+            scopeVersions[$"scope:{row.Id}"] = row.Version;
+            if (SameScope(scope, target)) owner = string.IsNullOrWhiteSpace(row.OwnerSubject) ? null : row.OwnerSubject;
+        }
+
+        var bindings = new List<ScopedRoleBinding>();
+        foreach (var scope in ancestry)
+        {
+            var page = new QueryDefinition { Page = 1, PageSize = _options.MaxBindingsPerScope + 1 };
+            var rows = await ScopedRoleBinding.Query(x => x.TenantId == target.TenantId &&
+                x.ScopeType == scope.Type && x.ScopeId == scope.Id, page, ct).ConfigureAwait(false);
+            if (rows.Count > _options.MaxBindingsPerScope)
+                throw new ScopedRoleValidationException("bindings.scope.bound.exceeded",
+                    "A scope has more role memberships than the configured compilation bound.");
+            bindings.AddRange(rows.Where(binding => !binding.Revoked &&
+                (SameScope(scope, target) || binding.Propagation == ScopedRolePropagation.Descendants)));
+        }
+
+        var roles = new Dictionary<string, ScopedRoleDefinition>(StringComparer.Ordinal);
+        foreach (var roleId in bindings.Select(binding => binding.RoleId).Distinct(StringComparer.Ordinal))
+        {
+            var role = await ScopedRoleDefinition.Get(roleId, ct).ConfigureAwait(false);
+            if (role is not null && role.TenantId == target.TenantId && ContainsScope(ancestry, role.Scope()))
+                roles[role.Id] = role;
+        }
+        var live = bindings.Where(binding => binding.ExpiresAt is null || binding.ExpiresAt > now)
+            .Where(binding => roles.TryGetValue(binding.RoleId, out var role) &&
+                role.Status == ScopedRoleStatus.Active && role.AuthorityVersion == binding.ApprovedRoleVersion)
+            .ToArray();
+
+        var roleGrants = roles.Values.Where(role => role.Status == ScopedRoleStatus.Active)
+            .ToDictionary(role => role.Id,
+                role => (IReadOnlyList<ScopedRoleGrantClause>)role.Grants.Select(Clone).ToArray(), StringComparer.Ordinal);
+        var roleMembers = live.GroupBy(binding => binding.RoleId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => (IReadOnlySet<string>)group.Select(binding => binding.Subject).ToHashSet(StringComparer.Ordinal),
+                StringComparer.Ordinal);
+        if (owner is not null)
+        {
+            roleMembers[ScopedRoleBuiltInRoles.Owner] = new HashSet<string>([owner], StringComparer.Ordinal);
+            roleGrants[ScopedRoleBuiltInRoles.Owner] = _catalog.Capabilities
+                .Where(capability => capability.ScopeTypes.Contains(target.Type))
+                .Select(capability => new ScopedRoleGrantClause(capability.Key)).ToArray();
+        }
+        var subjectRoles = roleMembers.SelectMany(pair => pair.Value.Select(subject => (subject, pair.Key)))
+            .GroupBy(pair => pair.subject, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => (IReadOnlySet<string>)group.Select(pair => pair.Key).ToHashSet(StringComparer.Ordinal),
+                StringComparer.Ordinal);
+        var subjectCapabilities = subjectRoles.ToDictionary(pair => pair.Key,
+            pair => (IReadOnlySet<string>)pair.Value.SelectMany(roleId => roleGrants.TryGetValue(roleId, out var grants)
+                    ? grants.Select(grant => grant.Capability) : [])
+                .ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+        var subjectMemberships = subjectRoles.ToDictionary(pair => pair.Key,
+            pair => ScopedRoleMembershipSet.Compile(pair.Key, true, pair.Value,
+                subjectCapabilities.TryGetValue(pair.Key, out var capabilities) ? capabilities : []),
+            StringComparer.Ordinal);
+        var defaultAudiences = roleGrants.SelectMany(pair => pair.Value.Select(grant => (RoleId: pair.Key, Grant: grant)))
+            .GroupBy(item => item.Grant.Capability, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => ScopedRoleAudience.Compile(group.Select(item => new ScopedRoleAudienceClause(
+                    ScopedRoleAudienceKind.Role, item.RoleId, item.Grant.Conditions)), roleMembers, false),
+                StringComparer.Ordinal);
+
+        var policyPage = new QueryDefinition { Page = 1, PageSize = _options.MaxPoliciesPerTenant + 1 };
+        var allPolicies = await ScopedRolePolicy.Query(x => x.TenantId == target.TenantId, policyPage, ct).ConfigureAwait(false);
+        if (allPolicies.Count > _options.MaxPoliciesPerTenant)
+            throw new ScopedRoleValidationException("policies.bound.exceeded",
+                "The tenant has more scoped-role policies than the configured compilation bound.");
+        var scopeOrder = ancestry.Select((scope, index) => (ScopedRoleScope.KeyFor(scope), index))
+            .ToDictionary(pair => pair.Item1, pair => pair.index, StringComparer.Ordinal);
+        var winners = allPolicies.Where(policy => policy.Mode == ScopedRoleOverrideMode.Replace &&
+                scopeOrder.ContainsKey(ScopedRoleScope.KeyFor(policy.Scope())))
+            .GroupBy(policy => policy.Capability, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(policy => scopeOrder[ScopedRoleScope.KeyFor(policy.Scope())]).First())
+            .ToArray();
+        var compiledPolicies = new Dictionary<string, ScopedRoleSnapshotCache.CompiledPolicy>(StringComparer.Ordinal);
+        foreach (var policy in winners)
+        {
+            var policyMembers = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
+            foreach (var roleId in policy.Audience.Where(item => item.Kind == ScopedRoleAudienceKind.Role)
+                         .Select(item => item.Value!).Distinct(StringComparer.Ordinal))
+            {
+                if (roleId == ScopedRoleBuiltInRoles.Owner && owner is not null)
+                {
+                    policyMembers[roleId] = new HashSet<string>([owner], StringComparer.Ordinal);
+                    continue;
+                }
+                policyMembers[roleId] = live.Where(binding => binding.RoleId == roleId &&
+                        binding.ApprovedPolicyVersions.TryGetValue(policy.Id, out var version) && version == policy.Version)
+                    .Select(binding => binding.Subject).ToHashSet(StringComparer.Ordinal);
+            }
+            var candidates = policyMembers.Values.SelectMany(members => members)
+                .Concat(policy.Audience.Where(item => item.Kind == ScopedRoleAudienceKind.Subject && item.Value is not null)
+                    .Select(item => item.Value!)).ToHashSet(StringComparer.Ordinal);
+            var descriptor = _catalog.DemandCapability(policy.Capability, target.Type);
+            compiledPolicies[policy.Capability] = new(policy.Id, policy.Audience.Select(Clone).ToArray(),
+                policyMembers, candidates, ScopedRoleAudience.Compile(policy.Audience, policyMembers,
+                    descriptor.AllowsAnonymous));
+        }
+
+        var subjectVersions = live.GroupBy(binding => binding.Subject, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key,
+                group => (IReadOnlyDictionary<string, long>)group.ToDictionary(binding => binding.Id,
+                    binding => binding.Version, StringComparer.Ordinal), StringComparer.Ordinal);
+        return new(new(target.TenantId, target.Type, target.Id), ancestry.ToArray(), roleGrants, roleMembers,
+            subjectRoles, subjectCapabilities, subjectMemberships, defaultAudiences,
+            compiledPolicies, roles.Keys.ToHashSet(StringComparer.Ordinal), scopeVersions,
+            roles.ToDictionary(pair => pair.Key, pair => pair.Value.Version, StringComparer.Ordinal),
+            winners.ToDictionary(policy => policy.Id, policy => policy.Version, StringComparer.Ordinal),
+            subjectVersions, live.Where(binding => binding.ExpiresAt is not null).Select(binding => binding.ExpiresAt!.Value)
+                .DefaultIfEmpty(DateTimeOffset.MaxValue).Min() is var expiry && expiry != DateTimeOffset.MaxValue ? expiry : null);
+    }
+
+    private static ScopedRoleGrantClause Clone(ScopedRoleGrantClause clause)
+        => new(clause.Capability, clause.Conditions?.ToArray());
+
+    private static ScopedRoleAudienceClause Clone(ScopedRoleAudienceClause clause)
+        => new(clause.Kind, clause.Value, clause.Conditions?.ToArray());
 
     private async Task<IReadOnlyList<ScopedRoleScopeRef>> LoadAncestry(ScopedRoleScopeRef target, CancellationToken ct)
     {
@@ -888,49 +1103,6 @@ public sealed class RoleEngine
         return normalized;
     }
 
-    private static bool AudienceMatches(ScopedRoleAudienceClause audience, ScopedRoleCapabilityDescriptor capability,
-        ScopedRoleActor subject, IReadOnlyList<ScopedRoleBinding> bindings,
-        IReadOnlyDictionary<string, ScopedRoleDefinition> roles, ScopedRolePolicy policy,
-        IReadOnlyDictionary<string, object?>? parameters)
-    {
-        if (!ConditionsMatch(audience.Conditions, parameters)) return false;
-        return audience.Kind switch
-        {
-            ScopedRoleAudienceKind.Anonymous => !subject.IsAuthenticated && capability.AllowsAnonymous,
-            ScopedRoleAudienceKind.Authenticated => subject.IsAuthenticated,
-            ScopedRoleAudienceKind.Subject => subject.IsAuthenticated && StringComparer.Ordinal.Equals(subject.StableSubject, audience.Value),
-            ScopedRoleAudienceKind.Role => subject.IsAuthenticated && bindings.Any(x =>
-                StringComparer.Ordinal.Equals(x.RoleId, audience.Value) && roles.ContainsKey(x.RoleId) &&
-                x.ApprovedPolicyVersions.TryGetValue(policy.Id, out var approved) && approved == policy.Version),
-            _ => false,
-        };
-    }
-
-    private static bool ConditionsMatch(IReadOnlyList<ScopedRoleCondition>? conditions,
-        IReadOnlyDictionary<string, object?>? parameters)
-    {
-        if (conditions is null || conditions.Count == 0) return true;
-        if (parameters is null) return false;
-        foreach (var condition in conditions)
-        {
-            if (!parameters.TryGetValue(condition.Parameter, out var actual) || actual is null) return false;
-            var actualText = Convert.ToString(actual, CultureInfo.InvariantCulture) ?? "";
-            var matched = condition.Operator switch
-            {
-                ScopedRoleConditionOperator.Equal => StringComparer.Ordinal.Equals(actualText, condition.Value),
-                ScopedRoleConditionOperator.LessThanOrEqual => CompareDecimal(actualText, condition.Value, (a, b) => a <= b),
-                ScopedRoleConditionOperator.GreaterThanOrEqual => CompareDecimal(actualText, condition.Value, (a, b) => a >= b),
-                _ => false,
-            };
-            if (!matched) return false;
-        }
-        return true;
-    }
-
-    private static bool CompareDecimal(string actual, string expected, Func<decimal, decimal, bool> compare)
-        => decimal.TryParse(actual, NumberStyles.Number, CultureInfo.InvariantCulture, out var a) &&
-           decimal.TryParse(expected, NumberStyles.Number, CultureInfo.InvariantCulture, out var b) && compare(a, b);
-
     private async Task<ScopedRoleDefinition> DemandRole(string id, CancellationToken ct)
         => await ScopedRoleDefinition.Get(ScopedRoleScopeRef.Require(id, nameof(id)), ct).ConfigureAwait(false)
             ?? throw new ScopedRoleValidationException("role.unknown", "The role does not exist or is unavailable.");
@@ -939,18 +1111,40 @@ public sealed class RoleEngine
         => await ScopedRoleBinding.Get(ScopedRoleScopeRef.Require(id, nameof(id)), ct).ConfigureAwait(false)
             ?? throw new ScopedRoleValidationException("binding.unknown", "The binding does not exist or is unavailable.");
 
-    private static async Task<TEntity> Insert<TEntity>(TEntity entity, AuthorityProof proof, CancellationToken ct)
+    private async Task<TEntity> Insert<TEntity>(TEntity entity, AuthorityProof proof, CancellationToken ct)
         where TEntity : Entity<TEntity>, IEntity<string>
     {
         using var mutation = ScopedRoleMutationGuard.Allow<TEntity>(entity.Id,
             Koan.Data.Core.Lifecycle.EntityLifecycleOperation.Upsert, proof.Revalidate);
         var result = await Data<TEntity, string>.Insert(entity, ct: ct).ConfigureAwait(false);
-        return result.Outcome == MutationOutcome.Inserted && result.Entity is not null
-            ? result.Entity
-            : throw new ScopedRoleConcurrencyException($"{typeof(TEntity).Name} already exists.");
+        if (result.Outcome != MutationOutcome.Inserted || result.Entity is null)
+            throw new ScopedRoleConcurrencyException($"{typeof(TEntity).Name} already exists.");
+        Invalidate(entity);
+        return result.Entity;
     }
 
-    private static async Task Replace(ScopedRoleScope entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
+    private async Task<bool> RemoveBinding(ScopedRoleActor actor, ScopedRoleDefinition role,
+        ScopedRoleBinding binding, AuthorityProof proof, CancellationToken ct)
+    {
+        var removing = ChangeContext(role, binding.Subject, actor, role.Grants, [], binding.Version,
+            ScopedRoleChangePhase.Before, ct);
+        await ScopedRoleEventRegistry.Before(ScopedRoleEventKind.MemberRemoving, removing).ConfigureAwait(false);
+        bool removed;
+        using (ScopedRoleMutationGuard.Allow<ScopedRoleBinding>(binding.Id,
+                   Koan.Data.Core.Lifecycle.EntityLifecycleOperation.Remove, proof.Revalidate))
+        {
+            removed = await binding.Remove(ct).ConfigureAwait(false);
+        }
+        if (!removed && await ScopedRoleBinding.Get(binding.Id, ct).ConfigureAwait(false) is not null)
+            throw new ScopedRoleConcurrencyException("The role membership changed before removal.");
+        _snapshots.InvalidateBinding(binding);
+        if (removed)
+            await ScopedRoleEventRegistry.After(ScopedRoleEventKind.MemberRemoved,
+                removing with { Phase = ScopedRoleChangePhase.After, Version = binding.Version + 1 }).ConfigureAwait(false);
+        return removed;
+    }
+
+    private async Task Replace(ScopedRoleScope entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
     {
         var id = entity.Id;
         using var mutation = ScopedRoleMutationGuard.Allow<ScopedRoleScope>(id,
@@ -958,9 +1152,10 @@ public sealed class RoleEngine
         if (!await Data<ScopedRoleScope, string>.ReplaceIf(entity,
                 row => row.Id == id && row.Version == expectedVersion, ct: ct).ConfigureAwait(false))
             throw new ScopedRoleConcurrencyException("ScopedRoleScope changed before the guarded write committed.");
+        Invalidate(entity);
     }
 
-    private static async Task Replace(ScopedRoleDefinition entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
+    private async Task Replace(ScopedRoleDefinition entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
     {
         var id = entity.Id;
         using var mutation = ScopedRoleMutationGuard.Allow<ScopedRoleDefinition>(id,
@@ -968,9 +1163,10 @@ public sealed class RoleEngine
         if (!await Data<ScopedRoleDefinition, string>.ReplaceIf(entity,
                 row => row.Id == id && row.Version == expectedVersion, ct: ct).ConfigureAwait(false))
             throw new ScopedRoleConcurrencyException("ScopedRoleDefinition changed before the guarded write committed.");
+        Invalidate(entity);
     }
 
-    private static async Task Replace(ScopedRoleBinding entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
+    private async Task Replace(ScopedRoleBinding entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
     {
         var id = entity.Id;
         using var mutation = ScopedRoleMutationGuard.Allow<ScopedRoleBinding>(id,
@@ -978,9 +1174,10 @@ public sealed class RoleEngine
         if (!await Data<ScopedRoleBinding, string>.ReplaceIf(entity,
                 row => row.Id == id && row.Version == expectedVersion, ct: ct).ConfigureAwait(false))
             throw new ScopedRoleConcurrencyException("ScopedRoleBinding changed before the guarded write committed.");
+        Invalidate(entity);
     }
 
-    private static async Task Replace(ScopedRolePolicy entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
+    private async Task Replace(ScopedRolePolicy entity, long expectedVersion, AuthorityProof proof, CancellationToken ct)
     {
         var id = entity.Id;
         using var mutation = ScopedRoleMutationGuard.Allow<ScopedRolePolicy>(id,
@@ -988,10 +1185,39 @@ public sealed class RoleEngine
         if (!await Data<ScopedRolePolicy, string>.ReplaceIf(entity,
                 row => row.Id == id && row.Version == expectedVersion, ct: ct).ConfigureAwait(false))
             throw new ScopedRoleConcurrencyException("ScopedRolePolicy changed before the guarded write committed.");
+        Invalidate(entity);
+    }
+
+    private void Invalidate(object entity)
+    {
+        switch (entity)
+        {
+            case ScopedRoleScope scope: _snapshots.InvalidateScope(scope.Reference()); break;
+            case ScopedRoleDefinition role: _snapshots.InvalidateRole(role.TenantId, role.Id); break;
+            case ScopedRoleBinding binding: _snapshots.InvalidateBinding(binding); break;
+            case ScopedRolePolicy policy: _snapshots.InvalidatePolicy(policy.Scope()); break;
+        }
     }
 
     private static bool GrantSetsEqual(IReadOnlyList<ScopedRoleGrantClause> left, IReadOnlyList<ScopedRoleGrantClause> right)
         => System.Text.Json.JsonSerializer.Serialize(left) == System.Text.Json.JsonSerializer.Serialize(right);
+    private static void ValidateRoleShape(string roleId, IReadOnlyList<ScopedRoleGrantClause> grants)
+    {
+        if (roleId.StartsWith("group:", StringComparison.Ordinal) && grants.Count > 0)
+            throw new ScopedRoleValidationException("group.capabilities.unsupported",
+                "group:* identities are audience memberships and cannot grant capabilities.");
+    }
+    private static bool SameMembership(ScopedRoleBinding left, ScopedRoleBinding right)
+        => left.TenantId == right.TenantId && left.Subject == right.Subject && left.RoleId == right.RoleId &&
+           left.ScopeType == right.ScopeType && left.ScopeId == right.ScopeId &&
+           left.Propagation == right.Propagation && left.ExpiresAt == right.ExpiresAt &&
+           left.ApprovedRoleVersion == right.ApprovedRoleVersion &&
+           DictionaryEqual(left.ApprovedPolicyVersions, right.ApprovedPolicyVersions);
+    private ScopedRoleChangeContext ChangeContext(ScopedRoleDefinition role, string? subject, ScopedRoleActor actor,
+        IReadOnlyList<ScopedRoleGrantClause> previous, IReadOnlyList<ScopedRoleGrantClause> current,
+        long version, ScopedRoleChangePhase phase, CancellationToken ct)
+        => new(role.TenantId, role.Scope(), role.Id, subject, actor, previous.Select(Clone).ToArray(),
+            current.Select(Clone).ToArray(), Now, version, phase, ct);
     private static Dictionary<string, string> Copy(IReadOnlyDictionary<string, string>? values)
         => values is null ? new(StringComparer.Ordinal) : new(values, StringComparer.Ordinal);
     private static ScopedRoleScopeRef Normalize(ScopedRoleScopeRef scope) => scope.Normalize();

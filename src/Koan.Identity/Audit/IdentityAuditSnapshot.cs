@@ -59,7 +59,7 @@ internal static class IdentityAuditSnapshot
         }),
         ScopedRoleScope scope => JsonConvert.SerializeObject(new
         {
-            scope.TenantId, scope.Type, scope.ScopeId, scope.ParentType, scope.ParentScopeId, scope.Version,
+            scope.TenantId, scope.Type, scope.ScopeId, scope.OwnerSubject, scope.ParentType, scope.ParentScopeId, scope.Version,
         }),
         ScopedRoleDefinition definition => JsonConvert.SerializeObject(new
         {
