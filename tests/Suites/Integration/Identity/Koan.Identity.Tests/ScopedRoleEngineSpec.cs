@@ -8,6 +8,7 @@ using Koan.Identity.Roles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using Koan.Tenancy;
 using Xunit;
 
 namespace Koan.Identity.Tests;
@@ -211,6 +212,58 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
     }
 
     [Fact]
+    public async Task Authority_is_revalidated_inside_the_lifecycle_commit_boundary()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var normal = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, _) = await Tree(normal);
+        var role = await normal.Define(owner, new(root, "Commit proof", []));
+        var catalog = scope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>();
+        var rejecting = new CommitRejectAuthority { Enabled = true };
+        var guarded = new RoleEngine(catalog, [rejecting], [],
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+
+        var write = async () => await guarded.Assign(owner, new(root, "participant:stale-proof", role.Id));
+        await write.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(x => x.Code == "authority.stale");
+        (await ScopedRoleBinding.Query(x => x.Subject == "participant:stale-proof")).Should().BeEmpty();
+        rejecting.Validations.Should().Be(1, "the proof is checked at lifecycle dispatch, not reused from admission");
+    }
+
+    [Fact]
+    public async Task Headless_query_by_id_and_count_share_the_provider_pushed_scope_plan()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var engine = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(engine);
+        var sibling = new ScopedRoleScopeRef(root.TenantId, "topic", Guid.NewGuid().ToString("N"));
+        await engine.Register(owner, new(sibling, root));
+        var reader = await engine.Define(owner, new(root, "Reader", [new("discussion.read")]));
+        await engine.Assign(owner, new(root, "participant:query", reader.Id, ScopedRolePropagation.Descendants));
+        using (Tenant.Use(root.TenantId))
+        {
+            var visible = await new ScopedDiscussionPost { TopicId = topic.Id, Body = "visible" }.Save();
+            await new ScopedDiscussionPost { TopicId = topic.Id, Body = "visible two" }.Save();
+            var hidden = await new ScopedDiscussionPost { TopicId = sibling.Id, Body = "hidden" }.Save();
+
+            using (_fixture.Actor.Use("participant:query"))
+            {
+                var rows = await engine.Query<ScopedDiscussionPost>(ScopedRoleResourceActions.Read, topic);
+                rows.Should().HaveCount(2).And.OnlyContain(x => x.TopicId == topic.Id);
+                (await engine.Get<ScopedDiscussionPost>(visible.Id, ScopedRoleResourceActions.Read, topic)).Should().NotBeNull();
+                (await engine.Get<ScopedDiscussionPost>(hidden.Id, ScopedRoleResourceActions.Read, topic)).Should().BeNull();
+                (await engine.Count<ScopedDiscussionPost>(ScopedRoleResourceActions.Read, topic)).Should().Be(2);
+
+                var paged = async () => await engine.QueryWithCount<ScopedDiscussionPost>(
+                    ScopedRoleResourceActions.Read, topic,
+                    new QueryDefinition { Page = 1, PageSize = 1, CountStrategy = CountStrategy.Exact });
+                await paged.Should().ThrowAsync<NotSupportedException>()
+                    .WithMessage("*cannot prove provider-bounded paging*");
+            }
+        }
+    }
+
+    [Fact]
     public async Task Public_operations_bind_the_verified_actor_instead_of_accepting_one_from_the_caller()
     {
         using var scope = _fixture.Services.CreateScope();
@@ -311,7 +364,37 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
                 ? ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([])
                 : ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
                     new(request.Target, new HashSet<ScopedRoleAuthorityOperation> { ScopedRoleAuthorityOperation.AssignRole },
-                        MaximumExpiry: Maximum, AllowSelfAssignment: true)
+                        MaximumExpiry: Maximum, AllowSelfAssignment: true, ProofKey: "finite", ProofVersion: 1)
                 ]);
+
+        public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+            ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+            => ValueTask.FromResult(envelope.ProofKey == "finite" && envelope.ProofVersion == 1);
     }
+
+    private sealed class CommitRejectAuthority : IScopedRoleAuthorityContributor
+    {
+        public bool Enabled { get; init; }
+        public int Validations { get; private set; }
+
+        public ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
+            ScopedRoleAuthorityRequest request, CancellationToken ct = default)
+            => ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>(Enabled
+                ? [new(request.Target, new HashSet<ScopedRoleAuthorityOperation> { request.Operation },
+                    AllowSelfAssignment: true, ProofKey: "revoked", ProofVersion: 7)]
+                : []);
+
+        public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+            ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+        {
+            Validations++;
+            return ValueTask.FromResult(false);
+        }
+    }
+}
+
+public sealed class ScopedDiscussionPost : Koan.Data.Core.Model.Entity<ScopedDiscussionPost>
+{
+    public string TopicId { get; set; } = "";
+    public string Body { get; set; } = "";
 }

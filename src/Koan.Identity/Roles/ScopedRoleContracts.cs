@@ -1,4 +1,5 @@
 using Koan.Core;
+using Koan.Data.Abstractions.Filtering;
 
 namespace Koan.Identity.Roles;
 
@@ -60,6 +61,20 @@ public sealed record ScopedRoleCapabilityDescriptor(
 
 public sealed record ScopedRoleScopeDescriptor(string Type, string? ParentType = null);
 
+public static class ScopedRoleResourceActions
+{
+    public const string Read = "read";
+    public const string Create = "create";
+    public const string Update = "update";
+    public const string Delete = "delete";
+}
+
+public sealed record ScopedRoleResourceDescriptor(
+    string Entity,
+    string ScopeType,
+    string ScopeField,
+    IReadOnlyDictionary<string, string> Actions);
+
 /// <summary>Application-owned structural vocabulary compiled when Identity composes.</summary>
 [KoanDiscoverable]
 public interface IScopedRoleCatalogContributor
@@ -87,13 +102,24 @@ public sealed record ScopedRoleAuthorityEnvelope(
     IReadOnlySet<string>? Capabilities = null,
     IReadOnlySet<ScopedRolePropagation>? Propagations = null,
     DateTimeOffset? MaximumExpiry = null,
-    bool AllowSelfAssignment = false);
+    bool AllowSelfAssignment = false,
+    string? ProofKey = null,
+    long? ProofVersion = null);
 
 [KoanDiscoverable]
 public interface IScopedRoleAuthorityContributor
 {
     ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
         ScopedRoleAuthorityRequest request,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Revalidates the selected versioned envelope at the mutation's lifecycle boundary. Implementations must read
+    /// their authoritative provider state; an in-process cache or earlier boolean is not a commit proof.
+    /// </summary>
+    ValueTask<bool> Validate(
+        ScopedRoleAuthorityRequest request,
+        ScopedRoleAuthorityEnvelope envelope,
         CancellationToken ct = default);
 }
 
@@ -173,6 +199,21 @@ public sealed record ScopedRolePlan(
     DateTimeOffset EvaluatedAt);
 
 public sealed record ScopedRolePreview(ScopedRolePlan Plan, bool IsSimulation = false);
+
+public sealed record ScopedRoleEngineLimits(
+    int MaxAncestryDepth,
+    int MaxBindingsPerSubject,
+    int MaxPoliciesPerTenant,
+    int MaxClausesPerRecord);
+
+/// <summary>Safe structural vocabulary for headless management clients and agents.</summary>
+public sealed record ScopedRoleEngineDescriptor(
+    IReadOnlyList<ScopedRoleScopeDescriptor> Scopes,
+    IReadOnlyList<ScopedRoleCapabilityDescriptor> Capabilities,
+    IReadOnlyList<ScopedRoleResourceDescriptor> Resources,
+    ScopedRoleEngineLimits Limits);
+
+public sealed record ScopedRoleQueryPlan(ScopedRolePlan Access, Filter Constraint);
 
 public sealed class RoleEngineOptions
 {

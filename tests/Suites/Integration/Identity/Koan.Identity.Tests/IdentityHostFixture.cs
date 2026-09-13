@@ -77,6 +77,9 @@ internal sealed class TestScopedRoleCatalog : IScopedRoleCatalogContributor
         catalog.Capability("discussion.reply", ["space", "topic"]);
         catalog.Capability("discussion.approve", ["space", "topic"], parameters: ["amount", "department"]);
         catalog.Capability("docs.read", ["folder", "document"]);
+        catalog.Resource<ScopedDiscussionPost>("topic", post => post.TopicId)
+            .Read("discussion.read")
+            .Create("discussion.reply");
     }
 }
 
@@ -93,9 +96,14 @@ internal sealed class TestScopedRoleAuthority : IScopedRoleAuthorityContributor
         if (!request.Actor.Subject.StartsWith("owner:", StringComparison.Ordinal))
             return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([]);
         return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
-            new(request.Target, Operations, Descendants: true, AllowSelfAssignment: true)
+            new(request.Target, Operations, Descendants: true, AllowSelfAssignment: true,
+                ProofKey: "test-owner", ProofVersion: 1)
         ]);
     }
+
+    public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+        ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+        => ValueTask.FromResult(envelope.ProofKey == "test-owner" && envelope.ProofVersion == 1);
 }
 
 internal sealed class TestScopedRoleGuard : IScopedRoleGuardContributor

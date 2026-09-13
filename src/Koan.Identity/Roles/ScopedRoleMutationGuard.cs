@@ -8,12 +8,14 @@ internal static class ScopedRoleMutationGuard
     private static readonly AsyncLocal<Permit?> Current = new();
     private const string Code = "scoped-role.mutation.guard";
 
-    public static IDisposable Allow<TEntity>(string id, EntityLifecycleOperation operation)
+    public static IDisposable Allow<TEntity>(string id, EntityLifecycleOperation operation,
+        Func<CancellationToken, ValueTask> revalidate)
         where TEntity : Entity<TEntity>
     {
         if (Current.Value is not null)
             throw new InvalidOperationException("Scoped-role mutation permits cannot be nested.");
-        var permit = new Permit(typeof(TEntity), ScopedRoleScopeRef.Require(id, nameof(id)), operation);
+        var permit = new Permit(typeof(TEntity), ScopedRoleScopeRef.Require(id, nameof(id)), operation,
+            revalidate ?? throw new ArgumentNullException(nameof(revalidate)));
         Current.Value = permit;
         return new Exit(permit);
     }
@@ -28,11 +30,12 @@ internal static class ScopedRoleMutationGuard
 
     private static void Guard<TEntity>() where TEntity : Entity<TEntity>
     {
-        Entity<TEntity>.Lifecycle.BeforeUpsert(ctx => Demand(ctx));
-        Entity<TEntity>.Lifecycle.BeforeRemove(ctx => Demand(ctx));
+        Entity<TEntity>.Lifecycle.BeforeUpsert(Demand);
+        Entity<TEntity>.Lifecycle.BeforeRemove(Demand);
     }
 
-    private static EntityLifecycleResult Demand<TEntity>(EntityLifecycleContext<TEntity> context) where TEntity : class
+    private static async ValueTask<EntityLifecycleResult> Demand<TEntity>(EntityLifecycleContext<TEntity> context)
+        where TEntity : class
     {
         var permit = Current.Value;
         var id = (context.Current as Koan.Data.Abstractions.IEntity<string>)?.Id;
@@ -40,6 +43,7 @@ internal static class ScopedRoleMutationGuard
             permit.Operation == context.Operation && StringComparer.Ordinal.Equals(permit.Id, id))
         {
             permit.Consumed = true; // a re-entrant hook cannot reuse this authorization for another write.
+            await permit.Revalidate(context.CancellationToken).ConfigureAwait(false);
             return context.Proceed();
         }
         return context.Cancel(
@@ -59,7 +63,8 @@ internal static class ScopedRoleMutationGuard
         }
     }
 
-    private sealed record Permit(Type EntityType, string Id, EntityLifecycleOperation Operation)
+    private sealed record Permit(Type EntityType, string Id, EntityLifecycleOperation Operation,
+        Func<CancellationToken, ValueTask> Revalidate)
     {
         public bool Consumed { get; set; }
     }
