@@ -77,7 +77,7 @@ internal sealed class TestScopedRoleCatalog : IScopedRoleCatalogContributor
         catalog.Capability("discussion.reply", ["space", "topic"]);
         catalog.Capability("discussion.approve", ["space", "topic"], parameters: ["amount", "department"]);
         catalog.Capability("docs.read", ["folder", "document"]);
-        catalog.Resource<ScopedDiscussionPost>("topic", post => post.TopicId)
+        catalog.Resource<ScopedDiscussionPost>("topic", post => post.TenantId, post => post.TopicId)
             .Read("discussion.read")
             .Create("discussion.reply");
     }

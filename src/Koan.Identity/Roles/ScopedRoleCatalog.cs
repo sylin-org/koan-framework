@@ -35,25 +35,45 @@ public sealed class ScopedRoleCatalogBuilder
         return this;
     }
 
-    /// <summary>Enroll an Entity in scoped enforcement using one direct, provider-pushable scope-key field.</summary>
+    /// <summary>
+    /// Legacy enrollment shape. Enforcement rejects it because a scope id alone cannot isolate tenants.
+    /// Use the overload that supplies both tenant and scope fields.
+    /// </summary>
     public ScopedRoleResourceBuilder<TEntity> Resource<TEntity>(string scopeType,
         Expression<Func<TEntity, string>> scopeField) where TEntity : class
+        => ResourceCore<TEntity>(scopeType, null, MemberName(scopeField, "scope"));
+
+    /// <summary>Enroll an Entity using direct, provider-pushable tenant-key and scope-key fields.</summary>
+    public ScopedRoleResourceBuilder<TEntity> Resource<TEntity>(string scopeType,
+        Expression<Func<TEntity, string>> tenantField,
+        Expression<Func<TEntity, string>> scopeField) where TEntity : class
+        => ResourceCore<TEntity>(scopeType, MemberName(tenantField, "tenant"), MemberName(scopeField, "scope"));
+
+    private ScopedRoleResourceBuilder<TEntity> ResourceCore<TEntity>(string scopeType, string? tenantField,
+        string scopeField) where TEntity : class
     {
         scopeType = ScopedRoleScopeRef.Require(scopeType, nameof(scopeType));
-        var member = scopeField.Body switch
-        {
-            MemberExpression direct when direct.Expression == scopeField.Parameters[0] => direct.Member.Name,
-            UnaryExpression { Operand: MemberExpression direct } when direct.Expression == scopeField.Parameters[0] => direct.Member.Name,
-            _ => throw new InvalidOperationException("A scoped-role resource field must be one direct string property (for example, x => x.TopicId).")
-        };
-        return new(this, scopeType, member);
+        return new(this, scopeType, tenantField, scopeField);
     }
 
-    internal void RegisterResource<TEntity>(string scopeType, string scopeField,
+    private static string MemberName<TEntity>(Expression<Func<TEntity, string>> field, string kind)
+    {
+        return field.Body switch
+        {
+            MemberExpression direct when direct.Expression == field.Parameters[0] => direct.Member.Name,
+            UnaryExpression { Operand: MemberExpression direct } when direct.Expression == field.Parameters[0] => direct.Member.Name,
+            _ => throw new InvalidOperationException($"A scoped-role resource {kind} field must be one direct string property.")
+        };
+    }
+
+    internal void RegisterResource<TEntity>(string scopeType, string? tenantField, string scopeField,
         IReadOnlyDictionary<string, string> actions) where TEntity : class
     {
         _resources[typeof(TEntity)] = new(typeof(TEntity).FullName ?? typeof(TEntity).Name,
-            scopeType, scopeField, new Dictionary<string, string>(actions, StringComparer.Ordinal));
+            scopeType, scopeField, new Dictionary<string, string>(actions, StringComparer.Ordinal))
+        {
+            TenantField = tenantField,
+        };
     }
 
     internal ScopedRoleCatalog Build()
@@ -84,13 +104,16 @@ public sealed class ScopedRoleResourceBuilder<TEntity> where TEntity : class
 {
     private readonly ScopedRoleCatalogBuilder _catalog;
     private readonly string _scopeType;
+    private readonly string? _tenantField;
     private readonly string _scopeField;
     private readonly Dictionary<string, string> _actions = new(StringComparer.Ordinal);
 
-    internal ScopedRoleResourceBuilder(ScopedRoleCatalogBuilder catalog, string scopeType, string scopeField)
+    internal ScopedRoleResourceBuilder(ScopedRoleCatalogBuilder catalog, string scopeType, string? tenantField,
+        string scopeField)
     {
         _catalog = catalog;
         _scopeType = scopeType;
+        _tenantField = tenantField;
         _scopeField = scopeField;
     }
 
@@ -105,7 +128,7 @@ public sealed class ScopedRoleResourceBuilder<TEntity> where TEntity : class
         capability = ScopedRoleScopeRef.Require(capability, nameof(capability));
         if (!_actions.TryAdd(action, capability))
             throw new InvalidOperationException($"Resource action '{action}' is declared more than once for {typeof(TEntity).Name}.");
-        _catalog.RegisterResource<TEntity>(_scopeType, _scopeField, _actions);
+        _catalog.RegisterResource<TEntity>(_scopeType, _tenantField, _scopeField, _actions);
         return this;
     }
 }
@@ -158,6 +181,9 @@ public sealed class ScopedRoleCatalog
     {
         if (!_resources.TryGetValue(typeof(TEntity), out var resource))
             throw new ScopedRoleValidationException("resource.unenrolled", $"Entity '{typeof(TEntity).Name}' is not enrolled in scoped-role enforcement.");
+        if (string.IsNullOrWhiteSpace(resource.TenantField))
+            throw new ScopedRoleValidationException("resource.tenant.unenrolled",
+                $"Entity '{typeof(TEntity).Name}' must declare a direct tenant field for scoped-role enforcement.");
         if (!StringComparer.Ordinal.Equals(resource.ScopeType, targetScopeType))
             throw new ScopedRoleValidationException("resource.scope.mismatch", $"Entity '{typeof(TEntity).Name}' is not mapped to scope type '{targetScopeType}'.");
         if (!resource.Actions.TryGetValue(action, out _))

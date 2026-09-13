@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Koan.Identity.Web.Tests</AssemblyName>
+    <RootNamespace>Koan.Identity.Web.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Identity/Koan.Identity.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Identity.Web/Koan.Identity.Web.csproj" />
+    <ProjectReference Include="../../../../../src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj" />
+  </ItemGroup>
+</Project>

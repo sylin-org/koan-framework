@@ -242,9 +242,10 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
         await engine.Assign(owner, new(root, "participant:query", reader.Id, ScopedRolePropagation.Descendants));
         using (Tenant.Use(root.TenantId))
         {
-            var visible = await new ScopedDiscussionPost { TopicId = topic.Id, Body = "visible" }.Save();
-            await new ScopedDiscussionPost { TopicId = topic.Id, Body = "visible two" }.Save();
-            var hidden = await new ScopedDiscussionPost { TopicId = sibling.Id, Body = "hidden" }.Save();
+            var visible = await new ScopedDiscussionPost { TenantId = root.TenantId, TopicId = topic.Id, Body = "visible" }.Save();
+            await new ScopedDiscussionPost { TenantId = root.TenantId, TopicId = topic.Id, Body = "visible two" }.Save();
+            var hidden = await new ScopedDiscussionPost { TenantId = root.TenantId, TopicId = sibling.Id, Body = "hidden" }.Save();
+            await new ScopedDiscussionPost { TenantId = "tenant:foreign", TopicId = topic.Id, Body = "foreign tenant" }.Save();
 
             using (_fixture.Actor.Use("participant:query"))
             {
@@ -261,6 +262,88 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
                     .WithMessage("*cannot prove provider-bounded paging*");
             }
         }
+    }
+
+    [Fact]
+    public async Task Delegation_envelopes_preserve_correlated_grant_and_audience_condition_ceilings()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var normal = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, _, topic) = await Tree(normal);
+        var actor = new ScopedRoleActor("delegate:bounded");
+        var permittedCondition = new ScopedRoleCondition("amount", ScopedRoleConditionOperator.LessThanOrEqual, "100");
+        var authority = new ClauseLimitedAuthority
+        {
+            Grants = [new("discussion.approve", [permittedCondition])],
+            Audience = [new(ScopedRoleAudienceKind.Authenticated, Conditions: [permittedCondition])],
+        };
+        var bounded = new RoleEngine(scope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>(), [authority], [],
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+
+        var role = await bounded.Define(actor, new(topic, "Bounded approver",
+            [new("discussion.approve", [permittedCondition])]));
+        role.Grants.Should().ContainSingle();
+
+        var widenedRole = async () => await bounded.Define(actor, new(topic, "Widened approver",
+            [new("discussion.approve", [new("amount", ScopedRoleConditionOperator.LessThanOrEqual, "1000")])]));
+        await widenedRole.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(error => error.Code == "authority.denied");
+
+        var policy = await bounded.Replace(actor, new(topic, "discussion.approve",
+            [new(ScopedRoleAudienceKind.Authenticated, Conditions: [permittedCondition])]));
+        policy.Version.Should().Be(1);
+
+        var widenedAudience = async () => await bounded.Replace(actor, new(topic, "discussion.approve",
+            [new(ScopedRoleAudienceKind.Authenticated,
+                Conditions: [new("amount", ScopedRoleConditionOperator.LessThanOrEqual, "1000")])], policy.Version));
+        await widenedAudience.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(error => error.Code == "authority.denied");
+
+        var badge = await normal.Define(owner, new(topic, "Badge", []));
+        policy = await normal.Replace(owner, new(topic, "discussion.approve",
+            [new(ScopedRoleAudienceKind.Role, badge.Id, [permittedCondition])], policy.Version));
+        (await bounded.Assign(actor, new(topic, "participant:bounded", badge.Id))).RoleId.Should().Be(badge.Id);
+
+        policy = await normal.Replace(owner, new(topic, "discussion.approve",
+            [new(ScopedRoleAudienceKind.Role, badge.Id,
+                [new("amount", ScopedRoleConditionOperator.LessThanOrEqual, "1000")])], policy.Version));
+        var widenedIndirectGrant = async () => await bounded.Assign(actor,
+            new(topic, "participant:widened", badge.Id));
+        await widenedIndirectGrant.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(error => error.Code == "authority.denied");
+    }
+
+    [Fact]
+    public async Task Resource_enrollment_without_a_tenant_field_fails_closed()
+    {
+        var builder = new ScopedRoleCatalogBuilder();
+        builder.Scope("topic");
+        builder.Capability("discussion.read", ["topic"]);
+        builder.Resource<LegacyScopedPost>("topic", post => post.TopicId).Read("discussion.read");
+        var engine = new RoleEngine(builder.Build(), [], [],
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+
+        var constrain = async () => await engine.Constrain<LegacyScopedPost>(new ScopedRoleActor("participant"),
+            ScopedRoleResourceActions.Read, new("tenant", "topic", "same-id"));
+        await constrain.Should().ThrowAsync<ScopedRoleValidationException>()
+            .Where(error => error.Code == "resource.tenant.unenrolled");
+    }
+
+    [Fact]
+    public void Additive_management_contracts_preserve_released_enum_and_constructor_shapes()
+    {
+        ((int)ScopedRoleAuthorityOperation.RegisterScope).Should().Be(0);
+        ((int)ScopedRoleAuthorityOperation.DefineRole).Should().Be(1);
+        ((int)ScopedRoleAuthorityOperation.EditRole).Should().Be(2);
+        ((int)ScopedRoleAuthorityOperation.AssignRole).Should().Be(3);
+        ((int)ScopedRoleAuthorityOperation.RevokeRole).Should().Be(4);
+        ((int)ScopedRoleAuthorityOperation.ManagePolicy).Should().Be(5);
+        ((int)ScopedRoleAuthorityOperation.Preview).Should().Be(6);
+        ((int)ScopedRoleAuthorityOperation.ReadAudit).Should().Be(7);
+        typeof(ScopedRoleAuthorityRequest).GetConstructors().Should()
+            .Contain(constructor => constructor.GetParameters().Length == 9);
+        typeof(ScopedRoleAuthorityEnvelope).GetConstructors().Should()
+            .Contain(constructor => constructor.GetParameters().Length == 10);
     }
 
     [Fact]
@@ -391,10 +474,39 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
             return ValueTask.FromResult(false);
         }
     }
+
+    private sealed class ClauseLimitedAuthority : IScopedRoleAuthorityContributor
+    {
+        private static readonly IReadOnlySet<ScopedRoleAuthorityOperation> Operations =
+            Enum.GetValues<ScopedRoleAuthorityOperation>().ToHashSet();
+        public IReadOnlyList<ScopedRoleGrantClause> Grants { get; init; } = [];
+        public IReadOnlyList<ScopedRoleAudienceClause> Audience { get; init; } = [];
+
+        public ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
+            ScopedRoleAuthorityRequest request, CancellationToken ct = default)
+            => ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
+                new ScopedRoleAuthorityEnvelope(request.Target, Operations, Descendants: true,
+                    ProofKey: "clause-limited", ProofVersion: 1)
+                {
+                    GrantClauses = Grants,
+                    AudienceClauses = Audience,
+                }
+            ]);
+
+        public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+            ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+            => ValueTask.FromResult(envelope.ProofKey == "clause-limited" && envelope.ProofVersion == 1);
+    }
 }
 
 public sealed class ScopedDiscussionPost : Koan.Data.Core.Model.Entity<ScopedDiscussionPost>
 {
+    public string TenantId { get; set; } = "";
     public string TopicId { get; set; } = "";
     public string Body { get; set; } = "";
+}
+
+public sealed class LegacyScopedPost : Koan.Data.Core.Model.Entity<LegacyScopedPost>
+{
+    public string TopicId { get; set; } = "";
 }

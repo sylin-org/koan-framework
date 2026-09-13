@@ -46,9 +46,10 @@ public sealed class ScopedRoleSqliteSpec
             var reader = await engine.Define(new(root, "Reader", [new("discussion.read")]));
             await engine.Assign(new(root, "participant:sqlite", reader.Id, ScopedRolePropagation.Descendants));
 
-            await new SqlitePost { TopicId = topic.Id, Body = "one" }.Save();
-            await new SqlitePost { TopicId = topic.Id, Body = "two" }.Save();
-            await new SqlitePost { TopicId = "topic:other", Body = "hidden" }.Save();
+            await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "one" }.Save();
+            await new SqlitePost { TenantId = root.TenantId, TopicId = topic.Id, Body = "two" }.Save();
+            await new SqlitePost { TenantId = root.TenantId, TopicId = "topic:other", Body = "hidden" }.Save();
+            await new SqlitePost { TenantId = "tenant:foreign", TopicId = topic.Id, Body = "foreign tenant" }.Save();
 
             var query = new QueryDefinition { Page = 1, PageSize = 1, CountStrategy = CountStrategy.Exact };
             var result = await engine.QueryWithCount<SqlitePost>(ScopedRoleResourceActions.Read, topic, query);
@@ -79,7 +80,7 @@ public sealed class ScopedRoleSqliteSpec
             catalog.Scope("space");
             catalog.Scope("topic", "space");
             catalog.Capability("discussion.read", ["space", "topic"]);
-            catalog.Resource<SqlitePost>("topic", post => post.TopicId).Read("discussion.read");
+            catalog.Resource<SqlitePost>("topic", post => post.TenantId, post => post.TopicId).Read("discussion.read");
         }
     }
 
@@ -112,6 +113,7 @@ public sealed class ScopedRoleSqliteSpec
 
 public sealed class SqlitePost : Entity<SqlitePost>
 {
+    public string TenantId { get; set; } = "";
     public string TopicId { get; set; } = "";
     public string Body { get; set; } = "";
 }

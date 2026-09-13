@@ -39,6 +39,7 @@ public sealed class RoleEngine
         if (_options.MaxBindingsPerSubject is < 1 or > 10_000) throw new InvalidOperationException("Scoped-role binding bound must be between 1 and 10000.");
         if (_options.MaxPoliciesPerTenant is < 1 or > 10_000) throw new InvalidOperationException("Scoped-role policy bound must be between 1 and 10000.");
         if (_options.MaxClausesPerRecord is < 1 or > 1024) throw new InvalidOperationException("Scoped-role clause bound must be between 1 and 1024.");
+        if (_options.MaxDirectoryPageSize is < 1 or > 1000) throw new InvalidOperationException("Scoped-role directory page bound must be between 1 and 1000.");
     }
 
     public Task<ScopedRoleEngineDescriptor> Describe(CancellationToken ct = default)
@@ -46,7 +47,7 @@ public sealed class RoleEngine
         ct.ThrowIfCancellationRequested();
         return Task.FromResult(new ScopedRoleEngineDescriptor(_catalog.Scopes, _catalog.Capabilities, _catalog.Resources,
             new(_options.MaxAncestryDepth, _options.MaxBindingsPerSubject, _options.MaxPoliciesPerTenant,
-                _options.MaxClausesPerRecord)));
+                _options.MaxClausesPerRecord) { MaxDirectoryPageSize = _options.MaxDirectoryPageSize }));
     }
 
     public Task<ScopedRoleScope> Register(RegisterScopedRoleScope command, CancellationToken ct = default)
@@ -104,7 +105,10 @@ public sealed class RoleEngine
         var grants = NormalizeGrants(command.Grants, scope.Type);
         var id = string.IsNullOrWhiteSpace(command.Id) ? Guid.NewGuid().ToString("N") : command.Id.Trim();
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.DefineRole, scope, RoleId: id,
-            EffectiveCapabilities: grants.Select(x => x.Capability).ToHashSet(StringComparer.Ordinal));
+            EffectiveCapabilities: grants.Select(x => x.Capability).ToHashSet(StringComparer.Ordinal))
+        {
+            EffectiveGrants = grants,
+        };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
 
         var role = new ScopedRoleDefinition
@@ -133,7 +137,10 @@ public sealed class RoleEngine
         var authorityChanged = status != role.Status || !GrantSetsEqual(role.Grants, grants);
         var approval = await ApprovalFor(role.Id, role.TenantId, grants, ct).ConfigureAwait(false);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.EditRole, scope, RoleId: role.Id,
-            EffectiveCapabilities: approval.Capabilities);
+            EffectiveCapabilities: approval.Capabilities)
+        {
+            EffectiveGrants = approval.Grants,
+        };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
 
         role.Name = command.Name is null ? role.Name : ScopedRoleScopeRef.Require(command.Name, nameof(command.Name));
@@ -180,7 +187,10 @@ public sealed class RoleEngine
         var approval = await ApprovalFor(role.Id, role.TenantId, role.Grants, ct).ConfigureAwait(false);
         var subject = ScopedRoleScopeRef.Require(command.Subject, nameof(command.Subject));
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.AssignRole, scope, subject, role.Id,
-            command.Propagation, command.ExpiresAt, approval.Capabilities);
+            command.Propagation, command.ExpiresAt, approval.Capabilities)
+        {
+            EffectiveGrants = approval.Grants,
+        };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
 
         var id = ScopedRoleBinding.KeyFor(scope.TenantId, subject, role.Id, scope);
@@ -226,7 +236,10 @@ public sealed class RoleEngine
             throw new ScopedRoleValidationException("role.inactive", "An inactive role cannot be reapproved.");
         var approval = await ApprovalFor(role.Id, role.TenantId, role.Grants, ct).ConfigureAwait(false);
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.AssignRole, scope, binding.Subject, role.Id,
-            binding.Propagation, binding.ExpiresAt, approval.Capabilities);
+            binding.Propagation, binding.ExpiresAt, approval.Capabilities)
+        {
+            EffectiveGrants = approval.Grants,
+        };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
         binding.ApprovedRoleVersion = role.AuthorityVersion;
         binding.ApprovedPolicyVersions = approval.PolicyVersions;
@@ -275,7 +288,10 @@ public sealed class RoleEngine
         }
         var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.ManagePolicy, scope,
             EffectiveCapabilities: new HashSet<string>([capability.Key], StringComparer.Ordinal),
-            EffectiveRoleIds: selectedRoles.ToHashSet(StringComparer.Ordinal));
+            EffectiveRoleIds: selectedRoles.ToHashSet(StringComparer.Ordinal))
+        {
+            EffectiveAudience = audience,
+        };
         var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
 
         var id = ScopedRolePolicy.KeyFor(scope, capability.Key);
@@ -434,7 +450,8 @@ public sealed class RoleEngine
         var plan = await Plan(subject, capability, target, parameters, ct).ConfigureAwait(false);
         if (!plan.Allowed)
             throw new ScopedRoleAuthorizationException("access.denied", "The subject is not authorized for this scoped resource operation.");
-        var constraint = Filter.Eq(resource.ScopeField, target.Id);
+        var constraint = Filter.All(Filter.Eq(resource.TenantField!, target.TenantId),
+            Filter.Eq(resource.ScopeField, target.Id));
         DemandPushdown<TEntity>(constraint, requireProviderPaging: false);
         return new(plan, constraint);
     }
@@ -489,6 +506,116 @@ public sealed class RoleEngine
         return await Data<TEntity, string>.Count(QueryDefinition.All.Where(access.Constraint), ct).ConfigureAwait(false);
     }
 
+    public Task<ScopedRolePage<ScopedRoleDefinition>> Roles(ScopedRoleScopeRef target, int page = 1,
+        int pageSize = 50, CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        return Directory(target, ScopedRoleAuthorityOperation.ReadDefinitions,
+            Filter.All(Filter.Eq(nameof(ScopedRoleDefinition.TenantId), target.TenantId),
+                Filter.Eq(nameof(ScopedRoleDefinition.ScopeType), target.Type),
+                Filter.Eq(nameof(ScopedRoleDefinition.ScopeId), target.Id)),
+            query => Data<ScopedRoleDefinition, string>.QueryWithCount(query, ct), page, pageSize, ct);
+    }
+
+    public async Task<ScopedRoleDefinition?> Role(string roleId, ScopedRoleScopeRef target,
+        CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadDefinitions, target),
+            ancestry, ct).ConfigureAwait(false);
+        var filter = Filter.All(Filter.Eq(nameof(ScopedRoleDefinition.Id), ScopedRoleScopeRef.Require(roleId, nameof(roleId))),
+            Filter.Eq(nameof(ScopedRoleDefinition.TenantId), target.TenantId),
+            Filter.Eq(nameof(ScopedRoleDefinition.ScopeType), target.Type),
+            Filter.Eq(nameof(ScopedRoleDefinition.ScopeId), target.Id));
+        DemandPushdown<ScopedRoleDefinition>(filter, requireProviderPaging: false);
+        return (await Data<ScopedRoleDefinition, string>.All(QueryDefinition.All.Where(filter), ct).ConfigureAwait(false)).SingleOrDefault();
+    }
+
+    public Task<ScopedRolePage<ScopedRoleBinding>> Bindings(ScopedRoleScopeRef target, int page = 1,
+        int pageSize = 50, CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        return Directory(target, ScopedRoleAuthorityOperation.ReadAssignments,
+            Filter.All(Filter.Eq(nameof(ScopedRoleBinding.TenantId), target.TenantId),
+                Filter.Eq(nameof(ScopedRoleBinding.ScopeType), target.Type),
+                Filter.Eq(nameof(ScopedRoleBinding.ScopeId), target.Id)),
+            query => Data<ScopedRoleBinding, string>.QueryWithCount(query, ct), page, pageSize, ct);
+    }
+
+    public async Task<ScopedRoleBinding?> Binding(string bindingId, ScopedRoleScopeRef target,
+        CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadAssignments, target),
+            ancestry, ct).ConfigureAwait(false);
+        var filter = Filter.All(Filter.Eq(nameof(ScopedRoleBinding.Id), ScopedRoleScopeRef.Require(bindingId, nameof(bindingId))),
+            Filter.Eq(nameof(ScopedRoleBinding.TenantId), target.TenantId),
+            Filter.Eq(nameof(ScopedRoleBinding.ScopeType), target.Type),
+            Filter.Eq(nameof(ScopedRoleBinding.ScopeId), target.Id));
+        DemandPushdown<ScopedRoleBinding>(filter, requireProviderPaging: false);
+        return (await Data<ScopedRoleBinding, string>.All(QueryDefinition.All.Where(filter), ct).ConfigureAwait(false)).SingleOrDefault();
+    }
+
+    public Task<ScopedRolePage<ScopedRolePolicy>> Policies(ScopedRoleScopeRef target, int page = 1,
+        int pageSize = 50, CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        return Directory(target, ScopedRoleAuthorityOperation.ReadPolicies,
+            Filter.All(Filter.Eq(nameof(ScopedRolePolicy.TenantId), target.TenantId),
+                Filter.Eq(nameof(ScopedRolePolicy.ScopeType), target.Type),
+                Filter.Eq(nameof(ScopedRolePolicy.ScopeId), target.Id)),
+            query => Data<ScopedRolePolicy, string>.QueryWithCount(query, ct), page, pageSize, ct);
+    }
+
+    public async Task<ScopedRolePolicy?> Policy(string capability, ScopedRoleScopeRef target,
+        CancellationToken ct = default)
+    {
+        target = Normalize(target);
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadPolicies, target,
+            EffectiveCapabilities: new HashSet<string>([capability], StringComparer.Ordinal)), ancestry, ct)
+            .ConfigureAwait(false);
+        return await ScopedRolePolicy.Get(ScopedRolePolicy.KeyFor(target, capability), ct).ConfigureAwait(false);
+    }
+
+    private async Task<ScopedRolePage<TEntity>> Directory<TEntity>(ScopedRoleScopeRef target,
+        ScopedRoleAuthorityOperation operation, Filter filter,
+        Func<QueryDefinition, Task<QueryResult<TEntity>>> query, int page, int pageSize, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        target = Normalize(target);
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        _ = await Demand(new(CurrentAdministrativeActor(), operation, target), ancestry, ct).ConfigureAwait(false);
+        return await DirectoryCore(filter, query, page, pageSize, ct).ConfigureAwait(false);
+    }
+
+    private async Task<ScopedRolePage<TEntity>> DirectoryCore<TEntity>(Filter filter,
+        Func<QueryDefinition, Task<QueryResult<TEntity>>> query, int page, int pageSize, CancellationToken ct)
+        where TEntity : class, IEntity<string>
+    {
+        ct.ThrowIfCancellationRequested();
+        ValidateDirectoryPage(page, pageSize);
+        DemandPushdown<TEntity>(filter, requireProviderPaging: true);
+        var result = await query(new QueryDefinition
+        {
+            Page = page,
+            PageSize = pageSize,
+            CountStrategy = CountStrategy.Exact,
+            Filter = filter,
+        }).ConfigureAwait(false);
+        return new(result.Items, result.TotalCount, result.Page, result.PageSize);
+    }
+
+    private void ValidateDirectoryPage(int page, int pageSize)
+    {
+        if (page < 1 || pageSize < 1 || pageSize > _options.MaxDirectoryPageSize)
+            throw new ScopedRoleValidationException("directory.page.invalid",
+                $"Directory pages require page >= 1 and pageSize between 1 and {_options.MaxDirectoryPageSize}.");
+        _ = new QueryDefinition { Page = page, PageSize = pageSize }.EffectiveOffset();
+    }
+
     private static void DemandPushdown<TEntity>(Filter filter, bool requireProviderPaging)
         where TEntity : class, IEntity<string>
     {
@@ -536,19 +663,27 @@ public sealed class RoleEngine
         IReadOnlyList<ScopedRoleGrantClause> grants, CancellationToken ct)
     {
         var result = grants.Select(x => x.Capability).ToHashSet(StringComparer.Ordinal);
+        var effectiveGrants = grants.ToList();
         var versions = new Dictionary<string, long>(StringComparer.Ordinal);
         var page = new QueryDefinition { Page = 1, PageSize = _options.MaxPoliciesPerTenant + 1 };
         var policies = await ScopedRolePolicy.Query(x => x.TenantId == tenantId, page, ct).ConfigureAwait(false);
         if (policies.Count > _options.MaxPoliciesPerTenant)
             throw new ScopedRoleValidationException("policies.bound.exceeded", "The tenant has more scoped-role policies than the configured delegation bound.");
         foreach (var policy in policies)
-            if (policy.Mode == ScopedRoleOverrideMode.Replace && policy.Audience.Any(x =>
-                    x.Kind == ScopedRoleAudienceKind.Role && StringComparer.Ordinal.Equals(x.Value, roleId)))
+        {
+            var roleAudiences = policy.Mode == ScopedRoleOverrideMode.Replace
+                ? policy.Audience.Where(x => x.Kind == ScopedRoleAudienceKind.Role &&
+                    StringComparer.Ordinal.Equals(x.Value, roleId)).ToArray()
+                : [];
+            if (roleAudiences.Length > 0)
             {
                 result.Add(policy.Capability);
                 versions[policy.Id] = policy.Version;
+                effectiveGrants.AddRange(roleAudiences.Select(audience =>
+                    new ScopedRoleGrantClause(policy.Capability, audience.Conditions)));
             }
-        return new(result, versions);
+        }
+        return new(result, effectiveGrants, versions);
     }
 
     private async Task<AuthorityProof> Demand(ScopedRoleAuthorityRequest request,
@@ -611,9 +746,31 @@ public sealed class RoleEngine
             (request.ExpiresAt is not { } expiry || expiry > maximum)) return false;
         if (request.EffectiveCapabilities is { Count: > 0 } capabilities && envelope.Capabilities is { } allowed && !capabilities.All(allowed.Contains)) return false;
         if (request.EffectiveRoleIds is { Count: > 0 } roles && envelope.RoleIds is { } allowedRoles && !roles.All(allowedRoles.Contains)) return false;
+        if (request.EffectiveGrants is { Count: > 0 } grants && envelope.GrantClauses is { } allowedGrants &&
+            !grants.All(grant => allowedGrants.Any(candidate => SameGrant(candidate, grant)))) return false;
+        if (request.EffectiveAudience is { Count: > 0 } audience && envelope.AudienceClauses is { } allowedAudience &&
+            !audience.All(item => allowedAudience.Any(candidate => SameAudience(candidate, item)))) return false;
         if (request.Operation == ScopedRoleAuthorityOperation.AssignRole &&
             StringComparer.Ordinal.Equals(request.Actor.StableSubject, request.Subject) && !envelope.AllowSelfAssignment) return false;
         return true;
+    }
+
+    private static bool SameGrant(ScopedRoleGrantClause left, ScopedRoleGrantClause right)
+        => StringComparer.Ordinal.Equals(left.Capability, right.Capability) && SameConditions(left.Conditions, right.Conditions);
+
+    private static bool SameAudience(ScopedRoleAudienceClause left, ScopedRoleAudienceClause right)
+        => left.Kind == right.Kind && StringComparer.Ordinal.Equals(left.Value, right.Value) &&
+            SameConditions(left.Conditions, right.Conditions);
+
+    private static bool SameConditions(IReadOnlyList<ScopedRoleCondition>? left,
+        IReadOnlyList<ScopedRoleCondition>? right)
+    {
+        var leftItems = left ?? [];
+        var rightItems = right ?? [];
+        return leftItems.Count == rightItems.Count && leftItems.Zip(rightItems).All(pair =>
+            StringComparer.Ordinal.Equals(pair.First.Parameter, pair.Second.Parameter) &&
+            pair.First.Operator == pair.Second.Operator &&
+            StringComparer.Ordinal.Equals(pair.First.Value, pair.Second.Value));
     }
 
     private List<ScopedRoleGrantClause> NormalizeGrants(IReadOnlyList<ScopedRoleGrantClause> grants, string scopeType)
@@ -779,7 +936,9 @@ public sealed class RoleEngine
     private static bool DictionaryEqual(IReadOnlyDictionary<string, long> left, IReadOnlyDictionary<string, long> right)
         => left.Count == right.Count && left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
 
-    private sealed record RoleApproval(IReadOnlySet<string> Capabilities, Dictionary<string, long> PolicyVersions);
+    private sealed record RoleApproval(IReadOnlySet<string> Capabilities,
+        IReadOnlyList<ScopedRoleGrantClause> Grants,
+        Dictionary<string, long> PolicyVersions);
     private sealed record AuthorityProof(Func<CancellationToken, ValueTask> Revalidate);
 
     private ScopedRoleActor CurrentAdministrativeActor()

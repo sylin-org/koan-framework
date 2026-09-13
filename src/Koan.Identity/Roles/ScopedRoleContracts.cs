@@ -8,7 +8,20 @@ public enum ScopedRolePropagation { Local, Descendants }
 public enum ScopedRoleOverrideMode { Inherit, Replace }
 public enum ScopedRoleAudienceKind { Anonymous, Authenticated, Subject, Role }
 public enum ScopedRoleConditionOperator { Equal, LessThanOrEqual, GreaterThanOrEqual }
-public enum ScopedRoleAuthorityOperation { RegisterScope, DefineRole, EditRole, AssignRole, RevokeRole, ManagePolicy, Preview, ReadAudit }
+public enum ScopedRoleAuthorityOperation
+{
+    RegisterScope = 0,
+    DefineRole = 1,
+    EditRole = 2,
+    AssignRole = 3,
+    RevokeRole = 4,
+    ManagePolicy = 5,
+    Preview = 6,
+    ReadAudit = 7,
+    ReadDefinitions = 8,
+    ReadAssignments = 9,
+    ReadPolicies = 10,
+}
 
 /// <summary>A trusted, tenant-bound location in an application's one-parent scope tree.</summary>
 public sealed record ScopedRoleScopeRef(string TenantId, string Type, string Id)
@@ -73,7 +86,11 @@ public sealed record ScopedRoleResourceDescriptor(
     string Entity,
     string ScopeType,
     string ScopeField,
-    IReadOnlyDictionary<string, string> Actions);
+    IReadOnlyDictionary<string, string> Actions)
+{
+    /// <summary>The direct tenant-key field that is conjoined with <see cref="ScopeField"/> for every provider query.</summary>
+    public string? TenantField { get; init; }
+}
 
 /// <summary>Application-owned structural vocabulary compiled when Identity composes.</summary>
 [KoanDiscoverable]
@@ -91,7 +108,11 @@ public sealed record ScopedRoleAuthorityRequest(
     ScopedRolePropagation? Propagation = null,
     DateTimeOffset? ExpiresAt = null,
     IReadOnlySet<string>? EffectiveCapabilities = null,
-    IReadOnlySet<string>? EffectiveRoleIds = null);
+    IReadOnlySet<string>? EffectiveRoleIds = null)
+{
+    public IReadOnlyList<ScopedRoleGrantClause>? EffectiveGrants { get; init; }
+    public IReadOnlyList<ScopedRoleAudienceClause>? EffectiveAudience { get; init; }
+}
 
 /// <summary>One complete delegation envelope. A mutation must fit one envelope; envelopes are not unioned.</summary>
 public sealed record ScopedRoleAuthorityEnvelope(
@@ -104,7 +125,11 @@ public sealed record ScopedRoleAuthorityEnvelope(
     DateTimeOffset? MaximumExpiry = null,
     bool AllowSelfAssignment = false,
     string? ProofKey = null,
-    long? ProofVersion = null);
+    long? ProofVersion = null)
+{
+    public IReadOnlyList<ScopedRoleGrantClause>? GrantClauses { get; init; }
+    public IReadOnlyList<ScopedRoleAudienceClause>? AudienceClauses { get; init; }
+}
 
 [KoanDiscoverable]
 public interface IScopedRoleAuthorityContributor
@@ -204,7 +229,16 @@ public sealed record ScopedRoleEngineLimits(
     int MaxAncestryDepth,
     int MaxBindingsPerSubject,
     int MaxPoliciesPerTenant,
-    int MaxClausesPerRecord);
+    int MaxClausesPerRecord)
+{
+    public int MaxDirectoryPageSize { get; init; } = 100;
+}
+
+public sealed record ScopedRolePage<TEntity>(
+    IReadOnlyList<TEntity> Items,
+    long TotalCount,
+    int Page,
+    int PageSize);
 
 /// <summary>Safe structural vocabulary for headless management clients and agents.</summary>
 public sealed record ScopedRoleEngineDescriptor(
@@ -222,4 +256,5 @@ public sealed class RoleEngineOptions
     public int MaxBindingsPerSubject { get; set; } = 256;
     public int MaxPoliciesPerTenant { get; set; } = 512;
     public int MaxClausesPerRecord { get; set; } = 64;
+    public int MaxDirectoryPageSize { get; set; } = 100;
 }
