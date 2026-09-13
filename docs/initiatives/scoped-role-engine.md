@@ -411,6 +411,13 @@ identity and limitations; reserve the full release ratchet for a real certificat
 | W17 | HTTP and a supported non-HTTP caller have decision parity and the documented post-revocation/commit-boundary freshness behavior. |
 | W18 | Errors expose stable safe reasons; successful audit rows identify actor, scope, target, version and change; failures/retries do not create false success evidence. |
 
+Current focused disposition: W06 now has provider-pushed role/capability read ceilings and forged
+same-scope selections deny, while the assignable-role picker itself remains deferred. W07 now proves
+that `ManagePolicy` plus an audience ceiling cannot remove a narrowing child replacement; only the
+distinct capability-scoped `ResetPolicy` operation may restore inheritance. W12 now carries the
+requested capability into preview authority, so a steward limited to `discussion.read` cannot preview
+`discussion.moderate`; non-mutating/non-reusable race evidence remains open.
+
 On changed shared contracts, sweep reflection and string-based consumers as well as compile-time
 callers. Respect Koan's shared build-output limitation: do not run parallel builds/tests against
 the same output tree. Provider parity and concurrency claims require corresponding evidence.
@@ -421,6 +428,17 @@ This section is the sole live ledger for this specification. Keep entries short 
 test receipts/current source rather than copying status into additional plans.
 
 ### Selected implementation contract
+
+Consumer boundary correction contract: `RoleIds` is the read ceiling for definition and assignment
+directories/by-id reads; `Capabilities` is the read ceiling for policy directories/by-id reads and
+preview. Supported alternative envelopes union only the operation's matching allow-list axis; an
+unbounded alternative is unbounded, while empty or unsupported alternatives cannot mask a later
+valid alternative. Those allow-lists are provider-pushed before paging and counting. Clause-shaped
+grant or audience ceilings on a read envelope are not provider-projectable across stored JSON and
+related records, so an unsupported-only read rejects rather than post-filter or broaden. Removing a local replacement is a
+distinct `ResetPolicy` authority operation, capability-scoped and never implied by `ManagePolicy`,
+because restoring inherited/default access can be a widening change. A reset selects one complete
+supported alternative and is independent of contributor/envelope order.
 
 Contributor exploration selected the existing functional `Koan.Identity` package as the owner; the
 engine will not add a second package or module. Persisted records are explicit-tenant
@@ -450,6 +468,7 @@ second existing adapter before provider parity is claimed.
 | 2026-09-13 | Slice 1 core prototype green; independent red-team completed | `dotnet test tests/Suites/Integration/Identity/Koan.Identity.Tests/Koan.Identity.Tests.csproj --no-restore`: 110/110 on InMemory. Red-team corrections landed for verified actors, finite expiry, canonical binding identity, policy-version reapproval, exact lifecycle permits, instruction/fast-remove bypass, mandatory guards and audit evidence. Not complete: provider-backed commit-boundary authority proof, Mongo/second-adapter receipts, query/Web integration and authorized directories remain open. |
 | 2026-09-13 | Slice 2 headless query boundary and first real-provider receipt green | Mutation authority is re-read through the selected contributor and captured scope versions at the one-shot lifecycle boundary. `Constrain`, `Query`, `QueryWithCount`, `Get` and `Count` share one immutable plan plus provider-pushed tenant-and-scope filters; paginated access rejects adapters without provider-bounded paging. Identity is 112/112 and the isolated SQLite receipt is 1/1, proving pushed filtering, paging/count, insert-only and conditional-replace CAS. Not complete: Mongo parity, optional Web management routes/directories and W01-W18 remain open. |
 | 2026-09-13 | Mongo parity and initial optional Web boundary green on `dev` | Isolated Mongo receipt is 1/1 for pushed tenant/scope filtering and paging/count, same-scope-id cross-tenant hiding, post-revocation denial and provider-re-read authority invalidation before dispatch. TestServer + SQLite Web receipt is 1/1 for reference activation, anonymous failure, server-generated role IDs, indistinguishable absent/unauthorized responses, ETag/`If-Match`, real-cookie antiforgery despite a forged authorization header, and global-operator separation. Identity is 115/115; SQLite remains 1/1; both packages build warning-free. Exact correlated direct and policy-derived grant/audience clauses are now optional delegation-envelope ceilings. Assignable-role and scoped-audit routes were withdrawn after independent red-team because their safe provider-paged/read-owner designs are not yet proven. Directory paging remains closed on adapters without provider-bounded paging. The freshness guarantee is a lifecycle-boundary pre-dispatch recheck, not a serializable authority+target transaction. W01-W18 are only partially covered; generic trusted-code reads, consumer/document-workspace, directory-scale, preview-race, concurrent ETag and restart evidence remain open. |
+| 2026-09-13 | Consumer read/reset boundary corrections green | SQLite provider receipt proves `RoleIds`/`Capabilities` constrain same-scope role, binding and policy rows, by-id reads, exact counts and preview before paging; same-axis alternatives union, empty/unsupported-first alternatives cannot mask later valid authority, and unsupported-only clause ceilings reject instead of post-filtering. Core proves a narrow child policy remains effective when a steward has only `ManagePolicy` plus an audience ceiling, while explicit capability-scoped `ResetPolicy` restores inheritance even after an unsupported alternative. Identity is 116/116 and SQLite is 1/1. Next: concrete Speakers public-read/selected-reply journey, real concurrent ETag and restart/revocation receipts. |
 
 **Current handoff:** the existing Koan task **Report framework status** owns implementation.
 The coordinating task **Polish Tangent Space UX** owns consumer adoption. Before production edits,

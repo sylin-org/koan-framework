@@ -21,6 +21,7 @@ public enum ScopedRoleAuthorityOperation
     ReadDefinitions = 8,
     ReadAssignments = 9,
     ReadPolicies = 10,
+    ResetPolicy = 11,
 }
 
 /// <summary>A trusted, tenant-bound location in an application's one-parent scope tree.</summary>

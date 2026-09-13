@@ -314,6 +314,63 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
     }
 
     [Fact]
+    public async Task Policy_reset_requires_distinct_authority_because_inheritance_can_widen_access()
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var normal = scope.ServiceProvider.GetRequiredService<RoleEngine>();
+        var (owner, root, topic) = await Tree(normal);
+        var member = await normal.Define(owner, new(root, "Member", [new("discussion.reply")]));
+        await normal.Assign(owner, new(root, "participant:reset", member.Id,
+            ScopedRolePropagation.Descendants));
+        var narrowing = await normal.Replace(owner, new(topic, "discussion.reply", []));
+        (await normal.Check(new("participant:reset"), "discussion.reply", topic)).Should().BeFalse();
+
+        var catalog = scope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>();
+        var steward = new ScopedRoleActor("steward:reset");
+        var manageOnly = new ResetPolicyAuthority
+        {
+            Scope = topic,
+            Capability = "discussion.reply",
+            Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
+        };
+        var limited = new RoleEngine(catalog, [manageOnly], [],
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+
+        var denied = async () => await limited.Inherit(steward, topic, "discussion.reply", narrowing.Version);
+        await denied.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(error => error.Code == "authority.denied");
+        var unchanged = await ScopedRolePolicy.Get(narrowing.Id);
+        unchanged.Should().NotBeNull();
+        unchanged!.Mode.Should().Be(ScopedRoleOverrideMode.Replace);
+        unchanged.Version.Should().Be(narrowing.Version);
+        (await normal.Check(new("participant:reset"), "discussion.reply", topic)).Should().BeFalse();
+
+        var clauseConstrainedReset = new RoleEngine(catalog, [new ResetPolicyAuthority
+        {
+            Scope = topic,
+            Capability = "discussion.reply",
+            AllowReset = true,
+            Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
+        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+        var unsupported = async () => await clauseConstrainedReset.Inherit(steward, topic,
+            "discussion.reply", narrowing.Version);
+        await unsupported.Should().ThrowAsync<ScopedRoleAuthorizationException>()
+            .Where(error => error.Code == "authority.reset.ceiling.unsupported");
+
+        var reset = new RoleEngine(catalog, [new ResetPolicyAuthority
+        {
+            Scope = topic,
+            Capability = "discussion.reply",
+            AllowReset = true,
+            Audience = [new(ScopedRoleAudienceKind.Role, member.Id)],
+            IncludeSupportedFallback = true,
+        }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()));
+        var inherited = await reset.Inherit(steward, topic, "discussion.reply", narrowing.Version);
+        inherited.Mode.Should().Be(ScopedRoleOverrideMode.Inherit);
+        (await normal.Check(new("participant:reset"), "discussion.reply", topic)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Resource_enrollment_without_a_tenant_field_fails_closed()
     {
         var builder = new ScopedRoleCatalogBuilder();
@@ -340,6 +397,7 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
         ((int)ScopedRoleAuthorityOperation.ManagePolicy).Should().Be(5);
         ((int)ScopedRoleAuthorityOperation.Preview).Should().Be(6);
         ((int)ScopedRoleAuthorityOperation.ReadAudit).Should().Be(7);
+        ((int)ScopedRoleAuthorityOperation.ResetPolicy).Should().Be(11);
         typeof(ScopedRoleAuthorityRequest).GetConstructors().Should()
             .Contain(constructor => constructor.GetParameters().Length == 9);
         typeof(ScopedRoleAuthorityEnvelope).GetConstructors().Should()
@@ -496,6 +554,44 @@ public sealed class ScopedRoleEngineSpec : IdentityHostScopedSpec
         public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
             ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
             => ValueTask.FromResult(envelope.ProofKey == "clause-limited" && envelope.ProofVersion == 1);
+    }
+
+    private sealed class ResetPolicyAuthority : IScopedRoleAuthorityContributor
+    {
+        public ScopedRoleScopeRef? Scope { get; init; }
+        public string? Capability { get; init; }
+        public bool AllowReset { get; init; }
+        public bool IncludeSupportedFallback { get; init; }
+        public IReadOnlyList<ScopedRoleAudienceClause>? Audience { get; init; }
+
+        public ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
+            ScopedRoleAuthorityRequest request, CancellationToken ct = default)
+        {
+            if (Scope is null || Capability is null || request.Actor.Subject != "steward:reset")
+                return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([]);
+            var operations = new HashSet<ScopedRoleAuthorityOperation>
+            {
+                AllowReset ? ScopedRoleAuthorityOperation.ResetPolicy : ScopedRoleAuthorityOperation.ManagePolicy,
+            };
+            var constrained = new ScopedRoleAuthorityEnvelope(Scope, operations,
+                    Capabilities: new HashSet<string>([Capability], StringComparer.Ordinal),
+                    ProofKey: "reset-policy", ProofVersion: 1)
+                {
+                    AudienceClauses = Audience,
+                };
+            if (!IncludeSupportedFallback)
+                return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([constrained]);
+            return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([
+                constrained,
+                new ScopedRoleAuthorityEnvelope(Scope, operations,
+                    Capabilities: new HashSet<string>([Capability], StringComparer.Ordinal),
+                    ProofKey: "reset-policy", ProofVersion: 1),
+            ]);
+        }
+
+        public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+            ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+            => ValueTask.FromResult(envelope.ProofKey == "reset-policy" && envelope.ProofVersion == 1);
     }
 }
 

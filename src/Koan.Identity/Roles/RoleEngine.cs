@@ -328,9 +328,13 @@ public sealed class RoleEngine
         scope = Normalize(scope);
         var ancestry = await LoadAncestry(scope, ct).ConfigureAwait(false);
         _catalog.DemandCapability(capability, scope.Type);
-        var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.ManagePolicy, scope,
+        var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.ResetPolicy, scope,
             EffectiveCapabilities: new HashSet<string>([capability], StringComparer.Ordinal));
-        var proof = await Demand(request, ancestry, ct, requireCommitProof: true).ConfigureAwait(false);
+        var proof = await Demand(request, ancestry, ct, requireCommitProof: true,
+            usable: IsSupportedResetEnvelope,
+            unsupportedCode: "authority.reset.ceiling.unsupported",
+            unsupportedMessage: "A policy reset requires distinct capability-scoped reset authority without role or clause ceilings.")
+            .ConfigureAwait(false);
         var policy = await ScopedRolePolicy.Get(ScopedRolePolicy.KeyFor(scope, capability), ct).ConfigureAwait(false)
             ?? throw new ScopedRoleValidationException("policy.missing", "The policy does not exist.");
         if (policy.Version != expectedVersion) throw new ScopedRoleConcurrencyException("The policy changed after it was read.");
@@ -361,7 +365,9 @@ public sealed class RoleEngine
     {
         target = Normalize(target);
         var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        _ = await Demand(new(actor, ScopedRoleAuthorityOperation.Preview, target, subject.StableSubject), ancestry, ct).ConfigureAwait(false);
+        var request = new ScopedRoleAuthorityRequest(actor, ScopedRoleAuthorityOperation.Preview, target,
+            subject.StableSubject, EffectiveCapabilities: new HashSet<string>([capability], StringComparer.Ordinal));
+        _ = await DemandReadEnvelopes(request, ancestry, ct).ConfigureAwait(false);
         return new(await Plan(subject, capability, target, parameters, ct).ConfigureAwait(false));
     }
 
@@ -514,6 +520,7 @@ public sealed class RoleEngine
             Filter.All(Filter.Eq(nameof(ScopedRoleDefinition.TenantId), target.TenantId),
                 Filter.Eq(nameof(ScopedRoleDefinition.ScopeType), target.Type),
                 Filter.Eq(nameof(ScopedRoleDefinition.ScopeId), target.Id)),
+            envelopes => RoleReadConstraint(envelopes, nameof(ScopedRoleDefinition.Id)),
             query => Data<ScopedRoleDefinition, string>.QueryWithCount(query, ct), page, pageSize, ct);
     }
 
@@ -522,9 +529,10 @@ public sealed class RoleEngine
     {
         target = Normalize(target);
         var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadDefinitions, target),
-            ancestry, ct).ConfigureAwait(false);
-        var filter = Filter.All(Filter.Eq(nameof(ScopedRoleDefinition.Id), ScopedRoleScopeRef.Require(roleId, nameof(roleId))),
+        roleId = ScopedRoleScopeRef.Require(roleId, nameof(roleId));
+        _ = await DemandReadEnvelopes(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadDefinitions,
+            target, RoleId: roleId), ancestry, ct).ConfigureAwait(false);
+        var filter = Filter.All(Filter.Eq(nameof(ScopedRoleDefinition.Id), roleId),
             Filter.Eq(nameof(ScopedRoleDefinition.TenantId), target.TenantId),
             Filter.Eq(nameof(ScopedRoleDefinition.ScopeType), target.Type),
             Filter.Eq(nameof(ScopedRoleDefinition.ScopeId), target.Id));
@@ -540,6 +548,7 @@ public sealed class RoleEngine
             Filter.All(Filter.Eq(nameof(ScopedRoleBinding.TenantId), target.TenantId),
                 Filter.Eq(nameof(ScopedRoleBinding.ScopeType), target.Type),
                 Filter.Eq(nameof(ScopedRoleBinding.ScopeId), target.Id)),
+            envelopes => RoleReadConstraint(envelopes, nameof(ScopedRoleBinding.RoleId)),
             query => Data<ScopedRoleBinding, string>.QueryWithCount(query, ct), page, pageSize, ct);
     }
 
@@ -548,12 +557,15 @@ public sealed class RoleEngine
     {
         target = Normalize(target);
         var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadAssignments, target),
-            ancestry, ct).ConfigureAwait(false);
+        var envelopes = await DemandReadEnvelopes(new(CurrentAdministrativeActor(),
+            ScopedRoleAuthorityOperation.ReadAssignments, target), ancestry, ct).ConfigureAwait(false);
+        var ceiling = RoleReadConstraint(envelopes, nameof(ScopedRoleBinding.RoleId));
+        if (ceiling.Empty) return null;
         var filter = Filter.All(Filter.Eq(nameof(ScopedRoleBinding.Id), ScopedRoleScopeRef.Require(bindingId, nameof(bindingId))),
             Filter.Eq(nameof(ScopedRoleBinding.TenantId), target.TenantId),
             Filter.Eq(nameof(ScopedRoleBinding.ScopeType), target.Type),
             Filter.Eq(nameof(ScopedRoleBinding.ScopeId), target.Id));
+        if (ceiling.Filter is not null) filter = Filter.All(filter, ceiling.Filter);
         DemandPushdown<ScopedRoleBinding>(filter, requireProviderPaging: false);
         return (await Data<ScopedRoleBinding, string>.All(QueryDefinition.All.Where(filter), ct).ConfigureAwait(false)).SingleOrDefault();
     }
@@ -566,6 +578,7 @@ public sealed class RoleEngine
             Filter.All(Filter.Eq(nameof(ScopedRolePolicy.TenantId), target.TenantId),
                 Filter.Eq(nameof(ScopedRolePolicy.ScopeType), target.Type),
                 Filter.Eq(nameof(ScopedRolePolicy.ScopeId), target.Id)),
+            envelopes => CapabilityReadConstraint(envelopes, nameof(ScopedRolePolicy.Capability)),
             query => Data<ScopedRolePolicy, string>.QueryWithCount(query, ct), page, pageSize, ct);
     }
 
@@ -574,7 +587,7 @@ public sealed class RoleEngine
     {
         target = Normalize(target);
         var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        _ = await Demand(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadPolicies, target,
+        _ = await DemandReadEnvelopes(new(CurrentAdministrativeActor(), ScopedRoleAuthorityOperation.ReadPolicies, target,
             EffectiveCapabilities: new HashSet<string>([capability], StringComparer.Ordinal)), ancestry, ct)
             .ConfigureAwait(false);
         return await ScopedRolePolicy.Get(ScopedRolePolicy.KeyFor(target, capability), ct).ConfigureAwait(false);
@@ -582,21 +595,19 @@ public sealed class RoleEngine
 
     private async Task<ScopedRolePage<TEntity>> Directory<TEntity>(ScopedRoleScopeRef target,
         ScopedRoleAuthorityOperation operation, Filter filter,
-        Func<QueryDefinition, Task<QueryResult<TEntity>>> query, int page, int pageSize, CancellationToken ct)
-        where TEntity : class, IEntity<string>
-    {
-        target = Normalize(target);
-        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
-        _ = await Demand(new(CurrentAdministrativeActor(), operation, target), ancestry, ct).ConfigureAwait(false);
-        return await DirectoryCore(filter, query, page, pageSize, ct).ConfigureAwait(false);
-    }
-
-    private async Task<ScopedRolePage<TEntity>> DirectoryCore<TEntity>(Filter filter,
+        Func<IReadOnlyList<ScopedRoleAuthorityEnvelope>, ReadConstraint> constrain,
         Func<QueryDefinition, Task<QueryResult<TEntity>>> query, int page, int pageSize, CancellationToken ct)
         where TEntity : class, IEntity<string>
     {
         ct.ThrowIfCancellationRequested();
+        target = Normalize(target);
         ValidateDirectoryPage(page, pageSize);
+        var ancestry = await LoadAncestry(target, ct).ConfigureAwait(false);
+        var envelopes = await DemandReadEnvelopes(new(CurrentAdministrativeActor(), operation, target), ancestry, ct)
+            .ConfigureAwait(false);
+        var ceiling = constrain(envelopes);
+        if (ceiling.Empty) return new([], 0, page, pageSize);
+        if (ceiling.Filter is not null) filter = Filter.All(filter, ceiling.Filter);
         DemandPushdown<TEntity>(filter, requireProviderPaging: true);
         var result = await query(new QueryDefinition
         {
@@ -607,6 +618,28 @@ public sealed class RoleEngine
         }).ConfigureAwait(false);
         return new(result.Items, result.TotalCount, result.Page, result.PageSize);
     }
+
+    private static ReadConstraint RoleReadConstraint(IReadOnlyList<ScopedRoleAuthorityEnvelope> envelopes, string field)
+        => AggregateReadConstraint(envelopes, field, envelope => envelope.RoleIds);
+
+    private static ReadConstraint CapabilityReadConstraint(IReadOnlyList<ScopedRoleAuthorityEnvelope> envelopes, string field)
+        => AggregateReadConstraint(envelopes, field, envelope => envelope.Capabilities);
+
+    private static ReadConstraint AggregateReadConstraint(IReadOnlyList<ScopedRoleAuthorityEnvelope> envelopes,
+        string field, Func<ScopedRoleAuthorityEnvelope, IReadOnlySet<string>?> select)
+    {
+        if (envelopes.Any(envelope => select(envelope) is null)) return new(null, false);
+        var values = envelopes.SelectMany(envelope => select(envelope)!).Distinct(StringComparer.Ordinal).ToArray();
+        return values.Length == 0
+            ? new(null, true)
+            : new(Filter.In(field, values.Cast<object?>().ToArray()), false);
+    }
+
+    private static bool IsSupportedReadEnvelope(ScopedRoleAuthorityEnvelope envelope)
+        => envelope.GrantClauses is null && envelope.AudienceClauses is null;
+
+    private static bool IsSupportedResetEnvelope(ScopedRoleAuthorityEnvelope envelope)
+        => envelope.RoleIds is null && envelope.GrantClauses is null && envelope.AudienceClauses is null;
 
     private void ValidateDirectoryPage(int page, int pageSize)
     {
@@ -687,23 +720,31 @@ public sealed class RoleEngine
     }
 
     private async Task<AuthorityProof> Demand(ScopedRoleAuthorityRequest request,
-        IReadOnlyList<ScopedRoleScopeRef> ancestry, CancellationToken ct, bool requireCommitProof = false)
+        IReadOnlyList<ScopedRoleScopeRef> ancestry, CancellationToken ct, bool requireCommitProof = false,
+        Func<ScopedRoleAuthorityEnvelope, bool>? usable = null, string? unsupportedCode = null,
+        string? unsupportedMessage = null)
     {
         if (!request.Actor.IsAuthenticated)
             throw new ScopedRoleAuthorizationException("authority.anonymous", "Authentication is required for scoped-role administration.");
+        var matchedUnsupported = false;
         foreach (var contributor in _authorities)
         {
             var envelopes = await contributor.Contribute(request, ct).ConfigureAwait(false);
             foreach (var envelope in envelopes)
             {
                 if (!Allows(envelope, request, ancestry)) continue;
+                if (usable is not null && !usable(envelope))
+                {
+                    matchedUnsupported = true;
+                    continue;
+                }
                 if (requireCommitProof && (string.IsNullOrWhiteSpace(envelope.ProofKey) || envelope.ProofVersion is null))
                     continue;
                 var scopeVersions = requireCommitProof
                     ? await CaptureScopeVersions(ancestry, ct).ConfigureAwait(false)
                     : new Dictionary<string, long>(StringComparer.Ordinal);
                 var boundActor = _actorAccessor?.CurrentActorSubject;
-                return new AuthorityProof(async token =>
+                return new AuthorityProof(envelope, async token =>
                 {
                     if (!string.IsNullOrWhiteSpace(boundActor) &&
                         !StringComparer.Ordinal.Equals(_actorAccessor?.CurrentActorSubject, request.Actor.StableSubject))
@@ -719,7 +760,39 @@ public sealed class RoleEngine
                 });
             }
         }
+        if (matchedUnsupported && unsupportedCode is not null)
+            throw new ScopedRoleAuthorizationException(unsupportedCode,
+                unsupportedMessage ?? "The matching authority envelope is not supported for this operation.");
         throw new ScopedRoleAuthorizationException("authority.denied", "The actor is not authorized for this scoped-role operation.");
+    }
+
+    private async Task<IReadOnlyList<ScopedRoleAuthorityEnvelope>> DemandReadEnvelopes(
+        ScopedRoleAuthorityRequest request, IReadOnlyList<ScopedRoleScopeRef> ancestry, CancellationToken ct)
+    {
+        if (!request.Actor.IsAuthenticated)
+            throw new ScopedRoleAuthorizationException("authority.anonymous", "Authentication is required for scoped-role administration.");
+        var supported = new List<ScopedRoleAuthorityEnvelope>();
+        var matchedUnsupported = false;
+        foreach (var contributor in _authorities)
+        {
+            var envelopes = await contributor.Contribute(request, ct).ConfigureAwait(false);
+            foreach (var envelope in envelopes)
+            {
+                if (!Allows(envelope, request, ancestry)) continue;
+                if (!IsSupportedReadEnvelope(envelope))
+                {
+                    matchedUnsupported = true;
+                    continue;
+                }
+                supported.Add(envelope);
+            }
+        }
+        if (supported.Count > 0) return supported;
+        if (matchedUnsupported)
+            throw new ScopedRoleAuthorizationException("authority.read.ceiling.unsupported",
+                "Grant and audience clause ceilings cannot be projected safely onto scoped-role reads.");
+        throw new ScopedRoleAuthorizationException("authority.denied",
+            "The actor is not authorized for this scoped-role operation.");
     }
 
     private static async Task<Dictionary<string, long>> CaptureScopeVersions(
@@ -939,7 +1012,9 @@ public sealed class RoleEngine
     private sealed record RoleApproval(IReadOnlySet<string> Capabilities,
         IReadOnlyList<ScopedRoleGrantClause> Grants,
         Dictionary<string, long> PolicyVersions);
-    private sealed record AuthorityProof(Func<CancellationToken, ValueTask> Revalidate);
+    private sealed record AuthorityProof(ScopedRoleAuthorityEnvelope Envelope,
+        Func<CancellationToken, ValueTask> Revalidate);
+    private sealed record ReadConstraint(Filter? Filter, bool Empty);
 
     private ScopedRoleActor CurrentAdministrativeActor()
     {

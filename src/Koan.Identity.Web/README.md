@@ -39,6 +39,11 @@ operation; they never require or confer the global operator role. Mutable resour
 require `If-Match`. Cookie-authenticated mutations require ASP.NET antiforgery validation, while authenticated
 non-cookie schemes retain the application's configured authentication and CORS behavior. Effective and preview
 responses expose only a safe allow/deny decision; role, policy, binding and version provenance stays inside core.
+For constrained management, `RoleIds` bounds definition and assignment reads, while `Capabilities` bounds policy
+reads and previews. Multiple supported alternatives union only that operation's matching read axis, so contributor
+order cannot suppress valid authority. Resetting a local policy to inheritance requires the distinct `ResetPolicy`
+authority operation; ordinary `ManagePolicy` authority is insufficient because a reset can restore broader
+ancestor/default access.
 
 ## Boundaries
 

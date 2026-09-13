@@ -66,12 +66,106 @@ public sealed class ScopedRoleSqliteSpec
             reader = await engine.Edit(new(reader.Id, staleVersion, Name: "Reader renamed"));
             var stale = async () => await engine.Edit(new EditScopedRole(reader.Id, staleVersion, Name: "lost"));
             await stale.Should().ThrowAsync<ScopedRoleConcurrencyException>();
+
+            var allowedRole = await engine.Define(new(topic, "Visible reader", [new("discussion.read")],
+                Id: "role:sqlite:reader"));
+            var sensitiveRole = await engine.Define(new(topic, "Hidden moderator", [new("discussion.moderate")],
+                Id: "role:sqlite:moderator"));
+            var allowedBinding = await engine.Assign(new(topic, "participant:visible", allowedRole.Id));
+            var sensitiveBinding = await engine.Assign(new(topic, "participant:hidden", sensitiveRole.Id));
+            await engine.Replace(new(topic, "discussion.read", [new(ScopedRoleAudienceKind.Authenticated)]));
+            await engine.Replace(new(topic, "discussion.moderate", [new(ScopedRoleAudienceKind.Authenticated)]));
+
+            var catalog = serviceScope.ServiceProvider.GetRequiredService<ScopedRoleCatalog>();
+            var limitedAuthority = new LimitedReadAuthority
+            {
+                Scope = topic,
+                RoleIds = new HashSet<string>([allowedRole.Id], StringComparer.Ordinal),
+                Capabilities = new HashSet<string>(["discussion.read"], StringComparer.Ordinal),
+            };
+            var limited = new RoleEngine(catalog, [limitedAuthority], [],
+                Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()),
+                new FixedActor("steward:sqlite"), new FixedSubject("participant:visible"));
+
+            var roles = await limited.Roles(topic, page: 1, pageSize: 10);
+            roles.Items.Should().ContainSingle().Which.Id.Should().Be(allowedRole.Id);
+            roles.TotalCount.Should().Be(1);
+            (await limited.Role(allowedRole.Id, topic))!.Id.Should().Be(allowedRole.Id);
+            await FluentActions.Awaiting(() => limited.Role(sensitiveRole.Id, topic))
+                .Should().ThrowAsync<ScopedRoleAuthorizationException>();
+
+            var bindings = await limited.Bindings(topic, page: 1, pageSize: 10);
+            bindings.Items.Should().ContainSingle().Which.Id.Should().Be(allowedBinding.Id);
+            bindings.TotalCount.Should().Be(1);
+            (await limited.Binding(allowedBinding.Id, topic))!.Id.Should().Be(allowedBinding.Id);
+            (await limited.Binding(sensitiveBinding.Id, topic)).Should().BeNull();
+
+            var policies = await limited.Policies(topic, page: 1, pageSize: 10);
+            policies.Items.Should().ContainSingle().Which.Capability.Should().Be("discussion.read");
+            policies.TotalCount.Should().Be(1);
+            (await limited.Policy("discussion.read", topic))!.Capability.Should().Be("discussion.read");
+            await FluentActions.Awaiting(() => limited.Policy("discussion.moderate", topic))
+                .Should().ThrowAsync<ScopedRoleAuthorizationException>();
+            (await limited.Preview("participant:visible", "discussion.read", topic)).Plan.Allowed.Should().BeTrue();
+            await FluentActions.Awaiting(() => limited.Preview("participant:visible", "discussion.moderate", topic))
+                .Should().ThrowAsync<ScopedRoleAuthorizationException>();
+
+            var unsupported = new RoleEngine(catalog, [new LimitedReadAuthority
+            {
+                Scope = topic,
+                RoleIds = limitedAuthority.RoleIds,
+                Capabilities = limitedAuthority.Capabilities,
+                GrantClauses = [],
+            }], [], Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()),
+                new FixedActor("steward:sqlite"), new FixedSubject("participant:visible"));
+            await FluentActions.Awaiting(() => unsupported.Roles(topic, page: 1, pageSize: 10))
+                .Should().ThrowAsync<ScopedRoleAuthorizationException>()
+                .Where(error => error.Code == "authority.read.ceiling.unsupported");
+
+            var emptyThenLimited = LimitedEngine(catalog, topic,
+                new(Set(), Set()),
+                new(Set(allowedRole.Id), Set("discussion.read")));
+            (await emptyThenLimited.Roles(topic, page: 1, pageSize: 10)).Items
+                .Should().ContainSingle().Which.Id.Should().Be(allowedRole.Id);
+
+            var unsupportedThenSupported = LimitedEngine(catalog, topic,
+                new(Set(allowedRole.Id), Set("discussion.read"), []),
+                new(Set(allowedRole.Id), Set("discussion.read")));
+            (await unsupportedThenSupported.Roles(topic, page: 1, pageSize: 10)).Items
+                .Should().ContainSingle().Which.Id.Should().Be(allowedRole.Id);
+            (await unsupportedThenSupported.Preview("participant:visible", "discussion.read", topic))
+                .Plan.Allowed.Should().BeTrue();
+
+            var disjoint = LimitedEngine(catalog, topic,
+                new(Set(allowedRole.Id), Set("discussion.read")),
+                new(Set(sensitiveRole.Id), Set("discussion.moderate")));
+            var disjointRoles = await disjoint.Roles(topic, page: 1, pageSize: 10);
+            disjointRoles.Items.Select(role => role.Id).Should().BeEquivalentTo([allowedRole.Id, sensitiveRole.Id]);
+            disjointRoles.TotalCount.Should().Be(2);
+            var disjointBindings = await disjoint.Bindings(topic, page: 1, pageSize: 10);
+            disjointBindings.Items.Select(binding => binding.Id)
+                .Should().BeEquivalentTo([allowedBinding.Id, sensitiveBinding.Id]);
+            disjointBindings.TotalCount.Should().Be(2);
+            (await disjoint.Binding(sensitiveBinding.Id, topic))!.Id.Should().Be(sensitiveBinding.Id);
+            var disjointPolicies = await disjoint.Policies(topic, page: 1, pageSize: 10);
+            disjointPolicies.Items.Select(policy => policy.Capability)
+                .Should().BeEquivalentTo(["discussion.read", "discussion.moderate"]);
+            disjointPolicies.TotalCount.Should().Be(2);
         }
         finally
         {
             if (File.Exists(path)) File.Delete(path);
         }
     }
+
+    private static RoleEngine LimitedEngine(ScopedRoleCatalog catalog, ScopedRoleScopeRef scope,
+        params LimitedReadEnvelope[] alternatives)
+        => new(catalog, [new LimitedReadAuthority { Scope = scope, Alternatives = alternatives }], [],
+            Microsoft.Extensions.Options.Options.Create(new RoleEngineOptions()),
+            new FixedActor("steward:sqlite"), new FixedSubject("participant:visible"));
+
+    private static IReadOnlySet<string> Set(params string[] values)
+        => new HashSet<string>(values, StringComparer.Ordinal);
 
     private sealed class SqliteCatalog : IScopedRoleCatalogContributor
     {
@@ -80,6 +174,7 @@ public sealed class ScopedRoleSqliteSpec
             catalog.Scope("space");
             catalog.Scope("topic", "space");
             catalog.Capability("discussion.read", ["space", "topic"]);
+            catalog.Capability("discussion.moderate", ["topic"]);
             catalog.Resource<SqlitePost>("topic", post => post.TenantId, post => post.TopicId).Read("discussion.read");
         }
     }
@@ -99,6 +194,45 @@ public sealed class ScopedRoleSqliteSpec
             ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
             => ValueTask.FromResult(envelope.ProofKey == "sqlite-owner" && envelope.ProofVersion == 1);
     }
+
+    private sealed class LimitedReadAuthority : IScopedRoleAuthorityContributor
+    {
+        private static readonly IReadOnlySet<ScopedRoleAuthorityOperation> Operations =
+            new HashSet<ScopedRoleAuthorityOperation>
+            {
+                ScopedRoleAuthorityOperation.ReadDefinitions,
+                ScopedRoleAuthorityOperation.ReadAssignments,
+                ScopedRoleAuthorityOperation.ReadPolicies,
+                ScopedRoleAuthorityOperation.Preview,
+            };
+
+        public ScopedRoleScopeRef? Scope { get; init; }
+        public IReadOnlySet<string>? RoleIds { get; init; }
+        public IReadOnlySet<string>? Capabilities { get; init; }
+        public IReadOnlyList<ScopedRoleGrantClause>? GrantClauses { get; init; }
+        public IReadOnlyList<LimitedReadEnvelope>? Alternatives { get; init; }
+
+        public ValueTask<IReadOnlyList<ScopedRoleAuthorityEnvelope>> Contribute(
+            ScopedRoleAuthorityRequest request, CancellationToken ct = default)
+        {
+            if (Scope is null || request.Actor.Subject != "steward:sqlite")
+                return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>([]);
+            var alternatives = Alternatives ?? [new(RoleIds, Capabilities, GrantClauses)];
+            return ValueTask.FromResult<IReadOnlyList<ScopedRoleAuthorityEnvelope>>(alternatives.Select(item =>
+                new ScopedRoleAuthorityEnvelope(Scope, Operations, RoleIds: item.RoleIds,
+                    Capabilities: item.Capabilities, ProofKey: "sqlite-limited-reader", ProofVersion: 1)
+                {
+                    GrantClauses = item.GrantClauses,
+                }).ToArray());
+        }
+
+        public ValueTask<bool> Validate(ScopedRoleAuthorityRequest request,
+            ScopedRoleAuthorityEnvelope envelope, CancellationToken ct = default)
+            => ValueTask.FromResult(envelope.ProofKey == "sqlite-limited-reader" && envelope.ProofVersion == 1);
+    }
+
+    private sealed record LimitedReadEnvelope(IReadOnlySet<string>? RoleIds,
+        IReadOnlySet<string>? Capabilities, IReadOnlyList<ScopedRoleGrantClause>? GrantClauses = null);
 
     private sealed class FixedActor(string subject) : IIdentityActorAccessor
     {

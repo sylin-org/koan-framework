@@ -32,6 +32,15 @@ Current-subject effective checks return the same safe denial for an absent scope
 access. Effective and authorized preview responses intentionally omit role IDs, policy IDs, binding IDs, reasons and
 version provenance.
 
+Read ceilings have operation-specific, provider-pushable meanings. `RoleIds` is conjoined with role-definition IDs
+and binding role IDs before paging/counting; `Capabilities` is conjoined with policy capability keys and is carried
+by preview requests. Supported alternatives union only the matching read axis; any unbounded alternative is
+unbounded, and empty or unsupported alternatives do not mask later valid authority. Grant/audience clause ceilings
+cannot be projected across stored JSON and related records, so an unsupported-only read rejects with
+`authority.read.ceiling.unsupported`. Policy inheritance reset uses the separate `ResetPolicy` operation and skips
+unsupported alternatives while selecting one complete capability-scoped reset envelope; `ManagePolicy` only edits
+an explicit local audience and cannot remove that narrowing boundary.
+
 Authority freshness is a provider re-read immediately inside the one-shot lifecycle permit before adapter dispatch.
 It is not a serializable cross-record transaction between the authority row and the target row; providers that need
 that stronger guarantee must supply a shared transactional integration rather than infer it from this pre-dispatch
