@@ -20,9 +20,7 @@ public sealed class SecIdentityWebModule : KoanModule
     {
         // Mount the controllers from this assembly.
         services.AddKoanControllersFrom<IdentitySelfServiceController>();
-        services.AddAntiforgery();
-        services.TryAddScoped<ScopedRoleExceptionFilter>();
-        services.TryAddScoped<ScopedRoleAntiforgeryFilter>();
+        services.TryAddScoped<RoleManagementExceptionFilter>();
 
         // D8 — the impersonation banner rides every response while an actor claim is present.
         services.Configure<Microsoft.AspNetCore.Mvc.MvcOptions>(o => o.Filters.Add<ImpersonationBannerFilter>());
@@ -30,7 +28,6 @@ public sealed class SecIdentityWebModule : KoanModule
         // Audit attribution: resolve the acting subject from the request principal (actor when impersonating).
         services.AddHttpContextAccessor();
         services.TryAddSingleton<Koan.Identity.IIdentityActorAccessor, HttpContextActorAccessor>();
-        services.TryAddSingleton<Koan.Identity.Roles.IScopedRoleSubjectAccessor, HttpContextScopedRoleSubjectAccessor>();
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -40,7 +37,7 @@ public sealed class SecIdentityWebModule : KoanModule
             "Profile, sessions & devices, connected accounts", capability: "identity.self-service");
         module.AddTool("Identity — Operator", "/api/identity/admin",
             "User list, bulk lifecycle, lifecycle-aware delete, access, impersonation", capability: "identity.operator");
-        module.AddTool("Identity — Scoped roles", "/api/identity/scoped-roles/descriptor",
-            "Scoped definitions, assignments, policy and previews", capability: "identity.scoped-roles");
+        module.AddTool("Identity — Roles", "/api/identity/roles/descriptor",
+            "Bounded server-role catalog, membership and current-person bags", capability: "identity.roles");
     }
 }

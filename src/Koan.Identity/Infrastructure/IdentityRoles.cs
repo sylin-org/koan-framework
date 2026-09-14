@@ -4,8 +4,7 @@ namespace Koan.Identity;
 public static class IdentityRoles
 {
     /// <summary>
-    /// Host operator authority over the global identity plane. Grant globally through <see cref="IdentityRole"/> or
-    /// an external host identity; tenant memberships must never project this role.
+    /// Host operator authority over the global identity plane. Store it as a member collection in <see cref="Roles.Role"/>.
     /// </summary>
     public const string Operator = "koan:identity-operator";
 

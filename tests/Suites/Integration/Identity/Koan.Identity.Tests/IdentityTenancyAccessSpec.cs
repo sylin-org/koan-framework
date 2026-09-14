@@ -2,6 +2,7 @@ using AwesomeAssertions;
 using Koan.Data.Core;
 using Koan.Identity.Access;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,7 +20,7 @@ public sealed class IdentityTenancyAccessSpec : IdentityHostScopedSpec
     private readonly IdentityHostFixture _fx;
     public IdentityTenancyAccessSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
-    private IdentityRoleService Roles => _fx.Services.GetRequiredService<IdentityRoleService>();
+    private IdentityRoleTestClient Roles => new(_fx.Services.GetRequiredService<RoleCollection>());
     private EffectiveAccessResolver NewResolver(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>();
 
     [Fact]

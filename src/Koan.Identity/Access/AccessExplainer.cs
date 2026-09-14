@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Koan.Data.Core;
 using Koan.Web.Authorization;
 using Koan.Web.Hooks;
+using Koan.Identity.Roles;
 
 namespace Koan.Identity.Access;
 
@@ -14,11 +15,13 @@ public sealed class AccessExplainer
 {
     private readonly EffectiveAccessResolver _resolver;
     private readonly IAuthorize? _authorize;
+    private readonly RoleCollection? _roles;
 
-    public AccessExplainer(EffectiveAccessResolver resolver, IAuthorize? authorize = null)
+    public AccessExplainer(EffectiveAccessResolver resolver, IAuthorize? authorize = null, RoleCollection? roles = null)
     {
         _resolver = resolver;
         _authorize = authorize;
+        _roles = roles;
     }
 
     /// <summary>Reverse: the facts contributing to <paramref name="identityId"/>'s access on <paramref name="resourceName"/>.</summary>
@@ -63,11 +66,10 @@ public sealed class AccessExplainer
     {
         switch (fact.RowType)
         {
-            case nameof(IdentityRole):
-                var role = await IdentityRole.Get(fact.RowId, ct).ConfigureAwait(false);
-                if (role is null) return false;
-                await role.Remove(ct).ConfigureAwait(false);
-                return true;
+            case "RoleMember":
+                if (_roles is null || string.IsNullOrWhiteSpace(fact.Subject)) return false;
+                try { await _roles.Remove(fact.RowId, fact.Subject, ct).ConfigureAwait(false); return true; }
+                catch (KeyNotFoundException) { return false; }
             case nameof(AgentGrant):
                 var grant = await AgentGrant.Get(fact.RowId, ct).ConfigureAwait(false);
                 if (grant is null) return false;

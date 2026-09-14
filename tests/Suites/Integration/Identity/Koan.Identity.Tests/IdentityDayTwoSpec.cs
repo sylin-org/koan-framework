@@ -175,7 +175,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         var access = new IdentityAccessController(
             scope.ServiceProvider.GetRequiredService<Koan.Identity.Access.EffectiveAccessResolver>(),
             scope.ServiceProvider.GetRequiredService<Koan.Identity.Access.AccessExplainer>(),
-            _fx.Services.GetRequiredService<IdentityRoleService>());
+            _fx.Services.GetRequiredService<Koan.Identity.Roles.RoleCollection>());
         access.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = impersonatingOperator } };
         ((await access.Grant("anyone", new IdentityAccessController.GrantRequest("koan:admin"), default)).Result as ObjectResult)?.StatusCode.Should().Be(403, "role grant is guarded while impersonating");
     }

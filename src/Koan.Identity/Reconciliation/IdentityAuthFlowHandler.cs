@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Koan.Data.Core;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Flow;
 
@@ -46,12 +47,16 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             }
         }
 
-        // Stamp the person's GLOBAL roles (IdentityRole, Layer 2) onto the cookie so production actually HONORS a
-        // global grant — without this the binding would be write-only (the authorize floor reads role claims). This
-        // also makes the access explainer's "preview == production" true for global roles.
-        foreach (var globalRole in await IdentityRole.Query(r => r.IdentityId == subject, ct).ConfigureAwait(false))
-            if (!ctx.Identity.HasClaim(ClaimTypes.Role, globalRole.RoleKey))
-                ctx.Identity.AddClaim(new Claim(ClaimTypes.Role, globalRole.RoleKey));
+        // Project role/group membership tokens from the compiled bag onto the standard role-claim surface.
+        if (ctx.Services.GetService<RoleCollection>() is { } roles)
+        {
+            var bag = await roles.Bag(subject, true, ct).ConfigureAwait(false);
+            foreach (var roleKey in bag.Tokens.Where(token => token != RoleTokens.Everyone
+                                                             && token != RoleTokens.Authenticated
+                                                             && !token.StartsWith(RoleTokens.GlobalPrefix, StringComparison.Ordinal)))
+                if (!ctx.Identity.HasClaim(ClaimTypes.Role, roleKey))
+                    ctx.Identity.AddClaim(new Claim(ClaimTypes.Role, roleKey));
+        }
 
         // Record a durable device session and stamp its id on the cookie so "sign out everywhere-else" can revoke
         // this specific session and OnValidatePrincipal can enforce it.

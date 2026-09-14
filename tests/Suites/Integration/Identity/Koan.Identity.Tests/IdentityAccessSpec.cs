@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Koan.Data.Core;
 using Koan.Identity.Access;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 using Koan.Tenancy;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Flow;
@@ -24,7 +25,7 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     private readonly IdentityHostFixture _fx;
     public IdentityAccessSpec(IdentityHostFixture fx) : base(fx) => _fx = fx;
 
-    private IdentityRoleService Roles => _fx.Services.GetRequiredService<IdentityRoleService>();
+    private IdentityRoleTestClient Roles => new(_fx.Services.GetRequiredService<RoleCollection>());
 
     private EffectiveAccessResolver NewResolver(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>();
     private AccessExplainer NewExplainer(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<AccessExplainer>();
@@ -61,7 +62,7 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
 
             access.Roles.Should().Contain("koan:editor", "the IdentityRole contributor supplies global roles");
             access.Capabilities.Should().Contain("has:scope:orders", "the AgentGrant contributor supplies tenant capabilities");
-            access.Facts.Should().Contain(f => f.Source == "IdentityRole" && f.Value == "koan:editor");
+            access.Facts.Should().Contain(f => f.Source == "Role" && f.Value == "koan:editor");
             access.Facts.Should().Contain(f => f.Source == "AgentGrant" && f.Resource == "Orders");
         }
     }
@@ -168,13 +169,13 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
         await new Identity { Id = id, DisplayName = "Role Audit" }.Save();
         var role = await Roles.GrantAsync(id, "koan:admin");
 
-        (await AuditEvent.Query(a => a.Subject == id)).Should().Contain(
-            a => a.Action == "identityrole.created" && a.Target == $"IdentityRole/{role.Id}",
-            "granting a global role self-audits with the person as Subject");
+        (await AuditEvent.Query(a => a.Subject == role.Id)).Should().Contain(
+            a => a.Action == "role.created" && a.Target == $"Role/{role.Id}",
+            "defining the server role self-audits against its stable key");
 
         (await Roles.RevokeAsync(id, "koan:admin")).Should().BeTrue();
-        (await AuditEvent.Query(a => a.Subject == id)).Should().Contain(
-            a => a.Action == "identityrole.deleted", "revoking a global role self-audits the deletion");
+        (await AuditEvent.Query(a => a.Subject == role.Id)).Should().Contain(
+            a => a.Action == "role.updated", "membership removal self-audits the role collection mutation");
     }
 
     [Fact]
@@ -187,10 +188,10 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
         using var scope = _fx.Services.CreateScope();
         var explainer = NewExplainer(scope);
 
-        var roleFact = (await explainer.WhyAsync(id, "Invoices")).SingleOrDefault(f => f.Source == "IdentityRole" && f.Value == "koan:admin");
+        var roleFact = (await explainer.WhyAsync(id, "Invoices")).SingleOrDefault(f => f.Source == "Role" && f.Value == "koan:admin");
         roleFact.Should().NotBeNull("a global role (Resource=*) contributes to access on ANY resource");
 
-        (await explainer.RevokeAsync(new AccessFactRef(roleFact!.RowType, roleFact.RowId))).Should().BeTrue("drives the IdentityRole revoke branch");
+            (await explainer.RevokeAsync(new AccessFactRef(roleFact!.RowType, roleFact.RowId, roleFact.Subject))).Should().BeTrue("drives the server-role membership revoke branch");
         (await explainer.RevokeAsync(new AccessFactRef("Membership", "no-such"))).Should().BeFalse("an unknown row type fails closed");
         (await explainer.WhyAsync(id, "Invoices")).Should().NotContain(f => f.RowId == roleFact.RowId);
     }

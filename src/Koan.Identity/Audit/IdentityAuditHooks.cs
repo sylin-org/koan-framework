@@ -21,12 +21,8 @@ internal static class IdentityAuditHooks
         Hook<IdentityEmail>("IdentityEmail", e => e.IdentityId);
         Hook<ExternalIdentityLink>("ExternalIdentityLink", e => e.IdentityId);
         Hook<Session>("Session", e => e.IdentityId);
-        Hook<IdentityRole>("IdentityRole", e => e.IdentityId);
+        Hook<Role>("Role", e => e.Id, e => e.UpdatedBy);
         Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target);
-        Hook<ScopedRoleScope>("ScopedRoleScope", e => e.ScopeId, e => e.UpdatedBy);
-        Hook<ScopedRoleDefinition>("ScopedRoleDefinition", e => e.Id, e => e.UpdatedBy);
-        Hook<ScopedRoleParticipant>("ScopedRoleParticipant", e => e.Subject, e => e.UpdatedBy);
-        Hook<ScopedRolePolicy>("ScopedRolePolicy", e => e.ScopeId, e => e.UpdatedBy);
     }
 
     private const string BeforeKey = "__koan_identity_audit_before";

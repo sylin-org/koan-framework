@@ -4,6 +4,7 @@ using Koan.Data.Core;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Audit;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -162,7 +163,9 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         await new IdentityEmail { Id = IdentityEmail.KeyFor(id, "del@example.com"), IdentityId = id, Address = "del@example.com", Verified = true, Primary = true }.Save();
         await Sessions.RecordAsync(id, "Laptop", "Firefox", "Linux", null);
         await new ExternalIdentityLink { Id = ExternalIdentityLink.KeyFor(id, "google", "H"), IdentityId = id, Provider = "google", ProviderKeyHash = "H" }.Save();
-        await new IdentityRole { Id = IdentityRole.KeyFor(id, "koan:admin"), IdentityId = id, RoleKey = "koan:admin" }.Save();
+        var roles = _fx.Services.GetRequiredService<RoleCollection>();
+        await roles.Define("koan:admin", "Admin", ["global:admin"]);
+        await roles.Add("koan:admin", id);
         await new ImpersonationGrant { Actor = id, Target = "target", Reason = "actor dependent" }.Save();
         await new ImpersonationGrant { Actor = "other", Target = id, Reason = "target dependent" }.Save();
 
@@ -178,7 +181,7 @@ public sealed class IdentityManagementSpec : IdentityHostScopedSpec
         (await IdentityEmail.Query(e => e.IdentityId == id)).Should().BeEmpty("emails cascade");
         (await Session.Query(s => s.IdentityId == id)).Should().BeEmpty("sessions cascade");
         (await ExternalIdentityLink.Query(l => l.IdentityId == id)).Should().BeEmpty("external links cascade");
-        (await IdentityRole.Query(r => r.IdentityId == id)).Should().BeEmpty("global roles cascade");
+        (await roles.ForPerson(id)).Should().BeEmpty("global roles cascade");
         (await ImpersonationGrant.Query(g => g.Actor == id || g.Target == id)).Should().BeEmpty(
             "acting and target-side impersonation grants cascade");
         (await AuditEvent.All()).Should().Contain(a =>

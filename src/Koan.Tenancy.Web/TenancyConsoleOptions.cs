@@ -56,7 +56,7 @@ public sealed class ConsoleGrantOptions
     /// identity, NOT request-shape — a host config grant, never derived from a tenant membership ("no master backdoor").</summary>
     public string[] Operators { get; set; } = Array.Empty<string>();
 
-    /// <summary>The role claim that admits (e.g. bound via <c>Koan.Identity</c>'s <c>IdentityRole</c>, or any auth scheme).</summary>
+    /// <summary>The role claim that admits (e.g. projected from a Koan.Identity server role, or any auth scheme).</summary>
     public string Role { get; set; } = TenancyRoles.Operator;
 }
 

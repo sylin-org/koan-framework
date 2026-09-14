@@ -45,10 +45,9 @@ internal static class IdentityAuditSnapshot
             session.FirstSeen,
             session.LastActive,
         }),
-        IdentityRole role => JsonConvert.SerializeObject(new
+        Role role => JsonConvert.SerializeObject(new
         {
-            role.RoleKey,
-            role.CreatedAt,
+            role.Id, role.Name, Permissions = role.Permissions.Count, Members = role.Members.Count, Metadata = role.Metadata.Keys.Order(), role.UpdatedAt,
         }),
         ImpersonationGrant grant => JsonConvert.SerializeObject(new
         {
@@ -56,26 +55,6 @@ internal static class IdentityAuditSnapshot
             grant.ExpiresAt,
             grant.Revoked,
             grant.RequestedAt,
-        }),
-        ScopedRoleScope scope => JsonConvert.SerializeObject(new
-        {
-            scope.TenantId, scope.Type, scope.ScopeId, scope.OwnerSubject, scope.ParentType, scope.ParentScopeId, scope.Version,
-        }),
-        ScopedRoleDefinition definition => JsonConvert.SerializeObject(new
-        {
-            definition.TenantId, definition.ScopeType, definition.ScopeId, definition.Status,
-            definition.Version, definition.AuthorityVersion,
-            Capabilities = definition.Grants.Select(x => x.Capability).Distinct(StringComparer.Ordinal).Order(),
-        }),
-        ScopedRoleParticipant participant => JsonConvert.SerializeObject(new
-        {
-            participant.TenantId, participant.Subject, participant.ScopeType, participant.ScopeId,
-            Roles = participant.Roles.Count, Groups = participant.Groups.Count,
-        }),
-        ScopedRolePolicy policy => JsonConvert.SerializeObject(new
-        {
-            policy.TenantId, policy.ScopeType, policy.ScopeId, policy.Capability, policy.Mode,
-            policy.Version, AudienceKinds = policy.Audience.Select(x => x.Kind).Distinct().Order(),
         }),
         _ => JsonConvert.SerializeObject(new { Entity = entity.GetType().Name }),
     };

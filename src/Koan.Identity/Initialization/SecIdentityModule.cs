@@ -40,36 +40,13 @@ public sealed class SecIdentityModule : KoanModule
         // Layer 2 — access model: the global role binding + the contributor-pipeline effective-access resolver +
         // the bidirectional explainer. Contributors are discovered ([KoanDiscoverable]) so an external Membership
         // contributor (with Koan.Tenancy) lights up over the same resolver — graceful degradation, no fork.
-        services.TryAddSingleton<Management.IdentityRoleService>();
+        services.AddKoanOptions<RoleOptions>(RoleOptions.SectionPath);
+        services.TryAddSingleton<RoleBagCache>();
+        services.TryAddSingleton<RoleCollection>();
         services.TryAddScoped<Access.EffectiveAccessResolver>();
         services.TryAddScoped<Access.AccessExplainer>();
         foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(Access.IEffectiveAccessContributor)))
             services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(Access.IEffectiveAccessContributor), type));
-
-        // Scoped roles remain in Identity's operative access owner. Structural vocabulary and delegation
-        // authority are application contributions; absence means an empty catalog / deny-all administration.
-        services.AddKoanOptions<RoleEngineOptions>(RoleEngineOptions.SectionPath);
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleCatalogContributor)))
-            services.TryAddEnumerable(ServiceDescriptor.Singleton(typeof(IScopedRoleCatalogContributor), type));
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleAuthorityContributor)))
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IScopedRoleAuthorityContributor), type));
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IScopedRoleGuardContributor)))
-            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(IScopedRoleGuardContributor), type));
-        services.TryAddSingleton<ScopedRoleCatalog>();
-        services.TryAddSingleton<ScopedRoleSnapshotCache>();
-        services.TryAddSingleton<ScopedRoleMembershipCoordinator>();
-        services.TryAddSingleton<IScopedRoleAccessInvalidator>(provider =>
-            provider.GetRequiredService<ScopedRoleSnapshotCache>());
-        services.TryAddScoped(provider => new RoleEngine(
-            provider.GetRequiredService<ScopedRoleCatalog>(),
-            provider.GetServices<IScopedRoleAuthorityContributor>(),
-            provider.GetServices<IScopedRoleGuardContributor>(),
-            provider.GetRequiredService<IOptions<RoleEngineOptions>>(),
-            provider.GetService<IIdentityActorAccessor>(),
-            provider.GetService<IScopedRoleSubjectAccessor>(),
-            null,
-            provider.GetRequiredService<ScopedRoleSnapshotCache>(),
-            provider.GetRequiredService<ScopedRoleMembershipCoordinator>()));
 
         // SEC-0009 — semantic owners compose one privacy erasure plan. Scoped registration permits an
         // application-owned contributor to use its ordinary scoped dependencies without special wiring.
@@ -80,7 +57,7 @@ public sealed class SecIdentityModule : KoanModule
         services.TryAddSingleton<Impersonation.ImpersonationService>();
         services.TryAddSingleton<Management.JitGrantService>();
         services.TryAddSingleton<Audit.AuditChain>();
-        ScopedRoleMutationGuard.Register();
+        RoleMutationGuard.Register();
         Audit.IdentityAuditHooks.Register();
 
         // Replace the in-memory stubs with durable Entity<>-backed stores. This is order-independent: Web Auth uses

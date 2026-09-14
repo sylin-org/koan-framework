@@ -17,7 +17,7 @@ namespace Koan.Tenancy.Web.Authorization;
 /// <see cref="TenancyConsoleOptions.RequireLoopbackForOpenPosture"/> so a public dev bind can't expose an ungated
 /// console.</item>
 /// <item><b>Closed (Production)</b> — admit an authenticated principal that either carries the grant
-/// <see cref="ConsoleGrantOptions.Role"/> (e.g. bound via <c>Koan.Identity</c>'s <c>IdentityRole</c>) <b>or</b> whose
+/// <see cref="ConsoleGrantOptions.Role"/> (e.g. projected from a Koan.Identity server role) <b>or</b> whose
 /// identity is in the break-glass <see cref="ConsoleGrantOptions.Operators"/> allow-list. Both are keyed on
 /// identity/role, never on the forgeable request-shape (that's the exposure layer's job); neither is derived from a
 /// tenant membership ("no master backdoor").</item>

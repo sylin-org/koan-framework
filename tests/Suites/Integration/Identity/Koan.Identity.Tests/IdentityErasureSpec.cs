@@ -3,6 +3,7 @@ using Koan.Data.Core;
 using Koan.Identity.Audit;
 using Koan.Identity.Erasure;
 using Koan.Identity.Impersonation;
+using Koan.Identity.Roles;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Management;
 using Koan.Identity.Tenancy.Deprovisioning;
@@ -59,12 +60,9 @@ public sealed class IdentityErasureSpec : IdentityHostScopedSpec
             ProviderKeyHash = "provider-hash",
             ClaimsJson = $"{{\"private\":\"{marker}\"}}",
         }.Save();
-        await new IdentityRole
-        {
-            Id = IdentityRole.KeyFor(identityId, "koan:reader"),
-            IdentityId = identityId,
-            RoleKey = "koan:reader",
-        }.Save();
+        var roles = _fixture.Services.GetRequiredService<RoleCollection>();
+        await roles.Define("koan:reader", "Reader", ["global:read"]);
+        await roles.Add("koan:reader", identityId);
         await new ImpersonationGrant
         {
             Actor = identityId,

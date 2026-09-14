@@ -2,11 +2,12 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Infrastructure;
+using Koan.Identity.Roles;
 
 namespace Koan.Identity.Erasure;
 
 /// <summary>Closes access first, then removes every core-owned durable-person row.</summary>
-internal sealed class IdentityCoreErasureContributor : IIdentityErasureContributor
+internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IIdentityErasureContributor
 {
     public string Owner => IdentityErasureConstants.CoreOwner;
     public int Order => 100;
@@ -39,7 +40,8 @@ internal sealed class IdentityCoreErasureContributor : IIdentityErasureContribut
         var emailCount = await RemoveAll(owned.Emails, ct).ConfigureAwait(false);
         var sessionCount = await RemoveAll(owned.Sessions, ct).ConfigureAwait(false);
         var linkCount = await RemoveAll(owned.ExternalLinks, ct).ConfigureAwait(false);
-        var roleCount = await RemoveAll(owned.Roles, ct).ConfigureAwait(false);
+        var roleCount = 0;
+        foreach (var role in owned.Roles) { await roles.Remove(role.Id, identityId, ct); roleCount++; }
         var impersonationCount = await RemoveAll(owned.ImpersonationGrants, ct).ConfigureAwait(false);
         var identityCount = owned.Person is not null && await owned.Person.Remove(ct).ConfigureAwait(false) ? 1 : 0;
 
@@ -61,17 +63,17 @@ internal sealed class IdentityCoreErasureContributor : IIdentityErasureContribut
         };
     }
 
-    private static async Task<OwnedRows> LoadAsync(string identityId, CancellationToken ct)
+    private async Task<OwnedRows> LoadAsync(string identityId, CancellationToken ct)
     {
         var person = await Identity.Get(identityId, ct).ConfigureAwait(false);
         var emails = await IdentityEmail.Query(email => email.IdentityId == identityId, ct).ConfigureAwait(false);
         var sessions = await Session.Query(session => session.IdentityId == identityId, ct).ConfigureAwait(false);
         var links = await ExternalIdentityLink.Query(link => link.IdentityId == identityId, ct).ConfigureAwait(false);
-        var roles = await IdentityRole.Query(role => role.IdentityId == identityId, ct).ConfigureAwait(false);
+        var roleRows = await roles.ForPerson(identityId, ct).ConfigureAwait(false);
         var impersonation = await ImpersonationGrant.Query(
             grant => grant.Actor == identityId || grant.Target == identityId,
             ct).ConfigureAwait(false);
-        return new OwnedRows(person, emails, sessions, links, roles, impersonation);
+        return new OwnedRows(person, emails, sessions, links, roleRows, impersonation);
     }
 
     private static async Task<int> RemoveAll<TEntity>(IReadOnlyList<TEntity> rows, CancellationToken ct)
@@ -95,6 +97,6 @@ internal sealed class IdentityCoreErasureContributor : IIdentityErasureContribut
         IReadOnlyList<IdentityEmail> Emails,
         IReadOnlyList<Session> Sessions,
         IReadOnlyList<ExternalIdentityLink> ExternalLinks,
-        IReadOnlyList<IdentityRole> Roles,
+        IReadOnlyList<Role> Roles,
         IReadOnlyList<ImpersonationGrant> ImpersonationGrants);
 }

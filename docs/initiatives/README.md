@@ -32,7 +32,7 @@ architecture canon:
 | [Connector fleet](connector-fleet/README.md) | Make stores an application already operates do more, so a capability stops requiring a new service | Active — T1 not started |
 | [Announcement](announcement/README.md) | Take Koan 1.0 public with demonstrated claims, launch artifacts, and community surfaces | See [progress](announcement/PROGRESS.md) |
 | [Application evolution](application-evolution/README.md) | Test shared expertise, governed agent workflows, explainable changes, and incremental adoption through two applications | See [progress](application-evolution/PROGRESS.md) |
-| [Scoped role engine](scoped-role-engine.md) | Reusable, explainable scoped roles with shared query enforcement; Tangent Space is the first consumer | See [progress and handoff](scoped-role-engine.md#12-progress-and-handoff) |
+| [Server role collections](scoped-role-engine.md) | Stable role/group collections, compiled person bags, and resource-selected permission criteria | Implemented POC with Identity, Web, SQLite, and Mongo receipts |
 
 ## Initiative contract
 

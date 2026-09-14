@@ -4,5 +4,5 @@ namespace Koan.Data.Core.Model;
 
 public static class Entity
 {
-    public static ScopedRoleLifecycleBuilder Role { get; } = new();
+    public static RoleLifecycleBuilder Role { get; } = new();
 }

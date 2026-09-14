@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Koan.Identity.Access;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 
 namespace Koan.Identity.Web;
 
@@ -18,9 +19,9 @@ public sealed class IdentityAccessController : ControllerBase
 {
     private readonly EffectiveAccessResolver _resolver;
     private readonly AccessExplainer _explainer;
-    private readonly IdentityRoleService _roles;
+    private readonly RoleCollection _roles;
 
-    public IdentityAccessController(EffectiveAccessResolver resolver, AccessExplainer explainer, IdentityRoleService roles)
+    public IdentityAccessController(EffectiveAccessResolver resolver, AccessExplainer explainer, RoleCollection roles)
     {
         _resolver = resolver;
         _explainer = explainer;
@@ -42,13 +43,17 @@ public sealed class IdentityAccessController : ControllerBase
     public sealed record GrantRequest(string RoleKey);
 
     [HttpPost("roles")]
-    public async Task<ActionResult<IdentityRole>> Grant([FromRoute] string id, [FromBody] GrantRequest req, CancellationToken ct)
+    public async Task<ActionResult<Role>> Grant([FromRoute] string id, [FromBody] GrantRequest req, CancellationToken ct)
     {
         if (ImpersonationGuard.IsBlocked(User, "role.grant")) return StatusCode(403, new { error = "granting roles is blocked while impersonating" });
-        return Ok(await _roles.GrantAsync(id, req.RoleKey, ct));
+        try { return Ok(await _roles.Add(req.RoleKey, id, ct)); }
+        catch (KeyNotFoundException) { return NotFound(); }
     }
 
     [HttpDelete("roles/{roleKey}")]
     public async Task<IActionResult> Revoke([FromRoute] string id, [FromRoute] string roleKey, CancellationToken ct)
-        => await _roles.RevokeAsync(id, roleKey, ct) ? NoContent() : NotFound();
+    {
+        try { await _roles.Remove(roleKey, id, ct); return NoContent(); }
+        catch (KeyNotFoundException) { return NotFound(); }
+    }
 }

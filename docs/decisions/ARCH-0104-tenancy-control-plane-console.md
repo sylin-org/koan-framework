@@ -36,7 +36,7 @@ the bundled UI. The headless core keeps working without it.
 ### 2. The host-operator principal — explicit, never a master backdoor
 
 A new well-known host role **`TenancyRoles.Operator = "koan:tenancy-operator"`**. It is a *global/host*
-role, granted out-of-band (e.g. an `IdentityRole` binding or config), and is **never derived from any
+role, granted out-of-band (e.g. membership in a Koan.Identity server `Role` or config), and is **never derived from any
 tenant membership** — this is the design's "no master backdoor / master tenant is an `IsDefault` routing
 pointer with zero special powers." The controllers gate on it (`[Authorize(Roles = …)]`). Under the
 tenancy **dev-open** posture the console dev-seeds the grant for the loopback dev caller (Reference =
@@ -95,8 +95,8 @@ exposure, never authority.** Resolution is strictly layered and fail-closed:
   and composes host/header.)
 - **Grant (authority → 403-or-200, fail-closed, composed OR)** — `Grant.Operators` (break-glass identity
   allow-list, keyed on email/`sub`/name — a host config grant, never a tenant membership) **or** `Grant.Role`
-  (a role claim, e.g. bound via `Koan.Identity`'s `IdentityRole`). Either admits; empty list + no role claim =
-  nobody. The allow-list bootstraps the first operator; `IdentityRole` runs the managed/revocable steady state.
+  (a role claim, e.g. projected from a Koan.Identity server `Role`). Either admits; empty list + no role claim =
+  nobody. The allow-list bootstraps the first operator; the server `Role` collection runs the managed/revocable steady state.
 - **Posture** stays the dev-open/prod-closed baseline. `RequireLoopbackForOpenPosture` optionally restricts the
   dev-open auto-admit to loopback, so a dev host on a public bind can't expose an ungated console.
 - **Self-announcing** — the boot report prints the resolved activation

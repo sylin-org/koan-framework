@@ -1,151 +1,43 @@
 # Sylin.Koan.Identity
 
-Koan's durable person and day-two identity core. Reference the package beside Web Auth and keep `AddKoan()` as the
-only bootstrap; successful sign-ins reconcile to Entity-backed people, create enforceable cookie sessions, and project
-global roles through standard .NET role claims.
+Koan's durable person, session, audit, erasure, and server-role core. Reference the package beside Web Auth and keep
+`AddKoan()` as the only bootstrap.
 
-## Install
+## Server roles
 
-```powershell
-dotnet add package Sylin.Koan.Identity
-dotnet add package Sylin.Koan.Web.Auth.Connector.Test
-```
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddKoan();
-var app = builder.Build();
-await app.RunAsync();
-```
-
-The Test connector is the shortest local sign-in path. Use a deployment provider instead when appropriate. Identity
-does not add a second authentication flow: it consumes Web Auth's sign-in lifecycle when Web Auth is present.
-
-## Meaningful behavior
-
-- Each `(provider, subject)` reconciles idempotently to a durable `Identity` and its `IdentityEmail` factors.
-- Matching email claims never merge people. A signed-in user must explicitly link another provider identity.
-- Each cookie sign-in records a durable `Session`; revoked sessions and suspended/deactivated people are rejected on
-  later cookie validation.
-- `IdentityRole` binds ordinary role strings globally and sign-in projects them as `ClaimTypes.Role`.
-- Effective-access contributors explain global roles and active grants; optional modules such as Identity Tenancy add
-  their own facts through the same resolver.
-- Identity-domain Entity mutations produce best-effort `AuditEvent` records. Optional hash chaining detects later
-  alteration, deletion, or reordering. Snapshots contain bounded, privacy-safe state by default.
-- `IdentityLifecycleService` previews and executes one erasure across every registered semantic owner, returning a
-  non-identifying, integrity-checked receipt with explicit partial-failure and retry information.
-- Dual-control, time-boxed impersonation preserves the real actor in a separate claim and rechecks the grant.
-
-All records use Koan's selected Data provider. There is no Identity-specific repository or storage adapter.
-
-Scoped-role checks compile durable scopes, roles, memberships and policies into a bounded immutable target-scope
-snapshot. The snapshot contains both subject-to-role/capability and role-to-member indexes; warm checks apply
-parameters and live mandatory guards without rereading the role graph. Role membership is collection semantics:
-`Add(ScopedRoleMember)` and `Remove(ScopedRoleMember)` are idempotent, and the internal participant row is deleted
-when its role and group sets are empty.
-
-Plans expose that scope-specific compiled model directly without exposing the cache:
+Identity owns one `Role` collection. The role `Id` is its stable token (for example `role:member` or
+`group:gardeners`); renaming the display name does not change authorization. `Members` is direct collection
+membership. `Permissions` may contain application tokens; only unchanged `global:*` tokens compile into member
+bags. `Metadata` is a bounded opaque string dictionary for application presentation such as purpose or color.
 
 ```csharp
-var aliceAtTopic = await roles.Plan(alice, "discussion.read", topic, ct: ct);
+var roles = services.GetRequiredService<RoleCollection>();
+await roles.Define("role:member", "Member", ["global:topic_read", "global:post_create"],
+    new Dictionary<string, string> { ["color"] = "#45a67f" }, ct);
+await roles.Add("role:member", personId, ct);
 
-var isGardenerOrAdmin = aliceAtTopic.Memberships
-    .ContainsAny("group:gardeners", "role:admin");
-var matchesPrivateTopic = aliceAtTopic.Audience
-    .Matches(aliceAtTopic.Memberships);
+var bag = await roles.Bag(personId, authenticated: true, ct);
+var allowed = Role.CanDo(PermissionCriteria.Any("global:topic_read"), bag);
 ```
 
-Use `role:*` definitions for capability-bearing roles and grantless `group:*` definitions for audience membership.
-Compiled membership sets may contain derived `permission:*` tokens, but callers cannot inject those tokens as
-membership truth. `Audience.Matches` evaluates the compiled ordinary audience; `Plan.Allowed` is still the final
-answer because it also intersects mandatory live guards and request parameters.
+Every bag contains `everyone`; authenticated bags also contain `authenticated`. Warm bag reads are cache-only.
+Role/member/permission changes invalidate affected people, and a generation check prevents an in-flight stale build
+from winning an invalidation race. Cold membership queries and all collection sizes are bounded and fail closed.
 
-Applications react through one discoverable lifecycle family:
+After authentication and entity lookup, applications can select criteria from the loaded resource:
 
 ```csharp
-Entity.Role
-    .MemberAdding(context => ValidateMembership(context))
-    .MemberAdded(context => ProjectMembership(context))
-    .PermissionsChanging(context => ValidatePermissions(context))
-    .PermissionsChanged(context => ProjectPermissions(context));
+var allowed = RoleResourceAuthorization.CanDo(post, bag,
+    loaded => PermissionCriteria.Any(loaded.ReadPermission));
 ```
 
-Pre-events may veto. Post-events run only after durable success and compiled-snapshot invalidation. A post-handler
-failure is reported as `ScopedRolePostEventException`; the mutation remains committed. Recursive role mutation from
-a handler rejects. External domain facts publish a monotonic version after commit through
-`IScopedRoleAccessInvalidator`. Actual membership changes run the matching `MemberAdding` / `MemberAdded` or
-`MemberRemoving` / `MemberRemoved` pair; successful no-ops emit no events.
-
-Authorized management reads are also collection-shaped: `Memberships(subject, scope)` returns the visible role and
-group sets, while `Members(roleId, scope, page, pageSize)` returns a provider-bounded subject page and exact total.
-
-The HTTP and headless management paths enforce the same bounded inputs: identifiers, names, descriptions,
-presentation metadata and scalar access parameters. Nested parameter objects/arrays reject before evaluation.
+Applications react through `Entity.Role.MemberAdding/Added`, `MemberRemoving/Removed`,
+`PermissionsChanging/Changed`, `RoleChanging/Changed`, and `RoleDeleting/Deleted`. Before events may veto. Post events
+run after persistence and bag invalidation; recursive role mutation is rejected.
 
 ## Configuration
 
-```jsonc
-{
-  "Koan": {
-    "Identity": {
-      "Posture": "Closed",
-      "SeedDevUsers": false,
-      "DevUser": "local-operator",
-      "HashChainAudit": true,
-      "AuditSnapshotMode": "PrivacySafe",
-      "ScopedRoles": { "MaxCompiledSnapshots": 1024, "MaxMembersPerScope": 1024 }
-    }
-  }
-}
-```
+Bounds live under `Koan:Identity:Roles`: `MaxCachedBags`, `MaxRolesPerPerson`, `MaxMembersPerRole`,
+`MaxPermissionsPerRole`, `MaxMetadataEntries`, and `MaxPageSize`.
 
-`Posture` is a nullable `IdentityPosture` enum. Without an override, Development is `Open` and other environments are
-`Closed`. Open posture may seed local people when `SeedDevUsers` is enabled; forcing Open outside Development refuses
-startup. `AuditSnapshotMode` defaults to `PrivacySafe`; `Full` is an explicit forensic compatibility choice and raw
-provider claims remain redacted. Invalid enum values fail standard .NET options binding.
-
-## Erase a person
-
-Resolve `IdentityLifecycleService` from DI. Preview is read-only; erase runs the same preview internally and then
-executes all discovered owners in deterministic order:
-
-```csharp
-var plan = await lifecycle.PreviewErasureAsync(identityId, ct);
-var receipt = await lifecycle.EraseAsync(identityId, ct);
-
-if (!receipt.Complete)
-    logger.LogWarning("Retry identity erasure using receipt {ReceiptId}", receipt.Id);
-```
-
-`receipt` intentionally contains no identity ID. Keep its opaque ID if an operator must retrieve it later, and use
-`receipt.HasValidHash()` to detect field changes. A retry creates a new receipt and safely converges completed owners.
-
-Applications with identity-bearing domain data implement and register `IIdentityErasureContributor`. One contributor
-should represent one stable semantic owner; its preview, counts, summaries, and corrections must not contain personal
-data. Referencing `Sylin.Koan.Identity.Tenancy` automatically adds its memberships, tenant grants, and retained-evidence
-owner.
-
-## Add management HTTP APIs
-
-Reference `Sylin.Koan.Identity.Web` to add subject-scoped self-service and role-gated operator APIs. No controller or
-route registration is required. Add `Sylin.Koan.Identity.Tenancy` only when tenant membership and request resolution
-are intended.
-
-## Boundaries
-
-- Identity persists and governs the person after authentication. `Sylin.Koan.Web.Auth` and its connectors establish
-  the browser session; `Sylin.Koan.Web.Auth.Server` issues OAuth client tokens.
-- Session revocation governs Koan cookie sessions. It does not revoke already-issued bearer tokens.
-- Personal access tokens are not provided. Koan does not issue a credential unless a real authentication path accepts
-  and enforces it.
-- Scoped `group:*` memberships are audience-only and never grant capabilities. They do not replace global
-  `IdentityRole`, tenant `Membership.Roles`, or an application-owned organizational group directory.
-- Audit emission is best-effort after the domain mutation. Hash chaining detects tampering but does not make the
-  underlying store append-only or deliver records to a SIEM.
-- An erasure receipt proves only the registered owners it lists. External IdPs, bearer-token issuers, SIEMs, backups,
-  and application stores need their own owner or explicit operational handling.
-- Erasure is an ordered, idempotent multi-write workflow, not a cross-provider transaction. Access closes first;
-  failures are explicit and the same request can be retried.
-
-See [TECHNICAL.md](TECHNICAL.md) and the public
-[authentication guide](../../docs/guides/authentication-setup.md).
+Reference `Sylin.Koan.Identity.Web` for management routes. See [TECHNICAL.md](TECHNICAL.md).

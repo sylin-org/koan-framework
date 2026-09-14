@@ -1,5 +1,9 @@
 # SEC-0007 — Koan.Identity: the durable person, its management surfaces, and the day-2 access primitives
 
+> **Role-model supersession (2026-09-14):** D3's per-person `IdentityRole` binding was replaced by the single
+> server [`Role` collection and compiled `RoleBag`](../initiatives/scoped-role-engine.md). The historical decision
+> text below records the earlier implementation; it is not the current role API.
+
 - **Status:** Accepted — **implementing**. P0–P2 + P3-core + **P4 (membership/tenancy-on)** shipped (`src/Koan.Identity` + `src/Koan.Identity.Web` + `src/Koan.Identity.Tenancy`, 92-fact offline spec, each layer adversarially reviewed); P3 group 4 **Phase 1** (passwords + TOTP MFA + recovery + Security Checkup + the 2-phase step-up seam) shipped; P3-grp4 **Phase 2** (passkeys + mid-session step-up + this-was-me) + P5 (SnapVault dogfood) remain. Supersedes the draft design doc [koan-identity-design.md](../architecture/koan-identity-design.md). Per-layer status is recorded inline in "Build in composition order" below.
 - **Date:** 2026-06-27
 - **Deciders:** framework architect
