@@ -37,6 +37,48 @@ public sealed class ServiceDiscoveryPlanSpec
         result.DiscoveryMethod.Should().Contain("local");
     }
 
+    [Fact(DisplayName = "disabling automatic discovery avoids all source and adapter probes")]
+    public async Task Disabled_automatic_discovery_does_not_probe()
+    {
+        var source = new RecordingSource((_, _) => Candidates(SourceEndpoint));
+        using var fixture = RuntimeWith(source);
+        var adapter = new TestAdapter([SourceEndpoint, LocalEndpoint]);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [Koan.Core.Infrastructure.Constants.Configuration.Discovery.DisableAutomatic] = "true"
+            }).Build();
+        var coordinator = Coordinator(adapter, fixture.Runtime, configuration: configuration);
+
+        var result = await coordinator.DiscoverService("testsvc", Context());
+
+        result.IsSuccessful.Should().BeFalse();
+        result.ErrorMessage.Should().Contain("Automatic service discovery is disabled");
+        adapter.Attempts.Should().BeEmpty();
+        source.QueryCount.Should().Be(0);
+        coordinator.GetRegisteredAdapters().Should().OnlyContain(registered => ReferenceEquals(registered, adapter));
+    }
+
+    [Fact(DisplayName = "disabling automatic discovery preserves explicit source intent")]
+    public async Task Disabled_automatic_discovery_preserves_required_intent()
+    {
+        var source = new RecordingSource((_, _) => Candidates(SourceEndpoint));
+        using var fixture = RuntimeWith(source);
+        var adapter = new TestAdapter([SourceEndpoint, LocalEndpoint]);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                [Koan.Core.Infrastructure.Constants.Configuration.Discovery.DisableAutomatic] = "true"
+            }).Build();
+        var coordinator = Coordinator(adapter, fixture.Runtime, configuration: configuration);
+
+        var result = await coordinator.ResolveServiceIntent("testsvc", "source://offering", Context());
+
+        result.IsSuccessful.Should().BeTrue();
+        result.ServiceUrl.Should().Be(SourceEndpoint);
+        source.QueryCount.Should().Be(1);
+    }
+
     [Fact(DisplayName = "the plan preserves owner order and sorts source identities within each owner")]
     public void Plan_order_is_deterministic()
     {
@@ -296,8 +338,9 @@ public sealed class ServiceDiscoveryPlanSpec
         IServiceDiscoveryAdapter adapter,
         ServiceDiscoveryRuntime runtime,
         ILogger<ServiceDiscoveryCoordinator>? logger = null,
-        IKoanRuntimeFactRecorder? facts = null) =>
-        new([adapter], runtime, logger ?? NullLogger<ServiceDiscoveryCoordinator>.Instance, facts);
+        IKoanRuntimeFactRecorder? facts = null,
+        IConfiguration? configuration = null) =>
+        new([adapter], runtime, logger ?? NullLogger<ServiceDiscoveryCoordinator>.Instance, facts, configuration);
 
     private static RuntimeFixture RuntimeWith(RecordingSource source)
     {

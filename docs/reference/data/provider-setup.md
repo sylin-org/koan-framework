@@ -47,6 +47,14 @@ persisting them in clear text.
 
 No extra registration, temporary named source, Entity type, or change to `Default` is required.
 
+For hosts that deliberately configure every active external service, set
+`Koan:Discovery:DisableAutomatic=true` (`Koan__Discovery__DisableAutomatic=true` in an environment
+variable). This prevents automatic network searches by referenced connectors during startup. It does
+not remove providers from `Candidates`, prevent `Data.Providers.Probe(...)` with submitted settings,
+or disable an explicit discovery-source intent. An active connector without a concrete endpoint or
+explicit source intent must be configured before use. The switch applies to automatic service
+discovery across Koan, including non-data connectors.
+
 ## Guarantee and correction
 
 `Candidates` is the same immutable provider set used by Data provider election. `Probe` resolves only

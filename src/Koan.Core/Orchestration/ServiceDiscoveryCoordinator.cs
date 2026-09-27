@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Koan.Core.Diagnostics;
 using Koan.Core.Logging;
@@ -18,17 +19,20 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
     private readonly ServiceDiscoveryRuntime _runtime;
     private readonly ILogger<ServiceDiscoveryCoordinator> _logger;
     private readonly IKoanRuntimeFactRecorder? _facts;
+    private readonly IConfiguration? _configuration;
 
     public ServiceDiscoveryCoordinator(
         IEnumerable<IServiceDiscoveryAdapter> adapters,
         ServiceDiscoveryRuntime runtime,
         ILogger<ServiceDiscoveryCoordinator> logger,
-        IKoanRuntimeFactRecorder? facts = null)
+        IKoanRuntimeFactRecorder? facts = null,
+        IConfiguration? configuration = null)
     {
         ArgumentNullException.ThrowIfNull(adapters);
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _facts = facts;
+        _configuration = configuration;
         RegisterAdapters(adapters);
     }
 
@@ -38,6 +42,12 @@ internal sealed class ServiceDiscoveryCoordinator : IServiceDiscoveryCoordinator
         CancellationToken cancellationToken = default)
     {
         if (!TryGetAdapter(serviceName, out var adapter, out var failure)) return failure;
+
+        // A host with explicitly selected services need not probe every referenced adapter while
+        // ValidateOnStart materializes its options. Required source intents remain available.
+        if (_configuration?.GetValue<bool>(CoreConstants.Configuration.Discovery.DisableAutomatic) == true)
+            return AdapterDiscoveryResult.Failed(adapter.ServiceName,
+                "Automatic service discovery is disabled. Configure a concrete endpoint or use an explicit source intent.");
 
         context ??= new DiscoveryContext();
         var request = CreateRequest(adapter, context, intent: null);

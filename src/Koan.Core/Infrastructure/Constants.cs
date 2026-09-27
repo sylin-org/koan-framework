@@ -71,6 +71,11 @@ public static class Constants
             public const string ForceOrchestrationMode = "Koan:Orchestration:ForceOrchestrationMode";
         }
 
+        public static class Discovery
+        {
+            public const string DisableAutomatic = "Koan:Discovery:DisableAutomatic";
+        }
+
         public static class Observability
         {
             public const string Section = "Koan:Observability";
