@@ -339,7 +339,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, tooLarge);
         }
 
-        // Sort is now applied by Data<T,K>.QueryWithCount (orchestrator) before the result reaches here.
+        // Sort is applied by the shared Data<T,K> materialized-query orchestrator before the result reaches here.
         // The orchestrator inspects RepositoryQueryResult.SortHandled and falls back to in-memory sort
         // when the adapter cannot push it down — see DATA-0092.
         var list = queryResult.Items.ToList();
@@ -358,19 +358,19 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
-            var totalPages = context.Options.PageSize > 0 ? (int)Math.Ceiling((double)total / context.Options.PageSize) : 0;
-            context.Headers["X-Total-Pages"] = totalPages.ToString();
             if (request.IncludeTotalCount)
             {
+                var totalPages = context.Options.PageSize > 0 ? (int)Math.Ceiling((double)total / context.Options.PageSize) : 0;
+                context.Headers["X-Total-Pages"] = totalPages.ToString();
                 context.Headers["X-Total-Count"] = total.ToString();
-            }
 
-            if (!string.IsNullOrWhiteSpace(request.BasePath) && request.QueryParameters.Count > 0 && totalPages > 0)
-            {
-                var links = BuildLinkHeaders(request.BasePath!, request.QueryParameters, context.Options.Page, context.Options.PageSize, totalPages);
-                if (links.Length > 0)
+                if (!string.IsNullOrWhiteSpace(request.BasePath) && request.QueryParameters.Count > 0 && totalPages > 0)
                 {
-                    context.Headers["Link"] = string.Join(", ", links);
+                    var links = BuildLinkHeaders(request.BasePath!, request.QueryParameters, context.Options.Page, context.Options.PageSize, totalPages);
+                    if (links.Length > 0)
+                    {
+                        context.Headers["Link"] = string.Join(", ", links);
+                    }
                 }
             }
         }
@@ -1419,15 +1419,20 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         if (query.Filter is not null && !string.IsNullOrWhiteSpace(q))
             _logger?.LogInformation("EntityEndpointService<{Entity}> dropped free-text Q because the query has a normalized filter.", typeof(TEntity).Name);
 
-        var result = await Data<TEntity, TKey>.QueryWithCount(query, cancellationToken,
-            absoluteMaxRecords > 0 ? absoluteMaxRecords : null);
+        int? safetyLimit = absoluteMaxRecords > 0 ? absoluteMaxRecords : null;
+        var result = query.CountStrategy is null
+            ? await Data<TEntity, TKey>.QueryWithoutCount(query, cancellationToken, safetyLimit)
+            : await Data<TEntity, TKey>.QueryWithCount(query, cancellationToken, safetyLimit);
         return new RepositoryQueryResult(result.Items, result.TotalCount, result.RepositoryHandledPagination,
             result.ExceededSafetyLimit, result.ReadEvidence);
     }
 
     private static QueryDefinition BuildQueryDefinition(EntityCollectionRequest request, QueryOptions options)
     {
-        var query = QueryDefinition.All.ForPartition(request.Set).WithSort(options.Sort.ToArray());
+        var query = QueryDefinition.All
+            .ForPartition(request.Set)
+            .WithSort(options.Sort.ToArray())
+            .WithCountStrategy(request.IncludeTotalCount ? CountStrategy.Optimized : null);
         if (request.ApplyPagination && options.Page > 0 && options.PageSize > 0)
             query = query.WithPagination(options.Page, options.PageSize);
         return query;

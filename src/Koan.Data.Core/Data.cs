@@ -114,6 +114,16 @@ public static class Data<TEntity, TKey>
             ct,
             absoluteMaxRecords);
 
+    /// <summary>
+    /// Execute a materialized query without acquiring total-count semantics. An optional absolute
+    /// record bound remains enforced without issuing a separate count request.
+    /// </summary>
+    public static Task<QueryResult<TEntity>> QueryWithoutCount(
+        QueryDefinition query,
+        CancellationToken ct = default,
+        int? absoluteMaxRecords = null)
+        => QueryMaterialized(query, countStrategy: null, ct, absoluteMaxRecords);
+
     private static async Task<QueryResult<TEntity>> QueryMaterialized(
         QueryDefinition query,
         CountStrategy? countStrategy,
@@ -129,18 +139,23 @@ public static class Data<TEntity, TKey>
         query = query.WithCountStrategy(countStrategy);
 
         var hasPagination = query.HasPagination;
-        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
+        var safetyPageSize = absoluteMaxRecords == int.MaxValue
+            ? int.MaxValue
+            : absoluteMaxRecords + 1;
+        var plannedQuery = !hasPagination && countStrategy is null && safetyPageSize is > 0
+            ? query.WithPagination(1, safetyPageSize.Value)
+            : query;
+        var (adapterQuery, residual) = FilterPushdownCoordinator.Plan(plannedQuery, filterSupport, typeof(TEntity));
 
         // Safety cap on unpaged queries: count first, refuse if over the cap.
-        if (!hasPagination && absoluteMaxRecords.HasValue)
+        if (!hasPagination && absoluteMaxRecords.HasValue && countStrategy is not null)
         {
             // Only a clean count when nothing residual; otherwise we must materialize to know the true total.
             if (residual is null)
             {
                 var pre = ValidateCountResult(
                     await q.Count(adapterQuery, ct),
-                    countStrategy ?? throw new InvalidOperationException(
-                        "A safety-bounded materialized query requires an explicit count strategy."),
+                    countStrategy.Value,
                     DataCaps.Describe(repo, repo.GetType().Name));
                 if (pre.Value > absoluteMaxRecords.Value)
                     return Exceeded(pre.Value, pre.IsEstimate);

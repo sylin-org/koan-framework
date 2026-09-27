@@ -4,10 +4,10 @@ domain: web
 title: "Pagination"
 audience: [developers, architects]
 status: current
-last_updated: 2026-08-22
+last_updated: 2026-09-26
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-08-22
+  date_last_tested: 2026-09-26
   status: verified
   scope: read against src/Koan.Web — PaginationAttribute, PaginationPolicy, PaginationSafetyBounds, EntityController.GetCollection, and the headers EntityEndpointService emits
 ---
@@ -38,9 +38,9 @@ does not care about paging deserializes an ordinary array.
 | Header | Meaning |
 | --- | --- |
 | `X-Page`, `X-Page-Size` | the page actually served, after clamping |
-| `X-Total-Pages` | pages at that size |
+| `X-Total-Pages` | pages at that size; absent when `IncludeCount = false` |
 | `X-Total-Count` | matching rows; absent when `IncludeCount = false` |
-| `Link` | `first`, `last`, and `prev`/`next` where they exist |
+| `Link` | `first`, `last`, and `prev`/`next` where they exist; absent when `IncludeCount = false` |
 | `Koan-InMemory-Paging` | `true` when the adapter could not page the query and the framework paged the materialized result |
 
 That last header is the one worth alerting on: it means the whole matching set crossed the process
@@ -62,6 +62,12 @@ public sealed class TransactionsController : EntityController<Transaction>;
 | `MaxSize` | `200` | ceiling on a client-requested size |
 | `IncludeCount` | `true` | whether the total is counted and reported |
 | `DefaultSort` | none | sort applied when the client names none |
+
+`IncludeCount = false` is an execution contract, not only a response-shaping choice. The shared
+Entity query route sends the bounded page with no count strategy, so an adapter must not execute a
+total query or report a total. The response still carries `X-Page` and `X-Page-Size`; metadata that
+depends on knowing the full cardinality (`X-Total-Count`, `X-Total-Pages`, and `Link`) is omitted.
+No provider-specific configuration is required.
 
 ### Modes
 
