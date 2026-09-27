@@ -10,6 +10,7 @@ internal static class MySqlFeatures
 {
     private static readonly Capability[] All =
     [
+        DataCaps.Persistency,
         DataCaps.Query.Linq, DataCaps.Query.String,
         DataCaps.Query.ProviderBoundedPaging, DataCaps.Query.Filter, DataCaps.Query.FilterExecution,
         DataCaps.Write.BulkUpsert, DataCaps.Write.BulkDelete, DataCaps.Write.AtomicBatch,

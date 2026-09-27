@@ -8,6 +8,12 @@ namespace Koan.Data.Abstractions.Capabilities;
 /// </summary>
 public static class DataCaps
 {
+    /// <summary>
+    /// Provider can store records across application restarts when its target is configured for durable storage.
+    /// This is a provider capability, not proof that the selected endpoint, file, or deployment is durable.
+    /// </summary>
+    public static readonly Capability Persistency = new("storage.persistency");
+
     /// <summary>Query negotiation tokens.</summary>
     public static class Query
     {

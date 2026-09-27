@@ -40,8 +40,12 @@ var result = await Data.Providers.Probe(
     ct);
 ```
 
-Each candidate carries its canonical provider ID, display name, aliases, setup fields, and whether it
-implements a live probe. Field keys are the source-setting keys accepted beneath
+Each candidate carries its canonical provider ID, display name, aliases, setup fields, declared Data
+capability IDs, and whether it implements a live probe. `DataCaps.Persistency` means the adapter can
+store records across application restarts when its target is configured for durable storage; it does
+not prove that the submitted deployment, volume, or endpoint is durable. In-memory and Redis do not
+declare this capability: Redis's current probe does not verify persistence configuration. Field keys
+are the source-setting keys accepted beneath
 `Koan:Data:Sources:{name}`. Secret fields are marked so a caller can use a protected input and avoid
 persisting them in clear text.
 

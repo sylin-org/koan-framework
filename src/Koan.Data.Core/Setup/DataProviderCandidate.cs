@@ -8,4 +8,5 @@ public sealed record DataProviderCandidate(
     string DisplayName,
     IReadOnlyList<string> Aliases,
     IReadOnlyList<DataProviderSetupField> Fields,
-    bool SupportsProbe);
+    bool SupportsProbe,
+    IReadOnlyList<string> Capabilities);

@@ -10,6 +10,7 @@ internal static class SqliteFeatures
 {
     internal static readonly IReadOnlyList<Capability> All =
     [
+        DataCaps.Persistency,
         DataCaps.Query.Linq,
         DataCaps.Query.String,
         DataCaps.Query.ProviderBoundedPaging,

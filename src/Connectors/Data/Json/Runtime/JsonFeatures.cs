@@ -9,6 +9,7 @@ internal static class JsonFeatures
 {
     private static readonly IReadOnlyList<Capability> All =
     [
+        DataCaps.Persistency,
         DataCaps.Query.Linq,
         DataCaps.Query.Filter,
         DataCaps.Query.FilterExecution,

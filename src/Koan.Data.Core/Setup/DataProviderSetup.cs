@@ -38,7 +38,8 @@ public sealed class DataProviderSetup
                 descriptor?.DisplayName?.Trim() ?? candidate.Id,
                 candidate.Aliases.ToArray(),
                 fields,
-                setup is not null);
+                setup is not null,
+                DataClaimSet.Describe(candidate.Value).Capabilities);
         }).ToArray();
     }
 

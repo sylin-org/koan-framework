@@ -1,5 +1,6 @@
 using Koan.Core.Composition;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Connector.InMemory;
 using Koan.Data.Connector.Json;
 using Koan.Data.Connector.Sqlite;
@@ -25,7 +26,8 @@ public sealed class DataProviderSetupSpec
             Id = "sample",
             DisplayName = "Sample store",
             Aliases = new[] { "sample-alias" },
-            SupportsProbe = true
+            SupportsProbe = true,
+            Capabilities = Array.Empty<string>()
         });
 
         var result = await setup.Probe("SAMPLE-ALIAS", new Dictionary<string, string?>
@@ -87,6 +89,13 @@ public sealed class DataProviderSetupSpec
         var memory = new InMemoryAdapterFactory();
         var sqlite = new SqliteAdapterFactory();
         var json = new JsonAdapterFactory();
+        var candidates = Create(new DataProviderCatalog([memory, sqlite, json], references: null)).Candidates;
+        candidates.Single(candidate => candidate.Id == "inmemory").Capabilities
+            .Should().NotContain(DataCaps.Persistency.Id);
+        candidates.Single(candidate => candidate.Id == "sqlite").Capabilities
+            .Should().Contain(DataCaps.Persistency.Id);
+        candidates.Single(candidate => candidate.Id == "json").Capabilities
+            .Should().Contain(DataCaps.Persistency.Id);
         var directory = Path.Combine(Path.GetTempPath(), $"koan-provider-setup-{Guid.CreateVersion7():N}");
         Directory.CreateDirectory(directory);
         try

@@ -23,6 +23,7 @@ internal static class MongoFeatures
 
     public static readonly IReadOnlyList<Capability> All =
     [
+        DataCaps.Persistency,
         DataCaps.Query.Linq,
         DataCaps.Query.ProviderBoundedPaging,
         DataCaps.Query.Filter,

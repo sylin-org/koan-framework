@@ -10,6 +10,7 @@ internal static class SqlServerFeatures
 {
     private static readonly Capability[] All =
     [
+        DataCaps.Persistency,
         DataCaps.Query.Linq, DataCaps.Query.String, DataCaps.Query.FastCount,
         DataCaps.Query.ProviderBoundedPaging, DataCaps.Query.Filter, DataCaps.Query.FilterExecution,
         DataCaps.Write.BulkUpsert, DataCaps.Write.BulkDelete, DataCaps.Write.AtomicBatch,
