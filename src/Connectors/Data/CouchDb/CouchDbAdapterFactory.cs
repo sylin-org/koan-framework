@@ -21,13 +21,46 @@ namespace Koan.Data.Connector.CouchDb;
     HealthEndpoint = "/_up", HealthIntervalSeconds = 5, HealthTimeoutSeconds = 2, HealthRetries = 12,
     Scheme = "http", Host = "couchdb", EndpointPort = 5984, UriPattern = "http://{host}:{port}",
     LocalScheme = "http", LocalHost = "localhost", LocalPort = 5984, LocalPattern = "http://{host}:{port}")]
-public sealed class CouchDbAdapterFactory : IDataAdapterFactory
+public sealed class CouchDbAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.CouchDb"];
 
     public void DescribeClaims(IDataClaims claims) => CouchDbFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("CouchDB",
+    [
+        new("ConnectionString", "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "http://localhost:5984"),
+        new(nameof(CouchDbOptions.Database), "Database", DataProviderSetupFieldKind.Text, Required: false,
+            DefaultValue: new CouchDbOptions().Database),
+        new(nameof(CouchDbOptions.UserId), "User ID", DataProviderSetupFieldKind.Text, Required: false),
+        new(nameof(CouchDbOptions.Password), "Password", DataProviderSetupFieldKind.Secret, Required: false)
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require("ConnectionString");
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("CouchDB candidate setup requires a concrete connection string.");
+        var parsed = CouchDbEndpoint.Parse(connectionString);
+        using var client = new CouchDbClient(
+            parsed.HttpEndpoint.ToString().TrimEnd('/'),
+            candidate.Get(nameof(CouchDbOptions.UserId)) ?? parsed.UserId,
+            candidate.Get(nameof(CouchDbOptions.Password)) ?? parsed.Password);
+        if (!await client.PingAsync(ct).ConfigureAwait(false))
+            return new DataProviderProbeResult(
+                DataProviderProbeStatus.Unavailable,
+                "The CouchDB endpoint did not report ready.",
+                "Check the endpoint, credentials, and CouchDB readiness.");
+        var database = candidate.Get(nameof(CouchDbOptions.Database));
+        if (database is not null && await client.DatabaseExistsAsync(database, ct).ConfigureAwait(false))
+            return DataProviderProbeResult.Ready("The CouchDB endpoint and database are ready.");
+        return DataProviderProbeResult.Reachable(
+            "The CouchDB endpoint is ready; the database will be provisioned during managed activation.");
+    }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(IServiceProvider services, string source = Constants.DefaultSource)
         where TEntity : class, IEntity<TKey>

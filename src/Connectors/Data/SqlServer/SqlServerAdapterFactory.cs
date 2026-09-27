@@ -22,13 +22,32 @@ namespace Koan.Data.Connector.SqlServer;
     AppEnv = ["Koan__Data__SqlServer__ConnectionString={scheme}://{host}:{port}"],
     Scheme = "mssql", Host = "mssql", EndpointPort = 1433, UriPattern = "mssql://{host}:{port}",
     LocalScheme = "mssql", LocalHost = "localhost", LocalPort = 1433, LocalPattern = "mssql://{host}:{port}")]
-public sealed class SqlServerAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class SqlServerAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [Constants.Service, "microsoft.sqlserver"];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.SqlServer"];
 
     public void DescribeClaims(IDataClaims claims) => SqlServerFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("SQL Server",
+    [
+        new(nameof(SqlServerOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "Server=localhost;Database=Koan;User Id=sa;Password=...")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(SqlServerOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("SQL Server candidate setup requires a concrete connection string.");
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new SqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The SQL Server target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

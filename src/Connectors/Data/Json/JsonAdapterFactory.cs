@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace Koan.Data.Connector.Json;
 
 [ProviderPriority(Infrastructure.Constants.Provider.Priority)]
-public sealed class JsonAdapterFactory : IDataAdapterFactory
+public sealed class JsonAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
 {
     public string Provider => Infrastructure.Constants.Provider.Name;
     public bool IsAutomaticFloor => true;
@@ -18,6 +18,39 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory
         [Infrastructure.Constants.Provider.ReferenceIdentity];
 
     public void DescribeClaims(IDataClaims claims) => JsonFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("JSON files",
+    [
+        new(nameof(JsonDataOptions.DirectoryPath), "Directory", DataProviderSetupFieldKind.Directory,
+            DefaultValue: new JsonDataOptions().DirectoryPath, Placeholder: "data")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services,
+        DataProviderProbeContext candidate,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var directory = Path.GetFullPath(candidate.Require(nameof(JsonDataOptions.DirectoryPath)));
+        if (!Directory.Exists(directory))
+        {
+            var parent = Path.GetDirectoryName(directory);
+            if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
+                throw new DirectoryNotFoundException();
+            _ = Directory.EnumerateFileSystemEntries(parent).Take(1).ToArray();
+            return DataProviderProbeResult.Reachable(
+                "The JSON directory can be provisioned beneath an existing parent directory.");
+        }
+
+        _ = Directory.EnumerateFileSystemEntries(directory).Take(1).ToArray();
+        var probe = Path.Combine(directory, $".__koan-setup-{Guid.CreateVersion7():N}.tmp");
+        await using (var stream = new FileStream(
+                         probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1,
+                         FileOptions.Asynchronous | FileOptions.DeleteOnClose))
+            await stream.FlushAsync(ct).ConfigureAwait(false);
+        if (File.Exists(probe)) File.Delete(probe);
+        return DataProviderProbeResult.Ready("The JSON directory is readable and writable.");
+    }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider services,

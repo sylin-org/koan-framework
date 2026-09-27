@@ -4,7 +4,7 @@ domain: data
 title: "Persist and query business state"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-09-10
+last_updated: 2026-09-26
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-08-06
@@ -58,6 +58,10 @@ await todo.Remove(ct);
 Referencing SQLite makes the connector available. `AddKoan()` discovers it, elects it, creates the
 default local schema on first use, and exposes the same Entity operations to application code,
 generated REST controllers, and generated MCP tools.
+
+When an application must let an operator choose among its referenced connectors before activation,
+use the [installed-provider setup surface](provider-setup.md) to list provider-owned fields and test
+candidate settings without changing the active source.
 
 ## The application vocabulary
 

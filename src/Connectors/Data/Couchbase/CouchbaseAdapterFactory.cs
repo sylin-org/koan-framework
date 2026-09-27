@@ -6,6 +6,9 @@ using Koan.Data.Abstractions.Sources;
 using Koan.Data.Connector.Couchbase.Infrastructure;
 using Koan.Data.Connector.Couchbase.Runtime;
 using Koan.Data.Core;
+using Couchbase;
+using Couchbase.Core.IO.Authentication.Authenticators;
+using Couchbase.Diagnostics;
 using Couchbase.KeyValue;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,13 +24,53 @@ namespace Koan.Data.Connector.Couchbase;
     AppEnv = ["Koan__Data__Couchbase__ConnectionString=couchbase://{host}", "Koan__Data__Couchbase__Bucket=Koan"],
     Scheme = "couchbase", Host = "couchbase", EndpointPort = 8091, UriPattern = "couchbase://{host}",
     LocalScheme = "couchbase", LocalHost = "localhost", LocalPort = 8091, LocalPattern = "couchbase://{host}")]
-public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [Constants.Alias];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Couchbase"];
 
     public void DescribeClaims(IDataClaims claims) => CouchbaseFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("Couchbase",
+    [
+        new(nameof(CouchbaseOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "couchbase://localhost"),
+        new(nameof(CouchbaseOptions.Bucket), "Bucket", DataProviderSetupFieldKind.Text,
+            DefaultValue: new CouchbaseOptions().Bucket),
+        new(nameof(CouchbaseOptions.Username), "Username", DataProviderSetupFieldKind.Text, Required: false),
+        new(nameof(CouchbaseOptions.Password), "Password", DataProviderSetupFieldKind.Secret, Required: false)
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(CouchbaseOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Couchbase candidate setup requires a concrete connection string.");
+        var options = new ClusterOptions { ConnectionString = connectionString };
+        var username = candidate.Get(nameof(CouchbaseOptions.Username));
+        if (username is not null)
+            options.WithAuthenticator(new PasswordAuthenticator(
+                username, candidate.Get(nameof(CouchbaseOptions.Password)) ?? string.Empty));
+        var cluster = await global::Couchbase.Cluster.ConnectAsync(options).WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var timeout = services.GetRequiredService<IOptions<CouchbaseOptions>>().Value.BootstrapTimeout;
+            await cluster.WaitUntilReadyAsync(timeout,
+                new WaitUntilReadyOptions().ServiceTypes(ServiceType.KeyValue)).WaitAsync(ct).ConfigureAwait(false);
+            var bucket = await cluster.BucketAsync(candidate.Require(nameof(CouchbaseOptions.Bucket)))
+                .AsTask().WaitAsync(ct).ConfigureAwait(false);
+            await bucket.WaitUntilReadyAsync(timeout,
+                new WaitUntilReadyOptions().ServiceTypes(ServiceType.KeyValue)).WaitAsync(ct).ConfigureAwait(false);
+            _ = await cluster.PingAsync().WaitAsync(ct).ConfigureAwait(false);
+            return DataProviderProbeResult.Ready("The Couchbase cluster and bucket are ready.");
+        }
+        finally
+        {
+            cluster.Dispose();
+        }
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

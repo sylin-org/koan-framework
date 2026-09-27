@@ -24,13 +24,32 @@ namespace Koan.Data.Connector.Postgres;
     AppEnv = ["Koan__Data__Postgres__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Postgres__Database=Koan"],
     Scheme = "postgres", Host = "postgres", EndpointPort = 5432, UriPattern = "postgres://{host}:{port}",
     LocalScheme = "postgres", LocalHost = "localhost", LocalPort = 5432, LocalPattern = "postgres://{host}:{port}")]
-public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["postgresql", "npgsql"];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Postgres"];
 
     public void DescribeClaims(IDataClaims claims) => NpgsqlFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("PostgreSQL",
+    [
+        new(nameof(PostgresOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "Host=localhost;Database=Koan;Username=postgres;Password=...")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(PostgresOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("PostgreSQL candidate setup requires a concrete connection string.");
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The PostgreSQL target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

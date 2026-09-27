@@ -18,6 +18,9 @@
       href: reference/core/index.md
     - name: Data
       href: reference/data/index.md
+      items:
+        - name: Discover and test installed providers
+          href: reference/data/provider-setup.md
     - name: HTTP APIs
       href: reference/web/index.md
     - name: Identity and tenancy

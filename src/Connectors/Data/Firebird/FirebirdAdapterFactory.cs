@@ -22,13 +22,33 @@ namespace Koan.Data.Connector.Firebird;
     AppEnv = ["Koan__Data__Firebird__ConnectionString=firebird://{host}:{port}"],
     Scheme = "firebird", Host = "firebird", EndpointPort = 3050, UriPattern = "firebird://{host}:{port}",
     LocalScheme = "firebird", LocalHost = "localhost", LocalPort = 3050, LocalPattern = "firebird://{host}:{port}")]
-public sealed class FirebirdAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class FirebirdAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Firebird"];
 
     public void DescribeClaims(IDataClaims claims) => FirebirdFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("Firebird",
+    [
+        new(nameof(FirebirdOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "Database=localhost:Koan;User=SYSDBA;Password=...")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(FirebirdOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Firebird candidate setup requires a concrete connection string.");
+        await using var connection = new FbConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM RDB$DATABASE";
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The Firebird target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

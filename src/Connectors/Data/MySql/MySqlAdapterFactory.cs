@@ -22,13 +22,32 @@ namespace Koan.Data.Connector.MySql;
     AppEnv = ["Koan__Data__MySql__ConnectionString={scheme}://{host}:{port}"],
     Scheme = "mysql", Host = "mysql", EndpointPort = 3306, UriPattern = "mysql://{host}:{port}",
     LocalScheme = "mysql", LocalHost = "localhost", LocalPort = 3306, LocalPattern = "mysql://{host}:{port}")]
-public sealed class MySqlAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class MySqlAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.MySql"];
 
     public void DescribeClaims(IDataClaims claims) => MySqlFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("MySQL / MariaDB",
+    [
+        new(nameof(MySqlOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "Server=localhost;Database=Koan;User ID=root;Password=...")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(MySqlOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("MySQL/MariaDB candidate setup requires a concrete connection string.");
+        await using var connection = new MySqlConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new MySqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The MySQL/MariaDB target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

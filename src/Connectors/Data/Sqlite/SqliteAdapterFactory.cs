@@ -10,6 +10,7 @@ using Koan.Data.Relational;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Sqlite;
@@ -23,7 +24,7 @@ namespace Koan.Data.Connector.Sqlite;
     Scheme = "file", Host = "", EndpointPort = 0,
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0,
     LocalPattern = "Data Source={path}")]
-public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["sqlite3"];
@@ -34,6 +35,49 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         string.Equals(provider, "sqlite3", StringComparison.OrdinalIgnoreCase);
 
     public void DescribeClaims(IDataClaims claims) => SqliteFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("SQLite",
+    [
+        new(nameof(SqliteOptions.ConnectionString), "Connection string",
+            DataProviderSetupFieldKind.ConnectionString, Placeholder: "Data Source=data/app.db")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services,
+        DataProviderProbeContext candidate,
+        CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(SqliteOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("SQLite candidate setup requires a concrete connection string.");
+        var builder = new SqliteConnectionStringBuilder(connectionString);
+        var memory = builder.Mode == SqliteOpenMode.Memory ||
+                     builder.DataSource.Equals(":memory:", StringComparison.OrdinalIgnoreCase);
+        if (!memory && !builder.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+        {
+            var root = services.GetService<IHostEnvironment>()?.ContentRootPath;
+            var path = Path.IsPathRooted(builder.DataSource) || string.IsNullOrWhiteSpace(root)
+                ? Path.GetFullPath(builder.DataSource)
+                : Path.GetFullPath(Path.Combine(root, builder.DataSource));
+            if (!File.Exists(path))
+            {
+                var parent = Path.GetDirectoryName(path);
+                if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
+                    throw new DirectoryNotFoundException();
+                return DataProviderProbeResult.Reachable(
+                    "The SQLite database can be provisioned at the submitted file path.");
+            }
+            builder.DataSource = path;
+            builder.Mode = SqliteOpenMode.ReadOnly;
+        }
+
+        await using var connection = new SqliteConnection(builder.ToString());
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1";
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The SQLite target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

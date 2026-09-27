@@ -91,6 +91,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Routing.DataProviderCatalog>(sp => new Routing.DataProviderCatalog(
             sp.GetServices<IDataAdapterFactory>(),
             sp.GetService<Koan.Core.Composition.KoanApplicationReferenceManifest>()));
+        services.AddSingleton(sp => new DataProviderSetup(
+            sp,
+            sp.GetRequiredService<Routing.DataProviderCatalog>(),
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Options.SourceIntegrationOptions>>()));
         services.AddSingleton<Routing.DataDefaultProviderPlan>();
         services.AddSingleton<Routing.DefaultDataRouteAuthority>();
         services.AddSingleton<Routing.DataOperationHorizon>();

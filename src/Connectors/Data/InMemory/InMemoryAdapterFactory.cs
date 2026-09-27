@@ -11,13 +11,25 @@ namespace Koan.Data.Connector.InMemory;
 
 /// <summary>Creates explicitly ephemeral, host-owned Entity repositories.</summary>
 [ProviderPriority(Constants.Provider.Priority)]
-public sealed class InMemoryAdapterFactory : IDataAdapterFactory
+public sealed class InMemoryAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider.Name;
     public IReadOnlyCollection<string> Aliases => [Constants.Provider.Alias];
     public IReadOnlyCollection<string> ReferenceIdentities => [Constants.Provider.ReferenceIdentity];
 
     public void DescribeClaims(IDataClaims claims) => InMemoryFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("In-memory", []);
+
+    public Task<DataProviderProbeResult> Probe(
+        IServiceProvider services,
+        DataProviderProbeContext candidate,
+        CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(DataProviderProbeResult.Ready(
+            "The in-memory provider is ready for this host lifetime."));
+    }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(
         IServiceProvider services,

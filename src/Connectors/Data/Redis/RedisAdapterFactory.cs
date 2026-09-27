@@ -14,13 +14,36 @@ using StackExchange.Redis;
 namespace Koan.Data.Connector.Redis;
 
 [ProviderPriority(Constants.Priority)]
-public sealed class RedisAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class RedisAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [Constants.Alias];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Redis"];
 
     public void DescribeClaims(IDataClaims claims) => Runtime.RedisFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("Redis",
+    [
+        new("ConnectionString", "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "localhost:6379"),
+        new(nameof(RedisOptions.Database), "Database", DataProviderSetupFieldKind.Integer,
+            Required: false, DefaultValue: new RedisOptions().Database.ToString(
+                System.Globalization.CultureInfo.InvariantCulture))
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require("ConnectionString");
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Redis candidate setup requires a concrete connection string.");
+        var database = candidate.GetInt32(nameof(RedisOptions.Database), new RedisOptions().Database);
+        if (database < 0) throw new ArgumentException("Redis Database must be zero or greater.");
+        using var connection = await ConnectionMultiplexer.ConnectAsync(connectionString)
+            .WaitAsync(ct).ConfigureAwait(false);
+        _ = await connection.GetDatabase(database).PingAsync().WaitAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The selected Redis database answered a ping.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

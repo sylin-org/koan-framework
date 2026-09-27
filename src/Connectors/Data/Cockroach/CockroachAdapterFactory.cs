@@ -23,13 +23,32 @@ namespace Koan.Data.Connector.Cockroach;
     AppEnv = ["Koan__Data__Cockroach__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Cockroach__Database=Koan"],
     Scheme = "cockroach", Host = "cockroach", EndpointPort = 26257, UriPattern = "cockroach://{host}:{port}",
     LocalScheme = "cockroach", LocalHost = "localhost", LocalPort = 26257, LocalPattern = "cockroach://{host}:{port}")]
-public sealed class CockroachAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class CockroachAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => [Constants.Alias];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Cockroach"];
 
     public void DescribeClaims(IDataClaims claims) => NpgsqlFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("CockroachDB",
+    [
+        new(nameof(CockroachOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "Host=localhost;Port=26257;Database=Koan;Username=root")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(CockroachOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("CockroachDB candidate setup requires a concrete connection string.");
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = new NpgsqlCommand("SELECT 1", connection);
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The CockroachDB target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

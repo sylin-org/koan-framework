@@ -10,6 +10,8 @@ using Koan.Data.Connector.Mongo.Runtime;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 namespace Koan.Data.Connector.Mongo;
 
@@ -20,7 +22,7 @@ namespace Koan.Data.Connector.Mongo;
     AppEnv = ["Koan__Data__Mongo__ConnectionString={scheme}://{host}:{port}", "Koan__Data__Mongo__Database=Koan"],
     Scheme = "mongodb", Host = "mongo", EndpointPort = 27017, UriPattern = "mongodb://{host}:{port}",
     LocalScheme = "mongodb", LocalHost = "localhost", LocalPort = 27017, LocalPattern = "mongodb://{host}:{port}")]
-public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider.Name;
     public IReadOnlyCollection<string> Aliases => [Constants.Provider.Alias];
@@ -31,6 +33,28 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
         string.Equals(provider, Constants.Provider.Alias, StringComparison.OrdinalIgnoreCase);
 
     public void DescribeClaims(IDataClaims claims) => MongoFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("MongoDB",
+    [
+        new(nameof(MongoOptions.ConnectionString), "Connection string", DataProviderSetupFieldKind.ConnectionString,
+            Placeholder: "mongodb://localhost:27017"),
+        new(nameof(MongoOptions.Database), "Database", DataProviderSetupFieldKind.Text,
+            DefaultValue: new MongoOptions().Database)
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services, DataProviderProbeContext candidate, CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(MongoOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("MongoDB candidate setup requires a concrete connection string.");
+        var client = new MongoClient(connectionString);
+        var database = client.GetDatabase(candidate.Require(nameof(MongoOptions.Database)));
+        _ = await database.RunCommandAsync<BsonDocument>(
+            new BsonDocumentCommand<BsonDocument>(new BsonDocument("ping", 1)),
+            cancellationToken: ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The MongoDB database answered a read-only ping.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,

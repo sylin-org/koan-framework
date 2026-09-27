@@ -8,6 +8,10 @@ namespace Koan.Data.Core;
 /// <summary>Provider-neutral source-first Data entry point.</summary>
 public static class Data
 {
+    /// <summary>Installed record providers and their pre-selection setup probes.</summary>
+    public static DataProviderSetup Providers => AppHost.GetRequiredService<DataProviderSetup>(
+        "data provider setup");
+
     public static DataSource Source(string name)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);

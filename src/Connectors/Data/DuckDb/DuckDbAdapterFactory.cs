@@ -24,7 +24,7 @@ namespace Koan.Data.Connector.DuckDb;
     Scheme = "file", Host = "", EndpointPort = 0,
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0,
     LocalPattern = "Data Source={path}")]
-public sealed class DuckDbAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory
+public sealed class DuckDbAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["duckdb"];
@@ -34,6 +34,45 @@ public sealed class DuckDbAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         string.Equals(provider, Constants.Provider, StringComparison.OrdinalIgnoreCase);
 
     public void DescribeClaims(IDataClaims claims) => DuckDbFeatures.Declare(claims);
+
+    public DataAdapterSetupDescriptor DescribeSetup() => new("DuckDB",
+    [
+        new(nameof(DuckDbOptions.ConnectionString), "Connection string",
+            DataProviderSetupFieldKind.ConnectionString, Placeholder: "Data Source=data/app.duckdb")
+    ]);
+
+    public async Task<DataProviderProbeResult> Probe(
+        IServiceProvider services,
+        DataProviderProbeContext candidate,
+        CancellationToken ct = default)
+    {
+        var connectionString = candidate.Require(nameof(DuckDbOptions.ConnectionString));
+        if (connectionString.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("DuckDB candidate setup requires a concrete connection string.");
+        var connections = services.GetRequiredService<DuckDbConnections>();
+        var (path, memory) = connections.DescribeSource(connectionString);
+        if (!memory && !string.IsNullOrWhiteSpace(path) && !path.Contains("://", StringComparison.Ordinal))
+        {
+            var anchored = connections.AnchorDataSource(path);
+            if (!File.Exists(anchored))
+            {
+                var parent = Path.GetDirectoryName(anchored);
+                if (string.IsNullOrWhiteSpace(parent) || !Directory.Exists(parent))
+                    throw new DirectoryNotFoundException();
+                return DataProviderProbeResult.Reachable(
+                    "The DuckDB database can be provisioned at the submitted file path.");
+            }
+        }
+
+        await using var connection = memory
+            ? new DuckDBConnection("Data Source=:memory:")
+            : connections.Create(connectionString, "CandidateSetup", nonCreating: true);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1";
+        _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        return DataProviderProbeResult.Ready("The DuckDB target answered a read-only query.");
+    }
 
     public DataSourceIntegrationDescriptor DescribeSource(string source) => new(
         SourceIntegrationCapabilities.RegisteredRecords | SourceIntegrationCapabilities.RegisteredScalar,
