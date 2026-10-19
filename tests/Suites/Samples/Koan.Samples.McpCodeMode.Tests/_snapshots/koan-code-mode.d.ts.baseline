@@ -11,8 +11,6 @@ declare namespace Koan {
 
     // AuditLog - Read-only audit log
     interface AuditLog {
-      /** Full-text query term. */
-      q: string;
       /** JSON filter expression compiled into repository predicates. */
       filter: string;
       /** When true string comparisons ignore case sensitivity. */
@@ -50,8 +48,6 @@ declare namespace Koan {
 
     // Todo - Test todo entity
     interface Todo {
-      /** Full-text query term. */
-      q: string;
       /** JSON filter expression compiled into repository predicates. */
       filter: string;
       /** When true string comparisons ignore case sensitivity. */

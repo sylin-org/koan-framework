@@ -27,12 +27,17 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger, IHost
             ? Path.GetFullPath(dataSource)
             : Path.GetFullPath(Path.Combine(_contentRoot, dataSource));
 
-    public SqliteConnection Create(string connectionString, string source, bool nonCreating = false)
+    // pooled: false yields a connection that is closed for real when disposed and shares no pool. A caller that sets
+    // connection-scoped state (a PRAGMA) takes one, because a pooled connection goes back to the pool with that state
+    // still set and the next caller inherits it.
+    public SqliteConnection Create(string connectionString, string source, bool nonCreating = false, bool pooled = true)
     {
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             var normalized = Normalize(connectionString, source, nonCreating);
+            if (!pooled)
+                return new SqliteConnection(new SqliteConnectionStringBuilder(normalized) { Pooling = false }.ToString());
             _poolGroups.Add(normalized);
             return new SqliteConnection(normalized);
         }

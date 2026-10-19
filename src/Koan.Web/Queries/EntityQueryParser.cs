@@ -19,7 +19,8 @@ public static class EntityQueryParser
 {
     /// <summary>
     /// Parses HTTP query collection into <see cref="QueryOptions"/> for entity queries.
-    /// Supports: q (search), page, pageSize/size, sort, dir, output (shape), view.
+    /// Supports: q (request text for hooks; see <see cref="QueryOptions.Q"/>), page, pageSize/size, sort, dir,
+    /// output (shape), view.
     /// </summary>
     public static QueryOptions Parse<TEntity>(IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false)
         => Parse(typeof(TEntity), query, defaults, lenient);
@@ -36,7 +37,8 @@ public static class EntityQueryParser
             View = defaults.DefaultView
         };
 
-        // Search query
+        // Request text, untrusted: carried for request-options hooks, never run as a provider query by the parser
+        // (the shared endpoint refuses what is left, unless the controller declared AllowRawQuery - WEB-0074).
         if (query.TryGetValue("q", out var vq))
         {
             opts.Q = vq.FirstOrDefault();

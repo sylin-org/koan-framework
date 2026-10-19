@@ -25,6 +25,12 @@ public sealed class EntityCollectionRequest
     // false keeps the bare array for existing consumers.
     public bool IncludeAccess { get; init; }
     public IReadOnlyDictionary<string, string?> QueryParameters { get; init; } = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The endpoint declared <c>q</c> a provider-native query (WEB-0074). False for every caller that did not say so,
+    /// including the MCP edge: a <c>q</c> still set when the read executes is then refused, never run.
+    /// </summary>
+    public bool AllowRawQuery { get; init; }
 }
 
 public sealed class EntityQueryRequest
@@ -34,6 +40,9 @@ public sealed class EntityQueryRequest
     public string? Set { get; init; }
     public bool IgnoreCase { get; init; }
     public string? Accept { get; init; }
+
+    /// <summary>The endpoint declared <c>q</c> a provider-native query (WEB-0074); see <see cref="EntityCollectionRequest.AllowRawQuery"/>.</summary>
+    public bool AllowRawQuery { get; init; }
 }
 
 public sealed class EntityGetNewRequest

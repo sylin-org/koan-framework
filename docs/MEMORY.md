@@ -652,3 +652,19 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   not, so the stable convention is the honest default). Also: stale consumer builds will lie about
   a fix — ProjectReference consumers do not rebuild referenced projects under `--no-build`.
   (2026-08-30)
+- **"The query is a SELECT" is not a read-only guarantee, and a security text rule should not need a lexer.**
+  `?q=` reached `QueryRaw` as SQL, and measuring the drivers showed more than the audit had claimed: Npgsql
+  executes every statement of a command, and `Microsoft.Data.Sqlite` runs the rest of a batch when the reader is
+  *disposed* — even when the first statement returned rows — so a stacked `DROP TABLE` ran on both. The floor
+  that holds is a text rule plus an engine-enforced mode: `RawSql` refuses `;` and NUL wherever they appear (a
+  lexer that disagrees with the engine is how a second statement gets through; the cost is that a value
+  containing `;` travels as a parameter), PostgreSQL runs the read in `SET TRANSACTION READ ONLY`, and SQLite on
+  an *unpooled* connection with `PRAGMA query_only` — a pooled one goes back to its pool still holding the
+  pragma, which was measured, not assumed. A mode that must not leak is set on a connection that cannot be
+  reused. (WEB-0074, 2026-10-19)
+- **Some test projects cannot restore today, and it is not your change.** `NuGetAudit` fetches advisories online
+  and `tests/Directory.Build.props` turns warnings into errors, so a newly published advisory (MessagePack 3.1.8
+  NU1902, ImageSharp 3.1.12 NU1903) makes the MCP, Tenancy, and Cache.Web suites fail restore in 3 seconds with no
+  test output. Run them with `-p:NuGetAudit=false` before concluding anything about a change. Test outputs also
+  live in `%TEMP%\Koan-framework\tests\<project>\` — shared by every worktree of this repository.
+  (2026-10-19)

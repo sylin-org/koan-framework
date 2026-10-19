@@ -58,6 +58,11 @@ extra row to prove whether the bound was exceeded. Collection operations use SQL
 Raw Entity queries are an explicit escape hatch. Registered named SQL is preferred for stable application intent
 and is independently bounded by Source Integration limits.
 
+`QueryRaw` and `CountRaw` take a predicate the caller owns, never request text (WEB-0074). The adapter runs it as exactly
+one statement - `;` and NUL are refused before the engine sees the text - on a dedicated, unpooled connection with
+`PRAGMA query_only = ON`, so a mistaken raw read can read but cannot write. The connection is unpooled because a pooled
+one goes back to its pool still holding the pragma. A predicate can still read anything the database holds.
+
 ## Schema and policy
 
 Managed sources with `AutoCreate` create the required table on first use. External sources perform validation only

@@ -7,6 +7,7 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
 - **`Koan.Web.AdapterSurface.TestKit`** — shared library. Defines:
   - `Widget` + `Sighting` (entity with scalar + nested collection, `[StorageName("widgets_surface")]`)
   - `WidgetController` (`EntityController<Widget>` on `/api/widgets`)
+  - `RawWidgetController` (the same entity on `/api/raw-widgets`, declaring `AllowRawQuery` - the only controller on the matrix whose `?q=` is a provider-native query; WEB-0074)
   - `IAdapterTestFactory` (per-adapter contract: client, services, reset, availability)
   - `IAdapterCapabilities` (per-adapter capability flags — adapters declare what they support; specs that need a missing capability skip cleanly with a clear reason)
   - **Three spec base classes**, all `IClassFixture<TFactory>`:
@@ -21,6 +22,8 @@ End-to-end HTTP tests that exercise the full `EntityController<T>` surface again
 ## Capability gating
 
 Each adapter declares what it supports via `IAdapterCapabilities` on its factory. Specs that need a missing capability skip with `[FactoryName] does not support <capability>`. The default for `SupportsDeleteByQuery` and `SupportsQueryStringFilter` is **false** because the framework's string-query path requires `IStringQueryRepository` (only the relational adapters implement it) and silently degrades to "operate on all" otherwise — a real adapter inconsistency the matrix surfaced.
+
+`SupportsRawQuery` (default **false**; SQLite and PostgreSQL declare it) means the adapter runs provider-native queries *and confines them to one read-only statement*. Every adapter, relational or not, runs the `?q=` refusal specs: request text is never a provider query, so `/api/widgets?q=` answers `400` with `web.read.freeTextUnsupported` and the table is untouched afterwards. Only adapters that declare the flag run the specs that drive `/api/raw-widgets`. Do not declare it for an adapter whose raw path is not confined - those specs send stacked statements.
 
 ## Historical status baseline
 

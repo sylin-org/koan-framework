@@ -248,6 +248,9 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         QueryDefinition shaping,
         CancellationToken ct = default)
     {
+        // WEB-0074 defense in depth: one statement (refused before the server sees it), read-only (the server refuses a
+        // write the text smuggles into a single statement). A raw read is a caller-owned escape hatch, not a sanitizer.
+        RawSql.RequireSingleStatement(query);
         await Ready(ct).ConfigureAwait(false);
         var paged = shaping.HasPagination;
         var sql = query.TrimStart().StartsWith("select ", StringComparison.OrdinalIgnoreCase)
@@ -255,8 +258,9 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             : $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {query} {StableOrder()}" +
               (paged ? $" LIMIT {shaping.EffectivePageSize()} OFFSET {shaping.EffectiveOffset()}" : string.Empty);
         await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var fence = await BeginReadOnly(connection, ct).ConfigureAwait(false);
         var rows = await AdoCommands.QueryRowsAsync(
-            connection, sql, SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
+            connection, sql, SqlParameters.FromObject(parameters), fence, ct).ConfigureAwait(false);
         return new RepositoryQueryResult<TEntity>
         {
             Items = rows.Select(Materialize).ToArray(),
@@ -267,10 +271,29 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
+        RawSql.RequireSingleStatement(query);
         await Ready(ct).ConfigureAwait(false);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var count = await AdoCommands.ExecuteScalarInt64Async(connection, $"SELECT COUNT(1) FROM {_plan.QualifiedTable} WHERE {query}", SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
+        await using var fence = await BeginReadOnly(connection, ct).ConfigureAwait(false);
+        var count = await AdoCommands.ExecuteScalarInt64Async(connection, $"SELECT COUNT(1) FROM {_plan.QualifiedTable} WHERE {query}", SqlParameters.FromObject(parameters), fence, ct).ConfigureAwait(false);
         return CountResult.Exact(count);
+    }
+
+    // The transaction a raw read runs in (WEB-0074): the server refuses any write inside it. Nothing is committed -
+    // disposing the transaction ends the read. This is the same fence a registered read lane uses.
+    private static async Task<NpgsqlTransaction> BeginReadOnly(NpgsqlConnection connection, CancellationToken ct)
+    {
+        var transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await AdoCommands.ExecuteAsync(connection, "SET TRANSACTION READ ONLY", null, transaction, ct).ConfigureAwait(false);
+            return transaction;
+        }
+        catch
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
     }
 
     public async Task<bool> ConditionalReplaceAsync(

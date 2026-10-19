@@ -19,6 +19,9 @@ source: src/Connectors/Data/Postgres/
 - The inspector exposes non-creating storage status through an open plus `SELECT 1`, returning redacted status codes for
   capability-qualified cutover planning.
 - Registered `.Sql(...)` records/scalars require a declared read lane and execute in a PostgreSQL read-only transaction.
+- `QueryRaw` and `CountRaw` take SQL the caller owns, never request text (WEB-0074). They run it as exactly one statement
+  (`;` and NUL are refused before the server sees the text) inside a `SET TRANSACTION READ ONLY` transaction, so a
+  mistaken raw read can read but cannot write. A predicate can still read anything the database user can.
 
 ## Configuration
 

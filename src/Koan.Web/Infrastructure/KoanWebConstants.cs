@@ -23,6 +23,10 @@ public static class KoanWebConstants
         {
             public const string EvidenceChanged = "web.read.evidenceChanged";
             public const string ProjectionFailed = "web.read.projectionFailed";
+            /// <summary>WEB-0074: a request carried <c>q</c> and the endpoint did not declare it a provider query.</summary>
+            public const string FreeTextUnsupported = "web.read.freeTextUnsupported";
+            /// <summary>WEB-0074: <c>q</c> is a provider query on this endpoint and cannot compose with a filter.</summary>
+            public const string FreeTextNotComposable = "web.read.freeTextNotComposable";
         }
         public static class Mutation
         {

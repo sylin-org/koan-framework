@@ -98,7 +98,8 @@ public sealed class SchemaBuilder
         var props = (JsonObject)schema["properties"]!;
         var metadata = descriptor.Metadata;
 
-        props["q"] = CreateStringProperty("Full-text query term.");
+        // No `q`: the MCP edge never offers an argument that reaches a provider query (WEB-0074). The structured
+        // filter is the one way to narrow a collection, and what the schema describes is what the edge enforces.
         props["filter"] = CreateStringProperty("JSON filter expression compiled into repository predicates.");
         props["ignoreCase"] = CreateBooleanProperty("When true string comparisons ignore case sensitivity.");
         props["page"] = new JsonObject

@@ -236,6 +236,9 @@ public sealed class RequestTranslator
     {
         var options = new QueryOptions();
 
+        // Untrusted request text, carried only so the application's request-options hooks can give it a meaning. This
+        // edge never sets EntityCollectionRequest.AllowRawQuery, so whatever q is left when the shared endpoint
+        // executes the read is refused, never run as a provider query (WEB-0074). It is not advertised in the schema.
         var q = ReadString(args, "q");
         if (!string.IsNullOrWhiteSpace(q)) options.Q = q;
 

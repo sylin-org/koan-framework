@@ -16,6 +16,7 @@ using Koan.Data.Core.Optimization;
 using Koan.Data.Core.Readiness;
 using Koan.Data.Core.Semantics;
 using Koan.Data.Relational;
+using Koan.Data.Relational.Ado;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Mapping;
 using Koan.Data.Relational.Orchestration;
@@ -305,10 +306,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("A SQLite predicate is required.", nameof(query));
+        // WEB-0074 defense in depth: one statement (the reader runs every statement in a batch when it is disposed),
+        // on a connection the engine will not let write. A raw read is a caller-owned escape hatch, not a sanitizer.
+        RawSql.RequireSingleStatement(query);
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
         var paged = shaping.HasPagination;
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var connection = await OpenReadOnly(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row WHERE ({query}) " +
                               StableOrder(plan) +
@@ -326,9 +330,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     public async Task<CountResult> CountRaw(string query, object? parameters, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) throw new ArgumentException("A SQLite predicate is required.", nameof(query));
+        RawSql.RequireSingleStatement(query);
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var connection = await OpenReadOnly(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = $"SELECT COUNT(1) FROM {plan.QualifiedTable} AS koan_row WHERE ({query})";
         BindObject(command, parameters);
@@ -528,6 +533,23 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     {
         var connection = _connections.Create(_route.ConnectionString, _route.Source);
         try { await connection.OpenAsync(ct).ConfigureAwait(false); return connection; }
+        catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
+    }
+
+    // The connection a raw read runs on (WEB-0074): the engine refuses any write through it. query_only is connection
+    // state and a pooled connection goes back to its pool still holding it, so this one is never pooled - it is closed
+    // for real when the read ends and no ordinary caller can inherit the mode.
+    private async Task<SqliteConnection> OpenReadOnly(CancellationToken ct)
+    {
+        var connection = _connections.Create(_route.ConnectionString, _route.Source, pooled: false);
+        try
+        {
+            await connection.OpenAsync(ct).ConfigureAwait(false);
+            await using var fence = connection.CreateCommand();
+            fence.CommandText = "PRAGMA query_only = ON";
+            await fence.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return connection;
+        }
         catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
     }
 

@@ -3,12 +3,13 @@ using Koan.Web.AdapterSurface.TestKit.Containers;
 
 namespace Koan.Web.AdapterSurface.Postgres.Tests;
 
-public sealed class PostgresAdapterFactory : AdapterTestFactoryBase
+public sealed class PostgresAdapterFactory : AdapterTestFactoryBase, IAdapterCapabilities
 {
     private readonly PostgresContainerHelper _pg = new();
 
     public override bool IsAvailable => _pg.IsAvailable;
     public override string? UnavailableReason => _pg.UnavailableReason;
+    bool IAdapterCapabilities.SupportsRawQuery => true;
 
     protected override async ValueTask StartBackingStoreAsync() => await _pg.InitializeAsync();
     protected override async ValueTask StopBackingStoreAsync() => await _pg.DisposeAsync();

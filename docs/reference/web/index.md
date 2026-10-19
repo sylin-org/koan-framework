@@ -4,12 +4,12 @@ domain: web
 title: "Expose Entities through HTTP"
 audience: [developers, architects, ai-agents]
 status: current
-last_updated: 2026-07-18
+last_updated: 2026-10-19
 framework_version: v1.0.0
 validation:
-  date_last_tested: 2026-07-18
+  date_last_tested: 2026-10-19
   status: tested
-  scope: controller/endpoint surfaces plus ordered request-context contribution and read projection
+  scope: controller/endpoint surfaces plus ordered request-context contribution and read projection; q refusal and the AllowRawQuery opt-in against SQLite and PostgreSQL (EntityController surface matrix), the hook seam, and the MCP edge
 ---
 
 # Expose Entities through HTTP
@@ -87,7 +87,7 @@ route.
 | `PATCH /{id}` | apply a JSON Patch document |
 | `DELETE /{id}` | remove one |
 | `DELETE /bulk` | remove the listed ids |
-| `DELETE /?q=` | remove what the query matches |
+| `DELETE /?q=` | remove what the JSON filter in `q` matches |
 | `DELETE /all` | remove every entity in the set |
 
 Each is `virtual`. Override one to add business behavior around it, and call `base` to keep the
@@ -113,7 +113,7 @@ public sealed class TodosController : EntityController<Todo>;
 - Collection requests accept `page`, `pageSize` (`size` is accepted as an alias), sort, filter,
   shape, set, and relationship options subject to endpoint policy.
 
-`filter` is URL-encoded JSON and `q` is a separate free-text slot:
+`filter` is URL-encoded JSON:
 
 ```bash
 curl --get   --data-urlencode 'filter={"status":"Pending"}'   http://localhost:5000/api/todos
@@ -127,6 +127,50 @@ down, or at the same cost. A malformed filter, an unknown field, or unsupported 
 - When count metadata is enabled, collection responses include `X-Total-Count`; paged responses can
   also include RFC-style `Link` navigation headers.
 - `POST /query` accepts the provider-agnostic JSON filter shape. It is not an `IQueryable` endpoint.
+
+### `q` is request text, never a provider query
+
+On the collection and on `POST /query`, `q` is untrusted request text. Koan never runs it as a provider query: a
+request that still carries `q` when the read executes answers `400` (`web.read.freeTextUnsupported`) naming `filter`,
+and a blank `q` is ignored. MCP does not offer `q` and refuses it the same way.
+
+Give `q` a meaning in code you own. A request-options hook turns it into a filter and clears it, so nothing is left to
+refuse. Register it with DI like any hook; it serves REST and MCP alike.
+
+```csharp
+using Koan.Web.Hooks;  // IRequestOptionsHook<T>, HookContext<T>, QueryOptions, AddPredicate
+
+public sealed class TodoSearch : IRequestOptionsHook<Todo>
+{
+    public int Order => 0;
+
+    public Task OnBuildingOptions(HookContext<Todo> context, QueryOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(options.Q)) return Task.CompletedTask;
+        var term = options.Q;
+        options.AddPredicate<Todo>(todo => todo.Title.Contains(term));
+        options.Q = null;
+        return Task.CompletedTask;
+    }
+}
+```
+
+A controller that must accept the connector's own query language from trusted callers declares it:
+
+```csharp
+[Route("api/reports")]
+public sealed class ReportsController : EntityController<Report>
+{
+    protected override bool AllowRawQuery => true;
+}
+```
+
+`?q=` is then a provider-native query - a SQL predicate on relational connectors - run as written and alone: combined
+with `filter` or a server-side constraint it answers `400` (`web.read.freeTextNotComposable`). SQLite and PostgreSQL
+confine it to one read-only statement, CockroachDB to one statement (its read-only mode refuses DML, not DDL); the other
+relational connectors run it as written. Either way, a caller who can read the collection can read whatever the
+connector's database user can, so declare it only behind authorization you control. A terse `[RestEntity]` controller cannot declare it, and MCP never carries it.
+`DELETE /?q=` is a different parameter: its `q` is the JSON filter.
 - `FirstPage`/`Page` are materialized Data APIs. `EntityController` does not promise an
   `IAsyncEnumerable` HTTP response merely because the selected adapter can stream internally.
 
@@ -175,7 +219,7 @@ must establish or re-resolve their own application authority.
 
 - `IModelHook<TEntity>` — before/after fetch, save, delete, and patch.
 - `ICollectionHook<TEntity>` — before/after collection fetch.
-- `IRequestOptionsHook<TEntity>` — adjust parsed query options.
+- `IRequestOptionsHook<TEntity>` — adjust parsed query options, including giving `q` a meaning.
 - `IEmitHook<TEntity>` — replace or transform emitted model/collection payloads.
 - `IEntityEnricher<TEntity>` — ordered same-shape output enrichment.
 - `IEntityTransformer<TEntity, TShape>` — content-negotiated terminal input/output transformation.
@@ -220,6 +264,7 @@ transforms, health, and facts. Three things stay with the application by design.
 - [OpenAPI package](../../../src/Koan.Web.OpenApi/README.md)
 - [WEB-0035 — EntityController transformers](../../decisions/WEB-0035-entitycontroller-transformers.md)
 - [ARCH-0092 — Entity exposure surfaces](../../decisions/ARCH-0092-entity-exposure-surfaces.md)
+- [WEB-0074 — request text is never a provider query](../../decisions/WEB-0074-request-text-is-never-a-provider-query.md)
 - [ARCH-0112 — bounded relationship negotiation](../../decisions/ARCH-0112-bounded-relationship-negotiation.md)
 - [DATA-0107 — provider-bounded Entity streams](../../decisions/DATA-0107-provider-bounded-entity-streams.md)
 - [Koan.Web source](../../../src/Koan.Web/)

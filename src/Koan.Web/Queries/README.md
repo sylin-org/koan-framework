@@ -15,7 +15,7 @@ This directory contains **query string parsing and normalization** utilities for
 #### What It Provides
 
 One pass over an HTTP query collection, producing the `QueryOptions` the endpoint pipeline consumes:
-free-text `q`, paging, sort specs resolved against the entity, shape, view, and declared extras. The
+request text `q`, paging, sort specs resolved against the entity, shape, view, and declared extras. The
 same parse backs every Entity endpoint, so the query grammar does not drift between surfaces.
 
 #### Available Methods
@@ -28,8 +28,8 @@ public static QueryOptions Parse(
     Type entityType, IQueryCollection query, EntityEndpointOptions defaults, bool lenient = false);
 ```
 
-One call reads the whole query string into `QueryOptions`: free-text `q`, page and page size, sort
-specs resolved against the entity, shape, view, and any extras the endpoint declared. There is no
+One call reads the whole query string into `QueryOptions`: `q`, page and page size, sort specs
+resolved against the entity, shape, view, and any extras the endpoint declared. There is no
 per-concern parse to assemble.
 
 Sort fields resolve against `TEntity`, so an unknown field throws `InvalidSortFieldException` --
@@ -77,8 +77,14 @@ The parser reads `q`, `page`, `pageSize` (or `size`), `sort`, `dir`, `view`, `ou
 curl --get --data-urlencode 'filter={"status":"Pending"}' http://localhost:5000/api/todos
 ```
 
-`q` is a separate free-text slot, and the two compose. A malformed filter, an unknown field, or an
-operator the adapter cannot execute answers `400` -- none of them degrades into an unfiltered read.
+A malformed filter, an unknown field, or an operator the adapter cannot execute answers `400` --
+none of them degrades into an unfiltered read.
+
+`q` is not a filter. The parser carries it as untrusted request text for request-options hooks, and the
+framework never runs it as a provider query: a `q` still set when the read executes answers `400` naming
+`filter`, unless the controller declared `AllowRawQuery`. See
+[Expose Entities through HTTP](../../../docs/reference/web/index.md) and
+[WEB-0074](../../../docs/decisions/WEB-0074-request-text-is-never-a-provider-query.md).
 
 ### Sorting
 

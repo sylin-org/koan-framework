@@ -311,9 +311,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         long total;
         try
         {
-            queryResult = await QueryCollection(query, context.Options.Q, request.AbsoluteMaxRecords,
-                context.CancellationToken);
+            queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery,
+                request.AbsoluteMaxRecords, context.CancellationToken);
             total = queryResult.Total;
+        }
+        catch (FreeTextRefusedException refused)
+        {
+            return new EntityCollectionResult<TEntity>(context, [], 0, null, FreeTextRefused(refused));
         }
         catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
@@ -510,8 +514,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         long total;
         try
         {
-            queryResult = await QueryCollection(query, context.Options.Q, 0, context.CancellationToken);
+            queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery, 0, context.CancellationToken);
             total = queryResult.Total;
+        }
+        catch (FreeTextRefusedException refused)
+        {
+            return new EntityCollectionResult<TEntity>(context, [], 0, null, FreeTextRefused(refused));
         }
         catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
         {
@@ -1407,17 +1415,47 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         };
     }
 
-    private async Task<RepositoryQueryResult> QueryCollection(QueryDefinition query, string? q,
+    // WEB-0074: what a refused q tells the caller. Both name the structured way to say the same thing.
+    private const string FreeTextUnsupportedMessage =
+        "q is not accepted on this endpoint: request text is never run as a provider query. Narrow the collection with " +
+        "filter=<URL-encoded JSON> (for example filter={\"title\":{\"$contains\":\"milk\"}}) or POST the filter to /query. " +
+        "To give q a meaning, convert it into a filter in an IRequestOptionsHook<TEntity> and clear Options.Q.";
+
+    private const string FreeTextNotComposableMessage =
+        "q is a provider-native query on this endpoint and cannot be combined with filter or a server-side constraint. " +
+        "Send the narrowing in filter and drop q.";
+
+    private sealed class FreeTextRefusedException(string code, string message) : Exception(message)
+    {
+        public string Code { get; } = code;
+    }
+
+    private static BadRequestObjectResult FreeTextRefused(FreeTextRefusedException refused)
+        => new(new { code = refused.Code, message = refused.Message });
+
+    private async Task<RepositoryQueryResult> QueryCollection(QueryDefinition query, string? q, bool allowRawQuery,
         int absoluteMaxRecords, CancellationToken cancellationToken)
     {
         using var partition = EntityContext.With(partition: query.Partition);
-        if (query.Filter is null && !string.IsNullOrWhiteSpace(q))
+        if (!string.IsNullOrWhiteSpace(q))
         {
+            // WEB-0074 / DATA-0096 section 7.5: request text becomes a provider query only on an endpoint that declared
+            // it so, and then only alone - it cannot compose with the normalized filter (the caller's, or a server-side
+            // constraint), so it is refused rather than silently dropped. A hook that gave q a meaning has already
+            // turned it into a filter and cleared it by the time this runs.
+            if (!allowRawQuery)
+            {
+                _logger?.LogInformation(
+                    "EntityEndpointService<{Entity}> refused q: this endpoint does not run request text as a provider query.",
+                    typeof(TEntity).Name);
+                throw new FreeTextRefusedException(KoanWebConstants.Codes.Read.FreeTextUnsupported, FreeTextUnsupportedMessage);
+            }
+            if (query.Filter is not null)
+                throw new FreeTextRefusedException(KoanWebConstants.Codes.Read.FreeTextNotComposable, FreeTextNotComposableMessage);
+
             var raw = await Data<TEntity, TKey>.QueryRaw(q, null, query, cancellationToken);
             return new RepositoryQueryResult(raw, raw.Count, false, false);
         }
-        if (query.Filter is not null && !string.IsNullOrWhiteSpace(q))
-            _logger?.LogInformation("EntityEndpointService<{Entity}> dropped free-text Q because the query has a normalized filter.", typeof(TEntity).Name);
 
         int? safetyLimit = absoluteMaxRecords > 0 ? absoluteMaxRecords : null;
         var result = query.CountStrategy is null

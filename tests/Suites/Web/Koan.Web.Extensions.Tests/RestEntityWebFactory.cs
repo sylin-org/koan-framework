@@ -66,6 +66,8 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                     services.AddScoped<EntityAccess<Memo>, MemoAccess>();
                     services.AddScoped<EntityAccess<Sprocket>, SprocketAccess>();
                     services.AddScoped<EntityAccess<Order>, OrderAccess>();
+                    // WEB-0074: the one supported meaning of ?q= - an application hook that turns it into a filter.
+                    services.AddSingleton<Koan.Web.Hooks.IRequestOptionsHook<Gizmo>, GizmoLabelSearch>();
                     // ARCH-0092 Phase 3.2: a test auth scheme so the entity floor can be exercised end-to-end.
                     services.AddAuthentication(TestAuthHandler.SchemeName)
                         .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });

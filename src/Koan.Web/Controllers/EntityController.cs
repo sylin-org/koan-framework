@@ -148,6 +148,19 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
         return EntityQueryParser.Parse<TEntity>(HttpContext.Request.Query, EndpointOptions);
     }
 
+    /// <summary>
+    /// Declares that <c>?q=</c> on this controller's collection and <c>POST query</c> endpoints is a provider-native
+    /// query - a SQL predicate on relational connectors - run as written. Off by default: a request that still carries
+    /// <c>q</c> when the read executes is refused with <c>400</c>, because request text is never a provider query
+    /// unless the endpoint says so (WEB-0074, DATA-0096 section 7.5). The MCP surface never grants it.
+    /// <para>Override it only on an endpoint restricted to trusted callers: it lets whoever can read the collection
+    /// read whatever the connector's database user can. SQLite and PostgreSQL confine the text to one read-only
+    /// statement, CockroachDB to one statement (its read-only mode refuses DML, not DDL); the other relational
+    /// connectors run it as written. To give <c>q</c> a meaning for untrusted callers, turn it into a filter in an
+    /// <c>IRequestOptionsHook&lt;TEntity&gt;</c> instead.</para>
+    /// </summary>
+    protected virtual bool AllowRawQuery => false;
+
     protected virtual ObjectResult PrepareResponse(object? content)
     {
         Response.Headers["Vary"] = "Accept";
@@ -258,7 +271,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             BasePath = HttpContext.Request.Path.HasValue ? HttpContext.Request.Path.Value : "/",
             // SEC-0004 (§C): ?access=true opts into the per-row `access` sidecar (decoupled from ?with= expansion).
             IncludeAccess = GetBooleanQueryValue(query, Koan.Web.Authorization.AccessProjection.QueryToggle),
-            QueryParameters = ToQueryDictionary(query)
+            QueryParameters = ToQueryDictionary(query),
+            AllowRawQuery = AllowRawQuery
         };
 
         var result = await EndpointService.GetCollection(request);
@@ -371,7 +385,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             FilterJson = filterJson,
             Set = set,
             IgnoreCase = ignoreCase,
-            Accept = HttpContext.Request.Headers["Accept"].ToString()
+            Accept = HttpContext.Request.Headers["Accept"].ToString(),
+            AllowRawQuery = AllowRawQuery
         };
 
         var result = await EndpointService.Query(request);

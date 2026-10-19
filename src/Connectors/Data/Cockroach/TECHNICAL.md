@@ -36,6 +36,10 @@ Registered SQL reads open the selected read-lane connection, begin a transaction
 `SET TRANSACTION READ ONLY` before executing the command. Inspection uses `information_schema` for container discovery
 and Npgsql result metadata for neutral record shapes. Sampling is bounded at the provider with one look-ahead row.
 
+Raw Entity reads (`QueryRaw`, `CountRaw`) share the Npgsql owner: caller-owned text, run as exactly one statement
+(`;` and NUL are refused) in a read-only transaction (WEB-0074). CockroachDB's read-only mode refuses DML but, measured,
+not DDL; the single-statement rule is what keeps DDL out of reach of a raw predicate.
+
 Health remains non-critical and connection-free until Cockroach wins default election or one of its sources is used.
 Active-source health opens each same resolved endpoint used by repositories and executes a minimal probe. A failed
 active source reports unhealthy with its source name and a redacted correction; optional unused routes do not gate

@@ -428,7 +428,7 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
     }
 
     // ============================================================================================
-    // GET /api/widgets?q=... — query-string filter
+    // GET /api/widgets?filter=... — query-string filter
     // ============================================================================================
 
     [Fact]
@@ -440,7 +440,8 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         await SeedAlphaBravoCharlie();
 
         // The controller routes ?filter=<json> into EntityCollectionRequest.FilterJson, which then
-        // becomes a server-evaluated predicate. ?q= is a separate free-text search slot.
+        // becomes a server-evaluated predicate. ?q= is not a filter: it is request text the framework never runs as a
+        // provider query (see the ?q= specs below).
         var filter = JsonSerializer.Serialize(new { Name = "Bravo" });
         var encoded = Uri.EscapeDataString(filter);
         var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
@@ -495,6 +496,151 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         var response = await Client.GetAsync($"/api/widgets?filter={encoded}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    // ============================================================================================
+    // GET /api/widgets?q=... — request text is never a provider query (WEB-0074)
+    // ============================================================================================
+
+    // Each payload is hostile in some engine's dialect and meaningless in the others; the refusal does not depend on
+    // which, so every adapter runs the same cases. Before the fix a relational adapter ran each one as SQL: the UNION
+    // read sqlite_master, the stacked DROP removed the table, and "select " was executed as a whole statement.
+    private static readonly string[] ProviderQueryPayloads =
+    [
+        "1=0) UNION SELECT name, sql FROM sqlite_master --",
+        "1=0) UNION SELECT table_name, table_schema FROM information_schema.tables --",
+        "1=1); DROP TABLE widgets_surface; --",
+        "1=1; DROP TABLE widgets_surface; --",
+        "select 1; drop table widgets_surface; --",
+        "select * from widgets_surface",
+        "1 = 1",
+        "Bravo",
+    ];
+
+    [Fact]
+    public async Task GetCollection_q_is_refused_and_never_runs_as_a_provider_query()
+    {
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        foreach (var payload in ProviderQueryPayloads)
+        {
+            var response = await Client.GetAsync($"/api/widgets?q={Uri.EscapeDataString(payload)}");
+            await ExpectFreeTextRefused(response, payload);
+        }
+
+        // Nothing ran: the table is still there and still holds every row.
+        var after = await Client.GetAsync("/api/widgets");
+        after.StatusCode.Should().Be(HttpStatusCode.OK, await after.Content.ReadAsStringAsync());
+        (await ReadItems(after)).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task BodyQuery_q_is_refused_and_never_runs_as_a_provider_query()
+    {
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        foreach (var payload in ProviderQueryPayloads)
+        {
+            var response = await Client.PostAsJsonAsync($"/api/widgets/query?q={Uri.EscapeDataString(payload)}", new { });
+            await ExpectFreeTextRefused(response, payload);
+        }
+
+        var after = await Client.GetAsync("/api/widgets");
+        after.StatusCode.Should().Be(HttpStatusCode.OK, await after.Content.ReadAsStringAsync());
+        (await ReadItems(after)).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task GetCollection_blank_q_carries_no_text_and_is_ignored()
+    {
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        foreach (var blank in new[] { "", "%20", "%20%20" })
+        {
+            var response = await Client.GetAsync($"/api/widgets?q={blank}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK, $"q='{blank}' is not text");
+            (await ReadItems(response)).Should().HaveCount(3);
+        }
+    }
+
+    // The DATA-0096 section 7.5 escape hatch: a controller that declares AllowRawQuery makes ?q= the connector's own query
+    // language. Its sibling WidgetController does not, so the same text is refused there.
+    [Fact]
+    public async Task RawQuery_controller_runs_q_as_a_provider_predicate_and_the_default_controller_refuses_it()
+    {
+        Assert.SkipWhen(!Factory.SupportsRawQuery, $"[{typeof(TFactory).Name}] does not confine raw provider queries.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+        var predicate = Uri.EscapeDataString("1 = 1");
+
+        var raw = await Client.GetAsync($"/api/raw-widgets?q={predicate}");
+        raw.StatusCode.Should().Be(HttpStatusCode.OK, await raw.Content.ReadAsStringAsync());
+        (await ReadItems(raw)).Should().HaveCount(3);
+
+        // The text is the predicate: it narrows when it says so, which "returns everything" alone cannot show.
+        var one = await Client.GetAsync($"/api/raw-widgets?q={Uri.EscapeDataString("\"Id\" = 'id2'")}");
+        one.StatusCode.Should().Be(HttpStatusCode.OK, await one.Content.ReadAsStringAsync());
+        (await ReadItems(one)).Select(NameOf).Should().Equal("Alpha");
+        (await ReadItems(await Client.GetAsync($"/api/raw-widgets?q={Uri.EscapeDataString("1 = 0")}"))).Should().BeEmpty();
+
+        var refused = await Client.GetAsync($"/api/widgets?q={predicate}");
+        refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task RawQuery_controller_still_runs_exactly_one_statement()
+    {
+        Assert.SkipWhen(!Factory.SupportsRawQuery, $"[{typeof(TFactory).Name}] does not confine raw provider queries.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        foreach (var payload in new[]
+                 {
+                     "1=1); DROP TABLE widgets_surface; --",
+                     "1=1; DROP TABLE widgets_surface; --",
+                     "select 1; drop table widgets_surface; --",
+                 })
+        {
+            var response = await Client.GetAsync($"/api/raw-widgets?q={Uri.EscapeDataString(payload)}");
+            var body = await response.Content.ReadAsStringAsync();
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, $"q={payload}: {body}");
+            body.Should().Contain("exactly one statement");
+        }
+
+        var after = await Client.GetAsync("/api/widgets");
+        after.StatusCode.Should().Be(HttpStatusCode.OK, await after.Content.ReadAsStringAsync());
+        (await ReadItems(after)).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task RawQuery_controller_refuses_q_combined_with_a_filter()
+    {
+        Assert.SkipWhen(!Factory.SupportsQueryStringFilter, $"[{typeof(TFactory).Name}] does not support ?filter= query-string filter.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+
+        var response = await Client.GetAsync(
+            $"/api/raw-widgets?q={Uri.EscapeDataString("1 = 1")}&filter={Uri.EscapeDataString("{\"Name\":\"Bravo\"}")}");
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, body);
+        using var problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().Should().Be("web.read.freeTextNotComposable", body);
+    }
+
+    private static async Task ExpectFreeTextRefused(HttpResponseMessage response, string payload)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, $"q={payload} must be refused, not executed: {body}");
+        using var problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().Should().Be("web.read.freeTextUnsupported", body);
+        problem.RootElement.GetProperty("message").GetString().Should()
+            .Contain("filter", "the refusal names the fix").And.Contain("IRequestOptionsHook");
+        body.Should().NotContain("sqlite_master", "the refusal never echoes schema")
+            .And.NotContain("information_schema");
     }
 
     // ============================================================================================

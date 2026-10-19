@@ -10,6 +10,13 @@ public sealed class QueryOptions
 {
     /// <summary>The normalized relationship expansion choice shared by endpoint and emit hooks.</summary>
     public bool IncludeRelationships { get; set; }
+
+    /// <summary>
+    /// The request's <c>q</c> text, untrusted. The framework never runs it as a provider query unless the controller
+    /// declared <c>AllowRawQuery</c>; a <c>Q</c> still set when the read executes answers <c>400</c>. A request-options
+    /// hook gives it a meaning by adding a predicate (<see cref="QueryOptionsExtensions.AddPredicate{TEntity}"/>) and
+    /// setting <c>Q</c> to null (WEB-0068, WEB-0074).
+    /// </summary>
     public string? Q { get; set; }
     public int Page { get; set; } = 1;
     public int PageSize { get; set; } = Infrastructure.KoanWebConstants.Defaults.DefaultPageSize;
@@ -27,7 +34,8 @@ public sealed class QueryOptions
     /// <summary>
     /// Complete normalized server constraint, AND-composed with the user's filter before execution.
     /// AddPredicate lowers recognized captured values when contributed. Null means unconstrained.
-    /// When a filter exists, free-text Q is dropped because that separate provider input cannot be composed.
+    /// A provider-native <see cref="Q"/> (a controller that declared <c>AllowRawQuery</c>) cannot compose with a
+    /// filter, so the pair answers <c>400</c> instead of one silently winning.
     /// </summary>
     public Filter? Filter { get; set; }
 }

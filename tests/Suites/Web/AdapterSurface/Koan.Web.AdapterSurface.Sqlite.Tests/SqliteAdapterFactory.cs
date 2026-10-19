@@ -3,12 +3,13 @@ using Koan.Web.AdapterSurface.TestKit;
 
 namespace Koan.Web.AdapterSurface.Sqlite.Tests;
 
-public sealed class SqliteAdapterFactory : AdapterTestFactoryBase
+public sealed class SqliteAdapterFactory : AdapterTestFactoryBase, IAdapterCapabilities
 {
     private readonly string _dbPath = Path.Combine(Path.GetTempPath(), $"koan-surface-sqlite-{Guid.NewGuid():N}.db");
     private string ConnectionString => $"Data Source={_dbPath}";
 
     public override bool IsAvailable => true;
+    bool IAdapterCapabilities.SupportsRawQuery => true;
 
     protected override IEnumerable<KeyValuePair<string, string?>> AdapterConfiguration() => new Dictionary<string, string?>
     {

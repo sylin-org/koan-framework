@@ -43,7 +43,7 @@ public interface IAdapterCapabilities
     /// <summary>Entity&lt;T&gt;.Copy()/Move()/Mirror() across partitions.</summary>
     bool SupportsCrossPartitionTransfer => true;
 
-    /// <summary>POST /query with a JSON body filter (?q= equivalent).</summary>
+    /// <summary>POST /query with a JSON body filter (?filter= equivalent).</summary>
     bool SupportsBodyQuery => true;
 
     /// <summary>
@@ -52,4 +52,12 @@ public interface IAdapterCapabilities
     /// ILinqQueryRepository adapter.
     /// </summary>
     bool SupportsQueryStringFilter => true;
+
+    /// <summary>
+    /// The adapter runs provider-native queries <b>and confines them to one read-only statement</b> (WEB-0074), so a
+    /// controller that declares <c>AllowRawQuery</c> can be exercised end to end. Default false; SQLite and PostgreSQL
+    /// opt in. An adapter whose raw path is not confined must not claim it: the opt-in specs would execute stacked
+    /// statements against it.
+    /// </summary>
+    bool SupportsRawQuery => false;
 }
