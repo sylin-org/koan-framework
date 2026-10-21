@@ -58,7 +58,9 @@ Framework modules may declare their own handlers during normal Koan module regis
 - `Before*` handlers return `context.Proceed()` or `context.Cancel(reason, code)`. Cancellation throws
   `EntityLifecycleCancelledException` before the corresponding persistence operation.
 - `context.Prior` is the stable persisted predecessor captured before the operation, or `null` for a new entity.
-- `Protect`, `ProtectAll`, and `AllowMutation` guard fields from subsequent handler mutation.
+- `Protect`, `ProtectAll`, and `AllowMutation` guard fields from subsequent handler mutation. The guard is for
+  handlers: after the write, protection is rebased to the persisted row, so the identity the write mints and the
+  `[Timestamp]` and contributor stamps it applies never trip it (DATA-0132).
 - `Items` carries operation-local values between handlers; it is not shared between writes.
 - Handler exceptions surface to the caller. Koan does not silently retry application handlers.
 

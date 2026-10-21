@@ -74,6 +74,19 @@ public sealed class EntityLifecycleContext<TEntity> where TEntity : class
     internal void UpdateCurrent(TEntity current) =>
         Current = current ?? throw new ArgumentNullException(nameof(current));
 
+    /// <summary>
+    /// NK-014: re-capture every protected member from <see cref="Current"/> once the write has persisted it. The write
+    /// plan stamps identity, [Timestamp] and contributor values after the before-handlers ran; those are the
+    /// framework's changes, not a handler's, so after-handlers are checked against what was stored.
+    /// </summary>
+    internal void RebaseProtection()
+    {
+        if (_protectedSnapshots.Count == 0) return;
+        foreach (var name in _protectedSnapshots.Keys.ToArray())
+            if (PropertyGetters.Value.TryGetValue(name, out var getter))
+                _protectedSnapshots[name] = getter(Current);
+    }
+
     private static IReadOnlyDictionary<string, Func<TEntity, object?>> CreatePropertyGetterMap()
     {
         var result = new Dictionary<string, Func<TEntity, object?>>(StringComparer.Ordinal);

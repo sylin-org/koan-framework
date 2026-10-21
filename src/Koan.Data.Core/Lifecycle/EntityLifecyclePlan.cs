@@ -108,6 +108,7 @@ internal sealed class EntityLifecyclePlan<TEntity, TKey> : IEntityLifecyclePlan
     internal async ValueTask CompleteUpsert(EntityLifecycleContext<TEntity> context, TEntity persisted)
     {
         context.UpdateCurrent(persisted);
+        context.RebaseProtection();
         await RunAfter(_afterUpsert, context).ConfigureAwait(false);
     }
 
@@ -119,7 +120,12 @@ internal sealed class EntityLifecyclePlan<TEntity, TKey> : IEntityLifecyclePlan
         return context;
     }
 
-    internal ValueTask CompleteRemove(EntityLifecycleContext<TEntity> context) => RunAfter(_afterRemove, context);
+    internal ValueTask CompleteRemove(EntityLifecycleContext<TEntity> context)
+    {
+        // A soft-delete override re-persists the row with fresh write stamps; rebase as an upsert does (NK-014).
+        context.RebaseProtection();
+        return RunAfter(_afterRemove, context);
+    }
 
     private static async ValueTask RunBefore(
         IReadOnlyList<Func<EntityLifecycleContext<TEntity>, ValueTask<EntityLifecycleResult>>> handlers,
