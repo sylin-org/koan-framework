@@ -89,7 +89,9 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         var result = await Collect(StreamingRecord.AllStream(batchSize: 2));
 
         result.Select(record => record.Sequence).Should().Equal(1, 2, 3, 4, 5);
-        _repository.QueryCalls.Select(query => query.EffectivePage()).Should().Equal(1, 2, 3);
+        _repository.QueryCalls.Select(query => query.EffectivePage()).Should().Equal(1, 1, 1);
+        _repository.QueryCalls.Select(query => query.Filter).Should().Equal(
+            [null, Seek("0002"), Seek("0004")], Filter.Equivalent);
         _repository.QueryCalls.Select(query => query.EffectivePageSize()).Should().OnlyContain(size => size == 2);
         _repository.QueryCalls.Should().OnlyContain(query => query.CountStrategy == null);
         _repository.QueryCalls.Should().OnlyContain(query =>
@@ -100,6 +102,84 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         fact.State.Should().Be(KoanFactState.Selected);
         fact.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.ProviderBoundedPaging);
         fact.Summary.Should().Contain(nameof(StreamingRecord)).And.Contain("2");
+    }
+
+    /// <summary>
+    /// NK-205, NK-207, NK-254. A stream in identity order asks for the rows after the last identity it read, always as
+    /// the first page: no offset moves when another writer inserts or deletes, and no page number bounds the read.
+    /// </summary>
+    [Fact]
+    public async Task Identity_order_continues_after_the_last_identity_and_keeps_the_callers_filter()
+    {
+        _repository.Reset([Record(1, true), Record(2, false), Record(3, true), Record(4, true), Record(5, true)]);
+
+        var result = await Collect(StreamingRecord.QueryStream(record => record.Include, batchSize: 2));
+
+        result.Select(record => record.Sequence).Should().Equal(1, 3, 4, 5);
+        _repository.QueryCalls.Should().OnlyContain(query => query.EffectivePage() == 1);
+        _repository.QueryCalls[1].Filter.Should().BeOfType<AllOf>()
+            .Which.Operands.Should().HaveCount(2).And.Contain(operand => Filter.Equivalent(operand, Seek("0003")));
+    }
+
+    [Fact]
+    public async Task Descending_identity_order_continues_before_the_last_identity()
+    {
+        _repository.Reset(Rows(1, 2, 3));
+
+        _ = await Collect(StreamingRecord.AllStream("-Id", batchSize: 2));
+
+        _repository.QueryCalls.Should().HaveCountGreaterThan(1);
+        Filter.Equivalent(_repository.QueryCalls[1].Filter,
+            new FieldFilter(FieldPath.Of(nameof(StreamingRecord.Id)), FilterOperator.Lt, FilterValue.Of("0002")))
+            .Should().BeTrue("a descending read continues before the last identity it returned");
+    }
+
+    /// <summary>
+    /// The source changes between two pages, ahead of the read and behind it. A numbered page is a position: two
+    /// deletes behind it skip rows, and two inserts behind it repeat one. A row present for the whole read must come
+    /// back exactly once whatever the other writer does.
+    /// </summary>
+    [Theory]
+    [InlineData("delete-behind")]
+    [InlineData("insert-behind")]
+    public async Task A_stream_neither_skips_nor_repeats_rows_when_the_source_changes_during_the_read(string change)
+    {
+        _repository.Reset(Rows(1, 2, 3, 4, 5, 6, 7, 8));
+        var seen = new List<int>();
+        await using (var rows = StreamingRecord.AllStream(batchSize: 3).GetAsyncEnumerator())
+        {
+            while (seen.Count < 3 && await rows.MoveNextAsync()) seen.Add(rows.Current.Sequence);
+            _repository.Mutate(items =>
+            {
+                if (change == "delete-behind")
+                {
+                    items.RemoveAll(record => record.Sequence is 1 or 2 or 5);
+                    items.Add(Record(9, include: true));
+                }
+                else
+                {
+                    items.Add(Record(0, include: true));
+                    items.Add(new StreamingRecord { Id = "0002a", Sequence = 20, Include = true });
+                    items.Add(new StreamingRecord { Id = "0006a", Sequence = 60, Include = true });
+                }
+            });
+            while (await rows.MoveNextAsync()) seen.Add(rows.Current.Sequence);
+        }
+
+        seen.Should().Equal(change == "delete-behind"
+            ? [1, 2, 3, 4, 6, 7, 8, 9]
+            : [1, 2, 3, 4, 5, 6, 60, 7, 8]);
+    }
+
+    [Fact]
+    public async Task A_provider_that_ignores_the_seek_is_refused_instead_of_streaming_forever()
+    {
+        _repository.Reset(Rows(1, 2, 3, 4), ignoreFilter: true);
+
+        var exception = await Reject(StreamingRecord.AllStream(batchSize: 2));
+
+        exception.ReasonCode.Should().Be(Constants.Diagnostics.Reasons.InvalidStreamReceipt);
+        _repository.QueryCalls.Should().HaveCount(2);
     }
 
     [Fact]
@@ -254,7 +334,7 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     public async Task Custom_entity_key_rejects_before_provider_io()
     {
         var repository = new CustomKeyRepository();
-        var stream = QueryStreamCoordinator.Execute<CustomKeyRecord, int>(
+        var stream = QueryStreamCoordinator.Execute<CustomKeyRecord, decimal>(
             repository,
             QueryDefinition.All,
             "custom-key-spec",
@@ -391,7 +471,8 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
     public void Portable_stream_sort_floor_is_exact(Type type, bool expected)
     {
         TypeClassification.IsPortableStreamSortScalar(type).Should().Be(expected);
-        QueryStreamCoordinator.IsProviderStableIdentifierType(type).Should().Be(type == typeof(string));
+        QueryStreamCoordinator.IsProviderStableIdentifierType(type).Should().Be(
+            type == typeof(string) || type == typeof(Guid) || type == typeof(int) || type == typeof(long));
     }
 
     [Fact]
@@ -511,6 +592,9 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             fact.Code == Constants.Diagnostics.Codes.StreamExecution
             && fact.Subject.EndsWith(nameof(StreamingRecord), StringComparison.Ordinal));
 
+    private static Filter Seek(string after)
+        => new FieldFilter(FieldPath.Of(nameof(StreamingRecord.Id)), FilterOperator.Gt, FilterValue.Of(after));
+
     private static IReadOnlyList<StreamingRecord> Rows(params int[] sequences)
         => sequences.Select(sequence => Record(sequence, include: true)).ToList();
 
@@ -543,13 +627,13 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         public string Value { get; set; } = "";
     }
 
-    private sealed class CustomKeyRecord : Entity<CustomKeyRecord, int>
+    private sealed class CustomKeyRecord : Entity<CustomKeyRecord, decimal>
     {
     }
 
     private sealed class CustomKeyRepository :
-        IDataRepository<CustomKeyRecord, int>,
-        IQueryRepository<CustomKeyRecord, int>,
+        IDataRepository<CustomKeyRecord, decimal>,
+        IQueryRepository<CustomKeyRecord, decimal>,
         IDescribesCapabilities
     {
         public int QueryCalls { get; private set; }
@@ -568,23 +652,23 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
             => throw new InvalidOperationException("A custom-key rejection must not count.");
 
-        public Task<CustomKeyRecord?> Get(int id, CancellationToken ct = default)
+        public Task<CustomKeyRecord?> Get(decimal id, CancellationToken ct = default)
             => Task.FromResult<CustomKeyRecord?>(null);
 
         public Task<IReadOnlyList<CustomKeyRecord?>> GetMany(
-            IEnumerable<int> ids,
+            IEnumerable<decimal> ids,
             CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<CustomKeyRecord?>>([]);
 
         public Task<CustomKeyRecord> Upsert(CustomKeyRecord model, CancellationToken ct = default)
             => Task.FromResult(model);
 
-        public Task<bool> Delete(int id, CancellationToken ct = default) => Task.FromResult(false);
+        public Task<bool> Delete(decimal id, CancellationToken ct = default) => Task.FromResult(false);
         public Task<int> UpsertMany(IEnumerable<CustomKeyRecord> models, CancellationToken ct = default) => Task.FromResult(0);
-        public Task<int> DeleteMany(IEnumerable<int> ids, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<int> DeleteMany(IEnumerable<decimal> ids, CancellationToken ct = default) => Task.FromResult(0);
         public Task<int> DeleteAll(CancellationToken ct = default) => Task.FromResult(0);
         public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default) => Task.FromResult(0L);
-        public IBatchSet<CustomKeyRecord, int> CreateBatch() => throw new NotSupportedException();
+        public IBatchSet<CustomKeyRecord, decimal> CreateBatch() => throw new NotSupportedException();
     }
 
     private sealed class EmptyScope : IDisposable
@@ -635,7 +719,8 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
         IQueryRepository<StreamingRecord, string>,
         IDescribesCapabilities
     {
-        private IReadOnlyList<StreamingRecord> _items = [];
+        private List<StreamingRecord> _items = [];
+        private bool _ignoreFilter;
         private bool _advertiseBoundedPaging = true;
         private FilterSupport _filterSupport = FilterSupport.Full;
         private bool _paginationHandled = true;
@@ -654,9 +739,11 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             FilterSupport? filterSupport = null,
             bool paginationHandled = true,
             bool sortHandled = true,
-            bool returnOneExtraCandidate = false)
+            bool returnOneExtraCandidate = false,
+            bool ignoreFilter = false)
         {
-            _items = items;
+            _items = items.ToList();
+            _ignoreFilter = ignoreFilter;
             _advertiseBoundedPaging = advertiseBoundedPaging;
             _filterSupport = filterSupport ?? FilterSupport.Full;
             _paginationHandled = paginationHandled;
@@ -668,6 +755,8 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             ObservedAxes.Clear();
             CountCalls = 0;
         }
+
+        public void Mutate(Action<List<StreamingRecord>> change) => change(_items);
 
         public void Describe(ICapabilities capabilities)
         {
@@ -687,8 +776,8 @@ public sealed class EntityStreamingSpec : IAsyncLifetime
             ObservedSources.Add(EntityContext.Current?.Source);
             ObservedAxes.Add(KoanContext.Get<StreamingAxis>()?.Value);
 
-            IEnumerable<StreamingRecord> candidates = _items;
-            if (query.Filter is not null)
+            IEnumerable<StreamingRecord> candidates = _items.ToList();
+            if (query.Filter is not null && !_ignoreFilter)
                 candidates = candidates.Where(InMemoryFilterEvaluator.Compile<StreamingRecord>(query.Filter));
 
             // Sequence and Id deliberately have the same order. The fake reports every requested sort

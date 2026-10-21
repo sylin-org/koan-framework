@@ -43,8 +43,8 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         CancellationToken ct)
     {
         var progress = new TransferProgress();
-        var read = 0;
-        var copied = 0;
+        var read = 0L;
+        var copied = 0L;
         await using var absent = new TransferJournal<TKey>();
 
         await foreach (var batch in ReadBatches(authoritative, ct).ConfigureAwait(false))
@@ -105,8 +105,8 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
     {
         var progress = new TransferProgress();
         var conflicts = new List<TransferConflict<TKey>>();
-        var read = 0;
-        var copied = 0;
+        var read = 0L;
+        var copied = 0L;
         PropertyInfo? timestamp = null;
         if (_conflict == MirrorConflict.Latest)
         {

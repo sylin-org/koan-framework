@@ -640,9 +640,11 @@ public static class Data<TEntity, TKey>
     /// on them already costs.</para>
     ///
     /// <para>A bounded provider is materialized too when the Entity's key is not a proven stream tie-breaker
-    /// (<see cref="QueryStreamCoordinator.IsProviderStableIdentifierType"/>: only string keys today). The stream
-    /// would refuse such a key before any I/O, so without this a Guid- or int-keyed Entity could not be
-    /// transferred or backed up on any bounded provider (NK-016).</para>
+    /// (<see cref="QueryStreamCoordinator.IsProviderStableIdentifierType"/>: string, Guid, int and long keys). The
+    /// stream would refuse such a key before any I/O, so without this an Entity with any other key could not be
+    /// transferred or backed up on any bounded provider (NK-016). The streamed read continues each page after the
+    /// last identity it returned, so a row present for the whole read is read exactly once even while other
+    /// writers change the source (NK-205, NK-306).</para>
     ///
     /// <para>The choice is never silent: it records a <c>koan.data.stream.execution</c> fact either way, and
     /// <paramref name="onMaterialized"/> lets a caller add its own user-facing notice. This lives here, not in
@@ -670,7 +672,7 @@ public static class Data<TEntity, TKey>
         }
 
         var reason = bounded
-            ? $"Koan proves a provider-bounded stream order only for string identifiers, and {typeof(TEntity).Name} " +
+            ? $"Koan proves a provider-bounded stream order only for string, Guid, int and long identifiers, and {typeof(TEntity).Name} " +
               $"is keyed by {typeof(TKey).Name} (DATA-0107)"
             : "the routed provider does not advertise provider-bounded paging (DATA-0107)";
         onMaterialized?.Invoke(reason);

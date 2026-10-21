@@ -40,6 +40,8 @@ public sealed class BackupRecoverySpec
                     new BackupRequest { PageSize = 2, StorageProfile = Profile });
 
             runtime.Probe.RequestedPages.Should().Equal(1, 2, 3);
+            runtime.Probe.ProviderPageNumbers.Should().OnlyContain(page => page == 1,
+                "each request continues after the last identity read instead of numbering pages (DATA-0151)");
             runtime.Probe.CompletedPages.Should().SatisfyRespectively(
                 page => AssertPage(page, number: 1, candidates: 2),
                 page => AssertPage(page, number: 2, candidates: 2),
@@ -453,13 +455,16 @@ public sealed class BackupRecoverySpec
     {
         private int? _cancelPage;
         private CancellationTokenSource? _cancellation;
+        // The ordinal of each provider request; ProviderPageNumbers holds the page number the request carried.
         public List<int> RequestedPages { get; } = [];
+        public List<int> ProviderPageNumbers { get; } = [];
         public List<PageObservation> CompletedPages { get; } = [];
         public int CountCalls { get; private set; }
 
         public void Reset()
         {
             RequestedPages.Clear();
+            ProviderPageNumbers.Clear();
             CompletedPages.Clear();
             CountCalls = 0;
             _cancelPage = null;
@@ -474,8 +479,9 @@ public sealed class BackupRecoverySpec
 
         public void Requested(QueryDefinition query, CancellationToken ct)
         {
-            var page = query.EffectivePage();
+            var page = RequestedPages.Count + 1;
             RequestedPages.Add(page);
+            ProviderPageNumbers.Add(query.EffectivePage());
             if (_cancelPage == page)
             {
                 _cancellation!.Cancel();
@@ -485,7 +491,7 @@ public sealed class BackupRecoverySpec
 
         public void Completed(QueryDefinition query, RepositoryQueryResult<BackupRecord> result)
             => CompletedPages.Add(new PageObservation(
-                query.EffectivePage(), query.EffectivePageSize(), result.Items.Count,
+                CompletedPages.Count + 1, query.EffectivePageSize(), result.Items.Count,
                 result.PaginationHandled, result.SortFullyHandled(query), query.CountStrategy is not null));
 
         public void Counted() => CountCalls++;

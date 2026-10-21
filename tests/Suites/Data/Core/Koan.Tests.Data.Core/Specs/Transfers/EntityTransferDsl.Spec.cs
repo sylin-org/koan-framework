@@ -573,6 +573,101 @@ public sealed class EntityTransferDslSpec
         audits.Last().IsSummary.Should().BeTrue();
     }
 
+    /// <summary>
+    /// NK-306. Another writer removes a row the Move already copied, behind its read. A numbered source page shifts
+    /// down by one, so the next page used to start one row late: the skipped row was never copied and stayed in the
+    /// source while the Move reported success. The read continues after the last identity it returned instead.
+    /// </summary>
+    [Fact]
+    public async Task Move_ARowDeletedBehindTheRead_DoesNotMakeTheMoveSkipTheNextRow()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("hot"))
+            foreach (var id in new[] { "a1", "a2", "a3" })
+                await new TransferTodo { Id = id, Title = id, Active = true }.Save();
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+
+        var result = await TransferTodo.Move()
+            .From(partition: "hot")
+            .To(partition: "archive")
+            .Batch(1)
+            .Audit(batch =>
+            {
+                if (batch is { IsSummary: false, BatchNumber: 1 })
+                    repository.BeforeNextQuery = () => repository.Delete("a1").GetAwaiter().GetResult();
+            })
+            .Run();
+
+        result.CopiedCount.Should().Be(3, "every row present for the whole read is copied");
+        result.DeletedCount.Should().Be(2, "the row another writer removed is not counted as moved");
+        using (runtime.UsePartition("hot"))
+            (await TransferTodo.All()).Should().BeEmpty();
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Select(todo => todo.Id).Should().BeEquivalentTo(["a1", "a2", "a3"]);
+    }
+
+    /// <summary>
+    /// NK-205. A row with a lower identity enters the Move's predicate between two source pages. A numbered page
+    /// counted it and read a row it had already copied a second time. The row that entered behind the read is not
+    /// read at all, so it is neither copied nor deleted, and nothing is read twice.
+    /// </summary>
+    [Fact]
+    public async Task Move_ARowEnteringThePredicateBehindTheRead_IsNotCopiedAndNothingIsReadTwice()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("hot"))
+        {
+            await new TransferTodo { Id = "a", Title = "a", Active = false }.Save();
+            foreach (var id in new[] { "b", "c", "d", "e" })
+                await new TransferTodo { Id = id, Title = id, Active = true }.Save();
+        }
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+
+        var result = await TransferTodo.Move(todo => todo.Active)
+            .From(partition: "hot")
+            .To(partition: "archive")
+            .Batch(2)
+            .Audit(batch =>
+            {
+                if (batch is { IsSummary: false, BatchNumber: 1 })
+                    repository.BeforeNextQuery = () => repository
+                        .Upsert(new TransferTodo { Id = "a", Title = "a", Active = true }).GetAwaiter().GetResult();
+            })
+            .Run();
+
+        result.ReadCount.Should().Be(4);
+        result.CopiedCount.Should().Be(4);
+        result.DeletedCount.Should().Be(4);
+        result.Warnings.Should().BeEmpty();
+        using (runtime.UsePartition("hot"))
+            (await TransferTodo.All()).Select(todo => todo.Id).Should().Equal("a");
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Select(todo => todo.Id).Should().BeEquivalentTo(["b", "c", "d", "e"]);
+    }
+
+    /// <summary>NK-254. A transfer counts past Int32: its totals and the audit's running numbers are 64-bit.</summary>
+    [Fact]
+    public void Transfer_counters_are_64_bit()
+    {
+        typeof(TransferResult<string>).GetProperties()
+            .Where(property => property.Name.EndsWith("Count", StringComparison.Ordinal))
+            .Should().OnlyContain(property => property.PropertyType == typeof(long));
+        typeof(TransferAuditBatch).GetProperty(nameof(TransferAuditBatch.BatchNumber))!.PropertyType.Should().Be(typeof(long));
+        typeof(TransferAuditBatch).GetProperty(nameof(TransferAuditBatch.TotalProcessed))!.PropertyType.Should().Be(typeof(long));
+    }
+
     [Fact]
     public async Task Copy_AmbiguousDestinationFault_IsNotReplayed()
     {

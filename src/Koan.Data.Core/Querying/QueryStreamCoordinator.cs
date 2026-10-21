@@ -83,12 +83,16 @@ internal static class QueryStreamCoordinator
         var (adapterBase, residual) = FilterPushdownCoordinator.Plan(query, filterSupport, typeof(TEntity));
         var residualPredicate = residual is null ? null : InMemoryFilterEvaluator.Compile<TEntity>(residual);
 
+        // A read ordered by the identity continues from the last identity it returned; any other order still
+        // pages by number, because a seek over a caller's key would need each store's null placement.
+        var seek = IdentitySeek.For(typeof(TEntity), query.Sort, IsEntityIdentifier<TEntity, TKey>, filterSupport);
+        object? cursor = null;
         var pageNumber = 1;
         var selectedRecorded = false;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var adapterPage = adapterBase
+            var adapterPage = (cursor is null ? adapterBase : seek!.Continue(adapterBase, cursor))
                 .WithPagination(pageNumber, batchSize)
                 .WithCountStrategy(null);
             RepositoryQueryResult<TEntity> result;
@@ -127,15 +131,25 @@ internal static class QueryStreamCoordinator
                     batchSize);
             }
 
+            // A store that ignored the seek would hand back the row it continued from, and the stream would never end.
+            if (cursor is not null && result.Items.Any(item => Equals(item.Id, cursor)))
+                throw Reject<TEntity>(facts, provider,
+                    Infrastructure.Constants.Diagnostics.Reasons.InvalidStreamReceipt,
+                    "The provider returned the row the stream continued from; it must apply the identity seek it received.",
+                    batchSize);
+
             if (!selectedRecorded)
             {
                 Record<TEntity>(facts, provider, KoanFactState.Selected,
-                    $"Selected provider-bounded paging for {typeof(TEntity).Name} with a maximum candidate page of {batchSize}.",
+                    $"Selected provider-bounded paging for {typeof(TEntity).Name} with a maximum candidate page of {batchSize}, " +
+                    (seek is null ? "in numbered pages." : "each page continuing after the last identity read."),
                     Infrastructure.Constants.Diagnostics.Reasons.ProviderBoundedPaging, null);
                 selectedRecorded = true;
             }
 
             var candidateCount = result.Items.Count;
+            // Taken before any row is handed out, so nothing the caller does with a row moves the seek.
+            object? last = candidateCount == 0 ? null : result.Items[^1].Id;
             foreach (var item in result.Items)
             {
                 ct.ThrowIfCancellationRequested();
@@ -153,6 +167,12 @@ internal static class QueryStreamCoordinator
             }
 
             if (candidateCount < batchSize) yield break;
+
+            if (seek is not null)
+            {
+                cursor = last;
+                continue;
+            }
 
             // Qualified adapters currently express OFFSET/Skip as Int32. The next provider request
             // would calculate pageNumber * batchSize, so refuse before that multiplication can wrap.
@@ -260,11 +280,13 @@ internal static class QueryStreamCoordinator
         return IsProviderStableIdentifierType(path.ValueType);
     }
 
-    // This floor is intentionally separate from caller-sort admission. The shared six-adapter
-    // corpus proves Koan's normal string key as an opaque page tie-breaker; no custom key shape is
-    // inferred merely because business fields of that CLR type have portable ordering.
+    // This floor is intentionally separate from caller-sort admission. A stream ordered by the identity
+    // seeks on it in the store (IdentitySeek), so the identity needs only an order the store applies the same
+    // way to ORDER BY and to a comparison. That holds for any key the store keeps as one scalar; it is proven
+    // for these on SQLite, PostgreSQL and MongoDB. No other key shape is inferred merely because business
+    // fields of that CLR type have portable ordering.
     internal static bool IsProviderStableIdentifierType(Type type)
-        => type == typeof(string);
+        => type == typeof(string) || type == typeof(Guid) || type == typeof(int) || type == typeof(long);
 
     private static bool IsEntityIdentifier<TEntity, TKey>(MemberPath path)
         where TEntity : class, IEntity<TKey>
@@ -290,7 +312,7 @@ internal static class QueryStreamCoordinator
         => Record<TEntity>(facts, provider, KoanFactState.Selected,
             $"Materialized bulk read for {typeof(TEntity).Name} because {because}.",
             Infrastructure.Constants.Diagnostics.Reasons.MaterializedBulkRead,
-            "Stream it instead by routing a string-keyed Entity to an adapter that advertises provider-bounded paging.");
+            "Stream it instead by routing an Entity keyed by a string, Guid, int or long to an adapter that advertises provider-bounded paging.");
 
     private static QueryStreamRejectedException Reject<TEntity>(
         IKoanRuntimeFactRecorder? facts,

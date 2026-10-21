@@ -6,9 +6,11 @@ using Microsoft.Data.Sqlite;
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 
 /// <summary>
-/// NK-016. Only string identifiers stream in provider-bounded pages, and a transfer always read through the stream
+/// NK-016. Only string identifiers streamed in provider-bounded pages, and a transfer always read through the stream
 /// when the provider advertised bounded paging. A Guid- or int-keyed Entity on SQLite therefore could not be copied,
-/// moved or mirrored at all. Such a read now takes the reported materialized strategy (DATA-0113).
+/// moved or mirrored at all, and then only through a reported materialized read (DATA-0113). NK-179: a stream in
+/// identity order continues after the last identity it read, in the store's own order of that key, so Guid and
+/// integral keys now stream in bounded pages like string keys.
 /// </summary>
 [Collection(nameof(SqliteNonStringKeyTransferSpec))]
 [CollectionDefinition(nameof(SqliteNonStringKeyTransferSpec), DisableParallelization = true)]
@@ -25,7 +27,7 @@ public sealed class SqliteNonStringKeyTransferSpec
     }
 
     [Fact]
-    public async Task Guid_keyed_entities_copy_move_and_mirror_with_a_reported_materialized_read()
+    public async Task Guid_keyed_entities_copy_move_and_mirror_through_a_bounded_stream()
     {
         await WithHost(async () =>
         {
@@ -40,7 +42,7 @@ public sealed class SqliteNonStringKeyTransferSpec
             mirror.CopiedCount.Should().Be(3);
             move.CopiedCount.Should().Be(3);
             move.DeletedCount.Should().Be(3);
-            copy.Warnings.Should().ContainSingle(warning => warning.Contains("Guid", StringComparison.Ordinal));
+            copy.Warnings.Should().BeEmpty("the source is streamed, not materialized");
             (await Data<Shipment, Guid>.All()).Should().BeEmpty();
             using (EntityContext.Partition("archive"))
                 (await Data<Shipment, Guid>.All()).Should().HaveCount(3);

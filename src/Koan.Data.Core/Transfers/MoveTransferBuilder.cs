@@ -23,8 +23,8 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
         await using var operationHorizon = await Admit(TransferKind.Move, ct).ConfigureAwait(false);
         using var fidelity = EnterFidelity();
         var progress = new TransferProgress();
-        var read = 0;
-        var copied = 0;
+        var read = 0L;
+        var copied = 0L;
         await using var confirmed = new TransferJournal<MovedRow>();
 
         await foreach (var batch in ReadBatches(FromContext, ct).ConfigureAwait(false))
@@ -50,14 +50,14 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
     /// unchanged row that then fails to delete is still an exact-receipt failure. The check and the delete are two
     /// steps, so a write landing between them is not detected.
     /// </summary>
-    private async Task<int> DeleteUnchanged(
+    private async Task<long> DeleteUnchanged(
         TransferJournal<MovedRow> journal,
         List<TransferConflict<TKey>> conflicts,
         CancellationToken ct)
     {
-        var deleted = 0;
-        var changed = 0;
-        var absent = 0;
+        var deleted = 0L;
+        var changed = 0L;
+        var absent = 0L;
         await foreach (var rows in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
         {
             using var scope = FromContext?.Apply();

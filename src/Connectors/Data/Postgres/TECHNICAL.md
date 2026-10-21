@@ -55,7 +55,9 @@ Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets 
 
 ## Provider-bounded streaming
 
-- `AllStream` and `QueryStream` are coordinated as lazy numbered pages by Data.Core.
+- `AllStream` and `QueryStream` are coordinated as lazy pages by Data.Core: in identity order each page
+  continues after the last identity read (`"Id" > @p`, compared on the native `uuid`, integer or text
+  column it is ordered by; DATA-0151), and under a caller's order as numbered pages.
 - `batchSize` is the maximum Koan-visible candidate page, not a promise about opaque Npgsql buffers.
 - Deep or collection ordering rejects correctively before provider I/O rather than falling back to a
   complete-result sort.

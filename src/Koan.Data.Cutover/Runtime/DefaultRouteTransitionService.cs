@@ -434,14 +434,14 @@ internal sealed class DefaultRouteTransitionService(
     {
         using var digest = new LogicalDigest();
         if (!sourcePresent) return new DigestResult(0, digest.Finish());
-        var page = 1;
+        string? after = null;
         while (true)
         {
-            var batch = await source.ReadPage(page, _options.PageSize, ct).ConfigureAwait(false);
+            var batch = await source.ReadPage(after, _options.PageSize, ct).ConfigureAwait(false);
             foreach (var entity in batch.Items) digest.Append(CanonicalEntityWriter.Write(root.RootIdentity, entity));
             if (batch.Items.Count != 0) await target.Upsert(batch.Items, ct).ConfigureAwait(false);
             if (!batch.HasMore) break;
-            page = NextPage(page);
+            after = LastId(batch);
         }
         return new DigestResult(digest.Count, digest.Finish());
     }
@@ -455,11 +455,12 @@ internal sealed class DefaultRouteTransitionService(
         CancellationToken ct)
     {
         using var sourceDigest = new LogicalDigest();
-        var page = 1;
+        string? after = null;
+        long page = 1;
         while (true)
         {
             var sourcePage = sourcePresent
-                ? await source.ReadPage(page, _options.PageSize, ct).ConfigureAwait(false)
+                ? await source.ReadPage(after, _options.PageSize, ct).ConfigureAwait(false)
                 : new DataEntityPage([], false);
             var sourceIds = sourcePage.Items
                 .Select(static entity => ((IEntity<string>)entity).Id)
@@ -482,7 +483,8 @@ internal sealed class DefaultRouteTransitionService(
                 sourceDigest.Append(sourceBytes);
             }
             if (!sourcePage.HasMore) break;
-            page = NextPage(page);
+            after = LastId(sourcePage);
+            page++;
         }
 
         var reread = new DigestResult(sourceDigest.Count, sourceDigest.Finish());
@@ -497,23 +499,21 @@ internal sealed class DefaultRouteTransitionService(
     private async Task<long> CountRows(IDataEntityRootSession session, CancellationToken ct)
     {
         long count = 0;
-        var page = 1;
+        string? after = null;
         while (true)
         {
-            var batch = await session.ReadPage(page, _options.PageSize, ct).ConfigureAwait(false);
+            var batch = await session.ReadPage(after, _options.PageSize, ct).ConfigureAwait(false);
             count = checked(count + batch.Items.Count);
             if (!batch.HasMore) return count;
-            page = NextPage(page);
+            after = LastId(batch);
         }
     }
 
     private static InvalidDataException Verification(DataEntityRootPlan root, string reason)
         => new($"Verified cutover rejected Entity root '{root.RootIdentity}': {reason}. The target is quarantined.");
 
-    private static int NextPage(int page)
-        => page == int.MaxValue
-            ? throw new InvalidOperationException("Cutover paging exceeded the supported provider page range.")
-            : page + 1;
+    // Each page continues after the last identity of the one before (NK-206), so no page number bounds a root.
+    private static string LastId(DataEntityPage page) => ((IEntity<string>)page.Items[^1]).Id;
 
     private static DefaultRouteTransitionBlocker Block(
         string code,

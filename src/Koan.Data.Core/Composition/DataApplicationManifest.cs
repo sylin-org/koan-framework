@@ -186,7 +186,8 @@ internal interface IDataEntityRootAccessor
 internal interface IDataEntityRootSession
 {
     Task EnsureReady(CancellationToken ct);
-    Task<DataEntityPage> ReadPage(int page, int pageSize, CancellationToken ct);
+    /// <summary>The next <paramref name="pageSize"/> rows in identity order after <paramref name="after"/>, or the first ones.</summary>
+    Task<DataEntityPage> ReadPage(string? after, int pageSize, CancellationToken ct);
     Task<IReadOnlyList<object?>> ReadByIds(IReadOnlyList<string> ids, CancellationToken ct);
     Task Upsert(IReadOnlyList<object> entities, CancellationToken ct);
 }
@@ -204,8 +205,10 @@ internal sealed class DataEntityRootAccessor<TEntity>(IServiceProvider services)
     public bool SupportsBoundedTraversal(IDataAdapterFactory factory, string source)
     {
         var repository = factory.Create<TEntity, string>(services, source);
+        var capabilities = DataCaps.Describe(repository, factory.Provider);
         return repository is IQueryRepository<TEntity, string> &&
-               DataCaps.Describe(repository, factory.Provider).Has(DataCaps.Query.ProviderBoundedPaging);
+               capabilities.Has(DataCaps.Query.ProviderBoundedPaging) &&
+               Session.Seek(capabilities) is not null;
     }
 
     public IDataEntityRootSession Open(IDataAdapterFactory factory, string source)
@@ -217,9 +220,21 @@ internal sealed class DataEntityRootAccessor<TEntity>(IServiceProvider services)
     {
         public Task EnsureReady(CancellationToken ct) => repository.EnsureReady(ct);
 
-        public async Task<DataEntityPage> ReadPage(int page, int pageSize, CancellationToken ct)
+        private static readonly IReadOnlyList<SortSpec> IdentityOrder =
+            SortBuilder<TEntity>.Build(sort => sort.OrderBy(entity => entity.Id));
+
+        /// <summary>The identity seek this provider applies, or null when it cannot push one (NK-206).</summary>
+        internal static IdentitySeek? Seek(Koan.Core.Capabilities.CapabilitySet capabilities) => IdentitySeek.For(
+            typeof(TEntity),
+            IdentityOrder,
+            static _ => true,
+            capabilities.Detail<Koan.Data.Abstractions.Filtering.FilterSupport>(DataCaps.Query.Filter)
+                ?? Koan.Data.Abstractions.Filtering.FilterSupport.None);
+
+        // Each page continues after the last identity read rather than at a numbered offset, so a page costs the
+        // same however deep into the root it is, and the root's size is not capped by an Int32 offset.
+        public async Task<DataEntityPage> ReadPage(string? after, int pageSize, CancellationToken ct)
         {
-            if (page <= 0) throw new ArgumentOutOfRangeException(nameof(page));
             if (pageSize <= 0) throw new ArgumentOutOfRangeException(nameof(pageSize));
             var capabilities = DataCaps.Describe(repository, provider);
             if (!capabilities.Has(DataCaps.Query.ProviderBoundedPaging))
@@ -229,9 +244,13 @@ internal sealed class DataEntityRootAccessor<TEntity>(IServiceProvider services)
                 throw new NotSupportedException(
                     $"Adapter '{provider}' does not expose structured queries for '{typeof(TEntity).FullName}'.");
 
-            var definition = QueryDefinition.All
-                .WithSort<TEntity>(sort => sort.OrderBy(entity => entity.Id))
-                .WithPagination(page, pageSize)
+            var seek = Seek(capabilities)
+                ?? throw new NotSupportedException(
+                    $"Adapter '{provider}' cannot apply an identity seek for '{typeof(TEntity).FullName}'.");
+            var definition = QueryDefinition.All.WithSort(IdentityOrder);
+            if (after is not null) definition = seek.Continue(definition, after);
+            definition = definition
+                .WithPagination(1, pageSize)
                 .WithCountStrategy(null);
             var result = await query.Query(definition, ct).ConfigureAwait(false);
             QueryReceiptValidator.Validate(definition, result);

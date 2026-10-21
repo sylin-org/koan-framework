@@ -408,6 +408,8 @@
       href: DATA-0149-transfers-carry-stored-values-exactly-by-default.md
     - name: DATA-0150 A unique [Index] on a row-scoped entity is unique per tenant
       href: DATA-0150-unique-indexes-are-unique-per-tenant.md
+    - name: DATA-0151 A stream in identity order continues after the last identity it read
+      href: DATA-0151-identity-ordered-streams-seek-after-the-last-identity.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

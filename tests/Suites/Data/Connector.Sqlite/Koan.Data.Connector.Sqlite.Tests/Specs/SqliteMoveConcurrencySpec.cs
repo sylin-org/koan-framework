@@ -61,7 +61,7 @@ public sealed class SqliteMoveConcurrencySpec
                 .Batch(1)
                 .Audit(batch =>
                 {
-                    // After the last copy: a delete during the read would shift the numbered pages instead.
+                    // After the last copy, so the row is gone only by the time the Move removes its copies.
                     if (batch is { IsSummary: false, BatchNumber: 3 })
                         InHot(async () => { await Data<Job, string>.Delete("b"); });
                 })
@@ -74,6 +74,38 @@ public sealed class SqliteMoveConcurrencySpec
                 (await Job.All()).Should().BeEmpty();
             using (EntityContext.Partition("cold"))
                 (await Job.All()).Should().HaveCount(3);
+        });
+    }
+
+    /// <summary>
+    /// NK-306. A row the Move already copied is deleted while the source is still being read. A numbered page then
+    /// started one row late, so the next row was never copied and stayed in the source. The read continues after the
+    /// last identity it returned, so the delete behind it moves nothing.
+    /// </summary>
+    [Fact]
+    public async Task A_row_deleted_behind_the_read_does_not_make_the_move_skip_a_row()
+    {
+        await WithHost(async () =>
+        {
+            await Seed();
+
+            var result = await Job.Move()
+                .From(partition: "hot")
+                .To(partition: "cold")
+                .Batch(1)
+                .Audit(batch =>
+                {
+                    if (batch is { IsSummary: false, BatchNumber: 1 })
+                        InHot(async () => { await Data<Job, string>.Delete("a"); });
+                })
+                .Run();
+
+            result.CopiedCount.Should().Be(3, "b and c were in the source for the whole read");
+            result.DeletedCount.Should().Be(2);
+            using (EntityContext.Partition("hot"))
+                (await Job.All()).Should().BeEmpty();
+            using (EntityContext.Partition("cold"))
+                (await Job.All()).Select(job => job.Id).Should().BeEquivalentTo(["a", "b", "c"]);
         });
     }
 

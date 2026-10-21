@@ -25,8 +25,9 @@ Three properties decide most of it.
 - **Order is completed for you.** Koan validates the portable order you asked for and appends the
   Entity identifier as a provider-stable tie-breaker, so pages do not shuffle between reads. Ordering
   by that identifier yourself is not portable.
-- **Offset pages drift under concurrent writes.** A row inserted between page 1 and page 2 shifts
-  everything after it, so a set that changes under you is a set to stream.
+- **A stream in identity order holds still under concurrent writes.** Each page continues after the
+  last identity read, so a row present for the whole read is returned exactly once. A stream ordered
+  by your own key, and an explicit numbered page, still drift when rows are inserted or deleted.
 
 Pass a `CancellationToken` to every one of them.
 
@@ -86,7 +87,7 @@ bounded candidate page; the provider must still own the page bound and complete 
 
 | Stream behavior | Adapters |
 |---|---|
-| Provider-bounded numbered pages | SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, Couchbase |
+| Provider-bounded pages (identity seek, or numbered under a caller's order) | SQLite, PostgreSQL, SQL Server, CockroachDB, MongoDB, Couchbase |
 | Reject before query/yield | InMemory, JSON, Redis |
 
 Unsupported execution throws `QueryStreamRejectedException` with the Entity, provider, stable reason,
@@ -103,10 +104,11 @@ provider's null placement. Koan records that as a runtime fact naming the keys i
 refusing the query -- an application that needs cross-backend agreement can see which keys to avoid,
 and one that does not gets the order it actually asked for.
 
-Koan separately adds the exact Entity identifier after validating caller ordering. The usual string
-key is an opaque provider-stable tie-break, not a CLR or cross-provider collation promise, so an
-explicit Entity-identifier sort rejects; a differently
-cased business member does not replace it. Avoid CLR persistence models whose members differ only by
+Koan separately adds the exact Entity identifier after validating caller ordering. A `string`, `Guid`,
+`int` or `long` key is an opaque provider-stable tie-break in the store's own order of that key (text by
+collation, a native column or BSON value by its type), not a CLR or cross-provider collation promise.
+An Entity keyed by any other type rejects before I/O; a differently cased business member does not
+replace the identifier. Avoid CLR persistence models whose members differ only by
 case, such as `Id` and `id`; their storage names are not portable across the qualified adapters.
 
 ## Explicit numbered paging
@@ -127,12 +129,19 @@ public cursor, Pager, continuation token, or resume API.
 
 ## Consistency boundary
 
-Streams use numbered offset pages. Concurrent inserts, deletes, or order-key changes can cause
-skips or duplicates. They are not mutation-safe and do not create a snapshot. Use an application-owned
-watermark/snapshot design when the business operation requires those guarantees.
+A stream whose order leads with the Entity identifier (`AllStream()`, `QueryStream(predicate)`, or an
+explicit `Id`/`-Id` order) continues each page after the last identity it read, compared by the store
+(DATA-0151). A row present for the whole read is returned exactly once, whatever another writer inserts or
+deletes; a row inserted behind the read is not returned, and one deleted ahead of it is not. Removing each
+row as it is streamed visits every row. Each page costs the same however deep the read is, and no page
+number bounds it. It is still not a snapshot: a row updated during the read is returned as it was when its
+page was read.
 
-The provider contract represents `Skip`/`OFFSET` as `Int32`. Koan rejects a requested page
-before provider I/O when `(pageNumber - 1) * pageSize` exceeds `Int32.MaxValue`.
+A stream ordered by a caller's own key still uses numbered offset pages, and concurrent inserts, deletes,
+or order-key changes can cause skips or duplicates there. The provider contract represents
+`Skip`/`OFFSET` as `Int32`, so Koan rejects such a page before provider I/O when
+`(pageNumber - 1) * pageSize` exceeds `Int32.MaxValue`. Use an application-owned watermark/snapshot
+design when the business operation requires more.
 
 The selected or rejected execution appears as `koan.data.stream.execution` in the shared facts
 envelope (`/.well-known/Koan/facts` and `koan://facts`) after the first enumeration attempt.

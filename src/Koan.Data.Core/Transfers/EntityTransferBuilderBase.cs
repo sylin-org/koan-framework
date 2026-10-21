@@ -168,12 +168,12 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return written;
     }
 
-    private protected async Task<int> DeleteJournal(
+    private protected async Task<long> DeleteJournal(
         TransferJournal<TKey> journal,
         TransferContextOptions? context,
         CancellationToken ct)
     {
-        var deleted = 0;
+        var deleted = 0L;
         await foreach (var ids in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
         {
             using var scope = context?.Apply();
@@ -191,9 +191,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     protected TransferResult<TKey> Complete(
         TransferKind kind,
-        int read,
-        int copied,
-        int deleted,
+        long read,
+        long copied,
+        long deleted,
         TransferProgress progress,
         IReadOnlyList<TransferConflict<TKey>>? conflicts = null)
     {
@@ -311,7 +311,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     protected sealed class TransferProgress
     {
         public Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
-        public int BatchNumber { get; set; }
-        public int TotalProcessed { get; set; }
+        public long BatchNumber { get; set; }
+        public long TotalProcessed { get; set; }
     }
 }

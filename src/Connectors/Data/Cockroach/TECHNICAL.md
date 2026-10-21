@@ -45,7 +45,8 @@ Active-source health opens each same resolved endpoint used by repositories and 
 active source reports unhealthy with its source name and a redacted correction; optional unused routes do not gate
 application readiness.
 
-Provider-bounded streams use numbered offset pages with the Entity identifier as the stable tie-breaker. They bound
+Provider-bounded streams in identity order continue each page after the last identity read (DATA-0151); under a
+caller's order they use numbered offset pages with the Entity identifier as the stable tie-breaker. They bound
 each provider request and yield, but do not promise a snapshot, resumability, mutation-safe traversal, or cross-process
 continuation.
 

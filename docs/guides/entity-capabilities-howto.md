@@ -1117,8 +1117,11 @@ if (result.HasConflicts)
 `Batch(...)` is one portable bound: it limits each provider candidate page, each destination mutation,
 and each deferred identity-delete batch. An adapter must prove provider-side paging and ordering before
 the first source query. A returned destination or delete count must exactly match its admitted batch;
-an ambiguous exception is surfaced and never replayed. Only string identifiers stream today, so a Guid- or
-int-keyed Entity is read with one materialized query even on a bounded provider, and the result's `Warnings` say so.
+an ambiguous exception is surfaced and never replayed. A string-, Guid-, int- or long-keyed Entity on a bounded
+provider streams in identity order, each page continuing after the last identity read, so a row present for the
+whole read is copied exactly once while other writers change the source; an Entity with any other key is read with
+one materialized query, and the result's `Warnings` say so. `ReadCount`, `CopiedCount` and `DeletedCount` are
+64-bit (DATA-0151).
 
 Endpoints are compared as the physical places they reach, not as written. `From(source: "Default").To()`, a
 source name in another letter case, a source that shares the default connection (`ConnectionString: auto` or the

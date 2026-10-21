@@ -277,9 +277,11 @@ validation:
   `Task<bool>`, `false` when a move found no source row to remove (the row is still written to the target). A
   string-keyed overload of each infers the key type.
 - Bulk reads (`Data<T,K>.BulkRead`: transfers and backup) stream only when the provider advertises bounded paging
-  and the key is a proven stream tie-breaker (string). A Guid-, int- or other-keyed Entity on a bounded provider takes
-  the materialized read with the reason in the `koan.data.stream.execution` fact and the transfer's warning, instead
-  of the stream's unsupported-sort rejection (DATA-0113, NK-016).
+  and the key is a proven stream tie-breaker (string, Guid, int, long). An Entity with any other key on a bounded
+  provider takes the materialized read with the reason in the `koan.data.stream.execution` fact and the transfer's
+  warning, instead of the stream's unsupported-sort rejection (DATA-0113, NK-016). The stream reads in identity order
+  and continues after the last identity it returned (DATA-0151), so another writer cannot make a transfer skip or
+  re-read a row that was in the source for the whole read. Transfer counters are `long`.
 - A Move journals each copied row's id with a SHA-256 fingerprint of its canonical document, taken as read and before
   write preparation stamps it. After the whole source is copied it re-reads each journaled group from the origin and
   deletes only rows whose fingerprint is unchanged. A row changed by another writer stays in the origin and is a
@@ -355,16 +357,22 @@ validation:
   `TimeOnly`, `TimeSpan` -- compares identically on every qualified adapter. Any other key still
   streams; `RecordProviderDefinedOrder` emits a fact naming the keys whose comparison the store defines
   rather than Koan, so the difference is discoverable instead of fatal.
-- The one stream-sort rejection is an Entity-identifier sort whose key type is not the provider-stable
-  `string`: that throws `QueryStreamRejectedException` before I/O, because the tie-break it would
-  replace has no proven shape.
-- After validating caller ordering, Koan appends the actual Entity identifier. The usual string key is
-  an opaque provider-stable tie-break, not a CLR/cross-provider collation promise. A
+- The one stream-sort rejection is an Entity identifier whose key type is not a provider-stable
+  `string`, `Guid`, `int` or `long`: that throws `QueryStreamRejectedException` before I/O, because the
+  tie-break it would supply has no proven shape.
+- After validating caller ordering, Koan appends the actual Entity identifier. The key is an opaque
+  provider-stable tie-break in the store's own order, not a CLR/cross-provider collation promise. A
   different business member named `id` does not suppress it, but models declaring both `Id` and `id`
   are not portable persistence models and are outside the qualified-adapter contract.
-- The current `Int32` provider-offset contract rejects a page before I/O when
-  `(pageNumber - 1) * pageSize` exceeds `Int32.MaxValue`. Numbered paging is not snapshot-consistent,
-  mutation-safe, resumable, or cursor-based.
+- When the order leads with the identity, `IdentitySeek` continues each page after the last identity the
+  previous page returned (`Id > last`, or `<` descending), always as page 1, so no offset moves under
+  concurrent writes and no page number bounds the read (DATA-0151). The seek is pushed like any filter and
+  compared by the store, which also orders the page; a provider that cannot push it falls back to numbered
+  pages, and one that returns the row the seek continued from is refused (`InvalidStreamReceipt`). The
+  selected fact says which pager ran. The verified cutover pager reads root pages the same way.
+- A stream ordered by a caller's own key still uses numbered pages. The `Int32` provider-offset contract
+  rejects such a page before I/O when `(pageNumber - 1) * pageSize` exceeds `Int32.MaxValue`. Numbered
+  paging is not snapshot-consistent, mutation-safe, resumable, or cursor-based.
 
 ## Edge cases and limits
 

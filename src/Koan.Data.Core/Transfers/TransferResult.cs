@@ -7,9 +7,9 @@ public sealed class TransferResult<TKey>
     where TKey : notnull
 {
     public TransferKind Kind { get; init; }
-    public int ReadCount { get; init; }
-    public int CopiedCount { get; init; }
-    public int DeletedCount { get; init; }
+    public long ReadCount { get; init; }
+    public long CopiedCount { get; init; }
+    public long DeletedCount { get; init; }
     public TimeSpan Duration { get; init; }
     public IReadOnlyList<TransferConflict<TKey>> Conflicts { get; init; } = Array.Empty<TransferConflict<TKey>>();
     public IReadOnlyList<string> Warnings { get; init; } = [];

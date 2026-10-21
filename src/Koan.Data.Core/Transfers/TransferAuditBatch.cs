@@ -4,9 +4,9 @@ namespace Koan.Data.Core.Transfers;
 
 public sealed record TransferAuditBatch(
     TransferKind Kind,
-    int BatchNumber,
+    long BatchNumber,
     int BatchCount,
-    int TotalProcessed,
+    long TotalProcessed,
     TransferContextSnapshot From,
     TransferContextSnapshot To,
     TimeSpan Elapsed,
