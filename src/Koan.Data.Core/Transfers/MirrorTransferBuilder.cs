@@ -26,13 +26,14 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
 
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
-        await using var operationHorizon = await Admit(TransferKind.Mirror, ct).ConfigureAwait(false);
+        var progress = new TransferProgress();
+        await using var operationHorizon = await Admit(TransferKind.Mirror, progress, ct).ConfigureAwait(false);
         using var fidelity = EnterFidelity();
         return _mode switch
         {
-            MirrorMode.Push => await RunOneWay(FromContext, ToContext, ct).ConfigureAwait(false),
-            MirrorMode.Pull => await RunOneWay(ToContext, FromContext, ct).ConfigureAwait(false),
-            MirrorMode.Bidirectional => await RunBidirectional(ct).ConfigureAwait(false),
+            MirrorMode.Push => await RunOneWay(FromContext, ToContext, progress, ct).ConfigureAwait(false),
+            MirrorMode.Pull => await RunOneWay(ToContext, FromContext, progress, ct).ConfigureAwait(false),
+            MirrorMode.Bidirectional => await RunBidirectional(progress, ct).ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(_mode))
         };
     }
@@ -40,14 +41,14 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
     private async Task<TransferResult<TKey>> RunOneWay(
         TransferContextOptions? authoritative,
         TransferContextOptions? replica,
+        TransferProgress progress,
         CancellationToken ct)
     {
-        var progress = new TransferProgress();
         var read = 0L;
         var copied = 0L;
         await using var absent = new TransferJournal<TKey>();
 
-        await foreach (var batch in ReadBatches(authoritative, ct).ConfigureAwait(false))
+        await foreach (var batch in ReadBatches(authoritative, progress, ct).ConfigureAwait(false))
         {
             read = checked(read + batch.Count);
             copied = checked(copied + await WriteBatch(
@@ -58,7 +59,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         // authoritative side no longer selects through provider-bounded pages, then delete the confirmed set from
         // the journal. With a predicate, "selects" means present and still matching it there (NK-019): a row that
         // left the predicate on the authoritative side must leave the replica too.
-        await foreach (var batch in ReadBatches(replica, ct).ConfigureAwait(false))
+        await foreach (var batch in ReadBatches(replica, progress, ct).ConfigureAwait(false))
         {
             read = checked(read + batch.Count);
             var ids = batch.Select(entity => entity.Id).ToArray();
@@ -101,9 +102,8 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
             .Select(entity => entity.Id).ToHashSet();
     }
 
-    private async Task<TransferResult<TKey>> RunBidirectional(CancellationToken ct)
+    private async Task<TransferResult<TKey>> RunBidirectional(TransferProgress progress, CancellationToken ct)
     {
-        var progress = new TransferProgress();
         var conflicts = new List<TransferConflict<TKey>>();
         var read = 0L;
         var copied = 0L;
@@ -111,7 +111,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         if (_conflict == MirrorConflict.Latest)
         {
             timestamp = ResolveTimestampProperty(out var unresolved);
-            if (unresolved is not null) AddWarning(unresolved);
+            if (unresolved is not null) progress.Warn(unresolved);
         }
 
         // Writes aimed at the source are deferred until its provider-bounded stream has completed.
@@ -121,7 +121,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         // the entity (NK-001: a JSON round trip drops defaults, recases dictionary keys, loses non-public setters,
         // appends to seeded collections and forgets the family variant).
         await using var targetWins = new TransferJournal<TKey>();
-        await foreach (var sourceBatch in ReadBatches(FromContext, ct).ConfigureAwait(false))
+        await foreach (var sourceBatch in ReadBatches(FromContext, progress, ct).ConfigureAwait(false))
         {
             read = checked(read + sourceBatch.Count);
             var targetWrites = new List<TEntity>(sourceBatch.Count);
@@ -181,7 +181,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
 
         // A second bounded pass admits only target-only identities. Overlaps were resolved exactly once
         // during the source pass; source-only rows copied above now have a source counterpart and are skipped.
-        await foreach (var targetBatch in ReadBatches(ToContext, ct).ConfigureAwait(false))
+        await foreach (var targetBatch in ReadBatches(ToContext, progress, ct).ConfigureAwait(false))
         {
             read = checked(read + targetBatch.Count);
             var sourceAdds = new List<TEntity>(targetBatch.Count);

@@ -20,14 +20,14 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
 
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
-        await using var operationHorizon = await Admit(TransferKind.Move, ct).ConfigureAwait(false);
-        using var fidelity = EnterFidelity();
         var progress = new TransferProgress();
+        await using var operationHorizon = await Admit(TransferKind.Move, progress, ct).ConfigureAwait(false);
+        using var fidelity = EnterFidelity();
         var read = 0L;
         var copied = 0L;
         await using var confirmed = new TransferJournal<MovedRow>();
 
-        await foreach (var batch in ReadBatches(FromContext, ct).ConfigureAwait(false))
+        await foreach (var batch in ReadBatches(FromContext, progress, ct).ConfigureAwait(false))
         {
             read = checked(read + batch.Count);
             // Fingerprint the rows as read, before write preparation stamps the instances for the destination.
@@ -39,7 +39,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
         }
 
         var conflicts = new List<TransferConflict<TKey>>();
-        var deleted = await DeleteUnchanged(confirmed, conflicts, ct).ConfigureAwait(false);
+        var deleted = await DeleteUnchanged(confirmed, conflicts, progress, ct).ConfigureAwait(false);
         return Complete(TransferKind.Move, read, copied, deleted, progress, conflicts);
     }
 
@@ -53,6 +53,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
     private async Task<long> DeleteUnchanged(
         TransferJournal<MovedRow> journal,
         List<TransferConflict<TKey>> conflicts,
+        TransferProgress progress,
         CancellationToken ct)
     {
         var deleted = 0L;
@@ -89,12 +90,12 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
         }
 
         if (changed != 0)
-            AddWarning($"{changed} moved row(s) changed in the source after they were copied and were kept there, " +
+            progress.Warn($"{changed} moved row(s) changed in the source after they were copied and were kept there, " +
                        "because the destination holds their older version. Conflicts lists " +
                        (changed > conflicts.Count ? $"the first {conflicts.Count}" : "them") +
                        "; run the Move again to carry the newer versions.");
         if (absent != 0)
-            AddWarning($"{absent} moved row(s) were no longer in the source when the Move removed its copies; " +
+            progress.Warn($"{absent} moved row(s) were no longer in the source when the Move removed its copies; " +
                        "another writer removed them, and they are not counted as deleted.");
         return deleted;
     }

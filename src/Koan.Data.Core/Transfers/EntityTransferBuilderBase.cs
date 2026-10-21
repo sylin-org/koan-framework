@@ -18,7 +18,6 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     private Action<TransferAuditBatch>? _audit;
     private TransferFidelity _fidelity = TransferFidelity.Exact;
-    private readonly List<string> _warnings = [];
 
     protected EntityTransferBuilderBase(Expression<Func<TEntity, bool>>? predicate)
         => Predicate = predicate;
@@ -27,7 +26,6 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     protected TransferContextOptions? FromContext { get; private set; }
     protected TransferContextOptions? ToContext { get; private set; }
     protected int BatchSize { get; private set; } = DefaultBatchSize;
-    protected IReadOnlyList<string> Warnings => _warnings;
     protected TBuilder Self => (TBuilder)this;
 
     public TBuilder From(string? source = null, string? adapter = null, string? partition = null)
@@ -69,12 +67,6 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return Self;
     }
 
-    protected void AddWarning(string message)
-    {
-        if (!string.IsNullOrWhiteSpace(message) && !_warnings.Contains(message, StringComparer.Ordinal))
-            _warnings.Add(message);
-    }
-
     /// <summary>
     /// Raises the exact-transfer flag for the rest of the run when the transfer's fidelity is Exact (DATA-0149). Entered
     /// by <c>Run</c> after admission, so it covers every read, write and delete the transfer issues and nothing else.
@@ -102,6 +94,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     /// </summary>
     protected async IAsyncEnumerable<IReadOnlyList<TEntity>> ReadBatches(
         TransferContextOptions? context,
+        TransferProgress progress,
         [EnumeratorCancellation] CancellationToken ct)
     {
         using var scope = context?.Apply();
@@ -110,7 +103,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         var source = Data<TEntity, TKey>.BulkRead(
             Predicate,
             BatchSize,
-            onMaterialized: because => AddWarning(
+            onMaterialized: because => progress.Warn(
                 $"Read the source with an explicitly materialized query because {because}. " +
                 $"Writes remained batched at {BatchSize}."),
             ct);
@@ -217,7 +210,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             DeletedCount = deleted,
             Duration = progress.Stopwatch.Elapsed,
             Conflicts = conflicts?.ToArray() ?? [],
-            Warnings = Warnings.ToArray()
+            Warnings = progress.Warnings.ToArray()
         };
     }
 
@@ -230,7 +223,10 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     /// are one container is refused; a Copy onto its own container is a reported no-op and returns
     /// <see langword="null"/>. Otherwise one mutation lease is entered over both routes for the whole run.
     /// </summary>
-    private protected async ValueTask<DataMultiOperationLease?> Admit(TransferKind kind, CancellationToken ct)
+    private protected async ValueTask<DataMultiOperationLease?> Admit(
+        TransferKind kind,
+        TransferProgress progress,
+        CancellationToken ct)
     {
         DemandDestination();
         // NK-043: a transfer reads, writes and deletes in bounded batches; none of it can wait for Commit, and a
@@ -249,7 +245,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         {
             var refusal = SamePlace(kind, origin);
             if (kind != TransferKind.Copy) throw new InvalidOperationException(refusal);
-            AddWarning(refusal);
+            progress.Warn(refusal);
             return null;
         }
 
@@ -308,10 +304,23 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return axes.Count == 0 ? "the ambient context" : string.Join(", ", axes);
     }
 
+    /// <summary>
+    /// The state of one <c>Run</c>. A builder can run more than once, so nothing a run observes (its warnings, its
+    /// counters) lives on the builder (NK-251).
+    /// </summary>
     protected sealed class TransferProgress
     {
+        private readonly List<string> _warnings = [];
+
         public Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
         public long BatchNumber { get; set; }
         public long TotalProcessed { get; set; }
+        public IReadOnlyList<string> Warnings => _warnings;
+
+        public void Warn(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message) && !_warnings.Contains(message, StringComparer.Ordinal))
+                _warnings.Add(message);
+        }
     }
 }

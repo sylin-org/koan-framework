@@ -732,6 +732,32 @@ public sealed class EntityTransferDslSpec
         repository.UpsertManyCalls.Should().Be(2);
     }
 
+    /// <summary>
+    /// NK-251. A builder kept its warnings on itself, so a second Run reported what the first one saw: the materialized
+    /// read notice came back on a run that streamed. Each Run reports its own warnings.
+    /// </summary>
+    [Fact]
+    public async Task Run_TwiceOnOneBuilder_ReportsEachRunsOwnWarnings()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("active"))
+            await new TransferTodo { Title = "reused", Active = true }.Save();
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+        repository.AdvertiseBoundedPaging = false;
+        var builder = TransferTodo.Copy().From(partition: "active").To(partition: "archive");
+
+        (await builder.Run()).Warnings.Should().ContainSingle(warning => warning.Contains("provider-bounded paging"));
+
+        repository.AdvertiseBoundedPaging = true;
+        (await builder.Run()).Warnings.Should().BeEmpty("the second run streamed and saw nothing to warn about");
+    }
+
     [Fact]
     public async Task Copy_CancellationBeforeCandidatePage_PreventsDestinationDispatch()
     {
