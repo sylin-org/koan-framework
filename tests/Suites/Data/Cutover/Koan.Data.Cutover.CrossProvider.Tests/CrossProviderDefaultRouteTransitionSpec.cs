@@ -16,11 +16,13 @@ public sealed class CrossProviderDefaultRouteTransitionSpec(CrossDatabaseFixture
     private const string Mongo = "MongoTarget";
     private const string Postgres = "PostgresTarget";
     private const string SqliteReturn = "SqliteReturn";
+    private const string PostgresSchema = "koan_cutover_spec";
 
     [Fact]
     public async Task Sqlite_to_Mongo_to_Postgres_and_back_preserves_logical_records_and_durable_route_continuity()
     {
         var paths = TestPaths.Create();
+        await SpecStores.Drop(databases, PostgresSchema, databases.MongoDatabase);
         try
         {
             await using (var host = await Boot(paths))
@@ -116,6 +118,7 @@ public sealed class CrossProviderDefaultRouteTransitionSpec(CrossDatabaseFixture
             AppHost.Current = null;
             TestHooks.ResetDataConfigs();
             paths.Delete();
+            await SpecStores.Drop(databases, PostgresSchema, databases.MongoDatabase);
         }
     }
 
@@ -133,7 +136,7 @@ public sealed class CrossProviderDefaultRouteTransitionSpec(CrossDatabaseFixture
             [$"Koan:Data:Sources:{Mongo}:Access"] = "ReadWrite",
             [$"Koan:Data:Sources:{Postgres}:Adapter"] = "postgres",
             [$"Koan:Data:Sources:{Postgres}:ConnectionString"] = databases.PostgresConnectionString,
-            [$"Koan:Data:Sources:{Postgres}:SearchPath"] = "public",
+            [$"Koan:Data:Sources:{Postgres}:SearchPath"] = PostgresSchema,
             [$"Koan:Data:Sources:{Postgres}:StorageLifecycle"] = "Managed",
             [$"Koan:Data:Sources:{Postgres}:Access"] = "ReadWrite",
             [$"Koan:Data:Sources:{SqliteReturn}:Adapter"] = "sqlite",

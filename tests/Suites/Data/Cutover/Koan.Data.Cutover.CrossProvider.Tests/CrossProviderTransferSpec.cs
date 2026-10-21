@@ -25,6 +25,8 @@ public sealed class CrossProviderTransferSpec(CrossDatabaseFixture databases)
     private const string Mongo = "TransferMongo";
     private const string SqliteReturn = "TransferSqliteReturn";
     private const string Back = "back";
+    private const string PostgresSchema = "koan_transfer_spec";
+    private const string MongoDatabase = "koan_transfer";
 
     public sealed class FidelityRecord : Entity<FidelityRecord>
     {
@@ -45,11 +47,11 @@ public sealed class CrossProviderTransferSpec(CrossDatabaseFixture databases)
         var ct = TestContext.Current.CancellationToken;
         var root = Path.Combine(Path.GetTempPath(), "koan-cross-provider-transfer", Guid.CreateVersion7().ToString("n"));
         Directory.CreateDirectory(root);
+        await SpecStores.Drop(databases, PostgresSchema, MongoDatabase);
         var host = await Boot(root);
         try
         {
             AppHost.Current = host.Services;
-            await Clear(ct);
 
             foreach (var record in Seed()) await record.Save(ct);
             var stored = (await FidelityRecord.All(ct)).OrderBy(record => record.Id, StringComparer.Ordinal).ToArray();
@@ -89,14 +91,11 @@ public sealed class CrossProviderTransferSpec(CrossDatabaseFixture databases)
         }
         finally
         {
-            try { await Clear(ct); }
-            finally
-            {
-                AppHost.Current = null;
-                TestHooks.ResetDataConfigs();
-                await host.DisposeAsync();
-                try { Directory.Delete(root, recursive: true); } catch { }
-            }
+            AppHost.Current = null;
+            TestHooks.ResetDataConfigs();
+            await host.DisposeAsync();
+            await SpecStores.Drop(databases, PostgresSchema, MongoDatabase);
+            try { Directory.Delete(root, recursive: true); } catch { }
         }
     }
 
@@ -132,15 +131,6 @@ public sealed class CrossProviderTransferSpec(CrossDatabaseFixture databases)
     private static DateTimeOffset Milliseconds(DateTimeOffset value)
         => new(value.Ticks - value.Ticks % TimeSpan.TicksPerMillisecond, value.Offset);
 
-    private static async Task Clear(CancellationToken ct)
-    {
-        foreach (var source in new[] { "", Postgres, Mongo, SqliteReturn })
-        {
-            using (EntityContext.Source(source)) await FidelityRecord.RemoveAll(ct);
-            using (EntityContext.With(source: source, partition: Back)) await FidelityRecord.RemoveAll(ct);
-        }
-    }
-
     private static IReadOnlyList<FidelityRecord> Seed() =>
     [
         Record("A", "upper", 1.25m, [0, 1, 255]),
@@ -169,12 +159,12 @@ public sealed class CrossProviderTransferSpec(CrossDatabaseFixture databases)
             ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(root, "source.db")};Pooling=False",
             [$"Koan:Data:Sources:{Postgres}:Adapter"] = "postgres",
             [$"Koan:Data:Sources:{Postgres}:ConnectionString"] = databases.PostgresConnectionString,
-            [$"Koan:Data:Sources:{Postgres}:SearchPath"] = "public",
+            [$"Koan:Data:Sources:{Postgres}:SearchPath"] = PostgresSchema,
             [$"Koan:Data:Sources:{Postgres}:StorageLifecycle"] = "Managed",
             [$"Koan:Data:Sources:{Postgres}:Access"] = "ReadWrite",
             [$"Koan:Data:Sources:{Mongo}:Adapter"] = "mongo",
             [$"Koan:Data:Sources:{Mongo}:ConnectionString"] = databases.MongoConnectionString,
-            [$"Koan:Data:Sources:{Mongo}:Database"] = "koan_transfer",
+            [$"Koan:Data:Sources:{Mongo}:Database"] = MongoDatabase,
             [$"Koan:Data:Sources:{Mongo}:StorageLifecycle"] = "Managed",
             [$"Koan:Data:Sources:{Mongo}:Access"] = "ReadWrite",
             [$"Koan:Data:Sources:{SqliteReturn}:Adapter"] = "sqlite",
