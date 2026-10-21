@@ -25,5 +25,8 @@ internal sealed class SqliteStoreFeatures : IRelationalStoreFeatures
     /// <summary>An index over <c>json_extract</c> is chosen by SQLite for the reads that spell it the same way.</summary>
     public bool SupportsRewriteFreeExpressionIndexes => true;
 
+    /// <summary>An index expression may read any document field, a managed one included.</summary>
+    public bool SupportsManagedFieldIndexParts => true;
+
     public bool SupportsNativeTtl => false;
 }

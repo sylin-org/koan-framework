@@ -76,8 +76,10 @@ internal sealed class MongoSchema<TEntity, TKey>(
 
     private async Task<string[]> EnsureIndexes(IMongoCollection<BsonDocument> collection, BsonValue collation, CancellationToken ct)
     {
-        // Each declared index, with the keys an older Koan created it under when those differ (DATA-0145).
-        var indexes = new List<(CreateIndexModel<BsonDocument> Model, IndexKeysDefinition<BsonDocument>? Legacy)>();
+        // Each declared index, with the keys an older Koan created it under when those differ (DATA-0145), and for a
+        // tenant-scoped unique index the global keys an older Koan created it under (DATA-0150).
+        var indexes = new List<(CreateIndexModel<BsonDocument> Model, IndexKeysDefinition<BsonDocument>? Legacy,
+            IndexKeysDefinition<BsonDocument>[] Global)>();
         if (entity.Mapping is { } mapping)
         {
             foreach (var index in mapping.Indexes.Where(static index => !index.Primary))
@@ -91,7 +93,7 @@ internal sealed class MongoSchema<TEntity, TKey>(
                         Name = index.Name,
                         Unique = index.Unique,
                         ExpireAfter = index.Ttl ? TimeSpan.Zero : null
-                    }), null));
+                    }), null, []));
             }
         }
         else
@@ -108,6 +110,23 @@ internal sealed class MongoSchema<TEntity, TKey>(
                     stored.Add(field);
                     legacy.Add(resolved.IsManaged ? field : entity.LegacyIndexField(path) ?? field);
                 }
+                // DATA-0150: a unique index on a row-scoped entity is unique per tenant, so it leads with the managed
+                // fields. Its name differs from the global index an older Koan built, which therefore stays in place.
+                if (index.Unique && entity.ScopeFields.Count != 0)
+                {
+                    IndexKeysDefinition<BsonDocument>[] global = legacy.SequenceEqual(stored)
+                        ? [Keys(stored)]
+                        : [Keys(stored), Keys(legacy)];
+                    indexes.Add((new CreateIndexModel<BsonDocument>(
+                        Keys(entity.ScopeFields.Concat(stored)),
+                        new CreateIndexOptions
+                        {
+                            Name = index.Name is null ? null : $"{index.Name}_{string.Join('_', entity.ScopeFields)}",
+                            Unique = true,
+                            ExpireAfter = index.Ttl ? TimeSpan.Zero : null
+                        }), null, global));
+                    continue;
+                }
                 indexes.Add((new CreateIndexModel<BsonDocument>(
                     Keys(stored),
                     new CreateIndexOptions
@@ -116,7 +135,7 @@ internal sealed class MongoSchema<TEntity, TKey>(
                         Unique = index.Unique,
                         ExpireAfter = index.Ttl ? TimeSpan.Zero : null
                     }),
-                    legacy.SequenceEqual(stored) ? null : Keys(legacy)));
+                    legacy.SequenceEqual(stored) ? null : Keys(legacy), []));
             }
         }
         if (indexes.Count == 0) return [];
@@ -127,10 +146,24 @@ internal sealed class MongoSchema<TEntity, TKey>(
         var names = new List<string>(indexes.Count);
         var render = new RenderArgs<BsonDocument>(collection.DocumentSerializer,
             MongoDB.Bson.Serialization.BsonSerializer.SerializerRegistry);
-        foreach (var (index, legacy) in indexes)
+        foreach (var (index, legacy, superseded) in indexes)
         {
             var keys = index.Keys.Render(render);
             var legacyKeys = legacy?.Render(render);
+            // The global unique index an older Koan built for this declaration stays; Koan never drops an index. Until
+            // it is dropped it still refuses, for every tenant, a value one tenant holds.
+            var globalKeys = superseded.Select(candidate => candidate.Render(render)).ToArray();
+            foreach (var old in existing.Where(candidate => candidate.GetValue(Constants.Index.Unique, false).ToBoolean()
+                         && globalKeys.Any(global => candidate[Constants.Index.Key].Equals(global))))
+                logger.LogWarning(
+                    "MongoDB collection {Collection} keeps the global unique index {Index} on {GlobalKeys}, built by an " +
+                    "earlier Koan before unique indexes became unique per tenant. Koan builds the per-tenant index on {Keys} beside it " +
+                    "and never drops an index. Until {Index} is dropped, a value one tenant holds is still refused for every " +
+                    "other tenant. Confirm the new index exists, then drop the old one: " +
+                    "db.getCollection(\"{Collection}\").dropIndex(\"{Index}\").",
+                    collection.CollectionNamespace.CollectionName, old[Constants.Index.Name].AsString,
+                    old[Constants.Index.Key].ToJson(), keys.ToJson(), old[Constants.Index.Name].AsString,
+                    collection.CollectionNamespace.CollectionName, old[Constants.Index.Name].AsString);
             var sameKeys = existing.Where(candidate => candidate[Constants.Index.Key].Equals(keys)).ToArray();
             var equivalent = sameKeys.FirstOrDefault(candidate => Equivalent(candidate, index.Options, collation)
                 && (index.Options.Name is null || candidate[Constants.Index.Name].AsString == index.Options.Name));

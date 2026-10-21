@@ -79,7 +79,7 @@ public sealed class MongoInsertOnlySpec(MongoFixture fixture, ITestOutputHelper 
             Builders<BsonDocument>.IndexKeys.Ascending("value"), new CreateIndexOptions { Unique = true }));
         var attemptedId = Guid.NewGuid().ToString("N");
         await FluentActions.Invoking(() => insert.Insert(new UniqueProbe { Id = attemptedId, Value = original.Value }))
-            .Should().ThrowAsync<MongoWriteException>();
+            .Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>();
         (await collection.Find(new BsonDocument("_id", attemptedId)).AnyAsync()).Should().BeFalse();
         (await collection.Find(new BsonDocument("value", original.Value)).ToListAsync()).Should().ContainSingle();
     }

@@ -46,15 +46,24 @@ public static class RelationalPlanGuard
             throw Error(mapping, schema.Mapping.Id, "The relational schema belongs to a different mapping plan instance.");
         foreach (var index in schema.Indexes)
         {
-            var expected = mapping.Indexes.SingleOrDefault(candidate => string.Equals(candidate.Name, index.Name, StringComparison.Ordinal))
-                ?? throw Error(mapping, index.Name, "The schema references an unknown mapped index.");
+            // A tenant-scoped unique index (DATA-0150) is its mapped declaration led by managed parts: the declaration
+            // is checked as compiled, and the scope may only add leading parts that read inside the document.
+            var declared = index.Unscoped ?? index;
+            var expected = mapping.Indexes.SingleOrDefault(candidate => string.Equals(candidate.Name, declared.Name, StringComparison.Ordinal))
+                ?? throw Error(mapping, declared.Name, "The schema references an unknown mapped index.");
             var parts = expected.Bindings.Select(static binding => new RelationalIndexPart(
                 binding.PhysicalPath,
                 binding.PhysicalType,
                 binding.Descriptor.Codec?.Id ?? $"clr:{binding.PhysicalType.AssemblyQualifiedName}")).ToArray();
-            if (!parts.SequenceEqual(index.Parts) ||
-                expected.Unique != index.Unique || expected.Primary != index.Primary || expected.Ttl != index.Ttl)
+            if (!parts.SequenceEqual(declared.Parts) ||
+                expected.Unique != declared.Unique || expected.Primary != declared.Primary || expected.Ttl != declared.Ttl)
                 throw Error(mapping, index.Name, "The schema changed a compiled index path, type, encoding, uniqueness, primary, or TTL decision.");
+            if (index.Unscoped is null) continue;
+            var scope = index.Parts.Count - parts.Length;
+            if (scope <= 0 || !index.Unique || index.Primary || index.Ttl != declared.Ttl ||
+                !index.Parts.Skip(scope).SequenceEqual(parts) ||
+                index.Parts.Take(scope).Any(static part => !part.Path.IsNested))
+                throw Error(mapping, index.Name, "A scoped unique index must be its declaration led by managed parts inside the document.");
         }
     }
 

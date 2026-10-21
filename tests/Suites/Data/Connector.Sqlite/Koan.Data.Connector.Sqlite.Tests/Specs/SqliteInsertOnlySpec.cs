@@ -90,7 +90,7 @@ public sealed class SqliteInsertOnlySpec(SqliteFixture fixture, ITestOutputHelpe
         index.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_KOAN_INSERT_VALUE ON KOAN_INSERT_GENERATED (VALUE)";
         await index.ExecuteNonQueryAsync();
         await FluentActions.Invoking(() => insert.Insert(new GeneratedProbe { Value = model.Value }))
-            .Should().ThrowAsync<SqliteException>();
+            .Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>();
         await using var count = connection.CreateCommand();
         count.CommandText = "SELECT COUNT(*) FROM KOAN_INSERT_GENERATED WHERE VALUE = @value";
         count.Parameters.AddWithValue("@value", model.Value);

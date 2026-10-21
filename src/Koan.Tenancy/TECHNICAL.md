@@ -29,6 +29,10 @@ pillar publishes one value-free runtime realization fact; tenant values never ap
 An adapter must announce and implement the guarantee required by its pillar. The grammar does not imply false backend
 parity: an incapable provider rejects the operation.
 
+Data realizes the dimension in unique indexes too: a unique `[Index]` on a tenant-scoped entity leads with
+`__koan_tenant`, so a value is unique per tenant, and a duplicate is reported as a conflict that does not say whether
+another tenant holds the value. A database built before keeps its global index until an operator drops it (DATA-0150).
+
 ## Posture and startup
 
 `TenancyOptions` binds from `Koan:Tenancy`. `Posture = null` derives Open only from the current host's Development

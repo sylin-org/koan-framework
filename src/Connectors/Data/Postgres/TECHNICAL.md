@@ -81,6 +81,20 @@ new name is redundant and can be dropped: list a table's indexes with
 old name of a partition table's declared index is the unqualified declared name, which only the first partition table
 ever held. CockroachDB scopes index names to their table and does not cut them, so it keeps the names as declared.
 
+## Unique indexes under tenancy
+
+Under row-scoped tenancy a unique `[Index]` is unique per tenant
+([DATA-0150](../../../../docs/decisions/DATA-0150-unique-indexes-are-unique-per-tenant.md)): it leads with
+`("Json" #>> '{__koan_tenant}')`, the expression the tenant filter emits, and has its own name (a derived name gains
+`__koan_tenant` as its first member, a declared one gains it as a suffix), fitted and verified as above. A duplicate in
+one tenant is a `UniqueValueConflictException` that does not name the index; SQLSTATE 23505 is not passed through.
+
+A database built before DATA-0150 keeps its global unique index beside the new one, and Koan logs a warning naming it.
+Until it is dropped, a value one tenant holds is still refused for every other. Migrate in three steps: let Koan build
+the per-tenant index (start the application and use the entity), confirm it with
+`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '<table>'`, then run the `DROP INDEX "<schema>"."<old>";`
+the warning gives. Koan never drops it itself.
+
 ## Error modes
 
 - Provider errors (NpgsqlException) surfaced; transient failures retried per options.

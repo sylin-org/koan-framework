@@ -69,6 +69,15 @@ Managed sources with `AutoCreate` create the required table on first use. Extern
 and never create, alter, or drop a physical object. `Access: ReadOnly` is enforced by Data before repository
 construction or provider I/O. The two decisions are independent.
 
+Under row-scoped tenancy a unique `[Index]` is unique per tenant
+([DATA-0150](../../../../docs/decisions/DATA-0150-unique-indexes-are-unique-per-tenant.md)): it leads with the
+`json_extract` of `__koan_tenant` that the tenant filter emits, under its own name (`IX_<table>___koan_tenant_<members>`,
+or a declared name with `___koan_tenant` appended). A duplicate in one tenant is a `UniqueValueConflictException` that
+does not name the index. A database built before keeps its global unique index; Koan logs a warning naming it and the
+`DROP INDEX "<old>";` that removes it, and never drops it. Until it is dropped, a value one tenant holds is still refused
+for every other. Confirm the new index with `SELECT name, sql FROM sqlite_master WHERE tbl_name = '<table>'`, then drop
+the old one.
+
 ## Bulk and batch
 
 Constrained single-item endpoint creates use `IInsertOnlyRepository.Insert`. SQLite executes `INSERT OR ABORT`,

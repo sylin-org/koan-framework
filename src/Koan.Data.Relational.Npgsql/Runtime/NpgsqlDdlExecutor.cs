@@ -118,6 +118,21 @@ internal sealed class NpgsqlDdlExecutor(
             NpgsqlIndexNames.Verify(table, index, effective, await Catalog(table.Schema, effective, ct).ConfigureAwait(false));
     }
 
+    public async Task<RelationalIndexState?> FindIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default)
+    {
+        // The catalog lookup is the same one DATA-0142's verification uses, so it is only asked where that holds:
+        // PostgreSQL, whose index names are schema-wide.
+        if (!verifyIndexes) return null;
+        var name = NpgsqlIndexNames.Effective(NpgsqlIndexNames.Name(table, index, partitioned));
+        var found = await Catalog(table.Schema, name, ct).ConfigureAwait(false);
+        return found.Any(entry => string.Equals(entry.Table, table.Name, StringComparison.Ordinal))
+            ? new RelationalIndexState(name, $"DROP INDEX {NpgsqlDialect.Quote(table.Schema)}.{NpgsqlDialect.Quote(name)};")
+            : null;
+    }
+
     private async Task<IReadOnlyList<NpgsqlIndexNames.CatalogEntry>> Catalog(string schema, string name, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();

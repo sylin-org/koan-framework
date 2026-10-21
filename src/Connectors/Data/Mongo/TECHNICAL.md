@@ -84,8 +84,18 @@ Warning with its drop command, and, when unique, rejects a second document until
 index that still has the old keys stops the entity with a message naming it and the `dropIndex` call; drop it and
 restart. Koan never drops it. Members whose names start with one capital (`Name`) and explicit maps are unaffected.
 
-Duplicate business-key violations retain the Mongo driver error. A duplicate is described as a cross-scope
-write only when a scoped identity lookup proves the existing identity lies outside the current write guard.
+Under row-scoped tenancy a unique index is unique per tenant
+([DATA-0150](../../../../docs/decisions/DATA-0150-unique-indexes-are-unique-per-tenant.md)): it is keyed
+`{ __koan_tenant: 1, <field>: 1 }`, unnamed declarations take MongoDB's name for those keys (`__koan_tenant_1_email_1`)
+and named ones gain `___koan_tenant`. A collection provisioned before keeps its global unique index (`email_1`) beside
+the new one; Koan logs it at Warning with its drop command and never drops it. Until it is dropped, a value one tenant
+holds is still refused for every other. Migrate by letting Koan build the new index, confirming it with
+`db.getCollection("<collection>").getIndexes()`, then running the `dropIndex` from the warning.
+
+A duplicate business key is reported as `UniqueValueConflictException`, a conflict that does not name the index; the
+driver error is not passed through, because the index it names would say whether another tenant holds the value. A
+duplicate is described as a cross-scope write only when a scoped identity lookup proves the existing identity lies
+outside the current write guard.
 
 ## Inspection and registered operations
 

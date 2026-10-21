@@ -40,6 +40,7 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
             throw new MappingCompilationException(source, typeof(TEntity),
                 "Explicit MongoDB maps cannot preserve framework-managed row fields. Use a managed map or a separate source/container axis.");
 
+        ScopeFields = segmentation.Fields.Select(static field => field.StorageName).ToArray();
         _identityJsonName = Naming.GetPropertyName(IdentityName, hasSpecifiedName: false);
         _json = EntityJsonSerialization.Apply(new JsonSerializerSettings
         {
@@ -57,6 +58,12 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
     }
 
     public StorageOptimizationInfo Optimization { get; }
+
+    /// <summary>
+    /// The managed fields that scope this entity's rows (the tenant), in order, as stored in each document. A unique
+    /// index leads with them (DATA-0150). Empty when the host has no row-scoped segmentation for the entity.
+    /// </summary>
+    public IReadOnlyList<string> ScopeFields { get; }
     public string IdentityName { get; }
     public bool IsMapped => _mapping is not null;
     public MappingPlan? Mapping => _mapping;

@@ -28,6 +28,8 @@ public sealed class MongoModule : KoanModule
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<MongoAdapterFactory>());
         services.AddSingleton<IDataSourceIntegrationFactory>(static provider => provider.GetRequiredService<MongoAdapterFactory>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, MongoHealthContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<Koan.Data.Abstractions.Failures.IDataFailureClassifier, MongoFailureClassifier>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, MongoDiscoveryAdapter>());
     }
 

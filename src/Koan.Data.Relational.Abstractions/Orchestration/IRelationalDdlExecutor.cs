@@ -67,6 +67,21 @@ public interface IRelationalDdlExecutor
             $"{GetType().Name} declares mapped-index support but cannot spell index '{index.Name}' for {table}.");
 
     /// <summary>
+    /// The index the store holds for <paramref name="index"/> on <paramref name="table"/>, under the name
+    /// <see cref="CreateIndex"/> would give it, or <see langword="null"/> when it holds none.
+    ///
+    /// <para>The orchestrator asks only to report: after building a tenant-scoped unique index it looks for the
+    /// global one an earlier version built, so the operator can be told it is redundant and how to drop it
+    /// (DATA-0150). Koan never drops it. The default answers <see langword="null"/>, which only means nothing is
+    /// reported.</para>
+    /// </summary>
+    Task<RelationalIndexState?> FindIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default) =>
+        Task.FromResult<RelationalIndexState?>(null);
+
+    /// <summary>
     /// Rebuilds a projected column the store already holds, so that it computes what the mapping now says.
     ///
     /// <para>This is the one column an existing table can be corrected into rather than merely told about. A

@@ -406,6 +406,8 @@
       href: DATA-0148-every-store-holds-a-koan-store-marker.md
     - name: DATA-0149 Copy, Move and Mirror carry stored values exactly by default; Save semantics are an opt-in
       href: DATA-0149-transfers-carry-stored-values-exactly-by-default.md
+    - name: DATA-0150 A unique [Index] on a row-scoped entity is unique per tenant
+      href: DATA-0150-unique-indexes-are-unique-per-tenant.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -122,6 +122,18 @@ internal sealed class SqliteDdlExecutor(
             ct).ConfigureAwait(false);
     }
 
+    public async Task<RelationalIndexState?> FindIndex(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition index,
+        CancellationToken ct = default)
+    {
+        var connection = await Writer(ct).ConfigureAwait(false);
+        var (owner, _) = await Inspect(connection, index.Name, ct).ConfigureAwait(false);
+        return owner is not null && string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase)
+            ? new RelationalIndexState(index.Name, $"DROP INDEX {SqliteDialect.Quote(index.Name)};")
+            : null;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_writer is null) return;

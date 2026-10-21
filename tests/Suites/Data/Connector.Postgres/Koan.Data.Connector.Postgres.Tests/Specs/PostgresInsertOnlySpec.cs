@@ -67,7 +67,7 @@ public sealed class PostgresInsertOnlySpec(PostgresFixture fixture, ITestOutputH
         var email = $"{Guid.NewGuid():N}@example.test";
         (await insert.Insert(new PgUniqueProbe { Id = "u1-" + email, Email = email })).Outcome.Should().Be(MutationOutcome.Inserted);
         await FluentActions.Invoking(() => insert.Insert(new PgUniqueProbe { Id = "u2-" + email, Email = email }))
-            .Should().ThrowAsync<PostgresException>();
+            .Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>();
     }
 
     [Fact]

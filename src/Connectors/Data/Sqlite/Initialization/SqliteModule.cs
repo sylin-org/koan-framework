@@ -36,6 +36,8 @@ public sealed class SqliteModule : KoanModule
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<SqliteAdapterFactory>());
         services.AddSingleton<IDataSourceIntegrationFactory>(static provider => provider.GetRequiredService<SqliteAdapterFactory>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, SqliteHealthContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<Koan.Data.Abstractions.Failures.IDataFailureClassifier, SqliteFailureClassifier>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataProviderConnectionFactory, SqliteConnectionFactory>());
     }
 

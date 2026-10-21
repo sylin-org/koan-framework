@@ -35,7 +35,7 @@ public sealed class MongoExistingIndexSpec(MongoFixture fixture, ITestOutputHelp
         indexes.Select(index => index["name"].AsString).Should().BeEquivalentTo(
             "_id_", "ix_Slug", "ix_Kind_Status", "ix_ExpiresAt");
         await FluentActions.Invoking(() => new Document { Slug = "existing" }.Save())
-            .Should().ThrowAsync<MongoWriteException>();
+            .Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>();
     }
 
     [Theory]
@@ -93,7 +93,7 @@ public sealed class MongoExistingIndexSpec(MongoFixture fixture, ITestOutputHelp
             await new CollatedDocument { Slug = "one" }.Save();
             await FluentActions.Invoking(() => CollatedDocument.UpsertMany([
                 new CollatedDocument { Slug = "ONE" }
-            ])).Should().ThrowAsync<MongoBulkWriteException<BsonDocument>>();
+            ])).Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>();
             using var cursor = await collection.Indexes.ListAsync();
             (await cursor.ToListAsync()).Select(index => index["name"].AsString)
                 .Should().BeEquivalentTo("_id_", "legacy_" + suffix);

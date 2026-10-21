@@ -24,7 +24,7 @@ public sealed class MongoAcronymIndexSpec(MongoFixture fixture, ITestOutputHelpe
         await new Volume { Id = "v1", ISBN = "978-1" }.Save();
         await new Volume { Id = "v2", ISBN = "978-2" }.Save();
         await FluentActions.Invoking(() => new Volume { Id = "v3", ISBN = "978-1" }.Save())
-            .Should().ThrowAsync<MongoWriteException>("a second row with a held ISBN violates the unique index");
+            .Should().ThrowAsync<Koan.Data.Abstractions.Failures.UniqueValueConflictException>("a second row with a held ISBN violates the unique index");
 
         var keys = (await Indexes(host.Services, partition, typeof(Volume))).Where(static index => index["name"].AsString != "_id_").ToArray();
         keys.Should().ContainSingle();

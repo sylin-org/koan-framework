@@ -27,6 +27,8 @@ public sealed class PostgresModule : KoanModule
         services.AddSingleton<IDataAdapterFactory>(static provider => provider.GetRequiredService<PostgresAdapterFactory>());
         services.AddSingleton<IDataSourceIntegrationFactory>(static provider => provider.GetRequiredService<PostgresAdapterFactory>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, PostgresHealthContributor>());
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<Koan.Data.Abstractions.Failures.IDataFailureClassifier, Runtime.PostgresFailureClassifier>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, PostgresDiscoveryAdapter>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IDataProviderConnectionFactory, PostgresConnectionFactory>());
     }

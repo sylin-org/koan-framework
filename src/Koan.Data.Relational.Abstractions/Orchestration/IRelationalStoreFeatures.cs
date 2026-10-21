@@ -30,6 +30,14 @@ public interface IRelationalStoreFeatures
     /// </summary>
     bool SupportsRewriteFreeExpressionIndexes => false;
 
+    /// <summary>
+    /// Whether an index part can read a framework-managed field (the tenant) inside the structured root directly,
+    /// which is what lets a unique index lead with the tenant (DATA-0150). A store that indexes a document value only
+    /// through a projected column it computes per mapped property has no column for a managed field, so it keeps the
+    /// global unique index and reports the scoping as unproved.
+    /// </summary>
+    bool SupportsManagedFieldIndexParts => false;
+
     /// <summary>Whether the store expires rows itself, so a TTL index means something here.</summary>
     bool SupportsNativeTtl => false;
 

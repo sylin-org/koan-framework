@@ -1,11 +1,24 @@
+using System.Collections.Immutable;
+using Koan.Core.Naming;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
+using Koan.Data.Core.Semantics;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Relational.Orchestration;
 
-internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrator
+/// <param name="segmentation">The host's row-scoped segmentation (the tenant). A unique index on an entity it scopes
+/// leads with the scope's managed fields (DATA-0150). Without it no index is scoped.</param>
+/// <param name="logger">Where the redundant global index an earlier version built is reported.</param>
+internal sealed class RelationalSchemaOrchestrator(
+    DataSegmentationPlan? segmentation = null,
+    ILogger<RelationalSchemaOrchestrator>? logger = null) : IRelationalSchemaOrchestrator
 {
+    // A scoped name is longer than the one it replaces, and MySQL, PostgreSQL and Firebird 4 cap index names near 63
+    // bytes. Fitting it with the shared identifier engine (ARCH-0096) keeps a name that fitted before fitting now.
+    private static readonly CompositionPolicy ScopedNamePolicy = new("_", VerbatimParticleFormatter.Instance, 63);
+
     public RelationalSchemaPlan Plan(
         MappingPlan mapping,
         IRelationalStoreFeatures features,
@@ -26,32 +39,42 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
 
         var unproved = new List<string>();
         var refused = new List<string>();
+        var scope = ScopeOf(mapping);
         var indexes = mapping.Indexes.Select(index =>
         {
-            var nested = index.Bindings.Any(static binding => binding.PhysicalPath.IsNested);
+            // DATA-0150: a unique index on a row-scoped entity is unique per scope (per tenant), so it leads with the
+            // scope's managed fields, read the way every filter reads them.
+            var scopable = scope.Parts.Length != 0 && index.Unique && !index.Primary;
+            var scoped = scopable && features.SupportsManagedFieldIndexParts;
+            // A store that cannot key a managed field keeps the global index it always built, and says so.
+            if (scopable && !scoped) unproved.Add($"TenantScope:{index.Name}");
+            var name = scoped ? ScopedName(mapping, index, scope.Suffix) : index.Name;
+            var nested = scoped || index.Bindings.Any(static binding => binding.PhysicalPath.IsNested);
             var derived = index.Bindings.Any(static binding =>
                 binding.Descriptor.Authority == MappingAuthority.Derived);
             var rewriteFree = !derived || features.SupportsRewriteFreeExpressionIndexes;
-            var keysSupported = index.Bindings.All(binding => features.CanIndexKey(binding.PhysicalType));
+            var keysSupported = index.Bindings.All(binding => features.CanIndexKey(binding.PhysicalType)) &&
+                (!scoped || scope.Parts.All(part => features.CanIndexKey(part.PhysicalType)));
             var shortfalls = new List<string>();
-            if (!index.Primary && !features.SupportsMappedIndexes) shortfalls.Add($"Index:{index.Name}");
-            if (derived && !rewriteFree) shortfalls.Add($"RewriteFree:{index.Name}");
+            if (!index.Primary && !features.SupportsMappedIndexes) shortfalls.Add($"Index:{name}");
+            if (derived && !rewriteFree) shortfalls.Add($"RewriteFree:{name}");
             if (nested && !features.SupportsRewriteFreeExpressionIndexes)
-                shortfalls.Add($"ExpressionIndex:{index.Name}");
-            if (index.Ttl && !features.SupportsNativeTtl) shortfalls.Add($"TTL:{index.Name}");
-            if (!index.Primary && !keysSupported) shortfalls.Add($"IndexKey:{index.Name}");
+                shortfalls.Add($"ExpressionIndex:{name}");
+            if (index.Ttl && !features.SupportsNativeTtl) shortfalls.Add($"TTL:{name}");
+            if (!index.Primary && !keysSupported) shortfalls.Add($"IndexKey:{name}");
             unproved.AddRange(shortfalls);
             // Declared as depended upon, and this store cannot build it. Reporting that as unproved would leave
             // the application to discover under load what it already said it could not accept (DATA-0119 rule 3).
             if (index.Required && shortfalls.Count != 0)
                 refused.Add(
-                    $"Index '{index.Name}' is required and {features.ProviderName} cannot build it " +
+                    $"Index '{name}' is required and {features.ProviderName} cannot build it " +
                     $"({string.Join(", ", shortfalls)}). Drop Required to accept the reads resolving without it, " +
                     "index a value this store can key, or select a store that can.");
-            return new RelationalIndexDefinition(
-                index.Name,
-                index.Bindings.Select(static binding => new RelationalIndexPart(
-                    binding.PhysicalPath, binding.PhysicalType, EncodingId(binding))),
+            var parts = index.Bindings.Select(static binding => new RelationalIndexPart(
+                binding.PhysicalPath, binding.PhysicalType, EncodingId(binding))).ToArray();
+            var definition = new RelationalIndexDefinition(
+                name,
+                scoped ? scope.Parts.Concat(parts) : parts,
                 index.Unique,
                 index.Primary,
                 index.Ttl,
@@ -59,6 +82,19 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 keysSupported,
                 index.Required,
                 index.NameDeclared);
+            return !scoped ? definition : definition with
+            {
+                Unscoped = new RelationalIndexDefinition(
+                    index.Name,
+                    parts,
+                    index.Unique,
+                    index.Primary,
+                    index.Ttl,
+                    rewriteFree,
+                    index.Bindings.All(binding => features.CanIndexKey(binding.PhysicalType)),
+                    index.Required,
+                    index.NameDeclared)
+            };
         }).ToArray();
 
         var table = new RelationalTableDefinition(
@@ -221,6 +257,7 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 // application is told rather than quietly served an index that would break its writes.
                 if (!index.KeysSupported) continue;
                 await ddl.CreateIndex(plan.Table, index, ct).ConfigureAwait(false);
+                if (index.Unscoped is { } global) await ReportGlobal(plan.Table, index, global, ddl, ct).ConfigureAwait(false);
             }
         }
 
@@ -310,6 +347,62 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 binding.PhysicalType,
                 IsProjected: true,
                 ProjectedFrom: binding.PhysicalPath);
+    }
+
+    /// <summary>
+    /// The managed fields that scope this entity's rows (DATA-0150), as index parts inside the document root, and the
+    /// suffix a scoped index name carries. Empty when the host has no row-scoped segmentation for the entity, or the
+    /// map has no document root to hold managed fields (an explicit map refuses managed fields before this).
+    /// </summary>
+    private (RelationalIndexPart[] Parts, string Suffix) ScopeOf(MappingPlan mapping)
+    {
+        var fields = segmentation?.For(mapping.EntityType).Fields ?? ImmutableArray<DataSegmentationField>.Empty;
+        var root = mapping.Bindings.FirstOrDefault(static binding =>
+            binding.Shape == MappingValueShape.Object && binding.LogicalPath.IsRoot);
+        if (fields.IsDefaultOrEmpty || root is null) return ([], "");
+        return (
+            fields.Select(field => new RelationalIndexPart(
+                new PhysicalPath(root.PhysicalPath.Name, field.StorageName),
+                field.ClrType,
+                $"clr:{field.ClrType.AssemblyQualifiedName}")).ToArray(),
+            string.Join('_', fields.Select(static field => field.StorageName)));
+    }
+
+    /// <summary>
+    /// A scoped index never takes the name its global predecessor had, so an existing database keeps that index and
+    /// gains this one beside it. A derived name gains the managed fields as its leading members
+    /// (<c>IX_Member___koan_tenant_Email</c>); a declared name gains them as a suffix (<c>ux_email___koan_tenant</c>).
+    /// </summary>
+    private static string ScopedName(MappingPlan mapping, MappingIndexPlan index, string suffix)
+    {
+        var prefix = $"IX_{mapping.Container.Name}_";
+        var name = !index.NameDeclared && index.Name.StartsWith(prefix, StringComparison.Ordinal)
+            ? $"{prefix}{suffix}_{index.Name[prefix.Length..]}"
+            : $"{index.Name}_{suffix}";
+        return IdentifierComposer.Compose(name, [], ScopedNamePolicy);
+    }
+
+    /// <summary>
+    /// After a scoped unique index is built, an existing database may still hold the global one an earlier version
+    /// built for the same declaration. Koan never drops an index; it says the old one is redundant, that it still
+    /// refuses a value another tenant holds until it is dropped, and how to drop it.
+    /// </summary>
+    private async Task ReportGlobal(
+        RelationalTableDefinition table,
+        RelationalIndexDefinition scoped,
+        RelationalIndexDefinition global,
+        IRelationalDdlExecutor ddl,
+        CancellationToken ct)
+    {
+        if (logger is null) return;
+        var existing = await ddl.FindIndex(table, global, ct).ConfigureAwait(false);
+        if (existing is null) return;
+        logger.LogWarning(
+            "{Table} keeps the global unique index {Index}, built by an earlier Koan before unique indexes became " +
+            "unique per tenant. Koan built {Scoped} beside it and never drops an index. Until {Index} is dropped, a " +
+            "value one tenant holds is still refused for every other tenant. Confirm {Scoped} exists, then drop the " +
+            "old index: {Drop}",
+            table.ToString(), existing.Name, scoped.Name, existing.Name, scoped.Name, existing.DropStatement);
     }
 
     private static string EncodingId(MappingBindingPlan binding) =>

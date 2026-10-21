@@ -11,6 +11,7 @@ using Koan.Data.Core.Axes;
 using Koan.Data.Core.Execution;
 using Koan.Data.Core.Metadata;
 using Koan.Data.Core.Pipeline;
+using Koan.Data.Core.Failures;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Polymorphism;
 using Koan.Data.Core.Querying;
@@ -234,9 +235,20 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         CancellationToken ct)
     {
         var values = CurrentManagedValues(segmentation);
-        if (values is null) return await _inner.Upsert(payload, ct);
-        using (ManagedFieldWriteScope.Enter(values)) return await _inner.Upsert(payload, ct);
+        try
+        {
+            if (values is null) return await _inner.Upsert(payload, ct);
+            using (ManagedFieldWriteScope.Enter(values)) return await _inner.Upsert(payload, ct);
+        }
+        catch (Exception error) when (UniqueConflict(error, out var conflict)) { throw conflict; }
     }
+
+    /// <summary>
+    /// A store's unique-index violation, reported without saying which index refused the value (DATA-0150): under
+    /// row-scoped tenancy the index that refused it would tell the caller whether another tenant holds it.
+    /// </summary>
+    private bool UniqueConflict(Exception error, out UniqueValueConflictException conflict)
+        => UniqueValueConflicts.TryTranslate(error, typeof(TEntity), _inner.GetType().Name, _sourcePlan, out conflict);
 
     private bool HasManaged => _managed.Count > 0 || !_segmentation.IsEmpty;
 
@@ -874,9 +886,14 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             ? (IList<TEntity>)models.Select(WritePayload).ToList()
             : models;
         var values = CurrentManagedValues(segmentation);
-        var reported = values is null
-            ? await _inner.UpsertMany(payloads, ct)
-            : await PersistScoped();
+        int reported;
+        try
+        {
+            reported = values is null
+                ? await _inner.UpsertMany(payloads, ct)
+                : await PersistScoped();
+        }
+        catch (Exception error) when (UniqueConflict(error, out var conflict)) { throw conflict; }
         if (reported != models.Count)
             throw new BulkMutationReceiptRejectedException(
                 typeof(TEntity).FullName ?? typeof(TEntity).Name,
@@ -932,11 +949,15 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             throw new InvalidOperationException("A field transform cannot change an insertion's identity. Preserve the submitted identity in the storage payload.");
         var values = CurrentManagedValues(operationScope.Segmentation);
         MutationResult<TEntity, TKey> result;
-        if (values is null) result = await inserts.Insert(payload, ct);
-        else
+        try
         {
-            using (ManagedFieldWriteScope.Enter(values)) result = await inserts.Insert(payload, ct);
+            if (values is null) result = await inserts.Insert(payload, ct);
+            else
+            {
+                using (ManagedFieldWriteScope.Enter(values)) result = await inserts.Insert(payload, ct);
+            }
         }
+        catch (Exception error) when (UniqueConflict(error, out var conflict)) { throw conflict; }
 
         if (result is null)
             throw new MutationReceiptRejectedException(typeof(TEntity).FullName ?? typeof(TEntity).Name,
@@ -984,15 +1005,19 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         var payload = WritePayload(current);
         var values = CurrentManagedValues(segmentation);
         MutationResult<TEntity, TKey> result;
-        if (values is null)
+        try
         {
-            result = await outcomes.UpsertWithOutcome(payload, ct);
-        }
-        else
-        {
-            using (ManagedFieldWriteScope.Enter(values))
+            if (values is null)
+            {
                 result = await outcomes.UpsertWithOutcome(payload, ct);
+            }
+            else
+            {
+                using (ManagedFieldWriteScope.Enter(values))
+                    result = await outcomes.UpsertWithOutcome(payload, ct);
+            }
         }
+        catch (Exception error) when (UniqueConflict(error, out var conflict)) { throw conflict; }
 
         if (!EqualityComparer<TKey>.Default.Equals(result.Key, current.Id) ||
             result.Outcome is not (MutationOutcome.Inserted or MutationOutcome.Updated) ||
@@ -1296,7 +1321,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             throw new InvalidOperationException("Conditional replacement routing changed during preparation. Start a new operation in the intended scope.");
         DemandUnscopedConditional(_segmentation.Bind("entity conditional replace"));
         ct.ThrowIfCancellationRequested();
-        var replaced = await cas.ConditionalReplaceAsync(payload, frozen, ct);
+        bool replaced;
+        try { replaced = await cas.ConditionalReplaceAsync(payload, frozen, ct); }
+        catch (Exception error) when (UniqueConflict(error, out var conflict)) { throw conflict; }
         if (replaced && context is not null)
             await Lifecycle!.CompleteUpsert(context, current);
         return replaced;
@@ -1637,13 +1664,17 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
             var values = _outer.CurrentManagedValues(segmentation);
             BatchResult result;
-            if (values is null) result = await native.Save(options, ct);
-            else
+            try
             {
-                // Stamp-AND-verify the whole batch under one scope (all rows share the ambient managed value).
-                using (ManagedFieldWriteScope.Enter(values))
-                    result = await native.Save(options, ct);
+                if (values is null) result = await native.Save(options, ct);
+                else
+                {
+                    // Stamp-AND-verify the whole batch under one scope (all rows share the ambient managed value).
+                    using (ManagedFieldWriteScope.Enter(values))
+                        result = await native.Save(options, ct);
+                }
             }
+            catch (Exception error) when (_outer.UniqueConflict(error, out var conflict)) { throw conflict; }
 
             if (result.Added < 0 || result.Updated < 0 || result.Deleted < 0)
                 throw new BatchReceiptRejectedException(

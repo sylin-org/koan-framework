@@ -42,6 +42,14 @@ Index plans carry the same binding and encoding identities as filter/write plans
 rewrite-free behavior, and TTL are executed only when `IRelationalStoreFeatures` proves the matching native profile;
 unsupported TTL metadata is never lowered as an ordinary index.
 
+Under row-scoped segmentation, on a store whose features declare `SupportsManagedFieldIndexParts` (SQLite, Npgsql), the
+orchestrator leads every unique, non-primary index with the managed fields (`__koan_tenant`) read inside the document
+root, under a name of its own fitted to 63 bytes, and keeps the global
+predecessor in `RelationalIndexDefinition.Unscoped`; `RelationalPlanGuard` accepts exactly that shape. After creating a
+scoped index it asks `IRelationalDdlExecutor.FindIndex` for the predecessor and logs a warning with its drop statement
+when the store holds it; it never drops it. SQLite and PostgreSQL implement `FindIndex`; the default finds nothing.
+Any other store keeps the global unique index and reports `TenantScope:<index>` as unproved (DATA-0150).
+
 ## Query translation
 
 The common translator supports scalar equality/comparison, logical composition, null checks, Boolean members, and the
