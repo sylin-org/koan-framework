@@ -35,6 +35,16 @@ public sealed class AdminLog : Entity<AdminLog>
     public string Message { get; set; } = "";
 }
 
+/// <summary>SEC-0015 — readable only from the local process (STDIO). A try-it call arrives over HTTP, so it is remote
+/// whatever origin claim the signed-in principal carries.</summary>
+[McpEntity(Name = "localnote", Description = "Local-only notes.", Exposure = McpExposureMode.Full)]
+[Access(all: "origin:local")]
+[StorageName("explorer_localnotes")]
+public sealed class LocalNote : Entity<LocalNote>
+{
+    public string Text { get; set; } = "";
+}
+
 /// <summary>A custom [McpTool] verb whose parameter carries a description (WEB-0072 P2 — proving the description
 /// flows into the input schema).</summary>
 public static class ExplorerTools

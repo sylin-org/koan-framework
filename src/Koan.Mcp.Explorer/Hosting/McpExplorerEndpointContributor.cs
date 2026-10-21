@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
 using Koan.Mcp.Resources;
+using Koan.Web.Authorization;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -147,8 +148,13 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
             return;
         }
 
+        // SEC-0015: try-it is an HTTP door, so the connection decides the origin tier, as REST does; any koan:origin
+        // claim the signed-in principal carries is replaced.
+        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
+        var caller = OriginStamp.Apply(context.User, OriginResolver.FromHttpContext(context, originOptions));
+
         var executor = context.RequestServices.GetRequiredService<EndpointToolExecutor>();
-        var result = await executor.Execute(request.Name!, args, context.RequestAborted, context.User);
+        var result = await executor.Execute(request.Name!, args, context.RequestAborted, caller);
 
         await WriteJson(context, StatusCodes.Status200OK, new JObject
         {

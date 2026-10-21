@@ -67,6 +67,19 @@ public sealed class OriginBuilderTests
         OriginOf(ctx).Should().Be("remote", "the connection is authoritative — a forged 'local' claim is overwritten");
     }
 
+    // SEC-0015: only the carrier identity OriginStamp.Apply creates is a stamp. A koan:origin claim an IdP or a claims
+    // transformation put on the caller's own identity is not, and the non-HTTP path replaces it with remote.
+    [Fact]
+    public void Mcp_path_replaces_an_origin_claim_on_the_callers_identity()
+    {
+        var (builder, _) = Make();
+        var forged = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(Origin.ClaimType, "local") }, "cookie"));
+
+        OriginStamp.IsStamped(forged).Should().BeFalse("a claim on the caller's identity is not a framework stamp");
+        var ctx = builder.Build(new QueryOptions(), CancellationToken.None, httpContext: null, user: forged);
+        ctx.User.FindAll(Origin.ClaimType).Select(c => c.Value).Should().Equal("remote");
+    }
+
     [Fact]
     public void Mcp_path_preserves_a_pre_stamped_origin()
     {

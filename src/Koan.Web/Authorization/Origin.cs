@@ -56,6 +56,10 @@ public static class Origin
 /// </summary>
 public static class OriginStamp
 {
+    // SEC-0015: the label of the carrier identity Apply creates. Only that identity's claim is a stamp; a koan:origin
+    // claim on any other identity (an IdP's, a claims transformation's) is caller-supplied.
+    private const string CarrierLabel = "koan:origin-stamp";
+
     public static ClaimsPrincipal Apply(ClaimsPrincipal principal, OriginTier tier)
     {
         if (principal is null) throw new ArgumentNullException(nameof(principal));
@@ -68,15 +72,18 @@ public static class OriginStamp
             .ToList();
 
         // The framework's tier rides on a distinct, unauthenticated carrier identity (added last → not primary).
-        var carrier = new ClaimsIdentity();
+        var carrier = new ClaimsIdentity { Label = CarrierLabel };
         carrier.AddClaim(new Claim(Origin.ClaimType, Origin.Value(tier)));
         identities.Add(carrier);
 
         return new ClaimsPrincipal(identities);
     }
 
-    /// <summary>True when a principal already carries a framework origin stamp (used by the request builder to avoid
-    /// double-stamping a pre-stamped non-HTTP principal and to detect an unstamped path).</summary>
+    /// <summary>True when a principal carries the framework's origin stamp: the carrier identity <see cref="Apply"/>
+    /// creates (used by the request builder to avoid double-stamping a pre-stamped non-HTTP principal and to detect an
+    /// unstamped path). An origin claim on any other identity does not count (SEC-0015).</summary>
     public static bool IsStamped(ClaimsPrincipal principal)
-        => principal is not null && principal.HasClaim(c => string.Equals(c.Type, Origin.ClaimType, StringComparison.Ordinal));
+        => principal is not null && principal.Identities.Any(identity =>
+            string.Equals(identity.Label, CarrierLabel, StringComparison.Ordinal)
+            && identity.HasClaim(c => string.Equals(c.Type, Origin.ClaimType, StringComparison.Ordinal)));
 }

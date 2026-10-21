@@ -44,6 +44,8 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
             var value = kv[1].Trim();
             if (key == "role") claims.Add(new Claim(ClaimTypes.Role, value));
             else if (key == "scope") scopes.Add(value);
+            // A claim the sign-in itself carries (an IdP or a claims transformation), never a framework stamp.
+            else if (key == "origin") claims.Add(new Claim(Koan.Web.Authorization.Origin.ClaimType, value));
         }
         if (scopes.Count > 0) claims.Add(new Claim("scope", string.Join(' ', scopes)));
 

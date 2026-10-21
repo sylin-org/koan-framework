@@ -147,6 +147,19 @@ public sealed class ExplorerConsoleSpec : IClassFixture<ExplorerFixture>
     }
 
     [Fact]
+    public async Task Execute_stamps_the_connection_origin_over_a_carried_claim()
+    {
+        // The signed-in principal carries koan:origin=local; try-it arrives over HTTP from loopback with no declared
+        // internal network, so the connection's tier (remote) is what the origin:local gate sees.
+        var res = await PostCall(ToolName("localnote", EntityEndpointOperationKind.Collection), auth: "role=user;origin=local");
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = JObject.Parse(await res.Content.ReadAsStringAsync(Ct));
+
+        body["success"]!.Value<bool>().Should().BeFalse(body.ToString());
+        body["errorCode"]!.Value<string>().Should().Be("forbidden");
+    }
+
+    [Fact]
     public async Task Execute_denied_by_the_gate_short_circuits()
     {
         // Authenticated but WITHOUT docs:read — the [Access] gate denies the scoped entity.
