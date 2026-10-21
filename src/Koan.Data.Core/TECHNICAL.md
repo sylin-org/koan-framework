@@ -260,6 +260,10 @@ validation:
   partition, else the base set. A source that resolves to the target's own container (the same `TransferPlace`
   comparison as transfers) throws `ArgumentException` before anything is written; the result is `false` when a move
   found no source row to remove. A string-keyed overload infers the key type.
+- Bulk reads (`Data<T,K>.BulkRead`: transfers and backup) stream only when the provider advertises bounded paging
+  and the key is a proven stream tie-breaker (string). A Guid-, int- or other-keyed Entity on a bounded provider takes
+  the materialized read with the reason in the `koan.data.stream.execution` fact and the transfer's warning, instead
+  of the stream's unsupported-sort rejection (DATA-0113, NK-016).
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

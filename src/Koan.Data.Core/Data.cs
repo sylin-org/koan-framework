@@ -585,22 +585,29 @@ public static class Data<TEntity, TKey>
     /// reaches keep their whole set resident or local, so the materialized read costs what every other read
     /// on them already costs.</para>
     ///
+    /// <para>A bounded provider is materialized too when the Entity's key is not a proven stream tie-breaker
+    /// (<see cref="QueryStreamCoordinator.IsProviderStableIdentifierType"/>: only string keys today). The stream
+    /// would refuse such a key before any I/O, so without this a Guid- or int-keyed Entity could not be
+    /// transferred or backed up on any bounded provider (NK-016).</para>
+    ///
     /// <para>The choice is never silent: it records a <c>koan.data.stream.execution</c> fact either way, and
     /// <paramref name="onMaterialized"/> lets a caller add its own user-facing notice. This lives here, not in
     /// each consumer, so the next bulk consumer inherits the decision instead of re-deriving it.</para>
     /// </summary>
     /// <param name="predicate">Optional filter; <see langword="null"/> reads everything.</param>
     /// <param name="batchSize">Bound for the streamed path's candidate page.</param>
-    /// <param name="onMaterialized">Invoked once, before the first item, only when the read is materialized.</param>
+    /// <param name="onMaterialized">Invoked once, before the first item, only when the read is materialized,
+    /// with the reason as a clause ("the routed provider does not ...").</param>
     /// <param name="ct">Cancellation observed between items on both paths.</param>
     internal static async IAsyncEnumerable<TEntity> BulkRead(
         Expression<Func<TEntity, bool>>? predicate,
         int? batchSize,
-        Action? onMaterialized,
+        Action<string>? onMaterialized,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         var (bounded, provider, facts) = ResolveBulkStrategy();
-        if (bounded)
+        var streamableKey = QueryStreamCoordinator.IsProviderStableIdentifierType(typeof(TKey));
+        if (bounded && streamableKey)
         {
             var stream = predicate is null ? AllStream(batchSize, ct) : QueryStream(predicate, batchSize, ct);
             await foreach (var entity in stream.WithCancellation(ct).ConfigureAwait(false))
@@ -608,8 +615,12 @@ public static class Data<TEntity, TKey>
             yield break;
         }
 
-        onMaterialized?.Invoke();
-        QueryStreamCoordinator.RecordMaterializedBulkRead<TEntity>(facts, provider);
+        var reason = bounded
+            ? $"Koan proves a provider-bounded stream order only for string identifiers, and {typeof(TEntity).Name} " +
+              $"is keyed by {typeof(TKey).Name} (DATA-0107)"
+            : "the routed provider does not advertise provider-bounded paging (DATA-0107)";
+        onMaterialized?.Invoke(reason);
+        QueryStreamCoordinator.RecordMaterializedBulkRead<TEntity>(facts, provider, reason);
 
         var materialized = predicate is null
             ? await All(ct).ConfigureAwait(false)

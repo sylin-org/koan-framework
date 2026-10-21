@@ -283,11 +283,14 @@ internal static class QueryStreamCoordinator
     /// provider advertises no bounded paging (DATA-0113). It is a selected strategy, not a rejection —
     /// but it is recorded on the same fact code as streaming so "how was this read?" has one answer.
     /// </summary>
-    internal static void RecordMaterializedBulkRead<TEntity>(IKoanRuntimeFactRecorder? facts, string provider)
+    internal static void RecordMaterializedBulkRead<TEntity>(
+        IKoanRuntimeFactRecorder? facts,
+        string provider,
+        string because)
         => Record<TEntity>(facts, provider, KoanFactState.Selected,
-            $"Materialized bulk read for {typeof(TEntity).Name}; the provider advertises no bounded paging.",
+            $"Materialized bulk read for {typeof(TEntity).Name} because {because}.",
             Infrastructure.Constants.Diagnostics.Reasons.MaterializedBulkRead,
-            "Route this Entity to an adapter that advertises provider-bounded paging to stream it instead.");
+            "Stream it instead by routing a string-keyed Entity to an adapter that advertises provider-bounded paging.");
 
     private static QueryStreamRejectedException Reject<TEntity>(
         IKoanRuntimeFactRecorder? facts,

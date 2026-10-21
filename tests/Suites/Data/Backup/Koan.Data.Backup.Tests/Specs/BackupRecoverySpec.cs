@@ -131,6 +131,37 @@ public sealed class BackupRecoverySpec
         });
     }
 
+    /// <summary>
+    /// NK-016. Only string identifiers stream in provider-bounded pages, so a Guid- or int-keyed Entity on SQLite used
+    /// to fail its backup with an unsupported-stream-sort rejection. It now takes the reported materialized read.
+    /// </summary>
+    [Fact]
+    public async Task Non_string_keys_back_up_and_restore_on_a_bounded_provider()
+    {
+        await WithRuntime("sqlite", async runtime =>
+        {
+            Guid[] guids = [Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7()];
+            foreach (var id in guids) await new GuidRecord { Id = id, Label = id.ToString("n") }.Save();
+            for (var id = 1; id <= 3; id++) await new CounterRecord { Id = id, Label = $"counter-{id}" }.Save();
+
+            using var scope = runtime.Services.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<IBackupService>();
+            var guidBackup = await service.Create<GuidRecord, Guid>(
+                "guid-keys", new BackupRequest { PageSize = 2, StorageProfile = Profile });
+            var counterBackup = await service.Create<CounterRecord, int>(
+                "int-keys", new BackupRequest { PageSize = 2, StorageProfile = Profile });
+
+            guidBackup.RecordCount.Should().Be(3);
+            counterBackup.RecordCount.Should().Be(3);
+
+            (await Data<GuidRecord, Guid>.DeleteAll()).Should().Be(3);
+            var restored = await service.Restore<GuidRecord, Guid>(
+                guidBackup.StorageKey, new RestoreRequest { BatchSize = 2, StorageProfile = Profile });
+            restored.RecordCount.Should().Be(3);
+            (await Data<GuidRecord, Guid>.All()).Select(record => record.Id).Should().BeEquivalentTo(guids);
+        });
+    }
+
     [Fact]
     public async Task Repeated_names_publish_distinct_archives()
     {
@@ -388,6 +419,16 @@ public sealed class BackupRecoverySpec
     }
 
     private sealed class OtherRecord : Entity<OtherRecord>;
+
+    private sealed class GuidRecord : Entity<GuidRecord, Guid>
+    {
+        public string Label { get; set; } = "";
+    }
+
+    private sealed class CounterRecord : Entity<CounterRecord, int>
+    {
+        public string Label { get; set; } = "";
+    }
 
     private class BackupMedia : Entity<BackupMedia>
     {

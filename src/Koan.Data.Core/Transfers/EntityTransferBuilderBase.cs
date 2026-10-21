@@ -83,9 +83,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         var source = Data<TEntity, TKey>.BulkRead(
             Predicate,
             BatchSize,
-            onMaterialized: () => AddWarning(
-                "Read the source with an explicitly materialized query because the routed provider does not "
-                + $"advertise provider-bounded paging (DATA-0107). Writes remained batched at {BatchSize}."),
+            onMaterialized: because => AddWarning(
+                $"Read the source with an explicitly materialized query because {because}. " +
+                $"Writes remained batched at {BatchSize}."),
             ct);
 
         await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
