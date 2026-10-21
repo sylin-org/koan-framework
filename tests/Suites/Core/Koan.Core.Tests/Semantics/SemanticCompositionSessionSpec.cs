@@ -186,6 +186,62 @@ public sealed class SemanticCompositionSessionSpec
         session.IsFrozen.Should().BeFalse();
     }
 
+    [Fact]
+    public void A_session_copied_before_it_freezes_commits_into_the_collection_being_composed()
+    {
+        // NK-035: StartKoan() copies the caller's descriptors, the unfrozen session among them, into the collection
+        // it builds. The compiled plans must land in that collection, never in the abandoned original.
+        var original = new ServiceCollection();
+        var session = SemanticCompositionSession.GetOrCreate(original);
+        var manifest = Manifest();
+        var descriptor = new SemanticComponentDescriptor(ComponentId, typeof(ProbeModule), () => new ProbeModule());
+        var constitution = SemanticActivationCompiler.Compile(manifest, [descriptor]);
+        session.CompleteModuleInitialization(manifest, constitution, SemanticModuleRuntime.Create(constitution));
+        session.ScheduleContributions<ProbeTarget, ProbePlan>(
+            static _ => new ProbeTarget(),
+            static () => new ProbePlan(),
+            static (collection, plan) => collection.AddSingleton(plan));
+        var copy = new ServiceCollection();
+        foreach (var service in original) ((ICollection<ServiceDescriptor>)copy).Add(service);
+
+        using (var lease = session.Enter(copy))
+        {
+            lease.Complete();
+        }
+
+        copy.Should().Contain(service => service.ServiceType == typeof(ProbePlan));
+        copy.Should().Contain(service => service.ServiceType == typeof(Koan.Core.Semantics.Contributions.SemanticContributionCompilationSnapshot));
+        original.Should().NotContain(service => service.ServiceType == typeof(ProbePlan));
+        original.Should().NotContain(service => service.ServiceType == typeof(Koan.Core.Semantics.Contributions.SemanticContributionCompilationSnapshot));
+    }
+
+    [Fact]
+    public void A_nested_lease_for_another_collection_is_refused()
+    {
+        var session = SemanticCompositionSession.GetOrCreate(new ServiceCollection());
+        using var outer = session.Enter();
+
+        var other = () => session.Enter(new ServiceCollection());
+
+        other.Should().Throw<InvalidOperationException>().WithMessage("*another service collection*");
+    }
+
+    [Fact]
+    public void AddKoanCore_is_one_Core_per_collection()
+    {
+        var services = new ServiceCollection();
+
+        services.AddKoanCore();
+        var again = () => services.AddKoanCore();
+
+        again.Should().NotThrow();
+        services.Where(service => service.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)).Should().ContainSingle();
+    }
+
+    private sealed class ProbeTarget;
+
+    private sealed class ProbePlan;
+
     private static KoanApplicationReferenceManifest Manifest()
     {
         using var reader = new StringReader($"schema|1{Environment.NewLine}reference|package|{ComponentId}|{ComponentId}");

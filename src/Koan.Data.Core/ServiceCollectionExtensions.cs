@@ -16,12 +16,16 @@ namespace Koan.Data.Core;
 
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Composes Koan for this collection and guarantees the Data core services. The same composition as
+    /// <c>AddKoan()</c>: referenced modules activate and their typed contributions (tenant segmentation among them)
+    /// compile once, so a data-only host is never a partially composed one (NK-034).
+    /// </summary>
     public static IServiceCollection AddKoanDataCore(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        // Compile and activate referenced Koan modules (adapters, etc.).
-        AppBootstrapper.InitializeModules(services);
+        Koan.Core.ServiceCollectionExtensions.AddKoan(services);
         RegisterKoanDataCoreServices(services);
         return services;
     }
@@ -165,10 +169,10 @@ public static class ServiceCollectionExtensions
             TryInvokeSecretsBootstrap("AddSecretsReferenceConfiguration", builder.Configuration, null);
         }
 
-        if (!builder.Services.Any(d => d.ServiceType == typeof(Koan.Core.Hosting.Runtime.IAppRuntime)))
-        {
-            builder.Services.AddKoan();
-        }
+        // Compose the collection that is built. AddKoan() is a no-op over a frozen composition, and over a
+        // partially composed one (a copied AddKoanCore() session) it finishes the composition into this collection,
+        // not the caller's abandoned one (NK-035). A caller-supplied IAppRuntime is kept by AddKoanCore.
+        builder.Services.AddKoan();
 
         var owner = new StartedKoanHost(builder.Build());
 
@@ -190,7 +194,7 @@ public static class ServiceCollectionExtensions
         }
         catch
         {
-            owner.Dispose();
+            owner.DisposeAfterFailedStart();
             throw;
         }
     }
@@ -225,8 +229,24 @@ public static class ServiceCollectionExtensions
         {
             var current = Volatile.Read(ref _host)
                 ?? throw new ObjectDisposedException(nameof(StartedKoanHost));
-            current.Start();
+            // A start that fails part-way has already started the hosted services before the failing one, the
+            // ambient-host binder among them. Mark the host started first so disposal stops them and the binder
+            // releases AppHost.Current instead of leaving it on a disposed provider.
             Volatile.Write(ref _started, 1);
+            current.Start();
+        }
+
+        /// <summary>Releases a host whose start failed, without letting a stop failure hide the start failure.</summary>
+        public void DisposeAfterFailedStart()
+        {
+            try
+            {
+                Dispose();
+            }
+            catch
+            {
+                // The start failure is the one the caller must see.
+            }
         }
 
         public async Task StartAsync(CancellationToken cancellationToken = default)

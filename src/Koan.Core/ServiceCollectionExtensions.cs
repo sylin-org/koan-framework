@@ -68,11 +68,11 @@ public static class ServiceCollectionExtensions
                 "This Koan application is already composed. Put business declarations in the initial AddKoan(() => ...) call.");
         }
 
-        using var lease = session.Enter();
+        using var lease = session.Enter(services);
         try
         {
             using var declarationScope = Composition.KoanCompositionScope.Enter(services);
-            if (session.TryConfigureCore()) services.AddKoanCore();
+            services.AddKoanCore();
             AppBootstrapper.InitializeModules(services);
             configure?.Invoke();
             lease.Complete();
@@ -85,8 +85,16 @@ public static class ServiceCollectionExtensions
         }
     }
 
+    /// <summary>
+    /// Registers the Core substrate and schedules Core's contribution targets. Idempotent per service collection:
+    /// <c>AddKoan()</c> calls it, and an explicit earlier call (<c>services.AddKoanCore().AddKoanDataCore()</c>) is not
+    /// a second Core.
+    /// </summary>
     public static IServiceCollection AddKoanCore(this IServiceCollection services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+        if (!SemanticCompositionSession.GetOrCreate(services).TryConfigureCore()) return services;
+
         CorePillarManifest.EnsureRegistered();
 
         var segmentation = new SegmentationPlanBuilder();

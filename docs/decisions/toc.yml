@@ -210,6 +210,8 @@
       href: ARCH-0134-a-capabilities-tree-routes-agent-knowledge-by-intent.md
     - name: ARCH-0135 Capability accessors follow one anatomy
       href: ARCH-0135-capability-accessors-follow-one-anatomy.md
+    - name: ARCH-0136 Every composition entry path is the whole composition
+      href: ARCH-0136-every-composition-entry-path-is-the-whole-composition.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

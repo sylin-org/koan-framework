@@ -5,9 +5,15 @@ using Koan.Core.Semantics.Contributions;
 namespace Koan.Core.Semantics;
 
 /// <summary>Owns semantic composition state for exactly one service collection until it freezes.</summary>
+/// <remarks>
+/// The session travels with its descriptor, so a collection copied before it freezes (<c>StartKoan()</c> copies the
+/// caller's descriptors into a new host builder) carries the same session. Everything the session writes therefore goes
+/// to the collection whose outermost <see cref="Enter"/> is open, never to the collection it was first created for: a
+/// plan committed into an abandoned collection would leave the running host on an empty plan (NK-035).
+/// </remarks>
 internal sealed class SemanticCompositionSession
 {
-    private readonly IServiceCollection _services;
+    private IServiceCollection _services;
     private readonly object _gate = new();
     private int _compositionDepth;
     private int _coreConfigured;
@@ -35,6 +41,15 @@ internal sealed class SemanticCompositionSession
         }
     }
 
+    /// <summary>True while an <see cref="Enter"/> lease is open, so module work can tell whether it will be compiled.</summary>
+    public bool IsComposing
+    {
+        get
+        {
+            lock (_gate) return _compositionDepth > 0;
+        }
+    }
+
     public static SemanticCompositionSession GetOrCreate(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -53,8 +68,21 @@ internal sealed class SemanticCompositionSession
         }
     }
 
+    /// <summary>Opens a lease that writes into the collection this session currently belongs to.</summary>
     public CompositionLease Enter()
     {
+        IServiceCollection owner;
+        lock (_gate) owner = _services;
+        return Enter(owner);
+    }
+
+    /// <summary>
+    /// Opens a lease for <paramref name="services"/>. The outermost lease decides the collection that receives the
+    /// constitution, the compiled plans and the compilation snapshot.
+    /// </summary>
+    public CompositionLease Enter(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
         lock (_gate)
         {
             ThrowIfCompositionFaulted();
@@ -62,6 +90,17 @@ internal sealed class SemanticCompositionSession
             {
                 throw new InvalidOperationException(
                     "This Koan application composition is already frozen. Put business declarations in the initial AddKoan(() => ...) call.");
+            }
+
+            if (_compositionDepth == 0)
+            {
+                _services = services;
+            }
+            else if (!ReferenceEquals(_services, services))
+            {
+                throw new InvalidOperationException(
+                    "A Koan composition is already open for another service collection that shares this composition session. " +
+                    "Compose one collection at a time: finish AddKoan() before copying its descriptors into another collection.");
             }
 
             _compositionDepth++;
@@ -139,9 +178,11 @@ internal sealed class SemanticCompositionSession
 
         Constitution = constitution;
         Modules = modules;
-        _services.AddSingleton(manifest);
-        _services.AddSingleton(constitution);
-        _services.AddSingleton(modules);
+        IServiceCollection target;
+        lock (_gate) target = _services;
+        target.AddSingleton(manifest);
+        target.AddSingleton(constitution);
+        target.AddSingleton(modules);
         Volatile.Write(ref _moduleInitialization, 2);
     }
 
@@ -180,9 +221,11 @@ internal sealed class SemanticCompositionSession
         IScheduledContributionTarget[] scheduled;
         SemanticHostConstitution? constitution = null;
         SemanticModuleRuntime? modules = null;
+        IServiceCollection target;
         lock (_gate)
         {
             ThrowIfCompositionFaulted();
+            target = _services;
             if (_contributionFinalization == 2) return;
             if (_contributionFinalization != 0)
             {
@@ -217,8 +260,8 @@ internal sealed class SemanticCompositionSession
             var snapshot = new SemanticContributionCompilationSnapshot(
                 pending.Select(static result => result.Snapshot));
 
-            foreach (var result in pending) result.Commit(_services);
-            _services.AddSingleton(snapshot);
+            foreach (var result in pending) result.Commit(target);
+            target.AddSingleton(snapshot);
 
             lock (_gate) _contributionFinalization = 2;
         }

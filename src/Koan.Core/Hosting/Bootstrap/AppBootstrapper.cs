@@ -68,6 +68,17 @@ public static class AppBootstrapper
     public static void InitializeModules(IServiceCollection services)
     {
         var semanticSession = SemanticCompositionSession.GetOrCreate(services);
+
+        // Activated modules are only half a host: their typed contributions (segmentation, AI providers, discovery
+        // sources) compile when the outermost composition lease completes. Outside a lease, activation would leave
+        // an active Tenancy on SegmentationPlan.Empty with no error (NK-034), so module initialization always runs
+        // as the complete composition.
+        if (!semanticSession.IsComposing && !semanticSession.IsFrozen)
+        {
+            Koan.Core.ServiceCollectionExtensions.AddKoan(services);
+            return;
+        }
+
         if (!semanticSession.TryBeginModuleInitialization()) return;
 
         try

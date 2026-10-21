@@ -650,7 +650,7 @@ public static class Data<TEntity, TKey>
         {
             var repo = dataService.GetRepository<TEntity, TKey>();
             var sourceRegistry = (DataSourceRegistry?)services.GetService(typeof(DataSourceRegistry))
-                ?? throw new InvalidOperationException("Data source registry is unavailable. Ensure AddKoanDataCore() ran during startup.");
+                ?? throw new InvalidOperationException("Data source registry is unavailable. Compose the host with AddKoan() during startup.");
             var (provider, _) = AdapterResolver.ResolveForEntity<TEntity>(services, sourceRegistry);
             return (DataCaps.Describe(repo, provider).Has(DataCaps.Query.ProviderBoundedPaging), provider, facts);
         }
@@ -675,7 +675,7 @@ public static class Data<TEntity, TKey>
         {
             repo = dataService.GetRepository<TEntity, TKey>();
             var sourceRegistry = (DataSourceRegistry?)services.GetService(typeof(DataSourceRegistry))
-                ?? throw new InvalidOperationException("Data source registry is unavailable. Ensure AddKoanDataCore() ran during startup.");
+                ?? throw new InvalidOperationException("Data source registry is unavailable. Compose the host with AddKoan() during startup.");
             (provider, _) = AdapterResolver.ResolveForEntity<TEntity>(services, sourceRegistry);
         }
         var facts = services.GetService(typeof(IKoanRuntimeFactRecorder)) as IKoanRuntimeFactRecorder;
