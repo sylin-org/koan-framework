@@ -520,6 +520,20 @@ public static class Data<TEntity, TKey>
         return await repo.Upsert(current, ct);
     }
 
+    /// <summary>
+    /// Read the visible row, apply <paramref name="patch"/> to a working copy (it throws before any write when the
+    /// patch is refused) and save the copy. Read and save are two operations: last-writer-wins.
+    /// </summary>
+    internal static async Task<TEntity?> PatchCopy(TKey id, Func<TEntity, TEntity> patch, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(patch);
+        var repo = Repo;
+        await using var horizon = await EnterMutationHorizon(repo, "entity patch", ct);
+        var current = await repo.Get(id, ct).ConfigureAwait(false);
+        if (current is null) return null;
+        return await repo.Upsert(patch(current), ct).ConfigureAwait(false);
+    }
+
     public static async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         var context = EntityContext.Current;

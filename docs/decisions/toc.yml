@@ -368,6 +368,8 @@
       href: DATA-0130-variant-views-and-the-cache-honour-deletes.md
     - name: DATA-0131 Inside EntityContext.Transaction every write is deferred in call order under its own context, or refused
       href: DATA-0131-a-transaction-defers-or-refuses-every-write.md
+    - name: DATA-0132 Entity patch honours its null policy, and lifecycle protection guards handlers, not write stamps
+      href: DATA-0132-entity-patch-and-lifecycle-protection-keep-their-word.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
