@@ -265,4 +265,55 @@ public sealed class ReadFilterContributorSpec(SqliteFixture fixture, ITestOutput
         var act = async () => await Doc.QueryRaw("SELECT Id, Json FROM Doc");
         await act.Should().ThrowAsync<NotSupportedException>();
     }
+
+    [Fact(DisplayName = "Sqlite: opaque SQL instructions fail closed under a read scope, as raw queries do (NK-046)")]
+    public async Task Opaque_instructions_fail_closed_under_a_read_scope()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(s => s.AddSingleton<IReadFilterContributor, TitleReadContributor>());
+        using var _ = Lease(NewPartition());
+        await new Doc { Title = "a" }.Save();
+
+        var read = async () => await Data<Doc, string>.Execute<long>(
+            Koan.Data.Abstractions.Instructions.InstructionSql.Scalar("SELECT 1", Koan.Data.Abstractions.Sources.DataOperationEffect.Read));
+        await read.Should().ThrowAsync<NotSupportedException>("the SQL is opaque and cannot carry the read predicate");
+        var write = async () => await Data<Doc, string>.Execute("SELECT 1", Koan.Data.Abstractions.Sources.DataOperationEffect.Write);
+        await write.Should().ThrowAsync<NotSupportedException>();
+
+        // Schema instructions carry no rows and stay available.
+        (await Data<Doc, string>.Execute<bool>(new Koan.Data.Abstractions.Instructions.Instruction(
+            Koan.Data.Abstractions.Instructions.DataInstructions.EnsureCreated))).Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Sqlite: the Clear instruction fails closed under a read scope instead of wiping hidden rows (NK-046, NK-101)")]
+    public async Task Clear_instruction_fails_closed_under_a_read_scope()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(RegisterAxis, s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        using var _ = Lease(NewPartition());
+
+        using (Writing("visible")) await new Doc { Title = "v" }.Save();
+        using (Writing("hidden")) await new Doc { Title = "h" }.Save();
+
+        var clear = async () => await Data<Doc, string>.Execute<int>(new Koan.Data.Abstractions.Instructions.Instruction(
+            Koan.Data.Abstractions.Instructions.DataInstructions.Clear));
+        await clear.Should().ThrowAsync<NotSupportedException>();
+
+        using (AsModerator()) (await Doc.All()).Should().HaveCount(2, "nothing was deleted");
+    }
+
+    [Fact(DisplayName = "Sqlite: a Direct session refuses while a Shared isolation axis value is ambient (NK-046, NK-066)")]
+    public async Task Direct_session_refuses_under_an_ambient_isolation_axis()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(RegisterAxis, s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        using var _ = Lease(NewPartition());
+        var direct = () => host.Services.GetRequiredService<IDataService>().Direct(adapter: "sqlite")
+            .Effect(Koan.Data.Abstractions.Sources.DataOperationEffect.Read).Scalar<long>("SELECT 1");
+
+        using (Writing("visible"))
+            await direct.Should().ThrowAsync<NotSupportedException>("opaque provider commands cannot carry the axis predicate");
+
+        (await direct()).Should().Be(1, "with no axis value bound the session runs");
+    }
 }

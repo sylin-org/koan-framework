@@ -236,6 +236,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     private void GuardDirect()
     {
+        GuardIsolationAxes();
         if (_segmentation.IsEmpty) return;
         var binding = _segmentation.Untyped.Bind("direct data operation");
         if (binding.IsEmpty) return; // an explicit host scope is a deliberate control-plane operation
@@ -244,6 +245,25 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             "Direct data operations cannot preserve the application's compiled segmentation guarantee because " +
             "opaque provider commands carry no framework predicate. Use the Entity surface, or establish an " +
             "explicit host scope for a genuine control-plane operation.");
+    }
+
+    // NK-046 / NK-066: a Shared-mode isolation axis (a row-scoped, ambient-stamped managed field such as an org or a
+    // region) isolates rows exactly like segmentation, and an opaque command cannot carry its predicate either. A
+    // Direct session is untyped, so it refuses whenever such an axis value is bound for any entity. Visibility axes
+    // whose value is set by an operation (soft delete) are not isolation and stay out of the refusal.
+    private static void GuardIsolationAxes()
+    {
+        foreach (var descriptor in Koan.Data.Abstractions.Pipeline.ManagedFieldRegistry.All)
+        {
+            if (descriptor.Provenance != Koan.Data.Abstractions.Pipeline.FieldProvenance.AmbientStamped ||
+                descriptor.RequiredCapability != Koan.Data.Abstractions.Capabilities.DataCaps.Isolation.RowScoped ||
+                descriptor.ValueProvider() is null)
+                continue;
+            throw new NotSupportedException(
+                $"Direct data operations cannot preserve the isolation axis '{descriptor.StorageName}' while its value is " +
+                "bound, because opaque provider commands carry no framework predicate. Use the Entity surface, or run " +
+                "the command where no isolation axis value is bound.");
+        }
     }
 
     private bool TryInvokeExecutor<TResult>(

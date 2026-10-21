@@ -179,6 +179,9 @@ validation:
 - A literal connection override retains the named/default source ceiling. Query and scalar carry proven `Read`;
   opaque execute and transaction creation carry `Unknown` and therefore reject on every constrained source.
   Data never infers safety from a SQL prefix or result shape.
+- A Direct session refuses, like segmentation, while a Shared-mode isolation axis value is bound (a row-scoped,
+  ambient-stamped managed field). It is untyped, so per-entity read predicates (soft delete, Web row filters) are
+  not evaluated for it; those paths are covered on the Entity surface (DATA-0129).
 
 ## Source Integration ownership
 

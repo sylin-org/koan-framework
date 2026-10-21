@@ -176,7 +176,11 @@ shape or data mutation authority by declaring the two independent ceilings once:
 Entity, batch, instruction, and Direct paths consume the same immutable source plan. `ReadOnly`
 blocks data writes; `External` independently blocks create/alter/drop/repair. Forbidden and opaque
 effects reject before lifecycle callbacks, readiness, resource creation, or provider I/O. Provider
-credentials remain the security boundary.
+credentials remain the security boundary. A `Read` label on SQL is the caller's word, so SQLite and
+PostgreSQL run Read instructions on their raw-read lane, where the engine refuses a write. Opaque
+instructions, like raw queries, fail closed under any active managed or read scope (soft delete, data
+axes, request row filters), and `DataInstructions.Clear` runs as `DeleteAll` (refused for soft-delete
+entities, DATA-0129).
 
 For a synchronous console process, `new ServiceCollection().StartKoan()` starts a standard .NET
 Generic Host and returns its active provider facade. The caller owns it; use

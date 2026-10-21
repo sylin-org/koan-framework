@@ -69,6 +69,31 @@ public sealed class SqliteRawQueryBoundarySpec(SqliteFixture fixture, ITestOutpu
             .Should().BeEmpty("the raw path is query_only every time, not only the first");
     }
 
+    [Fact(DisplayName = "Sqlite: a Read-labelled SQL instruction runs query_only, so a mislabelled write fails at the engine")]
+    public async Task A_read_labelled_instruction_cannot_write()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition("raw-read-instruction"));
+        await RawBoundaryProbe.UpsertMany([new RawBoundaryProbe { Id = "a" }]);
+        await using var side = await OpenSide();
+        await Execute(side, "CREATE TABLE IF NOT EXISTS KOAN_RAW_SENTINEL (Id INTEGER PRIMARY KEY); " +
+                            "INSERT OR IGNORE INTO KOAN_RAW_SENTINEL VALUES (1)");
+
+        // NK-037: the effect is the caller's label, and the source policy trusts it. The provider must not.
+        var mislabelled = async () => await Data<RawBoundaryProbe, string>.Execute(
+            "DELETE FROM KOAN_RAW_SENTINEL", Koan.Data.Abstractions.Sources.DataOperationEffect.Read);
+        await mislabelled.Should().ThrowAsync<SqliteException>().WithMessage("*readonly*");
+        (await Scalar(side, "SELECT COUNT(*) FROM KOAN_RAW_SENTINEL")).Should().Be(1, "the mislabelled DELETE did not run");
+
+        (await Data<RawBoundaryProbe, string>.Execute<long>(Koan.Data.Abstractions.Instructions.InstructionSql.Scalar(
+                "SELECT query_only FROM pragma_query_only", Koan.Data.Abstractions.Sources.DataOperationEffect.Read)))
+            .Should().Be(1, "a Read instruction runs on the query_only lane");
+        (await Data<RawBoundaryProbe, string>.Execute<long>(Koan.Data.Abstractions.Instructions.InstructionSql.Scalar(
+                "SELECT query_only FROM pragma_query_only", Koan.Data.Abstractions.Sources.DataOperationEffect.Write)))
+            .Should().Be(0, "a declared write keeps the ordinary connection");
+    }
+
     private static IRawQueryRepository<RawBoundaryProbe, string> Repository(BoundHost host)
         => (IRawQueryRepository<RawBoundaryProbe, string>)host.Services.GetRequiredService<IDataService>()
             .GetRepository<RawBoundaryProbe, string>();

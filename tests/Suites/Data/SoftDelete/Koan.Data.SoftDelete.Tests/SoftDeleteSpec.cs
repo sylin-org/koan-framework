@@ -181,4 +181,24 @@ public sealed class SoftDeleteSpec(SqliteFixture fixture, ITestOutputHelper outp
             .WithMessage("*Atomic batch removal*soft-deleted entity*");
         (await Doc.Get(doc.Id)).Should().NotBeNull("the contract is rejected before the first write");
     }
+
+    [Fact(DisplayName = "The Clear instruction never hard-deletes a soft-delete entity (NK-101)")]
+    public async Task Clear_instruction_never_hard_deletes_a_soft_delete_entity()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition());
+
+        await new Doc { Title = "a" }.Save();
+        await new Doc { Title = "b" }.Save();
+        var clear = () => Data<Doc, string>.Execute<int>(
+            new Koan.Data.Abstractions.Instructions.Instruction(Koan.Data.Abstractions.Instructions.DataInstructions.Clear));
+
+        await clear.Should().ThrowAsync<NotSupportedException>("the hide-deleted read scope applies, and Clear is opaque to it");
+        using (Doc.WithDeleted())
+            await clear.Should().ThrowAsync<NotSupportedException>("a table wipe would bypass the soft-delete override");
+
+        (await Doc.All()).Should().HaveCount(2);
+        using (Doc.WithDeleted()) (await Doc.All()).Should().HaveCount(2, "nothing was removed, physically or softly");
+    }
 }

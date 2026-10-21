@@ -918,7 +918,11 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private async Task<TResult> ExecuteSql<TResult>(Instruction instruction, CancellationToken ct)
     {
         var sql = InstructionSql(instruction);
-        await using var connection = await Open(ct).ConfigureAwait(false);
+        // NK-037: a Read effect is the caller's label, and source policy admitted the call on it. Run it on the raw-read
+        // lane (WEB-0074) so a mislabelled write fails at the engine instead of executing on a read-write connection.
+        await using var connection = instruction.EffectiveEffect() == DataOperationEffect.Read
+            ? await OpenReadOnly(ct).ConfigureAwait(false)
+            : await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         if (instruction.Parameters is not null) BindObject(command, instruction.Parameters);

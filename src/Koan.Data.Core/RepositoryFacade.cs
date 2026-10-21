@@ -1366,11 +1366,36 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 $"entity '{typeof(TEntity).Name}'. Use the Entity query/write surface, or model a genuine " +
                 "control-plane entity as host-scoped.");
         }
+        var carriesRows = !InstructionCarriesNoRows(instruction.Name);
+        if (instruction.Name == DataInstructions.Clear)
+        {
+            // Clear means DeleteAll. It refuses under an active scope first, as every opaque instruction does, rather
+            // than silently narrowing; lowered, it inherits DeleteAll's write effect, remove Lifecycle and bounded pages
+            // instead of the adapter's table wipe (NK-046, NK-101).
+            GuardRawAgainstActiveScope(_segmentation.Bind("entity instruction"));
+            // A soft-delete entity outside its hiding scope (WithDeleted) would be re-soft-deleted page after page
+            // without end (NK-100), and a wipe would bypass the override; Clear is refused for it instead.
+            if (_deleteOverride is not null)
+                throw new NotSupportedException(
+                    $"Instruction '{instruction.Name}' cannot clear '{typeof(TEntity).Name}', whose deletes are overridden " +
+                    $"(soft delete). Use {typeof(TEntity).Name}.RemoveAll() to soft-remove visible rows, or hard-delete rows explicitly.");
+            var cleared = await DeleteAll(ct);
+            return cleared is TResult typed
+                ? typed
+                : (TResult)Convert.ChangeType(cleared, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture);
+        }
         await using var operationScope = await Guard(effect, "entity instruction", ct);
+        // Opaque instructions carry no framework predicate, so they fail closed under any active managed or read scope
+        // (soft delete, data axes, request row filters), exactly as QueryRaw does (NK-046).
+        if (carriesRows) GuardRawAgainstActiveScope(operationScope.Segmentation);
         if (_inner is IInstructionExecutor<TEntity> exec)
             return await exec.ExecuteAsync<TResult>(instruction, ct);
         throw new NotSupportedException($"Repository for {typeof(TEntity).Name} does not support instruction '{instruction.Name}'.");
     }
+
+    /// <summary>Instructions that provision or inspect schema and read or change no rows.</summary>
+    private static bool InstructionCarriesNoRows(string name) =>
+        name is DataInstructions.EnsureCreated or RelationalInstructions.SchemaEnsureCreated or RelationalInstructions.SchemaValidate;
 
     private sealed class BatchFacade : IBatchSet<TEntity, TKey>
     {
@@ -1762,7 +1787,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     // --- analytics (DATA-0128): an aggregate is a read, so it carries the same read scope as Query ---
 
     /// <summary>
-    /// Compose what <see cref="ExecuteAnalytics"/> would run now: the adapter that owns the mapping and dialect writes
+    /// Compose what <see cref="Koan.Data.Abstractions.Analytics.IAnalyticsQueryExecutor{TEntity}.ExecuteAnalytics"/> would run now: the adapter that owns the mapping and dialect writes
     /// the SQL, and the caller's folded read scope (segmentation, managed equality, read-filter contributors such as
     /// soft delete, data axes and Web row filters) is ANDed into its predicate. The facade adds no words of its own.
     /// </summary>

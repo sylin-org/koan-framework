@@ -362,6 +362,8 @@
       href: DATA-0127-datasource-attribute-routes-the-entity.md
     - name: DATA-0128 An analytics answer is a read and carries the caller's read scope
       href: DATA-0128-analytics-reads-carry-the-read-scope.md
+    - name: DATA-0129 Opaque instructions fail closed under every scope, and a Read label is enforced by the store
+      href: DATA-0129-opaque-instructions-fail-closed-under-every-scope.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

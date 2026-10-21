@@ -663,15 +663,20 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             ? null
             : SqlParameters.FromDictionary(instruction.Parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
+        // NK-037: a Read effect is the caller's label, and source policy admitted the call on it. Run it inside the
+        // raw-read fence (WEB-0074) so a mislabelled write is refused by the server instead of executing.
+        await using var fence = instruction.EffectiveEffect() == DataOperationEffect.Read
+            ? await BeginReadOnly(connection, ct).ConfigureAwait(false)
+            : null;
         if (instruction.Name == RelationalInstructions.SqlScalar)
         {
-            var value = await AdoCommands.ExecuteScalarAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+            var value = await AdoCommands.ExecuteScalarAsync(connection, sql, parameters, fence, ct).ConfigureAwait(false);
             if (value is null or DBNull) return default!;
             return (TResult)Convert.ChangeType(value, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture);
         }
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
-            return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+            return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, fence, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, fence, ct).ConfigureAwait(false);
         return (TResult)(object)rows.Select(row => new Dictionary<string, object?>((IDictionary<string, object?>)row,
             StringComparer.OrdinalIgnoreCase)).ToArray();
     }
