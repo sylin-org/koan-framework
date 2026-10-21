@@ -87,6 +87,13 @@ public static class FilterConvergence
         ("scalar-nin-with-null",      "{ \"Score\": { \"$nin\": [null, 100] } }"),
         ("not-gt-on-nullable",        "{ \"$not\": { \"Score\": { \"$gt\": 80 } } }"),
         ("nor-on-nullable",           "{ \"$nor\": [ { \"Score\": { \"$gt\": 80 } } ] }"),
+        // Case-sensitive string matching (NK-022, NK-032): the oracle compares ordinally, so a pattern in the wrong
+        // case matches nothing.
+        ("prefix-case-mismatch",      "{ \"Name\": \"al*\" }"),
+        ("suffix-case-mismatch",      "{ \"Name\": \"*HA\" }"),
+        ("contains-case-mismatch",    "{ \"Name\": \"*LPH*\" }"),
+        ("contains-case-match",       "{ \"Name\": \"*lph*\" }"),
+        ("suffix-case-match",         "{ \"Name\": \"*vo\" }"),
         ("empty-matches-all",         "{}"),
     };
 

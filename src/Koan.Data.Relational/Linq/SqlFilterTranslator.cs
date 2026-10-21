@@ -149,9 +149,13 @@ public sealed class SqlFilterTranslator
             case FilterOperator.Gte: return Compare(column, ">=", f.Value, field.ComparableType, mapped);
             case FilterOperator.Lt: return Compare(column, "<", f.Value, field.ComparableType, mapped);
             case FilterOperator.Lte: return Compare(column, "<=", f.Value, field.ComparableType, mapped);
-            case FilterOperator.StartsWith: return Like(column, f, mapped, suffix: "%");
-            case FilterOperator.EndsWith: return Like(column, f, mapped, prefix: "%");
-            case FilterOperator.Contains: return Like(column, f, mapped, prefix: "%", suffix: "%");
+            case FilterOperator.StartsWith:
+            case FilterOperator.EndsWith:
+            case FilterOperator.Contains:
+            {
+                var raw = ScalarValue(f.Value, typeof(string)) as string ?? string.Empty;
+                return _dialect.StringMatch(column, f.Operator, raw, value => AddParam(value, mapped));
+            }
             case FilterOperator.In: return InList(column, f, field, mapped, negate: false);
             case FilterOperator.Nin: return InList(column, f, field, mapped, negate: true);
             default:
@@ -224,14 +228,6 @@ public sealed class SqlFilterTranslator
             return $"({RelationalEnumOrder.Rank(column, enumeration.GetType())} {op} {AddParam(Convert.ToDecimal(enumeration, CultureInfo.InvariantCulture))})";
         }
         return $"({column} {op} {AddParam(raw, mapped)})";
-    }
-
-    private string Like(string column, FieldFilter f, MappingBindingPlan? mapped, string prefix = "", string suffix = "")
-    {
-        var raw = ScalarValue(f.Value, typeof(string)) as string ?? string.Empty;
-        var escaped = _dialect.EscapeLike(raw);
-        var pattern = prefix + escaped + suffix;
-        return $"({column} LIKE {AddParam(pattern, mapped)} ESCAPE '\\')";
     }
 
     private string InList(string column, FieldFilter f, ResolvedField field, MappingBindingPlan? mapped, bool negate)

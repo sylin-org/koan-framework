@@ -374,6 +374,8 @@
       href: DATA-0133-a-fresh-sqlite-host-is-ready-and-unqualified-direct-follows-the-default.md
     - name: DATA-0134 Relational filters keep the oracle's two-valued null semantics for Ne, In, Nin and Not
       href: DATA-0134-relational-filters-keep-the-oracle-null-semantics.md
+    - name: DATA-0135 Scalar StartsWith, EndsWith and Contains are case-sensitive on SQLite, through a dialect string-match hook
+      href: DATA-0135-sqlite-string-matching-is-case-sensitive.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

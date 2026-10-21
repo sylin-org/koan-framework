@@ -7,7 +7,8 @@ namespace Koan.Data.Relational.Linq;
 /// push down via <see cref="SqlFilterTranslator"/>. Centralized so the relational trio declares one
 /// honest, identical surface (DATA-XXXX).
 ///
-/// Scalar operators map to native SQL (comparison, LIKE, IN/NOT IN, IS [NOT] NULL). Collection
+/// Scalar operators map to native SQL (comparison, IN/NOT IN, IS [NOT] NULL, and the dialect's case-sensitive
+/// string match: LIKE where LIKE is case-sensitive, an exact literal comparison where it folds case). Collection
 /// operators map to native JSON-array containment (List&lt;string&gt; stored as a JSON array): Has /
 /// HasAny / HasAll / HasNone via <c>JsonArrayContains</c>, HasContains via
 /// <c>JsonArrayElementLike</c> (some element LIKE the escaped pattern), Size via <c>JsonArrayLength</c>.

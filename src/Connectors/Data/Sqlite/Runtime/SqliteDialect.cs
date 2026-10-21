@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Mapping;
 
@@ -17,6 +18,26 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
     public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
         // SQLite's LIKE folds ASCII case, which the case-sensitive floor does not; instr() is exact.
         $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE instr(value, {literalParameter}) > 0)";
+
+    /// <summary>
+    /// SQLite's LIKE folds ASCII case, and the oracle compares ordinally, so scalar matching binds the raw literal and
+    /// compares exactly: <c>substr</c> and <c>instr</c> yield values without a collation, so <c>=</c> is binary even over
+    /// a column declared NOCASE. Wildcards in the value are literal by construction. A null value answers null, which
+    /// filters as false.
+    /// </summary>
+    public string StringMatch(string columnSql, FilterOperator op, string value, Func<object?, string> bind)
+    {
+        var literal = bind(value);
+        return op switch
+        {
+            FilterOperator.StartsWith => $"(substr({columnSql}, 1, length({literal})) = {literal})",
+            // A start at or before the first character yields at most the whole value, which is shorter than a longer
+            // literal and so never equal to it; an empty literal starts past the end and matches every non-null value.
+            FilterOperator.EndsWith => $"(substr({columnSql}, length({columnSql}) - length({literal}) + 1) = {literal})",
+            FilterOperator.Contains => $"(instr({columnSql}, {literal}) > 0)",
+            _ => throw new NotSupportedException($"Operator '{op}' is not a scalar string match.")
+        };
+    }
 
     public string Read(PhysicalPath path, MappingValueShape shape, Type physicalType)
     {
