@@ -110,12 +110,14 @@ public static class ModuleOrdering
     {
         if (target is null)
         {
-            throw new InvalidOperationException(
+            throw new ModuleOrderingException(
+                source,
                 $"Koan ordering: {attributeName} on '{source.FullName}' has a null target.");
         }
         if (!typeof(KoanModule).IsAssignableFrom(target))
         {
-            throw new InvalidOperationException(
+            throw new ModuleOrderingException(
+                source,
                 $"Koan ordering: {attributeName}({target.FullName}) on '{source.FullName}' is invalid — " +
                 $"target does not derive from {nameof(KoanModule)}.");
         }
@@ -123,7 +125,8 @@ public static class ModuleOrdering
 
     private static void ThrowSelfReference(Type node, string attributeName)
     {
-        throw new InvalidOperationException(
+        throw new ModuleOrderingException(
+            node,
             $"Koan ordering: {attributeName} on '{node.FullName}' references itself.");
     }
 
@@ -151,7 +154,8 @@ public static class ModuleOrdering
         path.Add(current); // closes the loop visually
 
         var cyclePath = string.Join(" -> ", path.Select(t => t.FullName));
-        throw new InvalidOperationException(
+        throw new ModuleOrderingException(
+            path[0],
             "Koan ordering: cycle detected in [Before]/[After] constraints. " +
             $"Cycle path: {cyclePath}. Resolve by removing one of the constraints along the cycle.");
     }

@@ -35,9 +35,13 @@ namespace Koan.Data.Core.Axes;
 /// </summary>
 public static class DataAxisExpander
 {
-    /// <summary>Discover every <see cref="IDataAxis"/> implementor and expand it. The production entry point.</summary>
+    /// <summary>
+    /// Discover every <see cref="IDataAxis"/> implementor this host activated and expand it. The production entry point.
+    /// An axis declared in an assembly whose module the host left inactive (unreferenced or side-loaded) does not apply
+    /// (ARCH-0138).
+    /// </summary>
     public static void ExpandDiscovered(IServiceCollection services)
-        => Expand(KoanRegistry.GetDiscoveredImplementors(typeof(IDataAxis)), services);
+        => Expand(KoanRegistry.GetDiscoveredImplementors(typeof(IDataAxis), services), services);
 
     /// <summary>
     /// Instantiate each axis type, declare it, and expand. Skips a type that is abstract or has no public parameterless

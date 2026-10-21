@@ -162,15 +162,9 @@ public static class AppBootstrapper
                 foreach (var rn in refs)
                 {
                     if (set.ContainsKey(rn.Name!)) continue;
-                    try
-                    {
-                        var loaded = Assembly.Load(rn);
-                        if (AddAsm(loaded))
-                        {
-                            changed = true;
-                        }
-                    }
-                    catch { lenientAssemblySkips++; /* TIER A: skip absent reference, counted */ }
+                    // TIER A: an absent reference is a counted skip; a manifest-loader failure is not (ARCH-0138).
+                    if (TryScan(() => Assembly.Load(rn), a => AddAsm(a), out var skipped)) changed = true;
+                    if (skipped) lenientAssemblySkips++;
                 }
             }
         }
@@ -192,19 +186,22 @@ public static class AppBootstrapper
             var baseDir = AppContext.BaseDirectory;
             foreach (var file in Directory.GetFiles(baseDir, "Koan.*.dll"))
             {
-                try
-                {
-                    var asmName = AssemblyName.GetAssemblyName(file);
-                    if (!set.ContainsKey(asmName.Name!))
+                // TIER A: a bad file is a counted skip; a manifest-loader failure is not (ARCH-0138).
+                TryScan(
+                    () =>
                     {
-                        var asm = Assembly.Load(asmName);
-                        AddAsm(asm, isDiscovery: true);
-                    }
-                }
-                catch { lenientAssemblySkips++; /* TIER A: ignore bad file, counted */ }
+                        var asmName = AssemblyName.GetAssemblyName(file);
+                        return set.ContainsKey(asmName.Name!) ? null : Assembly.Load(asmName);
+                    },
+                    a => AddAsm(a, isDiscovery: true),
+                    out var skipped);
+                if (skipped) lenientAssemblySkips++;
             }
         }
-        catch { lenientAssemblySkips++; /* TIER A: ignore base-dir scan failure, counted */ }
+        catch (Exception exception) when (exception is not KoanBootException)
+        {
+            lenientAssemblySkips++; /* TIER A: ignore base-dir scan failure, counted */
+        }
 
         EmitAssemblySummary(assemblyLog, discoveredAssemblies, verboseAssemblies, lenientAssemblySkips);
 
@@ -295,12 +292,48 @@ public static class AppBootstrapper
             {
                 var name = line.Trim();
                 if (name.Length == 0 || !name.StartsWith("Koan.", StringComparison.Ordinal)) continue;
-                try { addAsm(Assembly.Load(new AssemblyName(name)), /* isDiscovery: */ true); }
-                catch { skips++; /* TIER A: a named-but-unloadable module is counted, not fatal */ }
+                // TIER A: a named-but-unloadable module is counted, not fatal; a manifest-loader failure is fatal.
+                TryScan(() => Assembly.Load(new AssemblyName(name)), a => addAsm(a, /* isDiscovery: */ true), out var skipped);
+                if (skipped) skips++;
             }
         }
-        catch { skips++; /* manifest unreadable — fall back to the other prongs */ }
+        catch (Exception exception) when (exception is not KoanBootException)
+        {
+            skips++; /* manifest unreadable — fall back to the other prongs */
+        }
         return skips;
+    }
+
+    /// <summary>
+    /// The one tolerance policy of the scan prongs (ARCH-0138). <paramref name="load"/> failing (an absent reference,
+    /// an unreadable file, a named-but-unloadable module) is a counted skip. A <see cref="KoanBootException"/> from
+    /// <paramref name="add"/> is the manifest loader's boot failure, already recorded and already subject to
+    /// <c>KOAN_BOOT_LENIENT</c>, so it propagates. A null load result means there is nothing to scan.
+    /// </summary>
+    internal static bool TryScan(Func<Assembly?> load, Func<Assembly, bool> add, out bool skipped)
+    {
+        skipped = false;
+        Assembly? assembly;
+        try
+        {
+            assembly = load();
+        }
+        catch (Exception exception) when (exception is not KoanBootException)
+        {
+            skipped = true;
+            return false;
+        }
+
+        if (assembly is null) return false;
+        try
+        {
+            return add(assembly);
+        }
+        catch (Exception exception) when (exception is not KoanBootException)
+        {
+            skipped = true;
+            return false;
+        }
     }
 
     // internal (not private) so AssemblySummaryVerboseGateSpec can pin the KOAN_VERBOSE_ASSEMBLIES gate

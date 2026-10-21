@@ -214,6 +214,8 @@
       href: ARCH-0136-every-composition-entry-path-is-the-whole-composition.md
     - name: ARCH-0137 Segmentation coverage is checked at composition
       href: ARCH-0137-segmentation-coverage-is-checked-at-composition.md
+    - name: ARCH-0138 Module discovery failures are boot failures, and only active modules contribute
+      href: ARCH-0138-module-discovery-failures-are-boot-failures.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

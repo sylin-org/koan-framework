@@ -106,6 +106,35 @@ public static partial class KoanRegistry
             : Array.Empty<Type>();
 
     /// <summary>
+    /// Returns the discovered implementers that may contribute to the host <paramref name="services"/> composes: those
+    /// declared in an assembly whose Koan modules the host's constitution left inactive (present but not referenced,
+    /// or side-loaded) are excluded. An assembly with no Koan module, and every assembly under a degraded constitution
+    /// (no reference manifest, every loaded module active), is kept. Before module initialization the full set is
+    /// returned (ARCH-0138).
+    /// </summary>
+    public static Type[] GetDiscoveredImplementors(Type contract, IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        var discovered = GetDiscoveredImplementors(contract);
+        var constitution = services
+            .Select(static descriptor => descriptor.ImplementationInstance)
+            .OfType<SemanticCompositionSession>()
+            .FirstOrDefault()?.Constitution;
+        if (constitution is null || constitution.IsDegraded || discovered.Length == 0) return discovered;
+
+        var active = constitution.ActiveDescriptors
+            .Select(static descriptor => descriptor.ImplementationType.Assembly)
+            .ToHashSet();
+        var inactive = constitution.InactiveDescriptors
+            .Select(static descriptor => descriptor.ImplementationType.Assembly)
+            .Where(assembly => !active.Contains(assembly))
+            .ToHashSet();
+        return inactive.Count == 0
+            ? discovered
+            : discovered.Where(type => !inactive.Contains(type.Assembly)).ToArray();
+    }
+
+    /// <summary>
     /// Clears all registered items; intended for testing only.
     /// </summary>
     internal static void ResetForTesting()

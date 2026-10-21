@@ -64,7 +64,26 @@ internal sealed class SemanticModuleRuntime
     public void Register(IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        foreach (var type in OrderLifecycleTypes()) TryRegister(type, services);
+        Type[] ordered;
+        try
+        {
+            ordered = OrderLifecycleTypes();
+        }
+        catch (ModuleOrderingException exception)
+        {
+            // An invalid [Before]/[After] declaration is the declaring module's registration failure, so it reaches
+            // the same record-and-throw boot path as every other one (ARCH-0138).
+            var owner = _modules.FirstOrDefault(entry => entry.Descriptor.ImplementationType == exception.Module).Descriptor;
+            if (owner is null) throw;
+            throw new SemanticRuntimeException(
+                new SemanticProblem(
+                    owner.Id,
+                    "module-ordering-invalid",
+                    $"Fix the [Before]/[After] declaration on '{owner.ImplementationType.FullName}'."),
+                exception);
+        }
+
+        foreach (var type in ordered) TryRegister(type, services);
     }
 
     public KoanModule GetModule(SemanticId id) =>
