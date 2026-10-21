@@ -547,6 +547,27 @@ public sealed class EntityExecutionSemanticsSpec
         after.Should().Equal("kept");
     }
 
+    [Fact]
+    public async Task Batch_without_item_outcomes_runs_no_after_remove_when_the_store_deleted_fewer_rows()
+    {
+        // NK-302: without per-item outcomes the count is the only fact; a shortfall cannot say which remove completed.
+        var after = new List<string>();
+        var lifecycle = new EntityLifecyclePlan<ReceiptEntity, string>();
+        lifecycle.AddAfterRemove(context =>
+        {
+            after.Add(context.Current.Id);
+            return ValueTask.CompletedTask;
+        });
+        var repository = new ReceiptRepository { GetResult = id => new ReceiptEntity { Id = id } };
+        repository.Batch.SaveResult = new BatchResult(0, 0, 1);
+        var facade = new RepositoryFacade<ReceiptEntity, string>(repository, lifecycle: lifecycle);
+
+        var act = () => facade.CreateBatch().Delete("raced").Delete("kept").Save();
+
+        await act.Should().ThrowAsync<BatchReceiptRejectedException>().WithMessage("*1 of 2*");
+        after.Should().BeEmpty("no remove can be shown to have completed");
+    }
+
     private sealed class ReceiptEntity : Entity<ReceiptEntity, string>
     {
         [Identifier]

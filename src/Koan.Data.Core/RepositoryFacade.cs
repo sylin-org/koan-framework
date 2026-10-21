@@ -1801,6 +1801,15 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                     await lifecycle.CompleteUpsert(addContexts[i], adds[i]);
                 for (var i = 0; i < updateContexts.Count; i++)
                     await lifecycle.CompleteUpsert(updateContexts[i], updates[i]);
+                // NK-302: without per-item outcomes the count is the only fact. A shortfall cannot say which remove
+                // completed, so none completes and the receipt is refused, as DeleteMany refuses the same mismatch.
+                if (!result.HasCompleteItemOutcomes && !lowerSoftDeletes &&
+                    removeContexts.Count != 0 && result.Deleted != removeContexts.Count)
+                    throw new BatchReceiptRejectedException(
+                        typeof(TEntity).FullName ?? typeof(TEntity).Name,
+                        $"The store deleted {result.Deleted} of {removeContexts.Count} removes and reported no per-item " +
+                        "outcomes, so the removes that completed cannot be identified and AfterRemove did not run.",
+                        DataCommitOutcome.Unknown);
                 foreach (var context in completedRemoves)
                     await lifecycle.CompleteRemove(context);
             }

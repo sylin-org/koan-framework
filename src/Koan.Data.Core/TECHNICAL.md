@@ -255,7 +255,9 @@ validation:
 - A batch delete is scoped like `Delete` (DATA-0124). Under a managed or read scope only the queued ids the scope can
   read are dispatched (one scoped query, or the remove Lifecycle's scoped read); the rest report `Missing` and are
   never sent to the identity-only native delete. Each queued delete records its native slot, so complete outcomes stay
-  in builder order. With complete outcomes, `AfterRemove` runs only for deletes reported `Applied`.
+  in builder order. With complete outcomes, `AfterRemove` runs only for deletes reported `Applied`. Without them, a
+  store that deleted fewer rows than were dispatched cannot say which removes completed, so the batch throws
+  `BatchReceiptRejectedException` and no `AfterRemove` runs, as `DeleteMany` does (NK-302).
 - A keyed delete under a scope carries the folded read scope to the store when the adapter declares
   `Write.ConditionalDelete` (DATA-0156): `ConditionalDeleteAsync(id, scope)`, `ConditionalDeleteMany(ids, scope)`, and
   `IConditionalBatchDelete.DeleteIf(id, scope)` inside a native batch, which then needs no visibility read. A row that
