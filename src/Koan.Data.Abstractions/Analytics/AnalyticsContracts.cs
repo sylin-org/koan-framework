@@ -347,6 +347,55 @@ public interface IAnalyticsQueryComposer<TEntity>
         IReadOnlyDictionary<string, object?>? parameterValues,
         out AnalyticsSql sql,
         out string? corrective);
+
+    /// <summary>
+    /// Compose the bounded ask with <paramref name="scope"/>, the caller's read scope, ANDed into the ask's own
+    /// predicate, so the store aggregates only rows the caller may read. A composer that cannot place the scope in
+    /// its predicate refuses; this default refuses whenever a scope is supplied.
+    /// </summary>
+    bool TryCompose(
+        AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        Filter? scope,
+        out AnalyticsSql sql,
+        out string? corrective)
+    {
+        if (scope is null) return TryCompose(question, parameterValues, out sql, out corrective);
+        sql = null!;
+        corrective =
+            $"Question '{question.Name}' runs under a read scope (for example soft delete, a data axis or a request " +
+            "row filter) that this store's composer cannot place in its predicate. Route the entity to a connector " +
+            "that composes scoped asks (SQLite or DuckDB), or ask outside the scope.";
+        return false;
+    }
+}
+
+/// <summary>
+/// The boundary half of analytics, implemented by the repository facade: a declared question is composed with the
+/// caller's full read scope and executed as one guarded read, and a materialized projection, which is one table
+/// shared by every caller, is entered only when nothing scopes the caller's reads of its entity.
+/// </summary>
+public interface IAnalyticsQueryExecutor<TEntity>
+    where TEntity : class
+{
+    /// <summary>
+    /// Compose and run the question under one guarded read. Returns the scalar for an ungrouped question and the rows
+    /// (at most <paramref name="rowLimit"/> when set) for a grouped one. Throws <see cref="NotSupportedException"/>
+    /// with the composer's corrective when the store cannot answer honestly.
+    /// </summary>
+    Task<object?> ExecuteAnalytics(
+        AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        int? rowLimit,
+        CancellationToken ct);
+
+    /// <summary>
+    /// Enter one read or refresh of a materialized projection of this entity: the source policy and the operation
+    /// horizon admit it as a read, and the lease is held until it is disposed. Returns <c>null</c> while any read
+    /// scope applies to the caller, because the projection was not computed for that scope and must be neither
+    /// served to it nor refreshed under it.
+    /// </summary>
+    Task<IAsyncDisposable?> TryEnterProjection(string operation, CancellationToken ct);
 }
 
 /// <summary>

@@ -32,6 +32,7 @@ internal static class AnalyticsExecution
         var question = ResolveMaterialized(name, "the read-model door serves materialized rows", "Run it instead, or add Materialize to the declaration.");
         var services = AmbientHost();
         var sink = GetSink(services, question);
+        await using var projection = await EnterProjection(question, "analytics rows door", cancellationToken).ConfigureAwait(false);
         await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
         var raw = await sink.ReadRowsAsync(name, limit + 1, offset, filters, cancellationToken).ConfigureAwait(false);
         var capped = raw.Count > limit;
@@ -64,6 +65,7 @@ internal static class AnalyticsExecution
                 $"Column '{by}' is not a declared column of projection '{name}'. " +
                 "Declared columns: " + string.Join(", ", question.Columns.Select(static c => c.Name)) + ".");
         var sink = GetSink(AmbientHost(), question);
+        await using var projection = await EnterProjection(question, "analytics facets door", cancellationToken).ConfigureAwait(false);
         await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
 
         if (since is null)
@@ -121,6 +123,7 @@ internal static class AnalyticsExecution
             throw new NotSupportedException(
                 "The delta door needs a sink that tracks changes; the elected engine's sink does not. " +
                 "The read-model door (rows) remains available.");
+        await using var projection = await EnterProjection(question, "analytics delta door", cancellationToken).ConfigureAwait(false);
         await sink.EnsureAsync(name, question.Columns, cancellationToken).ConfigureAwait(false);
         var page = await tracking.ReadDeltaAsync(name, stamp, limit, cancellationToken).ConfigureAwait(false);
         var rows = new List<AnalyticsRow>(page.Rows.Count);
@@ -158,6 +161,46 @@ internal static class AnalyticsExecution
                 "The engine connector must implement IAnalyticsProjectionSink (the DuckDB connector does).");
     }
 
+    /// <summary>
+    /// The entity's repository boundary, which composes and executes asks under the caller's read scope and admits
+    /// projection reads (DATA-0128). Analytics never runs SQL around it.
+    /// </summary>
+    private static IAnalyticsQueryExecutor<TEntity> Boundary<TEntity, TKey>(IDataRepository<TEntity, TKey> repository)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+        => repository as IAnalyticsQueryExecutor<TEntity>
+           ?? throw new NotSupportedException(
+               $"The store for '{typeof(TEntity).Name}' does not execute aggregate asks through the Data boundary; analytics cannot run there.");
+
+    /// <summary>
+    /// Enter a read of one materialized projection. A projection is one table computed for every caller, so it is
+    /// entered only when nothing scopes the caller's reads of its entity; otherwise this refuses.
+    /// </summary>
+    internal static Task<IAsyncDisposable> EnterProjection(AnalyticsQuestion question, string operation, CancellationToken ct)
+        => question is IMaterializedProjectionGate gate
+            ? gate.EnterProjection(AmbientHost(), operation, ct)
+            : throw new NotSupportedException(
+                $"Question '{question.Name}' was not declared through Analytics.Question, so its projection cannot be admitted.");
+
+    internal static async Task<IAsyncDisposable> EnterProjection<TEntity, TKey>(
+        AnalyticsQuestion question,
+        IServiceProvider services,
+        string operation,
+        CancellationToken ct)
+        where TEntity : class, IEntity<TKey>
+        where TKey : notnull
+    {
+        var boundary = Boundary(services.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>());
+        return await boundary.TryEnterProjection(operation, ct).ConfigureAwait(false)
+               ?? throw ScopedProjection(question);
+    }
+
+    private static NotSupportedException ScopedProjection(AnalyticsQuestion question) =>
+        new($"Projection '{question.Name}' is one table computed for every caller, and this caller's reads of " +
+            $"'{question.EntityType.Name}' are scoped (soft delete, a data axis, a tenant, or a request row filter). It is " +
+            "neither served to nor refreshed under a scope it was not computed for. Ask the question with Run, which " +
+            "computes live under the caller's scope, or refresh and read it where no read scope applies.");
+
     public static async Task<AnalyticsResult> Run<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
         IServiceProvider services,
@@ -178,9 +221,7 @@ internal static class AnalyticsExecution
                 $"'{typeof(TEntity).Name}' is routed to '{repository.GetType().Name}', which offers none. " +
                 "Reference a relational connector (for example Sylin.Koan.Data.Connector.Sqlite) for the entity's store.");
 
-        if (repository is not IInstructionExecutor<TEntity> executor)
-            throw new NotSupportedException(
-                $"The store for '{typeof(TEntity).Name}' does not execute raw asks; analytics cannot run there.");
+        var boundary = Boundary(repository);
 
         // Values for parameters the question never declares are a caller mistake, not extra data. Refusing
         // here — before any composition — keeps the guard for questions with no Where clause too, where the
@@ -195,6 +236,7 @@ internal static class AnalyticsExecution
                     string.Join(", ", undeclared) + ".");
         }
 
+        // Composed now to refuse before any I/O and to name the engine; the boundary recomposes under its own guard.
         if (!composer.TryCompose(question, parameterValues, out var sql, out var corrective))
             throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
 
@@ -204,23 +246,29 @@ internal static class AnalyticsExecution
 
         // Serve-or-compute: a materialized question prefers its projection within the declared tolerance —
         // or the caller's maxAge when tighter; anything staler (or colder) computes live — and backfills
-        // when the question says so.
+        // when the question says so. A scoped caller is never served the shared projection and never backfills
+        // it: its answer is computed live under its own scope.
         if (question.Projection is not null)
         {
             var sink = GetSink(services, question);
-            return await RunMaterializedAsync(
-                question, sql, executor, sink, options, ceiling, timeout.Token, ask?.MaxAge).ConfigureAwait(false);
+            var projection = await boundary.TryEnterProjection("analytics projection serve", timeout.Token).ConfigureAwait(false);
+            if (projection is not null)
+            {
+                await using (projection.ConfigureAwait(false))
+                    return await RunMaterializedAsync(
+                        question, sql, parameterValues, boundary, sink, ceiling, timeout.Token, ask?.MaxAge).ConfigureAwait(false);
+            }
         }
 
-        return await ComputeLiveAsync(question, sql, executor, ceiling, timeout.Token).ConfigureAwait(false);
+        return await ComputeLiveAsync(question, sql, parameterValues, boundary, ceiling, timeout.Token).ConfigureAwait(false);
     }
 
     private static async Task<AnalyticsResult> RunMaterializedAsync<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
         AnalyticsSql composed,
-        IInstructionExecutor<TEntity> executor,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        IAnalyticsQueryExecutor<TEntity> boundary,
         IAnalyticsProjectionSink sink,
-        AnalyticsOptions options,
         int ceiling,
         CancellationToken token,
         TimeSpan? callerMaxAge = null)
@@ -256,16 +304,16 @@ internal static class AnalyticsExecution
         }
 
         // Stale or cold: compute live; backfill when declared. Either way the answer is labeled live.
-        var result = await ComputeLiveAsync(question, composed, executor, ceiling, token).ConfigureAwait(false);
+        var result = await ComputeLiveAsync(question, composed, parameterValues, boundary, ceiling, token).ConfigureAwait(false);
         if (policy.BackfillOnRead)
-            await BackfillAsync(question, composed, executor, sink, options, token).ConfigureAwait(false);
+            await RefreshAsync(question, boundary, sink, token, "backfill-on-read").ConfigureAwait(false);
         return result;
     }
 
-    /// <summary>Re-materialize one projection: compute over the record store, replace the engine's rows.</summary>
     /// <summary>
-    /// Refresh one materialized projection end to end: resolve the entity's repository, compose over the
-    /// record store, replace the elected engine's rows, stamp the refresh state.
+    /// Refresh one materialized projection end to end: resolve the entity's repository boundary, admit the
+    /// projection (refused under any read scope), compute over the record store, replace the elected engine's rows,
+    /// stamp the refresh state.
     /// </summary>
     public static async Task<ProjectionRefreshReceipt> RefreshAsync<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
@@ -278,23 +326,25 @@ internal static class AnalyticsExecution
         var data = services.GetRequiredService<IDataService>();
         var repository = data.GetRepository<TEntity, TKey>();
         if (repository is not IAnalyticsQueryComposer<TEntity> composer ||
-            repository is not IInstructionExecutor<TEntity> executor)
+            repository is not IAnalyticsQueryExecutor<TEntity> boundary)
             throw new NotSupportedException(
                 $"Analytics projection refresh needs a record store that composes and executes aggregate asks; " +
                 $"'{typeof(TEntity).Name}' is routed to one that offers neither.");
         var sink = GetSink(services, question);
-        if (!composer.TryCompose(question, null, out var composed, out var corrective))
+        await using var projection = await boundary.TryEnterProjection("analytics projection refresh", cancellationToken).ConfigureAwait(false)
+                                     ?? throw ScopedProjection(question);
+        if (!composer.TryCompose(question, null, out _, out var corrective))
             throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
-        return await RefreshAsync(question, composed, executor, sink, cancellationToken, trigger).ConfigureAwait(false);
+        return await RefreshAsync(question, boundary, sink, cancellationToken, trigger).ConfigureAwait(false);
     }
 
-    public static async Task<ProjectionRefreshReceipt> RefreshAsync<TEntity, TKey>(
+    /// <summary>Recompute and replace the projection's rows. The caller holds the admitted projection lease.</summary>
+    private static async Task<ProjectionRefreshReceipt> RefreshAsync<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
-        AnalyticsSql composed,
-        IInstructionExecutor<TEntity> executor,
+        IAnalyticsQueryExecutor<TEntity> boundary,
         IAnalyticsProjectionSink sink,
         CancellationToken token,
-        string trigger = "programmatic")
+        string trigger)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
@@ -303,13 +353,10 @@ internal static class AnalyticsExecution
             ? [new Dictionary<string, object?>(StringComparer.Ordinal)
                {
                    [MeasureAlias(question.MeasureKind, question.MeasureMember)] =
-                       Normalize(await executor.ExecuteAsync<object?>(
-                           InstructionSql.Scalar(composed.Text, DataOperationEffect.Read, composed.Parameters),
-                           token).ConfigureAwait(false))
+                       Normalize(await boundary.ExecuteAnalytics(question, null, null, token).ConfigureAwait(false))
                }]
-            : await executor.ExecuteAsync<object?>(
-                InstructionSql.Query(composed.Text, DataOperationEffect.Read, composed.Parameters),
-                token).ConfigureAwait(false) as IReadOnlyList<Dictionary<string, object?>>
+            : await boundary.ExecuteAnalytics(question, null, null, token).ConfigureAwait(false)
+                  as IReadOnlyList<Dictionary<string, object?>>
             ?? throw new InvalidOperationException(
                 "The store answered a projection refresh with an unexpected shape; the composer and the " +
                 "executor disagree, which is an adapter defect.");
@@ -321,24 +368,11 @@ internal static class AnalyticsExecution
         return new ProjectionRefreshReceipt(question.Name, raw.Count, refreshUtc);
     }
 
-    private static async Task BackfillAsync<TEntity, TKey>(
-        AnalyticsQuestion<TEntity, TKey> question,
-        AnalyticsSql composed,
-        IInstructionExecutor<TEntity> executor,
-        IAnalyticsProjectionSink sink,
-        AnalyticsOptions options,
-        CancellationToken token)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        _ = options;
-        await RefreshAsync(question, composed, executor, sink, token, "backfill-on-read").ConfigureAwait(false);
-    }
-
     private static async Task<AnalyticsResult> ComputeLiveAsync<TEntity, TKey>(
         AnalyticsQuestion<TEntity, TKey> question,
         AnalyticsSql sql,
-        IInstructionExecutor<TEntity> executor,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        IAnalyticsQueryExecutor<TEntity> boundary,
         int ceiling,
         CancellationToken token)
         where TEntity : class, IEntity<TKey>
@@ -346,9 +380,7 @@ internal static class AnalyticsExecution
     {
         if (question.GroupMember is null)
         {
-            var scalar = await executor.ExecuteAsync<object?>(
-                InstructionSql.Scalar(sql.Text, DataOperationEffect.Read, sql.Parameters),
-                token).ConfigureAwait(false);
+            var scalar = await boundary.ExecuteAnalytics(question, parameterValues, null, token).ConfigureAwait(false);
             var value = Normalize(scalar);
             return new AnalyticsResult
             {
@@ -363,10 +395,7 @@ internal static class AnalyticsExecution
         }
 
         // Grouped answers fetch one row beyond the cap so a capped answer can say so honestly.
-        var text = $"{sql.Text} LIMIT {ceiling + 1}";
-        var raw = await executor.ExecuteAsync<object?>(
-            InstructionSql.Query(text, DataOperationEffect.Read, sql.Parameters),
-            token).ConfigureAwait(false);
+        var raw = await boundary.ExecuteAnalytics(question, parameterValues, ceiling + 1, token).ConfigureAwait(false);
 
         var rows = raw as IReadOnlyList<Dictionary<string, object?>>
             ?? throw new InvalidOperationException(
@@ -457,6 +486,14 @@ internal static class AnalyticsExecution
         {
             would = "compute";
         }
+        else if ((repository as Koan.Data.Core.Axes.IAxisScopeDiagnostics)?.CurrentReadScope() is not null)
+        {
+            // Run's rule (DATA-0128): the shared projection is never served to, or backfilled from, a scoped caller.
+            engine = sql.Provider;
+            would = "compute";
+            reason = "the caller's reads are scoped, so the shared materialization is neither served nor backfilled; " +
+                     "the answer is computed live under that scope";
+        }
         else
         {
             var tolerance = question.Projection.ServeWithin;
@@ -516,6 +553,7 @@ internal static class AnalyticsExecution
         take = Math.Clamp(take, 1, 100);
         var question = ResolveMaterialized(name, "the history door reads materializations", "Run it instead, or add Materialize to the declaration.");
         var sink = GetSink(AmbientHost(), question);
+        await using var projection = await EnterProjection(question, "analytics history door", cancellationToken).ConfigureAwait(false);
         var entries = await sink.ReadHistoryAsync(name, take, cancellationToken).ConfigureAwait(false);
         return new AnalyticsHistory { Question = name, Entries = entries };
     }

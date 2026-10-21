@@ -38,5 +38,7 @@
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\DuckDb\Koan.Data.Connector.DuckDb.csproj" />
     <!-- The engine: materialized projections live in the elected engine's store. -->
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\DuckDb.Native\Koan.Data.Connector.DuckDb.Native.csproj" />
+    <!-- A read-filter contributor (soft delete) proves analytics carries the caller's read scope (DATA-0128). -->
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Data.SoftDelete\Koan.Data.SoftDelete.csproj" />
   </ItemGroup>
 </Project>

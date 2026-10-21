@@ -52,7 +52,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     IDataMutationOutcomes<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
     IDataQueryBoundary<TEntity, TKey>,
-    Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>
+    Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>,
+    Koan.Data.Abstractions.Analytics.IAnalyticsQueryExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
@@ -1758,9 +1759,12 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         }
     }
 
+    // --- analytics (DATA-0128): an aggregate is a read, so it carries the same read scope as Query ---
+
     /// <summary>
-    /// Analytics composition forwards to the adapter repository that owns the mapping and dialect; the
-    /// facade has no words of its own. Stores that cannot compose refuse with a corrective.
+    /// Compose what <see cref="ExecuteAnalytics"/> would run now: the adapter that owns the mapping and dialect writes
+    /// the SQL, and the caller's folded read scope (segmentation, managed equality, read-filter contributors such as
+    /// soft delete, data axes and Web row filters) is ANDed into its predicate. The facade adds no words of its own.
     /// </summary>
     bool Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity>.TryCompose(
         Koan.Data.Abstractions.Analytics.AnalyticsQuestion question,
@@ -1768,8 +1772,54 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         out Koan.Data.Abstractions.Analytics.AnalyticsSql sql,
         out string? corrective)
     {
+        _sourcePlan.Demand(DataOperationEffect.Read, "entity analytics compose");
+        var scope = ReadScopeFilter(_segmentation.Bind("entity analytics compose"));
+        return TryComposeScoped(question, parameterValues, scope, out sql, out corrective);
+    }
+
+    async Task<object?> Koan.Data.Abstractions.Analytics.IAnalyticsQueryExecutor<TEntity>.ExecuteAnalytics(
+        Koan.Data.Abstractions.Analytics.AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        int? rowLimit,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(question);
+        await using var operationScope = await Guard(DataOperationEffect.Read, "entity analytics", ct);
+        var scope = ReadScopeFilter(operationScope.Segmentation);
+        if (!TryComposeScoped(question, parameterValues, scope, out var sql, out var corrective))
+            throw new NotSupportedException(corrective ?? "The store cannot answer this question honestly.");
+        if (_inner is not IInstructionExecutor<TEntity> executor)
+            throw new NotSupportedException(
+                $"The store for '{typeof(TEntity).Name}' does not execute aggregate asks; analytics cannot run there.");
+        // The composed SQL carries the scope it was composed under and runs inside the same guard, so it is not the
+        // opaque caller SQL the instruction gate refuses. LIMIT follows the composers' shared contract: they leave it
+        // off so the execution layer can add the cap.
+        var text = rowLimit is { } limit ? $"{sql.Text} LIMIT {limit}" : sql.Text;
+        var instruction = question.GroupMember is null
+            ? InstructionSql.Scalar(text, DataOperationEffect.Read, sql.Parameters)
+            : InstructionSql.Query(text, DataOperationEffect.Read, sql.Parameters);
+        return await executor.ExecuteAsync<object?>(instruction, ct);
+    }
+
+    async Task<IAsyncDisposable?> Koan.Data.Abstractions.Analytics.IAnalyticsQueryExecutor<TEntity>.TryEnterProjection(
+        string operation,
+        CancellationToken ct)
+    {
+        var operationScope = await Guard(DataOperationEffect.Read, operation, ct);
+        if (FoldReadScope(operationScope.Segmentation) is null) return operationScope;
+        await operationScope.DisposeAsync();
+        return null;
+    }
+
+    private bool TryComposeScoped(
+        Koan.Data.Abstractions.Analytics.AnalyticsQuestion question,
+        IReadOnlyDictionary<string, object?>? parameterValues,
+        Filter? scope,
+        out Koan.Data.Abstractions.Analytics.AnalyticsSql sql,
+        out string? corrective)
+    {
         if (_inner is Koan.Data.Abstractions.Analytics.IAnalyticsQueryComposer<TEntity> composer)
-            return composer.TryCompose(question, parameterValues, out sql, out corrective);
+            return composer.TryCompose(question, parameterValues, scope, out sql, out corrective);
         sql = null!;
         corrective =
             "Analytics questions need a record store that can compose aggregate asks. " +

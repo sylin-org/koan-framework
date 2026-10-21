@@ -10,10 +10,16 @@ namespace Koan.Data.Analytics.Recipes;
 /// parameter declarations, and the closed-generic run/explain/refresh paths captured at declaration —
 /// so no caller, including an agent tool, ever needs to recover type arguments.
 /// </summary>
-public sealed class AnalyticsQuestion<TEntity, TKey> : AnalyticsQuestion
+public sealed class AnalyticsQuestion<TEntity, TKey> : AnalyticsQuestion, Runtime.IMaterializedProjectionGate
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    Task<IAsyncDisposable> Runtime.IMaterializedProjectionGate.EnterProjection(
+        IServiceProvider services,
+        string operation,
+        CancellationToken ct) =>
+        Runtime.AnalyticsExecution.EnterProjection<TEntity, TKey>(this, services, operation, ct);
+
     private static readonly IReadOnlyDictionary<string, object?> EmptyParameters =
         new Dictionary<string, object?>(StringComparer.Ordinal);
 

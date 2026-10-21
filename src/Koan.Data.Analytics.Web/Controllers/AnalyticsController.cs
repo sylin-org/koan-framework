@@ -172,6 +172,18 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
         if (question.Projection is null)
             return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; run it instead — it has no materialized rows." });
 
+        // The projection is one table computed for every caller; a caller whose reads are scoped is refused (DATA-0128).
+        IAsyncDisposable projection;
+        try
+        {
+            projection = await AnalyticsExecution.EnterProjection(question, "analytics rows door", ct);
+        }
+        catch (NotSupportedException refusal)
+        {
+            return BadRequest(new { Error = "rows-refused", Message = refusal.Message });
+        }
+        await using var admitted = projection;
+
         var sink = HttpContext.RequestServices.GetRequiredService<IAnalyticsProjectionSink>();
         // A never-refreshed projection has no table yet; ensure-then-read answers empty honestly.
         await sink.EnsureAsync(recipe, question.Columns, ct);
@@ -295,7 +307,14 @@ public abstract class AnalyticsController<TEntity, TKey> : ControllerBase
         if (question.Projection is null)
             return BadRequest(new { Error = "not-materialized", Message = $"Question '{recipe}' is an on-demand question; it computes live and has nothing to refresh." });
 
-        return Ok(await question.RefreshAsync(HttpContext.RequestServices, ct, "http"));
+        try
+        {
+            return Ok(await question.RefreshAsync(HttpContext.RequestServices, ct, "http"));
+        }
+        catch (NotSupportedException refusal)
+        {
+            return BadRequest(new { Error = "refresh-refused", Message = refusal.Message });
+        }
     }
 
     private bool TryGetQuestion(string recipe, out AnalyticsQuestion question, out IActionResult? notFound)

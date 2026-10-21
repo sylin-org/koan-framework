@@ -52,10 +52,17 @@ at Run.
 The materialization is per-host by design: the engine is single-writer per file, and a derived store
 that rebuilds from the record store wants exactly that topology.
 
+A projection is one table computed for every caller, so it is served and refreshed only where nothing
+scopes the caller's reads of the entity. Under soft delete, a data axis, a tenant or a request row filter,
+`Run` computes live under the caller's scope (labeled live, never backfilled), and the rows, facets,
+delta, history and refresh doors refuse with a corrective ([DATA-0128](../../docs/decisions/DATA-0128-analytics-reads-carry-the-read-scope.md)).
+
 ## Honest envelope
 
 - On-demand asks compute **where the data lives** — the entity's relational record store composes the
-  aggregate in its own dialect.
+  aggregate in its own dialect, and the Data boundary ANDs the caller's read scope (segmentation, soft
+  delete, data axes, request row filters) into it, so an answer aggregates exactly the rows `Query` returns.
+  A store whose composer cannot place the scope refuses.
 - Questions are parameter-free in this grammar version; document-expression mapped indexes are
   governed by each store's declared capabilities.
 - Only direct property expressions are expressible; everything else refuses with a corrective.

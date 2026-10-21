@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Koan.Data.Core\Koan.Data.Core.csproj" />
     <ProjectReference Include="..\Koan.Data.Relational\Koan.Data.Relational.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The HTTP rows door admits projection reads through the same internal gate as Analytics.Rows (DATA-0128). -->
+    <InternalsVisibleTo Include="Koan.Data.Analytics.Web" />
+  </ItemGroup>
 </Project>

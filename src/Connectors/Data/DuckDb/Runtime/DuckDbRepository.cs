@@ -1025,6 +1025,13 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
     /// the cap (+1) so a capped answer can say so.
     /// </summary>
     public bool TryCompose(AnalyticsQuestion question, IReadOnlyDictionary<string, object?>? parameterValues, out AnalyticsSql sql, out string? corrective)
+        => TryCompose(question, parameterValues, scope: null, out sql, out corrective);
+
+    /// <summary>
+    /// Compose with the caller's read scope ANDed into the question's own predicate, translated by the same
+    /// translator as a scoped query, so an aggregate reads exactly the rows <c>Query</c> would (DATA-0128).
+    /// </summary>
+    public bool TryCompose(AnalyticsQuestion question, IReadOnlyDictionary<string, object?>? parameterValues, Filter? scope, out AnalyticsSql sql, out string? corrective)
     {
         sql = null!;
         corrective = null;
@@ -1033,6 +1040,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         var dialect = plan.Dialect;
         var parameters = new Dictionary<string, object?>(StringComparer.Ordinal);
         string? where = null;
+        Filter? filter = null;
         if (question.WhereExpression is not null)
         {
             var typedWhere = (Expression<Func<TEntity, bool>>)question.WhereExpression;
@@ -1043,7 +1051,11 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
                 corrective = bindCorrective;
                 return false;
             }
-            var filter = LinqFilterCompiler.Compile(bound);
+            filter = LinqFilterCompiler.Compile(bound);
+        }
+        if (scope is not null) filter = filter is null ? scope : Filter.All(filter, scope);
+        if (filter is not null)
+        {
             var translated = new SqlFilterTranslator(dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
             where = translated.whereSql;
             for (var index = 0; index < translated.parameters.Count; index++)
