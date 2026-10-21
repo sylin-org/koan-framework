@@ -211,11 +211,31 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
     // SEC-0013: the rows a principal may delete. The Delete constraint, else the Read constraint ("delete only rows I
     // can see"), so a realization that scopes reads but forgets Delete bounds every delete verb, not only DeleteAll.
+    // SEC-0019: a Read fallback may be a counterpart predicate; the verbs evaluate it through the Data facade.
     private static Filter? DeleteBound(EntityAccess<TEntity> accessor)
+        => ConstrainFor(accessor, AccessAction.Delete).Filter ?? ConstrainFor(accessor, AccessAction.Read).Filter;
+
+    // SEC-0019: the rows among ids that the delete bound admits, in request order. A row-only bound is checked on the
+    // loaded row; a counterpart bound only the store can answer, so it runs as one scoped query through the Data
+    // facade, the path a governed read takes. A connector without counterpart reads refuses there, as reads do.
+    private static async Task<List<TEntity>> RowsInDeleteBound(IReadOnlyCollection<TKey> ids, Filter? bound, CancellationToken ct)
     {
-        var bound = ConstrainFor(accessor, AccessAction.Delete).Filter ?? ConstrainFor(accessor, AccessAction.Read).Filter;
-        Filter.RequireRowOnly(bound, "Delete access bound");
-        return bound;
+        var rows = new List<TEntity>(ids.Count);
+        if (Filter.HasCounterpart(bound))
+        {
+            var keys = ids.Distinct().Select(static id => (object?)id).ToArray();
+            var found = (await Data<TEntity, TKey>.All(QueryDefinition.All.Where(
+                Filter.And(Filter.In(nameof(IEntity<TKey>.Id), keys), bound)), ct)).ToDictionary(row => row.Id);
+            foreach (var id in ids)
+                if (found.TryGetValue(id, out var row)) rows.Add(row);
+            return rows;
+        }
+        foreach (var id in ids)
+        {
+            var row = await Data<TEntity, TKey>.Get(id, ct);
+            if (row is not null && PassesRequestPredicates(row, bound)) rows.Add(row);
+        }
+        return rows;
     }
 
     // Read visibility is independent of mutation authority. Inspect actual mutation declarations,
@@ -253,10 +273,13 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var owner = accessor?.OwnerExpression?.Compile();
 
         var writeFilter = accessor is null ? null : ConstrainFor(accessor, AccessAction.Update).Filter;
-        var removeFilter = accessor is null ? null : DeleteBound(accessor);
+        // SEC-0019: with no Delete constraint the remove bound is the Read constraint this request already executed, so
+        // `remove` follows the row's read (its query proof for a counterpart) instead of re-running the Read declaration.
+        var removeFilter = accessor is null ? null : ConstrainFor(accessor, AccessAction.Delete).Filter;
+        var removeFollowsRead = accessor is not null && removeFilter is null;
 
         return new RowProjection<TEntity>(gate, context.User, coarseRead, coarseWrite, coarseRemove,
-            owner, authed, frozenReadFilter, writeFilter, removeFilter, proof is null ? null : proof.Contains);
+            owner, authed, frozenReadFilter, writeFilter, removeFilter, proof is null ? null : proof.Contains, removeFollowsRead);
     }
 
     // SEC-0004 (§C): the per-row can:[] manifest for a set of rows (id → { can }). Computed once per request and
@@ -982,14 +1005,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var bound = accessor is null ? null : DeleteBound(accessor);
 
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
-        var model = await Data<TEntity, TKey>.Get(request.Id, context.CancellationToken);
-        if (model is null)
-        {
-            return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
-        }
-
         // SEC-0004: a row outside the principal's scope is a 404, never deleted (existence-hiding, matches reads).
-        if (bound is not null && !PassesRequestPredicates(model, bound))
+        var model = (await RowsInDeleteBound([request.Id], bound, context.CancellationToken)).SingleOrDefault();
+        if (model is null)
         {
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
         }
@@ -1050,15 +1068,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
             // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
             // rehearsal cannot leak the existence of out-of-scope ids. The loaded rows feed the delete hooks.
-            var owned = new List<TKey>(targets.Count);
-            foreach (var id in targets)
-            {
-                var row = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
-                if (row is null || !PassesRequestPredicates(row, bound)) continue;
-                owned.Add(id);
-                rows.Add(row);
-            }
-            targets = owned;
+            rows = await RowsInDeleteBound(targets, bound, context.CancellationToken);
+            targets = rows.Select(row => row.Id).ToList();
         }
 
         var hookContext = _hookPipeline.CreateContext(context);

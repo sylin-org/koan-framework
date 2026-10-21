@@ -45,7 +45,7 @@ public sealed class RowProjection<TEntity>
         Filter? writeFilter,
         Filter? removeFilter)
         : this(gate, principal, coarseRead, coarseWrite, coarseRemove, owner, authenticatedFallback,
-            readFilter, writeFilter, removeFilter, null)
+            readFilter, writeFilter, removeFilter, null, removeFollowsRead: false)
     {
     }
 
@@ -60,7 +60,8 @@ public sealed class RowProjection<TEntity>
         Filter? readFilter,
         Filter? writeFilter,
         Filter? removeFilter,
-        Func<TEntity, bool>? provenRead)
+        Func<TEntity, bool>? provenRead,
+        bool removeFollowsRead)
     {
         _gate = gate ?? throw new ArgumentNullException(nameof(gate));
         _principal = principal ?? throw new ArgumentNullException(nameof(principal));
@@ -71,7 +72,8 @@ public sealed class RowProjection<TEntity>
         _authenticatedFallback = authenticatedFallback;
         _read = provenRead ?? Compile(readFilter, "Read access projection without query evidence");
         _write = Compile(writeFilter, "Update access projection");
-        _remove = Compile(removeFilter, "Delete access projection");
+        // SEC-0019: a remove bound that falls back to the Read constraint is the row's executed read, not a second form.
+        _remove = removeFollowsRead ? _read : Compile(removeFilter, "Delete access projection");
     }
 
     /// <summary>The verbs this principal may perform on <paramref name="row"/> — read/write/remove (each gated and

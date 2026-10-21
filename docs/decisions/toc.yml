@@ -606,3 +606,5 @@
       href: SEC-0017-stdio-acts-as-one-principal.md
     - name: SEC-0018 MCP self-description is gated like Web and projected per caller
       href: SEC-0018-mcp-self-description-is-gated-like-web.md
+    - name: SEC-0019 Delete bounds evaluate counterpart Read constraints through the Data facade
+      href: SEC-0019-delete-bounds-evaluate-counterpart-read-constraints.md

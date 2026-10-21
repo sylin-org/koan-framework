@@ -153,9 +153,12 @@ object references and typed IDs. Access manifests use this read evidence rather 
 boundary. Changed identities, principal, query or scope reject the response with `web.read.evidenceChanged`.
 No proof is a request-wide permission or a caller-managed token.
 
-Counterpart predicates are read-only. Create, Update, Delete and mass-mutation bounds refuse them before
-mutation hooks or writes. A read-only declaration leaves ordinary admin writes unchanged. A `/new`
-template has no persisted identity and refuses a counterpart realization before its template callback.
+Counterpart predicates are read-only declarations. A Create, Update or Delete declaration that holds one
+refuses before mutation hooks or writes. A read-only declaration leaves ordinary admin writes unchanged,
+except that with no Delete declaration the Read constraint bounds every delete verb (SEC-0013): a
+counterpart Read bound runs as a scoped Data query, so only rows the caller can read are deleted, and the
+manifest's `remove` follows the row's read evidence (SEC-0019). A `/new` template has no persisted
+identity and refuses a counterpart realization before its template callback.
 
 ## Ordered response hooks
 

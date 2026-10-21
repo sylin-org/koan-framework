@@ -455,6 +455,57 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
         await host.StopAsync();
     }
 
+    // SEC-0019: with no Delete constraint every delete verb is bounded by the counterpart Read constraint, evaluated
+    // natively; the row the caller cannot read survives and only the visible row reaches the delete hooks.
+    [Theory]
+    [InlineData("delete")]
+    [InlineData("delete-many")]
+    [InlineData("delete-query")]
+    [InlineData("delete-all")]
+    public async Task Counterpart_read_constraint_bounds_every_delete_verb(string operation)
+    {
+        var state = new CounterpartEndpointState();
+        using var host = await Start(state);
+        using var app = AppHost.PushScope(host.Services);
+        await Seed(state, "visible", true, "Visible");
+        await Seed(state, "hidden", false, "Hidden");
+        state.MutationHooks = 0;
+        using var scope = host.Services.CreateScope();
+        var endpoint = scope.ServiceProvider.GetRequiredService<IEntityEndpointService<CounterpartPage, string>>();
+        var context = Context(scope.ServiceProvider, admin: true);
+        switch (operation)
+        {
+            case "delete":
+                (await endpoint.Delete(new() { Context = context, Id = "hidden", Set = state.Content }))
+                    .ShortCircuitResult.Should().BeOfType<NotFoundResult>();
+                (await endpoint.Delete(new() { Context = context, Id = "visible", Set = state.Content }))
+                    .ShortCircuitResult.Should().BeNull();
+                break;
+            case "delete-many":
+                Deleted(await endpoint.DeleteMany(new() { Context = context, Ids = ["visible", "hidden"], Set = state.Content })).Should().Be(1);
+                break;
+            case "delete-query":
+                Deleted(await endpoint.DeleteByQuery(new() { Context = context, Query = "{}", Set = state.Content })).Should().Be(1);
+                break;
+            default:
+                Deleted(await endpoint.DeleteAll(new() { Context = context, Set = state.Content })).Should().Be(1);
+                break;
+        }
+        state.MutationHooks.Should().Be(1);
+        using (EntityContext.Partition(state.Content))
+        {
+            (await CounterpartPage.Get("visible")).Should().BeNull();
+            (await CounterpartPage.Get("hidden")).Should().NotBeNull();
+        }
+        await host.StopAsync();
+
+        static int Deleted(EntityEndpointResult result)
+        {
+            result.ShortCircuitResult.Should().BeNull();
+            return JObject.FromObject(result.Payload!)["deleted"]!.Value<int>();
+        }
+    }
+
     private async Task<IHost> Start(CounterpartEndpointState state)
     {
         var host = Host.CreateDefaultBuilder().ConfigureAppConfiguration(config => config.AddInMemoryCollection(mongo.SettingsForBoot()))
