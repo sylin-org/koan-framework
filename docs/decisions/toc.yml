@@ -364,6 +364,8 @@
       href: DATA-0128-analytics-reads-carry-the-read-scope.md
     - name: DATA-0129 Opaque instructions fail closed under every scope, and a Read label is enforced by the store
       href: DATA-0129-opaque-instructions-fail-closed-under-every-scope.md
+    - name: DATA-0130 A variant view deletes only its own variant, and a mass delete retires the entity's cache entries
+      href: DATA-0130-variant-views-and-the-cache-honour-deletes.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

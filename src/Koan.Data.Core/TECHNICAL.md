@@ -93,6 +93,9 @@ validation:
   retains the exact variant receipt. Runtime variants continue through the existing write plan and
   discriminator serialization. No Insert companion methods are generated; existing root identity
   collision semantics apply across variants.
+- A variant view's `Delete`, `DeleteMany` and batch `Delete` first read the ids through the root under the
+  variant target and delete only members of that variant; another variant's id is not deleted and a batch reports
+  it `Missing` (DATA-0130).
 
 - `TEntity.Lifecycle` declares persistence behavior inside `AddKoan(() => ...)` or Koan module
   registration. The builder is static syntax; every plan and handler list belongs to one host.

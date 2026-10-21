@@ -60,7 +60,15 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
                 $"Root repository '{typeof(TRoot).FullName}' returned null after saving '{typeof(TVariant).FullName}'.");
     }
 
-    public Task<bool> Delete(TKey id, CancellationToken ct = default) => _root().Delete(id, ct);
+    // NK-015: a variant view shares the root's identity space, so a delete proves membership first: an id that
+    // resolves to another variant (or to nothing visible) is not this view's row, exactly as Get refuses it. The
+    // check-then-delete residual is the one every keyed facade delete carries (DATA-0124).
+    public async Task<bool> Delete(TKey id, CancellationToken ct = default)
+    {
+        var root = _root();
+        return (await Members(root, [id], ct).ConfigureAwait(false)).Count == 1 &&
+               await root.Delete(id, ct).ConfigureAwait(false);
+    }
 
     public Task<int> UpsertMany(IEnumerable<TVariant> models, CancellationToken ct = default)
     {
@@ -69,8 +77,32 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
         return _root().UpsertMany(models.Cast<TRoot>(), ct);
     }
 
-    public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-        => _root().DeleteMany(ids, ct);
+    public async Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        var root = _root();
+        var requested = ids as IReadOnlyList<TKey> ?? ids.ToArray();
+        var members = await Members(root, requested, ct).ConfigureAwait(false);
+        return members.Count == 0
+            ? 0
+            : await root.DeleteMany(requested.Where(members.Contains).ToArray(), ct).ConfigureAwait(false);
+    }
+
+    /// <summary>The requested ids whose visible root row materializes as this variant.</summary>
+    private static async Task<HashSet<TKey>> Members(
+        IDataRepository<TRoot, TKey> root,
+        IReadOnlyList<TKey> ids,
+        CancellationToken ct)
+    {
+        var members = new HashSet<TKey>();
+        if (ids.Count == 0) return members;
+        IReadOnlyList<TRoot?> rows;
+        using (EntityMaterializationScope.Enter(typeof(TRoot), typeof(TVariant)))
+            rows = await root.GetMany(ids.Distinct().ToArray(), ct).ConfigureAwait(false);
+        foreach (var row in rows)
+            if (row is TVariant variant) members.Add(variant.Id);
+        return members;
+    }
 
     public Task<int> DeleteAll(CancellationToken ct = default)
         => throw SetOperation(nameof(DeleteAll));
@@ -89,7 +121,10 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
         => throw SetOperation(nameof(Count));
 
     public IBatchSet<TVariant, TKey> CreateBatch()
-        => new VariantBatch(_root().CreateBatch());
+    {
+        var root = _root();
+        return new VariantBatch(root, root.CreateBatch());
+    }
 
     public void Describe(ICapabilities caps)
     {
@@ -128,25 +163,27 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
             $"'{operation}' is a set operation and cannot target variant '{typeof(TVariant).Name}' independently. " +
             $"Use the Entity root '{typeof(TRoot).Name}'.");
 
-    private sealed class VariantBatch(IBatchSet<TRoot, TKey> root) : IBatchSet<TVariant, TKey>
+    /// <summary>
+    /// Queues the builder's operations and replays them into the root batch at Save, so a delete is dispatched only
+    /// for a member of this variant (NK-015). Another variant's id reports <see cref="BatchItemOutcome.Missing"/> in
+    /// its builder position, the outcome a missing id reports (DATA-0124).
+    /// </summary>
+    private sealed class VariantBatch(IDataRepository<TRoot, TKey> rootRepository, IBatchSet<TRoot, TKey> root)
+        : IBatchSet<TVariant, TKey>
     {
+        private readonly List<Action<IBatchSet<TRoot, TKey>>> _operations = [];
+        private readonly Dictionary<int, TKey> _deletes = [];
+
         public BatchExecutionCapabilities ExecutionCapabilities => root.ExecutionCapabilities;
 
         public IBatchSet<TVariant, TKey> Add(TVariant entity)
-        {
-            root.Add(entity);
-            return this;
-        }
+            => Queue(batch => batch.Add(entity));
 
         public IBatchSet<TVariant, TKey> Update(TVariant entity)
-        {
-            root.Update(entity);
-            return this;
-        }
+            => Queue(batch => batch.Update(entity));
 
         public IBatchSet<TVariant, TKey> Update(TKey id, Action<TVariant> mutate)
-        {
-            root.Update(id, entity =>
+            => Queue(batch => batch.Update(id, entity =>
             {
                 if (entity is not TVariant variant)
                 {
@@ -155,22 +192,52 @@ internal sealed class EntityVariantRepository<TRoot, TVariant, TKey> :
                 }
 
                 mutate(variant);
-            });
-            return this;
-        }
+            }));
 
         public IBatchSet<TVariant, TKey> Delete(TKey id)
         {
-            root.Delete(id);
+            _deletes[_operations.Count] = id;
+            _operations.Add(batch => batch.Delete(id));
             return this;
         }
 
         public IBatchSet<TVariant, TKey> Clear()
             => throw SetOperation("Batch.Clear");
 
-        public Task<BatchResult> Save(
+        public async Task<BatchResult> Save(
             BatchOptions? options = null,
             CancellationToken ct = default)
-            => root.Save(options, ct);
+        {
+            var members = await Members(rootRepository, _deletes.Values.ToArray(), ct).ConfigureAwait(false);
+            var native = new int[_operations.Count];
+            var dispatched = 0;
+            for (var index = 0; index < _operations.Count; index++)
+            {
+                if (_deletes.TryGetValue(index, out var id) && !members.Contains(id))
+                {
+                    native[index] = -1;
+                    continue;
+                }
+
+                _operations[index](root);
+                native[index] = dispatched++;
+            }
+
+            var result = await root.Save(options, ct).ConfigureAwait(false);
+            if (dispatched == _operations.Count || !result.HasCompleteItemOutcomes) return result;
+            var byNative = result.Items.ToDictionary(static item => item.Index);
+            var items = new BatchItemResult[_operations.Count];
+            for (var index = 0; index < _operations.Count; index++)
+                items[index] = native[index] < 0
+                    ? new BatchItemResult(index, BatchOperation.Delete, BatchItemOutcome.Missing)
+                    : byNative[native[index]] with { Index = index };
+            return result with { Items = items };
+        }
+
+        private VariantBatch Queue(Action<IBatchSet<TRoot, TKey>> operation)
+        {
+            _operations.Add(operation);
+            return this;
+        }
     }
 }
