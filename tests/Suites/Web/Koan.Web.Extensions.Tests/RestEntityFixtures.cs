@@ -133,6 +133,31 @@ public sealed class MemoAccess : EntityAccess<Memo>
 }
 
 /// <summary>
+/// SEC-0013 — an owned entity whose realization narrows only Read (and stamps Create): the authoring mistake that
+/// DeleteAll always anticipated. Every delete verb falls back to the Read constraint.
+/// </summary>
+[RestEntity]
+[StorageName("rest_journals")]
+public sealed class Journal : Entity<Journal>
+{
+    public string? OwnerId { get; set; }
+    public string Text { get; set; } = "";
+}
+
+/// <summary>Read narrows to the owner and create stamps it; Delete is left unconstrained on purpose.</summary>
+public sealed class JournalAccess : EntityAccess<Journal>
+{
+    protected override Expression<Func<Journal, bool>>? Owner => j => j.OwnerId == CurrentUserId;
+
+    public override IAccessFilter<Journal> Constrain(IAccessFilter<Journal> q, AccessAction action) => action switch
+    {
+        AccessAction.Create => q.Stamp(j => j.OwnerId, CurrentUserId),
+        AccessAction.Read => q.Where(Owner!),
+        _ => q,
+    };
+}
+
+/// <summary>
 /// SEC-0004 Slice C — PUBLIC read, owner-only write/remove. The read Constrain is OPEN, so a collection returns
 /// every principal's rows; the per-row <c>can</c> projection then DIFFERS by row (own rows advertise
 /// <c>read, write, remove</c>; others advertise <c>read</c> only). That divergence is the projection's reason to
