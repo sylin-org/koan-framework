@@ -55,7 +55,9 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
     private static async Task ServeMap(HttpContext context)
     {
         var projector = context.RequestServices.GetRequiredService<McpSurfaceProjector>();
-        var surface = projector.Project(context.User);
+        // SEC-0015/0018: project for the principal try-it would run as, stamped with this connection's origin tier.
+        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
+        var surface = projector.Project(OriginStamp.Apply(context.User, OriginResolver.FromHttpContext(context, originOptions)));
         context.Response.Headers["Cache-Control"] = "no-store";
         context.Response.Headers["Vary"] = "Accept";
         context.Response.ContentType = "application/json; charset=utf-8";

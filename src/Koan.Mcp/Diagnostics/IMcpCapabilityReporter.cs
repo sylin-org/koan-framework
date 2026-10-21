@@ -1,28 +1,69 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 using Koan.Mcp.Options;
 using Koan.Mcp;
+using Koan.Mcp.Execution;
+using Koan.Web.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Mcp.Diagnostics;
 
 public interface IMcpCapabilityReporter
 {
+    /// <summary>The host's MCP edge with every registered entity tool, unfiltered: an operator's view.</summary>
     Task<McpCapabilityDocument> GetCapabilities(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// SEC-0018: the document as <paramref name="caller"/> may see it, the one the capabilities endpoint serves. A
+    /// reporter that cannot filter lists no tools.
+    /// </summary>
+    async Task<McpCapabilityDocument> GetCapabilitiesFor(ClaimsPrincipal caller, CancellationToken cancellationToken)
+        => (await GetCapabilities(cancellationToken).ConfigureAwait(false)) with { Tools = [] };
 }
 
 public sealed class McpCapabilityReporter : IMcpCapabilityReporter
 {
     private readonly McpEntityRegistry _registry;
     private readonly IOptionsMonitor<McpServerOptions> _options;
+    private readonly IServiceScopeFactory? _scopes;
+    private readonly IAccessGateCache? _gates;
+
+    /// <summary>SEC-0018: tools are listed per caller by the decision the calls enforce (SEC-0011).</summary>
+    public McpCapabilityReporter(McpEntityRegistry registry, IOptionsMonitor<McpServerOptions> options,
+        IServiceScopeFactory scopes, IAccessGateCache gates)
+        : this(registry, options)
+    {
+        _scopes = scopes ?? throw new ArgumentNullException(nameof(scopes));
+        _gates = gates ?? throw new ArgumentNullException(nameof(gates));
+    }
 
     public McpCapabilityReporter(McpEntityRegistry registry, IOptionsMonitor<McpServerOptions> options)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+    }
+
+    public async Task<McpCapabilityDocument> GetCapabilitiesFor(ClaimsPrincipal caller, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        var document = await GetCapabilities(cancellationToken).ConfigureAwait(false);
+        if (_gates is null || !McpExposure.ExposesTools(McpExposure.Resolve(_options.CurrentValue)))
+            return document with { Tools = [] };
+
+        using var visibility = McpVerbVisibility.For(_scopes, _gates, caller);
+        var visible = new List<McpCapabilityTool>(document.Tools.Count);
+        foreach (var tool in document.Tools)
+        {
+            if (_registry.TryGetTool(tool.Name, out var registration, out var definition)
+                && await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken).ConfigureAwait(false))
+                visible.Add(tool);
+        }
+        return document with { Tools = visible };
     }
 
     public Task<McpCapabilityDocument> GetCapabilities(CancellationToken cancellationToken)

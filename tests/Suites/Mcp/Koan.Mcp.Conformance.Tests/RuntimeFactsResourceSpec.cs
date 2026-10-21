@@ -32,3 +32,26 @@ public sealed class RuntimeFactsResourceSpec : IClassFixture<ConformanceFixture>
         envelope!.Complete.Should().BeTrue();
     }
 }
+
+/// <summary>SEC-0018: a host outside Development that does not opt in keeps its facts off MCP, as off Web.</summary>
+public sealed class StagingHostFixture : Koan.Mcp.TestKit.McpHarnessFixtureBase
+{
+    protected override string Environment => "Staging";
+}
+
+public sealed class RuntimeFactsGatingSpec : IClassFixture<StagingHostFixture>
+{
+    private readonly StagingHostFixture _fixture;
+
+    public RuntimeFactsGatingSpec(StagingHostFixture fixture) => _fixture = fixture;
+
+    [Fact]
+    public async Task Runtime_facts_are_neither_listed_nor_readable_outside_development()
+    {
+        var resources = await _fixture.ListResourcesAsync();
+        resources.OfType<JObject>().Select(resource => resource["uri"]?.Value<string>())
+            .Should().NotContain(RuntimeFactsResourceProvider.ResourceUri);
+
+        (await _fixture.ReadResourceAsync(RuntimeFactsResourceProvider.ResourceUri)).Should().BeNull();
+    }
+}

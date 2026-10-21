@@ -144,7 +144,8 @@ internal static class McpEndpointMapping
             {
                 group.MapGet("capabilities", async context =>
                 {
-                    var document = await capabilityReporter.GetCapabilities(context.RequestAborted);
+                    // SEC-0018: the tools this request's principal may call, not the registry.
+                    var document = await capabilityReporter.GetCapabilitiesFor(McpSessionManager.RequestPrincipal(context), context.RequestAborted);
                     await context.Response.WriteAsJsonAsync(document, cancellationToken: context.RequestAborted);
                 })
                 .WithName("KoanMcpCapabilities")
@@ -205,11 +206,26 @@ internal static class McpEndpointMapping
                         provider.Current = sdkGenerator.GenerateDefinitions(registry.Registrations);
                     }
 
-                    group.MapGet("sdk/definitions", context =>
+                    group.MapGet("sdk/definitions", async context =>
                     {
-                        var defs = provider.Current ?? sdkGenerator.GenerateDefinitions(registry.Registrations);
+                        // SEC-0018: declare only the entities this request's principal can call at least one verb on.
+                        var gates = context.RequestServices.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>();
+                        using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(
+                            context.RequestServices.GetRequiredService<IServiceScopeFactory>(), gates,
+                            McpSessionManager.RequestPrincipal(context));
+                        var visible = new List<McpEntityRegistration>();
+                        foreach (var registration in registry.Registrations)
+                        {
+                            foreach (var tool in registration.Tools)
+                            {
+                                if (!await visibility.Allows(registration.EntityType, tool.Operation, context.RequestAborted)) continue;
+                                visible.Add(registration);
+                                break;
+                            }
+                        }
+                        var defs = sdkGenerator.GenerateDefinitions(visible);
                         context.Response.ContentType = "application/typescript";
-                        return context.Response.WriteAsync(defs, context.RequestAborted);
+                        await context.Response.WriteAsync(defs, context.RequestAborted);
                     })
                     .WithName("KoanMcpSdkDefinitions")
                     .WithMetadata(new ProducesResponseTypeAttribute(typeof(string), StatusCodes.Status200OK, "application/typescript"))

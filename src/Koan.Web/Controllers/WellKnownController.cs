@@ -31,7 +31,8 @@ public sealed class WellKnownController(
     IKoanRuntimeFacts runtimeFacts
 ) : ControllerBase
 {
-    private bool CanExposeObservability() => KoanEnv.Gate.DevelopmentOnly(env) || (webOptions?.Value?.ExposeObservabilitySnapshot == true);
+    // SEC-0018: the one decision koan://facts also asks.
+    private bool CanExposeObservability() => ObservabilityExposure.Allowed(env, webOptions?.Value);
 
     [HttpGet("observability")]
     public IActionResult Observability()
