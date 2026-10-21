@@ -23,6 +23,9 @@ internal sealed class HookRunner<TEntity> where TEntity : class
         _emit = emit.OrderBy(i => i.Order).ToArray();
     }
 
+    /// <summary>WEB-0077: whether any model hook is registered, so a bulk delete knows it must load its rows.</summary>
+    public bool HasModelHooks => _model.Any();
+
     /// <summary>
     /// Allow hooks to mutate query options; returns false if short-circuited.
     /// </summary>

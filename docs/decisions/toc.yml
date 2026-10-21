@@ -406,6 +406,8 @@
       href: WEB-0075-rate-limiter-precedes-the-endpoints.md
     - name: WEB-0076 Every paged entity read is bounded by one policy, on REST and MCP
       href: WEB-0076-every-paged-entity-read-is-bounded.md
+    - name: WEB-0077 Every delete verb raises the model delete hooks
+      href: WEB-0077-every-delete-verb-raises-the-delete-hooks.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

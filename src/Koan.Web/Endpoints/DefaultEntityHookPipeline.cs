@@ -16,6 +16,9 @@ internal sealed class DefaultEntityHookPipeline<TEntity> : IEntityHookPipeline<T
         _runner = new HookRunner<TEntity>(optionHooks, collectionHooks, modelHooks, emitHooks);
     }
 
+    /// <summary>WEB-0077: whether a delete must raise model hooks per row.</summary>
+    internal bool HasModelHooks => _runner.HasModelHooks;
+
     public HookContext<TEntity> CreateContext(EntityRequestContext requestContext)
         => new HookContext<TEntity>(requestContext);
 

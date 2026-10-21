@@ -34,6 +34,43 @@ public sealed class Pebble : Entity<Pebble>
     public string Name { get; set; } = "";
 }
 
+/// <summary>WEB-0077 — a row its model hook refuses to delete while <see cref="Locked"/>.</summary>
+[RestEntity]
+[StorageName("rest_lockers")]
+public sealed class Locker : Entity<Locker>
+{
+    public string Tag { get; set; } = "";
+    public bool Locked { get; set; }
+}
+
+/// <summary>Refuses deleting a locked <see cref="Locker"/> with 409 and records every delete it sees, by tag.</summary>
+public sealed class LockerDeleteHook : Koan.Web.Hooks.IModelHook<Locker>
+{
+    public static readonly System.Collections.Concurrent.ConcurrentQueue<string> Before = new();
+    public static readonly System.Collections.Concurrent.ConcurrentQueue<string> After = new();
+
+    public int Order => 0;
+    public Task OnBeforeFetch(Koan.Web.Hooks.HookContext<Locker> ctx, string id) => Task.CompletedTask;
+    public Task OnAfterFetch(Koan.Web.Hooks.HookContext<Locker> ctx, Locker? model) => Task.CompletedTask;
+    public Task OnBeforeSave(Koan.Web.Hooks.HookContext<Locker> ctx, Locker model) => Task.CompletedTask;
+    public Task OnAfterSave(Koan.Web.Hooks.HookContext<Locker> ctx, Locker model) => Task.CompletedTask;
+    public Task OnBeforePatch(Koan.Web.Hooks.HookContext<Locker> ctx, string id, object patch) => Task.CompletedTask;
+    public Task OnAfterPatch(Koan.Web.Hooks.HookContext<Locker> ctx, Locker model) => Task.CompletedTask;
+
+    public Task OnBeforeDelete(Koan.Web.Hooks.HookContext<Locker> ctx, Locker model)
+    {
+        Before.Enqueue(model.Tag);
+        if (model.Locked) ctx.ShortCircuit(new ConflictObjectResult(new { error = "locked" }));
+        return Task.CompletedTask;
+    }
+
+    public Task OnAfterDelete(Koan.Web.Hooks.HookContext<Locker> ctx, Locker model)
+    {
+        After.Enqueue(model.Tag);
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Lifecycle parity probe for the generated REST path.</summary>
 [RestEntity]
 [StorageName("rest_lifecycle_widgets")]

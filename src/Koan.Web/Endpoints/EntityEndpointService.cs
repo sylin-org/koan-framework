@@ -190,6 +190,25 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return filter;
     }
 
+    // WEB-0077: a delete must raise the model delete hooks per row when any may exist. A custom pipeline may hold hooks
+    // the default runner cannot see, so it always does.
+    private bool RaisesDeleteHooks => _hookPipeline is not DefaultEntityHookPipeline<TEntity> pipeline || pipeline.HasModelHooks;
+
+    // WEB-0077: BeforeDelete for every row of a batch, before any is deleted. The first short circuit refuses the batch.
+    private async Task<bool> BeforeDeleteAll(HookContext<TEntity> hookContext, IEnumerable<TEntity> rows)
+    {
+        foreach (var row in rows)
+            if (!await _hookPipeline.BeforeDelete(hookContext, row)) return false;
+        return true;
+    }
+
+    private async Task<bool> AfterDeleteAll(HookContext<TEntity> hookContext, IEnumerable<TEntity> rows)
+    {
+        foreach (var row in rows)
+            if (!await _hookPipeline.AfterDelete(hookContext, row)) return false;
+        return true;
+    }
+
     // SEC-0013: the rows a principal may delete. The Delete constraint, else the Read constraint ("delete only rows I
     // can see"), so a realization that scopes reads but forgets Delete bounds every delete verb, not only DeleteAll.
     private static Filter? DeleteBound(EntityAccess<TEntity> accessor)
@@ -1024,19 +1043,27 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         IReadOnlyCollection<TKey> targets = request.Ids ?? [];
         var accessor = ResolveAccessor(context);
         var bound = accessor is null ? null : DeleteBound(accessor);
-        if (accessor is not null && targets.Count > 0)
+        var hooked = RaisesDeleteHooks;
+        var rows = new List<TEntity>();
+        if ((accessor is not null || hooked) && targets.Count > 0)
         {
             // SEC-0004: trust no id — a row must be in scope to be deleted (out-of-scope ids are silently skipped,
             // the same hidden-row semantics as a single delete). This bounding runs BEFORE the dry-run report so a
-            // rehearsal cannot leak the existence of out-of-scope ids.
+            // rehearsal cannot leak the existence of out-of-scope ids. The loaded rows feed the delete hooks.
             var owned = new List<TKey>(targets.Count);
             foreach (var id in targets)
             {
                 var row = await Data<TEntity, TKey>.Get(id, context.CancellationToken);
-                if (row is not null && PassesRequestPredicates(row, bound)) owned.Add(id);
+                if (row is null || !PassesRequestPredicates(row, bound)) continue;
+                owned.Add(id);
+                rows.Add(row);
             }
             targets = owned;
         }
+
+        var hookContext = _hookPipeline.CreateContext(context);
+        if (hooked && !await BeforeDeleteAll(hookContext, rows))
+            return await ModelShortCircuit(context, hookContext);
 
         if (request.DryRun)
         {
@@ -1048,6 +1075,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
 
         var deleted = await Data<TEntity, TKey>.DeleteMany(targets, context.CancellationToken);
         await AuditMutation(context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+        if (hooked && !await AfterDeleteAll(hookContext, rows))
+            return await ModelShortCircuit(context, hookContext);
+        CopyHookHeaders(context, hookContext);
         return new EntityEndpointResult(context, new { deleted });
     }
 
@@ -1088,6 +1118,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
         var ids = items.Select(e => e.Id).ToList();
 
+        var hooked = RaisesDeleteHooks;
+        var hookContext = _hookPipeline.CreateContext(request.Context);
+        if (hooked && !await BeforeDeleteAll(hookContext, items))
+            return await ModelShortCircuit(request.Context, hookContext);
+
         if (request.DryRun)
         {
             // AN11: the query already ran, so the rehearsal reports an EXACT affected count for free.
@@ -1100,6 +1135,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
         var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
         await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+        if (hooked && !await AfterDeleteAll(hookContext, items))
+            return await ModelShortCircuit(request.Context, hookContext);
+        CopyHookHeaders(request.Context, hookContext);
         return new EntityEndpointResult(request.Context, new { deleted = removedByPredicate });
     }
 
@@ -1110,26 +1148,31 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         using var _ = EntityContext.With(partition: string.IsNullOrWhiteSpace(request.Set) ? null : request.Set);
 
         var accessor = ResolveAccessor(request.Context);
-        if (accessor is not null)
+        // SEC-0004: a row-scoped entity must NOT truncate the table — bound like every delete (SEC-0013). WEB-0077: an
+        // entity whose delete hooks may run loads its rows too, so each one passes BeforeDelete and AfterDelete. Only
+        // an entity with neither keeps RemoveAll.
+        var bound = accessor is null ? null : DeleteBound(accessor);
+        var hooked = RaisesDeleteHooks;
+        if (bound is not null || hooked)
         {
-            // SEC-0004: a row-scoped entity must NOT truncate the table — bound like every delete (SEC-0013). Only an
-            // entity with NEITHER narrowing keeps RemoveAll.
-            var bound = DeleteBound(accessor);
-            if (bound is not null)
+            var rows = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(bound), request.Context.CancellationToken);
+            var ids = rows.Select(e => e.Id).ToList();
+            var hookContext = _hookPipeline.CreateContext(request.Context);
+            if (hooked && !await BeforeDeleteAll(hookContext, rows))
+                return await ModelShortCircuit(request.Context, hookContext);
+            if (request.DryRun)
             {
-                var ids = (await Data<TEntity, TKey>.All(QueryDefinition.All.Where(bound), request.Context.CancellationToken))
-                    .Select(e => e.Id).ToList();
-                if (request.DryRun)
-                {
-                    request.Context.Items[EntityMutationProbe.DryRunKey] = true;
-                    request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
-                    request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
-                    return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
-                }
-                var deletedBounded = ids.Count == 0 ? 0 : await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
-                await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
-                return new EntityEndpointResult(request.Context, new { deleted = deletedBounded });
+                request.Context.Items[EntityMutationProbe.DryRunKey] = true;
+                request.Context.Items[EntityMutationProbe.OperationKey] = "deleteAll";
+                request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
+                return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
             }
+            var deletedBounded = ids.Count == 0 ? 0 : await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+            await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
+            if (hooked && !await AfterDeleteAll(hookContext, rows))
+                return await ModelShortCircuit(request.Context, hookContext);
+            CopyHookHeaders(request.Context, hookContext);
+            return new EntityEndpointResult(request.Context, new { deleted = deletedBounded });
         }
 
         if (request.DryRun)
