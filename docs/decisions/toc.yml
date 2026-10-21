@@ -414,6 +414,8 @@
       href: DATA-0152-a-transfer-is-admitted-per-route-effect-and-checks-its-writes-first.md
     - name: DATA-0153 An empty transfer axis names its base value, and naming a source or an adapter names the route
       href: DATA-0153-transfer-endpoints-can-name-the-base-set.md
+    - name: DATA-0154 A transfer endpoint cannot leave its Database-mode route or address the retired default by accident
+      href: DATA-0154-a-transfer-endpoint-stays-inside-the-routing-authority.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

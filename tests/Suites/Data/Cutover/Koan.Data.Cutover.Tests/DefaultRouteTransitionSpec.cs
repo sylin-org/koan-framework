@@ -97,6 +97,42 @@ public sealed class DefaultRouteTransitionSpec
         }
     }
 
+    /// <summary>
+    /// NK-112. After a cutover an explicit EntityContext.Source("Default") still reaches the retired store, so a scheduled
+    /// Move().From(source: "Default").To() upserted retired rows over the active store, reverting edits made since, and
+    /// then deleted them. A transfer endpoint naming Default after a cutover is refused before it reads or writes.
+    /// </summary>
+    [Fact]
+    public async Task After_a_cutover_a_transfer_naming_Default_is_refused_and_the_active_store_is_untouched()
+    {
+        var paths = TestPaths.Create();
+        try
+        {
+            await using var host = await Boot(paths);
+            AppHost.Current = host.Services;
+            await new CutoverRecord { Id = "x", Value = "before cutover" }.Save(TestContext.Current.CancellationToken);
+            await Koan.Data.Core.Data.Source(Target).PromoteToDefault().Run(TestContext.Current.CancellationToken);
+            await new CutoverRecord { Id = "x", Value = "edited after cutover" }.Save(TestContext.Current.CancellationToken);
+
+            var revert = async () => await CutoverRecord.Move().From(source: "Default").To().Run(TestContext.Current.CancellationToken);
+            (await revert.Should().ThrowAsync<InvalidOperationException>())
+                .WithMessage("*names source 'Default' in From()*retired store*");
+            var archive = async () => await CutoverRecord.Copy().To(source: "default", partition: "archive")
+                .Run(TestContext.Current.CancellationToken);
+            (await archive.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*in To()*");
+
+            (await CutoverRecord.Get("x", TestContext.Current.CancellationToken))!.Value.Should().Be("edited after cutover");
+            using (EntityContext.Source("Default"))
+                (await CutoverRecord.Get("x", TestContext.Current.CancellationToken))!.Value.Should().Be("before cutover");
+        }
+        finally
+        {
+            AppHost.Current = null;
+            TestHooks.ResetDataConfigs();
+            paths.Delete();
+        }
+    }
+
     [Fact]
     public async Task Planning_rejects_a_nonempty_target_without_mutating_either_route()
     {

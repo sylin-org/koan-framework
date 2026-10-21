@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
+using Koan.Core.Diagnostics;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
@@ -107,5 +108,34 @@ public sealed class MultiDatabaseRoutingSpec : IAsyncLifetime
 
         (await act.Should().ThrowAsync<InvalidOperationException>())
             .WithMessage("*tenant_z*not configured (provisioning posture: ExternalOnly)*");
+    }
+
+    [Fact(DisplayName = "NK-107: a transfer naming a source outside the routed database is refused unless it opts in")]
+    public async Task Transfer_naming_a_source_outside_the_routed_database_is_refused_unless_it_opts_in()
+    {
+        Doc a, b;
+        using (ShardAmbient.Use("tenant_a")) a = await new Doc { Title = "from-a" }.Save();
+        using (ShardAmbient.Use("tenant_b")) b = await new Doc { Title = "from-b" }.Save();
+
+        using (ShardAmbient.Use("tenant_a"))
+        {
+            var leak = async () => await Doc.Copy().To(source: "Default").Run();
+            (await leak.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*AcrossDatabaseRoutes()*");
+            var peek = async () => await Doc.Copy().From(source: "tenant_b").To(partition: "seen").Run();
+            (await peek.Should().ThrowAsync<InvalidOperationException>()).WithMessage("*AcrossDatabaseRoutes()*");
+
+            var inside = await Doc.Copy().To(partition: "archive").Run();
+            inside.CopiedCount.Should().Be(1, "a transfer that names no source stays in the routed database");
+        }
+
+        (await Doc.All()).Should().BeEmpty("nothing reached the shared default store");
+        using (EntityContext.Partition("seen")) (await Doc.All()).Should().BeEmpty();
+
+        using (ShardAmbient.Use("tenant_a"))
+            (await Doc.Copy().To(source: "Default").AcrossDatabaseRoutes().Run()).CopiedCount.Should().Be(1);
+        (await Doc.Get(a.Id)).Should().NotBeNull();
+        (await Doc.Get(b.Id)).Should().BeNull();
+        _host!.Services.GetRequiredService<IKoanRuntimeFacts>().Current.Facts
+            .Should().Contain(fact => fact.Code == "koan.data.transfer.route.crossed");
     }
 }

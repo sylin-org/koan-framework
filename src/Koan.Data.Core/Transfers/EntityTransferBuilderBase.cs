@@ -19,6 +19,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     private Action<TransferAuditBatch>? _audit;
     private TransferFidelity _fidelity = TransferFidelity.Exact;
+    private bool _acrossDatabaseRoutes;
 
     protected EntityTransferBuilderBase(Expression<Func<TEntity, bool>>? predicate)
         => Predicate = predicate;
@@ -58,6 +59,18 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         if (!Enum.IsDefined(fidelity))
             throw new ArgumentOutOfRangeException(nameof(fidelity), fidelity, "Choose TransferFidelity.Exact or TransferFidelity.Semantic.");
         _fidelity = fidelity;
+        return Self;
+    }
+
+    /// <summary>
+    /// Lets an endpoint name a source other than the one the Entity's Database-mode axis routes the current scope to
+    /// (DATA-0154). Without it such a transfer is refused, because a named source carries no tenant or shard boundary:
+    /// <c>To(source: "Shared")</c> under one tenant would write that tenant's rows where every tenant reads them. A run
+    /// that crosses records a runtime fact.
+    /// </summary>
+    public TBuilder AcrossDatabaseRoutes()
+    {
+        _acrossDatabaseRoutes = true;
         return Self;
     }
 
@@ -266,6 +279,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         var destination = PlaceOf(ToContext, services, registry);
         progress.ResolvedFrom = origin.Endpoint;
         progress.ResolvedTo = destination.Endpoint;
+        var crosses = RefuseEscapedRoute(kind, origin, "From()", services) | RefuseEscapedRoute(kind, destination, "To()", services);
 
         if (origin.IsSameAs(destination))
         {
@@ -278,6 +292,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         var operation = $"Entity transfer for '{typeof(TEntity).FullName}'";
         if (writesFrom) Preflight(FromContext, operation);
         if (writesTo) Preflight(ToContext, operation);
+        if (crosses) RecordCrossing(kind, services);
 
         // A Move deletes what it copied, so two places that might be one container are not enough: the endpoints must
         // be proven apart (NK-305). Copy and Mirror delete nothing they wrote and keep running on an unproven pair.
@@ -297,6 +312,53 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     {
         using var scope = context?.Apply();
         Data<TEntity, TKey>.Preflight(DataOperationEffect.Write, operation);
+    }
+
+    /// <summary>
+    /// Refuses an endpoint that names a source the routing authority no longer stands behind (DATA-0154). After a
+    /// cutover an explicit <c>"Default"</c> is the retired store, not the active default. Under a Database-mode axis a
+    /// named source other than the routed one leaves the tenant's or shard's database, which only
+    /// <see cref="AcrossDatabaseRoutes"/> allows; that case returns <see langword="true"/> so the run records it.
+    /// </summary>
+    private bool RefuseEscapedRoute(TransferKind kind, TransferPlace place, string side, IServiceProvider services)
+    {
+        if (place.Binding is not { Origin: DataRouteOrigin.ExplicitSource } binding) return false;
+
+        var active = services.GetRequiredService<DefaultDataRouteAuthority>().Current;
+        if (string.Equals(place.Source, Infrastructure.Constants.Defaults.DefaultSource, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(binding.Plan.RouteIdentity, active.Plan.RouteIdentity, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"{kind} of '{typeof(TEntity).Name}' names source 'Default' in {side}, but the active default is source " +
+                $"'{active.Source}' since a cutover; an explicit 'Default' now reaches the retired store. Leave the source " +
+                "unset to use the active default. To reach the retired store on purpose, configure it under its own source " +
+                "name (Koan:Data:Sources:<Name> with the same connection) and name that.");
+
+        if (DatabaseRouteRegistry.IsEmpty ||
+            DatabaseRouteRegistry.ResolveSourceKey(typeof(TEntity)) is not { } routed ||
+            string.Equals(routed, place.Source, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (_acrossDatabaseRoutes) return true;
+        throw new InvalidOperationException(
+            $"{kind} of '{typeof(TEntity).Name}' names source '{place.Source}' in {side}, but '{typeof(TEntity).Name}' is " +
+            "routed by a Database-mode axis to another source in the current scope. A named source carries no tenant or " +
+            "shard boundary, so the transfer would carry rows out of the routed database or read another one. Leave the " +
+            "source unset to stay in the routed database, or call AcrossDatabaseRoutes() to cross it deliberately.");
+    }
+
+    private static void RecordCrossing(TransferKind kind, IServiceProvider services)
+    {
+        if (services.GetService<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>() is not { } facts) return;
+        var entity = typeof(TEntity).FullName ?? typeof(TEntity).Name;
+        facts.Record(new Koan.Core.Diagnostics.KoanFactDescriptor(
+            Infrastructure.Constants.Diagnostics.Codes.TransferRouteCrossed,
+            Koan.Core.Diagnostics.KoanFactKind.Guarantee,
+            Koan.Core.Diagnostics.KoanFactState.Degraded,
+            $"transfer:{entity}",
+            $"A {kind} of {typeof(TEntity).Name} named a source outside its Database-mode route, by AcrossDatabaseRoutes().",
+            Infrastructure.Constants.Diagnostics.Reasons.AcrossDatabaseRoutes,
+            "Leave the endpoint's source unset to keep the transfer inside the routed database.",
+            "Koan.Data.Core.Transfers",
+            $"transfer:{entity}"));
     }
 
     private static TransferPlace PlaceOf(

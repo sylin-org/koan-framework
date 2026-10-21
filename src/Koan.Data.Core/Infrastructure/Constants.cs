@@ -15,6 +15,7 @@ public static class Constants
             public const string SourcePlanSelected = "koan.data.source.plan.selected";
             public const string SourceClaimsSelected = "koan.data.source.claims.selected";
             public const string DefaultRouteSelected = "koan.data.route.default.selected";
+            public const string TransferRouteCrossed = "koan.data.transfer.route.crossed";
         }
 
         public static class Reasons
@@ -47,11 +48,14 @@ public static class Constants
             public const string StreamPageLimitExceeded = "provider-stream-page-limit-exceeded";
             public const string InvalidStreamReceipt = "provider-stream-receipt-invalid";
             public const string UnsupportedRegisteredOperation = "registered-operation-unsupported";
+            public const string AcrossDatabaseRoutes = "across-database-routes";
         }
     }
 
     public static class Defaults
     {
+        /// <summary>The name of the configured default data source.</summary>
+        public const string DefaultSource = "Default";
         public const int RelationshipBatchSize = 100;
         public const int SourceMaxRecords = 1_000;
         public const long SourceMaxBytes = 16 * 1024 * 1024;

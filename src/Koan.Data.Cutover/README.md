@@ -85,8 +85,10 @@ maintenance-window checklist, blocker handling, durable-state preservation, and 
 The active pointer is persisted outside both databases at `.Koan/data/active-route.json` beneath the host content root;
 override it with `Koan:Data:Route:StatePath`. Preserve that file with the deployment. After activation, unqualified
 Entity and Direct calls use the target, retained default-derived repositories fail as stale, and explicit
-`EntityContext.Source("Default")` access still addresses the old configured source. Koan never performs an automatic
-rollback.
+`EntityContext.Source("Default")` access still addresses the old configured source; a `Copy`, `Move` or `Mirror` endpoint
+naming `Default` is refused instead, so a scheduled transfer cannot revert the active store from the retired one
+([DATA-0154](../../docs/decisions/DATA-0154-a-transfer-endpoint-stays-inside-the-routing-authority.md)). Koan never
+performs an automatic rollback.
 
 A failed run leaves the old default active. Once target mutation could have begun, the target is durably quarantined
 and normal Data access rejects it until an operator empties or reprovisions it and a later verified run succeeds.

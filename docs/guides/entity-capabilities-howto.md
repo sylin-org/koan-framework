@@ -1129,6 +1129,12 @@ route, so the other of the two is not inherited: `To(adapter: "mongo")` inside `
 reaches MongoDB's default store, and `From(source: "", partition: "")` reads the base set under any ambient scope
 ([DATA-0153](../decisions/DATA-0153-transfer-endpoints-can-name-the-base-set.md)).
 
+An endpoint that names a source the routing authority no longer stands behind is refused before anything is read.
+After a cutover, `source: "Default"` reaches the retired store, so a transfer naming it throws; leave the source unset
+for the active default. Under a Database-mode axis (database per tenant), naming a source other than the one the scope
+routes to would carry rows out of the tenant's database, so it needs `.AcrossDatabaseRoutes()`, and a run that crosses
+records a runtime fact ([DATA-0154](../decisions/DATA-0154-a-transfer-endpoint-stays-inside-the-routing-authority.md)).
+
 Endpoints are compared as the physical places they reach, not as written. `From(source: "Default").To()`, a
 source name in another letter case, a source that shares the default connection (`ConnectionString: auto` or the
 provider-wide connection), a partition spelled in another case, or a
