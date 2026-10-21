@@ -264,6 +264,13 @@ validation:
   and the key is a proven stream tie-breaker (string). A Guid-, int- or other-keyed Entity on a bounded provider takes
   the materialized read with the reason in the `koan.data.stream.execution` fact and the transfer's warning, instead
   of the stream's unsupported-sort rejection (DATA-0113, NK-016).
+- A Move journals each copied row's id with a SHA-256 fingerprint of its canonical document, taken as read and before
+  write preparation stamps it. After the whole source is copied it re-reads each journaled group from the origin and
+  deletes only rows whose fingerprint is unchanged. A row changed by another writer stays in the origin and is a
+  `Conflicts` entry (the first `Batch` of them) plus a warning; a row already gone is a warning and is not counted in
+  `DeletedCount`. A present, unchanged row that fails to delete is still a `BulkMutationReceiptRejectedException`.
+  The re-read and the delete are two steps, so a write between them is not detected. A Load hook that is not
+  deterministic makes every row look changed, which keeps rows rather than losing them.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

@@ -1083,7 +1083,7 @@ logger.LogInformation(
     result.Warnings.Count
 );
 
-// Check for conflicts (Mirror operations)
+// Check for conflicts (Mirror overlaps; Move rows changed by another writer while moving)
 if (result.HasConflicts)
 {
     foreach (var conflict in result.Conflicts)
@@ -1117,7 +1117,10 @@ a pair throws before reading anything; a `Copy` writes nothing and reports it in
 ([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)).
 
 Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
-dataset in application memory or mutate an offset-paged source while reading it. Use Jobs and an
+dataset in application memory or mutate an offset-paged source while reading it. Before deleting, it re-reads
+each copied row from the source: a row another writer changed after it was copied is kept and listed in
+`Conflicts`, and a row already removed is reported in `Warnings` and not counted. Run the Move again to carry a
+newer version. Use Jobs and an
 application-owned checkpoint when work must survive process failure or resume across runs.
 
 **Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
