@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Core.Context;
 using Koan.Data.Abstractions;
 using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +28,51 @@ internal interface ITrackedOperation
 }
 
 /// <summary>
+/// The context an operation was issued in (NK-047): every registered context carrier (tenant, data axes and other
+/// ambient scopes) captured when the operation was tracked, restored exactly when it is resolved and executed at
+/// commit, so a deferred write lands where it would have landed had it run immediately, whatever the commit ambient.
+/// </summary>
+internal readonly record struct CapturedCarriers(
+    KoanContextCarrierRegistry? Registry,
+    IReadOnlyDictionary<string, string>? Values)
+{
+    public static CapturedCarriers Capture(IServiceProvider services)
+    {
+        var registry = services.GetService(typeof(KoanContextCarrierRegistry)) as KoanContextCarrierRegistry;
+        return new CapturedCarriers(registry, registry?.Capture());
+    }
+
+    /// <summary>Restore the captured carriers, then the operation's routing, outside any transaction.</summary>
+    public IDisposable Enter(EntityContext.ContextState context)
+    {
+        var carriers = Registry?.Restore(Values, ContextIngressTrust.HostTrusted);
+        try
+        {
+            var routing = EntityContext.With(
+                source: context.Source ?? "",
+                adapter: context.Adapter ?? "",
+                partition: context.Partition ?? "",
+                preserveTransaction: false);
+            return new Scope(routing, carriers);
+        }
+        catch
+        {
+            carriers?.Dispose();
+            throw;
+        }
+    }
+
+    private sealed class Scope(IDisposable routing, IDisposable? carriers) : IDisposable
+    {
+        public void Dispose()
+        {
+            try { routing.Dispose(); }
+            finally { carriers?.Dispose(); }
+        }
+    }
+}
+
+/// <summary>
 /// Tracked entity save operation.
 /// </summary>
 internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
@@ -34,26 +81,19 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
 {
     private readonly TEntity _entity;
     private readonly EntityContext.ContextState _context;
-    private readonly string? _partition;
+    private readonly CapturedCarriers _carriers;
 
-    public SaveOperation(TEntity entity, EntityContext.ContextState context, string? partition = null)
+    public SaveOperation(TEntity entity, EntityContext.ContextState context, CapturedCarriers carriers)
     {
         _entity = entity ?? throw new ArgumentNullException(nameof(entity));
         _context = context ?? throw new ArgumentNullException(nameof(context));
-        _partition = partition;
+        _carriers = carriers;
     }
 
     public async Task Execute(CancellationToken ct)
     {
-        var partition = _partition ?? _context.Partition;
-
-        using var _ = EntityContext.With(
-            source: _context.Source ?? "",
-            adapter: _context.Adapter ?? "",
-            partition: partition ?? "",
-            preserveTransaction: false);
-
-        await Data<TEntity, TKey>.Upsert(_entity, ct);
+        using var _ = _carriers.Enter(_context);
+        await Data<TEntity, TKey>.Upsert(_entity, ct).ConfigureAwait(false);
     }
 
     public string GetAdapterHint()
@@ -63,11 +103,7 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
 
     public DataRouteBinding? ResolveDataBinding(IServiceProvider services)
     {
-        using var _ = EntityContext.With(
-            source: _context.Source ?? "",
-            adapter: _context.Adapter ?? "",
-            partition: _partition ?? _context.Partition ?? "",
-            preserveTransaction: false);
+        using var _ = _carriers.Enter(_context);
         return AdapterResolver.ResolveDecisionForEntity<TEntity>(
             services,
             services.GetRequiredService<DataSourceRegistry>()).Binding;
@@ -83,26 +119,19 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
 {
     private readonly TKey _id;
     private readonly EntityContext.ContextState _context;
-    private readonly string? _partition;
+    private readonly CapturedCarriers _carriers;
 
-    public DeleteOperation(TKey id, EntityContext.ContextState context, string? partition = null)
+    public DeleteOperation(TKey id, EntityContext.ContextState context, CapturedCarriers carriers)
     {
         _id = id ?? throw new ArgumentNullException(nameof(id));
         _context = context ?? throw new ArgumentNullException(nameof(context));
-        _partition = partition;
+        _carriers = carriers;
     }
 
     public async Task Execute(CancellationToken ct)
     {
-        var partition = _partition ?? _context.Partition;
-
-        using var _ = EntityContext.With(
-            source: _context.Source ?? "",
-            adapter: _context.Adapter ?? "",
-            partition: partition ?? "",
-            preserveTransaction: false);
-
-        await Data<TEntity, TKey>.Delete(_id, ct);
+        using var _ = _carriers.Enter(_context);
+        await Data<TEntity, TKey>.Delete(_id, ct).ConfigureAwait(false);
     }
 
     public string GetAdapterHint()
@@ -112,11 +141,7 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
 
     public DataRouteBinding? ResolveDataBinding(IServiceProvider services)
     {
-        using var _ = EntityContext.With(
-            source: _context.Source ?? "",
-            adapter: _context.Adapter ?? "",
-            partition: _partition ?? _context.Partition ?? "",
-            preserveTransaction: false);
+        using var _ = _carriers.Enter(_context);
         return AdapterResolver.ResolveDecisionForEntity<TEntity>(
             services,
             services.GetRequiredService<DataSourceRegistry>()).Binding;

@@ -867,11 +867,18 @@ from one explicit commit point—creating a project with initial tasks, synchron
 importing a batch of related records.
 
 Koan's ambient transaction support is a deferred coordinator, not a native or distributed transaction.
-Operations are tracked in memory and executed sequentially on commit. A later failure can therefore
-leave the successfully completed prefix durable.
+Operations are tracked in memory and executed sequentially on commit, in the order the application issued
+them, each under the context it was issued in (tenant, data axes, source, adapter, partition). A later
+failure can therefore leave the successfully completed prefix durable, and `TransactionException.CompletedOperationCount`
+says how long it is, cancellation included.
+
+Inside the scope, single and collection `Save`/`Remove` (`items.Save()`, `items.Remove()`, `Todo.Remove(ids)`,
+`SaveReplacing`) defer until `Commit`. Every other write refuses before it writes, because it cannot wait:
+`DeleteAll`, `RemoveAll` (every strategy), `Patch`, `Batch().Save()`, instructions, `Insert`, outcome verbs,
+conditional writes, and `Copy`/`Move`/`Mirror`. Run those outside the transaction (DATA-0131).
 
 **Key features:**
-- Auto-commit on dispose (minimal cognitive load)
+- Explicit commit point, with optional auto-commit on dispose
 - Named transactions for telemetry correlation
 - Can sequence work across different adapters without claiming atomicity
 
@@ -917,9 +924,11 @@ using (EntityContext.Transaction("create-project"))
 }
 ```
 
-Set `AutoCommitOnDispose` to `true` where a scope that exits cleanly should dispatch its tracked work.
-It is off by default so the application must name the commit point. This option changes when dispatch
-begins; it does not add atomicity.
+Set `AutoCommitOnDispose` to `true` where disposing the scope should dispatch its tracked work. It is off
+by default so the application must name the commit point. `Dispose` cannot tell how the block exited, so
+auto-commit also dispatches when an exception leaves the block; call `Commit` explicitly where an exception
+must discard the work. A failed auto-commit throws its `TransactionException` from `Dispose`. This option
+changes when dispatch begins; it does not add atomicity.
 
 **Discarding pending work after a validation failure:**
 
@@ -992,7 +1001,8 @@ an Entity-level atomic transaction spanning different Entity roots or data sourc
 
 ⚠️ **No nested transactions:** Attempting to nest throws `InvalidOperationException`.
 
-⚠️ **Infrastructure operations bypass transactions:** `RemoveAll()` and `Truncate()` execute immediately.
+⚠️ **Non-deferrable operations refuse inside a transaction:** `DeleteAll()`, `RemoveAll()`, `Patch`, batches,
+instructions and transfers throw `NotSupportedException` or `InvalidOperationException` before writing.
 
 ⚠️ **Memory tracking:** For huge batches (10,000+ ops), break into smaller transactions to avoid memory pressure.
 

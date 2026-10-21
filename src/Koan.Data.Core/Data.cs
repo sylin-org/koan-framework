@@ -462,7 +462,44 @@ public static class Data<TEntity, TKey>
         }
         return Repo.Delete(id, ct);
     }
-    public static Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default) => Repo.DeleteMany(ids, ct);
+    public static Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
+        => EntityContext.Current is { TransactionCoordinator: not null } context
+            ? Task.FromResult(TrackDeletes(ids, context, "deferred entity bulk delete"))
+            : Repo.DeleteMany(ids, ct);
+
+    // NK-043/NK-044: inside EntityContext.Transaction a bulk verb is the single verb repeated, so it defers per item,
+    // in call order, under the context it was issued in. Like a deferred Delete, the count is the work tracked.
+    private static int TrackDeletes(IEnumerable<TKey> ids, EntityContext.ContextState context, string operation)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        ((IDataOperationGate)Repo).Demand(DataOperationEffect.Write, operation);
+        var tracked = 0;
+        foreach (var id in ids)
+        {
+            context.TransactionCoordinator!.TrackDelete<TEntity, TKey>(id, context);
+            tracked++;
+        }
+        return tracked;
+    }
+
+    private static async Task<int> TrackSaves(
+        IEnumerable<TEntity> models,
+        EntityContext.ContextState context,
+        string operation,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(models);
+        ((IDataOperationGate)Repo).Demand(DataOperationEffect.Write, operation);
+        var manager = AppHost.GetRequiredService<IAggregateIdentityManager>(IdentityOperation);
+        var tracked = 0;
+        foreach (var model in models)
+        {
+            await manager.EnsureIdAsync<TEntity, TKey>(model, ct).ConfigureAwait(false);
+            context.TransactionCoordinator!.TrackSave<TEntity, TKey>(model, context);
+            tracked++;
+        }
+        return tracked;
+    }
     public static Task<int> DeleteAll(CancellationToken ct = default) => Repo.DeleteAll(ct);
 
     public static Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
@@ -519,7 +556,10 @@ public static class Data<TEntity, TKey>
         var repo = Repo;
         return ((IDataMutationOutcomes<TEntity, TKey>)repo).DeleteWithOutcome(id, ct);
     }
-    public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default) => Repo.UpsertMany(models, ct);
+    public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
+        => EntityContext.Current is { TransactionCoordinator: not null } context
+            ? TrackSaves(models, context, "deferred entity bulk upsert", ct)
+            : Repo.UpsertMany(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
 
     // ------------------------------------------------------------------
@@ -794,10 +834,20 @@ public static class Data<TEntity, TKey>
     }
 
     public static Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.UpsertMany(models, ct); }
+    {
+        if (EntityContext.Current is { TransactionCoordinator: not null } context)
+            return TrackSaves(models, context with { Partition = partition }, "deferred partition entity bulk upsert", ct);
+        using var _ = WithPartition(partition);
+        return Repo.UpsertMany(models, ct);
+    }
 
     public static Task<int> DeleteMany(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
-    { using var _ = WithPartition(partition); return Repo.DeleteMany(ids, ct); }
+    {
+        if (EntityContext.Current is { TransactionCoordinator: not null } context)
+            return Task.FromResult(TrackDeletes(ids, context with { Partition = partition }, "deferred partition entity bulk delete"));
+        using var _ = WithPartition(partition);
+        return Repo.DeleteMany(ids, ct);
+    }
 
     public static Task<int> DeleteAll(string partition, CancellationToken ct = default)
     { using var _ = WithPartition(partition); return Repo.DeleteAll(ct); }

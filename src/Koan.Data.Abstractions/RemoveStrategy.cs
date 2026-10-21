@@ -9,7 +9,7 @@ public enum RemoveStrategy
     /// Safe removal with per-entity Lifecycle participation and provider transaction support.
     /// <para>
     /// - Runs configured BeforeRemove/AfterRemove handlers<br/>
-    /// - Participates in transactions<br/>
+    /// - Refuses inside an EntityContext.Transaction scope, which cannot defer it<br/>
     /// - Returns exact count of deleted records<br/>
     /// - Safe for production use
     /// </para>

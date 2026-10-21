@@ -224,10 +224,12 @@ public static class EntityContext
     public static IDisposable RefreshCache() => WithCacheBehavior(CacheBehavior.Refresh);
 
     /// <summary>
-    /// Start a named deferred-coordination scope. Entity operations are held until <see cref="Commit"/>,
-    /// then executed sequentially; this is not a native or distributed atomic transaction. A failed commit
-    /// can leave a durable prefix, and <see cref="Rollback"/> discards only operations not yet dispatched.
-    /// By default disposal rolls back pending work; auto-commit on dispose is an explicit option.
+    /// Start a named deferred-coordination scope. Single and collection Save/Remove are held until <see cref="Commit"/>,
+    /// then executed in call order under the context each was issued in; every write that cannot be deferred refuses
+    /// inside the scope. This is not a native or distributed atomic transaction. A failed commit can leave a durable
+    /// prefix, and <see cref="Rollback"/> discards only operations not yet dispatched. By default disposal rolls back
+    /// pending work; auto-commit on dispose is an explicit option, which also commits when an exception leaves the
+    /// block and throws a failed commit from Dispose.
     /// </summary>
     /// <param name="name">Transaction name for correlation and telemetry</param>
     /// <returns>A disposable scope that discards pending work on disposal unless auto-commit is configured</returns>
@@ -301,15 +303,24 @@ public static class EntityContext
                 {
                     var autoCommit = _options?.AutoCommitOnDispose ?? false;
                     if (autoCommit)
-                        _coordinator.Commit(default).GetAwaiter().GetResult();
+                    {
+                        // NK-012: a failed commit can leave a durable prefix; it surfaces from Dispose instead of being
+                        // swallowed. Dispose cannot tell how the block exited, so auto-commit also dispatches when an
+                        // exception leaves it: call Commit explicitly where an exception must discard the work.
+                        _coordinator.Commit(default).ConfigureAwait(false).GetAwaiter().GetResult();
+                    }
                     else
-                        _coordinator.Rollback(default).GetAwaiter().GetResult();
+                    {
+                        try
+                        {
+                            _coordinator.Rollback(default).ConfigureAwait(false).GetAwaiter().GetResult();
+                        }
+                        catch
+                        {
+                            // Rollback only discards undispatched work and is already logged by the coordinator.
+                        }
+                    }
                 }
-            }
-            catch
-            {
-                // Swallow exceptions in Dispose (already logged by coordinator)
-                // Transaction will be marked as failed
             }
             finally
             {

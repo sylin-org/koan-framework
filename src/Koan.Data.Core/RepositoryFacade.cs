@@ -421,7 +421,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     {
         await using var operation = await Guard(
             DataOperationEffect.SchemaOrAdmin,
-            "entity ensure ready",
+            EnsureReadyOperation,
             ct,
             ensureReadiness: false);
         await _inner.EnsureReady(ct);
@@ -451,6 +451,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // Source policy is the first semantic action. It runs before cancellation observation,
         // segmentation callbacks, cross-cutting guards, readiness, lifecycle, or provider work.
         _sourcePlan.Demand(effect, operation);
+        RefuseImmediateWriteInDeferredScope(effect, operation);
         ct.ThrowIfCancellationRequested();
         DataOperationLease? lease = null;
         try
@@ -473,6 +474,27 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             if (lease is not null) await lease.DisposeAsync();
             throw;
         }
+    }
+
+    private const string EnsureReadyOperation = "entity ensure ready";
+    private const string SchemaInstructionOperation = "entity schema instruction";
+
+    /// <summary>
+    /// NK-043/NK-044: Data defers single and bulk Save/Remove inside <c>EntityContext.Transaction</c>, so a write that
+    /// reaches the facade there is one that cannot be deferred (DeleteAll, RemoveAll, Patch, Batch, instructions,
+    /// transfers, a lifecycle- or extension-issued write). It would be durable before Commit and survive Rollback, so it
+    /// refuses before any write instead. Schema provisioning carries no rows and stays available.
+    /// </summary>
+    private static void RefuseImmediateWriteInDeferredScope(DataOperationEffect effect, string operation)
+    {
+        if (effect == DataOperationEffect.Read ||
+            operation is EnsureReadyOperation or SchemaInstructionOperation ||
+            EntityContext.Current?.TransactionCoordinator is not { } coordinator)
+            return;
+        throw new NotSupportedException(
+            $"'{operation}' on '{typeof(TEntity).Name}' cannot be deferred by the ambient EntityContext.Transaction " +
+            $"('{coordinator.Name}'): it would run now and survive Rollback. Use Save/Remove (single or collection), " +
+            "which defer until Commit, or run this operation outside the transaction.");
     }
 
     private sealed class GuardedOperation(
@@ -1384,7 +1406,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 ? typed
                 : (TResult)Convert.ChangeType(cleared, typeof(TResult), System.Globalization.CultureInfo.InvariantCulture);
         }
-        await using var operationScope = await Guard(effect, "entity instruction", ct);
+        await using var operationScope = await Guard(
+            effect, carriesRows ? "entity instruction" : SchemaInstructionOperation, ct);
         // Opaque instructions carry no framework predicate, so they fail closed under any active managed or read scope
         // (soft delete, data axes, request row filters), exactly as QueryRaw does (NK-046).
         if (carriesRows) GuardRawAgainstActiveScope(operationScope.Segmentation);

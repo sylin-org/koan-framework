@@ -167,11 +167,11 @@ public static class AggregateExtensions
     {
         if (model is null) throw new System.ArgumentNullException(nameof(model));
         var (aggType, keyType) = ResolveAggregateContract(model.GetType());
-        var data = DataService();
-        var getRepo = typeof(IDataService).GetMethod(nameof(IDataService.GetRepository))!;
-        var repo = getRepo.MakeGenericMethod(aggType, keyType).Invoke(data, Array.Empty<object>())!;
-        var upsert = repo.GetType().GetMethod("Upsert")!;
-        var task = (Task)upsert.Invoke(repo, new object[] { model, ct })!;
+        _ = DataService(); // Preserve the standard missing-host failure contract.
+        // Through Data<,>.Upsert, not the repository, so the untyped receiver keeps deferral and every Data rule (NK-088).
+        var upsert = typeof(Data<,>).MakeGenericType(aggType, keyType)
+            .GetMethod("Upsert", [aggType, typeof(CancellationToken)])!;
+        var task = (Task)upsert.Invoke(null, new object[] { model, ct })!;
         await task;
         var resultProp = task.GetType().GetProperty("Result");
         return resultProp?.GetValue(task);

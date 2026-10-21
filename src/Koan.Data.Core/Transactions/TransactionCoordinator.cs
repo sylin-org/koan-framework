@@ -19,7 +19,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 {
     private readonly ILogger<TransactionCoordinator> _logger;
     private readonly TransactionOptions _options;
-    private readonly Dictionary<string, List<ITrackedOperation>> _operationsByAdapter = new();
+    // One list in call order (NK-047): commit dispatches exactly the order the application issued.
+    private readonly List<ITrackedOperation> _operations = new();
     private Activity? _activity;
     private bool _hasTrackedWork;
     private bool _isCompleted;
@@ -54,7 +55,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
         lock (_lock)
         {
-            var operation = new SaveOperation<TEntity, TKey>(entity, context);
+            var operation = new SaveOperation<TEntity, TKey>(entity, context, CapturedCarriers.Capture(_services));
             TrackOperation(operation);
 
             _logger.LogDebug(
@@ -73,7 +74,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
         lock (_lock)
         {
-            var operation = new DeleteOperation<TEntity, TKey>(id, context);
+            var operation = new DeleteOperation<TEntity, TKey>(id, context, CapturedCarriers.Capture(_services));
             TrackOperation(operation);
 
             _logger.LogDebug(
@@ -130,23 +131,15 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private void TrackOperation(ITrackedOperation operation)
     {
         StartWorkTelemetry();
-        var adapter = operation.GetAdapterHint();
-
-        if (!_operationsByAdapter.ContainsKey(adapter))
-        {
-            _operationsByAdapter[adapter] = new List<ITrackedOperation>();
-        }
-
-        _operationsByAdapter[adapter].Add(operation);
-
-        // Check max operations limit
-        var totalOperations = _operationsByAdapter.Values.Sum(list => list.Count);
-        if (totalOperations > _options.MaxTrackedOperations)
+        // Check max operations limit before the operation joins the unit of work.
+        if (_operations.Count + 1 > _options.MaxTrackedOperations)
         {
             throw new InvalidOperationException(
                 $"Transaction '{Name}' exceeded maximum tracked operations ({_options.MaxTrackedOperations}). " +
                 $"Consider breaking into smaller transactions.");
         }
+
+        _operations.Add(operation);
     }
 
     public async Task Commit(CancellationToken ct = default)
@@ -165,11 +158,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _logger.LogInformation(
                 "Deferred coordination '{TransactionName}' executing {OperationCount} operations across {AdapterCount} adapter(s)",
                 Name,
-                _operationsByAdapter.Values.Sum(list => list.Count),
-                _operationsByAdapter.Count);
+                _operations.Count,
+                Adapters.Count);
 
-            var bindings = _operationsByAdapter.Values
-                .SelectMany(static operations => operations)
+            var bindings = _operations
                 .Select(operation => operation.ResolveDataBinding(_services))
                 .OfType<DataRouteBinding>()
                 .ToArray();
@@ -179,7 +171,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
             // Execute operations sequentially inside one declared route horizon. This does not create a native
             // transaction, so a later failure can leave an earlier operation durable.
-            await ExecuteOperations(ct);
+            await ExecuteOperations(ct).ConfigureAwait(false);
 
             _isCompleted = true;
             stopwatch.Stop();
@@ -232,10 +224,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _logger.LogWarning(
                 "Transaction '{TransactionName}' rolling back {OperationCount} operations (discarding tracked changes)",
                 Name,
-                _operationsByAdapter.Values.Sum(list => list.Count));
+                _operations.Count);
 
             // Simply discard tracked operations - nothing was persisted yet
-            _operationsByAdapter.Clear();
+            _operations.Clear();
 
             _isCompleted = true;
 
@@ -267,9 +259,9 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         "transaction",
         c => c.Add(TxCaps.DeferredCoordination));
 
-    public IReadOnlyList<string> Adapters => _operationsByAdapter.Keys.ToArray();
+    public IReadOnlyList<string> Adapters => _operations.Select(static operation => operation.GetAdapterHint()).Distinct().ToArray();
 
-    public int TrackedOperationCount => _operationsByAdapter.Values.Sum(list => list.Count);
+    public int TrackedOperationCount => _operations.Count;
 
     private void StartWorkTelemetry()
     {
@@ -310,49 +302,39 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 preserveTransaction: false)
             : null;
 
-        foreach (var (adapter, operations) in _operationsByAdapter)
+        // Call order, not adapter groups (NK-047). The cancellation check sits inside the try, so a cancelled
+        // commit reports the operations already durable instead of zero.
+        foreach (var operation in _operations)
         {
-            _logger.LogDebug(
-                "Transaction '{TransactionName}' executing {OperationCount} operations on adapter '{Adapter}'",
-                Name,
-                operations.Count,
-                adapter);
-
-            _activity?.SetTag($"transaction.adapter.{adapter}.operation_count", operations.Count);
-
-            foreach (var operation in operations)
+            var adapter = operation.GetAdapterHint();
+            try
             {
                 ct.ThrowIfCancellationRequested();
-
-                try
-                {
-                    await operation.Execute(ct);
-                    completedOperations++;
-                }
-                catch (Exception ex)
-                {
-                    // Critical: Some adapters completed, some didn't
-                    _logger.LogError(ex,
-                        "Transaction '{TransactionName}' operation failed on adapter '{Adapter}'. " +
-                        "Completed adapters: {CompletedAdapters}",
-                        Name,
-                        adapter,
-                        string.Join(", ", executedAdapters));
-
-                    throw new TransactionException(
-                        $"Deferred coordination '{Name}' failed after {completedOperations} completed operation(s). " +
-                        "Its commit outcome is unknown and it will not be replayed.",
-                        Name,
-                        adapter,
-                        completedOperations,
-                        DataCommitOutcome.Unknown,
-                        ex);
-                }
+                await operation.Execute(ct).ConfigureAwait(false);
+                completedOperations++;
+                if (!executedAdapters.Contains(adapter)) executedAdapters.Add(adapter);
             }
+            catch (Exception ex)
+            {
+                // Critical: earlier operations are durable, this and later ones are not dispatched.
+                _logger.LogError(ex,
+                    "Transaction '{TransactionName}' operation failed on adapter '{Adapter}'. " +
+                    "Adapters with completed operations: {CompletedAdapters}",
+                    Name,
+                    adapter,
+                    string.Join(", ", executedAdapters));
 
-            executedAdapters.Add(adapter);
-            _activity?.SetTag($"transaction.adapter.{adapter}.completed", true);
+                throw new TransactionException(
+                    $"Deferred coordination '{Name}' failed after {completedOperations} completed operation(s). " +
+                    "Its commit outcome is unknown and it will not be replayed.",
+                    Name,
+                    adapter,
+                    completedOperations,
+                    DataCommitOutcome.Unknown,
+                    ex);
+            }
         }
+        _activity?.SetTag("transaction.operation_count", completedOperations);
     }
 
     private void ThrowIfCompleted()

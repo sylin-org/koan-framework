@@ -206,6 +206,12 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     private protected async ValueTask<DataMultiOperationLease?> Admit(TransferKind kind, CancellationToken ct)
     {
         DemandDestination();
+        // NK-043: a transfer reads, writes and deletes in bounded batches; none of it can wait for Commit, and a
+        // rolled-back Move would already have deleted its source rows. Refuse before the first read.
+        if (EntityContext.Current?.TransactionCoordinator is { } coordinator)
+            throw new InvalidOperationException(
+                $"{kind} of '{typeof(TEntity).Name}' cannot run inside EntityContext.Transaction('{coordinator.Name}'): " +
+                "its writes and deletes would be durable before Commit and survive Rollback. Run it outside the transaction.");
         var services = AppHost.Current
             ?? throw new InvalidOperationException("A running Koan host is required for Entity transfer.");
         var registry = services.GetRequiredService<DataSourceRegistry>();

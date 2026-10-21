@@ -191,6 +191,24 @@ public sealed class AssertNoTenantLeakSpec
         using (Tenant.Use("globex")) (await Note.Get(row.Id)).Should().NotBeNull();
     }
 
+    [Fact(DisplayName = "no tenant leak: a deferred save commits under the tenant it was issued in (NK-047, NK-103)")]
+    public async Task Deferred_save_commits_under_its_enqueue_tenant()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture("Closed"));
+        runtime.ResetEntityCaches();
+        using var _iso = Isolate();
+
+        var note = new Note { Id = Guid.CreateVersion7().ToString("n"), Title = "acme's" };
+        using (EntityContext.Transaction("cross-tenant"))
+        {
+            using (Tenant.Use("acme")) await note.Save();
+            using (Tenant.Use("globex")) await EntityContext.Commit();
+        }
+
+        using (Tenant.Use("acme")) (await Note.Get(note.Id)).Should().NotBeNull("the save was issued under acme");
+        using (Tenant.Use("globex")) (await Note.Get(note.Id)).Should().BeNull("the commit ambient must not restamp it");
+    }
+
     [Fact(DisplayName = "no tenant leak: Direct rejects a segmented operation before opening a provider connection")]
     public async Task Direct_fails_closed_under_a_tenant_scope()
     {
