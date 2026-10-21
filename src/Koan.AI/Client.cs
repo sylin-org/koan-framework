@@ -9,7 +9,9 @@ using Koan.AI.Contracts.Adapters;
 using Koan.AI.Contracts.Models;
 using Koan.AI.Contracts.Options;
 using Koan.AI.Contracts.Routing;
+using Koan.AI.Contracts.Sources;
 using Koan.AI.Context;
+using Koan.AI.Resolution;
 using Koan.Core;
 using Koan.Core.Hosting.App;
 
@@ -1547,32 +1549,19 @@ public static class Client
     // ========================================================================
 
     /// <summary>
-    /// Resolve a typed adapter from the registry, optionally filtering by source.
-    /// Used by Protocol verbs (Imagine, Transcribe, Speak, Rerank, Edit, Render)
-    /// that bypass the pipeline and call adapters directly.
+    /// Resolve the adapter behind a protocol verb (Imagine, Transcribe, Speak, Rerank, Edit, Render).
+    /// An explicit or scoped source is required: it resolves through the AI source registry to its provider
+    /// and never falls back to another one. Without a source the elected provider serves (AI-0041).
     /// </summary>
     private static TAdapter FindAdapter<TAdapter>(string capability, string? sourceOverride = null)
         where TAdapter : class, IAiAdapter
     {
-        var registry = AppHost.GetRequiredService<IAiAdapterRegistry>(AdapterSelectionOperation);
+        var adapters = AppHost.GetRequiredService<IAiAdapterRegistry>(AdapterSelectionOperation);
+        var sources = AppHost.GetRequiredService<IAiSourceRegistry>(AdapterSelectionOperation);
 
         var (source, _) = AiCategoryScope.ResolveMerged(capability, sourceOverride);
 
-        // If a source is specified, try to find that specific adapter first.
-        if (source is not null)
-        {
-            var byId = registry.Get(source);
-            if (byId is TAdapter typed)
-                return typed;
-        }
-
-        // Fall back to first adapter implementing the requested interface.
-        var adapter = registry.All.OfType<TAdapter>().FirstOrDefault()
-            ?? throw new InvalidOperationException(
-                $"No adapter registered for {typeof(TAdapter).Name}. " +
-                $"Add a provider that supports the '{capability}' capability.");
-
-        return adapter;
+        return ProtocolAdapterResolver.Resolve<TAdapter>(adapters, sources, capability, source);
     }
 
     // ========================================================================
