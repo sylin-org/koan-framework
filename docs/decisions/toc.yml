@@ -356,6 +356,8 @@
       href: DATA-0125-transfer-endpoints-are-compared-as-physical-places.md
     - name: DATA-0126 A declared source owns its connection or says it shares one
       href: DATA-0126-a-declared-source-owns-its-connection.md
+    - name: DATA-0127 [DataSource] routes the entity to its declared source
+      href: DATA-0127-datasource-attribute-routes-the-entity.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

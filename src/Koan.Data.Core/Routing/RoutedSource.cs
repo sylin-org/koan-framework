@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Concurrent;
+using System.Reflection;
+using Koan.Data.Abstractions.Annotations;
 
 namespace Koan.Data.Core.Routing;
 
@@ -14,6 +17,9 @@ public enum RouteKind
 
     /// <summary>A <see cref="Koan.Data.Core.Axes.AxisMode.Database"/> <c>[DataAxis]</c> derived the source from the ambient.</summary>
     DatabaseAxis,
+
+    /// <summary>The entity's <see cref="DataSourceAttribute"/> names its home source (DATA-0127).</summary>
+    Declared,
 }
 
 /// <summary>
@@ -32,6 +38,8 @@ public enum RouteKind
 /// </remarks>
 public readonly record struct RoutedSource(string? Source, RouteKind Kind)
 {
+    private static readonly ConcurrentDictionary<Type, string?> DeclaredSources = new();
+
     /// <summary>Resolve the routed source for <typeparamref name="TEntity"/> from the current ambient context.</summary>
     public static RoutedSource Resolve<TEntity>() where TEntity : class
         => Resolve(typeof(TEntity), EntityContext.Current);
@@ -56,6 +64,13 @@ public readonly record struct RoutedSource(string? Source, RouteKind Kind)
             var key = DatabaseRouteRegistry.ResolveSourceKey(entityType);
             if (key is not null) return new RoutedSource(key, RouteKind.DatabaseAxis);
         }
+
+        // Priority 2 (DATA-0127) — the entity's [DataSource] declaration names its home source.
+        var declared = DeclaredSources.GetOrAdd(entityType, static type =>
+            type.GetCustomAttribute<DataSourceAttribute>(inherit: false)?.Name is { } name && !string.IsNullOrWhiteSpace(name)
+                ? name.Trim()
+                : null);
+        if (declared is not null) return new RoutedSource(declared, RouteKind.Declared);
 
         return new RoutedSource(null, RouteKind.None);
     }

@@ -57,6 +57,35 @@ internal static class AdapterResolver
                 $"Correct Koan:Data:Sources:{routed.Source}:Adapter or reference the requested connector.");
         }
 
+        if (routed.Kind == RouteKind.Declared)
+        {
+            var declared = routed.Source!;
+            var source = sourceRegistry.GetSource(declared);
+            if (source is null)
+            {
+                throw new InvalidOperationException(
+                    $"Entity '{typeof(TEntity).Name}' declares [DataSource(\"{declared}\")], which is not configured. " +
+                    $"Add Koan:Data:Sources:{declared}:{{Adapter,ConnectionString}}, or remove the declaration to use the default source.");
+            }
+
+            if (string.IsNullOrWhiteSpace(source.Adapter))
+            {
+                throw new InvalidOperationException(
+                    $"Entity '{typeof(TEntity).Name}' declares [DataSource(\"{declared}\")], which does not specify an adapter. " +
+                    $"Add 'Adapter' to Koan:Data:Sources:{declared}.");
+            }
+
+            return Required(
+                services,
+                sourceRegistry,
+                providers,
+                source.Adapter,
+                declared,
+                DataRouteOrigin.EntityAttribute,
+                Constants.Diagnostics.Reasons.EntityAttribute,
+                $"Correct Koan:Data:Sources:{declared}:Adapter or the [DataSource] declaration on '{typeof(TEntity).Name}'.");
+        }
+
         if (routed.Kind == RouteKind.DatabaseAxis)
         {
             var routedKey = routed.Source!;

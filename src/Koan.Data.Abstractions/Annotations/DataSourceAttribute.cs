@@ -1,8 +1,10 @@
 namespace Koan.Data.Abstractions.Annotations;
 
 /// <summary>
-/// Declares a logical data source name for an entity. The selected provider can use this name
-/// to resolve its connection string from configuration (e.g., ConnectionStrings:{name} or Koan:Data:Sources:{name}:{provider}).
+/// Declares the configured data source an entity lives in. Every operation on the entity routes to
+/// <c>Koan:Data:Sources:{name}</c>, which must declare an <c>Adapter</c>; an unconfigured name is refused on the first
+/// operation. An explicit <c>EntityContext.Source(...)</c> and a Database-mode data axis still take precedence. The
+/// entity is outside default-route promotion (DATA-0127).
 /// </summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
 public sealed class DataSourceAttribute : Attribute

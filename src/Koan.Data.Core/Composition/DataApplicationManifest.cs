@@ -94,7 +94,8 @@ internal sealed class DataApplicationManifest
                 "Exclude the root from default-route promotion or supply a finite axis inventory in a later envelope."));
         }
         if (root.GetCustomAttribute<SourceAdapterAttribute>(inherit: true) is not null ||
-            root.GetCustomAttribute<DataAdapterAttribute>(inherit: true) is not null)
+            root.GetCustomAttribute<DataAdapterAttribute>(inherit: true) is not null ||
+            root.GetCustomAttribute<Koan.Data.Abstractions.Annotations.DataSourceAttribute>(inherit: false) is not null)
         {
             scope = DataEntityRouteScope.OutsideDefault;
         }
