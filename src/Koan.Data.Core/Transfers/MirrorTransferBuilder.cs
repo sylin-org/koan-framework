@@ -83,7 +83,11 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
 
         // Writes aimed at the source are deferred until its provider-bounded stream has completed.
         // This prevents a conflict resolution from changing predicate membership between numbered pages.
-        await using var sourceWrites = new TransferJournal<TEntity>();
+        // Only the winning identities are journaled; the rows are re-read from the destination at replay, so the
+        // source receives exactly what the destination's adapter materializes and never a journal round trip of
+        // the entity (NK-001: a JSON round trip drops defaults, recases dictionary keys, loses non-public setters,
+        // appends to seeded collections and forgets the family variant).
+        await using var targetWins = new TransferJournal<TKey>();
         await foreach (var sourceBatch in ReadBatches(FromContext, ct).ConfigureAwait(false))
         {
             read = checked(read + sourceBatch.Count);
@@ -106,7 +110,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                         targetWrites.Add(source);
                         break;
                     case MirrorConflict.Destination:
-                        await sourceWrites.Append(target, ct).ConfigureAwait(false);
+                        await targetWins.Append(target.Id, ct).ConfigureAwait(false);
                         break;
                     case MirrorConflict.Report:
                         AddConflict(conflicts, source.Id, "Both mirror sides contain this identity.");
@@ -123,7 +127,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                             break;
                         }
                         if (comparison > 0) targetWrites.Add(source);
-                        else if (comparison < 0) await sourceWrites.Append(target, ct).ConfigureAwait(false);
+                        else if (comparison < 0) await targetWins.Append(target.Id, ct).ConfigureAwait(false);
                         break;
                     default:
                         throw new ArgumentOutOfRangeException(nameof(_conflict));
@@ -134,9 +138,13 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                 targetWrites, FromContext, ToContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
-        await foreach (var deferred in sourceWrites.ReadBatches(BatchSize, ct).ConfigureAwait(false))
+        await foreach (var ids in targetWins.ReadBatches(BatchSize, ct).ConfigureAwait(false))
+        {
+            // A winner removed from the destination since the source pass has nothing left to write.
+            var winners = (await ReadMany(ids, ToContext, ct).ConfigureAwait(false)).OfType<TEntity>().ToArray();
             copied = checked(copied + await WriteBatch(
-                deferred, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+                winners, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+        }
 
         // A second bounded pass admits only target-only identities. Overlaps were resolved exactly once
         // during the source pass; source-only rows copied above now have a source counterpart and are skipped.

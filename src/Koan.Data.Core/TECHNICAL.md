@@ -252,6 +252,10 @@ validation:
   the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,
   and an equal or unknown store are one place: Move and Mirror throw before the lease is taken, Copy returns a zero
   result with a warning (DATA-0125).
+- Transfer journals hold identities only. A bidirectional mirror whose destination wins journals the winning ids and
+  re-reads those rows from the destination when it replays them into the source, so the source receives the row the
+  destination's adapter materializes (runtime family type, defaults, non-public setters, dictionary keys) and never a
+  JSON round trip of the entity. A winner deleted from the destination in between is skipped.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

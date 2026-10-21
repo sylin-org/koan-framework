@@ -310,6 +310,53 @@ public sealed class EntityTransferDslSpec
         defaultNote!.Content.Should().Be("default");
     }
 
+    /// <summary>
+    /// NK-001. When the target wins, the bidirectional mirror writes the target's row into the source. It used to
+    /// journal the whole entity through lossy JSON (defaults omitted, dictionary keys recased, no non-public setters,
+    /// seeded collections appended), so the source received a degraded copy. The winner must arrive intact.
+    /// </summary>
+    [Theory]
+    [InlineData(MirrorConflict.Destination)]
+    [InlineData(MirrorConflict.Latest)]
+    public async Task Mirror_Bidirectional_TargetWinsWritesTheTargetRowIntact(MirrorConflict policy)
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var source = new MirrorFlag { Enabled = true, Tags = ["source"], UpdatedAt = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
+        source.AssignOwner("source-owner");
+        source = await source.Save();
+
+        using (runtime.UsePartition("secondary"))
+        {
+            var target = new MirrorFlag
+            {
+                Id = source.Id,
+                Enabled = false,
+                Meta = new Dictionary<string, string> { ["SeoTitle"] = "target" },
+                Tags = ["target"],
+                UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            };
+            target.AssignOwner("target-owner");
+            await target.Save();
+        }
+
+        var result = await MirrorFlag.Mirror(MirrorMode.Bidirectional)
+            .To(partition: "secondary")
+            .Conflict(policy)
+            .Run();
+
+        result.Conflicts.Should().BeEmpty();
+        var mirrored = await MirrorFlag.Get(source.Id);
+        mirrored.Should().NotBeNull();
+        using var scope = new AwesomeAssertions.Execution.AssertionScope();
+        mirrored!.Enabled.Should().BeFalse("a stored default must not come back as the initializer");
+        mirrored.Owner.Should().Be("target-owner", "a non-public setter must be restored");
+        mirrored.Meta.Should().ContainKey("SeoTitle", "dictionary keys are data and keep their case");
+        mirrored.Tags.Should().Equal(["target"], "a stored collection replaces the seeded one");
+    }
+
     [Fact]
     public async Task To_WithSourceAndAdapter_ShouldThrow()
     {
@@ -573,13 +620,15 @@ public sealed class EntityTransferDslSpec
 
         await TransferTodo.RemoveAll();
         await BasicNote.RemoveAll();
+        await MirrorFlag.RemoveAll();
 
         foreach (var partition in Partitions)
         {
             using var lease = runtime.UsePartition(partition);
             await TransferTodo.RemoveAll();
             await BasicNote.RemoveAll();
-            }
+            await MirrorFlag.RemoveAll();
+        }
     }
 
     [DataAdapter(TransferAdapterFactory.ProviderId)]
@@ -596,6 +645,21 @@ public sealed class EntityTransferDslSpec
     private sealed class BasicNote : Entity<BasicNote>
     {
         public string Content { get; set; } = "";
+    }
+
+    [DataAdapter(TransferAdapterFactory.ProviderId)]
+    private sealed class MirrorFlag : Entity<MirrorFlag>
+    {
+        public bool Enabled { get; set; } = true;
+        public string Owner { get; private set; } = "unassigned";
+        public Dictionary<string, string> Meta { get; set; } = new();
+        public List<string> Tags { get; set; } = ["seeded"];
+
+        // Set once and given explicitly, so Latest deterministically picks the target.
+        [Timestamp]
+        public DateTime UpdatedAt { get; set; }
+
+        public void AssignOwner(string owner) => Owner = owner;
     }
 
     private sealed class TransferAdapterFactory : IDataAdapterFactory
@@ -618,7 +682,8 @@ public sealed class EntityTransferDslSpec
             where TKey : notnull
         {
             if (typeof(TKey) != typeof(string) ||
-                (typeof(TEntity) != typeof(TransferTodo) && typeof(TEntity) != typeof(BasicNote)))
+                (typeof(TEntity) != typeof(TransferTodo) && typeof(TEntity) != typeof(BasicNote) &&
+                 typeof(TEntity) != typeof(MirrorFlag)))
                 throw new InvalidOperationException($"The transfer spec adapter cannot create {typeof(TEntity).Name}<{typeof(TKey).Name}>.");
 
             var repository = _repositories.GetOrAdd(
