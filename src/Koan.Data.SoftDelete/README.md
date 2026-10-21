@@ -42,6 +42,10 @@ controller, option, or manual registration is required.
   a visible or already deleted row physically.
 - Read scopes, including tenancy and request-contributed filters, still apply. A recycle-bin scope is not an
   authorization bypass.
+- `Copy`, `Move` and `Mirror` read what the caller sees, so soft-deleted rows travel only inside `WithDeleted()`, and
+  then they arrive soft-deleted. A `Move` removes the rows it moved from the source physically, because the
+  destination now holds them; with `TransferFidelity.Semantic` it removes them as `Remove` does, leaving tombstones,
+  and says so in `Warnings` ([DATA-0155](../../docs/decisions/DATA-0155-transfers-carry-soft-delete-state-and-a-move-removes-what-it-moved.md)).
 - Soft deletion is a persistence semantic, not an audit log, retention policy, legal hold, or automatic recycle-bin
   HTTP API. Build explicit authorized controllers when the product earns that workflow.
 

@@ -416,6 +416,8 @@
       href: DATA-0153-transfer-endpoints-can-name-the-base-set.md
     - name: DATA-0154 A transfer endpoint cannot leave its Database-mode route or address the retired default by accident
       href: DATA-0154-a-transfer-endpoint-stays-inside-the-routing-authority.md
+    - name: DATA-0155 Transfers carry soft-delete state, and a Move removes what it moved and reports what it could not
+      href: DATA-0155-transfers-carry-soft-delete-state-and-a-move-removes-what-it-moved.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

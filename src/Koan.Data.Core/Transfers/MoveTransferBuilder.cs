@@ -46,9 +46,11 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
     /// <summary>
     /// Deletes from the origin only the copied rows that are still there and unchanged since they were read. A row
     /// another writer changed in the meantime stays in the origin and is reported as a conflict, because the
-    /// destination holds its older version; a row another writer removed is reported and not counted. A present,
-    /// unchanged row that then fails to delete is still an exact-receipt failure. The check and the delete are two
-    /// steps, so a write landing between them is not detected.
+    /// destination holds its older version; a row another writer removed is reported and not counted. The check and the
+    /// delete are two steps, so a write landing between them is not detected. A delete that removes fewer rows than
+    /// asked is reported and the remaining batches still run (NK-183); one that removes more is an exact-receipt failure.
+    /// A moved row is removed physically under the default exact fidelity, even for a soft-delete Entity, because the
+    /// destination now holds it; Semantic fidelity removes it as a Remove does, which leaves a tombstone (DATA-0155).
     /// </summary>
     private async Task<long> DeleteUnchanged(
         TransferJournal<MovedRow> journal,
@@ -59,6 +61,8 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
         var deleted = 0L;
         var changed = 0L;
         var absent = 0L;
+        var shortfall = 0L;
+        var tombstoned = 0L;
         await foreach (var rows in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
         {
             using var scope = FromContext?.Apply();
@@ -79,24 +83,30 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
             }
 
             if (unchanged.Count == 0) continue;
-            var affected = await Data<TEntity, TKey>.DeleteMany(unchanged, ct).ConfigureAwait(false);
-            if (affected != unchanged.Count)
-                throw new BulkMutationReceiptRejectedException(
-                    typeof(TEntity).FullName ?? typeof(TEntity).Name,
-                    unchanged.Count,
-                    affected,
-                    DataCommitOutcome.Unknown);
+            var soft = Data<TEntity, TKey>.TransferRows is { HasDeleteOverride: true } plane ? plane : null;
+            var affected = soft is not null && IsExact
+                ? await soft.Purge(unchanged, ct).ConfigureAwait(false)
+                : await Data<TEntity, TKey>.DeleteMany(unchanged, ct).ConfigureAwait(false);
+            shortfall += Receipt(unchanged.Count, affected);
+            if (soft is not null && !IsExact) tombstoned += affected;
             deleted = checked(deleted + affected);
         }
 
         if (changed != 0)
             progress.Warn($"{changed} moved row(s) changed in the source after they were copied and were kept there, " +
-                       "because the destination holds their older version. Conflicts lists " +
+                          "because the destination holds their older version. Conflicts lists " +
                        (changed > conflicts.Count ? $"the first {conflicts.Count}" : "them") +
-                       "; run the Move again to carry the newer versions.");
+                          "; run the Move again to carry the newer versions.");
         if (absent != 0)
             progress.Warn($"{absent} moved row(s) were no longer in the source when the Move removed its copies; " +
-                       "another writer removed them, and they are not counted as deleted.");
+                          "another writer removed them, and they are not counted as deleted.");
+        if (shortfall != 0)
+            progress.Warn($"{shortfall} moved row(s) were copied but not removed from the source by this Move: another " +
+                          "writer removed them between the check and the delete, or the store removed fewer than asked. " +
+                          "They are in the destination; run the Move again to remove any still in the source.");
+        if (tombstoned != 0)
+            progress.Warn($"{tombstoned} moved row(s) remain in the source as soft-delete tombstones, because Semantic " +
+                          "fidelity removes each row as a Remove does. The default exact fidelity removes them physically.");
         return deleted;
     }
 

@@ -736,6 +736,61 @@ public sealed class EntityTransferDslSpec
     }
 
     /// <summary>
+    /// NK-183. A row another writer removed between the Move's check and its delete made the delete return fewer rows
+    /// than asked, and the Move threw with earlier batches already deleted and its counts lost. It now reports the
+    /// shortfall and finishes the remaining batches.
+    /// </summary>
+    [Fact]
+    public async Task Move_ADeleteThatRemovesFewerRows_IsReportedAndTheRemainingBatchesRun()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("hot"))
+            foreach (var id in new[] { "a1", "a2", "a3" })
+                await new TransferTodo { Id = id, Title = id, Active = true }.Save();
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+        repository.BeforeNextDeleteMany = () => repository.Delete("a1").GetAwaiter().GetResult();
+
+        var result = await TransferTodo.Move().From(partition: "hot").To(partition: "archive").Batch(1).Run();
+
+        result.CopiedCount.Should().Be(3);
+        result.DeletedCount.Should().Be(2);
+        result.Warnings.Should().ContainSingle(warning => warning.Contains("1 moved row(s) were copied but not removed"));
+        using (runtime.UsePartition("hot"))
+            (await TransferTodo.All()).Should().BeEmpty("the batches after the short one still ran");
+    }
+
+    /// <summary>NK-183. The Mirror's replica delete reports a short receipt the same way instead of throwing.</summary>
+    [Fact]
+    public async Task Mirror_ADeleteThatRemovesFewerRows_IsReported()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("archive"))
+            foreach (var id in new[] { "r1", "r2" })
+                await new TransferTodo { Id = id, Title = id, Active = true }.Save();
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+        repository.BeforeNextDeleteMany = () => repository.Delete("r1").GetAwaiter().GetResult();
+
+        var result = await TransferTodo.Mirror().From(partition: "active").To(partition: "archive").Run();
+
+        result.DeletedCount.Should().Be(1);
+        result.Warnings.Should().ContainSingle(warning => warning.Contains("1 row(s) the Mirror meant to delete"));
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Should().BeEmpty();
+    }
+
+    /// <summary>
     /// NK-205. A row with a lower identity enters the Move's predicate between two source pages. A numbered page
     /// counted it and read a row it had already copied a second time. The row that entered behind the read is not
     /// read at all, so it is neither copied nor deleted, and nothing is read twice.
@@ -1455,6 +1510,7 @@ public sealed class EntityTransferDslSpec
         public bool HandlePagination { get; set; } = true;
         public bool ThrowAfterNextUpsertMany { get; set; }
         public Action? BeforeNextQuery { get; set; }
+        public Action? BeforeNextDeleteMany { get; set; }
         public int QueryCalls { get; private set; }
         public int UpsertManyCalls { get; private set; }
         public int MaxRequestedPageSize { get; private set; }
@@ -1466,6 +1522,7 @@ public sealed class EntityTransferDslSpec
             HandlePagination = true;
             ThrowAfterNextUpsertMany = false;
             BeforeNextQuery = null;
+            BeforeNextDeleteMany = null;
             QueryCalls = 0;
             UpsertManyCalls = 0;
             MaxRequestedPageSize = 0;
@@ -1536,6 +1593,9 @@ public sealed class EntityTransferDslSpec
 
         public Task<int> DeleteMany(IEnumerable<string> ids, CancellationToken ct = default)
         {
+            var before = BeforeNextDeleteMany;
+            BeforeNextDeleteMany = null;
+            before?.Invoke();
             var count = 0;
             var set = Current();
             foreach (var id in ids)

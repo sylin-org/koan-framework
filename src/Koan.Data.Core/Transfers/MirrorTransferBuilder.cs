@@ -83,7 +83,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
             }
         }
 
-        var deleted = await DeleteJournal(absent, replica, ct).ConfigureAwait(false);
+        var deleted = await DeleteJournal(absent, replica, progress, ct).ConfigureAwait(false);
         return Complete(TransferKind.Mirror, read, copied, deleted, progress);
     }
 

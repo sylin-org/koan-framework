@@ -85,6 +85,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     /// Raises the exact-transfer flag for the rest of the run when the transfer's fidelity is Exact (DATA-0149). Entered
     /// by <c>Run</c> after admission, so it covers every read, write and delete the transfer issues and nothing else.
     /// </summary>
+    /// <summary>Whether this transfer carries stored values exactly (DATA-0149), the default.</summary>
+    private protected bool IsExact => _fidelity == TransferFidelity.Exact;
+
     private protected TransferFidelityScope.Scope EnterFidelity()
         => TransferFidelityScope.Enter(_fidelity == TransferFidelity.Exact);
 
@@ -149,7 +152,8 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
     /// <summary>
     /// Writes one batch into the side <paramref name="direction"/> names: <c>To()</c> for rows read from <c>From()</c>,
-    /// <c>From()</c> for rows read from <c>To()</c>. The audit event always carries the declared From and To.
+    /// <c>From()</c> for rows read from <c>To()</c>. The audit event always carries the declared From and To. A row the
+    /// side it was read from holds soft-deleted (read inside <c>WithDeleted()</c>) is written soft-deleted (DATA-0155).
     /// </summary>
     protected async Task<int> WriteBatch(
         IReadOnlyList<TEntity> entities,
@@ -158,16 +162,30 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         TransferProgress progress,
         CancellationToken ct)
     {
-        var destination = direction == TransferDirection.IntoDestination ? ToContext : FromContext;
+        var (origin, destination) = direction == TransferDirection.IntoDestination
+            ? (FromContext, ToContext)
+            : (ToContext, FromContext);
         if (entities.Count == 0) return 0;
         if (entities.Count > BatchSize)
             throw new InvalidOperationException(
                 $"Transfer execution attempted a destination batch of {entities.Count}, above the declared bound of {BatchSize}.");
 
         ct.ThrowIfCancellationRequested();
+        var marked = await Marked(entities, origin, ct).ConfigureAwait(false);
         int written;
         using (destination?.Apply())
-            written = await Data<TEntity, TKey>.UpsertMany(entities, ct).ConfigureAwait(false);
+        {
+            if (marked.Count == 0)
+                written = await Data<TEntity, TKey>.UpsertMany(entities, ct).ConfigureAwait(false);
+            else
+            {
+                var live = entities.Where(entity => !marked.Contains(entity.Id)).ToArray();
+                written = live.Length == 0 ? 0 : await Data<TEntity, TKey>.UpsertMany(live, ct).ConfigureAwait(false);
+                written += await Data<TEntity, TKey>.TransferRows!
+                    .UpsertMarked(entities.Where(entity => marked.Contains(entity.Id)).ToArray(), ct)
+                    .ConfigureAwait(false);
+            }
+        }
 
         progress.BatchNumber++;
         progress.TotalProcessed = checked(progress.TotalProcessed + written);
@@ -188,25 +206,55 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return written;
     }
 
+    /// <summary>The rows among <paramref name="entities"/> the side they were read from holds soft-deleted.</summary>
+    private static async Task<IReadOnlySet<TKey>> Marked(
+        IReadOnlyList<TEntity> entities,
+        TransferContextOptions? origin,
+        CancellationToken ct)
+    {
+        using var scope = origin?.Apply();
+        if (Data<TEntity, TKey>.TransferRows is not { HasDeleteOverride: true } rows) return NoneMarked;
+        return await rows.Marked(entities.Select(entity => entity.Id).ToArray(), ct).ConfigureAwait(false);
+    }
+
+    private static readonly IReadOnlySet<TKey> NoneMarked = new HashSet<TKey>();
+
     private protected async Task<long> DeleteJournal(
         TransferJournal<TKey> journal,
         TransferContextOptions? context,
+        TransferProgress progress,
         CancellationToken ct)
     {
         var deleted = 0L;
+        var short_ = 0L;
         await foreach (var ids in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
         {
             using var scope = context?.Apply();
             var affected = await Data<TEntity, TKey>.DeleteMany(ids, ct).ConfigureAwait(false);
-            if (affected != ids.Count)
-                throw new BulkMutationReceiptRejectedException(
-                    typeof(TEntity).FullName ?? typeof(TEntity).Name,
-                    ids.Count,
-                    affected,
-                    DataCommitOutcome.Unknown);
+            short_ += Receipt(ids.Count, affected);
             deleted = checked(deleted + affected);
         }
+        if (short_ != 0)
+            progress.Warn($"{short_} row(s) the Mirror meant to delete from its replica were not deleted by it: another " +
+                          "writer removed them in the meantime, or the store removed fewer than asked. Run the Mirror " +
+                          "again to finish.");
         return deleted;
+    }
+
+    /// <summary>
+    /// Checks one delete receipt (NK-183). Fewer rows than asked means another writer removed some in the meantime, or
+    /// the store did not remove them: nothing was lost, so the shortfall is returned for the run to report while it
+    /// finishes its other batches. More rows than asked is an exact-receipt failure.
+    /// </summary>
+    private protected static long Receipt(int requested, int affected)
+    {
+        if (affected > requested)
+            throw new BulkMutationReceiptRejectedException(
+                typeof(TEntity).FullName ?? typeof(TEntity).Name,
+                requested,
+                affected,
+                DataCommitOutcome.Unknown);
+        return requested - affected;
     }
 
     protected TransferResult<TKey> Complete(

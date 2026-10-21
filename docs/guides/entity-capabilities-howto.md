@@ -1156,8 +1156,16 @@ Move journals confirmed identities in delete-on-close bounded records, so it doe
 dataset in application memory or mutate an offset-paged source while reading it. Before deleting, it re-reads
 each copied row from the source: a row another writer changed after it was copied is kept and listed in
 `Conflicts`, and a row already removed is reported in `Warnings` and not counted. Run the Move again to carry a
-newer version. Use Jobs and an
+newer version. A delete that removes fewer rows than asked (another writer got there first) is reported in `Warnings`
+and the Move finishes its other batches. A Move is not atomic: the copy completes before the first delete, so a
+process that stops in between leaves the rows in both places, and the journal does not survive the process. Running
+the Move again is safe, because the destination write is an upsert and only unchanged rows are deleted. Use Jobs and an
 application-owned checkpoint when work must survive process failure or resume across runs.
+
+For a `[SoftDelete]` Entity a transfer reads what the caller sees, so soft-deleted rows travel only inside
+`WithDeleted()`, and then they arrive soft-deleted. A `Move` removes the rows it moved from the source physically;
+`TransferFidelity.Semantic` removes them as `Remove` does and reports the tombstones it left
+([DATA-0155](../decisions/DATA-0155-transfers-carry-soft-delete-state-and-a-move-removes-what-it-moved.md)).
 
 A transfer carries rows exactly by default
 ([DATA-0149](../decisions/DATA-0149-transfers-carry-stored-values-exactly-by-default.md)): each row arrives with the

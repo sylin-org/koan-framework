@@ -46,6 +46,9 @@ public static class Data<TEntity, TKey>
         if (Repo is IDataOperationGate gate) gate.Preflight(effect, operation);
     }
 
+    /// <summary>The routed repository's delete-override plane for transfers (DATA-0155), or null for a variant view.</summary>
+    internal static ITransferRows<TEntity, TKey>? TransferRows => Repo as ITransferRows<TEntity, TKey>;
+
     private static ValueTask<DataMultiOperationLease> EnterMutationHorizon(
         IDataRepository<TEntity, TKey> repository,
         string operation,

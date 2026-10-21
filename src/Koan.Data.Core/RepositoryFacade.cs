@@ -1182,6 +1182,13 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             foreach (var row in soft.Items) await OverrideUpsert(row, ov, segmentation, ct);
             return soft.Items.Count;
         }
+        return await PhysicalDeleteMany(idList, managed, ct);
+    }
+
+    /// <summary>Removes the rows among <paramref name="idList"/> the read scope can see, physically: an identity-only
+    /// delete with no scope, a check-then-delete under one (IDOR).</summary>
+    private async Task<int> PhysicalDeleteMany(IReadOnlyList<TKey> idList, Filter? managed, CancellationToken ct)
+    {
         if (managed is null) return await _inner.DeleteMany(idList, ct);
         var owned = await VisibleIds(idList, managed, ct);
         return owned.Count == 0 ? 0 : await _inner.DeleteMany(owned, ct);
