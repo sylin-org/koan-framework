@@ -33,7 +33,7 @@ public sealed class SqlitePartitionMoveSpec
             {
                 var ticket = await new Ticket { Subject = "close me" }.Save();
 
-                (await ticket.MoveToPartition("archive")).Should().BeTrue();
+                (await ticket.TryMoveToPartition("archive")).Should().BeTrue();
 
                 (await Ticket.Get(ticket.Id)).Should().BeNull("the row left the base set");
                 using (EntityContext.Partition("archive"))

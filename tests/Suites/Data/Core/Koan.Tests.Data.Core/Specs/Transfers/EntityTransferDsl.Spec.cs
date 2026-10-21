@@ -415,8 +415,26 @@ public sealed class EntityTransferDslSpec
             (await TransferTodo.Get(todo.Id)).Should().NotBeNull();
     }
 
+    /// <summary>
+    /// Already-compiled callers bind to <c>Task MoveToPartition</c>; a changed return type is a binary break. The
+    /// outcome-reporting form is <c>TryMoveToPartition</c>.
+    /// </summary>
     [Fact]
-    public async Task MoveToPartition_InfersTheStringKeyAndReportsAMissingSourceRow()
+    public void MoveToPartition_KeepsItsPlainTaskReturnType_AndTryReportsTheOutcome()
+    {
+        var methods = typeof(EntityPartitionMoveExtensions).GetMethods();
+
+        var moves = methods.Where(m => m.Name == "MoveToPartition").ToArray();
+        moves.Should().HaveCount(2, "the keyed and the string-keyed overload");
+        moves.Should().OnlyContain(m => m.ReturnType == typeof(Task));
+
+        var tries = methods.Where(m => m.Name == "TryMoveToPartition").ToArray();
+        tries.Should().HaveCount(2, "the same overloads as MoveToPartition");
+        tries.Should().OnlyContain(m => m.ReturnType == typeof(Task<bool>));
+    }
+
+    [Fact]
+    public async Task TryMoveToPartition_InfersTheStringKeyAndReportsAMissingSourceRow()
     {
         await using var runtime = await CreateRuntime();
         await Reset(runtime);
@@ -425,9 +443,9 @@ public sealed class EntityTransferDslSpec
         var saved = await new TransferTodo { Title = "saved", Active = true }.Save();
         var unsaved = new TransferTodo { Title = "never saved", Active = true };
 
-        (await saved.MoveToPartition("archive")).Should().BeTrue();
-        (await unsaved.MoveToPartition("archive")).Should().BeFalse("the base set held no row to remove");
-        (await saved.MoveToPartition("dest", fromPartition: "archive", copy: true)).Should().BeTrue();
+        (await saved.TryMoveToPartition("archive")).Should().BeTrue();
+        (await unsaved.TryMoveToPartition("archive")).Should().BeFalse("the base set held no row to remove");
+        (await saved.TryMoveToPartition("dest", fromPartition: "archive", copy: true)).Should().BeTrue();
 
         using (runtime.UsePartition("archive"))
             (await TransferTodo.All()).Should().HaveCount(2);

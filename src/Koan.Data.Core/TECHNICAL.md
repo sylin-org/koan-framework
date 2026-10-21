@@ -265,8 +265,10 @@ validation:
   JSON round trip of the entity. A winner deleted from the destination in between is skipped.
 - `entity.MoveToPartition(to, fromPartition?, copy?)` takes its source from `fromPartition`, else the ambient
   partition, else the base set. A source that resolves to the target's own container (the same `TransferPlace`
-  comparison as transfers) throws `ArgumentException` before anything is written; the result is `false` when a move
-  found no source row to remove. A string-keyed overload infers the key type.
+  comparison as transfers) throws `ArgumentException` before anything is written. It returns a plain `Task`, the
+  shape compiled callers already bind to; `entity.TryMoveToPartition(...)` takes the same arguments and returns
+  `Task<bool>`, `false` when a move found no source row to remove (the row is still written to the target). A
+  string-keyed overload of each infers the key type.
 - Bulk reads (`Data<T,K>.BulkRead`: transfers and backup) stream only when the provider advertises bounded paging
   and the key is a proven stream tie-breaker (string). A Guid-, int- or other-keyed Entity on a bounded provider takes
   the materialized read with the reason in the `koan.data.stream.execution` fact and the transfer's warning, instead
