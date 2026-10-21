@@ -390,6 +390,8 @@
       href: DATA-0141-postgres-inserts-only-and-deletes-conditionally.md
     - name: DATA-0142 PostgreSQL confirms every index it creates, and refuses one a name collision would skip
       href: DATA-0142-postgres-confirms-every-index-it-creates.md
+    - name: DATA-0143 A Move needs proof that its endpoints are different stores; a store marker is proposed
+      href: DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

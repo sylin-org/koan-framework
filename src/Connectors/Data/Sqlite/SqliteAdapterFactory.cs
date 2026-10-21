@@ -115,6 +115,23 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         return services.GetRequiredService<SqliteConnections>().StoreIdentity(route.ConnectionString, route.Source);
     }
 
+    /// <summary>
+    /// Two sources whose identities differ are proven apart when either is an in-memory database (one per source and
+    /// connection, which Koan keeps itself), when either file does not exist yet, or when both files take SQLite's write
+    /// lock at once. Nothing is written. A URI data source is not proven.
+    /// </summary>
+    public ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default)
+    {
+        var first = ResolveRoute(services, source);
+        var second = ResolveRoute(services, other);
+        return services.GetRequiredService<SqliteConnections>()
+            .ProveDistinct(first.ConnectionString, second.ConnectionString, ct);
+    }
+
     internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

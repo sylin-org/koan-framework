@@ -126,6 +126,21 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
         return DataSourceRegistry.IdentityOf($"{server}|{schema}");
     }
 
+    /// <summary>
+    /// Asks the servers, through an advisory lock keyed by database, whether the two routes reach one database
+    /// (<see cref="NpgsqlStoreProof"/>). Different databases, or one database under different schemas, are proven apart.
+    /// </summary>
+    public ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default)
+    {
+        var first = ResolveRoute(services, source);
+        var second = ResolveRoute(services, other);
+        return NpgsqlStoreProof.Distinct(first.ConnectionString, first.SearchPath, second.ConnectionString, second.SearchPath, ct);
+    }
+
     internal PostgresRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

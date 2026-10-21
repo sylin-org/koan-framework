@@ -111,6 +111,40 @@ public sealed class SqliteTransferPlaceSpec
             (await Parcel.All()).Should().HaveCount(Rows);
     }
 
+    /// <summary>
+    /// NK-305: two spellings that the text identity cannot join (a <c>\\?\</c> prefix on Windows, a directory link
+    /// elsewhere) name one file. Before NK-305 the Move deleted every row it copied; now the adapter must prove the
+    /// files apart, cannot, and the Move is refused.
+    /// </summary>
+    [Fact]
+    public async Task Move_to_a_spelling_the_identity_cannot_join_is_refused_as_unproven()
+    {
+        await using var host = await Start();
+        await Seed();
+
+        var refusal = await Record.ExceptionAsync(() => Parcel.Move().To(source: "Spelled").Run());
+
+        (await Parcel.All()).Should().HaveCount(Rows, "a Move onto its own file must not delete anything");
+        refusal.Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Contain("could not prove");
+    }
+
+    [Fact]
+    public async Task Move_between_two_existing_files_is_proven_apart_and_runs()
+    {
+        await using var host = await Start();
+        using (EntityContext.Source("Preview"))
+            await new Parcel { Label = "already-there" }.Save();
+        await Seed();
+
+        var result = await Parcel.Move().To(source: "Preview").Run();
+
+        result.CopiedCount.Should().Be(Rows);
+        (await Parcel.All()).Should().BeEmpty();
+        using (EntityContext.Source("Preview"))
+            (await Parcel.All()).Should().HaveCount(Rows + 1);
+    }
+
     private async Task AssertMoveRefused(string? seed, Func<Task> move)
     {
         await using var host = await Start();
@@ -147,9 +181,19 @@ public sealed class SqliteTransferPlaceSpec
             .WithSetting("Koan:Data:Sources:Alias:Adapter", "sqlite")
             .WithSetting("Koan:Data:Sources:Alias:ConnectionString", $"Data Source={primary.ToUpperInvariant()};Pooling=False")
             .WithSetting("Koan:Data:Sources:Orphan:Adapter", "sqlite")
+            .WithSetting("Koan:Data:Sources:Spelled:Adapter", "sqlite")
+            .WithSetting("Koan:Data:Sources:Spelled:ConnectionString", $"Data Source={OtherSpelling(primary)}")
             .ConfigureServices(services => services.AddKoan())
             .StartAsync();
         return new TransferHost(host, primary, preview);
+    }
+
+    private static string OtherSpelling(string path)
+    {
+        if (OperatingSystem.IsWindows()) return @"\\?\" + path;
+        var link = Path.Combine(Path.GetTempPath(), $"koan-sqlite-link-{Guid.CreateVersion7():n}");
+        Directory.CreateSymbolicLink(link, Path.GetDirectoryName(path)!);
+        return Path.Combine(link, Path.GetFileName(path));
     }
 
     private static string TempDatabase(string label)

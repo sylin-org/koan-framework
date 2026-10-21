@@ -60,6 +60,13 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory, IDataAdapterSe
         => DataSourceRegistry.IdentityOf(
             "inmemory\n" + (string.IsNullOrWhiteSpace(source) ? Constants.Provider.DefaultSource : source));
 
+    /// <summary>Each source name keys its own host-owned store, so two different identities are two stores.</summary>
+    public ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default) => ValueTask.FromResult(true);
+
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
     {
         Style = StorageNamingStyle.EntityType,

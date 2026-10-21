@@ -69,6 +69,75 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger, IHost
             : "file\n" + AnchorDataSource(builder.DataSource).ToUpperInvariant());
     }
 
+    /// <summary>
+    /// Whether two connection strings whose <see cref="StoreIdentity"/> values differ open different databases. A path
+    /// compared as text can name one file two ways (a <c>\\?\</c> prefix, a link, a short name), so existing files are
+    /// asked: each connection takes the RESERVED lock with <c>BEGIN IMMEDIATE</c>, which one file refuses to a second
+    /// connection and two files grant to both. Both transactions roll back; nothing is written (NK-305).
+    /// </summary>
+    internal async ValueTask<bool> ProveDistinct(string first, string second, CancellationToken ct)
+    {
+        var a = Parse(first);
+        var b = Parse(second);
+        if (IsMemory(a) || IsMemory(b)) return true;
+        if (string.IsNullOrWhiteSpace(a.DataSource) || string.IsNullOrWhiteSpace(b.DataSource) ||
+            IsUri(a.DataSource) || IsUri(b.DataSource))
+            return false;
+        var pathA = AnchorDataSource(a.DataSource);
+        var pathB = AnchorDataSource(b.DataSource);
+        // A file that does not exist cannot be the one that does; two that do not exist hold no rows to lose.
+        if (!File.Exists(pathA) || !File.Exists(pathB)) return true;
+
+        await using var holder = await OpenExisting(pathA, ct).ConfigureAwait(false);
+        await using var prober = await OpenExisting(pathB, ct).ConfigureAwait(false);
+        await Run(holder, "BEGIN IMMEDIATE", ct).ConfigureAwait(false);
+        try
+        {
+            try
+            {
+                await Run(prober, "BEGIN IMMEDIATE", ct, timeoutSeconds: 1).ConfigureAwait(false);
+            }
+            catch (SqliteException error) when (error.SqliteErrorCode is Constants.BusyCode or Constants.LockedCode)
+            {
+                return false;
+            }
+            await Run(prober, "ROLLBACK", ct).ConfigureAwait(false);
+            return true;
+        }
+        finally
+        {
+            await Run(holder, "ROLLBACK", CancellationToken.None).ConfigureAwait(false);
+        }
+
+        static async Task<SqliteConnection> OpenExisting(string path, CancellationToken ct)
+        {
+            var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+            {
+                DataSource = path,
+                Mode = SqliteOpenMode.ReadWrite,
+                Pooling = false
+            }.ToString());
+            try
+            {
+                await connection.OpenAsync(ct).ConfigureAwait(false);
+                return connection;
+            }
+            catch
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+        }
+
+        static async Task Run(SqliteConnection connection, string sql, CancellationToken ct, int? timeoutSeconds = null)
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            if (timeoutSeconds is { } seconds) command.CommandTimeout = seconds;
+            await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+    }
+
     internal SqliteConnectionStringBuilder Parse(string connectionString)
     {
         try

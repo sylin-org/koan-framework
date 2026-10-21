@@ -10,6 +10,8 @@ public static class Constants
     public const int MaximumBatchItems = 4_096;
     public const int MaximumParameters = 30_000;
     internal const int PrimaryKeyConstraint = 1555;
+    internal const int BusyCode = 5;
+    internal const int LockedCode = 6;
     internal const string UniqueConstraintFailure = "UNIQUE constraint failed: ";
 
     public static class Configuration

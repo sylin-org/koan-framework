@@ -329,7 +329,7 @@ See [versioning.md](versioning.md) and the [release playbook](nuget-publishing.m
 
 | If you want to... | Approach |
 |---|---|
-| Add a new data store connector (SQL / NoSQL / document) | Same as above, pillar = `Data`, factory interface = `IDataAdapterFactory`. Model after `Koan.Data.Connector.Mongo`. Implement `ResolveStoreIdentity` from the route the repository opens (file, server database and schema), so transfers can tell two spellings of one store apart from two stores ([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)). |
+| Add a new data store connector (SQL / NoSQL / document) | Same as above, pillar = `Data`, factory interface = `IDataAdapterFactory`. Model after `Koan.Data.Connector.Mongo`. Implement `ResolveStoreIdentity` from the route the repository opens (file, server database and schema), so transfers can tell two spellings of one store apart from two stores ([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)), and `ProveDistinctStores` from the stores themselves without writing, or a `Move` between two of its stores is refused ([DATA-0143](../decisions/DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md)). |
 | Add a new vector connector | This workbook. Model after Weaviate. |
 | Add a new AI provider | Pillar = `AI`, model after `Koan.AI.Connector.Ollama`. |
 | Add a new communication transport | Pillar = `Communication`, model after `Koan.Communication.Connector.RabbitMq`. |

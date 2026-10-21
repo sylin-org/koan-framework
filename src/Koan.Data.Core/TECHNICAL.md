@@ -257,7 +257,8 @@ validation:
   `ResolveStoreIdentity` for the routed source (or the plan's connection identity when the adapter declares none) and
   the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,
   and an equal or unknown store are one place: Move and Mirror throw before the lease is taken, Copy returns a zero
-  result with a warning (DATA-0125).
+  result with a warning (DATA-0125). Identities that differ are not proof of two stores: a `Move` between two stores of
+  one provider also needs `ProveDistinctStores` to return true, or it throws before the lease (DATA-0143).
 - Transfer journals hold identities only. A bidirectional mirror whose destination wins journals the winning ids and
   re-reads those rows from the destination when it replays them into the source, so the source receives the row the
   destination's adapter materializes (runtime family type, defaults, non-public setters, dictionary keys) and never a

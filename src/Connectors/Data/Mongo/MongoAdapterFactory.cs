@@ -107,6 +107,41 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
         return DataSourceRegistry.IdentityOf($"{servers}\n{route.Database.ToLowerInvariant()}");
     }
 
+    /// <summary>
+    /// Asks each deployment who answered (<c>hello</c>, which needs no privilege): two writable primaries with different
+    /// process ids are different deployments; one process is one deployment, whose databases differ only by name. A
+    /// router (<c>mongos</c>) or a member that is not the writable primary is not proof, because two of them can front
+    /// one data set. Nothing is written (NK-305).
+    /// </summary>
+    public async ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default)
+    {
+        var first = ResolveRoute(services, source);
+        var second = ResolveRoute(services, other);
+        var clients = services.GetRequiredService<MongoClientManager>();
+        var a = await Hello(first).ConfigureAwait(false);
+        var b = await Hello(second).ConfigureAwait(false);
+        if (a is null || b is null) return false;
+        if (a != b) return true;
+        return !string.Equals(first.Database, second.Database, StringComparison.OrdinalIgnoreCase);
+
+        async Task<ObjectId?> Hello(MongoRoute route)
+        {
+            var database = await clients.Database(route, ct).ConfigureAwait(false);
+            var reply = await database.RunCommandAsync<BsonDocument>(
+                new BsonDocument("hello", 1), ReadPreference.Primary, ct).ConfigureAwait(false);
+            if (reply.TryGetValue("msg", out var message) && message == "isdbgrid") return null;
+            if (!reply.TryGetValue("isWritablePrimary", out var writable) || !writable.ToBoolean()) return null;
+            return reply.TryGetValue("topologyVersion", out var topology) && topology is BsonDocument version &&
+                   version.TryGetValue("processId", out var process) && process.IsObjectId
+                ? process.AsObjectId
+                : null;
+        }
+    }
+
     internal MongoRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

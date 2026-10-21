@@ -226,6 +226,12 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             return null;
         }
 
+        // A Move deletes what it copied, so two places that might be one container are not enough: the endpoints must
+        // be proven apart (NK-305). Copy and Mirror delete nothing they wrote and keep running on an unproven pair.
+        if (kind == TransferKind.Move &&
+            !await origin.IsProvenDistinctFrom(destination, services, ct).ConfigureAwait(false))
+            throw new InvalidOperationException(Unproven(origin, destination));
+
         DataRouteBinding[] bindings = [.. new[] { origin.Binding, destination.Binding }.OfType<DataRouteBinding>()];
         return await services.GetRequiredService<DataOperationHorizon>()
             .EnterMany(bindings, $"Entity transfer for '{typeof(TEntity).FullName}'", ct)
@@ -255,6 +261,14 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
                "inherits the ambient EntityContext, source names compare without case, a source without its own " +
                "connection shares its adapter's default store, and partitions that differ only by case share a container.";
     }
+
+    private string Unproven(TransferPlace origin, TransferPlace destination) =>
+        $"Move of '{typeof(TEntity).Name}' from {Describe(FromContext)} to {Describe(ToContext)} was refused: " +
+        $"source '{origin.Source}' and source '{destination.Source}' are both {origin.Provider} stores whose connections " +
+        "are spelled differently, and Koan could not prove they are different stores. One store spelled two ways " +
+        "(localhost and 127.0.0.1, a path prefix, a link) would make the Move delete every row it copied. The " +
+        $"{origin.Provider} adapter could not prove them apart; if they are different stores, Copy the rows and remove " +
+        "them from the origin yourself, or move through a store the adapter can tell apart.";
 
     private static string Describe(TransferContextOptions? context)
     {

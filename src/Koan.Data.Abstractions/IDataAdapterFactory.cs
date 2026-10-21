@@ -30,4 +30,17 @@ public interface IDataAdapterFactory : IAdapterFactory
     /// connection identity, which compares declarations rather than resolved connections.
     /// </summary>
     string? ResolveStoreIdentity(IServiceProvider services, string source) => null;
+
+    /// <summary>
+    /// Whether <paramref name="source"/> and <paramref name="other"/>, whose <see cref="ResolveStoreIdentity"/> values
+    /// differ, are proven to open different physical stores. An identity derived from connection text can differ for one
+    /// store (<c>localhost</c> and <c>127.0.0.1</c>, a path prefix, a link), so an operation that deletes what it
+    /// copied asks for proof before it runs. The answer comes from the stores themselves, may perform I/O, and must never
+    /// write to them. <see langword="false"/> means not proven, which is also the default.
+    /// </summary>
+    ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default) => ValueTask.FromResult(false);
 }

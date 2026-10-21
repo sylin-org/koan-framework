@@ -40,6 +40,9 @@ Entity mutation contracts follow the same rule:
 - `IDataAdapterFactory.ResolveStoreIdentity(services, source)` names the physical store a source opens, as a one-way
   identity. Two sources reaching one database file, server database and schema, or directory return the same value;
   Data uses it to refuse a transfer onto its own container (DATA-0125). `null` falls back to the source plan.
+- `IDataAdapterFactory.ProveDistinctStores(services, source, other, ct)` answers whether two sources whose identities
+  differ are proven to be different stores, from the stores themselves and without writing. A `Move` runs between two
+  stores of one provider only when this returns true (DATA-0143); the default is false.
 - `RequireAtomic` rejects before deferred loads, Lifecycle callbacks, or provider dispatch unless both the adapter
   claim and the created native execution seam prove atomicity.
 - `GetMany` returns exactly one slot per requested identity, preserving order and duplicates and using `null` for

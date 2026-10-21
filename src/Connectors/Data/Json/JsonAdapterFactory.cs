@@ -109,6 +109,26 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
         return DataSourceRegistry.IdentityOf("json\n" + route.DirectoryPath.ToUpperInvariant());
     }
 
+    /// <summary>
+    /// A directory that does not exist yet cannot be one that does. Two existing directories are not proven apart: a
+    /// link, a junction or a path prefix can name one directory two ways, and telling them apart would mean writing a
+    /// marker into the store (NK-305, DATA-0143).
+    /// </summary>
+    public ValueTask<bool> ProveDistinctStores(
+        IServiceProvider services,
+        string source,
+        string other,
+        CancellationToken ct = default)
+    {
+        string Directory(string name) => JsonRoute.Resolve(
+            services.GetRequiredService<IConfiguration>(),
+            services.GetRequiredService<DataSourceRegistry>(),
+            services.GetRequiredService<IOptions<JsonDataOptions>>().Value,
+            this,
+            string.IsNullOrWhiteSpace(name) ? Infrastructure.Constants.Provider.DefaultSource : name).DirectoryPath;
+        return ValueTask.FromResult(!System.IO.Directory.Exists(Directory(source)) || !System.IO.Directory.Exists(Directory(other)));
+    }
+
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
     {
         Style = StorageNamingStyle.EntityType,

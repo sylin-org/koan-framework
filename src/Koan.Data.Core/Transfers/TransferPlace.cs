@@ -15,7 +15,8 @@ internal sealed record TransferPlace(
     string Source,
     string? Store,
     string Container,
-    DataRouteBinding? Binding)
+    DataRouteBinding? Binding,
+    IDataAdapterFactory Factory)
 {
     /// <summary>Resolves the place under the current ambient context. Performs no I/O.</summary>
     public static TransferPlace Resolve<TEntity>(IServiceProvider services, DataSourceRegistry sources)
@@ -28,7 +29,7 @@ internal sealed record TransferPlace(
             typeof(TEntity),
             EntityContext.Current?.Partition,
             services);
-        return new TransferPlace(decision.Adapter, decision.Source, store, container, decision.Binding);
+        return new TransferPlace(decision.Adapter, decision.Source, store, container, decision.Binding, decision.Factory);
     }
 
     /// <summary>
@@ -36,6 +37,26 @@ internal sealed record TransferPlace(
     /// case because several stores (SQLite, SQL Server, MySQL on Windows, a JSON directory on a case-insensitive file
     /// system) resolve names that differ only by case to one object; an unknown store is assumed shared.
     /// </summary>
+    /// <summary>
+    /// True when the two places are proven to be different containers: different providers, one store with different
+    /// containers, or two stores the adapter proves apart. Two store identities that merely differ are not proof,
+    /// because connection text can spell one store two ways (NK-305).
+    /// </summary>
+    public async ValueTask<bool> IsProvenDistinctFrom(TransferPlace other, IServiceProvider services, CancellationToken ct)
+    {
+        if (IsSameAs(other)) return false;
+        if (!string.Equals(Provider, other.Provider, StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(Store, other.Store, StringComparison.Ordinal)) return true;
+        try
+        {
+            return await Factory.ProveDistinctStores(services, Source, other.Source, ct).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     public bool IsSameAs(TransferPlace other)
         => string.Equals(Provider, other.Provider, StringComparison.OrdinalIgnoreCase)
            && string.Equals(Container, other.Container, StringComparison.OrdinalIgnoreCase)

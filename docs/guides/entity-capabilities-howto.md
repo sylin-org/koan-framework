@@ -1127,7 +1127,11 @@ provider-wide connection), a partition spelled in another case, or a
 a pair throws before reading anything; a `Copy` writes nothing and reports it in `Warnings`
 ([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)). A declared source with
 no connection at all is refused on its first operation
-([DATA-0126](../decisions/DATA-0126-a-declared-source-owns-its-connection.md)).
+([DATA-0126](../decisions/DATA-0126-a-declared-source-owns-its-connection.md)). Two connections spelled differently
+(`localhost` and `127.0.0.1`, a path prefix, a link) can still be one store, so a `Move` between two stores of one
+provider runs only when the adapter proves them apart from the stores themselves: SQLite by file locks, PostgreSQL by an
+advisory lock, MongoDB by the answering process, InMemory by source. Otherwise the `Move` is refused; a `Copy` still
+runs ([DATA-0143](../decisions/DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md)).
 
 Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
 dataset in application memory or mutate an offset-paged source while reading it. Before deleting, it re-reads
