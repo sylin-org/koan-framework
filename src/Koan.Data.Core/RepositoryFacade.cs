@@ -391,6 +391,42 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     }
 
     /// <summary>
+    /// <see cref="OverrideUpsert"/> for a set: every row is prepared first, then written in ONE native bulk upsert, so a
+    /// mass soft delete is atomic wherever the adapter's bulk upsert is and never stops part-way through a loop of
+    /// single writes (NK-289). A receipt that does not account for every row is refused with an unknown outcome.
+    /// </summary>
+    private async Task<int> OverrideUpsertMany(
+        IReadOnlyList<TEntity> rows,
+        OperationOverrideDescriptor ov,
+        DataSegmentationBinding segmentation,
+        CancellationToken ct)
+    {
+        if (rows.Count == 0) return 0;
+        var payloads = new List<TEntity>(rows.Count);
+        foreach (var row in rows)
+        {
+            ct.ThrowIfCancellationRequested();
+            Reverse(row);
+            WritePlanFor(row).ApplyAll(row);
+            payloads.Add(WritePayload(row));
+        }
+        var overrides = new Dictionary<string, object?>(StringComparer.Ordinal) { [ov.Field] = ov.OnDeleteValue };
+        var values = CurrentManagedValues(segmentation);
+        int reported;
+        using (values is null
+                   ? ManagedFieldWriteScope.EnterOverrides(overrides)
+                   : ManagedFieldWriteScope.Enter(values, overrides))
+            reported = await _inner.UpsertMany(payloads, ct);
+        if (reported != rows.Count)
+            throw new BulkMutationReceiptRejectedException(
+                typeof(TEntity).FullName ?? typeof(TEntity).Name,
+                rows.Count,
+                reported,
+                DataCommitOutcome.Unknown);
+        return reported;
+    }
+
+    /// <summary>
     /// The AND-fold of every registered read-filter contributor's predicate isolating reads to the current ambient
     /// scope, or <c>null</c> when none constrains it (off / host / no axis) — DATA-0106 §2. Equality (tenancy) flows
     /// through the built-in <see cref="ManagedEqualityReadContributor"/>; a predicate axis (moderation) contributes its
@@ -1203,8 +1239,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         {
             var scoped = ScopedByIds(idList, Filter.And(managed, _notYetDeleted)!);
             var soft = await RequireQuery().Query(scoped, ct);
-            foreach (var row in soft.Items) await OverrideUpsert(row, ov, segmentation, ct);
-            return soft.Items.Count;
+            return await OverrideUpsertMany(soft.Items, ov, segmentation, ct);
         }
         return await PhysicalDeleteMany(idList, managed, ct);
     }
@@ -1781,10 +1816,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 }
                 else
                 {
-                    var deleted = 0;
-                    foreach (var id in deletes)
-                        if (await _outer.DeleteWithoutLifecycle(id, segmentation, ct))
-                            deleted++;
+                    // One scoped read and one bulk override write for the whole set (NK-289).
+                    var deleted = deletes.Count == 0 ? 0 : await _outer.DeleteManyWithoutLifecycle(deletes, segmentation, ct);
                     result = result with
                     {
                         Deleted = deleted,

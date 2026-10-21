@@ -38,6 +38,9 @@ controller, option, or manual registration is required.
   removing visible `[SoftDelete]` rows. Ordinary Entity reads hide those rows automatically.
 - A soft delete changes only rows not yet deleted and counts only those. Inside `WithDeleted()`, `Remove`, `DeleteAll`
   and `RemoveAll` skip rows already in the recycle bin, so a mass delete there finishes and reports what it changed.
+- A bulk soft delete (`Remove(ids)`, a non-Lifecycle batch, each `RemoveAll` page) reads the visible rows and writes
+  them back in one native bulk upsert, atomic where the adapter's bulk upsert is. The write re-persists the row as it
+  was read with `__deleted` set, so an update another writer makes between that read and the write is overwritten.
 - `T.WithDeleted()` opens the recycle bin only for `T`; it cannot reveal deleted rows from another Entity type.
   Nested scopes compose and unwind with the async flow.
 - Load a deleted row inside `WithDeleted()`, then call `.Restore()` to make it visible. Call `.HardDelete()` to purge
