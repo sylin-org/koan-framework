@@ -134,7 +134,8 @@ public sealed class StreamableHttpTransport
             return;
         }
 
-        var principal = session.User;
+        // SEC-0016: authorize the request as the credential and connection it carries; the session binds only the subject.
+        var principal = isInitialize ? session.User : McpSessionManager.RequestPrincipal(context);
         var handler = _server.CreateHandler();
 
         if (options.Transport.StreamableJsonResponse)
@@ -383,8 +384,8 @@ public sealed class StreamableHttpTransport
             return null;
         }
         // SEC-0006 — the session id is not a bearer capability: a non-initialize request must come from the same
-        // subject that established the session. The downstream gate runs as session.User, so a different caller who
-        // learns a session id must not be able to inject RPC that executes under the owner's principal.
+        // subject that established the session, so a caller who learns a session id cannot drive another subject's
+        // session. The request itself is authorized as its own principal (SEC-0016).
         if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
         {
             _logger.LogWarning("Rejected MCP Streamable request: caller does not own session {SessionId}.", sid);

@@ -155,7 +155,7 @@ public sealed class HttpSseTransport
         }
 
         // SEC-0006 — the session id is not a bearer capability: an RPC submitter must be the SAME subject that
-        // established the session on the GET /sse handshake (the dispatch runs as session.User).
+        // established the session on the GET /sse handshake (the dispatch runs as the submitter's own principal).
         if (options.RequireAuthentication && !McpEdgeAuth.SamePrincipal(context.User, session.User))
         {
             _logger.LogWarning("Rejected legacy MCP RPC submit: caller principal does not own session {SessionId}.", sessionId);
@@ -201,7 +201,8 @@ public sealed class HttpSseTransport
         }.ToString(Formatting.None)));
 
         var handler = _server.CreateHandler();
-        var response = await _dispatcher.DispatchAsync(envelope, session.User, handler, context.RequestAborted);
+        // SEC-0016: the submitter's own credential and connection, not the handshake's.
+        var response = await _dispatcher.DispatchAsync(envelope, McpSessionManager.RequestPrincipal(context), handler, context.RequestAborted);
         if (response is not null)
         {
             getStream.EnqueueRaw(new SseEnvelope("message", response.ToString(Formatting.None)));

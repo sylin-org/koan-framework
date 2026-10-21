@@ -39,6 +39,12 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
         return issuer.Issue(new TrustClaims { Subject = subject }, TimeSpan.FromMinutes(5), audience: _fx.Resource);
     }
 
+    private string Token(string subject, params string[] scopes)
+    {
+        var issuer = _fx.Services.GetRequiredService<IIssuer>();
+        return issuer.Issue(new TrustClaims { Subject = subject, Scopes = scopes }, TimeSpan.FromMinutes(5), audience: _fx.Resource);
+    }
+
     private async Task<string> InitializeAs(HttpClient client, string token)
     {
         using var req = PostRequest(Route, Rpc("initialize", id: 1, @params: InitParams));
@@ -61,6 +67,25 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
         var res = await client.SendAsync(req, Quick);
 
         res.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // SEC-0016: each request runs as the principal it carries. A refreshed token with fewer scopes reduces authority at
+    // once, without re-initializing.
+    [Fact]
+    public async Task A_scope_downgrade_between_requests_is_honored()
+    {
+        using var client = _fx.NewClient();
+        var sessionId = await InitializeAs(client, Token("carol", "items:read", "items:write"));
+
+        var body = Rpc("tools/call", id: 2, @params: new { name = "ledgerbook.upsert", arguments = new { model = new { entry = "x" } } });
+        using var req = PostRequest(Route, body, sessionId, accept: "application/json, text/event-stream", protocolVersion: "2025-06-18");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("carol", "items:read"));
+        var res = await client.SendAsync(req, Quick);
+        var text = await res.Content.ReadAsStringAsync(Quick);
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK, text);
+        text.Should().Contain("\"isError\":true", "the write scope is gone from the token this request carries");
+        text.Should().Contain("forbidden");
     }
 
     [Fact]

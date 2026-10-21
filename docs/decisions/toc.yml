@@ -566,3 +566,5 @@
       href: SEC-0014-exposure-mode-is-enforced-on-invoke.md
     - name: SEC-0015 The origin tier is stamped by the door that received the call
       href: SEC-0015-origin-is-stamped-by-the-door-that-received-the-call.md
+    - name: SEC-0016 Each MCP HTTP request is authorized as the principal it carries
+      href: SEC-0016-each-mcp-http-request-is-authorized-as-itself.md

@@ -67,13 +67,9 @@ public sealed class McpSessionManager : IHostedService, IDisposable
         var id = Guid.NewGuid().ToString("N");
         var now = _timeProvider.GetUtcNow();
 
-        // SEC-0004 origin: a remote (HTTP) caller is never `local` — stamp the session principal `internal` when its
-        // source IP is in a declared trusted network, else `remote` (the safe default). Stamped ONCE here, so every
-        // request this session makes carries the correct origin.
-        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
-        var principal = OriginStamp.Apply(
-            context.User ?? new ClaimsPrincipal(),
-            OriginResolver.FromHttpContext(context, originOptions));
+        // The session keeps the initializer's principal to bind later requests to its subject; each request is
+        // authorized as its own RequestPrincipal (SEC-0016).
+        var principal = RequestPrincipal(context);
 
         var session = new McpSession(
             id,
@@ -87,6 +83,19 @@ public sealed class McpSessionManager : IHostedService, IDisposable
         if (!_sessions.TryAdd(id, session)) return null;
         PublishHealth();
         return session;
+    }
+
+    /// <summary>
+    /// SEC-0016: the principal one HTTP request is authorized as: the credential it carries (the bearer the edge
+    /// authenticated, or the default scheme's user), stamped with the origin tier of its own connection — never the
+    /// principal or tier frozen when the session began. SEC-0004 origin: a remote (HTTP) caller is never <c>local</c>;
+    /// it is <c>internal</c> only from a declared trusted network.
+    /// </summary>
+    public static ClaimsPrincipal RequestPrincipal(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var originOptions = context.RequestServices.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
+        return OriginStamp.Apply(context.User ?? new ClaimsPrincipal(), OriginResolver.FromHttpContext(context, originOptions));
     }
 
     public bool TryGet(string sessionId, out McpSession session)
