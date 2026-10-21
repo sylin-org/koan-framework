@@ -33,7 +33,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
             // Fingerprint the rows as read, before write preparation stamps the instances for the destination.
             var moved = batch.Select(entity => new MovedRow(entity.Id, Fingerprint(entity))).ToArray();
             copied = checked(copied + await WriteBatch(
-                batch, FromContext, ToContext, TransferKind.Move, progress, ct).ConfigureAwait(false));
+                batch, TransferDirection.IntoDestination, TransferKind.Move, progress, ct).ConfigureAwait(false));
             foreach (var row in moved)
                 await confirmed.Append(row, ct).ConfigureAwait(false);
         }

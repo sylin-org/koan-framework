@@ -18,6 +18,9 @@ internal sealed record TransferPlace(
     DataRouteBinding? Binding,
     IDataAdapterFactory Factory)
 {
+    /// <summary>The place as a transfer result reports it.</summary>
+    public TransferEndpoint Endpoint => new(Source, Provider, Container);
+
     /// <summary>Resolves the place under the current ambient context. Performs no I/O.</summary>
     public static TransferPlace Resolve<TEntity>(IServiceProvider services, DataSourceRegistry sources)
         where TEntity : class

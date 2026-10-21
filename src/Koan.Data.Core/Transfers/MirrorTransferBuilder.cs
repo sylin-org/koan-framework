@@ -31,19 +31,25 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         using var fidelity = EnterFidelity();
         return _mode switch
         {
-            MirrorMode.Push => await RunOneWay(FromContext, ToContext, progress, ct).ConfigureAwait(false),
-            MirrorMode.Pull => await RunOneWay(ToContext, FromContext, progress, ct).ConfigureAwait(false),
+            MirrorMode.Push => await RunOneWay(TransferDirection.IntoDestination, progress, ct).ConfigureAwait(false),
+            MirrorMode.Pull => await RunOneWay(TransferDirection.IntoSource, progress, ct).ConfigureAwait(false),
             MirrorMode.Bidirectional => await RunBidirectional(progress, ct).ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(_mode))
         };
     }
 
+    /// <summary>
+    /// Makes the replica match the authoritative side. <paramref name="direction"/> names the replica: a Push writes
+    /// into <c>To()</c>, a Pull into <c>From()</c>.
+    /// </summary>
     private async Task<TransferResult<TKey>> RunOneWay(
-        TransferContextOptions? authoritative,
-        TransferContextOptions? replica,
+        TransferDirection direction,
         TransferProgress progress,
         CancellationToken ct)
     {
+        var (authoritative, replica) = direction == TransferDirection.IntoDestination
+            ? (FromContext, ToContext)
+            : (ToContext, FromContext);
         var read = 0L;
         var copied = 0L;
         await using var absent = new TransferJournal<TKey>();
@@ -52,7 +58,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         {
             read = checked(read + batch.Count);
             copied = checked(copied + await WriteBatch(
-                batch, authoritative, replica, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+                batch, direction, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
         // Do not mutate a numbered-page source while it is being read. First discover the replica identities the
@@ -168,7 +174,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
             }
 
             copied = checked(copied + await WriteBatch(
-                targetWrites, FromContext, ToContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+                targetWrites, TransferDirection.IntoDestination, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
         await foreach (var ids in targetWins.ReadBatches(BatchSize, ct).ConfigureAwait(false))
@@ -176,7 +182,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
             // A winner removed from the destination since the source pass has nothing left to write.
             var winners = (await ReadMany(ids, ToContext, ct).ConfigureAwait(false)).OfType<TEntity>().ToArray();
             copied = checked(copied + await WriteBatch(
-                winners, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+                winners, TransferDirection.IntoSource, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
         // A second bounded pass admits only target-only identities. Overlaps were resolved exactly once
@@ -191,7 +197,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                 if (sources[index] is null) sourceAdds.Add(targetBatch[index]);
 
             copied = checked(copied + await WriteBatch(
-                sourceAdds, ToContext, FromContext, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
+                sourceAdds, TransferDirection.IntoSource, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
         return Complete(TransferKind.Mirror, read, copied, 0, progress, conflicts);

@@ -89,3 +89,26 @@ public enum TransferFidelity
     /// </summary>
     Semantic
 }
+
+/// <summary>Which declared side of a transfer a batch of rows was written into (NK-252).</summary>
+public enum TransferDirection
+{
+    /// <summary>Rows read from <c>From()</c> were written into <c>To()</c>.</summary>
+    IntoDestination,
+
+    /// <summary>Rows read from <c>To()</c> were written into <c>From()</c>: a Pull, or the reverse half of a bidirectional Mirror.</summary>
+    IntoSource
+}
+
+/// <summary>How a transfer read its rows (DATA-0113).</summary>
+public enum TransferReadStrategy
+{
+    /// <summary>Nothing was read: the run was a reported no-op.</summary>
+    None,
+
+    /// <summary>Every read streamed in provider-bounded pages.</summary>
+    Streamed,
+
+    /// <summary>At least one read was materialized once because the provider could not stream it; a warning says why.</summary>
+    Materialized
+}

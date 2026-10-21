@@ -250,6 +250,43 @@ public sealed class EntityTransferDslSpec
         all.Should().ContainSingle(x => x.Title == "remote");
     }
 
+    /// <summary>
+    /// NK-252. A Pull writes into From(), and its batch audits used to report From and To swapped while the summary
+    /// reported them as declared; neither said which store or container was used. Every event now carries the declared
+    /// From and To, a direction, and the places both sides resolved to, and the result says how the source was read.
+    /// </summary>
+    [Theory]
+    [InlineData(MirrorMode.Push, TransferDirection.IntoDestination)]
+    [InlineData(MirrorMode.Pull, TransferDirection.IntoSource)]
+    public async Task Mirror_ReportsDeclaredSidesADirectionAndTheResolvedPlaces(
+        MirrorMode mode,
+        TransferDirection written)
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var authoritative = mode == MirrorMode.Push ? "active" : "mirror";
+        using (runtime.UsePartition(authoritative))
+            await new TransferTodo { Title = "only", Active = true }.Save();
+
+        var audits = new List<TransferAuditBatch>();
+        var result = await TransferTodo.Mirror(mode)
+            .From(partition: "active")
+            .To(partition: "mirror")
+            .Audit(audits.Add)
+            .Run();
+
+        result.CopiedCount.Should().Be(1);
+        result.ResolvedFrom.Should().Be(new TransferEndpoint("Default", TransferAdapterFactory.ProviderId, "TransferTodo#active"));
+        result.ResolvedTo.Should().Be(new TransferEndpoint("Default", TransferAdapterFactory.ProviderId, "TransferTodo#mirror"));
+        result.ReadStrategy.Should().Be(TransferReadStrategy.Streamed);
+        audits.Should().OnlyContain(audit => audit.From.Partition == "active" && audit.To.Partition == "mirror");
+        audits.Should().OnlyContain(audit => audit.ResolvedFrom == result.ResolvedFrom && audit.ResolvedTo == result.ResolvedTo);
+        audits.Where(audit => !audit.IsSummary).Should().ContainSingle()
+            .Which.Direction.Should().Be(written);
+    }
+
     [Fact]
     public async Task Mirror_Bidirectional_UsesTimestampForResolution()
     {

@@ -100,12 +100,17 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         using var scope = context?.Apply();
 
         var batch = new List<TEntity>(BatchSize);
+        if (progress.ReadStrategy == TransferReadStrategy.None) progress.ReadStrategy = TransferReadStrategy.Streamed;
         var source = Data<TEntity, TKey>.BulkRead(
             Predicate,
             BatchSize,
-            onMaterialized: because => progress.Warn(
-                $"Read the source with an explicitly materialized query because {because}. " +
-                $"Writes remained batched at {BatchSize}."),
+            onMaterialized: because =>
+            {
+                progress.ReadStrategy = TransferReadStrategy.Materialized;
+                progress.Warn(
+                    $"Read the source with an explicitly materialized query because {because}. " +
+                    $"Writes remained batched at {BatchSize}.");
+            },
             ct);
 
         await foreach (var entity in source.WithCancellation(ct).ConfigureAwait(false))
@@ -128,14 +133,18 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return await Data<TEntity, TKey>.GetMany(ids, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes one batch into the side <paramref name="direction"/> names: <c>To()</c> for rows read from <c>From()</c>,
+    /// <c>From()</c> for rows read from <c>To()</c>. The audit event always carries the declared From and To.
+    /// </summary>
     protected async Task<int> WriteBatch(
         IReadOnlyList<TEntity> entities,
-        TransferContextOptions? origin,
-        TransferContextOptions? destination,
+        TransferDirection direction,
         TransferKind kind,
         TransferProgress progress,
         CancellationToken ct)
     {
+        var destination = direction == TransferDirection.IntoDestination ? ToContext : FromContext;
         if (entities.Count == 0) return 0;
         if (entities.Count > BatchSize)
             throw new InvalidOperationException(
@@ -148,16 +157,20 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
 
         progress.BatchNumber++;
         progress.TotalProcessed = checked(progress.TotalProcessed + written);
-        var audit = new TransferAuditBatch(
+        Report(new TransferAuditBatch(
             kind,
             progress.BatchNumber,
             written,
             progress.TotalProcessed,
-            SnapshotFor(origin),
-            SnapshotFor(destination),
+            SnapshotFor(FromContext),
+            SnapshotFor(ToContext),
             progress.Stopwatch.Elapsed,
-            false);
-        Report(audit);
+            false)
+        {
+            Direction = direction,
+            ResolvedFrom = progress.ResolvedFrom,
+            ResolvedTo = progress.ResolvedTo
+        });
         return written;
     }
 
@@ -190,7 +203,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         TransferProgress progress,
         IReadOnlyList<TransferConflict<TKey>>? conflicts = null)
     {
-        var summary = new TransferAuditBatch(
+        Report(new TransferAuditBatch(
             kind,
             0,
             0,
@@ -198,8 +211,11 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             SnapshotFor(FromContext),
             SnapshotFor(ToContext),
             progress.Stopwatch.Elapsed,
-            true);
-        Report(summary);
+            true)
+        {
+            ResolvedFrom = progress.ResolvedFrom,
+            ResolvedTo = progress.ResolvedTo
+        });
         progress.Stopwatch.Stop();
 
         return new TransferResult<TKey>
@@ -210,7 +226,10 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             DeletedCount = deleted,
             Duration = progress.Stopwatch.Elapsed,
             Conflicts = conflicts?.ToArray() ?? [],
-            Warnings = progress.Warnings.ToArray()
+            Warnings = progress.Warnings.ToArray(),
+            ResolvedFrom = progress.ResolvedFrom,
+            ResolvedTo = progress.ResolvedTo,
+            ReadStrategy = progress.ReadStrategy
         };
     }
 
@@ -240,6 +259,8 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         var registry = services.GetRequiredService<DataSourceRegistry>();
         var origin = PlaceOf(FromContext, services, registry);
         var destination = PlaceOf(ToContext, services, registry);
+        progress.ResolvedFrom = origin.Endpoint;
+        progress.ResolvedTo = destination.Endpoint;
 
         if (origin.IsSameAs(destination))
         {
@@ -316,6 +337,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         public long BatchNumber { get; set; }
         public long TotalProcessed { get; set; }
         public IReadOnlyList<string> Warnings => _warnings;
+        public TransferEndpoint? ResolvedFrom { get; set; }
+        public TransferEndpoint? ResolvedTo { get; set; }
+        public TransferReadStrategy ReadStrategy { get; set; }
 
         public void Warn(string message)
         {

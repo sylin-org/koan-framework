@@ -26,7 +26,7 @@ public sealed class CopyTransferBuilder<TEntity, TKey>
         {
             read = checked(read + batch.Count);
             copied = checked(copied + await WriteBatch(
-                batch, FromContext, ToContext, TransferKind.Copy, progress, ct).ConfigureAwait(false));
+                batch, TransferDirection.IntoDestination, TransferKind.Copy, progress, ct).ConfigureAwait(false));
         }
 
         return Complete(TransferKind.Copy, read, copied, 0, progress);
