@@ -57,7 +57,8 @@ internal sealed class RelationalSchemaOrchestrator : IRelationalSchemaOrchestrat
                 index.Ttl,
                 rewriteFree,
                 keysSupported,
-                index.Required);
+                index.Required,
+                index.NameDeclared);
         }).ToArray();
 
         var table = new RelationalTableDefinition(

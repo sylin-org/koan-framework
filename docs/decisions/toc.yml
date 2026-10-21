@@ -398,6 +398,8 @@
       href: DATA-0144-unique-indexes-under-row-scoped-tenancy.md
     - name: DATA-0145 MongoDB index keys use the field names the serializer writes
       href: DATA-0145-mongo-index-keys-use-the-stored-field-names.md
+    - name: DATA-0146 PostgreSQL index names fit 63 bytes without collisions, and a declared name is qualified per partition table
+      href: DATA-0146-postgres-index-names-fit-63-bytes-and-are-qualified-per-partition.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

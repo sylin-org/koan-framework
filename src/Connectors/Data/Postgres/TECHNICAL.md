@@ -62,6 +62,25 @@ Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets 
 - Offset paging is not snapshot isolation and does not provide mutation-safe traversal, resume tokens,
   or a public cursor.
 
+## Index names
+
+PostgreSQL index names are unique per schema and are cut to 63 bytes, and `CREATE INDEX IF NOT EXISTS` skips on any
+name match. Koan therefore names every index so a declared index can exist, then confirms it in the catalog
+([DATA-0146](../../../../docs/decisions/DATA-0146-postgres-index-names-fit-63-bytes-and-are-qualified-per-partition.md)):
+
+- A derived name (`IX_<table>_<members>`) is used as is while it fits in 63 bytes. A longer one keeps a readable prefix
+  and ends in `_` plus an eight-character hash of the whole name, so names that used to be cut alike stay distinct.
+- A name you declare with `[Index(Name = ...)]` is used as written on the entity's own table. On a partition table it is
+  qualified, `<name>_<eight-character hash of the table name>`, so the declaration creates one index per partition table.
+- After each create the catalog is asked what the name holds. A name owned by another table (two entities that declare
+  the same name), a non-unique index under a unique declaration or a different key count is refused with the remedy.
+
+An upgrade creates the new names beside the old ones; Koan never drops an index. The old index of a table that gains a
+new name is redundant and can be dropped: list a table's indexes with
+`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '<table>'`, then `DROP INDEX "<schema>"."<old name>"`. The
+old name of a partition table's declared index is the unqualified declared name, which only the first partition table
+ever held. CockroachDB scopes index names to their table and does not cut them, so it keeps the names as declared.
+
 ## Error modes
 
 - Provider errors (NpgsqlException) surfaced; transient failures retried per options.

@@ -1,4 +1,6 @@
+using System.Security.Cryptography;
 using System.Text;
+using Koan.Core.Naming;
 using Koan.Data.Relational.Orchestration;
 
 namespace Koan.Data.Relational.Npgsql.Runtime;
@@ -14,6 +16,27 @@ internal static class NpgsqlIndexNames
 {
     /// <summary>PostgreSQL's identifier limit: NAMEDATALEN - 1.</summary>
     internal const int MaximumBytes = 63;
+
+    // One engine composes every Koan identifier (ARCH-0096): a name over the limit keeps a readable prefix and ends in
+    // '_' plus a hash of the whole, so two names sharing a prefix stay distinct.
+    private static readonly CompositionPolicy Policy = new("_", VerbatimParticleFormatter.Instance, MaximumBytes);
+
+    /// <summary>
+    /// The name this index is created under (DATA-0146). A derived name already carries its container, so it is only
+    /// fitted to 63 bytes with a hash, never cut. A declared name (<c>[Index(Name = ...)]</c>) is the application's and
+    /// is used as written, except on a partition table, where it is qualified by a hash of the table name: one
+    /// declaration then yields one index per partition table instead of one for the whole schema.
+    /// </summary>
+    internal static string Name(RelationalTableDefinition table, RelationalIndexDefinition index, bool partitioned)
+    {
+        if (!index.NameDeclared || !partitioned)
+            return IdentifierComposer.Compose(index.Name, [], Policy);
+        Span<Particle> qualifier = [new Particle(0, "table", Hash(table.Name))];
+        return IdentifierComposer.Compose(index.Name, qualifier, Policy);
+    }
+
+    private static string Hash(string value) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0, 4).ToLowerInvariant();
 
     /// <summary>The name PostgreSQL stores: at most 63 UTF-8 bytes, cut at a character boundary.</summary>
     internal static string Effective(string name)

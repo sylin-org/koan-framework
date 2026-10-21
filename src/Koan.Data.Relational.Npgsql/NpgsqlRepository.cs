@@ -406,7 +406,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
                 await Ready(ct).ConfigureAwait(false);
                 await using var connection = await Open(ct).ConfigureAwait(false);
                 var validation = await _schema.ValidateAsync(
-                    _plan.Mapping, new NpgsqlDdlExecutor(connection, _plan.Dialect, _options.IndexNamesAreSchemaWide), _features, _schemaPolicy, ct)
+                    _plan.Mapping, Ddl(connection), _features, _schemaPolicy, ct)
                     .ConfigureAwait(false);
                 return (TResult)(object)validation.Report(_options.ProviderName);
             }
@@ -436,11 +436,18 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
             .ConfigureAwait(false);
     }
 
+    // An ambient partition names a different table of the same entity, so a declared index name is qualified for it.
+    private NpgsqlDdlExecutor Ddl(NpgsqlConnection connection) => new(
+        connection,
+        _plan.Dialect,
+        _options.IndexNamesAreSchemaWide,
+        partitioned: !string.IsNullOrWhiteSpace(EntityContext.Current?.Partition));
+
     private async Task Provision(CancellationToken ct)
     {
         await using var connection = await OpenOrCreate(ct).ConfigureAwait(false);
         await _schema.EnsureCreatedAsync(
-            _plan.Mapping, new NpgsqlDdlExecutor(connection, _plan.Dialect, _options.IndexNamesAreSchemaWide), _features, _schemaPolicy, ct)
+            _plan.Mapping, Ddl(connection), _features, _schemaPolicy, ct)
             .ConfigureAwait(false);
     }
 
@@ -448,7 +455,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     {
         await using var connection = await Open(ct).ConfigureAwait(false);
         var validation = await _schema.ValidateAsync(
-            _plan.Mapping, new NpgsqlDdlExecutor(connection, _plan.Dialect, _options.IndexNamesAreSchemaWide), _features, _schemaPolicy, ct)
+            _plan.Mapping, Ddl(connection), _features, _schemaPolicy, ct)
             .ConfigureAwait(false);
         if (validation.IsServiceable) return;
         throw new SchemaMismatchException(

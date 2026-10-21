@@ -15,14 +15,17 @@ public sealed class NpgsqlIndexNamesSpec
 {
     private static readonly RelationalTableDefinition Customers = new("public", "Customer#p2", [], ["Id"]);
 
-    private static RelationalIndexDefinition Index(string name, bool unique = false, int keys = 1) => new(
+    private static RelationalIndexDefinition Index(string name, bool unique = false, int keys = 1, bool declared = false) => new(
         name,
         Enumerable.Range(0, keys).Select(index => new RelationalIndexPart(
             new PhysicalPath("Json", "K" + index), typeof(string), "text")),
         unique,
         primary: false,
         ttl: false,
-        rewriteFree: true);
+        rewriteFree: true,
+        nameDeclared: declared);
+
+    private static RelationalTableDefinition Table(string name) => new("public", name, [], ["Id"]);
 
     [Fact]
     public void Effective_names_truncate_to_63_bytes_at_a_character_boundary()
@@ -31,6 +34,53 @@ public sealed class NpgsqlIndexNamesSpec
         NpgsqlIndexNames.Effective(new string('a', 70)).Should().Be(new string('a', 63));
         var multibyte = new string('a', 62) + "é" + "tail";
         NpgsqlIndexNames.Effective(multibyte).Should().Be(new string('a', 62), "a two-byte character never splits");
+    }
+
+    [Fact]
+    public void A_derived_name_that_fits_is_unchanged()
+        => NpgsqlIndexNames.Name(Customers, Index("IX_Customer#p2_Email"), partitioned: true)
+            .Should().Be("IX_Customer#p2_Email");
+
+    [Fact]
+    public void Derived_names_over_the_limit_stay_distinct_instead_of_truncating_alike()
+    {
+        var prefix = "IX_" + new string('c', 60);
+        var email = NpgsqlIndexNames.Name(Customers, Index(prefix + "_Email"), partitioned: true);
+        var phone = NpgsqlIndexNames.Name(Customers, Index(prefix + "_Phone"), partitioned: true);
+
+        email.Should().NotBe(phone);
+        System.Text.Encoding.UTF8.GetByteCount(email).Should().BeLessThanOrEqualTo(63);
+        System.Text.Encoding.UTF8.GetByteCount(phone).Should().BeLessThanOrEqualTo(63);
+        NpgsqlIndexNames.Name(Customers, Index(prefix + "_Email"), partitioned: true).Should().Be(email, "a name is deterministic");
+    }
+
+    [Fact]
+    public void A_declared_name_is_used_as_written_outside_a_partition()
+        => NpgsqlIndexNames.Name(Table("Customer"), Index("UX_Email", declared: true), partitioned: false)
+            .Should().Be("UX_Email");
+
+    [Fact]
+    public void A_declared_name_is_qualified_for_each_partition_table()
+    {
+        var first = NpgsqlIndexNames.Name(Table("Customer#p1"), Index("UX_Email", declared: true), partitioned: true);
+        var second = NpgsqlIndexNames.Name(Table("Customer#p2"), Index("UX_Email", declared: true), partitioned: true);
+
+        first.Should().StartWith("UX_Email_").And.NotBe(second);
+        second.Should().StartWith("UX_Email_");
+        NpgsqlIndexNames.Name(Table("Customer#p1"), Index("UX_Email", declared: true), partitioned: true)
+            .Should().Be(first, "the same table always gets the same name");
+    }
+
+    [Fact]
+    public void A_long_declared_name_is_qualified_within_63_bytes_and_still_distinct_per_table()
+    {
+        var name = "UX_" + new string('n', 70);
+        var first = NpgsqlIndexNames.Name(Table("Customer#p1"), Index(name, declared: true), partitioned: true);
+        var second = NpgsqlIndexNames.Name(Table("Customer#p2"), Index(name, declared: true), partitioned: true);
+
+        first.Should().NotBe(second);
+        System.Text.Encoding.UTF8.GetByteCount(first).Should().BeLessThanOrEqualTo(63);
+        System.Text.Encoding.UTF8.GetByteCount(second).Should().BeLessThanOrEqualTo(63);
     }
 
     [Fact]

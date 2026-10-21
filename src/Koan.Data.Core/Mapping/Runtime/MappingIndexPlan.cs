@@ -12,7 +12,8 @@ public sealed class MappingIndexPlan
         bool primary,
         bool ttl,
         string planId,
-        bool required = false)
+        bool required = false,
+        bool nameDeclared = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var copy = bindings.ToArray();
@@ -23,6 +24,7 @@ public sealed class MappingIndexPlan
         Primary = primary;
         Ttl = ttl;
         Required = required;
+        NameDeclared = nameDeclared;
         Receipt = new MappingReceipt(planId, MappingConsumer.Index, copy.Select(static binding => binding.Id), nativeProofRequired: true);
     }
 
@@ -34,6 +36,13 @@ public sealed class MappingIndexPlan
 
     /// <summary>Whether the application declared that it depends on this index existing natively.</summary>
     public bool Required { get; }
+
+    /// <summary>
+    /// Whether the application chose <see cref="Name"/> (<c>[Index(Name = ...)]</c>) rather than Koan deriving it
+    /// from the container and the indexed members. A declared name is the application's own and is reused as written;
+    /// a derived one already carries its container.
+    /// </summary>
+    public bool NameDeclared { get; }
 
     public MappingReceipt Receipt { get; }
 }

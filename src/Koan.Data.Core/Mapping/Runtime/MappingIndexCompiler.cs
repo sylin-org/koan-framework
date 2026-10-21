@@ -43,14 +43,15 @@ internal static class MappingIndexCompiler
             var group = groups[key].OrderBy(static item => item.Order).ToArray();
             var paths = group.Select(item => MappingPath.Of(item.Property.Name)).ToArray();
             if (paths.Length == 1 && paths[0].Equals(plan.Identity.LogicalPath)) continue;
+            var declared = group.Select(static item => item.Attribute.Name).FirstOrDefault(static name => !string.IsNullOrWhiteSpace(name));
             indexes.Add(Build(
                 plan,
-                group.Select(static item => item.Attribute.Name).FirstOrDefault(static name => !string.IsNullOrWhiteSpace(name))
-                    ?? $"IX_{plan.Container.Name}_{string.Join('_', paths.Select(static path => path.Leaf))}",
+                declared ?? $"IX_{plan.Container.Name}_{string.Join('_', paths.Select(static path => path.Leaf))}",
                 paths,
                 group.Any(static item => item.Attribute.Unique),
                 group.Any(static item => item.Attribute.Ttl),
-                group.Any(static item => item.Attribute.Required)));
+                group.Any(static item => item.Attribute.Required),
+                declared is not null));
         }
 
         foreach (var attribute in plan.EntityType.GetCustomAttributes<IndexAttribute>(inherit: true))
@@ -70,7 +71,8 @@ internal static class MappingIndexCompiler
                 paths,
                 attribute.Unique,
                 attribute.Ttl,
-                attribute.Required));
+                attribute.Required,
+                attribute.Name is not null));
         }
 
         return indexes.ToArray();
@@ -82,12 +84,13 @@ internal static class MappingIndexCompiler
         IEnumerable<MappingPath> paths,
         bool unique,
         bool ttl,
-        bool required = false)
+        bool required = false,
+        bool nameDeclared = false)
     {
         var bindings = paths.SelectMany(path => plan.Use(path, MappingConsumer.Index).Bindings).ToArray();
         if (ttl && (bindings.Length != 1 || !IsTemporal(bindings[0].LogicalType)))
             throw new InvalidOperationException($"TTL index '{name}' requires one mapped temporal scalar.");
-        return new MappingIndexPlan(name, bindings, unique, primary: false, ttl, plan.Id, required);
+        return new MappingIndexPlan(name, bindings, unique, primary: false, ttl, plan.Id, required, nameDeclared);
     }
 
     private static bool IsTemporal(Type type)

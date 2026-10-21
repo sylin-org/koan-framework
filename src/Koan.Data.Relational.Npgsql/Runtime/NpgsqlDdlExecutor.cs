@@ -12,10 +12,19 @@ namespace Koan.Data.Relational.Npgsql.Runtime;
 /// <param name="connection">The connection the repository opened for this schema operation.</param>
 /// <param name="dialect">The dialect whose read each index expression repeats.</param>
 /// <param name="verifyIndexes">
-/// PostgreSQL index names are schema-wide and truncated to 63 bytes, so each created index is confirmed in the catalog
-/// (NK-056). CockroachDB scopes index names to their table and does not truncate, so it passes false.
+/// PostgreSQL index names are schema-wide and truncated to 63 bytes, so each index is named to fit and each created
+/// index is confirmed in the catalog (NK-056, DATA-0146). CockroachDB scopes index names to their table and does not
+/// truncate, so it passes false and keeps the names as declared.
 /// </param>
-internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDialect dialect, bool verifyIndexes = false)
+/// <param name="partitioned">
+/// Whether the table is a partition of its entity, so that a declared index name, shared by every partition table, is
+/// qualified to belong to this one.
+/// </param>
+internal sealed class NpgsqlDdlExecutor(
+    NpgsqlConnection connection,
+    NpgsqlDialect dialect,
+    bool verifyIndexes = false,
+    bool partitioned = false)
     : IRelationalDdlExecutor
 {
     private readonly Dictionary<string, string> _claimed = new(StringComparer.Ordinal);
@@ -90,7 +99,8 @@ internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDiale
         RelationalIndexDefinition index,
         CancellationToken ct = default)
     {
-        var effective = verifyIndexes ? NpgsqlIndexNames.Claim(_claimed, table, index.Name) : index.Name;
+        var name = verifyIndexes ? NpgsqlIndexNames.Name(table, index, partitioned) : index.Name;
+        var effective = verifyIndexes ? NpgsqlIndexNames.Claim(_claimed, table, name) : name;
         // The indexed term is the dialect's own read, so it is the expression queries emit. PostgreSQL uses an
         // expression index only on an exact match, so a spelling of its own here would build an index the
         // planner never chooses. Every cast this dialect produces - boolean, bigint, numeric - is immutable,
@@ -100,7 +110,7 @@ internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDiale
             : NpgsqlDialect.Quote(part.Path.Name));
         await Execute(
             $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS " +
-            $"{NpgsqlDialect.Quote(index.Name)} ON {Qualify(table)} ({string.Join(", ", terms)})",
+            $"{NpgsqlDialect.Quote(effective)} ON {Qualify(table)} ({string.Join(", ", terms)})",
             ct).ConfigureAwait(false);
         // IF NOT EXISTS skips on any index of that name in the schema, whatever table or keys it has, so the catalog is
         // asked what the name now holds.

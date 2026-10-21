@@ -11,7 +11,8 @@ public sealed record RelationalIndexDefinition
         bool ttl,
         bool rewriteFree,
         bool keysSupported = true,
-        bool required = false)
+        bool required = false,
+        bool nameDeclared = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(parts);
@@ -24,6 +25,7 @@ public sealed record RelationalIndexDefinition
         RewriteFree = rewriteFree;
         KeysSupported = keysSupported;
         Required = required;
+        NameDeclared = nameDeclared;
     }
 
     public string Name { get; }
@@ -38,6 +40,9 @@ public sealed record RelationalIndexDefinition
 
     /// <summary>Whether the application declared that it depends on this index existing natively.</summary>
     public bool Required { get; }
+
+    /// <summary>Whether the application chose <see cref="Name"/> (<c>[Index(Name = ...)]</c>) rather than Koan deriving it.</summary>
+    public bool NameDeclared { get; }
 
     /// <summary>Whether any part reads inside a structured value, which is what makes this an expression index.</summary>
     public bool IsExpression => Parts.Any(static part => part.Path.IsNested);
