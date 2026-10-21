@@ -27,7 +27,7 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
         "src", "dst", "staging", "prod", "mixed", "high",
         "src-direct", "dst-direct", "src-move", "dst-move",
         "fl-src", "fl-dst", "fl-src-move", "fl-dst-move",
-        "to-clear", "same"
+        "to-clear", "same", "own", "ambient", "Cased", "cased"
     };
 
     public async ValueTask InitializeAsync()
@@ -306,6 +306,98 @@ public abstract class AdapterTransferSpecsBase<TFactory> : IClassFixture<TFactor
             .Run()).CopiedCount;
         copied.Should().Be(0);
         (await CountIn("same")).Should().Be(2);
+    }
+
+    // ============================================================================================
+    // One physical container, two spellings (NK-006 / NK-048, DATA-0125)
+    // ============================================================================================
+
+    [Fact]
+    public async Task Move_onto_its_own_partition_is_refused_and_keeps_every_row()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("own", count: 2);
+
+        var refusal = await Record.ExceptionAsync(() => Data<Widget, string>.Move()
+            .From(partition: "own")
+            .To(partition: "own")
+            .Run());
+
+        (await CountIn("own")).Should().Be(2);
+        refusal.Should().BeOfType<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Move_whose_destination_inherits_the_ambient_partition_is_refused()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("ambient", count: 2);
+
+        Exception? refusal;
+        using (EntityContext.With(partition: "ambient"))
+            refusal = await Record.ExceptionAsync(() => Entity<Widget>.Move()
+                .From(partition: "ambient")
+                .To()
+                .Run());
+
+        (await CountIn("ambient")).Should().Be(2, "an unset To() axis inherits the ambient partition");
+        refusal.Should().BeOfType<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Move_between_partitions_that_differ_only_by_case_is_refused()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("Cased", count: 2);
+
+        var refusal = await Record.ExceptionAsync(() => Data<Widget, string>.Move()
+            .From(partition: "Cased")
+            .To(partition: "cased")
+            .Run());
+
+        (await CountIn("Cased")).Should().Be(2, "several stores resolve both spellings to one container");
+        refusal.Should().BeOfType<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task Mirror_onto_its_own_partition_is_refused()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("own", count: 2);
+
+        var refusal = await Record.ExceptionAsync(() => Data<Widget, string>.Mirror()
+            .From(partition: "own")
+            .To(partition: "own")
+            .Run());
+
+        refusal.Should().BeOfType<InvalidOperationException>();
+        (await CountIn("own")).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Copy_onto_its_own_partition_reports_that_it_wrote_nothing()
+    {
+        SkipIfTransferUnsupported();
+        SkipIfUnavailable();
+
+        await SeedPartition("own", count: 2);
+
+        var result = await Data<Widget, string>.Copy()
+            .From(partition: "own")
+            .To(partition: "own")
+            .Run();
+
+        result.CopiedCount.Should().Be(0);
+        result.Warnings.Should().ContainSingle(warning => warning.Contains("was skipped", StringComparison.Ordinal));
+        (await CountIn("own")).Should().Be(2);
     }
 
     // ============================================================================================

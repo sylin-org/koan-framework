@@ -94,6 +94,21 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
         };
     }
 
+    /// <summary>
+    /// The source's resolved directory, upper-cased because two spellings of one path meet on a case-insensitive
+    /// file system. Both layouts write beneath it, so the directory is the store.
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = JsonRoute.Resolve(
+            services.GetRequiredService<IConfiguration>(),
+            services.GetRequiredService<DataSourceRegistry>(),
+            services.GetRequiredService<IOptions<JsonDataOptions>>().Value,
+            this,
+            string.IsNullOrWhiteSpace(source) ? Infrastructure.Constants.Provider.DefaultSource : source);
+        return DataSourceRegistry.IdentityOf("json\n" + route.DirectoryPath.ToUpperInvariant());
+    }
+
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
     {
         Style = StorageNamingStyle.EntityType,

@@ -68,9 +68,6 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             throw new InvalidOperationException("Destination context must be specified via To().");
     }
 
-    protected bool HasSameContext()
-        => SnapshotFor(FromContext) == SnapshotFor(ToContext);
-
     /// <summary>
     /// Read the source in batches. Strategy selection lives in <c>Data&lt;TEntity, TKey&gt;.BulkRead</c>
     /// (DATA-0113) so every bulk consumer inherits it; this method only decides how to group the result.
@@ -200,20 +197,67 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     protected static TransferContextSnapshot SnapshotFor(TransferContextOptions? context)
         => context?.Snapshot() ?? TransferContextSnapshot.Empty;
 
-    private protected ValueTask<DataMultiOperationLease> EnterOperationHorizon(CancellationToken ct)
+    /// <summary>
+    /// Admits the transfer before any provider work. Both endpoints are resolved to the physical place they reach
+    /// (an unknown source, unavailable provider or invalid partition throws here). A Move or Mirror whose endpoints
+    /// are one container is refused; a Copy onto its own container is a reported no-op and returns
+    /// <see langword="null"/>. Otherwise one mutation lease is entered over both routes for the whole run.
+    /// </summary>
+    private protected async ValueTask<DataMultiOperationLease?> Admit(TransferKind kind, CancellationToken ct)
     {
+        DemandDestination();
         var services = AppHost.Current
             ?? throw new InvalidOperationException("A running Koan host is required for Entity transfer.");
         var registry = services.GetRequiredService<DataSourceRegistry>();
-        var bindings = new List<DataRouteBinding>(2);
-        foreach (var context in new[] { FromContext, ToContext })
+        var origin = PlaceOf(FromContext, services, registry);
+        var destination = PlaceOf(ToContext, services, registry);
+
+        if (origin.IsSameAs(destination))
         {
-            using var scope = context?.Apply();
-            var binding = AdapterResolver.ResolveDecisionForEntity<TEntity>(services, registry).Binding;
-            if (binding is not null) bindings.Add(binding);
+            var refusal = SamePlace(kind, origin);
+            if (kind != TransferKind.Copy) throw new InvalidOperationException(refusal);
+            AddWarning(refusal);
+            return null;
         }
-        return services.GetRequiredService<DataOperationHorizon>()
-            .EnterMany(bindings, $"Entity transfer for '{typeof(TEntity).FullName}'", ct);
+
+        DataRouteBinding[] bindings = [.. new[] { origin.Binding, destination.Binding }.OfType<DataRouteBinding>()];
+        return await services.GetRequiredService<DataOperationHorizon>()
+            .EnterMany(bindings, $"Entity transfer for '{typeof(TEntity).FullName}'", ct)
+            .ConfigureAwait(false);
+    }
+
+    private static TransferPlace PlaceOf(
+        TransferContextOptions? context,
+        IServiceProvider services,
+        DataSourceRegistry registry)
+    {
+        using var scope = context?.Apply();
+        return TransferPlace.Resolve<TEntity>(services, registry);
+    }
+
+    private string SamePlace(TransferKind kind, TransferPlace place)
+    {
+        var consequence = kind switch
+        {
+            TransferKind.Move => "was refused: a Move onto its own container would delete every row it copied",
+            TransferKind.Mirror => "was refused: a Mirror onto its own container has nothing to reconcile",
+            _ => "was skipped: a Copy onto its own container writes nothing"
+        };
+        return $"{kind} of '{typeof(TEntity).Name}' from {Describe(FromContext)} to {Describe(ToContext)} {consequence}. " +
+               $"Both endpoints resolve to container '{place.Container}' in one {place.Provider} store (source '{place.Source}'). " +
+               "Name a destination that reaches a different store or partition. An axis left unset in From() or To() " +
+               "inherits the ambient EntityContext, source names compare without case, a source without its own " +
+               "connection shares its adapter's default store, and partitions that differ only by case share a container.";
+    }
+
+    private static string Describe(TransferContextOptions? context)
+    {
+        if (context is not { } value) return "the ambient context";
+        var axes = new List<string>(3);
+        if (value.Source is not null) axes.Add($"source '{value.Source}'");
+        if (value.Adapter is not null) axes.Add($"adapter '{value.Adapter}'");
+        if (value.Partition is not null) axes.Add($"partition '{value.Partition}'");
+        return axes.Count == 0 ? "the ambient context" : string.Join(", ", axes);
     }
 
     protected sealed class TransferProgress

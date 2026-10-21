@@ -247,6 +247,11 @@ validation:
   read are dispatched (one scoped query, or the remove Lifecycle's scoped read); the rest report `Missing` and are
   never sent to the identity-only native delete. Each queued delete records its native slot, so complete outcomes stay
   in builder order. With complete outcomes, `AfterRemove` runs only for deletes reported `Applied`.
+- A transfer resolves each endpoint, under its applied context, to a `TransferPlace`: elected provider, the factory's
+  `ResolveStoreIdentity` for the routed source (or the plan's connection identity when the adapter declares none) and
+  the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,
+  and an equal or unknown store are one place: Move and Mirror throw before the lease is taken, Copy returns a zero
+  result with a warning (DATA-0125).
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

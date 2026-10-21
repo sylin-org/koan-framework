@@ -37,6 +37,9 @@ Entity mutation contracts follow the same rule:
   `CompleteItemOutcomes`, one outcome per builder call in logical call order. `IBatchSet.Delete(id)` matches on
   identity alone, so Data dispatches only ids visible in the caller's scope; a delete it withholds reports `Missing`
   (DATA-0124).
+- `IDataAdapterFactory.ResolveStoreIdentity(services, source)` names the physical store a source opens, as a one-way
+  identity. Two sources reaching one database file, server database and schema, or directory return the same value;
+  Data uses it to refuse a transfer onto its own container (DATA-0125). `null` falls back to the source plan.
 - `RequireAtomic` rejects before deferred loads, Lifecycle callbacks, or provider dispatch unless both the adapter
   claim and the created native execution seam prove atomicity.
 - `GetMany` returns exactly one slot per requested identity, preserving order and duplicates and using `null` for

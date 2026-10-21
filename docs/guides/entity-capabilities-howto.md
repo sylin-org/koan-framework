@@ -1109,6 +1109,12 @@ and each deferred identity-delete batch. An adapter must prove provider-side pag
 the first source query. A returned destination or delete count must exactly match its admitted batch;
 an ambiguous exception is surfaced and never replayed.
 
+Endpoints are compared as the physical places they reach, not as written. `From(source: "Default").To()`, a
+source name in another letter case, a source without its own connection, a partition spelled in another case, or a
+`To()` that inherits the ambient partition can all be the container the transfer reads. A `Move` or `Mirror` over such
+a pair throws before reading anything; a `Copy` writes nothing and reports it in `Warnings`
+([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)).
+
 Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
 dataset in application memory or mutate an offset-paged source while reading it. Use Jobs and an
 application-owned checkpoint when work must survive process failure or resume across runs.

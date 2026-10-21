@@ -19,4 +19,15 @@ public interface IDataAdapterFactory : IAdapterFactory
         string source = "Default")
         where TEntity : class, IEntity<TKey>
         where TKey : notnull;
+
+    /// <summary>
+    /// One-way identity of the physical store that <paramref name="source"/> opens for this provider: a database
+    /// file, a server database and schema, a directory. Two sources that reach one store return the same value,
+    /// whatever their names or connection-string spellings; the value never carries raw connection material.
+    /// Together with <see cref="Naming.INamingProvider.ResolveStorage"/> it says where a record operation lands, so
+    /// an operation over two endpoints (a transfer) can tell when they are one place. Resolving it performs no I/O.
+    /// <see langword="null"/> means the adapter cannot tell; the framework then falls back to the source plan's
+    /// connection identity, which compares declarations rather than resolved connections.
+    /// </summary>
+    string? ResolveStoreIdentity(IServiceProvider services, string source) => null;
 }

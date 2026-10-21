@@ -329,6 +329,13 @@ public sealed class DataSourceRegistry
         return new System.Collections.ObjectModel.ReadOnlyDictionary<string, DataReadLanePlan>(plans);
     }
 
+    /// <summary>
+    /// The one-way identity Koan derives from connection material: a SHA-256 hex digest, or <c>none</c> for a blank
+    /// value. Adapters use it for <see cref="Abstractions.IDataAdapterFactory.ResolveStoreIdentity"/>, so store and
+    /// plan connection identities are reduced the same way and neither retains the raw value.
+    /// </summary>
+    public static string IdentityOf(string? value) => Identity(value);
+
     private static string Identity(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return "none";

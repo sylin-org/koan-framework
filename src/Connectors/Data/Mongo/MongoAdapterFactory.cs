@@ -85,6 +85,28 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
             mapping);
     }
 
+    /// <summary>
+    /// The servers and the routed database: the parts that place a collection. Credentials and driver options do
+    /// not, so two spellings of one deployment compare equal. MongoDB refuses database names that differ only by
+    /// case, so the database compares without case. An unparsable connection is reduced as a whole.
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        string servers;
+        try
+        {
+            servers = string.Join(",", MongoUrl.Create(route.ConnectionString).Servers
+                .Select(static server => $"{server.Host}:{server.Port}".ToLowerInvariant())
+                .Order(StringComparer.Ordinal));
+        }
+        catch (Exception error) when (error is MongoConfigurationException or ArgumentException or FormatException)
+        {
+            servers = DataSourceRegistry.IdentityOf(route.ConnectionString);
+        }
+        return DataSourceRegistry.IdentityOf($"{servers}\n{route.Database.ToLowerInvariant()}");
+    }
+
     internal MongoRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

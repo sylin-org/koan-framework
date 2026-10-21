@@ -476,8 +476,59 @@ public sealed class EntityTransferDslSpec
             .Run();
 
         result.CopiedCount.Should().Be(0);
+        result.Warnings.Should().ContainSingle(warning => warning.Contains("was skipped", StringComparison.Ordinal));
         repository.QueryCalls.Should().Be(0);
         repository.UpsertManyCalls.Should().Be(0);
+    }
+
+    /// <summary>
+    /// NK-006 / NK-048 (DATA-0125). An unset To() axis inherits the ambient partition, so this Move is written as
+    /// two endpoints and resolves to one container. It used to copy the rows onto themselves and delete them.
+    /// </summary>
+    [Fact]
+    public async Task Move_DestinationInheritingTheAmbientPartition_IsRefusedBeforeProviderWork()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        using (runtime.UsePartition("hot"))
+        {
+            for (var i = 0; i < 3; i++)
+                await new TransferTodo { Title = $"ambient-{i}", Active = true }.Save();
+            repository.ResetObservations();
+
+            var refusal = await Record.ExceptionAsync(() => TransferTodo.Move().From(partition: "hot").To().Run());
+            var (queries, upserts) = (repository.QueryCalls, repository.UpsertManyCalls);
+
+            (await TransferTodo.All()).Should().HaveCount(3, "a Move onto its own container must not delete anything");
+            refusal.Should().BeOfType<InvalidOperationException>()
+                .Which.Message.Should().Contain("would delete every row it copied").And.Contain("TransferTodo#hot");
+            queries.Should().Be(0);
+            upserts.Should().Be(0);
+        }
+    }
+
+    [Fact]
+    public async Task MoveAndMirror_SameDeclaredContext_AreRefused()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("active"))
+            await new TransferTodo { Title = "kept", Active = true }.Save();
+
+        await FluentActions.Invoking(() => TransferTodo.Move().From(partition: "active").To(partition: "active").Run())
+            .Should().ThrowAsync<InvalidOperationException>();
+        await FluentActions.Invoking(() => TransferTodo.Mirror(MirrorMode.Bidirectional)
+                .From(partition: "active").To(partition: "active").Run())
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        using (runtime.UsePartition("active"))
+            (await TransferTodo.All()).Should().ContainSingle(todo => todo.Title == "kept");
     }
 
     [Fact]
@@ -528,7 +579,7 @@ public sealed class EntityTransferDslSpec
             using var lease = runtime.UsePartition(partition);
             await TransferTodo.RemoveAll();
             await BasicNote.RemoveAll();
-        }
+            }
     }
 
     [DataAdapter(TransferAdapterFactory.ProviderId)]

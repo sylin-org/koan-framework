@@ -26,10 +26,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
 
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
-        DemandDestination();
-        await using var operationHorizon = await EnterOperationHorizon(ct).ConfigureAwait(false);
-        if (HasSameContext())
-            return Complete(TransferKind.Mirror, 0, 0, 0, new TransferProgress());
+        await using var operationHorizon = await Admit(TransferKind.Mirror, ct).ConfigureAwait(false);
         return _mode switch
         {
             MirrorMode.Push => await RunOneWay(FromContext, ToContext, ct).ConfigureAwait(false),

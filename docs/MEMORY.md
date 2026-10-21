@@ -674,3 +674,9 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   isolation proofs (`DataAxis.AssertNoLeak`, `ManagedFieldNoLeak`) covered DeleteMany, DeleteAll and RemoveAll and
   had no batch leg, so a matrix read as complete while it skipped a verb. When a guarantee is "every path through the
   owner", list the owner's public verbs and check the proof names each one. (DATA-0124, 2026-10-21)
+- **A guard that compares what the caller wrote guards spelling, not safety.** `Move` refused a transfer onto itself
+  by comparing the declared `(source, adapter, partition)` triples, after resolving both routes and discarding the
+  result. `From(source: "Default").To()`, a source in another case, a source with no connection of its own, an
+  inherited ambient partition and a partition in another case all passed it, and each Move deleted every row it had
+  just written onto itself. The routes the operation will use are the only honest input to a same-place check; ask
+  the owner that opens the connection (the adapter) where it lands. (DATA-0125, 2026-10-21)

@@ -197,6 +197,9 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   mutation loads or callbacks when the selected adapter cannot prove it.
 - `Batch().Delete(id)` deletes only a row the caller's tenant, axis, soft-delete or other read scope can see, exactly
   like `Remove(id)`. An id outside the scope is not deleted and its item reports `Missing` (DATA-0124).
+- `Copy`, `Move` and `Mirror` compare the physical places their endpoints reach, not how they are written. A `Move` or
+  `Mirror` whose endpoints resolve to one container is refused before any read; a `Copy` onto itself writes nothing
+  and says so in its warnings (DATA-0125).
 - Ambient `EntityContext.Transaction` is deferred sequential coordination, not a native or distributed transaction.
   A failed commit can leave its completed prefix durable; rollback discards only undispatched work. For one Entity
   root, `BatchOptions(RequireAtomic: true)` is the qualified all-or-nothing seam.

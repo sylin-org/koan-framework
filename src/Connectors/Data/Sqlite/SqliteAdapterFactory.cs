@@ -109,6 +109,12 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         where TEntity : class, IEntity<TKey>
         where TKey : notnull => new SqliteRepository<TEntity, TKey>(services, ResolveRoute(services, source), this);
 
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return services.GetRequiredService<SqliteConnections>().StoreIdentity(route.ConnectionString, route.Source);
+    }
+
     internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

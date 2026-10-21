@@ -52,6 +52,23 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger, IHost
         if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
     }
 
+    /// <summary>
+    /// The database a connection string opens, keyed the way <see cref="Create"/> opens it: an anchored file path
+    /// (upper-cased, because two spellings of one file name meet on a case-insensitive file system), a URI, or one
+    /// in-memory database per source and connection string. <see langword="null"/> for an empty Data Source, which
+    /// SQLite opens as a private temporary database per connection.
+    /// </summary>
+    internal string? StoreIdentity(string connectionString, string source)
+    {
+        var builder = Parse(connectionString);
+        if (IsMemory(builder))
+            return Koan.Data.Core.DataSourceRegistry.IdentityOf("memory\n" + source + "\n" + builder);
+        if (string.IsNullOrWhiteSpace(builder.DataSource)) return null;
+        return Koan.Data.Core.DataSourceRegistry.IdentityOf(IsUri(builder.DataSource)
+            ? "uri\n" + builder.DataSource
+            : "file\n" + AnchorDataSource(builder.DataSource).ToUpperInvariant());
+    }
+
     internal SqliteConnectionStringBuilder Parse(string connectionString)
     {
         try

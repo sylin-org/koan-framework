@@ -55,6 +55,11 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory, IDataAdapterSe
             resolved);
     }
 
+    /// <summary>One host-owned store per source name, exactly as <see cref="InMemoryState"/> keys it.</summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+        => DataSourceRegistry.IdentityOf(
+            "inmemory\n" + (string.IsNullOrWhiteSpace(source) ? Constants.Provider.DefaultSource : source));
+
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()
     {
         Style = StorageNamingStyle.EntityType,

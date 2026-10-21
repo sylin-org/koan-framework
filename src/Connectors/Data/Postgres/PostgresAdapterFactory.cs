@@ -104,6 +104,28 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
         }, services.GetRequiredService<IStorageNameResolver>(), this);
     }
 
+    /// <summary>
+    /// Server, port, database and search path: the parts that place a table. Credentials and pool settings do not,
+    /// so two spellings of one database compare equal. An unparsable connection falls back to its plan identity.
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        var schema = (route.SearchPath ?? string.Empty).Replace(" ", string.Empty).ToLowerInvariant();
+        string server;
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(route.ConnectionString);
+            var database = string.IsNullOrWhiteSpace(builder.Database) ? builder.Username : builder.Database;
+            server = $"{builder.Host?.ToLowerInvariant()}|{builder.Port}|{database?.ToLowerInvariant()}";
+        }
+        catch (ArgumentException)
+        {
+            server = route.Plan.ConnectionIdentity;
+        }
+        return DataSourceRegistry.IdentityOf($"{server}|{schema}");
+    }
+
     internal PostgresRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
