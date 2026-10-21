@@ -680,3 +680,18 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   inherited ambient partition and a partition in another case all passed it, and each Move deleted every row it had
   just written onto itself. The routes the operation will use are the only honest input to a same-place check; ask
   the owner that opens the connection (the adapter) where it lands. (DATA-0125, 2026-10-21)
+- **A label the caller writes is a claim, so the owner that can check it must.** Source policy admitted
+  `Execute("DELETE ...", Read)` on a ReadOnly source because the effect is whatever the caller declares, and the
+  raw-read lane that would have refused the write already existed one method away. The same shape hid in analytics:
+  its SQL ran through the instruction gate labelled Read, so the gate's scope rule never asked what the SQL read.
+  Where a guarantee rests on a declared effect, put the enforcement where the effect actually happens (the
+  connection), and give framework-composed SQL its own door bound to the scope it was composed under.
+  (DATA-0128, DATA-0129, 2026-10-21)
+- **Lowering one verb onto another inherits the other's defects.** Routing `Clear` to the facade's `DeleteAll` gave it
+  scope, Lifecycle and soft-delete semantics, and also NK-100: inside `WithDeleted()` the bounded-page soft delete
+  never terminates, so a spec that used to finish hung the suite. When a fix re-expresses a path through an existing
+  owner, run the new path under every ambient that owner is already known to mishandle. (DATA-0129, 2026-10-21)
+- **"Inside the transaction" is a property of every write, so the refusal belongs at the one chokepoint writes
+  cross.** Deferral lived per verb in `Data<T,K>`, and every verb that did not opt in quietly ran at once. Data now
+  defers what it can, and any write that still reaches the facade guard under an ambient coordinator is by
+  construction one that could not be deferred, so the guard refuses it. (DATA-0131, 2026-10-21)
