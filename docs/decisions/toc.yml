@@ -410,6 +410,8 @@
       href: DATA-0150-unique-indexes-are-unique-per-tenant.md
     - name: DATA-0151 A stream in identity order continues after the last identity it read
       href: DATA-0151-identity-ordered-streams-seek-after-the-last-identity.md
+    - name: DATA-0152 A transfer is admitted per route effect and checks every side it writes before it reads
+      href: DATA-0152-a-transfer-is-admitted-per-route-effect-and-checks-its-writes-first.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

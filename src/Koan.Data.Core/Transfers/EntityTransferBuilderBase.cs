@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Failures;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core.Routing;
 using Koan.Core.Hosting.App;
 using Microsoft.Extensions.DependencyInjection;
@@ -240,10 +241,14 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     /// Admits the transfer before any provider work. Both endpoints are resolved to the physical place they reach
     /// (an unknown source, unavailable provider or invalid partition throws here). A Move or Mirror whose endpoints
     /// are one container is refused; a Copy onto its own container is a reported no-op and returns
-    /// <see langword="null"/>. Otherwise one mutation lease is entered over both routes for the whole run.
+    /// <see langword="null"/>. Every side the run will write is then asked to refuse what its first write would
+    /// (source policy, tenancy, isolation), so nothing is read or written before a refusal (NK-250). Finally one lease
+    /// is entered over both routes for the whole run: a written side as a mutation, a side only read as a read (NK-253).
     /// </summary>
     private protected async ValueTask<DataMultiOperationLease?> Admit(
         TransferKind kind,
+        bool writesFrom,
+        bool writesTo,
         TransferProgress progress,
         CancellationToken ct)
     {
@@ -270,16 +275,28 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             return null;
         }
 
+        var operation = $"Entity transfer for '{typeof(TEntity).FullName}'";
+        if (writesFrom) Preflight(FromContext, operation);
+        if (writesTo) Preflight(ToContext, operation);
+
         // A Move deletes what it copied, so two places that might be one container are not enough: the endpoints must
         // be proven apart (NK-305). Copy and Mirror delete nothing they wrote and keep running on an unproven pair.
         if (kind == TransferKind.Move &&
             !await origin.IsProvenDistinctFrom(destination, services, ct).ConfigureAwait(false))
             throw new InvalidOperationException(Unproven(origin, destination));
 
-        DataRouteBinding[] bindings = [.. new[] { origin.Binding, destination.Binding }.OfType<DataRouteBinding>()];
+        var routes = new List<DataRouteAdmission>(2);
+        if (origin.Binding is { } from) routes.Add(new DataRouteAdmission(from, writesFrom));
+        if (destination.Binding is { } to) routes.Add(new DataRouteAdmission(to, writesTo));
         return await services.GetRequiredService<DataOperationHorizon>()
-            .EnterMany(bindings, $"Entity transfer for '{typeof(TEntity).FullName}'", ct)
+            .EnterMany(routes, operation, ct)
             .ConfigureAwait(false);
+    }
+
+    private static void Preflight(TransferContextOptions? context, string operation)
+    {
+        using var scope = context?.Apply();
+        Data<TEntity, TKey>.Preflight(DataOperationEffect.Write, operation);
     }
 
     private static TransferPlace PlaceOf(

@@ -36,6 +36,16 @@ public static class Data<TEntity, TKey>
     private static IDataRepository<TEntity, TKey> Repo
         => Service.GetRepository<TEntity, TKey>();
 
+    /// <summary>
+    /// Asks the routed repository, under the ambient context, to refuse now whatever its first operation of
+    /// <paramref name="effect"/> would refuse (NK-250). A repository without the gate (an Entity variant view) answers at
+    /// its first operation instead.
+    /// </summary>
+    internal static void Preflight(DataOperationEffect effect, string operation)
+    {
+        if (Repo is IDataOperationGate gate) gate.Preflight(effect, operation);
+    }
+
     private static ValueTask<DataMultiOperationLease> EnterMutationHorizon(
         IDataRepository<TEntity, TKey> repository,
         string operation,

@@ -73,15 +73,35 @@ public sealed class DataOperationHorizon
         CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(bindings);
+        return EnterMany(
+            bindings.Select(static binding => new DataRouteAdmission(binding, Writes: true)).ToArray(),
+            operation,
+            ct);
+    }
+
+    /// <summary>
+    /// Admits one operation over several routes, each with its own effect (NK-253). A written route is counted as an
+    /// active mutation and refused while its writes are closed; a route the operation only reads is refused only while
+    /// its reads are closed and never delays a drain. A route both read and written is written. Inside the horizon only
+    /// the written routes accept writes, so a read-admitted route cannot be written by accident.
+    /// </summary>
+    internal ValueTask<DataMultiOperationLease> EnterMany(
+        IReadOnlyList<DataRouteAdmission> admissions,
+        string operation,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(admissions);
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
-        var routes = bindings
-            .GroupBy(static binding => binding.Plan.ConnectionIdentity, StringComparer.Ordinal)
-            .Select(static group => group.First())
-            .OrderBy(static binding => binding.Plan.ConnectionIdentity, StringComparer.Ordinal)
+        var routes = admissions
+            .GroupBy(static admission => admission.Binding.Plan.ConnectionIdentity, StringComparer.Ordinal)
+            .Select(static group => new DataRouteAdmission(
+                group.First().Binding,
+                group.Any(static admission => admission.Writes)))
+            .OrderBy(static admission => admission.Binding.Plan.ConnectionIdentity, StringComparer.Ordinal)
             .ToArray();
         if (routes.Length == 0)
             return ValueTask.FromResult(DataMultiOperationLease.Empty);
-        foreach (var binding in routes) _authority.Validate(binding);
+        foreach (var route in routes) _authority.Validate(route.Binding);
         ct.ThrowIfCancellationRequested();
 
         var parent = Ambient.Value;
@@ -92,13 +112,19 @@ public sealed class DataOperationHorizon
         var admitted = new List<RouteGate>(routes.Length);
         try
         {
-            foreach (var binding in routes)
+            foreach (var route in routes)
             {
-                var gate = _gates.GetOrAdd(binding.Plan.ConnectionIdentity, static _ => new RouteGate());
+                var gate = _gates.GetOrAdd(route.Binding.Plan.ConnectionIdentity, static _ => new RouteGate());
                 lock (gate.Sync)
                 {
+                    if (!route.Writes)
+                    {
+                        if (gate.ReadsClosed)
+                            throw new DataSwitchInProgressException(route.Binding.Plan.Source, DataOperationEffect.Read);
+                        continue;
+                    }
                     if (gate.WritesClosed)
-                        throw new DataSwitchInProgressException(binding.Plan.Source, DataOperationEffect.Write);
+                        throw new DataSwitchInProgressException(route.Binding.Plan.Source, DataOperationEffect.Write);
                     checked { gate.ActiveMutations++; }
                     gate.Drained = null;
                 }
@@ -111,8 +137,9 @@ public sealed class DataOperationHorizon
             throw;
         }
 
-        var allowed = routes.Select(static binding => binding.Plan.ConnectionIdentity).ToHashSet(StringComparer.Ordinal);
-        var node = new ScopeNode(routes[0], true, parent, allowed);
+        var written = routes.Where(static route => route.Writes).ToArray();
+        var allowed = written.Select(static route => route.Binding.Plan.ConnectionIdentity).ToHashSet(StringComparer.Ordinal);
+        var node = new ScopeNode((written.Length != 0 ? written[0] : routes[0]).Binding, written.Length != 0, parent, allowed);
         Ambient.Value = node;
         return ValueTask.FromResult(new DataMultiOperationLease(this, admitted, node));
     }
@@ -274,6 +301,9 @@ public sealed class DataOperationHorizon
         ScopeNode? Parent,
         IReadOnlySet<string>? AllowedConnections);
 }
+
+/// <summary>One route of a multi-route operation and whether the operation writes it.</summary>
+internal readonly record struct DataRouteAdmission(DataRouteBinding Binding, bool Writes);
 
 internal readonly record struct DataRouteMaintenanceRequest(
     DataRouteBinding Binding,

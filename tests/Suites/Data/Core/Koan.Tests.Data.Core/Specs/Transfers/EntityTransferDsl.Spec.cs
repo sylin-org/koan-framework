@@ -10,6 +10,8 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
+using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Tests.Data.Core.Specs.Transfers;
@@ -1106,10 +1108,87 @@ public sealed class EntityTransferDslSpec
         (await Mirror()).CopiedCount.Should().Be(0);
     }
 
+    /// <summary>
+    /// NK-250. A transfer learned that a side it writes is read-only only at its first write there: a Move from a
+    /// read-only source copied the whole selection and then failed at the first delete. Every side a transfer writes is
+    /// checked before the first read.
+    /// </summary>
+    [Fact]
+    public async Task Transfer_ThatWritesAReadOnlySource_IsRefusedBeforeItReadsOrWrites()
+    {
+        await using var runtime = await CreateRuntime(settings: ReadOnlyLegacy);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var factory = runtime.Services.GetRequiredService<TransferAdapterFactory>();
+        var legacy = factory.Repository<TransferTodo>("Legacy");
+        await legacy.Upsert(new TransferTodo { Id = "legacy-1", Title = "legacy", Active = true });
+        await new TransferTodo { Id = "local-1", Title = "local", Active = true }.Save();
+        legacy.ResetObservations();
+        var local = factory.Repository<TransferTodo>();
+        local.ResetObservations();
+
+        var move = await Record.ExceptionAsync(() => TransferTodo.Move().From(source: "Legacy").To(partition: "archive").Run());
+        move.Should().BeOfType<DataSourcePolicyException>();
+        var copy = await Record.ExceptionAsync(() => TransferTodo.Copy().To(source: "Legacy", partition: "archive").Run());
+        copy.Should().BeOfType<DataSourcePolicyException>();
+
+        legacy.QueryCalls.Should().Be(0, "the Move is refused before it reads its read-only origin");
+        local.QueryCalls.Should().Be(0, "the Copy is refused before it reads its origin");
+        local.UpsertManyCalls.Should().Be(0);
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// NK-253. Admission counted the side a transfer only reads as a mutation, so a Copy out of the default failed while a
+    /// cutover had closed the default's writes, and held the drain open while it ran. The side read is admitted as a read.
+    /// </summary>
+    [Fact]
+    public async Task Copy_FromARouteWhoseWritesAreClosed_RunsAndMoveIsRefused()
+    {
+        await using var runtime = await CreateRuntime(settings: Archive);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        await new TransferTodo { Id = "kept", Title = "kept", Active = true }.Save();
+        var route = ((RepositoryFacade<TransferTodo, string>)runtime.Services.GetRequiredService<IDataService>()
+            .GetRepository<TransferTodo, string>()).RouteBinding!;
+        var horizon = runtime.Services.GetRequiredService<DataOperationHorizon>();
+
+        await using (await horizon.CloseAndDrain(
+                         [new DataRouteMaintenanceRequest(route, BlockReads: false, BlockWrites: true)],
+                         CancellationToken.None))
+        {
+            var copied = await TransferTodo.Copy().To(source: "Archive", partition: "archive").Run();
+            copied.CopiedCount.Should().Be(1, "a Copy only reads the default");
+
+            var move = await Record.ExceptionAsync(() => TransferTodo.Move().To(source: "Archive", partition: "cold").Run());
+            move.Should().BeOfType<DataSwitchInProgressException>("a Move deletes from the default");
+        }
+
+        (await TransferTodo.Get("kept")).Should().NotBeNull();
+    }
+
+    private static readonly IReadOnlyDictionary<string, string?> ReadOnlyLegacy = new Dictionary<string, string?>
+    {
+        ["Koan:Data:Sources:Legacy:Adapter"] = TransferAdapterFactory.ProviderId,
+        ["Koan:Data:Sources:Legacy:ConnectionString"] = "legacy",
+        ["Koan:Data:Sources:Legacy:Access"] = "ReadOnly"
+    };
+
+    private static readonly IReadOnlyDictionary<string, string?> Archive = new Dictionary<string, string?>
+    {
+        ["Koan:Data:Sources:Archive:Adapter"] = TransferAdapterFactory.ProviderId,
+        ["Koan:Data:Sources:Archive:ConnectionString"] = "archive"
+    };
+
     private static Task<DataCoreRuntimeFixture> CreateRuntime() => CreateRuntime(null);
 
-    private static Task<DataCoreRuntimeFixture> CreateRuntime(Action? compose)
-        => DataCoreRuntimeFixture.CreateAsync(configureServices: services =>
+    private static Task<DataCoreRuntimeFixture> CreateRuntime(
+        Action? compose = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
+        => DataCoreRuntimeFixture.CreateAsync(extraSettings: settings, configureServices: services =>
         {
             compose?.Invoke();
             services.AddSingleton<TransferAdapterFactory>();
@@ -1260,6 +1339,14 @@ public sealed class EntityTransferDslSpec
                 static key => Activator.CreateInstance(typeof(TransferRepository<>).MakeGenericType(key.Entity))!);
             return (IDataRepository<TEntity, TKey>)repository;
         }
+
+        // Each source is its own set of in-memory partitions, so two source names are two stores.
+        public ValueTask<bool> ProveDistinctStores(
+            IServiceProvider services,
+            string source,
+            string other,
+            CancellationToken ct = default)
+            => ValueTask.FromResult(!string.Equals(source, other, StringComparison.OrdinalIgnoreCase));
 
         public StorageNamingCapability GetNamingCapability(IServiceProvider services)
             => new()

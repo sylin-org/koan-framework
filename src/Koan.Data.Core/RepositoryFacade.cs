@@ -449,6 +449,15 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     void IDataOperationGate.Demand(DataOperationEffect effect, string operation)
         => _sourcePlan.Demand(effect, operation);
 
+    void IDataOperationGate.Preflight(DataOperationEffect effect, string operation)
+    {
+        _sourcePlan.Demand(effect, operation);
+        var segmentation = _segmentation.Bind(operation);
+        for (var i = 0; i < _guards.Length; i++) _guards[i].Guard(typeof(TEntity));
+        if (effect == DataOperationEffect.Read) _ = ReadScopeFilter(segmentation);
+        else _ = CurrentManagedValues(segmentation);
+    }
+
     string IDataRouteBoundRepository.RouteNamespace =>
         _routeBinding?.Namespace ?? $"data-route:{_sourcePlan.RouteIdentity}:0";
 

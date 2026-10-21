@@ -21,7 +21,7 @@ public sealed class MoveTransferBuilder<TEntity, TKey>
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
         var progress = new TransferProgress();
-        await using var operationHorizon = await Admit(TransferKind.Move, progress, ct).ConfigureAwait(false);
+        await using var operationHorizon = await Admit(TransferKind.Move, writesFrom: true, writesTo: true, progress, ct).ConfigureAwait(false);
         using var fidelity = EnterFidelity();
         var read = 0L;
         var copied = 0L;

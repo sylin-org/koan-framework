@@ -27,7 +27,13 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
         var progress = new TransferProgress();
-        await using var operationHorizon = await Admit(TransferKind.Mirror, progress, ct).ConfigureAwait(false);
+        // A Push writes and deletes in To(), a Pull in From(), a bidirectional Mirror in both.
+        await using var operationHorizon = await Admit(
+            TransferKind.Mirror,
+            writesFrom: _mode != MirrorMode.Push,
+            writesTo: _mode != MirrorMode.Pull,
+            progress,
+            ct).ConfigureAwait(false);
         using var fidelity = EnterFidelity();
         return _mode switch
         {
