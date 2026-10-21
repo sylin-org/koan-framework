@@ -109,7 +109,7 @@ public sealed class McpRpcDispatcher
 
     private async Task<JObject> HandleToolsList(JsonRpcEnvelope envelope, ClaimsPrincipal principal, McpRpcHandler handler, CancellationToken cancellationToken)
     {
-        var response = await handler.ListTools(cancellationToken);
+        var response = await handler.ListExposedTools(cancellationToken);
         using var visibility = McpVerbVisibility.For(handler.Services.GetService<IServiceScopeFactory>(), _gateCache, principal);
         var filtered = new List<McpRpcHandler.ToolDescriptor>(response.Tools.Count);
         foreach (var tool in response.Tools)

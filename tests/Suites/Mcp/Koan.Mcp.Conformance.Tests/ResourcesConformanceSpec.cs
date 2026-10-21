@@ -52,9 +52,10 @@ public sealed class ResourcesConformanceSpec : IClassFixture<ConformanceFixture>
         verbs.OfType<JObject>().Select(v => v["operation"]?.Value<string>())
             .Should().Contain("GetById", "the catalog lists the entity's verbs");
 
-        // Local-trust (null principal): the scoped vault entity is visible too (STDIO sees everything).
+        // SEC-0017: the raw handler projects for the STDIO principal (anonymous, origin:local), the one its calls run
+        // as, so a scope-gated entity it could not call is absent.
         entities.OfType<JObject>().Select(e => e["name"]?.Value<string>())
-            .Should().Contain("vault", "the raw handler is local-trust, so scoped entities appear");
+            .Should().NotContain("vault", "an anonymous local caller cannot reach a scope-gated entity");
     }
 
     [Fact]

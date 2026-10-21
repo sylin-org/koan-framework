@@ -69,11 +69,13 @@ public sealed class DoorProjectionSpec : IClassFixture<DoorEntityFixture>
     }
 
     [Fact]
-    public async Task Stdio_local_trust_has_no_doors()
+    public async Task Stdio_sees_the_doors_its_anonymous_local_principal_faces()
     {
-        // The raw handler (null principal) is local-trust: every verb is callable, so no doors are projected.
+        // SEC-0017: the raw handler projects for the STDIO principal (anonymous, origin:local), the one its calls run
+        // as, so a scope-gated write is a door there too, not a verb that every call would deny.
         var contents = await _fx.ReadResourceAsync(EntityCatalogResourceProvider.ResourceUri);
         var doc = JObject.Parse(contents!["text"]!.Value<string>()!);
-        Entity(doc, "showcase")["doors"].Should().BeNull("STDIO local-trust sees everything as a verb — no doors");
+        var doors = (JArray)Entity(doc, "showcase")["doors"]!;
+        doors.OfType<JObject>().Select(d => d["operation"]!.Value<string>()).Should().Contain("Upsert");
     }
 }

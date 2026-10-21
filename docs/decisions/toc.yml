@@ -568,3 +568,5 @@
       href: SEC-0015-origin-is-stamped-by-the-door-that-received-the-call.md
     - name: SEC-0016 Each MCP HTTP request is authorized as the principal it carries
       href: SEC-0016-each-mcp-http-request-is-authorized-as-itself.md
+    - name: SEC-0017 STDIO acts as one principal for listing, resources and calls
+      href: SEC-0017-stdio-acts-as-one-principal.md

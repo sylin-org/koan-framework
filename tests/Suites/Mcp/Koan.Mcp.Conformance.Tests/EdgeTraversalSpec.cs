@@ -25,11 +25,13 @@ public sealed class EdgeTraversalSpec : IClassFixture<EdgeFixture>
 
     public EdgeTraversalSpec(EdgeFixture fx) => _fx = fx;
 
-    private async Task<JObject> CatalogEntity(string name)
+    // The catalog as a caller holding articles:read sees it: both ends of the edges are reachable.
+    private Task<JObject> CatalogEntity(string name)
     {
-        var contents = await _fx.ReadResourceAsync(EntityCatalogResourceProvider.ResourceUri);
-        var doc = JObject.Parse(contents!["text"]!.Value<string>()!);
-        return ((JArray)doc["entities"]!).OfType<JObject>().First(e => e["name"]?.Value<string>() == name);
+        var handler = _fx.Services.GetRequiredService<Koan.Mcp.Hosting.McpServer>().CreateHandler();
+        var read = handler.ReadResourceFor(EntityCatalogResourceProvider.ResourceUri, Koan.Mcp.TestKit.McpHarnessFixtureBase.Principal("articles:read"));
+        var doc = JObject.Parse(read.Contents.Single().Text);
+        return Task.FromResult(((JArray)doc["entities"]!).OfType<JObject>().First(e => e["name"]?.Value<string>() == name));
     }
 
     private static JArray Edges(JObject entity) => (entity["edges"] as JArray) ?? new JArray();
@@ -49,7 +51,7 @@ public sealed class EdgeTraversalSpec : IClassFixture<EdgeFixture>
     [Fact]
     public async Task The_catalog_lists_parent_edges()
     {
-        var article = await CatalogEntity("article"); // local-trust sees the scoped child
+        var article = await CatalogEntity("article"); // the scoped caller sees the scoped child
         var parentEdges = Edges(article).OfType<JObject>()
             .Where(e => e["kind"]?.Value<string>() == "parent" && e["target"]?.Value<string>() == "author").ToList();
 

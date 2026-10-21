@@ -93,8 +93,35 @@ public sealed class McpRpcHandler
         };
     }
 
+    /// <summary>
+    /// SEC-0017: the one principal a raw JSON-RPC channel (STDIO) acts as, for listing, resources and calls alike: an
+    /// anonymous caller stamped <c>origin:local</c>. The caller is nobody, yet the call demonstrably arrived from the
+    /// local process, so an <c>[Access(... "origin:local")]</c> gate admits it while an <c>authenticated</c> gate does not.
+    /// </summary>
+    public static ClaimsPrincipal StdioPrincipal()
+        => Koan.Web.Authorization.OriginStamp.Apply(new ClaimsPrincipal(), Koan.Web.Authorization.OriginTier.Local);
+
+    // SEC-0017: what a raw JSON-RPC (STDIO) caller is listed: the exposed tools, with each entity tool kept only when
+    // the STDIO principal may call it (SEC-0011). Custom verbs keep their exposure-only listing, as their call does.
     [JsonRpcMethod("tools/list")]
-    public Task<ToolsListResponse> ListTools(CancellationToken cancellationToken)
+    public async Task<ToolsListResponse> ListTools(CancellationToken cancellationToken)
+    {
+        var exposed = await ListExposedTools(cancellationToken).ConfigureAwait(false);
+        var gates = _services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>();
+        using var visibility = McpVerbVisibility.For(_services.GetService<IServiceScopeFactory>(), gates, StdioPrincipal());
+        var listed = new List<ToolDescriptor>(exposed.Tools.Count);
+        foreach (var tool in exposed.Tools)
+        {
+            if (!_registry.TryGetTool(tool.Name, out var registration, out var definition)
+                || await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken).ConfigureAwait(false))
+                listed.Add(tool);
+        }
+        return new ToolsListResponse { Tools = listed.ToArray(), Next = exposed.Next };
+    }
+
+    /// <summary>The tools the exposure mode surfaces, before any per-caller authorization; each transport filters it
+    /// for its own principal.</summary>
+    internal Task<ToolsListResponse> ListExposedTools(CancellationToken cancellationToken)
     {
         var exposureMode = ResolveExposureMode();
         var toolsList = new List<ToolDescriptor>();
@@ -149,10 +176,7 @@ public sealed class McpRpcHandler
     // not. The HTTP/SSE bridge calls CallToolFor with the session principal (stamped remote/internal) instead.
     [JsonRpcMethod("tools/call", UseSingleObjectParameterDeserialization = true)]
     public Task<CallToolResult> CallTool(ToolsCallParams parameters, CancellationToken cancellationToken)
-        => CallToolFor(
-            parameters,
-            Koan.Web.Authorization.OriginStamp.Apply(new ClaimsPrincipal(), Koan.Web.Authorization.OriginTier.Local),
-            cancellationToken);
+        => CallToolFor(parameters, StdioPrincipal(), cancellationToken);
 
     /// <summary>
     /// SEC-0004 Phase 3.3 — execute a tool AS <paramref name="user"/> (null = anonymous). The principal threads
@@ -292,16 +316,15 @@ public sealed class McpRpcHandler
     [JsonRpcMethod("ping")]
     public Task<string> Ping() => Task.FromResult("pong");
 
-    // P1.2: MCP resources. The JSON-RPC entry points carry no caller principal (STDIO binds this handler
-    // directly = local-trust, AN3), so they project with a null principal (full). The remote HTTP/SSE edge
-    // calls the *For overloads with its authenticated session principal so resources project per grant.
+    // P1.2: MCP resources. SEC-0017: the JSON-RPC entry points (STDIO) project for the STDIO principal, the one their
+    // calls run as. The remote HTTP/SSE edge calls the *For overloads with its own request principal.
     [JsonRpcMethod("resources/list")]
     public Task<ResourcesListResponse> ListResources(CancellationToken cancellationToken)
-        => Task.FromResult(ListResourcesFor(null));
+        => Task.FromResult(ListResourcesFor(StdioPrincipal()));
 
     [JsonRpcMethod("resources/read", UseSingleObjectParameterDeserialization = true)]
     public Task<ReadResourceResult> ReadResource(ReadResourceParams parameters, CancellationToken cancellationToken)
-        => Task.FromResult(ReadResourceFor(parameters?.Uri, null));
+        => Task.FromResult(ReadResourceFor(parameters?.Uri, StdioPrincipal()));
 
     public ResourcesListResponse ListResourcesFor(System.Security.Claims.ClaimsPrincipal? user)
     {

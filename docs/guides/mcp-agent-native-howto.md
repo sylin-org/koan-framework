@@ -290,7 +290,7 @@ public sealed class Note : Entity<Note> { /* … */ }
 
 ## Rung 9 — Go remote
 
-Everything above is transport-neutral. STDIO (rung 1's bootstrap) is local-trust for *discovery* but its *data* runs anonymous + `origin:local`. To reach an agent over the network, add the HTTP transport — and you do **not** hand-roll an auth scheme: referencing the embedded Authorization Server *is* the scheme.
+Everything above is transport-neutral. STDIO (rung 1's bootstrap) acts as one principal, anonymous + `origin:local`, for discovery and data alike: it lists what that principal can call (SEC-0017). To reach an agent over the network, add the HTTP transport — and you do **not** hand-roll an auth scheme: referencing the embedded Authorization Server *is* the scheme.
 
 ```csharp
 // Referencing Koan.Web (for the HTTP host) + Koan.Mcp is the whole change — the framework maps the /mcp HTTP edge
