@@ -75,4 +75,27 @@ public sealed class McpToolExecutionResult
             errorCode,
             errorMessage);
     }
+
+    /// <summary>
+    /// SEC-0010: the shared endpoint refused the call, by an authorization denial or a short circuit carrying an
+    /// error status. A failure that keeps the rendered short circuit and the response metadata, so the caller sees why.
+    /// </summary>
+    public static McpToolExecutionResult Refused(
+        string errorCode,
+        string errorMessage,
+        JToken? shortCircuit,
+        IReadOnlyDictionary<string, string> headers,
+        IReadOnlyList<string> warnings,
+        JObject diagnostics)
+    {
+        return new McpToolExecutionResult(
+            false,
+            null,
+            shortCircuit,
+            headers,
+            warnings,
+            diagnostics,
+            errorCode,
+            errorMessage);
+    }
 }

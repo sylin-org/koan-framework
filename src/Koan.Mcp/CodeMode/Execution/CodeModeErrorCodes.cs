@@ -24,4 +24,10 @@ public static class CodeModeErrorCodes
     // Tooling / registry
     public const string ToolNotFound = "tool_not_found";           // Requested tool name not registered
     public const string ServiceUnavailable = "service_unavailable";// IEntityEndpointService not available in DI scope
+
+    // Refusals by the shared entity endpoint (SEC-0010): the MCP form of the REST status
+    public const string Unauthenticated = "unauthenticated";       // 401: the gate challenged the caller
+    public const string Forbidden = "forbidden";                   // 403: the gate or a hook forbade the caller
+    public const string NotFound = "not_found";                    // 404: no such row, or a row outside the caller's scope
+    public const string Rejected = "rejected";                     // any other refusal status (400, 409, 413, 422, ...)
 }

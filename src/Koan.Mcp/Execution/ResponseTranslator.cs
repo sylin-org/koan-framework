@@ -2,8 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Koan.Mcp.CodeMode.Execution;
+using Koan.Web.Authorization;
 using Koan.Web.Endpoints;
+using Koan.Web.Hooks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -17,8 +22,6 @@ public sealed class ResponseTranslator
         if (tool is null) throw new ArgumentNullException(nameof(tool));
         if (result is null) throw new ArgumentNullException(nameof(result));
 
-        var payload = await SerializePayload(result).ConfigureAwait(false);
-        var shortCircuit = await SerializeShortCircuit(result).ConfigureAwait(false);
         var headers = result.Headers.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
         var warnings = result.Warnings.ToArray();
 
@@ -36,6 +39,15 @@ public sealed class ResponseTranslator
             diagnostics["correlationId"] = pin;
         }
 
+        // SEC-0010: a denial is a failed call, never an empty success. REST renders the same decision as a bare
+        // 401/403, so the decision record itself (whose Forbid reason describes the gate) is never serialized.
+        if (result.DeniedDecision is { } decision)
+        {
+            return Deny(registration, tool, result, decision, headers, warnings, diagnostics);
+        }
+
+        var shortCircuit = await SerializeShortCircuit(result).ConfigureAwait(false);
+
         // AN11 — project the dry-run posture + the semantic state delta (prospective on a rehearsal,
         // retrospective on a real run; identical shape). Walled-means-silent is enforced inside the projector.
         var (dryRun, delta) = await MutationDeltaProjector.Project(registration.EntityType, result).ConfigureAwait(false);
@@ -51,6 +63,21 @@ public sealed class ResponseTranslator
         {
             diagnostics["shortCircuitType"] = typeToken.ToString();
         }
+
+        // SEC-0010: a short circuit carrying an error status (400, 404, 409, 413, ...) is the same refusal REST returns,
+        // so it is a failed call. Its rendered body stays in the short circuit for the caller to read.
+        if (result.ShortCircuitResult is { } refusal && StatusOf(refusal) is >= 400 and var status)
+        {
+            return McpToolExecutionResult.Refused(
+                CodeFor(status),
+                RefusalMessage(tool, status, shortCircuit),
+                shortCircuit,
+                headers,
+                warnings,
+                diagnostics);
+        }
+
+        var payload = await SerializePayload(result).ConfigureAwait(false);
 
         if (!result.IsShortCircuited && result.GetType().IsGenericType
             && result.GetType().GetGenericTypeDefinition() == typeof(EntityCollectionResult<>))
@@ -136,9 +163,75 @@ public sealed class ResponseTranslator
         return obj;
     }
 
+    private static McpToolExecutionResult Deny(McpEntityRegistration registration, McpToolDefinition tool,
+        EntityEndpointResult result, AuthorizeDecision decision, IReadOnlyDictionary<string, string> headers,
+        IReadOnlyList<string> warnings, JObject diagnostics)
+    {
+        var challenged = decision is AuthorizeDecision.Challenge;
+        var status = challenged ? StatusCodes.Status401Unauthorized : StatusCodes.Status403Forbidden;
+        var rendered = new JObject
+        {
+            ["type"] = challenged ? nameof(AuthorizeDecision.Challenge) : nameof(AuthorizeDecision.Forbid),
+            ["statusCode"] = status
+        };
+
+        // What would unlock the verb is disclosed only where the Door discloses it (SEC-0005): a [Door] entity whose
+        // gate is not a role tier. Every other denial is silent, as REST is.
+        var gates = result.Context.Services.GetService<IAccessGateCache>();
+        var needs = gates is null || challenged
+            ? null
+            : McpEntityGate.DoorNeeds(gates, registration.EntityType, tool.Operation, result.Context.User);
+        if (needs is not null) rendered["needs"] = needs;
+
+        diagnostics["shortCircuitStatusCode"] = status;
+        diagnostics["shortCircuitType"] = rendered["type"];
+
+        var message = challenged
+            ? $"Authentication is required to call '{tool.Name}'."
+            : needs is null
+                ? $"The caller may not call '{tool.Name}'."
+                : $"The caller may not call '{tool.Name}'; it {needs}.";
+        return McpToolExecutionResult.Refused(
+            challenged ? CodeModeErrorCodes.Unauthenticated : CodeModeErrorCodes.Forbidden,
+            message, rendered, headers, warnings, diagnostics);
+    }
+
+    private static int? StatusOf(IActionResult action) => action switch
+    {
+        ObjectResult objectResult => objectResult.StatusCode ?? StatusCodes.Status200OK,
+        JsonResult jsonResult => jsonResult.StatusCode ?? StatusCodes.Status200OK,
+        ContentResult contentResult => contentResult.StatusCode ?? StatusCodes.Status200OK,
+        StatusCodeResult statusCodeResult => statusCodeResult.StatusCode,
+        ChallengeResult => StatusCodes.Status401Unauthorized,
+        ForbidResult => StatusCodes.Status403Forbidden,
+        _ => null
+    };
+
+    private static string CodeFor(int status) => status switch
+    {
+        StatusCodes.Status401Unauthorized => CodeModeErrorCodes.Unauthenticated,
+        StatusCodes.Status403Forbidden => CodeModeErrorCodes.Forbidden,
+        StatusCodes.Status404NotFound => CodeModeErrorCodes.NotFound,
+        _ => CodeModeErrorCodes.Rejected
+    };
+
+    // The refusal's own words when its body carries them ({ message } or { error }), else the status.
+    private static string RefusalMessage(McpToolDefinition tool, int status, JToken? shortCircuit)
+    {
+        var body = (shortCircuit as JObject)?["payload"] as JObject;
+        var said = body?["message"] ?? body?["error"];
+        return said is { Type: JTokenType.String } && !string.IsNullOrWhiteSpace(said.Value<string>())
+            ? $"'{tool.Name}' was refused ({status}): {said.Value<string>()}"
+            : $"'{tool.Name}' was refused ({status}).";
+    }
+
     private static async Task<JToken?> SerializePayload(EntityEndpointResult result)
     {
         if (result.Payload is not null) return await SerializeObject(result.Payload, result.Context).ConfigureAwait(false);
+        // A short circuit is never the empty Items/Model the endpoint carries alongside it: a success-status action
+        // result renders its own body, exactly as REST returns it.
+        if (result.ShortCircuitResult is { } action) return await SerializeObject(BodyOf(action), result.Context).ConfigureAwait(false);
+        if (result.IsShortCircuited) return null;
         var resultType = result.GetType();
         if (resultType.IsGenericType)
         {
@@ -156,6 +249,14 @@ public sealed class ResponseTranslator
         }
         return null;
     }
+
+    private static object? BodyOf(IActionResult action) => action switch
+    {
+        ObjectResult objectResult => objectResult.Value,
+        JsonResult jsonResult => jsonResult.Value,
+        ContentResult contentResult => contentResult.Content,
+        _ => null
+    };
 
     private static async Task<JToken?> SerializeObject(object? value, EntityRequestContext context)
     {

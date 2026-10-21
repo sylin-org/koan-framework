@@ -121,9 +121,9 @@ internal sealed class EntityOperationsProxy
     /// <summary>
     /// SDK.Entities.Todo.getById(id, options)
     /// Options: { set?: string, with?: string }
-    /// Returns: { id: "...", title: "...", ... }
+    /// Returns: { id: "...", title: "...", ... }, or null when no row with that id is visible to the caller.
     /// </summary>
-    public object getById(string id, object? options = null)
+    public object? getById(string id, object? options = null)
     {
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -150,6 +150,8 @@ internal sealed class EntityOperationsProxy
 
         var result = _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
 
+        // A lookup that finds nothing is an answer, not a failure (SEC-0010 renders the 404 as not_found).
+        if (!result.Success && result.ErrorCode == CodeMode.Execution.CodeModeErrorCodes.NotFound) return null;
         return ConvertToJavaScriptObject(result);
     }
 

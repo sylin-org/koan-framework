@@ -143,7 +143,7 @@ public sealed class ExplorerConsoleSpec : IClassFixture<ExplorerFixture>
         var res = await PostCall(ToolName("trinket", EntityEndpointOperationKind.Collection), auth: "role=user");
         res.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = JObject.Parse(await res.Content.ReadAsStringAsync(Ct));
-        body["success"]!.Value<bool>().Should().BeTrue();
+        body["success"]!.Value<bool>().Should().BeTrue(body.ToString());
     }
 
     [Fact]

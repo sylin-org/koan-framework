@@ -120,7 +120,7 @@ public sealed class Note : Entity<Note> { public string Title { get; set; } = ""
 
 **What the agent sees** — exactly the verbs it may invoke. An anonymous caller's `tools/list` and catalog show `note.collection`/`note.get-by-id` (read = anyone) but **not** `note.delete` (remove = is:admin) — a walled verb is *absent*, never a redaction (**walled-means-silent**: no name, no count, no existence signal).
 
-**What happens** — the gate is the **same authority on REST and MCP** (one seam, no per-transport copy). If an agent calls a verb it can't see, the data-layer gate denies it and the denial rides back as `meta.shortCircuit` — the MCP mirror of a REST `403`/`401`. The catalog never advertises what a call would deny.
+**What happens** — the gate is the **same authority on REST and MCP** (one seam, no per-transport copy). If an agent calls a verb it can't see, the data-layer gate denies it and the call fails (`isError: true`, `meta.errorCode` `unauthenticated` or `forbidden`) — the MCP mirror of a REST `401`/`403`. The denial never names a role; a `[Door]` entity's non-role gate adds its `needs` (SEC-0010). The catalog never advertises what a call would deny.
 
 > `[Authorize]` / `[RequireScope]` on the entity lower into this same gate, so a declaration written for HTTP governs the agent surface too. Full model: [SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md).
 
@@ -336,7 +336,7 @@ The boot report names availability and effective activation: `mcp.ops: available
 
 ```text
 [McpEntity]            → CRUD verbs as tools (+ koan://entities, koan://self for free)
-  + [Access]           → per-action gate; walled verbs vanish; denial = meta.shortCircuit
+  + [Access]           → per-action gate; walled verbs vanish; denial = isError + errorCode
   + EntityAccess<T>    → rows narrow to the owner; each row advertises its can:[]
   + origin:            → where the call came from, distinct from who (STDIO local vs remote)
   + [McpTool]          → a non-CRUD verb

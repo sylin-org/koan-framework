@@ -904,6 +904,7 @@ public sealed class McpRpcHandler
             return new ToolsCallResult
             {
                 Success = false,
+                ShortCircuit = execution.ShortCircuit,
                 Headers = ToJsonObject(execution.Headers),
                 Warnings = ToJsonArray(execution.Warnings),
                 Diagnostics = diagnostics,
@@ -991,6 +992,7 @@ public sealed class McpRpcHandler
                 Meta = new JObject
                 {
                     ["errorCode"] = result.ErrorCode,
+                    ["shortCircuit"] = result.ShortCircuit,
                     ["headers"] = result.Headers,
                     ["warnings"] = result.Warnings,
                     ["diagnostics"] = result.Diagnostics
@@ -1042,6 +1044,7 @@ public sealed class McpRpcHandler
                 Meta = new JObject
                 {
                     ["errorCode"] = execution.ErrorCode ?? CodeMode.Execution.CodeModeErrorCodes.ExecutionError,
+                    ["shortCircuit"] = execution.ShortCircuit,
                     ["headers"] = ToJsonObject(execution.Headers),
                     ["warnings"] = ToJsonArray(execution.Warnings),
                     ["diagnostics"] = diagnostics

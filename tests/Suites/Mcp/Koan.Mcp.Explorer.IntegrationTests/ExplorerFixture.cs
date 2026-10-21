@@ -16,6 +16,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
 
+// ARCH-0091: each fixture binds the process-global AppHost.Current, so classes run serially. In parallel, one class's
+// host disposal left another's in-process try-it call with no active host (a 400 that used to render as success).
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
+
 namespace Koan.Mcp.Explorer.IntegrationTests;
 
 /// <summary>
