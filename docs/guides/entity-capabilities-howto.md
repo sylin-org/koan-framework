@@ -1123,6 +1123,13 @@ each copied row from the source: a row another writer changed after it was copie
 newer version. Use Jobs and an
 application-owned checkpoint when work must survive process failure or resume across runs.
 
+A transfer is ordinary Entity work on both sides, not a physical copy
+([DATA-0111](../decisions/DATA-0111-verified-default-data-cutover.md) relies on that distinction): tenancy,
+source policy and storage guards apply, every row read runs Load lifecycle, every destination write runs Upsert
+lifecycle and the registered write stamps, and a `Move` runs Remove lifecycle at the origin. A
+`[Timestamp(OnSave = true)]` property is therefore stamped with the transfer time, so archiving with `Move` replaces
+the rows' last-modified values. Keep a business timestamp the application sets itself when that history matters.
+
 **Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
 not a checkpoint or resume token.
 

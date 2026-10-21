@@ -277,6 +277,10 @@ validation:
 - Mirror Push and Pull delete every replica row the authoritative side no longer selects. Without a predicate that is
   a row absent there; with one, a row that is absent or no longer matches, judged by the store's own answer to
   `predicate AND Id in (page ids)`, so a replica row whose authoritative counterpart left the predicate converges.
+- Transfers are semantic, by design: every read and write is an ordinary facade call, which is what keeps tenancy,
+  source policy and guards in force. Load, Upsert and Remove lifecycle and every registered write stamp run, and
+  OnSave timestamps take the transfer time. DATA-0111 keeps cutover off the transfer builders for this reason. A
+  faithful (stamp- and hook-free) transfer mode would be a new decision, not a fix (NK-050).
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
