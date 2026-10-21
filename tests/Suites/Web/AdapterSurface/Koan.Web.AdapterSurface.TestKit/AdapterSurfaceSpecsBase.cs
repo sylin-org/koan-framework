@@ -590,6 +590,28 @@ public abstract class AdapterSurfaceSpecsBase<TFactory> : IClassFixture<TFactory
         refused.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    // NK-296: the adapter already applied LIMIT and OFFSET to a raw read; the endpoint must not page the page again.
+    [Fact]
+    public async Task RawQuery_controller_pages_past_the_first_page()
+    {
+        Assert.SkipWhen(!Factory.SupportsRawQuery, $"[{typeof(TFactory).Name}] does not confine raw provider queries.");
+        SkipIfUnavailable();
+        await SeedAlphaBravoCharlie();
+        var predicate = Uri.EscapeDataString("1 = 1");
+
+        var first = await Client.GetAsync($"/api/raw-widgets?q={predicate}&page=1&pageSize=2");
+        var second = await Client.GetAsync($"/api/raw-widgets?q={predicate}&page=2&pageSize=2");
+        first.StatusCode.Should().Be(HttpStatusCode.OK, await first.Content.ReadAsStringAsync());
+        second.StatusCode.Should().Be(HttpStatusCode.OK, await second.Content.ReadAsStringAsync());
+
+        var page1 = (await ReadItems(first)).Select(NameOf).ToArray();
+        var page2 = (await ReadItems(second)).Select(NameOf).ToArray();
+        page1.Should().HaveCount(2);
+        page2.Should().HaveCount(1, "page 2 of three rows at two per page holds the third row");
+        page1.Concat(page2).Should().BeEquivalentTo(new[] { "Alpha", "Bravo", "Charlie" });
+        second.Headers.GetValues("X-Total-Count").Single().Should().Be("3");
+    }
+
     [Fact]
     public async Task RawQuery_controller_still_runs_exactly_one_statement()
     {

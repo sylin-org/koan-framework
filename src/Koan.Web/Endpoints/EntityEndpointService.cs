@@ -1512,8 +1512,17 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             if (query.Filter is not null)
                 throw new FreeTextRefusedException(KoanWebConstants.Codes.Read.FreeTextNotComposable, FreeTextNotComposableMessage);
 
-            var raw = await Data<TEntity, TKey>.QueryRaw(q, null, query, cancellationToken);
-            return new RepositoryQueryResult(raw, raw.Count, false, false);
+            // NK-296: the adapter applies the shaping's page itself and says so; the endpoint must not page that page
+            // again. The total is the raw predicate's count, not the page's length.
+            var repository = Data<TEntity, TKey>.As<IRawQueryRepository<TEntity, TKey>>()
+                ?? throw new NotSupportedException(
+                    $"The adapter backing {typeof(TEntity).Name} does not support raw provider queries. " +
+                    "Use a LINQ predicate or the JSON filter DSL instead.");
+            var raw = await repository.QueryRaw(q, null, query, cancellationToken);
+            long total = raw.Items.Count;
+            if (raw.PaginationHandled && query.CountStrategy is not null)
+                total = (await repository.CountRaw(q, null, cancellationToken)).Value;
+            return new RepositoryQueryResult(raw.Items, total, raw.PaginationHandled, false);
         }
 
         int? safetyLimit = absoluteMaxRecords > 0 ? absoluteMaxRecords : null;
