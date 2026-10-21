@@ -392,6 +392,8 @@
       href: DATA-0142-postgres-confirms-every-index-it-creates.md
     - name: DATA-0143 A Move needs proof that its endpoints are different stores; a store marker is proposed
       href: DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md
+    - name: DATA-0144 How a unique [Index] behaves under row-scoped tenancy (owner decision)
+      href: DATA-0144-unique-indexes-under-row-scoped-tenancy.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
