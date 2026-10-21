@@ -60,6 +60,8 @@
       href: AI-0014-mcp-code-mode.md
     - name: AI-0037 MCP Streamable HTTP transport
       href: AI-0037-mcp-streamable-http-transport.md
+    - name: AI-0040 The code-mode SDK reports what the endpoint did
+      href: AI-0040-code-mode-sdk-reports-what-the-endpoint-did.md
     - name: AI-0015 Canonical source member architecture
       href: AI-0015-canonical-source-member-architecture.md
     - name: AI-0016 LM Studio adapter for Koan AI

@@ -89,15 +89,16 @@ internal sealed class EntityOperationsProxy
 
     /// <summary>
     /// SDK.Entities.Todo.collection({ filter, page, pageSize, set, with, sort })
-    /// Returns: { items: [...], page: 1, pageSize: 10, totalCount: 42 }
+    /// Returns: { items: [...], count, page, pageSize, totalCount }. An unpaged read is page 1 of its whole set; a
+    /// paged read carries the page it served (WEB-0076). A refused read throws (AI-0040).
     /// </summary>
-    public object collection(object? args = null)
+    public object? collection(object? args = null)
         => ExecuteCollection(args);
 
     /// <summary>
     /// SDK.Entities.Todo.firstPage(pageSize?, args?) - convenience for page 1.
     /// </summary>
-    public object firstPage(int? pageSize = null, object? args = null)
+    public object? firstPage(int? pageSize = null, object? args = null)
     {
         // Merge provided args with enforced page=1
         var baseObj = ConvertToJsonObject(args) ?? new JObject();
@@ -109,7 +110,7 @@ internal sealed class EntityOperationsProxy
     /// <summary>
     /// SDK.Entities.Todo.page(pageNumber, pageSize?, args?) - collection with explicit page.
     /// </summary>
-    public object page(int pageNumber, int? pageSize = null, object? args = null)
+    public object? page(int pageNumber, int? pageSize = null, object? args = null)
     {
         if (pageNumber <= 0) throw new JavaScriptException("Page number must be > 0");
         var baseObj = ConvertToJsonObject(args) ?? new JObject();
@@ -160,7 +161,7 @@ internal sealed class EntityOperationsProxy
     /// Options: { set?: string }
     /// Returns: { id: "...", title: "...", ... }
     /// </summary>
-    public object upsert(object model, object? options = null)
+    public object? upsert(object model, object? options = null)
     {
         if (model == null)
         {
@@ -193,7 +194,8 @@ internal sealed class EntityOperationsProxy
     /// <summary>
     /// SDK.Entities.Todo.delete(id, options)
     /// Options: { set?: string }
-    /// Returns: number (count deleted, typically 1)
+    /// Returns: 1 when the row was deleted, 0 when no row with that id is visible to the caller. A refusal (denied,
+    /// rejected by a hook, failed) throws (AI-0040).
     /// </summary>
     public int delete(string id, object? options = null)
     {
@@ -217,15 +219,16 @@ internal sealed class EntityOperationsProxy
             }
         }
 
-        _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
-
-        return 1; // Successfully deleted
+        var result = _executor.Execute(tool.Name, args, default, _principal).GetAwaiter().GetResult();
+        if (!result.Success && result.ErrorCode == CodeMode.Execution.CodeModeErrorCodes.NotFound) return 0;
+        ThrowIfFailed(result);
+        return 1;
     }
 
     /// <summary>
     /// SDK.Entities.Todo.deleteMany(ids, options)
     /// Options: { set?: string }
-    /// Returns: number (count deleted)
+    /// Returns: the number of rows the endpoint deleted. A refusal throws (AI-0040).
     /// </summary>
     public int deleteMany(object idsArg, object? options = null)
     {
@@ -297,7 +300,7 @@ internal sealed class EntityOperationsProxy
         return tool;
     }
 
-    private object ExecuteCollection(object? args)
+    private object? ExecuteCollection(object? args)
     {
         _metrics.IncrementCalls();
         var tool = FindTool(EntityEndpointOperationKind.Collection);
@@ -309,28 +312,37 @@ internal sealed class EntityOperationsProxy
     private JObject? ConvertToJsonObject(object? obj) => obj == null ? null : (_json.FromObject(obj) as JObject);
     private JToken? ConvertToJsonNode(object? obj) => obj == null ? null : (_json.FromObject(obj));
 
-    private object ConvertToJavaScriptObject(McpToolExecutionResult result)
+    // AI-0040: a failed or refused call (SEC-0010) is a JavaScript error naming its code, never a silent value.
+    private static void ThrowIfFailed(McpToolExecutionResult result)
     {
-        if (!result.Success)
-        {
-            var errorMsg = !string.IsNullOrWhiteSpace(result.ErrorCode)
-                ? $"{result.ErrorCode}: {result.ErrorMessage}"
-                : result.ErrorMessage ?? "Operation failed";
+        if (result.Success) return;
+        var errorMsg = !string.IsNullOrWhiteSpace(result.ErrorCode)
+            ? $"{result.ErrorCode}: {result.ErrorMessage}"
+            : result.ErrorMessage ?? "Operation failed";
+        throw new JavaScriptException(errorMsg);
+    }
 
-            throw new JavaScriptException(errorMsg);
-        }
+    private object? ConvertToJavaScriptObject(McpToolExecutionResult result)
+    {
+        ThrowIfFailed(result);
 
-        if (result.Payload == null) return new {};
+        if (result.Payload == null) return null;
 
         var token = (result.Payload as JToken) ?? JToken.Parse(result.Payload.ToString());
 
-        // If collection endpoint produced array, wrap with items + count for stability
+        // A collection is wrapped with its paging: the page it served, or page 1 of the whole set when unpaged.
         if (token is JArray arr)
         {
+            var paged = result.Headers.TryGetValue("X-Page", out var page) && result.Headers.TryGetValue("X-Page-Size", out _);
             var wrapper = new JObject
             {
                 ["items"] = arr,
-                ["count"] = arr.Count
+                ["count"] = arr.Count,
+                ["page"] = paged ? int.Parse(page!, System.Globalization.CultureInfo.InvariantCulture) : 1,
+                ["pageSize"] = paged ? int.Parse(result.Headers["X-Page-Size"], System.Globalization.CultureInfo.InvariantCulture) : arr.Count,
+                ["totalCount"] = result.Headers.TryGetValue("X-Total-Count", out var total)
+                    ? long.Parse(total, System.Globalization.CultureInfo.InvariantCulture)
+                    : result.Diagnostics["totalCount"]?.Value<long>() ?? (paged ? (long?)null : arr.Count)
             };
             return _json.ToDynamic(wrapper) ?? new {};
         }
@@ -338,20 +350,13 @@ internal sealed class EntityOperationsProxy
         return _json.ToDynamic(token) ?? new {};
     }
 
-    private int ExtractCount(McpToolExecutionResult result)
+    // AI-0040: the count the endpoint reports ({ deleted }), or a thrown error for a refusal.
+    private static int ExtractCount(McpToolExecutionResult result)
     {
-        if (!result.Success)
-        {
-            return 0;
-        }
-
-        if (result.Payload is JObject jobj && jobj.TryGetValue("count", StringComparison.OrdinalIgnoreCase, out var countToken))
-        {
-            if (countToken.Type == JTokenType.Integer && (int)countToken >= 0)
-                return (int)countToken;
-        }
-
-        // Fallback: assume 1 if we got here successfully
-        return 1;
+        ThrowIfFailed(result);
+        if (result.Payload is JObject jobj && jobj.TryGetValue("deleted", StringComparison.OrdinalIgnoreCase, out var countToken)
+            && countToken.Type == JTokenType.Integer)
+            return (int)countToken;
+        throw new JavaScriptException($"execution_error: the endpoint reported no deleted count ({result.Payload?.ToString(Newtonsoft.Json.Formatting.None) ?? "no payload"}).");
     }
 }
