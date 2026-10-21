@@ -56,6 +56,7 @@ public static class Constants
             public const string SegmentationCompiled = "segmentation-compiled";
             public const string SegmentationRealizationInstalled = "segmentation-realization-installed";
             public const string SegmentationRealizationConflict = "segmentation-realization-conflict";
+            public const string SegmentationRealizationMissing = "segmentation-realization-missing";
         }
     }
 

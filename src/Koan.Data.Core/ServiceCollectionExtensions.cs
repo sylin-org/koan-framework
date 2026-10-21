@@ -34,6 +34,16 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Declared before the IDataService guard: an application-supplied IDataService replaces Data core and its
+        // segmentation realization, and composition must refuse that host when isolation is active (ARCH-0137).
+        Koan.Core.Semantics.Segmentation.SegmentationParticipation.Declare(
+            services,
+            new Koan.Core.Semantics.Segmentation.SegmentationParticipation(
+                "data",
+                typeof(Semantics.DataSegmentationPlan),
+                "An IDataService registered before AddKoan() replaces Koan Data core and its tenant isolation; " +
+                "remove that registration, or remove the isolation reference."));
+
         if (services.Any(d => d.ServiceType == typeof(IDataService)))
         {
             return;

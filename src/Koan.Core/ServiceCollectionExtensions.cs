@@ -103,7 +103,11 @@ public static class ServiceCollectionExtensions
             SegmentationPlan>(
             segmentation.ForOwner,
             segmentation.Build,
-            static (collection, plan) => collection.Replace(ServiceDescriptor.Singleton(plan)));
+            static (collection, plan) =>
+            {
+                collection.Replace(ServiceDescriptor.Singleton(plan));
+                SegmentationParticipation.Verify(collection, plan);
+            });
         services.TryAddSingleton(SegmentationPlan.Empty);
 
         // Default logging: simple console with concise output and sane category levels.

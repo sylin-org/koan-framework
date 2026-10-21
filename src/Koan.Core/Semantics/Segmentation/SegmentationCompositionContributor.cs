@@ -24,6 +24,21 @@ internal static class SegmentationCompositionFacts
             Constants.Diagnostics.Reasons.SegmentationCompiled,
             typeof(SegmentationCompositionFacts).FullName);
 
+        var realizedPillars = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var realization in services.GetServices<ISegmentationRealization>())
+            realizedPillars.Add(realization.SegmentationRealization.PillarId);
+        foreach (var participation in services.GetServices<SegmentationParticipation>()
+                     .Where(participation => !realizedPillars.Contains(participation.PillarId))
+                     .OrderBy(static participation => participation.PillarId, StringComparer.Ordinal))
+        {
+            builder.AddRejection(
+                $"segmentation:{participation.PillarId}",
+                Constants.Diagnostics.Reasons.SegmentationRealizationMissing,
+                participation.Correction,
+                typeof(SegmentationCompositionFacts).FullName,
+                Constants.Diagnostics.Codes.SegmentationRealizationRejected);
+        }
+
         var realizations = services.GetServices<ISegmentationRealization>()
             .Select(static realization => realization.SegmentationRealization)
             .OrderBy(static receipt => receipt.PillarId, StringComparer.Ordinal)

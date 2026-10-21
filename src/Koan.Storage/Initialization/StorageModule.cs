@@ -28,15 +28,24 @@ public sealed class StorageModule : KoanModule
         // Bind options and register orchestrator if not already present
         services.AddKoanOptions<StorageOptions>(StorageConstants.Constants.Configuration.Section);
 
+        // Storage realizes hard segmentation at the IStorageService boundary whoever implements the service, so the
+        // realization and the chokepoint never depend on whether the application supplied one (ARCH-0137, NK-059).
+        Koan.Core.Semantics.Segmentation.SegmentationParticipation.Declare(
+            services,
+            new Koan.Core.Semantics.Segmentation.SegmentationParticipation(
+                "storage",
+                typeof(StorageIdentityPlan),
+                "Do not remove Koan.Storage's StorageIdentityPlan registration; an application IStorageService is wrapped by it."));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<
+            Koan.Core.Semantics.Segmentation.ISegmentationRealization,
+            StorageIdentityPlan>());
+        services.TryAddSingleton(sp => sp
+            .GetServices<Koan.Core.Semantics.Segmentation.ISegmentationRealization>()
+            .OfType<StorageIdentityPlan>()
+            .Single());
+
         if (!services.Any(d => d.ServiceType == typeof(IStorageService)))
         {
-            services.TryAddEnumerable(ServiceDescriptor.Singleton<
-                Koan.Core.Semantics.Segmentation.ISegmentationRealization,
-                StorageIdentityPlan>());
-            services.TryAddSingleton(sp => sp
-                .GetServices<Koan.Core.Semantics.Segmentation.ISegmentationRealization>()
-                .OfType<StorageIdentityPlan>()
-                .Single());
             services.AddSingleton<StorageProviderCatalog>();
             services.AddSingleton<StorageRoutingPlan>();
             // Expose Storage's physical-identity chokepoint around the concrete provider. With no active
@@ -46,13 +55,38 @@ public sealed class StorageModule : KoanModule
                 sp.GetRequiredService<StorageService>(),
                 sp.GetRequiredService<StorageIdentityPlan>()));
         }
+        else
+        {
+            // An application-supplied IStorageService stays authoritative for mechanics and routing; the chokepoint
+            // still composes the segmentation particles onto every key it receives.
+            WrapSuppliedStorageServices(services);
+        }
+    }
+
+    private static void WrapSuppliedStorageServices(IServiceCollection services)
+    {
+        for (var index = 0; index < services.Count; index++)
+        {
+            var supplied = services[index];
+            if (supplied.ServiceType != typeof(IStorageService) || supplied.IsKeyedService) continue;
+
+            services[index] = ServiceDescriptor.Describe(
+                typeof(IStorageService),
+                sp => new ScopedStorageService(Resolve(sp, supplied), sp.GetRequiredService<StorageIdentityPlan>()),
+                supplied.Lifetime);
+        }
+
+        static IStorageService Resolve(IServiceProvider sp, ServiceDescriptor supplied)
+            => (IStorageService)(supplied.ImplementationInstance
+                ?? supplied.ImplementationFactory?.Invoke(sp)
+                ?? ActivatorUtilities.CreateInstance(sp, supplied.ImplementationType!));
     }
 
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
         // A Storage reference makes the capability available. Configuration makes routing active;
         // an actual service resolution remains the fail-loud boundary for unconfigured runtime use.
-        // A deliberately supplied IStorageService remains authoritative and needs no routing plan.
+        // A deliberately supplied IStorageService remains authoritative for routing and needs no routing plan.
         if (services.GetRequiredService<IOptions<StorageOptions>>().Value.DeclaresRoutingIntent)
             _ = services.GetService<StorageRoutingPlan>();
         return Task.CompletedTask;

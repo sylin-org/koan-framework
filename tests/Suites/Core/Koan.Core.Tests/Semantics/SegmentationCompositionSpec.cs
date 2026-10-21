@@ -89,6 +89,42 @@ public sealed class SegmentationCompositionSpec
         act.Should().Throw<ArgumentException>();
     }
 
+    [Fact]
+    public void A_declared_participant_without_a_realization_is_rejected_in_facts()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(Plan("tenant-a"))
+            .AddSingleton(new SegmentationParticipation("cache", typeof(Receipt), "Register the cache realization."))
+            .BuildServiceProvider();
+        var builder = new KoanCompositionBuilder();
+
+        SegmentationCompositionFacts.Project(builder, services);
+        builder.ApplyTo(out _, out _, out _, out _, out var facts);
+
+        facts.Should().ContainSingle(fact =>
+            fact.Code == Constants.Diagnostics.Codes.SegmentationRealizationRejected
+            && fact.Subject == "segmentation:cache");
+    }
+
+    [Fact]
+    public void Composition_refuses_an_active_dimension_with_an_unrealized_participant()
+    {
+        var services = new ServiceCollection();
+        SegmentationParticipation.Declare(services, new SegmentationParticipation("cache", typeof(Receipt), "Register the cache realization."));
+        SegmentationParticipation.Declare(services, new SegmentationParticipation("cache", typeof(Receipt), "duplicate declaration"));
+
+        var verify = () => SegmentationParticipation.Verify(services, Plan("tenant-a"));
+        var empty = () => SegmentationParticipation.Verify(services, SegmentationPlan.Empty);
+
+        verify.Should().Throw<InvalidOperationException>()
+            .WithMessage("*tenant*'cache'*Register the cache realization.*");
+        empty.Should().NotThrow();
+        services.Should().ContainSingle(descriptor => descriptor.ServiceType == typeof(SegmentationParticipation));
+
+        services.AddSingleton<ISegmentationRealization, Receipt>();
+        verify.Should().NotThrow();
+    }
+
     private static SegmentationPlan Plan(string currentValue)
     {
         var builder = new SegmentationPlanBuilder();
