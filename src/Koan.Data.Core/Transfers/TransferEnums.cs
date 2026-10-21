@@ -52,7 +52,11 @@ public enum MirrorMode
 /// <summary>Chooses the winner when both sides of a bidirectional mirror contain the same identity.</summary>
 public enum MirrorConflict
 {
-    /// <summary>Use the entity with the greatest supported <c>[Timestamp]</c> value.</summary>
+    /// <summary>
+    /// Use the entity with the greater value of its one <c>[Timestamp(OnSave = true)]</c> property, or of its only
+    /// <c>[Timestamp]</c> property when it has no OnSave one. A set-once creation stamp never decides over an OnSave
+    /// stamp; several deciding candidates report every overlap as a conflict.
+    /// </summary>
     Latest,
 
     /// <summary>The entity selected by <c>From(...)</c> wins.</summary>

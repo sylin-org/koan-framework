@@ -77,9 +77,12 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         var conflicts = new List<TransferConflict<TKey>>();
         var read = 0;
         var copied = 0;
-        var timestamp = _conflict == MirrorConflict.Latest ? ResolveTimestampProperty() : null;
-        if (_conflict == MirrorConflict.Latest && timestamp is null)
-            AddWarning($"No [Timestamp] property found on {typeof(TEntity).Name}; overlapping identities are reported without automatic resolution.");
+        PropertyInfo? timestamp = null;
+        if (_conflict == MirrorConflict.Latest)
+        {
+            timestamp = ResolveTimestampProperty(out var unresolved);
+            if (unresolved is not null) AddWarning(unresolved);
+        }
 
         // Writes aimed at the source are deferred until its provider-bounded stream has completed.
         // This prevents a conflict resolution from changing predicate membership between numbered pages.
@@ -173,9 +176,32 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
         conflicts.Add(new TransferConflict<TKey>(id, reason));
     }
 
-    private static PropertyInfo? ResolveTimestampProperty()
-        => typeof(TEntity).GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(property => property.GetCustomAttributes(typeof(TimestampAttribute), true).Length != 0);
+    /// <summary>
+    /// The property that says which side changed last: the one <c>[Timestamp(OnSave = true)]</c> property, or the
+    /// only <c>[Timestamp]</c> property when there is no OnSave one. A set-once creation stamp is never chosen over an
+    /// OnSave stamp, because copies share it and would always compare equal (NK-018). Several candidates of the
+    /// deciding kind are ambiguous: overlaps are then reported, not guessed.
+    /// </summary>
+    private static PropertyInfo? ResolveTimestampProperty(out string? unresolved)
+    {
+        var stamps = typeof(TEntity).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => (Property: property, Attribute: property.GetCustomAttribute<TimestampAttribute>(true)))
+            .Where(candidate => candidate.Attribute is not null)
+            .ToArray();
+        var onSave = stamps.Where(candidate => candidate.Attribute!.OnSave).Select(candidate => candidate.Property).ToArray();
+        var deciding = onSave.Length != 0 ? onSave : stamps.Select(candidate => candidate.Property).ToArray();
+
+        unresolved = deciding.Length switch
+        {
+            1 => null,
+            0 => $"No [Timestamp] property found on {typeof(TEntity).Name}; overlapping identities are reported without automatic resolution.",
+            _ => $"The latest-write timestamp on {typeof(TEntity).Name} is ambiguous: " +
+                 string.Join(", ", deciding.Select(property => property.Name).Order(StringComparer.Ordinal)) +
+                 $" are all {(onSave.Length != 0 ? "[Timestamp(OnSave = true)]" : "[Timestamp]")}. Overlapping identities " +
+                 "are reported without automatic resolution; keep one OnSave timestamp or choose Source or Destination."
+        };
+        return deciding.Length == 1 ? deciding[0] : null;
+    }
 
     private static bool TryCompareTimestamp(
         PropertyInfo property,

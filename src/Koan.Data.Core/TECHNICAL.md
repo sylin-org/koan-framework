@@ -271,6 +271,9 @@ validation:
   `DeletedCount`. A present, unchanged row that fails to delete is still a `BulkMutationReceiptRejectedException`.
   The re-read and the delete are two steps, so a write between them is not detected. A Load hook that is not
   deterministic makes every row look changed, which keeps rows rather than losing them.
+- `MirrorConflict.Latest` compares the Entity's one `[Timestamp(OnSave = true)]` property, or its only `[Timestamp]`
+  when it has no OnSave one. A set-once creation stamp, which copies share, never decides. Several deciding
+  candidates are ambiguous: a warning names them and every overlap is reported as a conflict.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

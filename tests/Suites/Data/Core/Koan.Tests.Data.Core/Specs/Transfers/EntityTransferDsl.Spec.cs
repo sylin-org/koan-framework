@@ -435,6 +435,48 @@ public sealed class EntityTransferDslSpec
             (await TransferTodo.Get(saved.Id)).Should().NotBeNull();
     }
 
+    /// <summary>
+    /// NK-018. Latest took the first [Timestamp] property, whatever its kind. With a set-once CreatedAt declared
+    /// before the OnSave UpdatedAt (Koan's own Identity shape), copies compared equal and edits never reconciled.
+    /// </summary>
+    [Fact]
+    public async Task Mirror_Latest_ComparesTheOnSaveTimestampNotTheCreationStamp()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var created = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        var source = await new AuditedNote { Content = "original", CreatedAt = created }.Save();
+        await Task.Delay(20);
+        using (runtime.UsePartition("secondary"))
+            await new AuditedNote { Id = source.Id, Content = "edited later", CreatedAt = created }.Save();
+
+        var result = await AuditedNote.Mirror(MirrorMode.Bidirectional).To(partition: "secondary").Run();
+
+        result.Conflicts.Should().BeEmpty();
+        result.CopiedCount.Should().Be(1, "the later edit wins and is written back");
+        (await AuditedNote.Get(source.Id))!.Content.Should().Be("edited later");
+    }
+
+    [Fact]
+    public async Task Mirror_Latest_WithTwoOnSaveTimestamps_ReportsTheOverlapInsteadOfGuessing()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var source = await new TwiceStampedNote { Content = "source" }.Save();
+        using (runtime.UsePartition("secondary"))
+            await new TwiceStampedNote { Id = source.Id, Content = "target" }.Save();
+
+        var result = await TwiceStampedNote.Mirror(MirrorMode.Bidirectional).To(partition: "secondary").Run();
+
+        result.Conflicts.Should().ContainSingle();
+        result.Warnings.Should().Contain(warning => warning.Contains("ambiguous", StringComparison.Ordinal));
+        (await TwiceStampedNote.Get(source.Id))!.Content.Should().Be("source");
+    }
+
     [Fact]
     public async Task To_WithSourceAndAdapter_ShouldThrow()
     {
@@ -699,6 +741,8 @@ public sealed class EntityTransferDslSpec
         await TransferTodo.RemoveAll();
         await BasicNote.RemoveAll();
         await MirrorFlag.RemoveAll();
+        await AuditedNote.RemoveAll();
+        await TwiceStampedNote.RemoveAll();
 
         foreach (var partition in Partitions)
         {
@@ -706,6 +750,8 @@ public sealed class EntityTransferDslSpec
             await TransferTodo.RemoveAll();
             await BasicNote.RemoveAll();
             await MirrorFlag.RemoveAll();
+            await AuditedNote.RemoveAll();
+            await TwiceStampedNote.RemoveAll();
         }
     }
 
@@ -740,6 +786,31 @@ public sealed class EntityTransferDslSpec
         public void AssignOwner(string owner) => Owner = owner;
     }
 
+    [DataAdapter(TransferAdapterFactory.ProviderId)]
+    private sealed class AuditedNote : Entity<AuditedNote>
+    {
+        public string Content { get; set; } = "";
+
+        // Declared first on purpose: a set-once creation stamp that copies share.
+        [Timestamp]
+        public DateTimeOffset CreatedAt { get; set; }
+
+        [Timestamp(OnSave = true)]
+        public DateTimeOffset UpdatedAt { get; set; }
+    }
+
+    [DataAdapter(TransferAdapterFactory.ProviderId)]
+    private sealed class TwiceStampedNote : Entity<TwiceStampedNote>
+    {
+        public string Content { get; set; } = "";
+
+        [Timestamp(OnSave = true)]
+        public DateTimeOffset ModifiedAt { get; set; }
+
+        [Timestamp(OnSave = true)]
+        public DateTimeOffset TouchedAt { get; set; }
+    }
+
     private sealed class TransferAdapterFactory : IDataAdapterFactory
     {
         public const string ProviderId = "transfer-spec";
@@ -761,7 +832,8 @@ public sealed class EntityTransferDslSpec
         {
             if (typeof(TKey) != typeof(string) ||
                 (typeof(TEntity) != typeof(TransferTodo) && typeof(TEntity) != typeof(BasicNote) &&
-                 typeof(TEntity) != typeof(MirrorFlag)))
+                 typeof(TEntity) != typeof(MirrorFlag) && typeof(TEntity) != typeof(AuditedNote) &&
+                 typeof(TEntity) != typeof(TwiceStampedNote)))
                 throw new InvalidOperationException($"The transfer spec adapter cannot create {typeof(TEntity).Name}<{typeof(TKey).Name}>.");
 
             var repository = _repositories.GetOrAdd(
