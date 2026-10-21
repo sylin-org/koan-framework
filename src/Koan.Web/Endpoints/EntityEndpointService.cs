@@ -543,7 +543,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         QueryDefinition query;
         try
         {
+            // The body query reports X-Total-Count, so it asks for the count unless the policy opts out (IncludeCount).
             var definition = QueryDefinition.All.ForPartition(request.Set).WithSort(context.Options.Sort.ToArray())
+                .WithCountStrategy(policy.IncludeCount ? CountStrategy.Optimized : null)
                 .WithPagination(context.Options.Page, context.Options.PageSize);
             query = FreezeReadQuery(definition, request.FilterJson, request.IgnoreCase, context.Options);
         }
@@ -591,7 +593,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         {
             context.Headers["X-Page"] = context.Options.Page.ToString();
             context.Headers["X-Page-Size"] = context.Options.PageSize.ToString();
-            context.Headers["X-Total-Count"] = total.ToString();
+            if (policy.IncludeCount) context.Headers["X-Total-Count"] = total.ToString();
         }
 
         if (!await _hookPipeline.AfterCollection(hookContext, list))

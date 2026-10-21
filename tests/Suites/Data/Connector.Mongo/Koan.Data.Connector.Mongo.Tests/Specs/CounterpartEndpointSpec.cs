@@ -275,7 +275,10 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
             (await rest.Content.ReadAsStringAsync()).Should().NotContain("mapper exception data");
             var mcp = await Call(host.Services, EntityEndpointOperationKind.Query, new JObject { ["set"] = state.Content });
             mcp["meta"]!["shortCircuit"]!["statusCode"]!.Value<int>().Should().Be(500);
-            JArray.Parse(mcp["content"]![0]!["text"]!.Value<string>()!).Should().BeEmpty();
+            // SEC-0010: a refusal is a failed tool call carrying a problem object, never an empty success.
+            mcp["isError"]!.Value<bool>().Should().BeTrue();
+            mcp["meta"]!["errorCode"]!.Value<string>().Should().Be("rejected");
+            mcp["content"]![0]!["text"]!.Value<string>().Should().NotContain("mapper exception data");
             mcp["meta"]!["diagnostics"]!["access"].Should().BeNull();
         }
         await host.StopAsync();
