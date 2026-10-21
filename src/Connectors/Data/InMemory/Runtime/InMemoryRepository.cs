@@ -27,11 +27,15 @@ internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, str
             throw new NotSupportedException("InMemory insert-only requires a non-default identity. Assign the entity identity before insertion.");
         var snapshot = new InMemoryState.Record(
             EntityJsonSerialization.SerializeDocument(model), CopyManaged(SnapshotManaged()));
-        var inserted = Current().TryAdd(model.Id, snapshot);
-        return Task.FromResult(new MutationResult<TEntity, TKey>(model.Id,
-            inserted ? MutationOutcome.Inserted : MutationOutcome.Conflict,
-            inserted ? model : null,
-            inserted ? DataCommitOutcome.Committed : DataCommitOutcome.NotCommitted));
+        // Inside the family write gate, so an insert cannot land between a guarded upsert's check and its write (NK-095).
+        return Exclusive(() =>
+        {
+            var inserted = Current().TryAdd(model.Id, snapshot);
+            return Task.FromResult(new MutationResult<TEntity, TKey>(model.Id,
+                inserted ? MutationOutcome.Inserted : MutationOutcome.Conflict,
+                inserted ? model : null,
+                inserted ? DataCommitOutcome.Committed : DataCommitOutcome.NotCommitted));
+        }, ct);
     }
 
     /// <summary>Compare the observed immutable stored record at the final dictionary update. Ordinary

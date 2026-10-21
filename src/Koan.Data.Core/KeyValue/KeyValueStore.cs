@@ -201,12 +201,30 @@ public abstract class KeyValueStore<TEntity, TKey> :
 
     // ==================== Write ====================
 
-    public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
+    // NK-095: the cross-scope write guard reads the stored record and the write lands later, so a guard and its write
+    // hold this gate together; otherwise two scopes writing one new id both pass and the later write takes the row.
+    // One gate per closed store type covers every physical store and source of the entity in this process; it does not
+    // reach another process sharing a file.
+    private static readonly SemaphoreSlim WriteGate = new(1, 1);
+
+    /// <summary>Runs <paramref name="work"/> while no other guarded write of this entity type runs in this process. A
+    /// backend write that reads before it writes (an insert-only check, a guarded removal) enters it too.</summary>
+    protected static async Task<T> Exclusive<T>(Func<Task<T>> work, CancellationToken ct)
+    {
+        await WriteGate.WaitAsync(ct).ConfigureAwait(false);
+        try { return await work().ConfigureAwait(false); }
+        finally { WriteGate.Release(); }
+    }
+
+    public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        var record = await GuardAndSnapshotAsync(model, ct).ConfigureAwait(false);
-        await WriteAsync(model.Id, record, ct).ConfigureAwait(false);
-        return model;
+        return Exclusive(async () =>
+        {
+            var record = await GuardAndSnapshotAsync(model, ct).ConfigureAwait(false);
+            await WriteAsync(model.Id, record, ct).ConfigureAwait(false);
+            return model;
+        }, ct);
     }
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
@@ -217,14 +235,17 @@ public abstract class KeyValueStore<TEntity, TKey> :
         // Guard + stamp every row first (the per-row Shared-mode contract), THEN hand the whole set to WriteManyAsync.
         // The default WriteManyAsync loops WriteAsync, but a backend with a native bulk write (Json: one file persist;
         // Redis: MSET) overrides it — so bulk upsert stays one physical write, not N (the family's perf floor).
-        var records = new List<KvRecord<TEntity>>(list.Count);
-        foreach (var m in list)
+        return await Exclusive(async () =>
         {
-            ct.ThrowIfCancellationRequested();
-            records.Add(await GuardAndSnapshotAsync(m, ct).ConfigureAwait(false));
-        }
-        await WriteManyAsync(records, ct).ConfigureAwait(false);
-        return records.Count;
+            var records = new List<KvRecord<TEntity>>(list.Count);
+            foreach (var m in list)
+            {
+                ct.ThrowIfCancellationRequested();
+                records.Add(await GuardAndSnapshotAsync(m, ct).ConfigureAwait(false));
+            }
+            await WriteManyAsync(records, ct).ConfigureAwait(false);
+            return records.Count;
+        }, ct).ConfigureAwait(false);
     }
 
     public Task<bool> Delete(TKey id, CancellationToken ct = default)
