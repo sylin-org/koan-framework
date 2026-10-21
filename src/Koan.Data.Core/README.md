@@ -204,6 +204,9 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 - `Copy`, `Move` and `Mirror` compare the physical places their endpoints reach, not how they are written. A `Move` or
   `Mirror` whose endpoints resolve to one container is refused before any read; a `Copy` onto itself writes nothing
   and says so in its warnings (DATA-0125).
+- Transfers carry rows exactly by default: stored values and OnSave timestamps arrive unchanged, and no Lifecycle or
+  write stamp runs for the transfer's reads and writes. Tenancy, policy, isolation and receipts still apply.
+  `.Fidelity(TransferFidelity.Semantic)` writes each row as a Save instead (DATA-0149).
 - Ambient `EntityContext.Transaction` is deferred sequential coordination, not a native or distributed transaction.
   A failed commit can leave its completed prefix durable; rollback discards only undispatched work. For one Entity
   root, `BatchOptions(RequireAtomic: true)` is the qualified all-or-nothing seam.

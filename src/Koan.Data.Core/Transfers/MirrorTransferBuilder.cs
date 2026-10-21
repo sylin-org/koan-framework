@@ -27,6 +27,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
     public async Task<TransferResult<TKey>> Run(CancellationToken ct = default)
     {
         await using var operationHorizon = await Admit(TransferKind.Mirror, ct).ConfigureAwait(false);
+        using var fidelity = EnterFidelity();
         return _mode switch
         {
             MirrorMode.Push => await RunOneWay(FromContext, ToContext, ct).ConfigureAwait(false),

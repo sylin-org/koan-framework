@@ -1144,12 +1144,19 @@ each copied row from the source: a row another writer changed after it was copie
 newer version. Use Jobs and an
 application-owned checkpoint when work must survive process failure or resume across runs.
 
-A transfer is ordinary Entity work on both sides, not a physical copy
-([DATA-0111](../decisions/DATA-0111-verified-default-data-cutover.md) relies on that distinction): tenancy,
-source policy and storage guards apply, every row read runs Load lifecycle, every destination write runs Upsert
-lifecycle and the registered write stamps, and a `Move` runs Remove lifecycle at the origin. A
-`[Timestamp(OnSave = true)]` property is therefore stamped with the transfer time, so archiving with `Move` replaces
-the rows' last-modified values. Keep a business timestamp the application sets itself when that history matters.
+A transfer carries rows exactly by default
+([DATA-0149](../decisions/DATA-0149-transfers-carry-stored-values-exactly-by-default.md)): each row arrives with the
+values it was stored with, `[Timestamp(OnSave = true)]` included, and no Load, Upsert or Remove lifecycle or
+registered write stamp runs for the transfer's reads and writes. A row without an identity is still given one.
+Tenancy, source policy, storage guards, field transforms, the Move proof and the receipts still apply, and the
+transfer reads and writes only inside the caller's tenant and scope. Archiving with `Move` therefore keeps the rows'
+last-modified values, and a bidirectional `Mirror` that has converged writes nothing on the next run.
+
+When the destination should see each row as a fresh Save (hooks run, OnSave stamps take the transfer time), ask for it:
+
+```csharp
+await Todo.Copy().To(partition: "staging").Fidelity(TransferFidelity.Semantic).Run(ct);
+```
 
 **Pro tip:** `.Audit()` reports destination write batches and a final summary. It is observability,
 not a checkpoint or resume token.

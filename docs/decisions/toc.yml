@@ -404,6 +404,8 @@
       href: DATA-0147-each-source-is-minted-once-from-its-physical-store.md
     - name: DATA-0148 Every store holds a __koan_store marker, and two endpoints are one store exactly when they read the same one
       href: DATA-0148-every-store-holds-a-koan-store-marker.md
+    - name: DATA-0149 Copy, Move and Mirror carry stored values exactly by default; Save semantics are an opt-in
+      href: DATA-0149-transfers-carry-stored-values-exactly-by-default.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

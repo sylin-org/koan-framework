@@ -17,6 +17,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     private const int DefaultBatchSize = 500;
 
     private Action<TransferAuditBatch>? _audit;
+    private TransferFidelity _fidelity = TransferFidelity.Exact;
     private readonly List<string> _warnings = [];
 
     protected EntityTransferBuilderBase(Expression<Func<TEntity, bool>>? predicate)
@@ -49,6 +50,18 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         return Self;
     }
 
+    /// <summary>
+    /// Chooses how rows are written (DATA-0149). The default, <see cref="TransferFidelity.Exact"/>, keeps every stored
+    /// value and runs no Lifecycle or write stamps; <see cref="TransferFidelity.Semantic"/> writes each row as a Save.
+    /// </summary>
+    public TBuilder Fidelity(TransferFidelity fidelity)
+    {
+        if (!Enum.IsDefined(fidelity))
+            throw new ArgumentOutOfRangeException(nameof(fidelity), fidelity, "Choose TransferFidelity.Exact or TransferFidelity.Semantic.");
+        _fidelity = fidelity;
+        return Self;
+    }
+
     public TBuilder Audit(Action<TransferAuditBatch> callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
@@ -60,6 +73,20 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     {
         if (!string.IsNullOrWhiteSpace(message) && !_warnings.Contains(message, StringComparer.Ordinal))
             _warnings.Add(message);
+    }
+
+    /// <summary>
+    /// Raises the exact-transfer flag for the rest of the run when the transfer's fidelity is Exact (DATA-0149). Entered
+    /// by <c>Run</c> after admission, so it covers every read, write and delete the transfer issues and nothing else.
+    /// </summary>
+    private protected TransferFidelityScope.Scope EnterFidelity()
+        => TransferFidelityScope.Enter(_fidelity == TransferFidelity.Exact);
+
+    /// <summary>The caller's audit callback is application code, so it runs as ordinary Entity work.</summary>
+    private void Report(TransferAuditBatch batch)
+    {
+        if (_audit is null) return;
+        using (TransferFidelityScope.Enter(false)) _audit(batch);
     }
 
     protected void DemandDestination()
@@ -137,7 +164,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             SnapshotFor(destination),
             progress.Stopwatch.Elapsed,
             false);
-        _audit?.Invoke(audit);
+        Report(audit);
         return written;
     }
 
@@ -179,7 +206,7 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
             SnapshotFor(ToContext),
             progress.Stopwatch.Elapsed,
             true);
-        _audit?.Invoke(summary);
+        Report(summary);
         progress.Stopwatch.Stop();
 
         return new TransferResult<TKey>

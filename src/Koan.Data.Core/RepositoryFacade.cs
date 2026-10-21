@@ -72,6 +72,13 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private readonly bool _skipReadPushabilityCheck;
     private readonly OperationOverrideDescriptor? _deleteOverride;
     private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
+
+    /// <summary>
+    /// The Lifecycle this operation runs: none for an exact transfer's own reads and writes (DATA-0149), else the
+    /// host-composed plan.
+    /// </summary>
+    private EntityLifecyclePlan<TEntity, TKey>? Lifecycle
+        => _lifecycle is null || Transfers.TransferFidelityScope.IsExact ? null : _lifecycle;
     private readonly DataSegmentationPlan.DataSegmentationScope _segmentation;
     private readonly DataSourcePlan _sourcePlan;
     private readonly DataOperationHorizon? _operationHorizon;
@@ -610,11 +617,11 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
     private async Task ApplyLoadLifecycle(IReadOnlyList<TEntity> entities, CancellationToken ct)
     {
-        if (_lifecycle is not { HasLoad: true }) return;
+        if (Lifecycle is not { HasLoad: true }) return;
         foreach (var entity in entities)
         {
             ct.ThrowIfCancellationRequested();
-            await _lifecycle.ApplyLoad(entity, ct);
+            await Lifecycle.ApplyLoad(entity, ct);
         }
     }
 
@@ -623,8 +630,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         await using var operationScope = await Guard(DataOperationEffect.Read, "entity get", ct);
         var segmentation = operationScope.Segmentation;
         var entity = await ReadOne(id, segmentation, ct);
-        if (entity is not null && _lifecycle is { HasLoad: true })
-            await _lifecycle.ApplyLoad(entity, ct);
+        if (entity is not null && Lifecycle is { HasLoad: true })
+            await Lifecycle.ApplyLoad(entity, ct);
         return entity;
     }
 
@@ -634,9 +641,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         var segmentation = operationScope.Segmentation;
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
         var entities = await ReadMany(idList, segmentation, ct);
-        if (_lifecycle is { HasLoad: true })
+        if (Lifecycle is { HasLoad: true })
             foreach (var entity in entities)
-                if (entity is not null) await _lifecycle.ApplyLoad(entity, ct);
+                if (entity is not null) await Lifecycle.ApplyLoad(entity, ct);
         return entities;
     }
 
@@ -705,8 +712,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
     private async ValueTask MaterializeVisible(TEntity entity, CancellationToken ct)
     {
-        if (_lifecycle is not { HasLoad: true }) return;
-        _ = await _lifecycle.ApplyLoad(entity, ct);
+        if (Lifecycle is not { HasLoad: true }) return;
+        _ = await Lifecycle.ApplyLoad(entity, ct);
     }
 
     public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
@@ -889,12 +896,12 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     {
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity upsert", ct);
         var segmentation = operationScope.Segmentation;
-        if (_lifecycle is not { HasUpsert: true })
+        if (Lifecycle is not { HasUpsert: true })
             return await PersistPreparedUpsert(model, segmentation, ct);
 
-        var context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct);
+        var context = await Lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct);
         var persisted = await PersistPreparedUpsert(context.Current, segmentation, ct);
-        await _lifecycle.CompleteUpsert(context, persisted);
+        await Lifecycle.CompleteUpsert(context, persisted);
         return context.Current;
     }
 
@@ -915,8 +922,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // An attempted insert has no prior row. Never turn read visibility into an absence proof,
         // and never fetch a hidden collision into lifecycle state.
         EntityLifecycleContext<TEntity>? context = null;
-        if (_lifecycle is { HasUpsert: true })
-            context = await _lifecycle.BeginUpsert(model, _ => new ValueTask<TEntity?>((TEntity?)null), ct);
+        if (Lifecycle is { HasUpsert: true })
+            context = await Lifecycle.BeginUpsert(model, _ => new ValueTask<TEntity?>((TEntity?)null), ct);
         var current = context?.Current ?? model;
         WritePlanFor(current).ApplyAll(current);
         var submittedKey = current.Id;
@@ -952,7 +959,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // encrypted field values must never become the application or lifecycle result.
         if (!EqualityComparer<TKey>.Default.Equals(current.Id, result.Key))
             AggregateMetadata.GetIdSpec(current.GetType())!.Prop.SetValue(current, result.Key);
-        if (context is not null) await _lifecycle!.CompleteUpsert(context, current);
+        if (context is not null) await Lifecycle!.CompleteUpsert(context, current);
         return result with { Entity = current };
     }
 
@@ -970,8 +977,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 "Use Save when insert/update distinction is not required, or route to an adapter that advertises mutation outcomes.");
 
         EntityLifecycleContext<TEntity>? context = null;
-        if (_lifecycle is { HasUpsert: true })
-            context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct);
+        if (Lifecycle is { HasUpsert: true })
+            context = await Lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct);
         var current = context?.Current ?? model;
         WritePlanFor(current).ApplyAll(current);
         var payload = WritePayload(current);
@@ -995,7 +1002,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 "A successful native upsert must report the same key, Inserted or Updated, and CommitOutcome=Committed.",
                 DataCommitOutcome.Unknown);
 
-        if (context is not null) await _lifecycle!.CompleteUpsert(context, current);
+        if (context is not null) await Lifecycle!.CompleteUpsert(context, current);
         return result with { Entity = current };
     }
 
@@ -1011,14 +1018,14 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 id, MutationOutcome.Missing, null, DataCommitOutcome.NotCommitted);
 
         EntityLifecycleContext<TEntity>? context = null;
-        if (_lifecycle is { HasRemove: true })
-            context = await _lifecycle.BeginRemove(entity, ct);
+        if (Lifecycle is { HasRemove: true })
+            context = await Lifecycle.BeginRemove(entity, ct);
         var current = context?.Current ?? entity;
         var deleted = await DeleteWithoutLifecycle(current.Id, segmentation, ct);
         if (!deleted)
             return new MutationResult<TEntity, TKey>(
                 id, MutationOutcome.Conflict, current, DataCommitOutcome.NotCommitted);
-        if (context is not null) await _lifecycle!.CompleteRemove(context);
+        if (context is not null) await Lifecycle!.CompleteRemove(context);
         return new MutationResult<TEntity, TKey>(
             current.Id, MutationOutcome.Deleted, current, DataCommitOutcome.Committed);
     }
@@ -1028,7 +1035,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity batch upsert", ct);
         var segmentation = operationScope.Segmentation;
         var list = models as IList<TEntity> ?? models.ToList();
-        if (_lifecycle is { HasUpsert: true })
+        if (Lifecycle is { HasUpsert: true })
         {
             // Prepare the complete set before the first write so a domain rejection never creates a
             // framework-induced partial batch. Provider failures retain their normal non-transactional semantics.
@@ -1036,13 +1043,13 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             foreach (var model in list)
             {
                 ct.ThrowIfCancellationRequested();
-                contexts.Add(await _lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct));
+                contexts.Add(await Lifecycle.BeginUpsert(model, token => ReadPrior(model, segmentation, token), ct));
             }
 
             var persisted = contexts.Select(context => context.Current).ToList();
             await PersistPreparedMany(persisted, segmentation, ct);
             for (var i = 0; i < contexts.Count; i++)
-                await _lifecycle.CompleteUpsert(contexts[i], persisted[i]);
+                await Lifecycle.CompleteUpsert(contexts[i], persisted[i]);
             return persisted.Count;
         }
         return await PersistPreparedMany(list, segmentation, ct);
@@ -1052,14 +1059,14 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     {
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity delete", ct);
         var segmentation = operationScope.Segmentation;
-        if (_lifecycle is not { HasRemove: true })
+        if (Lifecycle is not { HasRemove: true })
             return await DeleteWithoutLifecycle(id, segmentation, ct);
 
         var entity = await ReadOne(id, segmentation, ct);
         if (entity is null) return false;
-        var context = await _lifecycle.BeginRemove(entity, ct);
+        var context = await Lifecycle.BeginRemove(entity, ct);
         var removed = await DeleteWithoutLifecycle(context.Current.Id, segmentation, ct);
-        if (removed) await _lifecycle.CompleteRemove(context);
+        if (removed) await Lifecycle.CompleteRemove(context);
         return removed;
     }
 
@@ -1092,7 +1099,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity batch delete", ct);
         var segmentation = operationScope.Segmentation;
         var idList = ids as IReadOnlyList<TKey> ?? ids.ToList();
-        if (_lifecycle is { HasRemove: true })
+        if (Lifecycle is { HasRemove: true })
             return await DeleteManyWithLifecycle(idList, segmentation, ct);
         return await DeleteManyWithoutLifecycle(idList, segmentation, ct);
     }
@@ -1107,7 +1114,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         foreach (var entity in existing)
         {
             if (entity is null) continue;
-            contexts.Add(await _lifecycle!.BeginRemove(entity, ct));
+            contexts.Add(await Lifecycle!.BeginRemove(entity, ct));
         }
 
         var completed = new List<EntityLifecycleContext<TEntity>>(contexts.Count);
@@ -1121,7 +1128,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 DataCommitOutcome.Unknown);
         completed.AddRange(contexts);
         foreach (var context in completed)
-            await _lifecycle!.CompleteRemove(context);
+            await Lifecycle!.CompleteRemove(context);
         return completed.Count;
     }
 
@@ -1193,7 +1200,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             if (page.Items.Count == 0) return total;
 
             var ids = page.Items.Select(entity => entity.Id).ToArray();
-            var deleted = _lifecycle is { HasRemove: true }
+            var deleted = Lifecycle is { HasRemove: true }
                 ? await DeleteManyWithLifecycle(ids, segmentation, ct)
                 : await DeleteManyWithoutLifecycle(ids, segmentation, ct);
             if (deleted <= 0)
@@ -1211,7 +1218,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity delete all", ct);
         var segmentation = operationScope.Segmentation;
         var managed = ReadScopeFilter(segmentation);
-        if (_lifecycle is { HasRemove: true } || _deleteOverride is not null || managed is not null ||
+        if (Lifecycle is { HasRemove: true } || _deleteOverride is not null || managed is not null ||
             _sourcePlan.StorageLifecycle == StorageLifecycle.External)
             return checked((int)await DeleteVisibleInBoundedPages(segmentation, ct));
         return await _inner.DeleteAll(ct);
@@ -1232,7 +1239,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             strategy = RemoveStrategy.Safe;
         var managed = ReadScopeFilter(segmentation);
         if (strategy != RemoveStrategy.Fast &&
-            (_lifecycle is { HasRemove: true } || _deleteOverride is not null || managed is not null))
+            (Lifecycle is { HasRemove: true } || _deleteOverride is not null || managed is not null))
             return await DeleteVisibleInBoundedPages(segmentation, ct);
         if (managed is null) return await _inner.RemoveAll(strategy, ct);
         // Fast removal cannot preserve a managed scope; Guard already rejected External and this branch refuses
@@ -1273,8 +1280,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         DemandUnscopedConditional(operationScope.Segmentation);
         if (_sourcePlan.UsesLegacyProvisioningReadiness) await _inner.EnsureReady(ct);
         EntityLifecycleContext<TEntity>? context = null;
-        if (_lifecycle is { HasUpsert: true })
-            context = await _lifecycle.BeginUpsert(model, token => ReadPrior(model, operationScope.Segmentation, token), ct);
+        if (Lifecycle is { HasUpsert: true })
+            context = await Lifecycle.BeginUpsert(model, token => ReadPrior(model, operationScope.Segmentation, token), ct);
 
         var current = context?.Current ?? model;
         WritePlanFor(current).ApplyAll(current);
@@ -1291,7 +1298,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         ct.ThrowIfCancellationRequested();
         var replaced = await cas.ConditionalReplaceAsync(payload, frozen, ct);
         if (replaced && context is not null)
-            await _lifecycle!.CompleteUpsert(context, current);
+            await Lifecycle!.CompleteUpsert(context, current);
         return replaced;
     }
 
@@ -1324,7 +1331,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         var entity = await ReadOne(id, operationScope.Segmentation, ct);
         if (entity is null) return false;
         EntityLifecycleContext<TEntity>? context = null;
-        if (_lifecycle is { HasRemove: true }) context = await _lifecycle.BeginRemove(entity, ct);
+        if (Lifecycle is { HasRemove: true }) context = await Lifecycle.BeginRemove(entity, ct);
         if (context is not null && !EqualityComparer<TKey>.Default.Equals(context.Current.Id, id))
             throw new InvalidOperationException("Conditional deletion lifecycle preparation cannot change the submitted identity.");
         if (!Equals(routing, EntityContext.Current) ||
@@ -1333,7 +1340,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         DemandUnscopedConditional(_segmentation.Bind("entity conditional delete"));
         ct.ThrowIfCancellationRequested();
         var deleted = await conditional.ConditionalDeleteAsync(id, frozen, ct);
-        if (deleted && context is not null) await _lifecycle!.CompleteRemove(context);
+        if (deleted && context is not null) await Lifecycle!.CompleteRemove(context);
         return deleted;
     }
 
@@ -1556,15 +1563,15 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
             var addContexts = new List<EntityLifecycleContext<TEntity>>(_adds.Count);
             var updateContexts = new List<EntityLifecycleContext<TEntity>>(_updates.Count);
-            if (_outer._lifecycle is { HasUpsert: true })
+            if (_outer.Lifecycle is { HasUpsert: true })
             {
                 foreach (var entity in _adds)
-                    addContexts.Add(await _outer._lifecycle.BeginUpsert(
+                    addContexts.Add(await _outer.Lifecycle.BeginUpsert(
                         entity,
                         token => _outer.ReadPrior(entity, segmentation, token),
                         ct));
                 foreach (var entity in _updates)
-                    updateContexts.Add(await _outer._lifecycle.BeginUpsert(
+                    updateContexts.Add(await _outer.Lifecycle.BeginUpsert(
                         entity,
                         token => _outer.ReadPrior(entity, segmentation, token),
                         ct));
@@ -1578,7 +1585,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             var removeContexts = new List<EntityLifecycleContext<TEntity>>(_deletes.Count);
             var deletes = new List<TKey>(_deletes.Count);
             var deleteSlots = new int[_deletes.Count];
-            if (_outer._lifecycle is { HasRemove: true })
+            if (_outer.Lifecycle is { HasRemove: true })
             {
                 for (var i = 0; i < _deletes.Count; i++)
                 {
@@ -1588,7 +1595,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                         deleteSlots[i] = NotDispatched;
                         continue;
                     }
-                    var context = await _outer._lifecycle.BeginRemove(entity, ct);
+                    var context = await _outer.Lifecycle.BeginRemove(entity, ct);
                     removeContexts.Add(context);
                     deleteSlots[i] = deletes.Count;
                     deletes.Add(context.Current.Id);
@@ -1714,7 +1721,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                     };
             }
 
-            if (_outer._lifecycle is { } lifecycle)
+            if (_outer.Lifecycle is { } lifecycle)
             {
                 for (var i = 0; i < addContexts.Count; i++)
                     await lifecycle.CompleteUpsert(addContexts[i], adds[i]);

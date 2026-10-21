@@ -1,14 +1,21 @@
 using System.Runtime.CompilerServices;
 using Koan.Core.Hosting.App;
 using Koan.Data.Core.Metadata;
+using Koan.Data.Core.Transfers;
 
 namespace Koan.Data.Core.Pipeline;
 
 /// <summary>One host-owned compiled write-stamp plan per live entity type.</summary>
 internal sealed class StorageWritePlan
 {
+    private readonly IWriteStamp _identity;
     private readonly IWriteStamp[] _full;
-    private StorageWritePlan(IWriteStamp[] full) => _full = full;
+
+    private StorageWritePlan(IWriteStamp identity, IWriteStamp[] full)
+    {
+        _identity = identity;
+        _full = full;
+    }
 
     public static StorageWritePlan For(Type entityType)
     {
@@ -19,7 +26,8 @@ internal sealed class StorageWritePlan
 
     internal static StorageWritePlan Build(Type entityType)
     {
-        var stamps = new List<IWriteStamp> { new IdentityWriteStamp(entityType) };
+        var identity = new IdentityWriteStamp(entityType);
+        var stamps = new List<IWriteStamp> { identity };
         var bag = new TimestampPropertyBag(entityType);
         if (bag.HasTimestamp) stamps.Add(new TimestampWriteStamp(bag));
         foreach (var contributor in StorageWriteContributorRegistry.All)
@@ -27,11 +35,20 @@ internal sealed class StorageWritePlan
             var stamp = contributor.Build(entityType);
             if (stamp is not null) stamps.Add(stamp);
         }
-        return new StorageWritePlan(stamps.OrderBy(static stamp => stamp.Priority).ToArray());
+        return new StorageWritePlan(identity, stamps.OrderBy(static stamp => stamp.Priority).ToArray());
     }
 
+    /// <summary>
+    /// Stamps <paramref name="entity"/> for persistence. An exact transfer's write carries the stored values, so it gets
+    /// the identity stamp only: a row without an identity is still given one, and nothing else is rewritten (DATA-0149).
+    /// </summary>
     public void ApplyAll(object entity)
     {
+        if (TransferFidelityScope.IsExact)
+        {
+            _identity.Apply(entity);
+            return;
+        }
         foreach (var stamp in _full) stamp.Apply(entity);
     }
 

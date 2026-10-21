@@ -285,18 +285,21 @@ validation:
   deletes only rows whose fingerprint is unchanged. A row changed by another writer stays in the origin and is a
   `Conflicts` entry (the first `Batch` of them) plus a warning; a row already gone is a warning and is not counted in
   `DeletedCount`. A present, unchanged row that fails to delete is still a `BulkMutationReceiptRejectedException`.
-  The re-read and the delete are two steps, so a write between them is not detected. A Load hook that is not
-  deterministic makes every row look changed, which keeps rows rather than losing them.
+  The re-read and the delete are two steps, so a write between them is not detected. The re-read runs no Load
+  lifecycle by default; under `TransferFidelity.Semantic` a Load hook that is not deterministic makes every row look
+  changed, which keeps rows rather than losing them.
 - `MirrorConflict.Latest` compares the Entity's one `[Timestamp(OnSave = true)]` property, or its only `[Timestamp]`
   when it has no OnSave one. A set-once creation stamp, which copies share, never decides. Several deciding
   candidates are ambiguous: a warning names them and every overlap is reported as a conflict.
 - Mirror Push and Pull delete every replica row the authoritative side no longer selects. Without a predicate that is
   a row absent there; with one, a row that is absent or no longer matches, judged by the store's own answer to
   `predicate AND Id in (page ids)`, so a replica row whose authoritative counterpart left the predicate converges.
-- Transfers are semantic, by design: every read and write is an ordinary facade call, which is what keeps tenancy,
-  source policy and guards in force. Load, Upsert and Remove lifecycle and every registered write stamp run, and
-  OnSave timestamps take the transfer time. DATA-0111 keeps cutover off the transfer builders for this reason. A
-  faithful (stamp- and hook-free) transfer mode would be a new decision, not a fix (NK-050).
+- Transfers are exact by default (DATA-0149): every read and write is still an ordinary facade call, which keeps
+  tenancy, source policy, guards, field transforms and receipts in force, but `Run` raises `TransferFidelityScope`
+  after admission, so the facade runs no Load, Upsert or Remove lifecycle and `StorageWritePlan` applies the identity
+  stamp only. Stored values, OnSave timestamps included, arrive unchanged; the audit callback runs outside the scope.
+  `.Fidelity(TransferFidelity.Semantic)` restores Save semantics for one transfer. Cutover keeps its own execution
+  owner (DATA-0111).
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

@@ -17,6 +17,7 @@ public sealed class CopyTransferBuilder<TEntity, TKey>
     {
         var progress = new TransferProgress();
         await using var operationHorizon = await Admit(TransferKind.Copy, ct).ConfigureAwait(false);
+        using var fidelity = EnterFidelity();
         if (operationHorizon is null) return Complete(TransferKind.Copy, 0, 0, 0, progress);
         var read = 0;
         var copied = 0;

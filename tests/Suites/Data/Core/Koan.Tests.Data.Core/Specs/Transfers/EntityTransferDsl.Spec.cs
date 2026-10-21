@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using Koan.Core.Capabilities;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Transfers;
 using Koan.Data.Core.Querying;
 using Koan.Tests.Data.Core.Support;
@@ -781,9 +782,178 @@ public sealed class EntityTransferDslSpec
             (await TransferTodo.All()).Should().ContainSingle(todo => todo.Id == current.Id && todo.Title == "current");
     }
 
-    private static Task<DataCoreRuntimeFixture> CreateRuntime()
+    /// <summary>
+    /// NK-050 (DATA-0149). A transfer used to write every row as a Save, so a Copy marked every row fresh and an archiving
+    /// Move replaced every last-modified value with the move time. By default it now carries the stored values.
+    /// </summary>
+    [Theory]
+    [InlineData(TransferKind.Copy)]
+    [InlineData(TransferKind.Move)]
+    [InlineData(TransferKind.Mirror)]
+    public async Task Transfer_KeepsStoredTimestampsByDefault(TransferKind kind)
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var created = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        AuditedNote stored;
+        using (runtime.UsePartition("hot"))
+            stored = await new AuditedNote { Content = "kept", CreatedAt = created }.Save();
+        await Task.Delay(30);
+
+        var result = kind switch
+        {
+            TransferKind.Copy => await AuditedNote.Copy().From(partition: "hot").To(partition: "archive").Run(),
+            TransferKind.Move => await AuditedNote.Move().From(partition: "hot").To(partition: "archive").Run(),
+            _ => await AuditedNote.Mirror().From(partition: "hot").To(partition: "archive").Run()
+        };
+
+        result.CopiedCount.Should().Be(1);
+        using (runtime.UsePartition("archive"))
+        {
+            var archived = (await AuditedNote.Get(stored.Id))!;
+            archived.UpdatedAt.Should().Be(stored.UpdatedAt, "an exact transfer keeps the OnSave timestamp it read");
+            archived.CreatedAt.Should().Be(created);
+        }
+    }
+
+    /// <summary>
+    /// NK-050 (DATA-0149). Load, Upsert and Remove lifecycle and registered write stamps no longer run for a transfer's
+    /// own reads and writes, so an AfterLoad that mutates its entity is not persisted to the destination, a validator
+    /// cannot cancel a Move partway, and a Move fires no Remove hook per moved row.
+    /// </summary>
+    [Theory]
+    [InlineData(TransferKind.Copy)]
+    [InlineData(TransferKind.Move)]
+    [InlineData(TransferKind.Mirror)]
+    public async Task Transfer_RunsNoLifecycleOrWriteStampsByDefault(TransferKind kind)
+    {
+        await using var runtime = await CreateRuntime(HookedNote.Register);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        HookedNote seeded;
+        using (runtime.UsePartition("hot"))
+            seeded = await new HookedNote { Content = "stored" }.Save();
+        HookedNote.Counts.Clear();
+
+        var result = kind switch
+        {
+            TransferKind.Copy => await HookedNote.Copy().From(partition: "hot").To(partition: "archive").Run(),
+            TransferKind.Move => await HookedNote.Move().From(partition: "hot").To(partition: "archive").Run(),
+            _ => await HookedNote.Mirror().From(partition: "hot").To(partition: "archive").Run()
+        };
+
+        result.CopiedCount.Should().Be(1);
+        result.DeletedCount.Should().Be(kind == TransferKind.Move ? 1 : 0);
+        HookedNote.Counts.Should().BeEmpty("no Lifecycle or write stamp runs for an exact transfer");
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>().Repository<HookedNote>();
+        using (runtime.UsePartition("archive"))
+            (await repository.Get(seeded.Id))!.Content.Should().Be("stored", "the AfterLoad mutation is not persisted");
+    }
+
+    /// <summary>NK-050 (DATA-0149). Save semantics remain available as an explicit choice.</summary>
+    [Fact]
+    public async Task Transfer_WithSemanticFidelity_WritesEachRowAsASave()
+    {
+        await using var runtime = await CreateRuntime(HookedNote.Register);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        HookedNote seeded;
+        using (runtime.UsePartition("hot"))
+            seeded = await new HookedNote { Content = "stored" }.Save();
+        HookedNote.Counts.Clear();
+        await Task.Delay(30);
+
+        var result = await HookedNote.Move()
+            .From(partition: "hot")
+            .To(partition: "archive")
+            .Fidelity(TransferFidelity.Semantic)
+            .Run();
+
+        result.CopiedCount.Should().Be(1);
+        HookedNote.Counts.Should().ContainKeys("load", "upsert", "remove", "stamp");
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>().Repository<HookedNote>();
+        using (runtime.UsePartition("archive"))
+        {
+            var archived = (await repository.Get(seeded.Id))!;
+            archived.Content.Should().Be("stored|loaded", "a Semantic transfer persists what Load lifecycle produced");
+            archived.UpdatedAt.Should().BeAfter(seeded.UpdatedAt, "a Semantic write stamps OnSave with the transfer time");
+        }
+    }
+
+    /// <summary>
+    /// The audit callback is application code: work it does runs as ordinary Entity work, not as part of the transfer.
+    /// </summary>
+    [Fact]
+    public async Task Transfer_AuditCallbackRunsAsOrdinaryEntityWork()
+    {
+        await using var runtime = await CreateRuntime(HookedNote.Register);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("hot"))
+            await new HookedNote { Content = "stored" }.Save();
+        HookedNote.Counts.Clear();
+
+        await HookedNote.Copy()
+            .From(partition: "hot")
+            .To(partition: "archive")
+            .Audit(batch =>
+            {
+                if (!batch.IsSummary) new HookedNote { Content = "audit" }.Save().GetAwaiter().GetResult();
+            })
+            .Run();
+
+        HookedNote.Counts.Should().ContainKeys("upsert", "stamp");
+    }
+
+    /// <summary>
+    /// NK-109. A bidirectional mirror restamped the winner's OnSave timestamp on the losing side, so every run found the
+    /// other side newer, rewrote it, and Latest compared mirror times instead of edit times. An exact mirror writes the
+    /// winner's own timestamp: the second run finds both sides equal and writes nothing, and a later edit still wins.
+    /// </summary>
+    [Fact]
+    public async Task Mirror_Bidirectional_ConvergesAndKeepsTheWinnersTimestamp()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var source = await new AuditedNote { Content = "v2" }.Save();
+        await Task.Delay(30);
+        AuditedNote target;
+        using (runtime.UsePartition("secondary"))
+            target = await new AuditedNote { Id = source.Id, Content = "v2" }.Save();
+
+        Task<TransferResult<string>> Mirror()
+            => AuditedNote.Mirror(MirrorMode.Bidirectional).To(partition: "secondary").Run();
+
+        (await Mirror()).CopiedCount.Should().Be(1, "the newer target row is written back to the source");
+        (await AuditedNote.Get(source.Id))!.UpdatedAt.Should().Be(target.UpdatedAt);
+        (await Mirror()).CopiedCount.Should().Be(0, "both sides now hold the same edit time");
+        (await Mirror()).CopiedCount.Should().Be(0);
+
+        await Task.Delay(30);
+        var edited = await new AuditedNote { Id = source.Id, Content = "v3" }.Save();
+        (await Mirror()).CopiedCount.Should().Be(1, "an edit made after the mirror is newer than the mirrored copy");
+        using (runtime.UsePartition("secondary"))
+        {
+            var mirrored = (await AuditedNote.Get(source.Id))!;
+            mirrored.Content.Should().Be("v3");
+            mirrored.UpdatedAt.Should().Be(edited.UpdatedAt);
+        }
+        (await Mirror()).CopiedCount.Should().Be(0);
+    }
+
+    private static Task<DataCoreRuntimeFixture> CreateRuntime() => CreateRuntime(null);
+
+    private static Task<DataCoreRuntimeFixture> CreateRuntime(Action? compose)
         => DataCoreRuntimeFixture.CreateAsync(configureServices: services =>
         {
+            compose?.Invoke();
             services.AddSingleton<TransferAdapterFactory>();
             services.AddSingleton<IDataAdapterFactory>(provider =>
                 provider.GetRequiredService<TransferAdapterFactory>());
@@ -798,6 +968,7 @@ public sealed class EntityTransferDslSpec
         await MirrorFlag.RemoveAll();
         await AuditedNote.RemoveAll();
         await TwiceStampedNote.RemoveAll();
+        await HookedNote.RemoveAll();
 
         foreach (var partition in Partitions)
         {
@@ -807,6 +978,7 @@ public sealed class EntityTransferDslSpec
             await MirrorFlag.RemoveAll();
             await AuditedNote.RemoveAll();
             await TwiceStampedNote.RemoveAll();
+        await HookedNote.RemoveAll();
         }
     }
 
@@ -866,6 +1038,40 @@ public sealed class EntityTransferDslSpec
         public DateTimeOffset TouchedAt { get; set; }
     }
 
+    /// <summary>Counts every Lifecycle hook and write stamp that runs for it, and marks what Load produced.</summary>
+    [DataAdapter(TransferAdapterFactory.ProviderId)]
+    private sealed class HookedNote : Entity<HookedNote>
+    {
+        public static ConcurrentDictionary<string, int> Counts { get; } = new(StringComparer.Ordinal);
+
+        public string Content { get; set; } = "";
+
+        [Timestamp(OnSave = true)]
+        public DateTimeOffset UpdatedAt { get; set; }
+
+        public static void Register()
+        {
+            Lifecycle.AfterLoad(context =>
+            {
+                Tally("load");
+                context.Current.Content += "|loaded";
+            });
+            Lifecycle.BeforeUpsert(context => { Tally("upsert"); return context.Proceed(); });
+            Lifecycle.BeforeRemove(context => { Tally("remove"); return context.Proceed(); });
+            StorageWriteContributorRegistry.Register(new WriteStampContributor(
+                "transfer-spec-counting-stamp",
+                type => type == typeof(HookedNote) ? new CountingStamp() : null));
+        }
+
+        private static void Tally(string hook) => Counts.AddOrUpdate(hook, 1, static (_, count) => count + 1);
+
+        private sealed class CountingStamp : IWriteStamp
+        {
+            public int Priority => 200;
+            public void Apply(object entity) => Tally("stamp");
+        }
+    }
+
     private sealed class TransferAdapterFactory : IDataAdapterFactory
     {
         public const string ProviderId = "transfer-spec";
@@ -888,7 +1094,7 @@ public sealed class EntityTransferDslSpec
             if (typeof(TKey) != typeof(string) ||
                 (typeof(TEntity) != typeof(TransferTodo) && typeof(TEntity) != typeof(BasicNote) &&
                  typeof(TEntity) != typeof(MirrorFlag) && typeof(TEntity) != typeof(AuditedNote) &&
-                 typeof(TEntity) != typeof(TwiceStampedNote)))
+                 typeof(TEntity) != typeof(TwiceStampedNote) && typeof(TEntity) != typeof(HookedNote)))
                 throw new InvalidOperationException($"The transfer spec adapter cannot create {typeof(TEntity).Name}<{typeof(TKey).Name}>.");
 
             var repository = _repositories.GetOrAdd(
@@ -949,14 +1155,15 @@ public sealed class EntityTransferDslSpec
         public Task<TEntity?> Get(string id, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            return Task.FromResult(Current().GetValueOrDefault(id));
+            return Task.FromResult(Current().TryGetValue(id, out var stored) ? Stored(stored) : null);
         }
 
         public Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
             var set = Current();
-            return Task.FromResult<IReadOnlyList<TEntity?>>(ids.Select(set.GetValueOrDefault).ToArray());
+            return Task.FromResult<IReadOnlyList<TEntity?>>(ids
+                .Select(id => set.TryGetValue(id, out var stored) ? Stored(stored) : null).ToArray());
         }
 
         public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
@@ -966,8 +1173,8 @@ public sealed class EntityTransferDslSpec
             return Task.FromResult(model);
         }
 
-        // A store keeps its own copy. Holding the caller's instance would let a later in-memory edit of it change
-        // every partition the instance was written to, which no real adapter does.
+        // A store keeps its own copy and hands out new instances. Sharing one would let a later in-memory edit (a
+        // Load hook's, say) change every partition the instance was written to, which no real adapter does.
         private static TEntity Stored(TEntity model)
             => (TEntity)Koan.Data.Core.Polymorphism.EntityJsonSerialization.DeserializeDocument(
                 Koan.Data.Core.Polymorphism.EntityJsonSerialization.SerializeDocument(model), typeof(TEntity));
@@ -1043,7 +1250,7 @@ public sealed class EntityTransferDslSpec
 
             return Task.FromResult(new RepositoryQueryResult<TEntity>
             {
-                Items = page.ToArray(),
+                Items = page.Select(Stored).ToArray(),
                 FilterHandled = query.Filter is not null,
                 TotalCount = total,
                 CountExecution = total is null ? CountExecutionKind.None : CountExecutionKind.Exact,

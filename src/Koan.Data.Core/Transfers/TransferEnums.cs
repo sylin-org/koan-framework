@@ -68,3 +68,24 @@ public enum MirrorConflict
     /// <summary>Report the overlap without changing either entity.</summary>
     Report
 }
+
+/// <summary>
+/// How a transfer writes the rows it reads (DATA-0149). <see cref="Exact"/> is the default.
+/// </summary>
+public enum TransferFidelity
+{
+    /// <summary>
+    /// Each row arrives as it is stored: <c>[Timestamp]</c> values and every other stored value are kept, and Load,
+    /// Upsert and Remove lifecycle and registered write stamps do not run for the transfer's reads and writes. A row
+    /// without an identity still gets one. Tenancy, source policy, isolation, field transforms, the Move proof and the
+    /// receipts apply as for any Entity operation.
+    /// </summary>
+    Exact,
+
+    /// <summary>
+    /// Each row is read and written as ordinary Entity work: Load lifecycle runs on every row read, Upsert lifecycle and
+    /// every write stamp on every destination write (so <c>[Timestamp(OnSave = true)]</c> takes the transfer time), and a
+    /// Move or Mirror runs Remove lifecycle for the rows it deletes.
+    /// </summary>
+    Semantic
+}
