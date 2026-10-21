@@ -4,6 +4,7 @@ using Koan.Data.Relational.Ado;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
@@ -34,6 +35,8 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     IBulkUpsert<TKey>,
     IBulkDelete<TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
+    IConditionalDeleteRepository<TEntity, TKey>,
+    IInsertOnlyRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
@@ -310,6 +313,78 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         var (condition, conditionValues) = Where(guard);
         Add(parameters, conditionValues, "p");
         var sql = $"UPDATE {_plan.QualifiedTable} SET {set} WHERE {identity}" +
+                  (condition is null ? string.Empty : $" AND ({condition})");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        return await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false) == 1;
+    }
+
+    /// <summary>
+    /// Inserts only when the identity is free (NK-057). The conflict target is the identity itself, so a collision on
+    /// the key writes nothing and returns no row, while any other constraint still fails. Zero rows is reported as a
+    /// collision only after the key is seen to exist; a trigger that swallowed the insert is a failure, not a conflict.
+    /// </summary>
+    public async Task<MutationResult<TEntity, TKey>> Insert(TEntity model, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var plan = _plan;
+        var unassigned = EqualityComparer<TKey>.Default.Equals(model.Id, default!);
+        if (unassigned && !plan.Mapping.Identity.IsGenerated)
+            throw new NotSupportedException(
+                $"{_options.ProviderName} insert-only requires a non-default identity unless the mapping declares Generated. " +
+                "Assign the entity identity before insertion.");
+        _options.SourcePlan.Demand(DataOperationEffect.Write, "insert");
+        await Ready(ct).ConfigureAwait(false);
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        if (unassigned)
+        {
+            var generated = Insert(plan.Commands.Insert(model), includeConflict: false);
+            var key = await AdoCommands.ExecuteScalarAsync(connection,
+                generated.Sql + $" RETURNING {NpgsqlDialect.Quote(plan.IdentityRoots.Single())}",
+                generated.Parameters, null, ct).ConfigureAwait(false);
+            if (key is null or DBNull)
+                throw new InvalidOperationException($"{_options.ProviderName} insert did not return its generated identity.");
+            plan.AssignGenerated(model, key);
+            return new(model.Id, MutationOutcome.Inserted, model, DataCommitOutcome.Committed);
+        }
+
+        var write = plan.Commands.Update(model);
+        var prepared = Insert(write, includeConflict: false);
+        var keys = string.Join(", ", write.Identity.Select(value => NpgsqlDialect.Quote(value.Binding.PhysicalPath.Name)));
+        var affected = await AdoCommands.ExecuteAsync(connection,
+            prepared.Sql + $" ON CONFLICT ({keys}) DO NOTHING", prepared.Parameters, null, ct).ConfigureAwait(false);
+        if (affected == 1) return new(model.Id, MutationOutcome.Inserted, model, DataCommitOutcome.Committed);
+        if (affected == 0 && await IdentityExists(connection, write.Identity, ct).ConfigureAwait(false))
+            return new(model.Id, MutationOutcome.Conflict, null, DataCommitOutcome.NotCommitted);
+        throw new InvalidOperationException(
+            $"{_options.ProviderName} insert did not return a single-row mutation receipt ({affected} rows) and the identity is absent.");
+    }
+
+    private async Task<bool> IdentityExists(
+        NpgsqlConnection connection,
+        IEnumerable<RelationalValue> identity,
+        CancellationToken ct)
+    {
+        var parameters = new SqlParameters();
+        var predicate = IdentityPredicate(identity, "exists_", parameters);
+        var found = await AdoCommands.ExecuteScalarAsync(connection,
+            $"SELECT 1 FROM {_plan.QualifiedTable} WHERE {predicate} LIMIT 1", parameters, null, ct).ConfigureAwait(false);
+        return found is not null and not DBNull;
+    }
+
+    /// <summary>Deletes the identity only while its stored row matches <paramref name="guard"/>, in one statement.</summary>
+    public async Task<bool> ConditionalDeleteAsync(
+        TKey id,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        await Ready(ct).ConfigureAwait(false);
+        _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional delete");
+        var parameters = new SqlParameters();
+        var identity = IdentityPredicate(_plan.Commands.Delete(id).Identity, "key_", parameters);
+        var (condition, conditionValues) = Where(guard);
+        Add(parameters, conditionValues, "p");
+        var sql = $"DELETE FROM {_plan.QualifiedTable} WHERE {identity}" +
                   (condition is null ? string.Empty : $" AND ({condition})");
         await using var connection = await Open(ct).ConfigureAwait(false);
         return await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false) == 1;

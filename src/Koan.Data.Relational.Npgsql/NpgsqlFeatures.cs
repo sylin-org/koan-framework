@@ -21,6 +21,8 @@ public static class NpgsqlFeatures
         DataCaps.Write.AtomicBatch,
         DataCaps.Write.FastRemove,
         DataCaps.Write.ConditionalReplace,
+        DataCaps.Write.ConditionalDelete,
+        DataCaps.Write.InsertOnly,
         DataCaps.Isolation.RowScoped,
         DataCaps.Isolation.ContainerScoped,
         DataCaps.Isolation.DatabaseScoped

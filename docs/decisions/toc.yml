@@ -386,6 +386,8 @@
       href: DATA-0139-guid-and-datetime-document-values-compare-as-document-text.md
     - name: DATA-0140 PostgreSQL and CockroachDB read their documented provider options
       href: DATA-0140-postgres-and-cockroach-read-their-documented-options.md
+    - name: DATA-0141 PostgreSQL implements insert-only and conditional delete
+      href: DATA-0141-postgres-inserts-only-and-deletes-conditionally.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
