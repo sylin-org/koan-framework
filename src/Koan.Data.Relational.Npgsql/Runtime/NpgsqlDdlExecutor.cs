@@ -9,6 +9,8 @@ namespace Koan.Data.Relational.Npgsql.Runtime;
 /// to the schema orchestrator; this speaks over a connection the repository has already opened, for one schema
 /// operation. Connecting here creates nothing, so the repository can open before consent is settled.
 /// </summary>
+/// <param name="connection">The connection the repository opened for this schema operation.</param>
+/// <param name="dialect">The dialect whose read each index expression repeats.</param>
 /// <param name="verifyIndexes">
 /// PostgreSQL index names are schema-wide and truncated to 63 bytes, so each created index is confirmed in the catalog
 /// (NK-056). CockroachDB scopes index names to their table and does not truncate, so it passes false.
