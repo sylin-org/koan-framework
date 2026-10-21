@@ -98,8 +98,11 @@ public sealed class RequestTranslator
 
     private static EntityCollectionRequest BuildCollectionRequest(EntityRequestContext context, JObject args)
     {
-        var defaultPolicy = PaginationPolicy.FromAttribute(new PaginationAttribute(), PaginationSafetyBounds.Default);
-        var forcePagination = ReadBool(args, "forcePagination") ?? false;
+        // WEB-0076: the configured bounds (Koan:Web:Pagination), as REST resolves them. A page, a page size or
+        // forcePagination pages the read; the shared endpoint clamps it to the policy.
+        var policy = PaginationPolicy.Resolve(context.Services, null);
+        var paged = (ReadBool(args, "forcePagination") ?? false) || TryGet(args, "page") is not null || TryGet(args, "pageSize") is not null;
+        if (paged && TryGet(args, "pageSize") is null) context.Options.PageSize = policy.DefaultSize;
         return new EntityCollectionRequest
         {
             Context = context,
@@ -108,13 +111,13 @@ public sealed class RequestTranslator
             IgnoreCase = ReadBool(args, "ignoreCase") ?? false,
             With = ReadString(args, "with"),
             Shape = ReadString(args, "shape"),
-            ForcePagination = forcePagination,
-            ApplyPagination = forcePagination,
-            PaginationRequested = forcePagination,
+            ForcePagination = paged,
+            ApplyPagination = paged,
+            PaginationRequested = paged,
             ClientRequestedAll = false,
-            Policy = defaultPolicy,
-            IncludeTotalCount = forcePagination && defaultPolicy.IncludeCount,
-            AbsoluteMaxRecords = defaultPolicy.AbsoluteMaxRecords,
+            Policy = policy,
+            IncludeTotalCount = paged && policy.IncludeCount,
+            AbsoluteMaxRecords = policy.AbsoluteMaxRecords,
             Accept = ReadString(args, "accept"),
             BasePath = ReadString(args, "basePath"),
             QueryParameters = BuildQueryParameters(args)
@@ -129,7 +132,8 @@ public sealed class RequestTranslator
             FilterJson = ReadString(args, "filter"),
             Set = ReadString(args, "set"),
             IgnoreCase = ReadBool(args, "ignoreCase") ?? false,
-            Accept = ReadString(args, "accept")
+            Accept = ReadString(args, "accept"),
+            Policy = PaginationPolicy.Resolve(context.Services, null)
         };
     }
 

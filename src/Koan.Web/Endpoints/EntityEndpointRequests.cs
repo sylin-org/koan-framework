@@ -41,6 +41,12 @@ public sealed class EntityQueryRequest
     public bool IgnoreCase { get; init; }
     public string? Accept { get; init; }
 
+    /// <summary>
+    /// WEB-0076: the paging bounds of the endpoint. The body query is always paged and clamped to them; when absent the
+    /// configured defaults (<c>Koan:Web:Pagination</c>) apply.
+    /// </summary>
+    public PaginationPolicy? Policy { get; init; }
+
     /// <summary>The endpoint declared <c>q</c> a provider-native query (WEB-0074); see <see cref="EntityCollectionRequest.AllowRawQuery"/>.</summary>
     public bool AllowRawQuery { get; init; }
 }

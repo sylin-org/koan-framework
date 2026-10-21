@@ -26,6 +26,14 @@ public sealed class Trinket : Entity<Trinket>
     public string Name { get; set; } = "";
 }
 
+/// <summary>WEB-0076 — paging bounds probe: only the body-query paging spec writes it.</summary>
+[RestEntity]
+[StorageName("rest_pebbles")]
+public sealed class Pebble : Entity<Pebble>
+{
+    public string Name { get; set; } = "";
+}
+
 /// <summary>Lifecycle parity probe for the generated REST path.</summary>
 [RestEntity]
 [StorageName("rest_lifecycle_widgets")]

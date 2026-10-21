@@ -37,6 +37,13 @@ public sealed record PaginationPolicy
         };
     }
 
+    /// <summary>
+    /// WEB-0076: the page a read actually serves. A page below 1 is page 1; a size below 1 is the default size; a size
+    /// above the maximum is the maximum. Every paged entity read, on every surface, is bounded by this.
+    /// </summary>
+    public (int Page, int Size) Clamp(int page, int size)
+        => (page < 1 ? 1 : page, size < 1 ? DefaultSize : Math.Min(size, MaxSize));
+
     public static PaginationPolicy Resolve(IServiceProvider services, PaginationAttribute? attribute)
     {
         var bounds = services.GetService<IOptions<PaginationSafetyBounds>>()?.Value

@@ -17,13 +17,13 @@ declare namespace Koan {
       ignoreCase: boolean;
       /** Page number to request. */
       page: number;
-      /** Number of items per page (default 50). */
+      /** Number of items per page (default 50); a larger value is clamped to the server's maximum. */
       pageSize: number;
       /** Sort expression using field[:direction] format. */
       sort: string;
       /** Optional Accept header override (view negotiation). */
       accept: string;
-      /** When true forces pagination even when repository returns a full set. */
+      /** When true pages the result (page 1, default size) without page or pageSize. With none of the three the whole collection is returned, up to the server's safety limit. */
       forcePagination: boolean;
       /** Additional query parameters forwarded to hooks. */
       extras: Record<string, any>;
@@ -54,13 +54,13 @@ declare namespace Koan {
       ignoreCase: boolean;
       /** Page number to request. */
       page: number;
-      /** Number of items per page (default 50). */
+      /** Number of items per page (default 50); a larger value is clamped to the server's maximum. */
       pageSize: number;
       /** Sort expression using field[:direction] format. */
       sort: string;
       /** Optional Accept header override (view negotiation). */
       accept: string;
-      /** When true forces pagination even when repository returns a full set. */
+      /** When true pages the result (page 1, default size) without page or pageSize. With none of the three the whole collection is returned, up to the server's safety limit. */
       forcePagination: boolean;
       /** Additional query parameters forwarded to hooks. */
       extras: Record<string, any>;

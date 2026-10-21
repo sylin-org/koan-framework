@@ -18,6 +18,7 @@ using Koan.Data.Core.Model;
 using Koan.Data.Core.Relationships;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
+using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
@@ -290,6 +291,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return await CollectionShortCircuit(context, hookContext);
         }
 
+        // WEB-0076: a paged read serves at most the policy's page size, whichever surface asked.
+        if (request.ApplyPagination)
+            (context.Options.Page, context.Options.PageSize) = request.Policy.Clamp(context.Options.Page, context.Options.PageSize);
+        var safetyLimit = request.AbsoluteMaxRecords > 0 ? request.AbsoluteMaxRecords : request.Policy.AbsoluteMaxRecords;
+
         QueryDefinition query;
         try
         {
@@ -317,7 +323,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         try
         {
             queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery,
-                request.AbsoluteMaxRecords, context.CancellationToken);
+                safetyLimit, context.CancellationToken);
             total = queryResult.Total;
         }
         catch (FreeTextRefusedException refused)
@@ -335,17 +341,11 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             _logger?.LogWarning(
                 "EntityEndpointService<{Entity}> blocked unpaged response exceeding safety cap {Cap}. Path: {Path}. ReportedTotal: {Total}.",
                 typeof(TEntity).Name,
-                request.Policy.AbsoluteMaxRecords,
+                safetyLimit,
                 request.BasePath ?? context.HttpContext?.Request.Path.ToString() ?? "unknown",
                 queryResult.Total);
 
-            var errorPayload = new
-            {
-                error = "Result too large",
-                message = $"This endpoint allows at most {request.Policy.AbsoluteMaxRecords} records without pagination."
-            };
-            var tooLarge = new ObjectResult(errorPayload) { StatusCode = StatusCodes.Status413PayloadTooLarge };
-            return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, tooLarge);
+            return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, TooLarge(safetyLimit));
         }
 
         // Sort is applied by the shared Data<T,K> materialized-query orchestrator before the result reaches here.
@@ -493,12 +493,16 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return await CollectionShortCircuit(context, hookContext);
         }
 
+        // WEB-0076: the body query is always paged, clamped to the endpoint's policy: a size of 0 or a page of 0 is
+        // the first default page, never the whole table.
+        var policy = request.Policy ?? PaginationPolicy.Resolve(context.Services, null);
+        (context.Options.Page, context.Options.PageSize) = policy.Clamp(context.Options.Page, context.Options.PageSize);
+
         QueryDefinition query;
         try
         {
-            var definition = QueryDefinition.All.ForPartition(request.Set).WithSort(context.Options.Sort.ToArray());
-            if (context.Options.Page > 0 && context.Options.PageSize > 0)
-                definition = definition.WithPagination(context.Options.Page, context.Options.PageSize);
+            var definition = QueryDefinition.All.ForPartition(request.Set).WithSort(context.Options.Sort.ToArray())
+                .WithPagination(context.Options.Page, context.Options.PageSize);
             query = FreezeReadQuery(definition, request.FilterJson, request.IgnoreCase, context.Options);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FilterParseException or InvalidFilterFieldException or NotSupportedException)
@@ -519,7 +523,8 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         long total;
         try
         {
-            queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery, 0, context.CancellationToken);
+            queryResult = await QueryCollection(query, context.Options.Q, request.AllowRawQuery,
+                policy.AbsoluteMaxRecords, context.CancellationToken);
             total = queryResult.Total;
         }
         catch (FreeTextRefusedException refused)
@@ -531,6 +536,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             var bad = new BadRequestObjectResult(new { error = ex.Message });
             return new EntityCollectionResult<TEntity>(context, [], 0, null, bad);
         }
+
+        if (queryResult.ExceededSafetyLimit)
+            return new EntityCollectionResult<TEntity>(context, [], queryResult.Total, null, TooLarge(policy.AbsoluteMaxRecords));
 
         // Sort + pagination handled by orchestrator inside QueryCollectionFromBody (DATA-0092).
         // The caller only sets headers — never paginates again, or we'd page-of-page (regression).
@@ -1431,6 +1439,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
     {
         public string Code { get; } = code;
     }
+
+    private static ObjectResult TooLarge(int limit) => new(new
+    {
+        error = "Result too large",
+        message = $"This endpoint allows at most {limit} records without pagination."
+    }) { StatusCode = StatusCodes.Status413PayloadTooLarge };
 
     private static BadRequestObjectResult FreeTextRefused(FreeTextRefusedException refused)
         => new(new { code = refused.Code, message = refused.Message });

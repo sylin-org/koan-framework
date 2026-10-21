@@ -127,6 +127,13 @@ under a `MaxPageSize` of `500` gets `500`. The bounds normalize themselves after
 than the cap is refused with **`413 Payload Too Large`** and a body naming the limit, and the refusal
 is logged as a warning with the entity and path. Unpaged is a choice; unbounded is not.
 
+### The body query and MCP
+
+`POST /query` is always paged by the controller's policy: a `page` below 1 is page 1, a `size` of 0 or less is
+`DefaultSize`, and a larger `size` is clamped to `MaxSize` (WEB-0076). The MCP collection tool pages when the call
+names `page`, `pageSize` or `forcePagination`, and otherwise returns the set up to `AbsoluteMaxRecords`; the MCP query
+tool is always paged. Both resolve the same configured bounds, and every page size is clamped to them.
+
 ## Deciding per request
 
 `GetPaginationPolicy()` resolves the policy — method attribute, then controller attribute, then the

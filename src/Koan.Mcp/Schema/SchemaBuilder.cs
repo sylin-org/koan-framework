@@ -113,11 +113,11 @@ public sealed class SchemaBuilder
             ["type"] = "integer",
             ["minimum"] = 1,
             ["maximum"] = metadata.MaxPageSize,
-            ["description"] = $"Number of items per page (default {metadata.DefaultPageSize})."
+            ["description"] = $"Number of items per page (default {metadata.DefaultPageSize}); a larger value is clamped to the server's maximum."
         };
         props["sort"] = CreateStringProperty("Sort expression using field[:direction] format.");
         props["accept"] = CreateStringProperty("Optional Accept header override (view negotiation).");
-        props["forcePagination"] = CreateBooleanProperty("When true forces pagination even when repository returns a full set.");
+        props["forcePagination"] = CreateBooleanProperty("When true pages the result (page 1, default size) without page or pageSize. With none of the three the whole collection is returned, up to the server's safety limit.");
         props["extras"] = new JsonObject
         {
             ["type"] = "object",

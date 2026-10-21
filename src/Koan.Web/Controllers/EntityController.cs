@@ -386,6 +386,8 @@ public abstract class EntityController<TEntity, TKey> : ControllerBase
             Set = set,
             IgnoreCase = ignoreCase,
             Accept = HttpContext.Request.Headers["Accept"].ToString(),
+            // WEB-0076: size and page are clamped to this controller's policy by the shared endpoint.
+            Policy = GetPaginationPolicy(),
             AllowRawQuery = AllowRawQuery
         };
 
