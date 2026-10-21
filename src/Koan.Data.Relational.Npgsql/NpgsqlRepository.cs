@@ -508,7 +508,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
     private (string? Sql, IReadOnlyList<object?> Parameters) Where(Filter? filter)
     {
         if (filter is null) return (null, []);
-        var translator = new SqlFilterTranslator(_plan.Dialect, _plan.Mapping, _plan.ManagedPath);
+        var translator = _plan.Filter();
         var translated = translator.Translate(filter);
         return (translated.whereSql, translated.parameters);
     }

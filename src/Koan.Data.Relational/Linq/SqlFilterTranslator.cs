@@ -28,6 +28,7 @@ public sealed class SqlFilterTranslator
     private readonly MappingPlan? _mapping;
     private readonly IRelationalMappingDialect? _mappingDialect;
     private readonly Func<ResolvedField, string>? _managedResolver;
+    private readonly Func<object?, object?> _encodeColumn = static value => value;
     private readonly List<object?> _parameters = new();
 
     /// <param name="dialect">Provider dialect for quoting, LIKE escaping, parameters, JSON-array containment.</param>
@@ -56,6 +57,19 @@ public sealed class SqlFilterTranslator
         _entityType = mapping.EntityType;
         _columnResolver = (_, _) => throw new InvalidOperationException("Mapped translation does not use a caller-owned column resolver.");
     }
+
+    /// <summary>
+    /// Creates a mapped translator whose comparands for a real (non-nested) scalar column pass through
+    /// <paramref name="encodeColumn"/>, the same function the store's write path applies to that column, so a filter
+    /// compares like for like with what was written.
+    /// </summary>
+    public SqlFilterTranslator(
+        IRelationalMappingDialect dialect,
+        MappingPlan mapping,
+        Func<ResolvedField, string>? managedResolver,
+        Func<object?, object?> encodeColumn)
+        : this(dialect, mapping, managedResolver)
+        => _encodeColumn = encodeColumn ?? throw new ArgumentNullException(nameof(encodeColumn));
 
     /// <summary>Translates the whole filter into a WHERE fragment plus its ordered parameter values.</summary>
     public (string whereSql, IReadOnlyList<object?> parameters) Translate(Filter filter)
@@ -268,10 +282,11 @@ public sealed class SqlFilterTranslator
         // the write path produces (DateTimeOffset -> UTC-ISO text, TimeSpan -> ticks, DateOnly/TimeOnly ->
         // fixed text), so a pushed comparison is like-for-like. The ADO.NET drivers otherwise bind these
         // CLR types in a form that does not match the stored JSON text (or cannot bind them at all).
-        // Non-governed types pass through unchanged.
+        // A real scalar column holds whatever the store's write path encoded into it, so its comparand takes the
+        // same encoder (DATA-0136). Non-governed types pass through unchanged.
         var encoded = mapped is null ? value : mapped.Encode(value);
         _parameters.Add(mapped is { PhysicalPath.IsNested: false, Shape: MappingValueShape.Scalar }
-            ? encoded
+            ? _encodeColumn(encoded)
             : ComparableScalarEncoding.EncodeComparand(encoded));
         return _dialect.Parameter(idx);
     }

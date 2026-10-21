@@ -524,7 +524,7 @@ internal sealed class MySqlRepository<TEntity, TKey> :
         MySqlEntityPlan<TEntity, TKey> plan, Filter? filter)
     {
         if (filter is null) return (null, []);
-        var translated = new SqlFilterTranslator(plan.Dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
+        var translated = plan.Filter().Translate(filter);
         var sql = translated.whereSql.Replace(" ESCAPE '\\'", " ESCAPE '\\\\'", StringComparison.Ordinal);
         return (sql, translated.parameters);
     }

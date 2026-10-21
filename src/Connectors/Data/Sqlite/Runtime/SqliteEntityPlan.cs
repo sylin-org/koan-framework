@@ -42,15 +42,10 @@ internal sealed class SqliteEntityPlan<TEntity, TKey> : RelationalEntityPlan<TEn
     protected override string Project(string root) => $"koan_row.{SqliteDialect.Quote(root)}";
 
     /// <summary>
-    /// A scalar written to a real column, in the order-preserving form DATA-0100 defines, so that a filter —
-    /// whose comparand is encoded the same way by <see cref="ComparableScalarEncoding.EncodeComparand"/> —
-    /// compares like for like.
-    ///
-    /// <para>Of the four relational adapters only this one encodes here; the other three write the value as it
-    /// comes. Disabling this leaves the suite green, including the DATA-0100 oracle, which says the branch
-    /// carries no governed type today — a document column is encoded by the codec's converters instead, and a
-    /// projected column is computed by the store. Whether that makes this defensive or makes the other three
-    /// wrong is an open question rather than something this seam settles.</para>
+    /// A scalar written to a real column, in the order-preserving form DATA-0100 defines. The same function encodes a
+    /// filter comparand on that column (<see cref="RelationalEntityPlan{TEntity,TKey,TDialect}.Filter"/>) and an
+    /// identity key bound to it, so a query, a Get and a Delete compare like for like with what was written
+    /// (DATA-0136). A document column is encoded by the codec's converters instead.
     /// </summary>
     protected override object? EncodeScalar(object? value) => ComparableScalarEncoding.EncodeComparand(value);
 

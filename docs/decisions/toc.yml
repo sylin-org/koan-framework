@@ -376,6 +376,8 @@
       href: DATA-0134-relational-filters-keep-the-oracle-null-semantics.md
     - name: DATA-0135 Scalar StartsWith, EndsWith and Contains are case-sensitive on SQLite, through a dialect string-match hook
       href: DATA-0135-sqlite-string-matching-is-case-sensitive.md
+    - name: DATA-0136 A real scalar column is compared and keyed in the form the store writes it
+      href: DATA-0136-a-scalar-column-is-compared-in-the-form-it-is-written.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

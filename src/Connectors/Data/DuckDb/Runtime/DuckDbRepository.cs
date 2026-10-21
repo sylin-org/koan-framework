@@ -102,7 +102,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
             await using var command = connection.CreateCommand();
             var predicates = new List<string>();
             foreach (var (id, index) in requested.Skip(offset).Take(chunk).Select((value, index) => (value, index)))
-                predicates.Add(IdentityPredicate(command, plan.Commands.Get(id).Identity, $"k{index}_"));
+                predicates.Add(IdentityPredicate(command, plan, plan.Commands.Get(id).Identity, $"k{index}_"));
             command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row " +
                                   $"WHERE {string.Join(" OR ", predicates)}";
             await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -301,7 +301,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         var set = UpdateSet(command, plan, write.Values, "set_");
-        var identity = IdentityPredicate(command, write.Identity, "key_");
+        var identity = IdentityPredicate(command, plan, write.Identity, "key_");
         var (condition, values) = Where(plan, guard);
         AddParameters(command, values, "p");
         command.CommandText = $"UPDATE {plan.QualifiedTable} SET {set} WHERE {identity} AND ({condition})";
@@ -473,7 +473,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
-        var predicate = IdentityPredicate(command, plan.Commands.Get(id).Identity, "key_");
+        var predicate = IdentityPredicate(command, plan, plan.Commands.Get(id).Identity, "key_");
         command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row WHERE {predicate} LIMIT 1";
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         return await reader.ReadAsync(ct).ConfigureAwait(false) ? plan.Hydrate(reader) : null;
@@ -694,7 +694,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         var predicates = ids.Select((id, index) =>
-            IdentityPredicate(command, plan.Commands.Delete(id).Identity, $"d{index}_")).ToArray();
+            IdentityPredicate(command, plan, plan.Commands.Delete(id).Identity, $"d{index}_")).ToArray();
         command.CommandText = $"DELETE FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
@@ -704,7 +704,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         Filter? filter)
     {
         if (filter is null) return (null, []);
-        var translated = new SqlFilterTranslator(plan.Dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
+        var translated = plan.Filter().Translate(filter);
         return (translated.whereSql, translated.parameters);
     }
 
@@ -813,6 +813,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
 
     private static string IdentityPredicate(
         DuckDBCommand command,
+        DuckDbEntityPlan<TEntity, TKey> plan,
         IEnumerable<RelationalValue> identity,
         string prefix)
     {
@@ -821,7 +822,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         foreach (var value in identity)
         {
             var name = $"${prefix}{index++}";
-            command.Parameters.Add(new DuckDBParameter(name[1..], NormalizeValue(value.Value) ?? DBNull.Value));
+            command.Parameters.Add(new DuckDBParameter(name[1..], NormalizeValue(plan.Parameter(value)) ?? DBNull.Value));
             clauses.Add($"{DuckDbDialect.Quote(value.Binding.PhysicalPath.Name)} = {name}");
         }
         if (clauses.Count == 0) throw new InvalidOperationException("A DuckDB identity predicate cannot be empty.");
@@ -1056,7 +1057,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         if (scope is not null) filter = filter is null ? scope : Filter.All(filter, scope);
         if (filter is not null)
         {
-            var translated = new SqlFilterTranslator(dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
+            var translated = plan.Filter().Translate(filter);
             where = translated.whereSql;
             for (var index = 0; index < translated.parameters.Count; index++)
                 parameters[dialect.Parameter(index).TrimStart('@', '$')] = translated.parameters[index];

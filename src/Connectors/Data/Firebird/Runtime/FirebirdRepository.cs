@@ -88,7 +88,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         var parameters = new SqlParameters();
         var predicates = new string[requested.Count];
         for (var index = 0; index < requested.Count; index++)
-            predicates[index] = IdentityPredicate(plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
+            predicates[index] = IdentityPredicate(plan, plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
         var rows = await AdoCommands.QueryRowsAsync(connection, $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}", parameters, null, ct).ConfigureAwait(false);
         var entities = rows.Select(row => Materialize(plan, row)).ToDictionary(static entity => entity.Id);
@@ -234,7 +234,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         var command = plan.Commands.Update(model);
         var parameters = new SqlParameters();
         var set = UpdateSet(plan, command.Values, parameters, "set_", model);
-        var identity = IdentityPredicate(command.Identity, "key_", parameters);
+        var identity = IdentityPredicate(plan, command.Identity, "key_", parameters);
         var (condition, conditionValues) = Where(plan, guard);
         Add(parameters, conditionValues, "p");
         await using var connection = await Open(ct).ConfigureAwait(false);
@@ -338,7 +338,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
     {
         var plan = Plan;
         var parameters = new SqlParameters();
-        var predicate = IdentityPredicate(plan.Commands.Get(id).Identity, "key_", parameters);
+        var predicate = IdentityPredicate(plan, plan.Commands.Get(id).Identity, "key_", parameters);
         var rows = await AdoCommands.QueryRowsAsync(
             connection,
             $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {predicate} ROWS 1",
@@ -391,7 +391,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
     {
         var parameters = insert.Parameters;
         var set = UpdateSet(plan, command.Values, parameters, "update_", model);
-        var identity = IdentityPredicate(command.Identity, "key_", parameters);
+        var identity = IdentityPredicate(plan, command.Identity, "key_", parameters);
         var managed = ManagedGuard(plan, parameters);
         var scoped = $"{identity} AND {managed}";
         if (set.Length > 0)
@@ -544,7 +544,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         var parameters = new SqlParameters();
         var predicates = new string[ids.Count];
         for (var index = 0; index < ids.Count; index++)
-            predicates[index] = IdentityPredicate(plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
+            predicates[index] = IdentityPredicate(plan, plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
         var predicate = "(" + string.Join(" OR ", predicates) + ")";
         var managed = ManagedGuard(plan, parameters);
         if (managed.Length > 0) predicate += $" AND ({managed})";
@@ -558,7 +558,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         // Managed discriminators resolve through the plan to their shadow columns: the plan's
         // managed path is nested under the document root, and the dialect answers a single-segment
         // read with the plain shadow column.
-        var translated = new SqlFilterTranslator(plan.Dialect, plan.Mapping, plan.ManagedPath).Translate(filter);
+        var translated = plan.Filter().Translate(filter);
         return (translated.whereSql, translated.parameters);
     }
 
@@ -612,6 +612,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         await AdoCommands.ExecuteScalarInt64Async(connection, $"SELECT COUNT(1) FROM {plan.QualifiedTable}" + (where is null ? string.Empty : $" WHERE {where}"), Parameters(parameters), null, ct).ConfigureAwait(false);
 
     private static string IdentityPredicate(
+        FirebirdEntityPlan<TEntity, TKey> plan,
         IEnumerable<RelationalValue> identity, string prefix, SqlParameters parameters)
     {
         var clauses = new List<string>();
@@ -619,7 +620,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         foreach (var value in identity)
         {
             var name = $"{prefix}{index++}";
-            parameters.Add(name, value.Value);
+            parameters.Add(name, plan.Parameter(value));
             clauses.Add($"{FirebirdDialect.Quote(value.Binding.PhysicalPath.Name)} = @{name}");
         }
         if (clauses.Count == 0) throw new InvalidOperationException("A relational identity predicate cannot be empty.");

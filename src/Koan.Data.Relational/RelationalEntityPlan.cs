@@ -3,6 +3,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Core.Semantics;
+using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Mapping;
 
 namespace Koan.Data.Relational;
@@ -158,6 +159,13 @@ public abstract class RelationalEntityPlan<TEntity, TKey, TDialect>
             : EncodeScalar(value.Value);
 
     public string JsonParameter(RelationalValue value) => _structured.Serialize(value.Value);
+
+    /// <summary>
+    /// The filter translator for this table: paths from the compiled map, managed fields through
+    /// <see cref="ManagedPath(ResolvedField)"/>, and a real column's comparand encoded the way
+    /// <see cref="Parameter"/> writes it, so a filter and a write never disagree about a column's form.
+    /// </summary>
+    public SqlFilterTranslator Filter() => new(Dialect, Mapping, ManagedPath, EncodeScalar);
 
     public string NestedRoot(IEnumerable<RelationalValue> values)
     {
