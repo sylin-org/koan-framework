@@ -1021,7 +1021,9 @@ Moving data between partitions, sources, or adapters is common: archiving old re
 Koan's transfer DSL provides declarative copy, move, and mirror operations:
 - **Copy:** Duplicate entities to another context
 - **Move:** Copy bounded pages, then delete only identities whose destination batch returned an exact receipt
-- **Mirror:** Make one side authoritative, or reconcile both sides with an explicit conflict policy
+- **Mirror:** Make one side authoritative (`Push`, `Pull`: the replica's rows the authoritative side no longer
+  selects are deleted, within the predicate), or reconcile both sides (`Bidirectional`: each side receives what only
+  the other holds, overlaps follow the conflict policy, and nothing is deleted, so a row removed on one side returns)
 
 **Recipe**
 

@@ -350,6 +350,24 @@ public sealed class EntityTransferDslSpec
         defaultNote!.Content.Should().Be("default");
     }
 
+    /// <summary>NK-111: the documented guarantee of MirrorMode.Bidirectional. It never deletes, so a removed row returns.</summary>
+    [Fact]
+    public async Task Mirror_Bidirectional_DoesNotPropagateDeletes()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        await new BasicNote { Id = "kept-elsewhere", Content = "both" }.Save();
+        using (runtime.UsePartition("secondary")) await new BasicNote { Id = "kept-elsewhere", Content = "both" }.Save();
+        await BasicNote.Remove("kept-elsewhere");
+
+        var result = await BasicNote.Mirror(MirrorMode.Bidirectional).To(partition: "secondary").Run();
+
+        result.DeletedCount.Should().Be(0);
+        (await BasicNote.Get("kept-elsewhere")).Should().NotBeNull("the other side's row came back");
+    }
+
     /// <summary>
     /// NK-108. Past Batch() unresolved overlaps the bidirectional mirror threw, after the target had already received
     /// the source-only rows of earlier batches and before the target-only rows reached the source. It now finishes the

@@ -6,21 +6,23 @@ namespace Koan.Data.Core.Transfers;
 public enum TransferKind
 {
     /// <summary>
-    /// Entities are duplicated from source to destination. Both source and destination
-    /// retain their data after the operation completes.
+    /// The selected entities are upserted into the destination. Both sides keep their rows.
     /// </summary>
     Copy,
 
     /// <summary>
-    /// Entities are copied from source to destination and then deleted from the source.
-    /// Source is empty after a successful move.
+    /// The selected entities are upserted into the destination, and then the copied rows are removed from the source.
+    /// Only the selection is removed: rows outside the predicate, rows the caller cannot see (another tenant's,
+    /// soft-deleted ones outside <c>WithDeleted()</c>) and rows another writer changed after they were copied stay in the
+    /// source. The copy completes before the first delete, so a Move is not atomic: a process that stops in between
+    /// leaves the rows in both places, and running the Move again finishes it (DATA-0155).
     /// </summary>
     Move,
 
     /// <summary>
-    /// Destination is brought into sync with the source. Entities absent in source
-    /// are removed from destination; entities present in source are upserted.
-    /// Direction of sync is controlled by <see cref="MirrorMode"/>.
+    /// One or both sides are brought into line with the other, as <see cref="MirrorMode"/> says. A one-way mirror
+    /// upserts the authoritative side's selection into the replica and deletes the replica's rows that the
+    /// authoritative side no longer selects; a bidirectional mirror only adds and resolves, and never deletes.
     /// </summary>
     Mirror
 }
@@ -31,20 +33,23 @@ public enum TransferKind
 public enum MirrorMode
 {
     /// <summary>
-    /// Source is authoritative. Destination is updated to match source.
-    /// Entities in destination that are absent in source are deleted.
+    /// <c>From()</c> is authoritative. Its selection is upserted into <c>To()</c>, and the rows of <c>To()</c> that
+    /// <c>From()</c> no longer selects are deleted there, within the predicate.
     /// </summary>
     Push,
 
     /// <summary>
-    /// Destination is authoritative. Source is updated to match destination.
-    /// Entities in source that are absent in destination are deleted.
+    /// <c>To()</c> is authoritative. Its selection is upserted into <c>From()</c>, and the rows of <c>From()</c> that
+    /// <c>To()</c> no longer selects are deleted there, within the predicate.
     /// </summary>
     Pull,
 
     /// <summary>
-    /// Both source and destination are reconciled. Entities present in either
-    /// are propagated to the other; conflicts are resolved by last-write-wins (by default).
+    /// Each side receives the identities only the other side holds, and an identity both sides hold is resolved by the
+    /// <see cref="MirrorConflict"/> policy. Nothing is deleted, so a row removed on one side comes back from the other.
+    /// The default <see cref="MirrorConflict.Latest"/> resolves an overlap only through one comparable
+    /// <c>[Timestamp]</c> (an <c>OnSave</c> one first); without it every overlap is left on both sides and listed in
+    /// <c>Conflicts</c>, up to the <c>Batch()</c> size, with a warning giving the total.
     /// </summary>
     Bidirectional
 }
@@ -55,7 +60,8 @@ public enum MirrorConflict
     /// <summary>
     /// Use the entity with the greater value of its one <c>[Timestamp(OnSave = true)]</c> property, or of its only
     /// <c>[Timestamp]</c> property when it has no OnSave one. A set-once creation stamp never decides over an OnSave
-    /// stamp; several deciding candidates report every overlap as a conflict.
+    /// stamp. With no deciding candidate, or several, or values that cannot be compared, the overlap is left on both
+    /// sides and reported as a conflict.
     /// </summary>
     Latest,
 
