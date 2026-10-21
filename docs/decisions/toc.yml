@@ -372,6 +372,8 @@
       href: DATA-0132-entity-patch-and-lifecycle-protection-keep-their-word.md
     - name: DATA-0133 A fresh zero-config SQLite host is ready, and an unqualified Direct session follows the active default
       href: DATA-0133-a-fresh-sqlite-host-is-ready-and-unqualified-direct-follows-the-default.md
+    - name: DATA-0134 Relational filters keep the oracle's two-valued null semantics for Ne, In, Nin and Not
+      href: DATA-0134-relational-filters-keep-the-oracle-null-semantics.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

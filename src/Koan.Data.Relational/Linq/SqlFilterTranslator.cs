@@ -68,11 +68,18 @@ public sealed class SqlFilterTranslator
     {
         AllOf all => Combine(all.Operands, "AND"),
         AnyOf any => Combine(any.Operands, "OR"),
-        Not n => $"(NOT {Visit(n.Operand)})",
+        Not n => Negate(Visit(n.Operand)),
         FieldFilter f => VisitField(f),
         // ClrFilter is never pushable; the coordinator keeps it out of what we receive.
         _ => throw new NotSupportedException($"Filter node '{filter.GetType().Name}' is not translatable to SQL.")
     };
+
+    /// <summary>
+    /// The oracle (<see cref="InMemoryFilterEvaluator"/>) is two-valued: a predicate over a null or missing field is
+    /// false, so its negation is true. SQL is three-valued, and <c>NOT</c> of unknown stays unknown and drops the row.
+    /// <c>CASE</c> folds unknown to false before the negation, in a form every relational dialect Koan ships accepts.
+    /// </summary>
+    private static string Negate(string predicate) => $"(CASE WHEN {predicate} THEN 1 ELSE 0 END = 0)";
 
     private string Combine(IReadOnlyList<Filter> operands, string op)
     {
@@ -133,10 +140,10 @@ public sealed class SqlFilterTranslator
             case FilterOperator.Ne:
             {
                 var raw = ScalarValue(f.Value, field.ComparableType);
-                // Locked semantics: comparisons treat null specially. Ne null -> "is not null".
+                // The oracle's Ne is !Eq. Ne null -> "is not null"; Ne v is true for a null or missing value, which
+                // SQL <> alone would drop as unknown.
                 if (raw is null) return $"({column} IS NOT NULL)";
-                // SQL <> drops NULL rows; the floor also reports Ne false when the value is null, so this matches.
-                return $"({column} <> {AddParam(raw, mapped)})";
+                return $"({column} IS NULL OR {column} <> {AddParam(raw, mapped)})";
             }
             case FilterOperator.Gt: return Compare(column, ">", f.Value, field.ComparableType, mapped);
             case FilterOperator.Gte: return Compare(column, ">=", f.Value, field.ComparableType, mapped);
@@ -234,12 +241,22 @@ public sealed class SqlFilterTranslator
             // "in empty set" matches nothing; "not in empty set" matches everything (incl. null).
             return negate ? "1=1" : "1=0";
 
-        var placeholders = string.Join(", ", values.Select(value => AddParam(value, mapped)));
-        if (!negate)
-            return $"({column} IN ({placeholders}))";
+        // The oracle's In asks Eq of each member, so a null member matches a null or missing value; Nin is !In.
+        // SQL IN never matches NULL, and NOT IN over a list holding NULL is never true, so null is split out.
+        var members = values.Where(static value => value is not null).ToList();
+        var holdsNull = members.Count != values.Count;
+        if (members.Count == 0)
+            return negate ? $"({column} IS NOT NULL)" : $"({column} IS NULL)";
 
-        // Locked semantics: null is not a member of any set, so Nin MATCHES null/missing.
-        return $"({column} IS NULL OR {column} NOT IN ({placeholders}))";
+        var placeholders = string.Join(", ", members.Select(value => AddParam(value, mapped)));
+        if (!negate)
+            return holdsNull
+                ? $"({column} IS NULL OR {column} IN ({placeholders}))"
+                : $"({column} IN ({placeholders}))";
+
+        return holdsNull
+            ? $"({column} IS NOT NULL AND {column} NOT IN ({placeholders}))"
+            : $"({column} IS NULL OR {column} NOT IN ({placeholders}))";
     }
 
     private static string Disjoin(List<string> preds, string emptyResult)

@@ -80,6 +80,13 @@ public static class FilterConvergence
         ("and-scalar-plus-collection","{ \"Tier\": \"Free\", \"Tags\": { \"$in\": [\"wow\"] } }"),
         ("or-mixed",                  "{ \"$or\": [ { \"Level\": { \"$lt\": 10 } }, { \"Tags\": { \"$all\": [\"gw2\"] } } ] }"),
         ("nor",                       "{ \"$nor\": [ { \"Tier\": \"Pro\" } ] }"),
+        // Null semantics (NK-020, NK-021, NK-051): the oracle is two-valued, so a predicate over the null Score
+        // is false and its negation is true. Ne is !Eq, Nin is !In, and a set holding null matches null.
+        ("scalar-ne-on-nullable",     "{ \"Score\": { \"$ne\": 100 } }"),
+        ("scalar-in-with-null",       "{ \"Score\": { \"$in\": [null, 100] } }"),
+        ("scalar-nin-with-null",      "{ \"Score\": { \"$nin\": [null, 100] } }"),
+        ("not-gt-on-nullable",        "{ \"$not\": { \"Score\": { \"$gt\": 80 } } }"),
+        ("nor-on-nullable",           "{ \"$nor\": [ { \"Score\": { \"$gt\": 80 } } ] }"),
         ("empty-matches-all",         "{}"),
     };
 
