@@ -562,3 +562,5 @@
       href: SEC-0012-entity-authorize-fails-closed.md
     - name: SEC-0013 Every delete verb falls back to the Read constraint
       href: SEC-0013-every-delete-falls-back-to-the-read-constraint.md
+    - name: SEC-0014 The MCP exposure mode is enforced where tools run
+      href: SEC-0014-exposure-mode-is-enforced-on-invoke.md

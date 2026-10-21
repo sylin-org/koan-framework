@@ -135,6 +135,18 @@ internal sealed class McpExplorerEndpointContributor : IKoanEndpointContributor
             args = JObject.Parse(el.GetRawText());
         }
 
+        // SEC-0014: try-it runs only what the caller's MCP client could call.
+        var exposure = McpExposure.Resolve(context.RequestServices.GetRequiredService<IOptions<McpServerOptions>>().Value);
+        if (!McpExposure.ExposesTools(exposure))
+        {
+            await WriteJson(context, StatusCodes.Status403Forbidden, new JObject
+            {
+                ["error"] = Koan.Mcp.CodeMode.Execution.CodeModeErrorCodes.ExposureMode,
+                ["message"] = $"Tools are not exposed under exposure mode '{exposure}'.",
+            });
+            return;
+        }
+
         var executor = context.RequestServices.GetRequiredService<EndpointToolExecutor>();
         var result = await executor.Execute(request.Name!, args, context.RequestAborted, context.User);
 

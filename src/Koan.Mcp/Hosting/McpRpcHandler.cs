@@ -102,7 +102,7 @@ public sealed class McpRpcHandler
         // Add code execution tool if enabled. CodeModeOptions.Enabled is the kill switch honored by
         // the capabilities/SDK endpoints (EndpointRouteBuilderExtensions) — list and invoke must agree
         // with it, or a disabled-but-Full host advertises a tool the RPC path then refuses.
-        if ((exposureMode == McpExposureMode.Code || exposureMode == McpExposureMode.Full) && IsCodeModeEnabled())
+        if (McpExposure.ExposesCode(exposureMode) && IsCodeModeEnabled())
         {
             var codeModeTool = CreateCodeExecutionTool();
             toolsList.Add(codeModeTool);
@@ -112,7 +112,7 @@ public sealed class McpRpcHandler
         }
 
         // Add entity tools + custom [McpTool] verbs if enabled
-        if (exposureMode == McpExposureMode.Tools || exposureMode == McpExposureMode.Full)
+        if (McpExposure.ExposesTools(exposureMode))
         {
             var entityTools = _registry.Registrations
                 .SelectMany(registration => registration.Tools.Select(tool => ToolDescriptor.From(registration, tool)));
@@ -175,6 +175,19 @@ public sealed class McpRpcHandler
         {
             var res = ExecuteCodeValidation(parameters.Arguments);
             return ToCallToolResult(res);
+        }
+
+        // SEC-0014: hiding a tool from tools/list is not a control on its own. Entity tools and custom verbs run only
+        // under an exposure mode that lists them; code-mode SDK calls reach the executor directly and are unaffected.
+        var exposure = ResolveExposureMode();
+        if (!McpExposure.ExposesTools(exposure))
+        {
+            return new CallToolResult
+            {
+                IsError = true,
+                Content = new List<McpContent> { new McpContent { Type = "text", Text = $"Tool '{parameters.Name}' is not exposed under exposure mode '{exposure}'." } },
+                Meta = new JObject { ["errorCode"] = CodeMode.Execution.CodeModeErrorCodes.ExposureMode }
+            };
         }
 
         // Handle custom [McpTool] verbs
@@ -332,36 +345,8 @@ public sealed class McpRpcHandler
         return new ReadResourceResult { Contents = Array.Empty<ResourceContents>() };
     }
 
-    private McpExposureMode ResolveExposureMode()
-    {
-        // Check configuration
-        var configuredMode = _serverOptions.Value.Exposure;
-        if (configuredMode.HasValue && configuredMode.Value != McpExposureMode.Auto)
-        {
-            return configuredMode.Value;
-        }
-
-        // Check assembly attribute (scan all loaded assemblies)
-        var assemblies = AppDomain.CurrentDomain.GetAssemblies();
-        foreach (var assembly in assemblies)
-        {
-            var assemblyAttr = assembly.GetCustomAttributes(typeof(McpDefaultsAttribute), false)
-                .OfType<McpDefaultsAttribute>()
-                .FirstOrDefault();
-
-            if (assemblyAttr?.ExposureMode.HasValue == true)
-            {
-                return assemblyAttr.ExposureMode.Value;
-            }
-        }
-
-        // Default: Auto mode. For now we TREAT Auto as Full until client capability
-        // detection is implemented (handshake inspection). This ensures legacy MCP
-        // clients still see both code + entity tools instead of an empty set.
-        // TODO(S16): Implement handshake capability detection and choose Code or Tools
-        // dynamically; then return McpExposureMode.Auto here and handle mapping in caller.
-        return McpExposureMode.Full;
-    }
+    // SEC-0014: the shared exposure decision (Auto is treated as Full until handshake capability detection exists).
+    private McpExposureMode ResolveExposureMode() => McpExposure.Resolve(_serverOptions.Value);
 
     // CodeModeOptions.Enabled is the functional kill switch for code mode (AI-0014). It defaults to
     // true, and a misconfigured/partial host without the options registered fails closed. This is the
@@ -385,7 +370,7 @@ public sealed class McpRpcHandler
         }
 
         var exposureMode = ResolveExposureMode();
-        if (exposureMode != McpExposureMode.Code && exposureMode != McpExposureMode.Full)
+        if (!McpExposure.ExposesCode(exposureMode))
         {
             denial = CodeModeDisabled($"Code execution is not exposed under exposure mode '{exposureMode}'.");
             return true;

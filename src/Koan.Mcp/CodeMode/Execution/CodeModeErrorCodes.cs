@@ -30,4 +30,5 @@ public static class CodeModeErrorCodes
     public const string Forbidden = "forbidden";                   // 403: the gate or a hook forbade the caller
     public const string NotFound = "not_found";                    // 404: no such row, or a row outside the caller's scope
     public const string Rejected = "rejected";                     // any other refusal status (400, 409, 413, 422, ...)
+    public const string ExposureMode = "exposure_mode";            // SEC-0014: the active exposure mode does not expose the tool
 }

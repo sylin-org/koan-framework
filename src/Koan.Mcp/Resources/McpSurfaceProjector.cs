@@ -57,8 +57,14 @@ public sealed class McpSurfaceProjector
         var app = KoanEnv.CurrentSnapshot.Application;
 
         var entities = new JArray();
+        // SEC-0014: under an exposure mode that does not expose tools the caller's client sees none, so neither does
+        // the console.
+        var toolsExposed = McpExposure.ExposesTools(McpExposure.Resolve(_serverOptions.Value));
         using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(_scopes, _gateCache, user);
-        foreach (var (registration, verbs, doors) in EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult())
+        var visible = toolsExposed
+            ? EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult()
+            : [];
+        foreach (var (registration, verbs, doors) in visible)
         {
             var tools = new JArray();
             foreach (var verb in verbs)
@@ -89,7 +95,7 @@ public sealed class McpSurfaceProjector
         }
 
         var customTools = new JArray();
-        foreach (var tool in CustomToolProjection.Visible(_customTools, _serverOptions.Value, user))
+        foreach (var tool in toolsExposed ? CustomToolProjection.Visible(_customTools, _serverOptions.Value, user) : [])
         {
             customTools.Add(ToolJson(McpRpcHandler.ToolDescriptor.FromCustom(tool)));
         }

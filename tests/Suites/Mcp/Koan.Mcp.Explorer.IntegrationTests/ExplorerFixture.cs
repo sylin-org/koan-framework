@@ -29,7 +29,7 @@ namespace Koan.Mcp.Explorer.IntegrationTests;
 /// Verb / Door / Wall states. The HTTP/SSE transport is intentionally OFF — proving the console works standalone
 /// off the in-process executor.
 /// </summary>
-public sealed class ExplorerFixture : IAsyncLifetime
+public class ExplorerFixture : IAsyncLifetime
 {
     private IHost? _host;
 
@@ -44,11 +44,7 @@ public sealed class ExplorerFixture : IAsyncLifetime
         Port = GrabFreePort();
 
         _host = Host.CreateDefaultBuilder()
-            .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Koan:Mcp:Explorer:Enabled"] = "true",
-                ["Koan:Mcp:Instructions"] = TestInstructions,
-            }))
+            .ConfigureAppConfiguration(b => b.AddInMemoryCollection(Configuration()))
             .ConfigureWebHostDefaults(web =>
             {
                 web.UseUrls(BaseUrl);
@@ -77,6 +73,13 @@ public sealed class ExplorerFixture : IAsyncLifetime
         await _host.StartAsync();
     }
 
+    /// <summary>The host configuration; a variant fixture adds keys.</summary>
+    protected virtual Dictionary<string, string?> Configuration() => new()
+    {
+        ["Koan:Mcp:Explorer:Enabled"] = "true",
+        ["Koan:Mcp:Instructions"] = TestInstructions,
+    };
+
     public HttpClient NewClient() => new() { BaseAddress = new Uri(BaseUrl) };
 
     public async ValueTask DisposeAsync()
@@ -94,5 +97,16 @@ public sealed class ExplorerFixture : IAsyncLifetime
         l.Start();
         try { return ((IPEndPoint)l.LocalEndpoint).Port; }
         finally { l.Stop(); }
+    }
+}
+
+/// <summary>SEC-0014: the same host under <c>Koan:Mcp:Exposure = Code</c>.</summary>
+public sealed class CodeExposureExplorerFixture : ExplorerFixture
+{
+    protected override Dictionary<string, string?> Configuration()
+    {
+        var configuration = base.Configuration();
+        configuration["Koan:Mcp:Exposure"] = "Code";
+        return configuration;
     }
 }
