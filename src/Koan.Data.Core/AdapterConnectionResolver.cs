@@ -21,7 +21,9 @@ public static class AdapterConnectionResolver
     /// 2. <see cref="ConfigurationConstants.Sources"/>.ConnectionString(source, providerId).
     /// 3. ConnectionStrings:{source}, under the same source-ownership rule as priority 1.
     /// 4. <see cref="ConfigurationConstants.Adapter"/>.ConnectionString(providerId).
-    /// 5. Fallback to the "Default" source when the requested source is not Default.
+    /// 5. Fallback to the "Default" source when the requested source is not Default and is not declared under
+    ///    <see cref="ConfigurationConstants.Sources"/>. A declared source without a connection of its own is refused
+    ///    rather than silently sharing Default's database (NK-010, DATA-0126).
     /// </summary>
     public static string ResolveConnectionString(
         IConfiguration config,
@@ -53,18 +55,32 @@ public static class AdapterConnectionResolver
             config, sourceRegistry, providerId, source, sourceOwner);
         if (configured is not null) return configured;
 
-        // Priority 5: Fallback to Default source if not already trying it
-        if (!string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase))
+        // Priority 5: an undeclared name falls back to the Default source. A declared source never does: its rows
+        // would land in Default's database under the same table names.
+        if (!IsDefault(source) && !sourceRegistry.HasSource(source))
         {
             return ResolveConnectionStringCore(
                 config, sourceRegistry, providerId, "Default", sourceOwner);
         }
 
-        throw new InvalidOperationException(
-            $"No connection string found for provider '{providerId}', source '{source}'. " +
-            $"Configure one of: {ConfigurationConstants.Sources.ConnectionString(source, providerId)}, " +
-            $"ConnectionStrings:{source}, or {ConfigurationConstants.Adapter.ConnectionString(providerId)}");
+        throw MissingConnection(providerId, source);
     }
+
+    private static bool IsDefault(string? source)
+        => string.IsNullOrWhiteSpace(source) || string.Equals(source, "Default", StringComparison.OrdinalIgnoreCase);
+
+    private static InvalidOperationException MissingConnection(string providerId, string source)
+        => IsDefault(source)
+            ? new InvalidOperationException(
+                $"No connection string found for provider '{providerId}', source '{source}'. " +
+                $"Configure one of: {ConfigurationConstants.Sources.ConnectionString(source, providerId)}, " +
+                $"ConnectionStrings:{source}, or {ConfigurationConstants.Adapter.ConnectionString(providerId)}")
+            : new InvalidOperationException(
+                $"No connection string found for provider '{providerId}', source '{source}'. A named source does not " +
+                $"share the Default database implicitly. Configure one of: Koan:Data:Sources:{source}:ConnectionString, " +
+                $"{ConfigurationConstants.Sources.ConnectionString(source, providerId)}, ConnectionStrings:{source}, or " +
+                $"{ConfigurationConstants.Adapter.ConnectionString(providerId)}; or set " +
+                $"Koan:Data:Sources:{source}:ConnectionString to 'auto' to share the provider's default connection deliberately.");
 
     /// <summary>
     /// Resolve the per-source connection string for a Database-mode routed source, collapsing the <c>"auto"</c> /
@@ -73,9 +89,11 @@ public static class AdapterConnectionResolver
     /// <item>The Default source (or blank) first honors a concrete configured connection. An absent, blank, or
     /// <c>"auto"</c> source falls back to <paramref name="resolvedDefault"/> — the physical connection the adapter's
     /// options configurator already discovered.</item>
-    /// <item>A non-Default source resolves via <c>ResolveConnectionString</c>; if that yields the literal
-    /// <c>"auto"</c> or blank — a source relying on runtime discovery, which this resolver cannot perform — it collapses
-    /// onto <paramref name="resolvedDefault"/> so the per-source pool/store never keys on the unresolved sentinel.</item>
+    /// <item>A non-Default source honors a concrete configured connection. Only the literal <c>"auto"</c> — the
+    /// declared intent to share the provider's discovered default — collapses onto <paramref name="resolvedDefault"/>.
+    /// A source declared under <c>Koan:Data:Sources</c> with an absent or blank connection is refused (NK-010,
+    /// DATA-0126): collapsing it would put the source's rows in Default's database under the same table names. An
+    /// undeclared name (a factory-internal route) keeps the discovered default.</item>
     /// </list>
     /// This is the shared form of the per-adapter <c>ResolveRoutedConnection</c> the Mongo (<c>d0ea898e</c>) and Couchbase
     /// (ARCH-0103 P4) factories grew locally: the relational + SqliteVec factories had no <c>"auto"</c> fallback at all,
@@ -121,10 +139,11 @@ public static class AdapterConnectionResolver
         var configured = TryResolveConfiguredConnection(
             config, sourceRegistry, providerId, source, sourceOwner);
         if (!IsUnresolvedSentinel(configured)) return configured!;
+        if (configured is null && sourceRegistry.HasSource(source)) throw MissingConnection(providerId, source);
         if (!string.IsNullOrWhiteSpace(resolvedDefault)) return resolvedDefault!;
 
-        // Preserve an explicit unresolved intent when no runtime discovery result exists; an entirely absent
-        // placement retains the legacy fail-loud path and its actionable configuration error.
+        // Preserve an explicit "auto" intent when no runtime discovery result exists; an undeclared name with no
+        // placement keeps the fail-loud path and its actionable configuration error.
         return configured ?? ResolveConnectionStringCore(
             config, sourceRegistry, providerId, source, sourceOwner);
     }

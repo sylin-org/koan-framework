@@ -170,10 +170,9 @@ public sealed class AdapterConnectionResolverRoutingSpec
     }
 
     [Theory]
-    [InlineData("")]
     [InlineData("auto")]
     [InlineData(" AUTO ")]
-    public void Unresolved_non_default_source_uses_the_resolved_default(string configured)
+    public void Non_default_source_that_declares_auto_shares_the_resolved_default(string configured)
     {
         var registry = new DataSourceRegistry();
         registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
@@ -183,6 +182,54 @@ public sealed class AdapterConnectionResolverRoutingSpec
             new ConfigurationBuilder().Build(), registry, Provider, "Archive", Discovered);
 
         resolved.Should().Be(Discovered);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void Non_default_source_without_its_own_connection_is_refused_instead_of_sharing_the_default(string? configured)
+    {
+        // NK-010 / NK-036: a declared source that names an adapter and no connection used to collapse onto the
+        // provider's default database, so its rows mixed with Default's under the same table names.
+        var registry = new DataSourceRegistry();
+        registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
+            "Archive", Provider, configured!, new Dictionary<string, string>()));
+
+        var routed = () => AdapterConnectionResolver.ResolveRoutedConnection(
+            new ConfigurationBuilder().Build(), registry, Provider, "Archive", Discovered);
+        var direct = () => AdapterConnectionResolver.ResolveConnectionString(
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Koan:Data:Sources:Default:ConnectionString"] = Explicit,
+                })
+                .Build(),
+            registry,
+            Provider,
+            "Archive");
+
+        routed.Should().Throw<InvalidOperationException>()
+            .WithMessage("*source 'Archive'*Koan:Data:Sources:Archive:ConnectionString*ConnectionStrings:Archive*auto*");
+        direct.Should().Throw<InvalidOperationException>()
+            .WithMessage("*source 'Archive'*");
+    }
+
+    [Fact]
+    public void Non_default_source_keeps_the_provider_scoped_connection()
+    {
+        var registry = new DataSourceRegistry();
+        registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
+            "Archive", Provider, null!, new Dictionary<string, string>()));
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Koan:Data:{Provider}:ConnectionString"] = Explicit,
+            })
+            .Build();
+
+        AdapterConnectionResolver.ResolveRoutedConnection(config, registry, Provider, "Archive", Discovered)
+            .Should().Be(Explicit);
     }
 
     [Fact]

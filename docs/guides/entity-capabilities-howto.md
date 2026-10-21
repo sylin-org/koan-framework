@@ -1111,10 +1111,13 @@ an ambiguous exception is surfaced and never replayed. Only string identifiers s
 int-keyed Entity is read with one materialized query even on a bounded provider, and the result's `Warnings` say so.
 
 Endpoints are compared as the physical places they reach, not as written. `From(source: "Default").To()`, a
-source name in another letter case, a source without its own connection, a partition spelled in another case, or a
+source name in another letter case, a source that shares the default connection (`ConnectionString: auto` or the
+provider-wide connection), a partition spelled in another case, or a
 `To()` that inherits the ambient partition can all be the container the transfer reads. A `Move` or `Mirror` over such
 a pair throws before reading anything; a `Copy` writes nothing and reports it in `Warnings`
-([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)).
+([DATA-0125](../decisions/DATA-0125-transfer-endpoints-are-compared-as-physical-places.md)). A declared source with
+no connection at all is refused on its first operation
+([DATA-0126](../decisions/DATA-0126-a-declared-source-owns-its-connection.md)).
 
 Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
 dataset in application memory or mutate an offset-paged source while reading it. Before deleting, it re-reads

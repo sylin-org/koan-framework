@@ -354,6 +354,8 @@
       href: DATA-0124-batch-deletes-are-scoped-like-single-deletes.md
     - name: DATA-0125 Transfer endpoints are compared as the physical places they reach
       href: DATA-0125-transfer-endpoints-are-compared-as-physical-places.md
+    - name: DATA-0126 A declared source owns its connection or says it shares one
+      href: DATA-0126-a-declared-source-owns-its-connection.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
