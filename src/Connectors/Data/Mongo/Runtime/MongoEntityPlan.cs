@@ -21,6 +21,10 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
+    // The strategy the serializer names document fields with. Query, sort and order paths resolve each segment through
+    // it, so a filter addresses the field the document actually holds: Newtonsoft lower-cases a whole leading capital
+    // run, so ISBN is stored as "isbn" and IPAddress as "ipAddress", not "iSBN" and "iPAddress" (NK-029).
+    private static readonly CamelCaseNamingStrategy Naming = new();
     private readonly MappingPlan? _mapping;
     private readonly JsonSerializerSettings _json;
     private readonly string _identityJsonName;
@@ -36,11 +40,10 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
             throw new MappingCompilationException(source, typeof(TEntity),
                 "Explicit MongoDB maps cannot preserve framework-managed row fields. Use a managed map or a separate source/container axis.");
 
-        var naming = new CamelCaseNamingStrategy();
-        _identityJsonName = naming.GetPropertyName(IdentityName, hasSpecifiedName: false);
+        _identityJsonName = Naming.GetPropertyName(IdentityName, hasSpecifiedName: false);
         _json = EntityJsonSerialization.Apply(new JsonSerializerSettings
         {
-            ContractResolver = new ManagedFieldJsonInjector(segmentation.Fields) { NamingStrategy = naming },
+            ContractResolver = new ManagedFieldJsonInjector(segmentation.Fields) { NamingStrategy = Naming },
             DateParseHandling = DateParseHandling.None,
             NullValueHandling = NullValueHandling.Include,
             Converters =
@@ -171,7 +174,12 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
         }
         if (path.Segments.Count == 1 && string.Equals(path.Leaf, IdentityName, StringComparison.Ordinal))
             return Infrastructure.Constants.Storage.Identity;
-        return string.Join('.', path.Segments.Select(Camel));
+        // Index keys keep the first-letter spelling they have always been created with. Correcting them changes the
+        // indexes Koan provisions on existing collections (a new index beside each old one, and an explicitly named
+        // index trips the incompatible-index refusal), which is an owner decision recorded in DATA-0137.
+        return consumer == MappingConsumer.Index
+            ? string.Join('.', path.Segments.Select(LegacyIndexName))
+            : string.Join('.', path.Segments.Select(Stored));
     }
 
     /// <summary>
@@ -208,8 +216,8 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
         for (var index = boundary; index < path.Members.Count; index++)
             if (IsCollectionMember(path.Members[index])) return null;
 
-        var array = string.Join('.', path.Members.Take(boundary).Select(static member => Camel(member.Name)));
-        var leaf = string.Join('.', path.Members.Skip(boundary).Select(static member => Camel(member.Name)));
+        var array = string.Join('.', path.Members.Take(boundary).Select(static member => Stored(member.Name)));
+        var leaf = string.Join('.', path.Members.Skip(boundary).Select(static member => Stored(member.Name)));
         return new BsonDocument(accumulator, new BsonDocument("$map", new BsonDocument
         {
             ["input"] = new BsonDocument("$ifNull", new BsonArray { "$" + array, new BsonArray() }),
@@ -268,7 +276,10 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
         return Builders<BsonDocument>.Filter.And(filters);
     }
 
-    private static string Camel(string value) =>
+    /// <summary>The field name the serializer writes for a CLR member name.</summary>
+    private static string Stored(string member) => Naming.GetPropertyName(member, hasSpecifiedName: false);
+
+    private static string LegacyIndexName(string value) =>
         string.IsNullOrEmpty(value) || char.IsLower(value[0])
             ? value
             : char.ToLowerInvariant(value[0]) + value[1..];

@@ -378,6 +378,8 @@
       href: DATA-0135-sqlite-string-matching-is-case-sensitive.md
     - name: DATA-0136 A real scalar column is compared and keyed in the form the store writes it
       href: DATA-0136-a-scalar-column-is-compared-in-the-form-it-is-written.md
+    - name: DATA-0137 MongoDB filter and sort paths use the field names the serializer writes; index key spelling is an owner decision
+      href: DATA-0137-mongo-paths-use-the-serializer-field-names.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
