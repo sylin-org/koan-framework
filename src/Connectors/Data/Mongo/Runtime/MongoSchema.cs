@@ -76,41 +76,47 @@ internal sealed class MongoSchema<TEntity, TKey>(
 
     private async Task<string[]> EnsureIndexes(IMongoCollection<BsonDocument> collection, BsonValue collation, CancellationToken ct)
     {
-        var indexes = new List<CreateIndexModel<BsonDocument>>();
+        // Each declared index, with the keys an older Koan created it under when those differ (DATA-0145).
+        var indexes = new List<(CreateIndexModel<BsonDocument> Model, IndexKeysDefinition<BsonDocument>? Legacy)>();
         if (entity.Mapping is { } mapping)
         {
             foreach (var index in mapping.Indexes.Where(static index => !index.Primary))
             {
                 var keys = index.Bindings.Select(binding =>
                     Builders<BsonDocument>.IndexKeys.Ascending(MongoValues.Path(binding.PhysicalPath)));
-                indexes.Add(new CreateIndexModel<BsonDocument>(
+                indexes.Add((new CreateIndexModel<BsonDocument>(
                     Builders<BsonDocument>.IndexKeys.Combine(keys),
                     new CreateIndexOptions
                     {
                         Name = index.Name,
                         Unique = index.Unique,
                         ExpireAfter = index.Ttl ? TimeSpan.Zero : null
-                    }));
+                    }), null));
             }
         }
         else
         {
             foreach (var index in IndexMetadata.GetIndexes(typeof(TEntity)).Where(static index => !index.IsPrimaryKey))
             {
-                var keys = index.Properties.Select(property =>
+                var stored = new List<string>();
+                var legacy = new List<string>();
+                foreach (var property in index.Properties)
                 {
                     var path = FieldPath.Of(property.Name);
                     var resolved = FieldPathResolver.Resolve(typeof(TEntity), path);
-                    return Builders<BsonDocument>.IndexKeys.Ascending(entity.Field(path, resolved, MappingConsumer.Index));
-                });
-                indexes.Add(new CreateIndexModel<BsonDocument>(
-                    Builders<BsonDocument>.IndexKeys.Combine(keys),
+                    var field = entity.Field(path, resolved, MappingConsumer.Index);
+                    stored.Add(field);
+                    legacy.Add(resolved.IsManaged ? field : entity.LegacyIndexField(path) ?? field);
+                }
+                indexes.Add((new CreateIndexModel<BsonDocument>(
+                    Keys(stored),
                     new CreateIndexOptions
                     {
                         Name = index.Name,
                         Unique = index.Unique,
                         ExpireAfter = index.Ttl ? TimeSpan.Zero : null
-                    }));
+                    }),
+                    legacy.SequenceEqual(stored) ? null : Keys(legacy)));
             }
         }
         if (indexes.Count == 0) return [];
@@ -121,9 +127,10 @@ internal sealed class MongoSchema<TEntity, TKey>(
         var names = new List<string>(indexes.Count);
         var render = new RenderArgs<BsonDocument>(collection.DocumentSerializer,
             MongoDB.Bson.Serialization.BsonSerializer.SerializerRegistry);
-        foreach (var index in indexes)
+        foreach (var (index, legacy) in indexes)
         {
             var keys = index.Keys.Render(render);
+            var legacyKeys = legacy?.Render(render);
             var sameKeys = existing.Where(candidate => candidate[Constants.Index.Key].Equals(keys)).ToArray();
             var equivalent = sameKeys.FirstOrDefault(candidate => Equivalent(candidate, index.Options, collation)
                 && (index.Options.Name is null || candidate[Constants.Index.Name].AsString == index.Options.Name));
@@ -139,17 +146,39 @@ internal sealed class MongoSchema<TEntity, TKey>(
                 ?? existing.FirstOrDefault(candidate => index.Options.Name is not null
                     && candidate[Constants.Index.Name].AsString == index.Options.Name);
             if (conflict is not null)
+            {
+                if (legacyKeys is not null && conflict[Constants.Index.Key].Equals(legacyKeys))
+                    throw new InvalidOperationException(
+                        $"MongoDB index '{conflict[Constants.Index.Name].AsString}' on '{collection.CollectionNamespace.CollectionName}' " +
+                        $"has the keys {legacyKeys.ToJson()}, the spelling Koan used before index keys followed the stored field names; " +
+                        $"'{typeof(TEntity).FullName}' declares it on {keys.ToJson()}, so the old index covers no stored field. " +
+                        $"Drop the old index, then restart: db.getCollection(\"{collection.CollectionNamespace.CollectionName}\")" +
+                        $".dropIndex(\"{conflict[Constants.Index.Name].AsString}\"). Koan creates the correctly keyed index when it is gone " +
+                        "and will not drop or rename existing indexes.");
                 throw new InvalidOperationException(
                     $"MongoDB index '{conflict[Constants.Index.Name].AsString}' on '{collection.CollectionNamespace.CollectionName}' " +
                     $"is incompatible with the declared index for '{typeof(TEntity).FullName}'. " +
                     "Compare ordered keys, uniqueness, sparse/partial coverage, collation, visibility, TTL and any explicit name; " +
                     "resolve the difference with an explicit migration. Koan will not drop or rename existing indexes.");
+            }
+            // An index an older Koan created on the legacy spelling stays; the correctly keyed one is created beside it.
+            foreach (var old in legacyKeys is null ? [] : existing.Where(candidate => candidate[Constants.Index.Key].Equals(legacyKeys)))
+                logger.LogWarning(
+                    "MongoDB collection {Collection} keeps index {Index} on {LegacyKeys}, which covers no stored field of {Entity} " +
+                    "(the field is {Keys}). It is redundant and, when unique, rejects a second document; drop it with " +
+                    "db.getCollection(\"{Collection}\").dropIndex(\"{Index}\").",
+                    collection.CollectionNamespace.CollectionName, old[Constants.Index.Name].AsString, legacyKeys!.ToJson(),
+                    typeof(TEntity).FullName, keys.ToJson(),
+                    collection.CollectionNamespace.CollectionName, old[Constants.Index.Name].AsString);
             pending.Add(index);
         }
         if (pending.Count != 0)
             names.AddRange(await collection.Indexes.CreateManyAsync(pending, cancellationToken: ct).ConfigureAwait(false));
         return names.ToArray();
     }
+
+    private static IndexKeysDefinition<BsonDocument> Keys(IEnumerable<string> fields) =>
+        Builders<BsonDocument>.IndexKeys.Combine(fields.Select(static field => Builders<BsonDocument>.IndexKeys.Ascending(field)));
 
     private static bool Equivalent(BsonDocument existing, CreateIndexOptions desired, BsonValue collation)
     {

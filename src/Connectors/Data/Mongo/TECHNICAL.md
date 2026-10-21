@@ -76,6 +76,14 @@ Koan never drops or renames them automatically. Only missing indexes are created
 cached in the repository's per-physical-collection readiness gate, shared by concurrent callers and retried
 after failure. Reuse is reported at Debug level once during initialization, without further index I/O on reads.
 
+Managed index keys are the field names the serializer writes (Newtonsoft camel case lower-cases a whole leading capital
+run: `ISBN` is `isbn`, `IPAddress` is `ipAddress`), the same spelling filters and sorts use (DATA-0145). Before that
+decision they lower-cased only the first letter, so an index on an acronym member covered no stored field. A collection
+an older version provisioned gains the correctly keyed index beside the old one; the old index stays, is logged at
+Warning with its drop command, and, when unique, rejects a second document until it is dropped. An explicitly named
+index that still has the old keys stops the entity with a message naming it and the `dropIndex` call; drop it and
+restart. Koan never drops it. Members whose names start with one capital (`Name`) and explicit maps are unaffected.
+
 Duplicate business-key violations retain the Mongo driver error. A duplicate is described as a cross-scope
 write only when a scoped identity lookup proves the existing identity lies outside the current write guard.
 

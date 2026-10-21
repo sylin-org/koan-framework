@@ -396,6 +396,8 @@
       href: DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md
     - name: DATA-0144 How a unique [Index] behaves under row-scoped tenancy (owner decision)
       href: DATA-0144-unique-indexes-under-row-scoped-tenancy.md
+    - name: DATA-0145 MongoDB index keys use the field names the serializer writes
+      href: DATA-0145-mongo-index-keys-use-the-stored-field-names.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -33,6 +33,11 @@ An unnamed index declaration is satisfied by an existing equivalent index, which
 Koan checks equivalence once per physical collection. Incompatible constraints or conflicting explicit names
 require an operator migration; the connector never drops or renames an existing index automatically.
 
+Index keys use the stored field names (`ISBN` is indexed as `isbn`). A collection provisioned by an older version
+keeps its old `iSBN`-style index, which is redundant: drop it with `db.<collection>.dropIndex("<name>")` (the Warning in
+the log names it). An explicitly named index with the old keys blocks creation until you drop it, and the error says how
+([DATA-0145](../../../../docs/decisions/DATA-0145-mongo-index-keys-use-the-stored-field-names.md)).
+
 ## Fit a legacy collection without changing the model
 
 ```csharp

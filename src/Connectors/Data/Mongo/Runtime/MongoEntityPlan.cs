@@ -174,12 +174,20 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
         }
         if (path.Segments.Count == 1 && string.Equals(path.Leaf, IdentityName, StringComparison.Ordinal))
             return Infrastructure.Constants.Storage.Identity;
-        // Index keys keep the first-letter spelling they have always been created with. Correcting them changes the
-        // indexes Koan provisions on existing collections (a new index beside each old one, and an explicitly named
-        // index trips the incompatible-index refusal), which is an owner decision recorded in DATA-0137.
-        return consumer == MappingConsumer.Index
-            ? string.Join('.', path.Segments.Select(LegacyIndexName))
-            : string.Join('.', path.Segments.Select(Stored));
+        return string.Join('.', path.Segments.Select(Stored));
+    }
+
+    /// <summary>
+    /// The index key spelling Koan used before index keys followed the serializer (lower-casing only the first letter),
+    /// or <see langword="null"/> when it equals the stored spelling or this plan is mapped. Used only to recognize
+    /// indexes an older version created, so a corrective message can name them (DATA-0145).
+    /// </summary>
+    public string? LegacyIndexField(FieldPath path)
+    {
+        if (_mapping is not null) return null;
+        if (path.Segments.Count == 1 && string.Equals(path.Leaf, IdentityName, StringComparison.Ordinal)) return null;
+        var legacy = string.Join('.', path.Segments.Select(LegacyIndexName));
+        return string.Equals(legacy, string.Join('.', path.Segments.Select(Stored)), StringComparison.Ordinal) ? null : legacy;
     }
 
     /// <summary>
@@ -279,6 +287,7 @@ internal sealed class MongoEntityPlan<TEntity, TKey>
     /// <summary>The field name the serializer writes for a CLR member name.</summary>
     private static string Stored(string member) => Naming.GetPropertyName(member, hasSpecifiedName: false);
 
+    /// <summary>The first-letter-only spelling index keys had before DATA-0145; kept to recognize them.</summary>
     private static string LegacyIndexName(string value) =>
         string.IsNullOrEmpty(value) || char.IsLower(value[0])
             ? value
