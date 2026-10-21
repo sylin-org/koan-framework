@@ -256,6 +256,11 @@ validation:
   read are dispatched (one scoped query, or the remove Lifecycle's scoped read); the rest report `Missing` and are
   never sent to the identity-only native delete. Each queued delete records its native slot, so complete outcomes stay
   in builder order. With complete outcomes, `AfterRemove` runs only for deletes reported `Applied`.
+- A keyed delete under a scope carries the folded read scope to the store when the adapter declares
+  `Write.ConditionalDelete` (DATA-0156): `ConditionalDeleteAsync(id, scope)`, `ConditionalDeleteMany(ids, scope)`, and
+  `IConditionalBatchDelete.DeleteIf(id, scope)` inside a native batch, which then needs no visibility read. A row that
+  leaves the scope after any check is not removed. Other adapters, and scopes holding a counterpart predicate, keep the
+  check-then-delete; `IAxisScopeDiagnostics.ScopedDeletesAtStore` reports which path an entity takes.
 - A transfer resolves each endpoint, under its applied context, to a `TransferPlace`: elected provider, the factory's
   `ResolveStoreIdentity` for the routed source (or the plan's connection identity when the adapter declares none) and
   the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,

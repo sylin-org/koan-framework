@@ -73,6 +73,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private readonly bool _skipReadPushabilityCheck;
     private readonly OperationOverrideDescriptor? _deleteOverride;
     private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
+    private readonly IConditionalDeleteRepository<TEntity, TKey>? _scopedDeletes;
 
     /// <summary>
     /// The Lifecycle this operation runs: none for an exact transfer's own reads and writes (DATA-0149), else the
@@ -118,7 +119,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // a true no-op (byte-identical: no DataCaps.Describe, no FilterSupport). The result is consulted only when a
         // scope is actually active at runtime (DATA-0106 §4 fail-closed deferral).
         var couldScope = _managed.Count > 0 || !_segmentation.IsEmpty || HasNonDefaultReadContributor();
-        if (couldScope) (_scopeAdapterOk, _scopeAdapterError, _filterCaps) = InspectScopeAdapter();
+        if (couldScope) (_scopeAdapterOk, _scopeAdapterError, _filterCaps, _scopedDeletes) = InspectScopeAdapter();
         else { _scopeAdapterOk = true; _filterCaps = FilterSupport.None; }
         // Hot-path ([koan-design-principles] §2/§4): the equality (tenancy) read-filter shape is static per (type,adapter)
         // — Eq over a fixed managed field — so its pushability is a CONSTANT, proven ONCE here. When the only active read
@@ -258,17 +259,23 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     // scoped queries). The adapter's FilterSupport is captured for the per-read pushability check (§4b). We defer the
     // throw to the first operation that actually has a scope in effect, so a non-tenant app — or a referenced-but-off
     // axis on a non-isolating adapter — is a true no-op (zero regression). Fail-closed when used.
-    private (bool ok, string? error, FilterSupport caps) InspectScopeAdapter()
+    private (bool ok, string? error, FilterSupport caps, IConditionalDeleteRepository<TEntity, TKey>? scopedDeletes)
+        InspectScopeAdapter()
     {
         var describe = DataCaps.Describe(_inner, _inner.GetType().Name);
         var caps = describe.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
+        // DATA-0156: an adapter that deletes by identity under a stored-row guard carries the read scope into the delete
+        // itself. One that does not keeps the facade's check-then-delete, and the diagnostics say so.
+        var scopedDeletes = describe.Has(DataCaps.Write.ConditionalDelete)
+            ? _inner as IConditionalDeleteRepository<TEntity, TKey>
+            : null;
         foreach (var d in _managed)
         {
             if (d.RequiredCapability is { } req && !describe.Has(req))
                 return (false,
                     $"Entity '{typeof(TEntity).Name}' is in an active managed scope requiring isolation capability '{req.Id}', " +
                     $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.",
-                    caps);
+                    caps, null);
         }
         foreach (var c in _readContributors)
         {
@@ -276,20 +283,20 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 return (false,
                     $"Entity '{typeof(TEntity).Name}' is read-scoped by a contributor requiring isolation capability '{req.Id}', " +
                     $"but the adapter '{_inner.GetType().Name}' does not announce it. Route it to an isolating adapter, or exempt the entity.",
-                    caps);
+                    caps, null);
         }
         if (!_segmentation.IsEmpty && !describe.Has(DataCaps.Isolation.RowScoped))
             return (false,
                 $"Entity '{typeof(TEntity).Name}' requires shared-row isolation, but the adapter " +
                 $"'{_inner.GetType().Name}' does not announce '{DataCaps.Isolation.RowScoped.Id}'. " +
                 "Route it to an adapter that supports shared-row isolation, or mark a genuine control-plane entity [HostScoped].",
-                caps);
+                caps, null);
         if (_inner is not IQueryRepository<TEntity, TKey>)
             return (false,
                 $"Entity '{typeof(TEntity).Name}' is in an active managed scope, but the adapter '{_inner.GetType().Name}' does not " +
                 "implement IQueryRepository. Managed isolation lowers key operations to scoped queries, so it requires pushdown query support.",
-                caps);
-        return (true, null, caps);
+                caps, null);
+        return (true, null, caps, scopedDeletes);
     }
 
     /// <summary>Fail-closed for a scoped WRITE: the adapter must satisfy the static isolation contract (capability + query).</summary>
@@ -408,6 +415,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         => FoldReadScope(_segmentation.Bind("entity scope diagnostics"));
     bool IAxisScopeDiagnostics.IsFullyPushable(Filter folded)
         => _skipReadPushabilityCheck || FilterSplitter.Split(folded, _filterCaps, typeof(TEntity)).Residual is null;
+    bool IAxisScopeDiagnostics.ScopedDeletesAtStore => _scopedDeletes is not null;
 
     /// <summary>
     /// Whether any registered read-filter contributor constrains the current read of this type (ambient-active) — DATA-0106 §4.
@@ -424,6 +432,11 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
     private QueryDefinition ApplyManaged(QueryDefinition query, Filter managed)
         => query.Where(query.Filter is null ? managed : Filter.All(query.Filter, managed));
+
+    /// <summary>The adapter's conditional delete when it can carry <paramref name="scope"/> into the delete statement
+    /// (DATA-0156), else <c>null</c>: the delete is then checked first and executed by identity, which is not atomic.</summary>
+    private IConditionalDeleteRepository<TEntity, TKey>? StoreScoped(Filter scope)
+        => _scopedDeletes is not null && !Filter.HasCounterpart(scope) ? _scopedDeletes : null;
 
     private QueryDefinition ScopedById(TKey id, Filter managed)
         => QueryDefinition.All.Where(Filter.All(Filter.Eq(_idField, id), managed));
@@ -1122,7 +1135,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             return true;
         }
         if (managed is null) return await _inner.Delete(id, ct);
-        // check-then-delete: only an owned row may be deleted by id (IDOR).
+        // DATA-0156: the scope travels with the delete, so the store removes the row only if it is still in scope.
+        if (StoreScoped(managed) is { } store) return await store.ConditionalDeleteAsync(id, managed, ct);
+        // check-then-delete: only an owned row may be deleted by id (IDOR). Not atomic; the diagnostics declare it.
         var res2 = await RequireQuery().Query(ScopedById(id, managed), ct);
         if (res2.Items.Count == 0) return false;
         return await _inner.Delete(id, ct);
@@ -1186,10 +1201,12 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     }
 
     /// <summary>Removes the rows among <paramref name="idList"/> the read scope can see, physically: an identity-only
-    /// delete with no scope, a check-then-delete under one (IDOR).</summary>
+    /// delete with no scope; under one, a delete that carries the scope (DATA-0156), or a check-then-delete (IDOR) on an
+    /// adapter that cannot carry it.</summary>
     private async Task<int> PhysicalDeleteMany(IReadOnlyList<TKey> idList, Filter? managed, CancellationToken ct)
     {
         if (managed is null) return await _inner.DeleteMany(idList, ct);
+        if (StoreScoped(managed) is { } store) return await store.ConditionalDeleteMany(idList, managed, ct);
         var owned = await VisibleIds(idList, managed, ct);
         return owned.Count == 0 ? 0 : await _inner.DeleteMany(owned, ct);
     }
@@ -1628,6 +1645,12 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             var removeContexts = new List<EntityLifecycleContext<TEntity>>(_deletes.Count);
             var deletes = new List<TKey>(_deletes.Count);
             var deleteSlots = new int[_deletes.Count];
+            // DATA-0156: where the native batch can guard a delete, each dispatched delete carries the read scope, so the
+            // store removes a row only if it is still in scope and the receipt reports what it removed.
+            var deleteScope = lowerSoftDeletes || _deletes.Count == 0 ? null : _outer.ReadScopeFilter(segmentation);
+            var guardedNative = deleteScope is not null && _outer.StoreScoped(deleteScope) is not null
+                ? native as IConditionalBatchDelete<TEntity, TKey>
+                : null;
             if (_outer.Lifecycle is { HasRemove: true })
             {
                 for (var i = 0; i < _deletes.Count; i++)
@@ -1646,8 +1669,10 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             }
             else
             {
-                var managed = lowerSoftDeletes || _deletes.Count == 0 ? null : _outer.ReadScopeFilter(segmentation);
-                var visible = managed is null ? null : (await _outer.VisibleIds(_deletes, managed, ct)).ToHashSet();
+                // A guarded delete needs no visibility read: an id outside the scope deletes nothing and reports Missing.
+                var visible = deleteScope is null || guardedNative is not null
+                    ? null
+                    : (await _outer.VisibleIds(_deletes, deleteScope, ct)).ToHashSet();
                 for (var i = 0; i < _deletes.Count; i++)
                 {
                     if (visible is not null && !visible.Contains(_deletes[i]))
@@ -1676,7 +1701,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             // operation overrides, managed scope and Lifecycle retain exactly the same meaning as Entity.Remove().
             // This necessarily spans multiple writes; fail closed when the caller explicitly requires atomicity.
             if (!lowerSoftDeletes)
-                foreach (var id in deletes) native.Delete(id);
+                foreach (var id in deletes)
+                    if (guardedNative is not null) guardedNative.DeleteIf(id, deleteScope!);
+                    else native.Delete(id);
 
             var values = _outer.CurrentManagedValues(segmentation);
             BatchResult result;

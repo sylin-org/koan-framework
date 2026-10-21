@@ -261,6 +261,28 @@ public abstract class KeyValueStore<TEntity, TKey> :
         return await RemoveManyAsync(list, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Removes <paramref name="id"/> only while its stored record matches <paramref name="guard"/>, evaluated as a query
+    /// evaluates it (managed values included). This is the family's conditional delete: the facade passes its read scope
+    /// here so a scoped delete cannot remove a row that left the scope after it was checked (DATA-0156).
+    /// </summary>
+    protected Task<bool> RemoveIf(TKey id, Filter guard, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(guard);
+        Filter.RequireRowOnly(guard, "Conditional deletion");
+        ct.ThrowIfCancellationRequested();
+        return RemoveIfAsync(id, KvFilterEvaluator.Compile<TEntity>(guard), ct);
+    }
+
+    /// <summary>Remove one record while it matches <paramref name="match"/>, with no write between the check and the
+    /// removal. The default holds the write gate; a backend with a native compare-and-remove overrides it.</summary>
+    protected virtual Task<bool> RemoveIfAsync(TKey id, Func<KvRecord<TEntity>, bool> match, CancellationToken ct)
+        => Exclusive(async () =>
+        {
+            var record = await ReadAsync(id, ct).ConfigureAwait(false);
+            return record is { } found && match(found) && await RemoveAsync(id, ct).ConfigureAwait(false);
+        }, ct);
+
     /// <summary>The cross-scope write guard + managed-value stamp for one row, shared by <see cref="Upsert"/> and
     /// <see cref="UpsertMany"/>. Guards only the GUARDED isolation values (<c>ManagedFieldWriteScope.Current</c>), never
     /// the unguarded operation overrides — the KV analogue of the relational <c>ON CONFLICT … WHERE json_extract(...)</c>.</summary>
@@ -325,12 +347,13 @@ public abstract class KeyValueStore<TEntity, TKey> :
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new KvBatch(this);
 
-    private sealed class KvBatch : IBatchSet<TEntity, TKey>
+    private sealed class KvBatch : IBatchSet<TEntity, TKey>, IConditionalBatchDelete<TEntity, TKey>
     {
         private readonly KeyValueStore<TEntity, TKey> _repo;
         private readonly List<TEntity> _adds = new();
         private readonly List<TEntity> _updates = new();
         private readonly List<TKey> _deletes = new();
+        private readonly List<(TKey Id, Filter Guard)> _guardedDeletes = new();
         private readonly List<(TKey id, Action<TEntity> mutate)> _mutations = new();
 
         public KvBatch(KeyValueStore<TEntity, TKey> repo) => _repo = repo;
@@ -338,8 +361,14 @@ public abstract class KeyValueStore<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
         public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
+        public IBatchSet<TEntity, TKey> DeleteIf(TKey id, Filter guard)
+        {
+            ArgumentNullException.ThrowIfNull(guard);
+            _guardedDeletes.Add((id, guard));
+            return this;
+        }
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
-        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _mutations.Clear(); return this; }
+        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _deletes.Clear(); _guardedDeletes.Clear(); _mutations.Clear(); return this; }
 
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
@@ -365,6 +394,8 @@ public abstract class KeyValueStore<TEntity, TKey> :
             var add = _adds.Count > 0 ? await _repo.UpsertMany(_adds, ct).ConfigureAwait(false) : 0;
             var upd = _updates.Count > 0 ? await _repo.UpsertMany(_updates, ct).ConfigureAwait(false) : 0;
             var del = _deletes.Count > 0 ? await _repo.DeleteMany(_deletes, ct).ConfigureAwait(false) : 0;
+            foreach (var (id, guard) in _guardedDeletes)
+                if (await _repo.RemoveIf(id, guard, ct).ConfigureAwait(false)) del++;
 
             return new BatchResult(add, upd, del);
         }

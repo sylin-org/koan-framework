@@ -35,7 +35,8 @@ public sealed record AxisExplanation(
         var scope = ReadScopedNow ? "scoped-now" : "unscoped-now";
         var adapterNote = Adapter is null ? "" :
             $"; adapter={Adapter.Name} {(Adapter.IsolationSatisfied ? "isolates" : "CANNOT-ISOLATE")}" +
-            (Adapter.Pushable is { } push ? $"; predicate {(push ? "pushes-down" : "NOT-PUSHABLE")}" : "");
+            (Adapter.Pushable is { } push ? $"; predicate {(push ? "pushes-down" : "NOT-PUSHABLE")}" : "") +
+            (Adapter.ScopedDeletesAtStore is { } atStore ? $"; deletes {(atStore ? "scoped-at-store" : "check-then-delete")}" : "");
         return $"{EntityType.Name}: {planeNote}; {scope}; {(CacheExcluded ? "cache-excluded" : "cacheable")}{adapterNote}";
     }
 }
@@ -51,4 +52,9 @@ public sealed record AxisPlane(string Plane, string Key, string Detail);
 /// <param name="IsolationSatisfied">Whether the adapter announces every required isolation capability and is an <c>IQueryRepository</c>.</param>
 /// <param name="FailClosedReason">The fix-it message when it cannot isolate, else <c>null</c>.</param>
 /// <param name="Pushable">Whether the active read-scope predicate fully pushes down (no in-memory residual); <c>null</c> when nothing scopes now.</param>
-public sealed record AxisAdapter(string Name, bool IsolationSatisfied, string? FailClosedReason, bool? Pushable);
+public sealed record AxisAdapter(string Name, bool IsolationSatisfied, string? FailClosedReason, bool? Pushable)
+{
+    /// <summary>Whether a scoped delete by identity runs as one store statement carrying the scope (DATA-0156);
+    /// <c>false</c> when it is a check-then-delete, which is not atomic; <c>null</c> when the adapter is unresolved.</summary>
+    public bool? ScopedDeletesAtStore { get; init; }
+}

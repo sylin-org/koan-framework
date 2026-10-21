@@ -24,6 +24,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
+    IConditionalDeleteRepository<TEntity, TKey>,
     ICounterpartQueryRepository,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
@@ -265,6 +266,29 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return replaced;
     }
 
+    public async Task<bool> ConditionalDeleteAsync(TKey id, Filter guard, CancellationToken ct = default)
+    {
+        var deleted = await ConditionalDeletes().ConditionalDeleteAsync(id, guard, ct);
+        if (deleted) await Remove(id, ct);
+        return deleted;
+    }
+
+    public async Task<int> ConditionalDeleteMany(IReadOnlyList<TKey> ids, Filter guard, CancellationToken ct = default)
+    {
+        var deleted = await ConditionalDeletes().ConditionalDeleteMany(ids, guard, ct);
+        if (deleted > 0)
+            foreach (var id in ids) await Remove(id, ct);
+        return deleted;
+    }
+
+    // The forwarded capability set already carries the inner adapter's ConditionalDelete claim, so the interface
+    // forwards to the same adapter rather than leaving a declared capability without its contract (DATA-0156).
+    private IConditionalDeleteRepository<TEntity, TKey> ConditionalDeletes()
+        => _inner is IConditionalDeleteRepository<TEntity, TKey> conditional &&
+           DataCaps.Describe(_inner, _inner.GetType().Name).Has(DataCaps.Write.ConditionalDelete)
+            ? conditional
+            : throw new NotSupportedException($"The adapter backing {_entityName} does not support conditional deletion.");
+
     public async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         var result = await _inner.Upsert(model, ct);
@@ -320,7 +344,9 @@ internal sealed class CachedRepository<TEntity, TKey> :
             throw new InvalidOperationException($"Repository for {_entityName} returned a null batch set.");
         }
 
-        return new CachingBatchSet(this, batch);
+        return batch is IConditionalBatchDelete<TEntity, TKey> guarded
+            ? new GuardedCachingBatchSet(this, batch, guarded)
+            : new CachingBatchSet(this, batch);
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -427,12 +453,29 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private static bool IsDefaultKey(TKey key)
         => EqualityComparer<TKey>.Default.Equals(key, default!);
 
-    private sealed class CachingBatchSet : IBatchSet<TEntity, TKey>
+    /// <summary>A caching batch over a native batch that guards deletes: a guarded delete still retires its entry.</summary>
+    private sealed class GuardedCachingBatchSet(
+        CachedRepository<TEntity, TKey> outer,
+        IBatchSet<TEntity, TKey> inner,
+        IConditionalBatchDelete<TEntity, TKey> guarded)
+        : CachingBatchSet(outer, inner), IConditionalBatchDelete<TEntity, TKey>
+    {
+        public IBatchSet<TEntity, TKey> DeleteIf(TKey id, Filter guard)
+        {
+            Deletes.Add(id);
+            guarded.DeleteIf(id, guard);
+            return this;
+        }
+    }
+
+    private class CachingBatchSet : IBatchSet<TEntity, TKey>
     {
         private readonly CachedRepository<TEntity, TKey> _outer;
         private readonly IBatchSet<TEntity, TKey> _inner;
         private readonly List<TEntity> _upserts = new();
         private readonly List<TKey> _deletes = new();
+
+        protected List<TKey> Deletes => _deletes;
         private readonly HashSet<TKey> _mutations = new();
 
         public CachingBatchSet(CachedRepository<TEntity, TKey> outer, IBatchSet<TEntity, TKey> inner)

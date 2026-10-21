@@ -225,6 +225,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 transaction,
                 plan,
                 values.Skip(offset).Take(dispatchSize).ToArray(),
+                guard: null,
                 ct).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
         return deleted;
@@ -377,6 +378,38 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         AddParameters(command, values, "p");
         command.CommandText = $"DELETE FROM {plan.QualifiedTable} AS koan_row WHERE {identity} AND ({condition})";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
+    }
+
+    /// <summary>One guarded statement per bounded slice, in one transaction: <c>DELETE ... WHERE (ids) AND (guard)</c>.</summary>
+    public async Task<int> ConditionalDeleteMany(
+        IReadOnlyList<TKey> ids,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        ArgumentNullException.ThrowIfNull(guard);
+        if (ids.Count == 0) return 0;
+        var plan = Plan();
+        await Ready(plan, ct).ConfigureAwait(false);
+        _route.Policy.Demand(DataOperationEffect.Write, "conditional bulk delete");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var width = Math.Max(1, plan.IdentityRoots.Count);
+        var guardParameters = Where(plan, guard).Values.Count;
+        var dispatchSize = Math.Max(1, Math.Min(
+            Infrastructure.Constants.MaximumBatchItems,
+            (Infrastructure.Constants.MaximumParameters - guardParameters) / width));
+        var deleted = 0;
+        for (var offset = 0; offset < ids.Count; offset += dispatchSize)
+            deleted += await Delete(
+                connection,
+                transaction,
+                plan,
+                ids.Skip(offset).Take(dispatchSize).ToArray(),
+                guard,
+                ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return deleted;
     }
 
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
@@ -740,18 +773,28 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         return assignments;
     }
 
+    /// <summary>Deletes <paramref name="ids"/>; with a <paramref name="guard"/>, only the rows that still match it.</summary>
     private static async Task<int> Delete(
         SqliteConnection connection,
         SqliteTransaction? transaction,
         SqliteEntityPlan<TEntity, TKey> plan,
         IReadOnlyList<TKey> ids,
+        Filter? guard,
         CancellationToken ct)
     {
         await using var command = connection.CreateCommand();
         command.Transaction = transaction;
         var predicates = ids.Select((id, index) =>
             IdentityPredicate(command, plan, plan.Commands.Delete(id).Identity, $"d{index}_")).ToArray();
-        command.CommandText = $"DELETE FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}";
+        var identities = string.Join(" OR ", predicates);
+        if (guard is null)
+            command.CommandText = $"DELETE FROM {plan.QualifiedTable} WHERE {identities}";
+        else
+        {
+            var (condition, values) = Where(plan, guard);
+            AddParameters(command, values, "p");
+            command.CommandText = $"DELETE FROM {plan.QualifiedTable} AS koan_row WHERE ({identities}) AND ({condition})";
+        }
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
@@ -959,7 +1002,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 $"SQLite accepts at most {Infrastructure.Constants.MaximumBatchItems} items per bounded batch.");
     }
 
-    private sealed class Batch(SqliteRepository<TEntity, TKey> repository) : IBatchSet<TEntity, TKey>
+    private sealed class Batch(SqliteRepository<TEntity, TKey> repository) :
+        IBatchSet<TEntity, TKey>,
+        IConditionalBatchDelete<TEntity, TKey>
     {
         private readonly List<Queued> _operations = [];
 
@@ -987,6 +1032,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         public IBatchSet<TEntity, TKey> Delete(TKey id)
         {
             _operations.Add(new Queued(BatchOperation.Delete, null, id, null));
+            return this;
+        }
+
+        public IBatchSet<TEntity, TKey> DeleteIf(TKey id, Filter guard)
+        {
+            ArgumentNullException.ThrowIfNull(guard);
+            _operations.Add(new Queued(BatchOperation.Delete, null, id, null, guard));
             return this;
         }
 
@@ -1043,7 +1095,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     case BatchOperation.Delete:
                     {
                         var count = await SqliteRepository<TEntity, TKey>.Delete(
-                            connection, transaction, plan, [operation.Id!], ct).ConfigureAwait(false);
+                            connection, transaction, plan, [operation.Id!], operation.Guard, ct).ConfigureAwait(false);
                         deleted += count;
                         outcomes.Add(new BatchItemResult(index, operation.Kind,
                             count == 0 ? BatchItemOutcome.Missing : BatchItemOutcome.Applied));
@@ -1066,7 +1118,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             BatchOperation Kind,
             TEntity? Entity,
             TKey? Id,
-            Action<TEntity>? Mutate);
+            Action<TEntity>? Mutate,
+            Filter? Guard = null);
     }
 
     /// <summary>

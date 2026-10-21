@@ -181,7 +181,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await Delete(connection, null, values, ct).ConfigureAwait(false);
+        return await Delete(connection, null, values, guard: null, ct).ConfigureAwait(false);
     }
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
@@ -390,6 +390,21 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         return await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false) == 1;
     }
 
+    /// <summary>One guarded statement for the set: <c>DELETE ... WHERE (ids) AND (guard)</c>.</summary>
+    public async Task<int> ConditionalDeleteMany(
+        IReadOnlyList<TKey> ids,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        ArgumentNullException.ThrowIfNull(guard);
+        if (ids.Count == 0) return 0;
+        await Ready(ct).ConfigureAwait(false);
+        _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional bulk delete");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        return await Delete(connection, null, ids, guard, ct).ConfigureAwait(false);
+    }
+
     public async Task<TResult> ExecuteAsync<TResult>(Instruction instruction, CancellationToken ct = default)
     {
         switch (instruction.Name)
@@ -574,17 +589,25 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         return string.Join(", ", assignments);
     }
 
+    /// <summary>Deletes <paramref name="ids"/>; with a <paramref name="guard"/>, only the rows that still match it.</summary>
     private async Task<int> Delete(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         IReadOnlyList<TKey> ids,
+        Filter? guard,
         CancellationToken ct)
     {
         var parameters = new SqlParameters();
         var predicates = new string[ids.Count];
         for (var index = 0; index < ids.Count; index++)
             predicates[index] = IdentityPredicate(_plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
-        return await AdoCommands.ExecuteAsync(connection, $"DELETE FROM {_plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}", parameters, transaction, ct).ConfigureAwait(false);
+        var sql = $"DELETE FROM {_plan.QualifiedTable} WHERE ({string.Join(" OR ", predicates)})";
+        if (guard is not null && Where(guard) is ({ } condition, var conditionValues))
+        {
+            Add(parameters, conditionValues, "p");
+            sql += $" AND ({condition})";
+        }
+        return await AdoCommands.ExecuteAsync(connection, sql, parameters, transaction, ct).ConfigureAwait(false);
     }
 
     private (string? Sql, IReadOnlyList<object?> Parameters) Where(Filter? filter)
@@ -775,19 +798,28 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     private sealed record PreparedWrite(string Sql, SqlParameters Parameters);
 
-    private sealed class Batch(NpgsqlRepository<TEntity, TKey> repository) : IBatchSet<TEntity, TKey>
+    private sealed class Batch(NpgsqlRepository<TEntity, TKey> repository) :
+        IBatchSet<TEntity, TKey>,
+        IConditionalBatchDelete<TEntity, TKey>
     {
         private readonly List<TEntity> _adds = [];
         private readonly List<TEntity> _updates = [];
         private readonly List<(TKey Id, Action<TEntity> Mutate)> _mutations = [];
         private readonly List<TKey> _deletes = [];
+        private readonly List<(TKey Id, Filter Guard)> _guardedDeletes = [];
 
         public BatchExecutionCapabilities ExecutionCapabilities => BatchExecutionCapabilities.Atomic;
         public IBatchSet<TEntity, TKey> Add(TEntity entity) { _adds.Add(entity); return this; }
         public IBatchSet<TEntity, TKey> Update(TEntity entity) { _updates.Add(entity); return this; }
         public IBatchSet<TEntity, TKey> Update(TKey id, Action<TEntity> mutate) { _mutations.Add((id, mutate)); return this; }
         public IBatchSet<TEntity, TKey> Delete(TKey id) { _deletes.Add(id); return this; }
-        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _mutations.Clear(); _deletes.Clear(); return this; }
+        public IBatchSet<TEntity, TKey> DeleteIf(TKey id, Filter guard)
+        {
+            ArgumentNullException.ThrowIfNull(guard);
+            _guardedDeletes.Add((id, guard));
+            return this;
+        }
+        public IBatchSet<TEntity, TKey> Clear() { _adds.Clear(); _updates.Clear(); _mutations.Clear(); _deletes.Clear(); _guardedDeletes.Clear(); return this; }
 
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
@@ -806,7 +838,11 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
                 await repository.Upsert(connection, transaction, entity, ct).ConfigureAwait(false);
             var deleted = _deletes.Count == 0
                 ? 0
-                : await repository.Delete(connection, transaction, _deletes, ct).ConfigureAwait(false);
+                : await repository.Delete(connection, transaction, _deletes, guard: null, ct).ConfigureAwait(false);
+            // A guarded delete removes only rows that still match their guard; deletes sharing one guard run as one statement.
+            foreach (var group in _guardedDeletes.GroupBy(static item => (object)item.Guard, ReferenceEqualityComparer.Instance))
+                deleted += await repository.Delete(connection, transaction,
+                    group.Select(static item => item.Id).ToArray(), (Filter)group.Key!, ct).ConfigureAwait(false);
             await transaction.CommitAsync(ct).ConfigureAwait(false);
             return new BatchResult(_adds.Count, _updates.Count, deleted) { Atomicity = BatchAtomicity.Atomic };
         }

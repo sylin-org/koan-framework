@@ -34,4 +34,9 @@ public interface IAxisScopeDiagnostics
     /// <summary>Whether <paramref name="folded"/> is fully pushable at the store (no in-memory residual) — the §4b
     /// isolation-must-push-down check, read non-throwing.</summary>
     bool IsFullyPushable(Filter folded);
+
+    /// <summary>Whether a scoped delete by identity carries the read scope into the store's own delete statement
+    /// (DATA-0156). <c>false</c> means the facade checks visibility and then deletes by identity: correct, but not
+    /// atomic, so a row that leaves the scope between the two steps can still be deleted.</summary>
+    bool ScopedDeletesAtStore { get; }
 }

@@ -95,6 +95,7 @@ public static partial class DataAxis
                     diag.ScopeAdapterOk,
                     diag.ScopeAdapterOk ? null : diag.ScopeAdapterError,
                     readScope is null ? null : diag.IsFullyPushable(readScope))
+                { ScopedDeletesAtStore = diag.ScopedDeletesAtStore }
             : adapterError is not null && couldScope ? new AxisAdapter(
                     "<unresolved>", IsolationSatisfied: false, FailClosedReason: adapterError, Pushable: null)
             : null;

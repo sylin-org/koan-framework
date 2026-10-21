@@ -309,13 +309,39 @@ internal sealed class MongoRepository<TEntity, TKey> :
         DemandAcknowledged(result.IsAcknowledged);
         return result.DeletedCount == 1;
     }
+
+    /// <summary>One guarded <c>deleteMany</c> per identity slice: <c>{$and: [{_id: {$in}}, guard]}</c>.</summary>
+    public async Task<int> ConditionalDeleteMany(
+        IReadOnlyList<TKey> ids,
+        Filter guard,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        ArgumentNullException.ThrowIfNull(guard);
+        if (_entity.IsMapped)
+            throw new NotSupportedException("MongoDB conditional deletion requires native _id identity. Mapped key uniqueness has not been qualified.");
+        if (ids.Count == 0) return 0;
+        var predicate = _queries.Predicate(guard);
+        var collection = await Collection(ct).ConfigureAwait(false);
+        long deleted = 0;
+        for (var offset = 0; offset < ids.Count; offset += IdentityBatch)
+        {
+            var identities = Builders<BsonDocument>.Filter.Or(ids.Skip(offset).Take(IdentityBatch).Select(_entity.Identity));
+            var result = await collection.DeleteManyAsync(
+                Builders<BsonDocument>.Filter.And(identities, predicate, _entity.WriteGuard()),
+                ct).ConfigureAwait(false);
+            DemandAcknowledged(result.IsAcknowledged);
+            deleted += result.DeletedCount;
+        }
+        return checked((int)deleted);
+    }
     public IBatchSet<TEntity, TKey> CreateBatch() => new MongoBatch<TEntity, TKey>(CommitBatch);
 
     internal async Task<BatchResult> CommitBatch(
         IReadOnlyList<TEntity> adds,
         IReadOnlyList<TEntity> updates,
         IReadOnlyList<(TKey Id, Action<TEntity> Mutate)> mutations,
-        IReadOnlyList<TKey> deletes,
+        IReadOnlyList<(TKey Id, Filter? Guard)> deletes,
         BatchOptions? options,
         CancellationToken ct)
     {
@@ -345,7 +371,10 @@ internal sealed class MongoRepository<TEntity, TKey> :
         writes.AddRange(adds.Select(WriteModel));
         writes.AddRange(updates.Select(WriteModel));
         writes.AddRange(mutationModels.Select(WriteModel));
-        writes.AddRange(deletes.Select(id => new DeleteOneModel<BsonDocument>(_entity.Identity(id))));
+        // A guarded delete removes the row only while it still matches its guard (the facade's scope, DATA-0156).
+        writes.AddRange(deletes.Select(delete => new DeleteOneModel<BsonDocument>(delete.Guard is null
+            ? _entity.Identity(delete.Id)
+            : Builders<BsonDocument>.Filter.And(_entity.Identity(delete.Id), _queries.Predicate(delete.Guard), _entity.WriteGuard()))));
         var collection = await Collection(ct).ConfigureAwait(false);
         var result = await Bulk(collection, writes, session: null, ct).ConfigureAwait(false);
         return new BatchResult(adds.Count, updates.Count + mutationModels.Count, checked((int)result.DeletedCount));

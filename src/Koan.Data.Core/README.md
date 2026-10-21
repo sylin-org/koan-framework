@@ -201,6 +201,9 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   mutation loads or callbacks when the selected adapter cannot prove it.
 - `Batch().Delete(id)` deletes only a row the caller's tenant, axis, soft-delete or other read scope can see, exactly
   like `Remove(id)`. An id outside the scope is not deleted and its item reports `Missing` (DATA-0124).
+- On adapters that declare a conditional delete (SQLite, PostgreSQL, MongoDB, InMemory), a scoped `Remove`, bulk
+  remove or batch delete runs as one store statement carrying the scope, so a row that leaves the scope mid-flight is
+  not removed. Elsewhere the delete is checked first and is not atomic; `DataAxis.Explain<T>()` says which (DATA-0156).
 - `Copy`, `Move` and `Mirror` compare the physical places their endpoints reach, not how they are written. A `Move` or
   `Mirror` whose endpoints resolve to one container is refused before any read; a `Copy` onto itself writes nothing
   and says so in its warnings (DATA-0125).

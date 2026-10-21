@@ -56,13 +56,18 @@ internal sealed class InMemoryRepository<TEntity, TKey>(InMemoryState state, str
         return store.TryUpdate(model.Id, replacement, observed);
     }
 
+    /// <summary>The guard is evaluated over the stored record as a query evaluates it, managed values included, so the
+    /// facade's read scope can travel with a scoped delete (DATA-0156).</summary>
     public Task<bool> ConditionalDeleteAsync(TKey id, Filter guard, CancellationToken ct = default)
+        => RemoveIf(id, guard, ct);
+
+    /// <summary>Compare the observed immutable stored record at the removal itself: a record replaced after the check
+    /// is not removed.</summary>
+    protected override Task<bool> RemoveIfAsync(TKey id, Func<KvRecord<TEntity>, bool> match, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(guard);
         ct.ThrowIfCancellationRequested();
-        var guardFn = InMemoryFilterEvaluator.CompileConditional<TEntity>(guard);
         var store = Current();
-        if (!store.TryGetValue(id, out var observed) || !guardFn(Materialize(observed).Entity))
+        if (!store.TryGetValue(id, out var observed) || !match(Materialize(observed)))
             return Task.FromResult(false);
         ct.ThrowIfCancellationRequested();
         var removed = ((ICollection<KeyValuePair<TKey, InMemoryState.Record>>)store)
