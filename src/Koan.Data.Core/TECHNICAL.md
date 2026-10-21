@@ -261,7 +261,11 @@ validation:
   the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,
   and an equal or unknown store are one place: Move and Mirror throw before the lease is taken, Copy returns a zero
   result with a warning (DATA-0125). Identities that differ are not proof of two stores: a `Move` between two stores of
-  one provider also needs `ProveDistinctStores` to return true, or it throws before the lease (DATA-0143).
+  one provider also needs `ProveDistinctStores` to return true, or it throws before the lease (DATA-0143). Before
+  that, both endpoints are asked for their store markers (`ReadStoreMarker`, created where DDL is allowed): the same
+  marker is one store, so only a different container in it is distinct; different markers are two stores; without a
+  marker on both sides the adapter's proof decides. Cutover's physical-distinctness check asks the same question
+  (`StoreMarkers.Compare`) and refuses a target that reads the active default's marker (DATA-0148).
 - Transfer journals hold identities only. A bidirectional mirror whose destination wins journals the winning ids and
   re-reads those rows from the destination when it replays them into the source, so the source receives the row the
   destination's adapter materializes (runtime family type, defaults, non-public setters, dictionary keys) and never a

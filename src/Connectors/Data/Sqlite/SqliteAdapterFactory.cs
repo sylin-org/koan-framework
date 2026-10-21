@@ -132,6 +132,22 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
             .ProveDistinct(first.ConnectionString, second.ConnectionString, ct);
     }
 
+    /// <summary>
+    /// The id in the database's reserved <c>__koan_store</c> table (DATA-0148). It is created only where the source may
+    /// create a table (Managed + ReadWrite, <c>DdlPolicy=AutoCreate</c>, the production DDL gate); otherwise it is read.
+    /// </summary>
+    public ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default)
+    {
+        var route = ResolveRoute(services, source);
+        var allowed = create && Koan.Data.Relational.Orchestration.RelationalDdlGate.MayCreate(
+            route.Policy, route.Options.DdlPolicy, route.Options.AllowProductionDdl);
+        return services.GetRequiredService<SqliteConnections>().ReadMarker(route.ConnectionString, route.Source, allowed, ct);
+    }
+
     internal SqliteRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

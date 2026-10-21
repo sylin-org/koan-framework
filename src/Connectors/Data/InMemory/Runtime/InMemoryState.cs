@@ -28,6 +28,17 @@ internal sealed class InMemoryState
         }
     }
 
+    private readonly ConcurrentDictionary<string, string> _markers = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The store marker of a source (DATA-0148), keyed exactly as <see cref="Store{TKey}"/> keys its stores. It lives as
+    /// long as the host's stores do and is created only when <paramref name="create"/> is set.
+    /// </summary>
+    internal string? Marker(string source, bool create) =>
+        create
+            ? _markers.GetOrAdd(source, static _ => Koan.Data.Abstractions.StoreMarker.NewId())
+            : _markers.TryGetValue(source, out var marker) ? marker : null;
+
     internal readonly record struct Record(
         string EntityJson,
         IReadOnlyDictionary<string, object?>? Managed);

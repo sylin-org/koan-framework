@@ -43,6 +43,11 @@ Entity mutation contracts follow the same rule:
 - `IDataAdapterFactory.ProveDistinctStores(services, source, other, ct)` answers whether two sources whose identities
   differ are proven to be different stores, from the stores themselves and without writing. A `Move` runs between two
   stores of one provider only when this returns true (DATA-0143); the default is false.
+- `IDataAdapterFactory.ReadStoreMarker(services, source, create, ct)` reads the store marker: one random id in the
+  reserved `StoreMarker.Name` (`__koan_store`) table, collection, key or file of the namespace the source addresses,
+  created only under the source's DDL consent. Two endpoints are one store exactly when they read the same id; Move and
+  cutover ask it before `ProveDistinctStores` (DATA-0148). The marker is never listed as a container. `null` (the
+  default) means no marker is readable.
 - `RequireAtomic` rejects before deferred loads, Lifecycle callbacks, or provider dispatch unless both the adapter
   claim and the created native execution seam prove atomicity.
 - `GetMany` returns exactly one slot per requested identity, preserving order and duplicates and using `null` for

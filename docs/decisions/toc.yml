@@ -402,6 +402,8 @@
       href: DATA-0146-postgres-index-names-fit-63-bytes-and-are-qualified-per-partition.md
     - name: DATA-0147 Each source is minted once from the store its provider resolves, and every consumer uses that plan
       href: DATA-0147-each-source-is-minted-once-from-its-physical-store.md
+    - name: DATA-0148 Every store holds a __koan_store marker, and two endpoints are one store exactly when they read the same one
+      href: DATA-0148-every-store-holds-a-koan-store-marker.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

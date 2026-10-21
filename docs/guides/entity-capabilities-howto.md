@@ -1131,7 +1131,11 @@ no connection at all is refused on its first operation
 (`localhost` and `127.0.0.1`, a path prefix, a link) can still be one store, so a `Move` between two stores of one
 provider runs only when the adapter proves them apart from the stores themselves: SQLite by file locks, PostgreSQL by an
 advisory lock, MongoDB by the answering process, InMemory by source. Otherwise the `Move` is refused; a `Copy` still
-runs ([DATA-0143](../decisions/DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md)).
+runs ([DATA-0143](../decisions/DATA-0143-a-move-needs-proof-its-endpoints-are-different-stores.md)). First, though,
+each store is asked for its marker, a random id Koan keeps in a reserved `__koan_store` table, collection or file
+where the source may create tables: SQLite, PostgreSQL, MongoDB, JSON and InMemory read the same marker exactly when
+they are one store, which settles a pair the locks cannot, such as a SQLite URI or two JSON directories
+([DATA-0148](../decisions/DATA-0148-every-store-holds-a-koan-store-marker.md)).
 
 Move journals confirmed identities in delete-on-close bounded records, so it does not retain the selected
 dataset in application memory or mutate an offset-paged source while reading it. Before deleting, it re-reads

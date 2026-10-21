@@ -33,20 +33,24 @@ internal sealed record TransferPlace(
     }
 
     /// <summary>
-    /// True when both places are, or may be, one physical container. Containers compare without regard to letter
-    /// case because several stores (SQLite, SQL Server, MySQL on Windows, a JSON directory on a case-insensitive file
-    /// system) resolve names that differ only by case to one object; an unknown store is assumed shared.
-    /// </summary>
-    /// <summary>
     /// True when the two places are proven to be different containers: different providers, one store with different
-    /// containers, or two stores the adapter proves apart. Two store identities that merely differ are not proof,
-    /// because connection text can spell one store two ways (NK-305).
+    /// containers, or two stores proven apart. Two store identities that merely differ are not proof, because connection
+    /// text can spell one store two ways (NK-305). The stores' markers answer first (DATA-0148): the same marker is one
+    /// store, so only different containers in it are distinct; different markers are two stores. Without a marker on
+    /// both sides the adapter's own proof (locks, server identity) decides, and an unproven pair is not distinct.
     /// </summary>
     public async ValueTask<bool> IsProvenDistinctFrom(TransferPlace other, IServiceProvider services, CancellationToken ct)
     {
         if (IsSameAs(other)) return false;
         if (!string.Equals(Provider, other.Provider, StringComparison.OrdinalIgnoreCase)) return true;
         if (string.Equals(Store, other.Store, StringComparison.Ordinal)) return true;
+        switch (await StoreMarkers.Compare(Factory, Source, other.Factory, other.Source, services, ct).ConfigureAwait(false))
+        {
+            case StoreKinship.Same:
+                return !string.Equals(Container, other.Container, StringComparison.OrdinalIgnoreCase);
+            case StoreKinship.Different:
+                return true;
+        }
         try
         {
             return await Factory.ProveDistinctStores(services, Source, other.Source, ct).ConfigureAwait(false);
@@ -57,6 +61,11 @@ internal sealed record TransferPlace(
         }
     }
 
+    /// <summary>
+    /// True when both places are, or may be, one physical container. Containers compare without regard to letter
+    /// case because several stores (SQLite, SQL Server, MySQL on Windows, a JSON directory on a case-insensitive file
+    /// system) resolve names that differ only by case to one object; an unknown store is assumed shared.
+    /// </summary>
     public bool IsSameAs(TransferPlace other)
         => string.Equals(Provider, other.Provider, StringComparison.OrdinalIgnoreCase)
            && string.Equals(Container, other.Container, StringComparison.OrdinalIgnoreCase)

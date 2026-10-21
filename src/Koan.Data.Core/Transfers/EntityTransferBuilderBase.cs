@@ -266,9 +266,10 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         $"Move of '{typeof(TEntity).Name}' from {Describe(FromContext)} to {Describe(ToContext)} was refused: " +
         $"source '{origin.Source}' and source '{destination.Source}' are both {origin.Provider} stores whose connections " +
         "are spelled differently, and Koan could not prove they are different stores. One store spelled two ways " +
-        "(localhost and 127.0.0.1, a path prefix, a link) would make the Move delete every row it copied. The " +
-        $"{origin.Provider} adapter could not prove them apart; if they are different stores, Copy the rows and remove " +
-        "them from the origin yourself, or move through a store the adapter can tell apart.";
+        "(localhost and 127.0.0.1, a path prefix, a link) would make the Move delete every row it copied. Either both " +
+        $"read the same {StoreMarker.Name} marker, or a marker was not readable on both and the {origin.Provider} " +
+        "adapter could not prove them apart (DATA-0148). If they are different stores, let each source create its " +
+        "marker (Managed, ReadWrite, DDL allowed), or Copy the rows and remove them from the origin yourself.";
 
     private static string Describe(TransferContextOptions? context)
     {

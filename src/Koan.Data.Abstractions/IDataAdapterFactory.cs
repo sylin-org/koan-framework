@@ -45,4 +45,22 @@ public interface IDataAdapterFactory : IAdapterFactory
         string source,
         string other,
         CancellationToken ct = default) => ValueTask.FromResult(false);
+
+    /// <summary>
+    /// Reads the id of the store marker that <paramref name="source"/> addresses: one random id held in a reserved
+    /// <see cref="StoreMarker.Name"/> table, collection, key or file of the namespace the source writes to. Two endpoints
+    /// are one store exactly when they read the same id, whatever their spelling (NK-305, DATA-0148).
+    /// <para>
+    /// With <paramref name="create"/>, a missing marker is written first, but only under the consent that lets the
+    /// source create a table (a Managed + ReadWrite source, and the provider's own DDL policy). A source without that
+    /// consent reads the marker and never creates it. The marker is never listed as an entity set.
+    /// </para>
+    /// <see langword="null"/> means no marker is readable (absent, not permitted, or not supported, which is the
+    /// default); the caller then falls back to <see cref="ProveDistinctStores"/>.
+    /// </summary>
+    ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default) => ValueTask.FromResult<string?>(null);
 }

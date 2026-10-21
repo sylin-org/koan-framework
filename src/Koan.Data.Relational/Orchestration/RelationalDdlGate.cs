@@ -28,6 +28,19 @@ public static class RelationalDdlGate
     public static bool Allowed(bool consent) => KoanEnv.Gate.Allows(Magic(consent));
 
     /// <summary>
+    /// Whether a source may create storage objects: a Managed + ReadWrite source whose DDL policy is AutoCreate, under
+    /// the environment gate. The store marker (DATA-0148) is created under exactly this consent, like a table.
+    /// </summary>
+    public static bool MayCreate(
+        Koan.Data.Abstractions.Sources.DataSourcePlan plan,
+        Koan.Data.Relational.Orchestration.RelationalDdlPolicy ddl,
+        bool consent) =>
+        plan.StorageLifecycle == Koan.Data.Abstractions.Sources.StorageLifecycle.Managed &&
+        plan.Access == Koan.Data.Abstractions.Sources.DataSourceAccess.ReadWrite &&
+        ddl == Koan.Data.Relational.Orchestration.RelationalDdlPolicy.AutoCreate &&
+        Allowed(consent);
+
+    /// <summary>
     /// The environment half of a refusal, for adapters composing a message that also names the table. Kept
     /// identical across adapters so operators recognize it wherever they meet it.
     /// </summary>

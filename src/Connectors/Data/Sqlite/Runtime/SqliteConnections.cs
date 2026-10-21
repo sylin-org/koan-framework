@@ -138,6 +138,51 @@ internal sealed class SqliteConnections(ILogger<SqliteConnections> logger, IHost
         }
     }
 
+    /// <summary>
+    /// Reads the store marker (DATA-0148): the one row of the reserved <c>__koan_store</c> table in the database the
+    /// connection opens. With <paramref name="create"/> the table and its row are written first if missing, in one
+    /// statement each, so two writers agree on the first id. Without it, a database file that does not exist is not
+    /// created and a missing table reads as <see langword="null"/>. An empty Data Source (a private temporary
+    /// database per connection) has no marker.
+    /// </summary>
+    internal async ValueTask<string?> ReadMarker(string connectionString, string source, bool create, CancellationToken ct)
+    {
+        var builder = Parse(connectionString);
+        if (!IsMemory(builder))
+        {
+            if (string.IsNullOrWhiteSpace(builder.DataSource)) return null;
+            if (!IsUri(builder.DataSource))
+            {
+                if (!File.Exists(AnchorDataSource(builder.DataSource)) && !create) return null;
+                if (create) PrepareManaged(connectionString);
+            }
+        }
+
+        await using var connection = Create(connectionString, source, nonCreating: !create, pooled: false);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        var table = SqliteDialect.Quote(Koan.Data.Abstractions.StoreMarker.Name);
+        if (create)
+        {
+            await using var ddl = connection.CreateCommand();
+            ddl.CommandText =
+                $"CREATE TABLE IF NOT EXISTS {table} (\"slot\" INTEGER PRIMARY KEY CHECK (\"slot\" = 1), \"id\" TEXT NOT NULL);" +
+                $"INSERT OR IGNORE INTO {table} (\"slot\", \"id\") VALUES (1, @id);";
+            ddl.Parameters.AddWithValue("@id", Koan.Data.Abstractions.StoreMarker.NewId());
+            await ddl.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await using var exists = connection.CreateCommand();
+            exists.CommandText = "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = @name";
+            exists.Parameters.AddWithValue("@name", Koan.Data.Abstractions.StoreMarker.Name);
+            if (await exists.ExecuteScalarAsync(ct).ConfigureAwait(false) is null) return null;
+        }
+
+        await using var read = connection.CreateCommand();
+        read.CommandText = $"SELECT \"id\" FROM {table} WHERE \"slot\" = 1";
+        return await read.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+    }
+
     internal SqliteConnectionStringBuilder Parse(string connectionString)
     {
         try

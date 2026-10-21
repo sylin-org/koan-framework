@@ -57,12 +57,13 @@ internal sealed class PostgresInspector(PostgresRoute route) :
         await using var command = new NpgsqlCommand("""
             SELECT table_schema, table_name, table_type
             FROM information_schema.tables
-            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+            WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND table_name <> @marker
             ORDER BY table_schema, table_name
             LIMIT @take OFFSET @offset
             """, connection);
         command.Parameters.AddWithValue("take", take + 1);
         command.Parameters.AddWithValue("offset", offset);
+        command.Parameters.AddWithValue("marker", StoreMarker.Name);
         var values = new List<StorageContainerDescriptor>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -78,6 +79,8 @@ internal sealed class PostgresInspector(PostgresRoute route) :
     {
         ArgumentNullException.ThrowIfNull(address);
         var schema = address.Namespace.LastOrDefault() ?? route.SearchPath;
+        if (StoreMarker.Is(address.Name))
+            throw new KeyNotFoundException($"PostgreSQL container '{address}' is Koan's store marker, not an entity set.");
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = new NpgsqlCommand(
             "SELECT table_type FROM information_schema.tables WHERE table_schema=@schema AND table_name=@table", connection);

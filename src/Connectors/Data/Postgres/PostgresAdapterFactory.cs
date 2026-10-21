@@ -141,6 +141,23 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
         return NpgsqlStoreProof.Distinct(first.ConnectionString, first.SearchPath, second.ConnectionString, second.SearchPath, ct);
     }
 
+    /// <summary>
+    /// The id in the reserved <c>__koan_store</c> table of the route's schema (DATA-0148). It is created only where the
+    /// source may create a table (Managed + ReadWrite, <c>DdlPolicy=AutoCreate</c>, the production DDL gate); otherwise
+    /// it is read.
+    /// </summary>
+    public ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default)
+    {
+        var route = ResolveRoute(services, source);
+        var allowed = create && Koan.Data.Relational.Orchestration.RelationalDdlGate.MayCreate(
+            route.Plan, route.Options.DdlPolicy, route.Options.AllowProductionDdl);
+        return NpgsqlStoreMarker.Read(route.ConnectionString, route.SearchPath, allowed, ct);
+    }
+
     internal PostgresRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

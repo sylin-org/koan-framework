@@ -60,6 +60,23 @@ public sealed class InMemoryAdapterFactory : IDataAdapterFactory, IDataAdapterSe
         => DataSourceRegistry.IdentityOf(
             "inmemory\n" + (string.IsNullOrWhiteSpace(source) ? Constants.Provider.DefaultSource : source));
 
+    /// <summary>
+    /// The source's store marker (DATA-0148), held beside its stores for the host's lifetime. A ReadOnly source reads it
+    /// and never creates it.
+    /// </summary>
+    public ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default)
+    {
+        var resolved = string.IsNullOrWhiteSpace(source) ? Constants.Provider.DefaultSource : source;
+        var definition = services.GetRequiredService<DataSourceRegistry>().GetSource(resolved);
+        var allowed = create && (definition?.Access ?? DataSourceAccess.ReadWrite) == DataSourceAccess.ReadWrite &&
+                      (definition?.StorageLifecycle ?? StorageLifecycle.Managed) == StorageLifecycle.Managed;
+        return ValueTask.FromResult(services.GetRequiredService<InMemoryState>().Marker(resolved, allowed));
+    }
+
     /// <summary>Each source name keys its own host-owned store, so two different identities are two stores.</summary>
     public ValueTask<bool> ProveDistinctStores(
         IServiceProvider services,

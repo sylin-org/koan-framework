@@ -1,6 +1,7 @@
 using Koan.Core;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
+using Koan.Data.Abstractions.Sources;
 using Koan.Data.Connector.Json.Runtime;
 using Koan.Data.Core;
 using Microsoft.Extensions.Configuration;
@@ -127,6 +128,46 @@ public sealed class JsonAdapterFactory : IDataAdapterFactory, IDataAdapterSetup
             this,
             string.IsNullOrWhiteSpace(name) ? Infrastructure.Constants.Provider.DefaultSource : name).DirectoryPath;
         return ValueTask.FromResult(!System.IO.Directory.Exists(Directory(source)) || !System.IO.Directory.Exists(Directory(other)));
+    }
+
+    /// <summary>
+    /// The id in the reserved <c>__koan_store</c> file of the source's directory (DATA-0148). The file has no
+    /// <c>.json</c> extension, so no layout reads it as an entity set. It is created only for a Managed + ReadWrite
+    /// source; any other source reads it and never creates it or the directory.
+    /// </summary>
+    public async ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default)
+    {
+        var route = JsonRoute.Resolve(
+            services.GetRequiredService<IConfiguration>(),
+            services.GetRequiredService<DataSourceRegistry>(),
+            services.GetRequiredService<IOptions<JsonDataOptions>>().Value,
+            this,
+            string.IsNullOrWhiteSpace(source) ? Infrastructure.Constants.Provider.DefaultSource : source);
+        var path = Path.Combine(route.DirectoryPath, StoreMarker.Name);
+        if (!File.Exists(path))
+        {
+            if (!create || route.Policy.StorageLifecycle != StorageLifecycle.Managed ||
+                route.Policy.Access != DataSourceAccess.ReadWrite)
+                return null;
+            Directory.CreateDirectory(route.DirectoryPath);
+            try
+            {
+                await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                await using var writer = new StreamWriter(stream);
+                await writer.WriteAsync(StoreMarker.NewId().AsMemory(), ct).ConfigureAwait(false);
+            }
+            catch (IOException) when (File.Exists(path))
+            {
+                // Another writer created it first; its id is the marker.
+            }
+        }
+
+        var marker = (await File.ReadAllTextAsync(path, ct).ConfigureAwait(false)).Trim();
+        return marker.Length == 0 ? null : marker;
     }
 
     public StorageNamingCapability GetNamingCapability(IServiceProvider services) => new()

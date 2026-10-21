@@ -142,6 +142,42 @@ public sealed class MongoAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
         }
     }
 
+    /// <summary>
+    /// The id in the reserved <c>__koan_store</c> collection of the route's database (DATA-0148). It is created only where
+    /// the source may create a collection (Managed + ReadWrite); a ReadOnly or External source reads it and never creates
+    /// it, and a read never creates the collection.
+    /// </summary>
+    public async ValueTask<string?> ReadStoreMarker(
+        IServiceProvider services,
+        string source,
+        bool create,
+        CancellationToken ct = default)
+    {
+        var route = ResolveRoute(services, source);
+        var database = await services.GetRequiredService<MongoClientManager>().Database(route, ct).ConfigureAwait(false);
+        var markers = database.GetCollection<BsonDocument>(StoreMarker.Name);
+        var slot = Builders<BsonDocument>.Filter.Eq("_id", Constants.Provider.StoreMarkerSlot);
+        if (create && route.StorageLifecycle == StorageLifecycle.Managed && route.Access == DataSourceAccess.ReadWrite)
+        {
+            try
+            {
+                await markers.UpdateOneAsync(
+                        slot,
+                        Builders<BsonDocument>.Update.SetOnInsert("id", StoreMarker.NewId()),
+                        new UpdateOptions { IsUpsert = true },
+                        ct)
+                    .ConfigureAwait(false);
+            }
+            catch (MongoWriteException error) when (error.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+            {
+                // Another writer inserted the slot between the match and the insert; its id is the marker.
+            }
+        }
+
+        var marker = await markers.Find(slot).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return marker is not null && marker.TryGetValue("id", out var id) && id.IsString ? id.AsString : null;
+    }
+
     internal MongoRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

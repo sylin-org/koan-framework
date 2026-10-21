@@ -68,12 +68,13 @@ internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections conne
         command.CommandText = """
             SELECT name, type
             FROM sqlite_schema
-            WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%'
+            WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%' AND name <> @marker COLLATE NOCASE
             ORDER BY name
             LIMIT @take OFFSET @offset
             """;
         command.Parameters.AddWithValue("@take", take + 1);
         command.Parameters.AddWithValue("@offset", offset);
+        command.Parameters.AddWithValue("@marker", StoreMarker.Name);
         var containers = new List<StorageContainerDescriptor>();
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await reader.ReadAsync(ct).ConfigureAwait(false))
@@ -92,6 +93,8 @@ internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections conne
         if (address.Namespace.Count > 1 || address.Namespace.Count == 1 &&
             !string.Equals(address.Namespace[0], "main", StringComparison.OrdinalIgnoreCase))
             throw new KeyNotFoundException($"SQLite container address '{address}' is outside the main database.");
+        if (StoreMarker.Is(address.Name))
+            throw new KeyNotFoundException($"SQLite container '{address.Name}' is Koan's store marker, not an entity set.");
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT type FROM sqlite_schema WHERE name=@name AND type IN ('table', 'view')";

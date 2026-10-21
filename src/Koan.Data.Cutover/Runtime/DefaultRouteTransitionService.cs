@@ -5,6 +5,7 @@ using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
 using Koan.Data.Core.Composition;
 using Koan.Data.Core.Routing;
+using Koan.Data.Core.Transfers;
 using Koan.Data.Cutover.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -178,6 +179,16 @@ internal sealed class DefaultRouteTransitionService(
                 targetPlan.Source,
                 "The target is not physically distinct from the active default.",
                 "Configure a dedicated target database with a different connection identity."));
+        else if (string.Equals(current.Plan.Adapter, targetPlan.Adapter, StringComparison.OrdinalIgnoreCase) &&
+                 await StoreMarkers.Compare(sourceFactory, current.Plan.Source, targetFactory, targetPlan.Source, services, ct)
+                     .ConfigureAwait(false) == StoreKinship.Same)
+            // Two connections spelled differently can reach one store; both reading one store marker proves it
+            // (DATA-0148). Without a marker on both sides the connection identities decide, as before.
+            blockers.Add(Block(
+                Infrastructure.Constants.FailureCodes.TargetPolicy,
+                targetPlan.Source,
+                "The target reads the active default's store marker, so it is the same physical store.",
+                "Configure a dedicated target database; the target's connection reaches the active default's store."));
         if (targetPlan.StorageLifecycle != StorageLifecycle.Managed || targetPlan.Access != DataSourceAccess.ReadWrite)
             blockers.Add(Block(
                 Infrastructure.Constants.FailureCodes.TargetPolicy,

@@ -65,6 +65,7 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
                     providerBound = true;
                     break;
                 }
+                if (StoreMarker.Is(value["name"].AsString)) continue;
                 all.Add((value["name"].AsString, value.GetValue("type", "collection").AsString));
             }
             if (providerBound) break;
@@ -167,6 +168,8 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
 
     private async Task<string?> Kind(string name, CancellationToken ct)
     {
+        // The store marker (DATA-0148) is never an entity set, so it resolves like a missing collection.
+        if (StoreMarker.Is(name)) return null;
         var database = await clients.Database(route, ct).ConfigureAwait(false);
         using var cursor = await database.ListCollectionsAsync(
                 new ListCollectionsOptions { Filter = new BsonDocument("name", name) },

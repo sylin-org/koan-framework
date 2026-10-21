@@ -11,6 +11,8 @@ internal static class Constants
         internal const int MaximumRoutes = 128;
         internal const int MaximumCollectionsPerRepository = 1024;
         internal const int DuplicateKeyError = 11000;
+        // The _id of the one document in the store marker collection (DATA-0148).
+        internal const string StoreMarkerSlot = "store";
     }
 
     internal static class Configuration
