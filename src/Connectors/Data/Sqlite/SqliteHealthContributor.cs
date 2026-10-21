@@ -50,9 +50,10 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
     /// <summary>
     /// Whether this managed route is simply not provisioned yet, as opposed to broken.
     ///
-    /// <para>The distinction is the parent directory. A missing database file under a usable directory is what
-    /// every fresh host looks like before its first write. A missing file whose parent is absent — or is itself
-    /// a file — is a real fault and still probes, and still fails.</para>
+    /// <para>The distinction is the nearest existing ancestor of the database file. Provisioning creates every
+    /// missing directory, so a missing file under a missing <c>.koan/data</c> beneath a usable directory is what
+    /// every fresh zero-config host looks like before its first write (NK-008). An ancestor that is a file is a real
+    /// fault and still probes, and still fails.</para>
     /// </summary>
     private bool IsAwaitingProvisioning(string connectionString)
     {
@@ -66,8 +67,14 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
             var path = _connections.AnchorDataSource(builder.DataSource);
             if (File.Exists(path)) return false;
 
-            var directory = Path.GetDirectoryName(path);
-            return !string.IsNullOrWhiteSpace(directory) && Directory.Exists(directory);
+            for (var directory = Path.GetDirectoryName(path);
+                 !string.IsNullOrWhiteSpace(directory);
+                 directory = Path.GetDirectoryName(directory))
+            {
+                if (Directory.Exists(directory)) return true;
+                if (File.Exists(directory)) return false;
+            }
+            return false;
         }
         catch
         {

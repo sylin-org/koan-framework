@@ -220,6 +220,61 @@ public sealed class SqliteHealthContributorSpec
     }
 
     [Fact]
+    public async Task A_fresh_host_whose_data_directory_does_not_exist_yet_is_ready_without_creating_it()
+    {
+        // NK-008: the zero-config default is .koan/data/Koan.sqlite under a content root with no .koan directory.
+        var root = Path.Combine(Path.GetTempPath(), $"koan-sqlite-fresh-{Guid.CreateVersion7():n}");
+        Directory.CreateDirectory(root);
+        var databasePath = Path.Combine(root, ".koan", "data", "Koan.sqlite");
+        try
+        {
+            await using var host = await KoanIntegrationHost.Configure()
+                .WithSetting("Koan:Environment", "Test")
+                .WithSetting("Koan:Data:Sources:Default:Adapter", "sqlite")
+                .WithSetting("Koan:Data:Sources:Default:ConnectionString", Connection(databasePath))
+                .ConfigureServices(services => services.AddKoan())
+                .StartAsync();
+            var contributor = SqliteHealth(host.Services);
+
+            (await contributor.Check()).State.Should().Be(HealthState.Healthy, "an unprovisioned managed store is not a fault");
+            Directory.Exists(Path.Combine(root, ".koan")).Should().BeFalse("health is an observation, not a provisioning path");
+
+            await new HealthRecord { Value = "first write" }.Save();
+            (await contributor.Check()).State.Should().Be(HealthState.Healthy);
+            File.Exists(databasePath).Should().BeTrue();
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { Directory.Delete(root, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public async Task Unqualified_direct_session_follows_the_active_default_configured_by_connection_string()
+    {
+        // NK-009: ConnectionStrings:Default configures the default without a generic source ConnectionString.
+        var databasePath = TempDatabase("direct-default");
+        try
+        {
+            await using var host = await KoanIntegrationHost.Configure()
+                .WithSetting("Koan:Environment", "Test")
+                .WithSetting("ConnectionStrings:Default", Connection(databasePath))
+                .ConfigureServices(services => services.AddKoan())
+                .StartAsync();
+
+            var direct = host.Services.GetRequiredService<IDataService>().Direct()
+                .Effect(Koan.Data.Abstractions.Sources.DataOperationEffect.Read);
+            (await direct.Scalar<long>("SELECT 1")).Should().Be(1);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            if (File.Exists(databasePath)) File.Delete(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task Selected_sqlite_reports_unhealthy_when_its_database_directory_is_a_file()
     {
         var occupiedPath = TempDatabase("occupied-parent");

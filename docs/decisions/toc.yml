@@ -370,6 +370,8 @@
       href: DATA-0131-a-transaction-defers-or-refuses-every-write.md
     - name: DATA-0132 Entity patch honours its null policy, and lifecycle protection guards handlers, not write stamps
       href: DATA-0132-entity-patch-and-lifecycle-protection-keep-their-word.md
+    - name: DATA-0133 A fresh zero-config SQLite host is ready, and an unqualified Direct session follows the active default
+      href: DATA-0133-a-fresh-sqlite-host-is-ready-and-unqualified-direct-follows-the-default.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

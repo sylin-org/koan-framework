@@ -74,7 +74,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         ct.ThrowIfCancellationRequested();
         var route = Resolve();
         var plan = DemandResolvedRoute(route, ceiling, _effect, "direct transaction begin");
-        var binding = Bind(plan);
+        var binding = Bind(HorizonPlan(plan, ceiling));
         var lease = _sp.GetRequiredService<DataOperationHorizon>()
             .Enter(binding, _effect, "direct transaction", ct)
             .AsTask().GetAwaiter().GetResult();
@@ -294,7 +294,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     {
         var route = Resolve();
         var plan = DemandResolvedRoute(route, ceiling, effect, operation);
-        var binding = Bind(plan);
+        var binding = Bind(HorizonPlan(plan, ceiling));
         var lease = await _sp.GetRequiredService<DataOperationHorizon>()
             .Enter(binding, effect, operation, ct).ConfigureAwait(false);
         DbConnection? conn = null;
@@ -610,6 +610,12 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         }
         return list;
     }
+
+    // NK-009: an unqualified session follows the active logical default, so it binds the authority's current plan,
+    // the plan Entity repositories bind. The plan resolved from the provider's physical connection carries a
+    // connection-derived identity the authority never issued and would be rejected as stale; it still answers Demand.
+    private DataSourcePlan HorizonPlan(DataSourcePlan resolved, DataSourcePlan? ceiling)
+        => IsUnqualifiedDefault() && ceiling is not null ? ceiling : resolved;
 
     private DataRouteBinding Bind(DataSourcePlan plan)
     {
