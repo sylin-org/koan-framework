@@ -9,8 +9,15 @@ namespace Koan.Data.Relational.Npgsql.Runtime;
 /// to the schema orchestrator; this speaks over a connection the repository has already opened, for one schema
 /// operation. Connecting here creates nothing, so the repository can open before consent is settled.
 /// </summary>
-internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDialect dialect) : IRelationalDdlExecutor
+/// <param name="verifyIndexes">
+/// PostgreSQL index names are schema-wide and truncated to 63 bytes, so each created index is confirmed in the catalog
+/// (NK-056). CockroachDB scopes index names to their table and does not truncate, so it passes false.
+/// </param>
+internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDialect dialect, bool verifyIndexes = false)
+    : IRelationalDdlExecutor
 {
+    private readonly Dictionary<string, string> _claimed = new(StringComparer.Ordinal);
+
     public async Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
     {
         await using var command = connection.CreateCommand();
@@ -76,11 +83,12 @@ internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDiale
             $"ADD COLUMN IF NOT EXISTS {NpgsqlDialect.Quote(column.Name)} {StoreType(column)}",
             ct);
 
-    public Task CreateIndex(
+    public async Task CreateIndex(
         RelationalTableDefinition table,
         RelationalIndexDefinition index,
         CancellationToken ct = default)
     {
+        var effective = verifyIndexes ? NpgsqlIndexNames.Claim(_claimed, table, index.Name) : index.Name;
         // The indexed term is the dialect's own read, so it is the expression queries emit. PostgreSQL uses an
         // expression index only on an exact match, so a spelling of its own here would build an index the
         // planner never chooses. Every cast this dialect produces - boolean, bigint, numeric - is immutable,
@@ -88,10 +96,34 @@ internal sealed class NpgsqlDdlExecutor(NpgsqlConnection connection, NpgsqlDiale
         var terms = index.Parts.Select(part => part.Path.IsNested
             ? $"({dialect.Read(part.Path, MappingValueShape.Scalar, part.PhysicalType)})"
             : NpgsqlDialect.Quote(part.Path.Name));
-        return Execute(
+        await Execute(
             $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX IF NOT EXISTS " +
             $"{NpgsqlDialect.Quote(index.Name)} ON {Qualify(table)} ({string.Join(", ", terms)})",
-            ct);
+            ct).ConfigureAwait(false);
+        // IF NOT EXISTS skips on any index of that name in the schema, whatever table or keys it has, so the catalog is
+        // asked what the name now holds.
+        if (verifyIndexes)
+            NpgsqlIndexNames.Verify(table, index, effective, await Catalog(table.Schema, effective, ct).ConfigureAwait(false));
+    }
+
+    private async Task<IReadOnlyList<NpgsqlIndexNames.CatalogEntry>> Catalog(string schema, string name, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT t.relname, i.indisunique, i.indnkeyatts
+              FROM pg_class AS c
+              JOIN pg_namespace AS n ON n.oid = c.relnamespace
+              JOIN pg_index AS i ON i.indexrelid = c.oid
+              JOIN pg_class AS t ON t.oid = i.indrelid
+             WHERE n.nspname = @schema AND c.relname = @name
+            """;
+        command.Parameters.AddWithValue("schema", schema);
+        command.Parameters.AddWithValue("name", name);
+        var entries = new List<NpgsqlIndexNames.CatalogEntry>();
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            entries.Add(new(reader.GetString(0), reader.GetBoolean(1), Convert.ToInt32(reader.GetValue(2))));
+        return entries;
     }
 
     private async Task Execute(string sql, CancellationToken ct)

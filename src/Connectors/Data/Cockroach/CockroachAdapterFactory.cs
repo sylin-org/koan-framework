@@ -93,6 +93,7 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory, IDataSourceIn
         return new NpgsqlRepository<TEntity, TKey>(services, new NpgsqlRepositoryOptions
         {
             ProviderName = Provider,
+            IndexNamesAreSchemaWide = false,
             ConnectionString = route.ConnectionString,
             Source = route.Source,
             SearchPath = route.SearchPath,

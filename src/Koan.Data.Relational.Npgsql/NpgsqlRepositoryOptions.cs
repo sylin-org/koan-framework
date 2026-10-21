@@ -16,4 +16,11 @@ public sealed class NpgsqlRepositoryOptions
     public RelationalSchemaMatchingMode SchemaMatching { get; init; } = RelationalSchemaMatchingMode.Relaxed;
     public bool AllowProductionDdl { get; init; }
     public DataSourcePlan SourcePlan { get; init; } = DataSourcePlan.Default;
+
+    /// <summary>
+    /// Whether index names are unique per schema and truncated to 63 bytes, as on PostgreSQL. When true, every index
+    /// the schema owner creates is confirmed in the catalog, and a declared index that a name collision would silently
+    /// skip is refused (NK-056). CockroachDB scopes index names to their table and sets false.
+    /// </summary>
+    public bool IndexNamesAreSchemaWide { get; init; } = true;
 }
