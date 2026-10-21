@@ -14,6 +14,9 @@ public static class Constants
         public const string Username = Section + ":Username";
         public const string Password = Section + ":Password";
         public const string SearchPath = Section + ":SearchPath";
+
+        /// <summary>The documented spelling of <c>SchemaMatching</c>; the section binding reads the property name.</summary>
+        public const string SchemaMatchingMode = Section + ":SchemaMatchingMode";
     }
 
     internal static class StorageStatus

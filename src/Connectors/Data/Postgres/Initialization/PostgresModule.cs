@@ -20,7 +20,7 @@ public sealed class PostgresModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
-        services.AddKoanOptions<PostgresOptions>();
+        services.AddKoanOptions<PostgresOptions>(Infrastructure.Constants.Configuration.Section);
         services.AddSingleton<IConfigureOptions<PostgresOptions>, PostgresOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<PostgresAdapterFactory>();

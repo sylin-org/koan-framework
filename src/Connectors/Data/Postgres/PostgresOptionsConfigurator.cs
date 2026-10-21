@@ -3,6 +3,7 @@ using Koan.Core.Adapters;
 using Koan.Core.Orchestration;
 using Koan.Core.Orchestration.Abstractions;
 using Koan.Data.Adapters.Configuration;
+using Koan.Data.Relational.Orchestration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,11 @@ internal sealed class PostgresOptionsConfigurator : AdapterOptionsConfigurator<P
             Configuration[Infrastructure.Constants.Configuration.ConnectionString],
             Configuration.GetConnectionString("Postgres"));
         options.ConnectionString = configured ?? Discover();
+        // The section is bound onto the options (DdlPolicy, SchemaMatching, AllowProductionDdl, NamingStyle,
+        // Separator); the documented SchemaMatchingMode spelling is honoured too, and wins when both are set.
+        if (Enum.TryParse<RelationalSchemaMatchingMode>(
+                Configuration[Infrastructure.Constants.Configuration.SchemaMatchingMode], ignoreCase: true, out var matching))
+            options.SchemaMatching = matching;
     }
 
     private string Discover()

@@ -20,7 +20,7 @@ public sealed class CockroachModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
-        services.AddKoanOptions<CockroachOptions>();
+        services.AddKoanOptions<CockroachOptions>(Infrastructure.Constants.Configuration.Section);
         services.AddSingleton<IConfigureOptions<CockroachOptions>, CockroachOptionsConfigurator>();
         services.TryAddSingleton<IStorageNameResolver, DefaultStorageNameResolver>();
         services.AddSingleton<CockroachAdapterFactory>();

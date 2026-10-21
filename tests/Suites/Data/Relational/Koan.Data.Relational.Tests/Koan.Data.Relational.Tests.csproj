@@ -23,5 +23,6 @@
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Relational.Abstractions\Koan.Data.Relational.Abstractions.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Data.Relational.Npgsql\Koan.Data.Relational.Npgsql.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Cockroach\Koan.Data.Connector.Cockroach.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Connectors\Data\Postgres\Koan.Data.Connector.Postgres.csproj" />
   </ItemGroup>
 </Project>
