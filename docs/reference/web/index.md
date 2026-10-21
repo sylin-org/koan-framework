@@ -231,7 +231,9 @@ translation in Web.
 
 - Base Entity operations use the shared authorization seam. Declare standard
   `[Authorize]`/`[AllowAnonymous]` and Koan scope requirements on the entity or applicable surface,
-  and the same decision holds wherever that entity is read — REST and MCP alike.
+  and the same decision holds wherever that entity is read — REST and MCP alike. On an entity,
+  `[Authorize]` carries roles or `Policy = "scope:<scope>"` only; any other named policy, or
+  `AuthenticationSchemes`, stops boot because the entity gate cannot enforce it (SEC-0012).
 - `?access=true` opts a REST collection into the per-row capability sidecar when configured.
 - `?with=...` expands declared direct relationships through the governed relationship executor.
   Native or resident execution is accepted by default; bounded fallback requires an explicit finite

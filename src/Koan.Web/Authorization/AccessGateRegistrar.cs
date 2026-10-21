@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Data.Abstractions;
+using Microsoft.AspNetCore.Authorization;
 
 namespace Koan.Web.Authorization;
 
@@ -12,6 +14,8 @@ namespace Koan.Web.Authorization;
 /// <c>[Access]</c>-bearing entity, and AGGREGATES every malformed declaration into ONE
 /// <see cref="AccessGateException"/> so a developer sees all bad gates in a single boot rather than one-at-a-time
 /// on first request. A typo can therefore never reach production as a silently-open or silently-denied gate.
+/// SEC-0012: an entity's <c>[Authorize]</c> / <c>[RequireScope]</c> floor is compiled here too, so a requirement the
+/// gate cannot express stops boot instead of failing each request.
 /// </summary>
 internal static class AccessGateRegistrar
 {
@@ -45,12 +49,19 @@ internal static class AccessGateRegistrar
     {
         var attributeAssembly = typeof(AccessAttribute).Assembly;
         var attributeAssemblyName = attributeAssembly.GetName();
+        var authorizeAssemblyName = typeof(AuthorizeAttribute).Assembly.GetName();
+        var entityAssemblyName = typeof(IEntity<>).Assembly.GetName();
         foreach (var assembly in assemblies)
         {
-            // Only these assemblies can declare Access. Do not load unrelated runtime property metadata.
-            if (assembly != attributeAssembly && !assembly.GetReferencedAssemblies()
-                    .Any(reference => AssemblyName.ReferenceMatchesDefinition(reference, attributeAssemblyName)))
-                continue;
+            // Only these assemblies can declare Access, or an Entity carrying an ASP.NET [Authorize]. Do not load
+            // unrelated metadata.
+            if (assembly != attributeAssembly)
+            {
+                var references = assembly.GetReferencedAssemblies();
+                bool References(AssemblyName name) => references.Any(r => AssemblyName.ReferenceMatchesDefinition(r, name));
+                if (!References(attributeAssemblyName) && !(References(authorizeAssemblyName) && References(entityAssemblyName)))
+                    continue;
+            }
 
             Type?[] types;
             try
@@ -69,7 +80,7 @@ internal static class AccessGateRegistrar
             foreach (var type in types)
             {
                 if (type is null) continue;
-                if (type.GetCustomAttribute<AccessAttribute>(inherit: false) is not null)
+                if (type.GetCustomAttribute<AccessAttribute>(inherit: false) is not null || DeclaresEntityFloor(type))
                     yield return type;
                 foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                     if (property.GetCustomAttribute<AccessAttribute>(inherit: false) is not null)
@@ -77,4 +88,10 @@ internal static class AccessGateRegistrar
             }
         }
     }
+
+    // An Entity carrying the floor sugar the gate lowers. Controllers carry [Authorize] too; ASP.NET enforces theirs.
+    private static bool DeclaresEntityFloor(Type type)
+        => (type.IsDefined(typeof(AuthorizeAttribute), inherit: false)
+            || type.IsDefined(typeof(RequireScopeAttribute), inherit: false))
+           && type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IEntity<>));
 }

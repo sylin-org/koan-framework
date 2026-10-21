@@ -550,3 +550,5 @@
       href: SEC-0010-mcp-renders-the-enforced-refusal.md
     - name: SEC-0011 MCP listings ask the authorization ladder the call enforces
       href: SEC-0011-mcp-listings-ask-the-enforcing-ladder.md
+    - name: SEC-0012 An entity [Authorize] the gate cannot enforce stops boot
+      href: SEC-0012-entity-authorize-fails-closed.md

@@ -141,6 +141,8 @@ public sealed class AccessGateCache : IAccessGateCache
 
     // Lower [AllowAnonymous] / [Authorize] / [Authorize(Roles=)] / [RequireScope] into ONE entity-wide ActionGate
     // applied to read+write+remove — exactly reproducing EntityFloorAuthorizationProvider's prior decision matrix.
+    // SEC-0012: an [Authorize] the gate cannot express (a named policy other than scope:<x>, or authentication
+    // schemes) is refused, never lowered to "any authenticated principal".
     internal static AccessGate? LowerLegacyFloor(Type entityType)
     {
         // [AllowAnonymous] opens the entity outright (mirrors ASP.NET precedence): an Anyone BAG (not an open
@@ -155,6 +157,7 @@ public sealed class AccessGateCache : IAccessGateCache
         if (authorize.Length == 0 && requireScopes.Length == 0) return null;
 
         var grants = new List<Grant>();
+        var policyScopes = authorize.Select(a => PolicyScope(entityType, a)).OfType<string>().ToList();
 
         // [Authorize(Roles="a,b")] — roles within one attribute are any-of; ACROSS attributes they AND. The first
         // role-set is the bag's IsRolesAnyOf; each additional becomes a RoleAnyOf grant (AND-evaluated, OR-internal).
@@ -174,6 +177,7 @@ public sealed class AccessGateCache : IAccessGateCache
         // [RequireScope("x","y")] (stacked) — all scopes required (AND), distinct.
         foreach (var scope in requireScopes
                      .SelectMany(a => a.Scopes)
+                     .Concat(policyScopes)
                      .Where(s => !string.IsNullOrWhiteSpace(s))
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -183,6 +187,27 @@ public sealed class AccessGateCache : IAccessGateCache
         var bag = new AccessBag(isRolesAnyOf, grants, RequiresOwner: false, Anyone: false, Authenticated: true);
         return EntityWide(new ActionGate(new[] { bag }));
     }
+
+    // The scope a [Authorize(Policy = "scope:<x>")] names, or null for an attribute without a policy. Any other
+    // policy, and any AuthenticationSchemes, is a requirement only ASP.NET could evaluate, and nothing evaluates
+    // entity attributes as endpoint metadata, so it would silently become "authenticated" on REST and MCP.
+    private static string? PolicyScope(Type entityType, AuthorizeAttribute authorize)
+    {
+        if (!string.IsNullOrWhiteSpace(authorize.AuthenticationSchemes))
+            throw Unexpressible(entityType, $"AuthenticationSchemes = \"{authorize.AuthenticationSchemes}\"");
+        var policy = authorize.Policy?.Trim();
+        if (string.IsNullOrEmpty(policy)) return null;
+        const string prefix = Infrastructure.KoanWebConstants.Authorization.ScopePolicyPrefix;
+        if (policy.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && policy.Length > prefix.Length)
+            return policy[prefix.Length..].Trim();
+        throw Unexpressible(entityType, $"Policy = \"{policy}\"");
+    }
+
+    private static AccessGateException Unexpressible(Type entityType, string declared)
+        => new($"[Authorize({declared})] on {entityType.Name} cannot be enforced by the entity gate: REST and MCP would " +
+               "admit any authenticated caller. Declare the requirement with [Access(...)] (for example " +
+               "[Access(all: \"is:admin\")]), [RequireScope(...)], [Authorize(Policy = \"scope:<scope>\")], or an " +
+               $"EntityAccess<{entityType.Name}> realization, and keep named policies and schemes on controllers.");
 
     private static AccessGate EntityWide(ActionGate gate)
     {

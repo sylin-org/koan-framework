@@ -67,6 +67,12 @@ public static class KoanWebConstants
         public const string NoStore = "no-store";
     }
 
+    public static class Authorization
+    {
+        // ARCH-0092 / SEC-0012: [Authorize(Policy = "scope:<x>")] on an entity lowers to the scope grant <x>.
+        public const string ScopePolicyPrefix = "scope:";
+    }
+
     public static class Routes
     {
         // Health

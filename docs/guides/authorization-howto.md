@@ -29,7 +29,7 @@ The everyday path. One model authorizes an `Entity<T>` identically on REST **and
 | `[Access(...)]` on the entity | a coarse per-action RBAC **gate** |
 | an `EntityAccess<T>` realization (`Owner` + `Constrain`) | fine-grained, resource-aware **rows** (+ create-stamp, mass-delete bound) |
 
-**Gate** — *who may touch this entity at all, per action.* A token bag per action; allow-by-default (an unspecified action is open). `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` are the declarative form of the same thing: they lower into this gate, so one model enforces whichever you write.
+**Gate** — *who may touch this entity at all, per action.* A token bag per action; allow-by-default (an unspecified action is open). `[Authorize]` / `[AllowAnonymous]` / `[RequireScope]` are the declarative form of the same thing: they lower into this gate, so one model enforces whichever you write. On an entity, `[Authorize]` lowers roles and the `Policy = "scope:<scope>"` convention; any other named policy, or `AuthenticationSchemes`, is refused at boot rather than weakened to "authenticated" (SEC-0012).
 
 ```csharp
 using Koan.Data.Core.Model;    // Entity<T>
