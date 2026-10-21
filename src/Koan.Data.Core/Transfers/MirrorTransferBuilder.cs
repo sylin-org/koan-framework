@@ -53,22 +53,51 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                 batch, authoritative, replica, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
-        // Do not mutate a numbered-page source while it is being read. First discover replica-only
-        // identities through provider-bounded pages, then delete the confirmed set from the journal.
+        // Do not mutate a numbered-page source while it is being read. First discover the replica identities the
+        // authoritative side no longer selects through provider-bounded pages, then delete the confirmed set from
+        // the journal. With a predicate, "selects" means present and still matching it there (NK-019): a row that
+        // left the predicate on the authoritative side must leave the replica too.
         await foreach (var batch in ReadBatches(replica, ct).ConfigureAwait(false))
         {
             read = checked(read + batch.Count);
-            var existing = await ReadMany(batch.Select(entity => entity.Id).ToArray(), authoritative, ct)
-                .ConfigureAwait(false);
-            for (var index = 0; index < batch.Count; index++)
+            var ids = batch.Select(entity => entity.Id).ToArray();
+            var selected = await StillSelected(ids, authoritative, ct).ConfigureAwait(false);
+            foreach (var id in ids)
             {
-                if (existing[index] is null)
-                    await absent.Append(batch[index].Id, ct).ConfigureAwait(false);
+                if (!selected.Contains(id))
+                    await absent.Append(id, ct).ConfigureAwait(false);
             }
         }
 
         var deleted = await DeleteJournal(absent, replica, ct).ConfigureAwait(false);
         return Complete(TransferKind.Mirror, read, copied, deleted, progress);
+    }
+
+    /// <summary>
+    /// The identities among <paramref name="ids"/> that the authoritative side still selects. Without a predicate
+    /// that is every present row; with one it is the store's own answer to <c>predicate AND Id in ids</c>, so a
+    /// row is judged by the same semantics that selected it for the copy pass.
+    /// </summary>
+    private async Task<HashSet<TKey>> StillSelected(
+        IReadOnlyList<TKey> ids,
+        TransferContextOptions? authoritative,
+        CancellationToken ct)
+    {
+        if (Predicate is null)
+            return (await ReadMany(ids, authoritative, ct).ConfigureAwait(false))
+                .OfType<TEntity>().Select(entity => entity.Id).ToHashSet();
+
+        var row = Predicate.Parameters[0];
+        var among = Expression.Call(
+            typeof(Enumerable),
+            nameof(Enumerable.Contains),
+            [typeof(TKey)],
+            Expression.Constant(ids.ToArray(), typeof(IEnumerable<TKey>)),
+            Expression.Property(row, nameof(IEntity<TKey>.Id)));
+        var selection = Expression.Lambda<Func<TEntity, bool>>(Expression.AndAlso(Predicate.Body, among), row);
+        using var scope = authoritative?.Apply();
+        return (await Data<TEntity, TKey>.Query(selection, ct).ConfigureAwait(false))
+            .Select(entity => entity.Id).ToHashSet();
     }
 
     private async Task<TransferResult<TKey>> RunBidirectional(CancellationToken ct)

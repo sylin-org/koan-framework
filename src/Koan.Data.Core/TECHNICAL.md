@@ -274,6 +274,9 @@ validation:
 - `MirrorConflict.Latest` compares the Entity's one `[Timestamp(OnSave = true)]` property, or its only `[Timestamp]`
   when it has no OnSave one. A set-once creation stamp, which copies share, never decides. Several deciding
   candidates are ambiguous: a warning names them and every overlap is reported as a conflict.
+- Mirror Push and Pull delete every replica row the authoritative side no longer selects. Without a predicate that is
+  a row absent there; with one, a row that is absent or no longer matches, judged by the store's own answer to
+  `predicate AND Id in (page ids)`, so a replica row whose authoritative counterpart left the predicate converges.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

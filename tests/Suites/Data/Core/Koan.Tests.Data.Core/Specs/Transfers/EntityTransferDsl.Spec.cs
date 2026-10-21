@@ -477,6 +477,43 @@ public sealed class EntityTransferDslSpec
         (await TwiceStampedNote.Get(source.Id))!.Content.Should().Be("source");
     }
 
+    /// <summary>
+    /// NK-019. A filtered Push mirror tested replica rows against the authoritative side without the predicate, so a
+    /// row that left the predicate there stayed in the replica with its last matching copy.
+    /// </summary>
+    [Theory]
+    [InlineData(MirrorMode.Push)]
+    [InlineData(MirrorMode.Pull)]
+    public async Task Mirror_WithPredicate_RemovesReplicaRowsWhoseAuthoritativeRowLeftThePredicate(MirrorMode mode)
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        // Push: the base set is authoritative and "mirror" the replica. Pull swaps them.
+        var authoritative = mode == MirrorMode.Push ? "" : "mirror";
+        var replica = mode == MirrorMode.Push ? "mirror" : "";
+        TransferTodo todo;
+        using (EntityContext.Partition(authoritative))
+            todo = await new TransferTodo { Title = "published", Active = true }.Save();
+
+        (await TransferTodo.Mirror(todo => todo.Active, mode).To(partition: "mirror").Run()).CopiedCount.Should().Be(1);
+
+        using (EntityContext.Partition(authoritative))
+        {
+            todo.Active = false;
+            await todo.Save();
+        }
+
+        var second = await TransferTodo.Mirror(todo => todo.Active, mode).To(partition: "mirror").Run();
+
+        second.DeletedCount.Should().Be(1);
+        using (EntityContext.Partition(replica))
+            (await TransferTodo.Get(todo.Id)).Should().BeNull("the authoritative row no longer matches the mirror");
+        using (EntityContext.Partition(authoritative))
+            (await TransferTodo.Get(todo.Id)).Should().NotBeNull();
+    }
+
     [Fact]
     public async Task To_WithSourceAndAdapter_ShouldThrow()
     {
@@ -907,9 +944,15 @@ public sealed class EntityTransferDslSpec
         public Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            Current()[model.Id] = model;
+            Current()[model.Id] = Stored(model);
             return Task.FromResult(model);
         }
+
+        // A store keeps its own copy. Holding the caller's instance would let a later in-memory edit of it change
+        // every partition the instance was written to, which no real adapter does.
+        private static TEntity Stored(TEntity model)
+            => (TEntity)Koan.Data.Core.Polymorphism.EntityJsonSerialization.DeserializeDocument(
+                Koan.Data.Core.Polymorphism.EntityJsonSerialization.SerializeDocument(model), typeof(TEntity));
 
         public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
         {
@@ -919,7 +962,7 @@ public sealed class EntityTransferDslSpec
             foreach (var model in models)
             {
                 ct.ThrowIfCancellationRequested();
-                set[model.Id] = model;
+                set[model.Id] = Stored(model);
                 count++;
             }
             MaxUpsertManyCount = Math.Max(MaxUpsertManyCount, count);
