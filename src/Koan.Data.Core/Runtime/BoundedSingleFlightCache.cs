@@ -17,7 +17,14 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
         _entries = new Dictionary<TKey, Pending>(comparer);
     }
 
-    public TValue GetOrAdd(TKey key, Func<TValue> create)
+    public TValue GetOrAdd(TKey key, Func<TValue> create) => GetOrAdd(key, create, supersedes: null);
+
+    /// <summary>
+    /// Like <see cref="GetOrAdd(TKey, Func{TValue})"/>, and when <paramref name="key"/> is admitted it first forgets every
+    /// entry <paramref name="supersedes"/> says the new key replaces (NK-170): an entry nothing can use any more must
+    /// not hold a place in the bound. The check runs only when a key is admitted, never on a hit.
+    /// </summary>
+    public TValue GetOrAdd(TKey key, Func<TValue> create, Func<TKey, TKey, bool>? supersedes)
     {
         ArgumentNullException.ThrowIfNull(create);
         Pending entry;
@@ -25,6 +32,9 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
         {
             if (!_entries.TryGetValue(key, out entry!))
             {
+                if (supersedes is not null)
+                    foreach (var stale in _entries.Keys.Where(existing => supersedes(key, existing)).ToArray())
+                        _entries.Remove(stale);
                 if (_entries.Count >= _capacity)
                 {
                     throw new InvalidOperationException(

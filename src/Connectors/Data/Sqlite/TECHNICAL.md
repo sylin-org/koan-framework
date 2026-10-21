@@ -116,7 +116,9 @@ Connection and provenance output are redacted.
 - SQLite attached databases are not inferred from mapping namespaces.
 - Provider exceptions surface directly; commands are not replayed after failure.
 - Native bulk accepts at most 4,096 items and 30,000 parameters per dispatch.
-- A host accepts at most 256 distinct in-memory source targets and 512 compiled entity plans per repository.
+- A host accepts at most 256 distinct in-memory source targets. A repository keeps at most 512 compiled entity plans,
+  one per partition table; past that it drops the least recently used plan and compiles it again on that partition's
+  next use, so a partition per customer or per day keeps working (NK-170).
 
 ## Enum storage contract
 

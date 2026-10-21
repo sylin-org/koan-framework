@@ -133,6 +133,46 @@ public sealed class DefaultRouteTransitionSpec
         }
     }
 
+    /// <summary>
+    /// NK-170. Each committed cutover made the next default-routed operation cache a new repository and kept the stale
+    /// one, so a host hit 'Entity repository cache reached its configured limit' after enough cutovers and failed every
+    /// first use until restart. A new default-derived repository replaces the stale one it supersedes.
+    /// </summary>
+    [Fact]
+    public async Task Repository_cache_does_not_grow_with_committed_cutovers()
+    {
+        var paths = TestPaths.Create();
+        var second = Path.Combine(paths.Root, "second.db");
+        try
+        {
+            await using var host = await Boot(paths, services => services.PostConfigure<DataRuntimeOptions>(
+                options => options.RepositoryEntries = 2), new Dictionary<string, string?>
+            {
+                ["Koan:Data:Sources:Second:Adapter"] = "sqlite",
+                ["Koan:Data:Sources:Second:ConnectionString"] = $"Data Source={second};Pooling=False",
+                ["Koan:Data:Sources:Second:StorageLifecycle"] = "Managed",
+                ["Koan:Data:Sources:Second:Access"] = "ReadWrite"
+            });
+            AppHost.Current = host.Services;
+            await new CutoverRecord { Id = "a", Value = "first default" }.Save(TestContext.Current.CancellationToken);
+
+            await Koan.Data.Core.Data.Source(Target).PromoteToDefault().Run(TestContext.Current.CancellationToken);
+            await new CutoverRecord { Id = "b", Value = "second default" }.Save(TestContext.Current.CancellationToken);
+
+            await Koan.Data.Core.Data.Source("Second").PromoteToDefault().Run(TestContext.Current.CancellationToken);
+            await new CutoverRecord { Id = "c", Value = "third default" }.Save(TestContext.Current.CancellationToken);
+
+            (await CutoverRecord.All(TestContext.Current.CancellationToken)).Select(record => record.Id)
+                .Should().BeEquivalentTo(["a", "b", "c"]);
+        }
+        finally
+        {
+            AppHost.Current = null;
+            TestHooks.ResetDataConfigs();
+            paths.Delete();
+        }
+    }
+
     [Fact]
     public async Task Planning_rejects_a_nonempty_target_without_mutating_either_route()
     {
@@ -274,8 +314,11 @@ public sealed class DefaultRouteTransitionSpec
         }
     }
 
-    private static Task<IntegrationHost> Boot(TestPaths paths) => KoanIntegrationHost.Configure()
-        .WithSettings(new Dictionary<string, string?>(StringComparer.Ordinal)
+    private static Task<IntegrationHost> Boot(
+        TestPaths paths,
+        Action<IServiceCollection>? configure = null,
+        IReadOnlyDictionary<string, string?>? extra = null) => KoanIntegrationHost.Configure()
+        .WithSettings(new Dictionary<string, string?>(extra ?? new Dictionary<string, string?>(), StringComparer.Ordinal)
         {
             ["Koan:Environment"] = "Test",
             ["Koan:Orchestration:ForceOrchestrationMode"] = "Standalone",
@@ -290,7 +333,11 @@ public sealed class DefaultRouteTransitionSpec
                 CutoverWriterOwnership.HostExclusiveOrExternallyQuiesced.ToString(),
             ["Koan:Data:Cutover:PageSize"] = "1"
         })
-        .ConfigureServices(static services => services.AddKoan())
+        .ConfigureServices(services =>
+        {
+            services.AddKoan();
+            configure?.Invoke(services);
+        })
         .StartAsync(TestContext.Current.CancellationToken);
 
     private sealed record TestPaths(string Root, string Source, string Target, string State)

@@ -51,8 +51,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly DataSegmentationPlan _segmentation;
     private readonly MappingPlan? _declaredMapping;
-    private readonly object _planGate = new();
-    private readonly Dictionary<string, SqliteEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
+    private readonly RelationalPlanCache<SqliteEntityPlan<TEntity, TKey>> _plans = new(Infrastructure.Constants.MaximumPlans);
 
     internal SqliteRepository(IServiceProvider services, SqliteRoute route, SqliteAdapterFactory factory)
     {
@@ -506,13 +505,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         typeof(TEntity),
                         EntityContext.Current?.Partition,
                         _services);
-        var key = _declaredMapping?.Id ?? table;
-        lock (_planGate)
+        return _plans.GetOrAdd(_declaredMapping?.Id ?? table, _ =>
         {
-            if (_plans.TryGetValue(key, out var existing)) return existing;
-            if (_plans.Count >= Infrastructure.Constants.MaximumPlans)
-                throw new InvalidOperationException(
-                    $"SQLite reached the repository plan bound of {Infrastructure.Constants.MaximumPlans}.");
             if (_declaredMapping is not null)
             {
                 var segmentation = _segmentation.For(typeof(TEntity));
@@ -523,10 +517,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             var mapping = _declaredMapping ?? RelationalManagedMapping.Compile<TEntity>(
                 _route.Source,
                 StorageAddress.From(table));
-            var created = new SqliteEntityPlan<TEntity, TKey>(mapping, _segmentation);
-            _plans.Add(key, created);
-            return created;
-        }
+            return new SqliteEntityPlan<TEntity, TKey>(mapping, _segmentation);
+        });
     }
 
     private async Task<SqliteConnection> Open(CancellationToken ct)

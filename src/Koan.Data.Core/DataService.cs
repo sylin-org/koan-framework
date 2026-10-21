@@ -31,7 +31,23 @@ public sealed class DataService : IDataService
         Type KeyType,
         string Adapter,
         string Source,
-        string BindingIdentity);
+        string BindingIdentity,
+        bool DefaultDerived)
+    {
+        /// <summary>
+        /// Whether this key replaces <paramref name="other"/>: the same Entity on a route whose binding has moved on. A
+        /// default-derived repository of an earlier authority revision, or an explicit one of an earlier content
+        /// generation of the same source, fails as stale on every use (NK-170).
+        /// </summary>
+        public bool Supersedes(CacheKey other)
+            => other.EntityType == EntityType &&
+               other.KeyType == KeyType &&
+               other.DefaultDerived == DefaultDerived &&
+               !string.Equals(other.BindingIdentity, BindingIdentity, StringComparison.Ordinal) &&
+               (DefaultDerived ||
+                string.Equals(other.Adapter, Adapter, StringComparison.Ordinal) &&
+                string.Equals(other.Source, Source, StringComparison.Ordinal));
+    }
 
     public DataService(IServiceProvider services, IOptions<DataRuntimeOptions> options)
     {
@@ -77,11 +93,12 @@ public sealed class DataService : IDataService
             ?? throw new InvalidOperationException("The resolved Data route did not carry an operation binding.");
         var sourcePlan = binding.Plan;
 
-        var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source, binding.RepositoryIdentity);
+        var key = new CacheKey(typeof(TEntity), typeof(TKey), adapter, source, binding.RepositoryIdentity, binding.IsDefaultDerived);
 
         return (IDataRepository<TEntity, TKey>)_cache.GetOrAdd(
             key,
-            () => CreateRepository<TEntity, TKey>(decision, sourcePlan, binding));
+            () => CreateRepository<TEntity, TKey>(decision, sourcePlan, binding),
+            static (admitted, existing) => admitted.Supersedes(existing));
     }
 
     private object CreateRepository<TEntity, TKey>(
