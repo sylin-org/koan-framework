@@ -61,8 +61,14 @@ internal sealed class MongoSchema<TEntity, TKey>(
             throw new InvalidOperationException(
                 $"External MongoDB collection '{route.Database}/{collection}' does not exist. " +
                 "Create it outside Koan or select StorageLifecycle=Managed.");
+        // ReadOnly forbids storage-lifecycle mutation (DataSourcePlan: SchemaOrAdmin), so a read-only source never
+        // creates a collection or an index, even on first use and even when the credentials would allow it (NK-030).
+        if (metadata is null && route.Access == DataSourceAccess.ReadOnly)
+            throw new InvalidOperationException(
+                $"MongoDB collection '{route.Database}/{collection}' does not exist, and source '{route.Source}' is " +
+                "ReadOnly, so Koan will not create it. Create it outside Koan, or provision through a ReadWrite source.");
         if (metadata is null) await database.CreateCollectionAsync(collection, cancellationToken: ct).ConfigureAwait(false);
-        if (route.StorageLifecycle == StorageLifecycle.External) return [];
+        if (route.StorageLifecycle == StorageLifecycle.External || route.Access == DataSourceAccess.ReadOnly) return [];
         var collation = metadata?.GetValue(Constants.Index.Options, new BsonDocument()).AsBsonDocument
             .GetValue(Constants.Index.Collation, BsonNull.Value) ?? BsonNull.Value;
         return await EnsureIndexes(database.GetCollection<BsonDocument>(collection), collation, ct).ConfigureAwait(false);

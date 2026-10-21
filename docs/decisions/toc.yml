@@ -380,6 +380,8 @@
       href: DATA-0136-a-scalar-column-is-compared-in-the-form-it-is-written.md
     - name: DATA-0137 MongoDB filter and sort paths use the field names the serializer writes; index key spelling is an owner decision
       href: DATA-0137-mongo-paths-use-the-serializer-field-names.md
+    - name: DATA-0138 A ReadOnly MongoDB source never creates a collection or an index
+      href: DATA-0138-a-readonly-mongo-source-never-provisions.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
