@@ -226,16 +226,16 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
         CancellationToken ct)
     {
         var deleted = 0L;
-        var short_ = 0L;
+        var shortfall = 0L;
         await foreach (var ids in journal.ReadBatches(BatchSize, ct).ConfigureAwait(false))
         {
             using var scope = context?.Apply();
             var affected = await Data<TEntity, TKey>.DeleteMany(ids, ct).ConfigureAwait(false);
-            short_ += Receipt(ids.Count, affected);
+            shortfall += Receipt(ids.Count, affected);
             deleted = checked(deleted + affected);
         }
-        if (short_ != 0)
-            progress.Warn($"{short_} row(s) the Mirror meant to delete from its replica were not deleted by it: another " +
+        if (shortfall != 0)
+            progress.Warn($"{shortfall} row(s) the Mirror meant to delete from its replica were not deleted by it: another " +
                           "writer removed them in the meantime, or the store removed fewer than asked. Run the Mirror " +
                           "again to finish.");
         return deleted;
