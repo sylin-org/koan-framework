@@ -351,6 +351,39 @@ public sealed class EntityTransferDslSpec
     }
 
     /// <summary>
+    /// NK-108. Past Batch() unresolved overlaps the bidirectional mirror threw, after the target had already received
+    /// the source-only rows of earlier batches and before the target-only rows reached the source. It now finishes the
+    /// run, lists the first Batch() conflicts and says how many it left out.
+    /// </summary>
+    [Fact]
+    public async Task Mirror_Bidirectional_PastTheConflictBound_FinishesAndReportsTheFirstConflicts()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        foreach (var id in new[] { "o1", "o2", "o3" })
+        {
+            await new BasicNote { Id = id, Content = "default" }.Save();
+            using (runtime.UsePartition("secondary")) await new BasicNote { Id = id, Content = "secondary" }.Save();
+        }
+        await new BasicNote { Id = "s1", Content = "source-only" }.Save();
+        using (runtime.UsePartition("secondary")) await new BasicNote { Id = "t1", Content = "target-only" }.Save();
+
+        var result = await BasicNote.Mirror(MirrorMode.Bidirectional)
+            .To(partition: "secondary")
+            .Batch(2)
+            .Run();
+
+        result.Conflicts.Select(conflict => conflict.Id).Should().Equal("o1", "o2");
+        result.Warnings.Should().Contain(warning => warning.Contains("3 overlapping identities were left unresolved"));
+        result.CopiedCount.Should().Be(2, "the source-only and target-only rows both cross");
+        (await BasicNote.Get("t1")).Should().NotBeNull();
+        using (runtime.UsePartition("secondary")) (await BasicNote.Get("s1")).Should().NotBeNull();
+        (await BasicNote.Get("o3"))!.Content.Should().Be("default", "an unresolved overlap changes neither side");
+    }
+
+    /// <summary>
     /// NK-001. When the target wins, the bidirectional mirror writes the target's row into the source. It used to
     /// journal the whole entity through lossy JSON (defaults omitted, dictionary keys recased, no non-public setters,
     /// seeded collections appended), so the source received a degraded copy. The winner must arrive intact.

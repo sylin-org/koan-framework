@@ -117,6 +117,7 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
     private async Task<TransferResult<TKey>> RunBidirectional(TransferProgress progress, CancellationToken ct)
     {
         var conflicts = new List<TransferConflict<TKey>>();
+        var unreported = 0L;
         var read = 0L;
         var copied = 0L;
         PropertyInfo? timestamp = null;
@@ -158,17 +159,17 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                         await targetWins.Append(target.Id, ct).ConfigureAwait(false);
                         break;
                     case MirrorConflict.Report:
-                        AddConflict(conflicts, source.Id, "Both mirror sides contain this identity.");
+                        AddConflict(conflicts, ref unreported, source.Id, "Both mirror sides contain this identity.");
                         break;
                     case MirrorConflict.Latest:
                         if (timestamp is null)
                         {
-                            AddConflict(conflicts, source.Id, "No timestamp is available to resolve the overlap.");
+                            AddConflict(conflicts, ref unreported, source.Id, "No timestamp is available to resolve the overlap.");
                             break;
                         }
                         if (!TryCompareTimestamp(timestamp, source, target, out var comparison, out var reason))
                         {
-                            AddConflict(conflicts, source.Id, reason ?? "The timestamps cannot be compared.");
+                            AddConflict(conflicts, ref unreported, source.Id, reason ?? "The timestamps cannot be compared.");
                             break;
                         }
                         if (comparison > 0) targetWrites.Add(source);
@@ -206,16 +207,23 @@ public sealed class MirrorTransferBuilder<TEntity, TKey>
                 sourceAdds, TransferDirection.IntoSource, TransferKind.Mirror, progress, ct).ConfigureAwait(false));
         }
 
+        if (unreported != 0)
+            progress.Warn($"{conflicts.Count + unreported} overlapping identities were left unresolved on both sides; " +
+                          $"Conflicts lists the first {conflicts.Count}, the bound set by Batch(). Choose Source or " +
+                          "Destination conflict resolution, give the Entity one comparable [Timestamp(OnSave = true)], or " +
+                          "narrow the predicate.");
         return Complete(TransferKind.Mirror, read, copied, 0, progress, conflicts);
     }
 
-    private void AddConflict(List<TransferConflict<TKey>> conflicts, TKey id, string reason)
+    /// <summary>
+    /// Records an unresolved overlap. The result lists at most the <c>Batch()</c> size
+    /// of them and counts the rest (NK-108): an unresolved overlap changes neither side, so the run continues and
+    /// finishes its other writes instead of failing partway with them half applied.
+    /// </summary>
+    private void AddConflict(List<TransferConflict<TKey>> conflicts, ref long unreported, TKey id, string reason)
     {
-        if (conflicts.Count == BatchSize)
-            throw new InvalidOperationException(
-                $"The bidirectional mirror exceeded its explicit conflict-result bound of {BatchSize}. " +
-                "Choose Source or Destination conflict resolution, provide comparable [Timestamp] values, or narrow the predicate.");
-        conflicts.Add(new TransferConflict<TKey>(id, reason));
+        if (conflicts.Count < BatchSize) conflicts.Add(new TransferConflict<TKey>(id, reason));
+        else unreported++;
     }
 
     /// <summary>
