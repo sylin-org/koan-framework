@@ -402,6 +402,8 @@
       href: WEB-0072-mcp-explorer-console-and-access-map.md
     - name: WEB-0074 Request text is never a provider query unless the endpoint says so
       href: WEB-0074-request-text-is-never-a-provider-query.md
+    - name: WEB-0075 The rate limiter precedes the endpoints Koan maps
+      href: WEB-0075-rate-limiter-precedes-the-endpoints.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

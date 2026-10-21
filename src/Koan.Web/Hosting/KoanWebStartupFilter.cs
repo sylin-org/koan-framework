@@ -121,6 +121,9 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                         // No authorization services registered; ignore.
                     }
                     RunStage(app, KoanWebPipelineStage.AfterAuthorization);
+                    // WEB-0075: the limiter runs after routing (so endpoint [EnableRateLimiting] metadata applies) and
+                    // before the endpoints, which terminate the pipeline: placed after them it saw only unmatched requests.
+                    if (pipeline.UseRateLimiter) UseRateLimiterIfRegistered(app);
                     // Add minimal tracing header for correlation (always safe)
                     app.Use(async (ctx, next) =>
                     {
@@ -146,20 +149,26 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                         }
                     });
                 }
-                if (pipeline.UseRateLimiter)
+                else if (pipeline.UseRateLimiter)
                 {
-                    try
-                    {
-                        app.UseRateLimiter();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // No limiter registered via AddRateLimiter(...); treat as a no-op per ADR-0012
-                    }
+                    // The application maps its own endpoints after Koan's middleware, so the limiter precedes them.
+                    UseRateLimiterIfRegistered(app);
                 }
             }
             next(app);
         };
+    }
+
+    private static void UseRateLimiterIfRegistered(IApplicationBuilder app)
+    {
+        try
+        {
+            app.UseRateLimiter();
+        }
+        catch (InvalidOperationException)
+        {
+            // No limiter registered via AddRateLimiter(...); treat as a no-op per ADR-0012
+        }
     }
 
     // WEB-0069: run the middleware contributors registered for a given pipeline stage, ordered.
