@@ -23,6 +23,16 @@ internal sealed class DuckDbDialect : IRelationalMappingDialect
     public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
         $"EXISTS (SELECT 1 FROM json_each({columnSql}, '$') AS koan_element WHERE (koan_element.value ->> '$') LIKE {patternParameter} ESCAPE '\\')";
 
+    /// <summary>
+    /// JSON holds a Guid as lower-case D text and a DateTime as round-trip ISO text, so both sides compare as that
+    /// text: a DateTime operand is rewritten to fixed-width wall-clock text, and the comparand is encoded to match
+    /// (DATA-0139). Index expressions keep <see cref="Read"/>.
+    /// </summary>
+    public string DocumentOperand(string readSql, Type physicalType) =>
+        RelationalDocumentText.IsDateTime(physicalType) ? RelationalDocumentText.DateTimeOperand(readSql) : readSql;
+
+    public object? DocumentComparand(object? value, Type physicalType) => RelationalDocumentText.Comparand(value);
+
     public string Read(PhysicalPath path, MappingValueShape shape, Type physicalType)
     {
         var root = $"koan_row.{Quote(path.Name)}";

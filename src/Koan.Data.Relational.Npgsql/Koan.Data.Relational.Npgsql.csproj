@@ -7,6 +7,9 @@
     <PackageTags>$(CommonPackageTags);data;relational;npgsql;postgresql;sql</PackageTags>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Koan.Data.Relational.Tests" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Newtonsoft.Json" />

@@ -382,6 +382,8 @@
       href: DATA-0137-mongo-paths-use-the-serializer-field-names.md
     - name: DATA-0138 A ReadOnly MongoDB source never creates a collection or an index
       href: DATA-0138-a-readonly-mongo-source-never-provisions.md
+    - name: DATA-0139 Guid and DateTime document values compare as the text the document holds
+      href: DATA-0139-guid-and-datetime-document-values-compare-as-document-text.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

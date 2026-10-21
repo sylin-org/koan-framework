@@ -7,6 +7,21 @@ public interface IRelationalMappingDialect : Linq.ILinqSqlDialect
     string Read(PhysicalPath path, MappingValueShape shape, Type physicalType);
 
     /// <summary>
+    /// The expression a filter compares for a scalar read out of a JSON document (<paramref name="readSql"/>, from
+    /// <see cref="Read"/>). Types DATA-0100 does not govern, such as Guid and DateTime, are held as the serializer's own
+    /// text, which is not the form a driver binds the CLR value in; a dialect can rewrite the operand into a comparable
+    /// text here and encode the comparand to match in <see cref="DocumentComparand"/>. Index expressions keep
+    /// <see cref="Read"/>. The default leaves the operand alone.
+    /// </summary>
+    string DocumentOperand(string readSql, Type physicalType) => readSql;
+
+    /// <summary>
+    /// The value bound against <see cref="DocumentOperand"/> for a scalar read out of a JSON document, after the
+    /// DATA-0100 comparand encoding. The default binds it unchanged.
+    /// </summary>
+    object? DocumentComparand(object? value, Type physicalType) => value;
+
+    /// <summary>
     /// The complete ORDER BY term for an order key that aggregates over a JSON array inside a document column —
     /// <c>-Sightings.LastChangedAt</c>, meaning "by each widget's latest sighting".
     ///

@@ -126,6 +126,8 @@ public sealed class SqlFilterTranslator
                 var use = _mapping.Use(resolved.CanonicalPath ?? f.Field, MappingConsumer.Filter);
                 mapped = use.Bindings.Single();
                 column = _mappingDialect!.Read(mapped.PhysicalPath, mapped.Shape, mapped.PhysicalType);
+                if (mapped is { PhysicalPath.IsNested: true, Shape: MappingValueShape.Scalar })
+                    column = _mappingDialect.DocumentOperand(column, mapped.PhysicalType);
             }
         }
         else column = _columnResolver(resolved.CanonicalPath ?? f.Field, resolved);
@@ -284,10 +286,15 @@ public sealed class SqlFilterTranslator
         // CLR types in a form that does not match the stored JSON text (or cannot bind them at all).
         // A real scalar column holds whatever the store's write path encoded into it, so its comparand takes the
         // same encoder (DATA-0136). Non-governed types pass through unchanged.
+        // A scalar read out of a JSON document is compared as the dialect's document text (DATA-0139).
         var encoded = mapped is null ? value : mapped.Encode(value);
-        _parameters.Add(mapped is { PhysicalPath.IsNested: false, Shape: MappingValueShape.Scalar }
-            ? _encodeColumn(encoded)
-            : ComparableScalarEncoding.EncodeComparand(encoded));
+        _parameters.Add(mapped switch
+        {
+            { PhysicalPath.IsNested: false, Shape: MappingValueShape.Scalar } => _encodeColumn(encoded),
+            { PhysicalPath.IsNested: true, Shape: MappingValueShape.Scalar } when _mappingDialect is not null =>
+                _mappingDialect.DocumentComparand(ComparableScalarEncoding.EncodeComparand(encoded), mapped.PhysicalType),
+            _ => ComparableScalarEncoding.EncodeComparand(encoded)
+        });
         return _dialect.Parameter(idx);
     }
 
