@@ -448,6 +448,105 @@ public sealed class EntityExecutionSemanticsSpec
             (2, BatchOperation.Update, BatchItemOutcome.Conflict));
     }
 
+    [Fact]
+    public async Task Lifecycle_batch_reports_an_invisible_delete_as_missing_and_completes_the_visible_one()
+    {
+        var before = new List<string>();
+        var after = new List<string>();
+        var lifecycle = new EntityLifecyclePlan<ReceiptEntity, string>();
+        lifecycle.AddBeforeRemove(context =>
+        {
+            before.Add(context.Current.Id);
+            return ValueTask.FromResult(context.Proceed());
+        });
+        lifecycle.AddAfterRemove(context =>
+        {
+            after.Add(context.Current.Id);
+            return ValueTask.CompletedTask;
+        });
+        var repository = new ReceiptRepository
+        {
+            GetResult = id => id == "visible" ? new ReceiptEntity { Id = id } : null
+        };
+        repository.Batch.Capabilities = BatchExecutionCapabilities.CompleteItemOutcomes;
+        repository.Batch.SaveResult = new BatchResult(1, 0, 1)
+        {
+            HasCompleteItemOutcomes = true,
+            Items =
+            [
+                new BatchItemResult(0, BatchOperation.Add, BatchItemOutcome.Applied),
+                new BatchItemResult(1, BatchOperation.Delete, BatchItemOutcome.Applied)
+            ]
+        };
+        var facade = new RepositoryFacade<ReceiptEntity, string>(repository, lifecycle: lifecycle);
+
+        var result = await facade.CreateBatch()
+            .Delete("missing")
+            .Add(new ReceiptEntity { Id = "new" })
+            .Delete("visible")
+            .Save();
+
+        repository.Batch.Deleted.Should().Equal("visible");
+        result.Items.Select(item => (item.Index, item.Operation, item.Outcome)).Should().Equal(
+            (0, BatchOperation.Delete, BatchItemOutcome.Missing),
+            (1, BatchOperation.Add, BatchItemOutcome.Applied),
+            (2, BatchOperation.Delete, BatchItemOutcome.Applied));
+        before.Should().Equal("visible");
+        after.Should().Equal("visible");
+    }
+
+    [Fact]
+    public async Task Lifecycle_batch_never_dispatches_ids_it_cannot_see()
+    {
+        var before = 0;
+        var lifecycle = new EntityLifecyclePlan<ReceiptEntity, string>();
+        lifecycle.AddBeforeRemove(context =>
+        {
+            before++;
+            return ValueTask.FromResult(context.Proceed());
+        });
+        var repository = new ReceiptRepository();
+        repository.Batch.Capabilities = BatchExecutionCapabilities.CompleteItemOutcomes;
+        repository.Batch.SaveResult = new BatchResult(0, 0, 0) { HasCompleteItemOutcomes = true, Items = [] };
+        var facade = new RepositoryFacade<ReceiptEntity, string>(repository, lifecycle: lifecycle);
+
+        var result = await facade.CreateBatch().Delete("foreign").Save();
+
+        repository.Batch.Deleted.Should().BeEmpty("a remove Lifecycle never falls back to the raw caller ids");
+        result.Deleted.Should().Be(0);
+        result.Items.Select(item => item.Outcome).Should().Equal(BatchItemOutcome.Missing);
+        before.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Complete_batch_runs_after_remove_only_for_applied_deletes()
+    {
+        var after = new List<string>();
+        var lifecycle = new EntityLifecyclePlan<ReceiptEntity, string>();
+        lifecycle.AddAfterRemove(context =>
+        {
+            after.Add(context.Current.Id);
+            return ValueTask.CompletedTask;
+        });
+        var repository = new ReceiptRepository { GetResult = id => new ReceiptEntity { Id = id } };
+        repository.Batch.Capabilities = BatchExecutionCapabilities.CompleteItemOutcomes;
+        repository.Batch.SaveResult = new BatchResult(0, 0, 1)
+        {
+            HasCompleteItemOutcomes = true,
+            Items =
+            [
+                new BatchItemResult(0, BatchOperation.Delete, BatchItemOutcome.Missing),
+                new BatchItemResult(1, BatchOperation.Delete, BatchItemOutcome.Applied)
+            ]
+        };
+        var facade = new RepositoryFacade<ReceiptEntity, string>(repository, lifecycle: lifecycle);
+
+        var result = await facade.CreateBatch().Delete("raced").Delete("kept").Save();
+
+        result.Items.Select(item => item.Outcome).Should().Equal(BatchItemOutcome.Missing, BatchItemOutcome.Applied);
+        after.Should().Equal("kept");
+    }
+
     private sealed class ReceiptEntity : Entity<ReceiptEntity, string>
     {
         [Identifier]
@@ -475,6 +574,7 @@ public sealed class EntityExecutionSemanticsSpec
         IDescribesCapabilities
     {
         public IReadOnlyList<ReceiptEntity?> GetManyResult { get; init; } = [];
+        public Func<string, ReceiptEntity?>? GetResult { get; init; }
         public int GetCalls { get; private set; }
         public int InsertCalls { get; private set; }
         public Func<ReceiptEntity, MutationResult<ReceiptEntity, string>>? InsertResult { get; init; }
@@ -508,7 +608,7 @@ public sealed class EntityExecutionSemanticsSpec
         public Task<ReceiptEntity?> Get(string id, CancellationToken ct = default)
         {
             GetCalls++;
-            return Task.FromResult<ReceiptEntity?>(null);
+            return Task.FromResult(GetResult?.Invoke(id));
         }
 
         public Task<IReadOnlyList<ReceiptEntity?>> GetMany(IEnumerable<string> ids, CancellationToken ct = default)

@@ -22,7 +22,7 @@ public static partial class DataAxis
     /// (ARCH-0079) it exercises two contexts of the axis across the FULL matrix the discriminator must cover — <b>read</b>
     /// isolation · the <b>get-by-id IDOR</b> defence · the <b>[Cacheable] cache-key</b> partition · the <b>cross-scope
     /// write-takeover</b> (IDOR-on-write — the conflict-aware upsert must reject A clobbering B's row by id) · the
-    /// <b>async-hop</b> carrier round-trip · scoped <b>DeleteMany / DeleteAll / RemoveAll</b> that never cross the
+    /// <b>async-hop</b> carrier round-trip · scoped <b>DeleteMany / batch Delete / DeleteAll / RemoveAll</b> that never cross the
     /// boundary — and <b>throws</b> <see cref="DataAxisLeakDetectedException"/> (naming the failed check) on the first
     /// leak. A clean axis returns.
     ///
@@ -137,12 +137,29 @@ public static partial class DataAxis
             using (withContext(contextA)) AssertSameIds<TEntity, TKey>("scoped DeleteMany", await Data<TEntity, TKey>.All(ct), a2);
             using (withContext(contextB)) AssertSameIds<TEntity, TKey>("scoped DeleteMany", await Data<TEntity, TKey>.All(ct), b1);
 
-            // 7. SCOPED DeleteAll — wipes ONLY A's remaining rows; B untouched (never an unscoped Clear).
+            // 7. SCOPED batch Delete over a MIX of ids — the batch applies the single Delete's visibility rule (DATA-0124):
+            //    only A's row is deleted, and B's id is not dispatched and reports Missing.
+            TKey a3;
+            using (withContext(contextA)) a3 = (await Data<TEntity, TKey>.Upsert(new TEntity(), ct)).Id;
+            using (withContext(contextA))
+            {
+                var batch = await Data<TEntity, TKey>.Batch().Delete(b1).Delete(a3).Save(ct: ct);
+                if (batch.Deleted != 1)
+                    throw new DataAxisLeakDetectedException("scoped batch Delete", typeof(TEntity),
+                        $"a batch under '{contextA}' over its own + '{contextB}'s ids deleted {batch.Deleted} rows (expected 1 — its own only).");
+                if (batch.HasCompleteItemOutcomes && batch.Items[0].Outcome != BatchItemOutcome.Missing)
+                    throw new DataAxisLeakDetectedException("scoped batch Delete", typeof(TEntity),
+                        $"a batch under '{contextA}' reported '{batch.Items[0].Outcome}' for '{contextB}'s id '{b1}' (expected Missing).");
+            }
+            using (withContext(contextA)) AssertSameIds<TEntity, TKey>("scoped batch Delete", await Data<TEntity, TKey>.All(ct), a2);
+            using (withContext(contextB)) AssertSameIds<TEntity, TKey>("scoped batch Delete", await Data<TEntity, TKey>.All(ct), b1);
+
+            // 8. SCOPED DeleteAll — wipes ONLY A's remaining rows; B untouched (never an unscoped Clear).
             using (withContext(contextA)) await Data<TEntity, TKey>.DeleteAll(ct);
             using (withContext(contextA)) AssertSameIds<TEntity, TKey>("scoped DeleteAll", await Data<TEntity, TKey>.All(ct));
             using (withContext(contextB)) AssertSameIds<TEntity, TKey>("scoped DeleteAll", await Data<TEntity, TKey>.All(ct), b1);
 
-            // 8. SCOPED RemoveAll — a DISTINCT facade path from DeleteAll; re-create A's rows, then RemoveAll under A
+            // 9. SCOPED RemoveAll — a DISTINCT facade path from DeleteAll; re-create A's rows, then RemoveAll under A
             //    wipes only A's; B untouched.
             using (withContext(contextA)) { await Data<TEntity, TKey>.Upsert(new TEntity(), ct); await Data<TEntity, TKey>.Upsert(new TEntity(), ct); }
             using (withContext(contextA)) await Data<TEntity, TKey>.RemoveAll(RemoveStrategy.Safe, ct);

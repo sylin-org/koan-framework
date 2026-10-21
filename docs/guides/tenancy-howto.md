@@ -301,7 +301,8 @@ business-named application workflows when membership grants require additional d
 
 **Concept.** Isolation is a security boundary, and its failure mode is silent. Koan ships an **executable proof** —
 `DataAxis.AssertNoLeak<T>` (ARCH-0101 §10) — that drives the whole matrix (read · get-by-id IDOR · cross-scope
-write-takeover · scoped delete · cache-key · async-hop) for any value-isolation axis and throws on the first leak.
+write-takeover · scoped DeleteMany, batch delete, DeleteAll and RemoveAll · cache-key · async-hop) for any
+value-isolation axis and throws on the first leak.
 
 **Recipe.** Call it in an integration test through a real `AddKoan()` boot, passing the scope-enter verb.
 

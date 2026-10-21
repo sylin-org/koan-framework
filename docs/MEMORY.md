@@ -668,3 +668,9 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   test output. Run them with `-p:NuGetAudit=false` before concluding anything about a change. Test outputs also
   live in `%TEMP%\Koan-framework\tests\<project>\` — shared by every worktree of this repository.
   (2026-10-19)
+- **"The facade is the gate" is a claim about every verb, so the proof needs a leg per verb.** ARCH-0103 dismissed the
+  batch-delete IDOR on exactly that argument, and the batch was the one facade verb that forwarded caller ids to an
+  identity-only native delete: `Batch().Delete(otherTenantsId)` deleted the row on SQLite, InMemory and Json. The
+  isolation proofs (`DataAxis.AssertNoLeak`, `ManagedFieldNoLeak`) covered DeleteMany, DeleteAll and RemoveAll and
+  had no batch leg, so a matrix read as complete while it skipped a verb. When a guarantee is "every path through the
+  owner", list the owner's public verbs and check the proof names each one. (DATA-0124, 2026-10-21)

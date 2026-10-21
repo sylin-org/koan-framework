@@ -344,6 +344,8 @@
       href: DATA-0122-adapters-classify-failures-the-framework-decides.md
     - name: DATA-0123 An embedded analytics pillar, carried first by a DuckDB connector
       href: DATA-0123-embedded-analytics-and-duckdb-connector.md
+    - name: DATA-0124 A batch delete is scoped exactly like a single delete
+      href: DATA-0124-batch-deletes-are-scoped-like-single-deletes.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -34,7 +34,9 @@ Entity mutation contracts follow the same rule:
 
 - `MutationResult<TEntity,TKey>` reports insert, update, delete, missing, or conflict plus commit outcome.
 - `BatchResult` reports realized atomicity and, when the created native batch earns
-  `CompleteItemOutcomes`, one outcome per builder call in logical call order.
+  `CompleteItemOutcomes`, one outcome per builder call in logical call order. `IBatchSet.Delete(id)` matches on
+  identity alone, so Data dispatches only ids visible in the caller's scope; a delete it withholds reports `Missing`
+  (DATA-0124).
 - `RequireAtomic` rejects before deferred loads, Lifecycle callbacks, or provider dispatch unless both the adapter
   claim and the created native execution seam prove atomicity.
 - `GetMany` returns exactly one slot per requested identity, preserving order and duplicates and using `null` for

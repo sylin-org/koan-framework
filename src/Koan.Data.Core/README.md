@@ -195,6 +195,8 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   projection; discarded provider candidates never escape through Lifecycle.
 - Atomic batches and exact per-item outcomes are negotiated execution seams. `RequireAtomic` rejects before deferred
   mutation loads or callbacks when the selected adapter cannot prove it.
+- `Batch().Delete(id)` deletes only a row the caller's tenant, axis, soft-delete or other read scope can see, exactly
+  like `Remove(id)`. An id outside the scope is not deleted and its item reports `Missing` (DATA-0124).
 - Ambient `EntityContext.Transaction` is deferred sequential coordination, not a native or distributed transaction.
   A failed commit can leave its completed prefix durable; rollback discards only undispatched work. For one Entity
   root, `BatchOptions(RequireAtomic: true)` is the qualified all-or-nothing seam.

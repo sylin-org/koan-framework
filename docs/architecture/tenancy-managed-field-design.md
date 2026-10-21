@@ -137,6 +137,7 @@ managed behavior — none "falls through unchanged":
 | `GetMany(ids)` | → `Query(All(In(idField,ids), managedPredicates…))`, re-ordered to requested ids (nulls for unowned). |
 | `Delete(id)` | check-then-delete: managed-scoped `Get(id)`; if owned → `_inner.Delete(id)`, else false. |
 | `DeleteMany(ids)` | resolve owned subset via managed query → `_inner.DeleteMany(owned)`. |
+| `Batch().Delete(id)` | resolve owned subset via managed query (or the remove Lifecycle's scoped read) → native batch deletes only those; unowned ids report `Missing` (DATA-0124). |
 | `DeleteAll` / `RemoveAll` | lower to a **managed-scoped DELETE** (managed predicate in WHERE); **never** the unscoped truncate/Clear instruction. If the adapter can only truncate → **fail closed**. |
 | `Upsert` / `UpsertMany` / batch | set the write-scope (stamp) **and verify**: the inner write is **conflict-aware** — the row is updated only if its existing managed fields equal the scope (§3.4); a mismatch is fail-closed. |
 | `ConditionalReplaceAsync(model, guard)` | AND the managed predicate into the CAS guard; a managed entity on an adapter that cannot is fail-closed. |

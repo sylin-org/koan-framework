@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -174,6 +175,67 @@ public sealed class ReadFilterContributorSpec(SqliteFixture fixture, ITestOutput
         // RemoveAll is likewise a SCOPED wipe — never an unscoped truncate across the visibility boundary.
         using (Writing("visible")) await new Doc { Title = "v3" }.Save();
         await Doc.RemoveAll();
+        using (AsModerator()) (await Doc.All()).Select(d => d.Id).Should().Equal(hidden.Id);
+    }
+
+    [Fact(DisplayName = "Sqlite: a non-equality read-filter contributor scopes batch delete; the hidden id reports Missing")]
+    public async Task Non_equality_predicate_scopes_batch_delete()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(RegisterAxis, s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        using var _ = Lease(NewPartition());
+
+        Doc visible, hidden;
+        using (Writing("visible")) visible = await new Doc { Title = "v" }.Save();
+        using (Writing("hidden")) hidden = await new Doc { Title = "h" }.Save();
+
+        // DATA-0124: a batch delete applies the single Delete's visibility rule — the viewer cannot delete the hidden row.
+        var result = await Doc.Batch().Delete(hidden.Id).Delete(visible.Id).Save();
+
+        result.Deleted.Should().Be(1);
+        result.HasCompleteItemOutcomes.Should().BeTrue();
+        result.Items.Select(item => (item.Index, item.Operation, item.Outcome)).Should().Equal(
+            (0, BatchOperation.Delete, BatchItemOutcome.Missing),
+            (1, BatchOperation.Delete, BatchItemOutcome.Applied));
+        using (AsModerator()) (await Doc.All()).Select(d => d.Id).Should().Equal(hidden.Id);
+    }
+
+    [Fact(DisplayName = "Sqlite: a remove-Lifecycle batch with invisible and missing ids deletes only the visible row and completes its handlers")]
+    public async Task Lifecycle_batch_with_invisible_and_missing_ids_completes()
+    {
+        RequireBackingStore();
+        var before = new List<string>();
+        var after = new List<string>();
+        await using var host = await BootAsync(
+            () =>
+            {
+                RegisterAxis();
+                Doc.Lifecycle
+                    .BeforeRemove(context => { before.Add(context.Current.Id); return context.Proceed(); })
+                    .AfterRemove(context => after.Add(context.Current.Id));
+            },
+            s => s.AddSingleton<IReadFilterContributor, ModerationReadContributor>());
+        using var _ = Lease(NewPartition());
+
+        Doc visible, hidden;
+        using (Writing("visible")) visible = await new Doc { Title = "v" }.Save();
+        using (Writing("hidden")) hidden = await new Doc { Title = "h" }.Save();
+
+        // Every queued id invisible: nothing is dispatched, no handler runs, the hidden row survives (NK-003/NK-005).
+        var none = await Doc.Batch().Delete(hidden.Id).Save();
+        none.Deleted.Should().Be(0);
+        none.Items.Select(item => item.Outcome).Should().Equal(BatchItemOutcome.Missing);
+        before.Should().BeEmpty();
+        after.Should().BeEmpty();
+
+        // A mix of hidden, missing and visible ids: the outcomes stay aligned with the builder order and the visible
+        // row's AfterRemove runs after the commit (NK-017).
+        var mixed = await Doc.Batch().Delete(hidden.Id).Delete("missing-" + Guid.CreateVersion7().ToString("n")).Delete(visible.Id).Save();
+        mixed.Deleted.Should().Be(1);
+        mixed.Items.Select(item => item.Outcome).Should().Equal(
+            BatchItemOutcome.Missing, BatchItemOutcome.Missing, BatchItemOutcome.Applied);
+        before.Should().Equal(visible.Id);
+        after.Should().Equal(visible.Id);
         using (AsModerator()) (await Doc.All()).Select(d => d.Id).Should().Equal(hidden.Id);
     }
 

@@ -243,6 +243,10 @@ validation:
 - A batch is one-shot. Atomicity is prequalified through both the adapter capability and the created native batch;
   successful results must report committed execution and matching realized atomicity. Complete item results are
   validated in native positions, then remapped to logical builder order.
+- A batch delete is scoped like `Delete` (DATA-0124). Under a managed or read scope only the queued ids the scope can
+  read are dispatched (one scoped query, or the remove Lifecycle's scoped read); the rest report `Missing` and are
+  never sent to the identity-only native delete. Each queued delete records its native slot, so complete outcomes stay
+  in builder order. With complete outcomes, `AfterRemove` runs only for deletes reported `Applied`.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during

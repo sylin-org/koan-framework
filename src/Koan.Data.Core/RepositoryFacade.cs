@@ -1119,9 +1119,17 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             return soft.Items.Count;
         }
         if (managed is null) return await _inner.DeleteMany(idList, ct);
-        var res = await RequireQuery().Query(ScopedByIds(idList, managed), ct);
-        var owned = res.Items.Select(e => e.Id).ToList();
+        var owned = await VisibleIds(idList, managed, ct);
         return owned.Count == 0 ? 0 : await _inner.DeleteMany(owned, ct);
+    }
+
+    /// <summary>The requested identities the active read scope can see. Native deletes match on identity alone, so
+    /// every keyed delete under a scope (DeleteMany, the batch) names only these rows — the single Delete's
+    /// check-then-delete, lowered once for the set (DATA-0124).</summary>
+    private async Task<IReadOnlyList<TKey>> VisibleIds(IReadOnlyList<TKey> ids, Filter managed, CancellationToken ct)
+    {
+        var res = await RequireQuery().Query(ScopedByIds(ids, managed), ct);
+        return res.Items.Select(e => e.Id).ToList();
     }
 
     private async Task<long> DeleteVisibleInBoundedPages(
@@ -1365,6 +1373,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
 
     private sealed class BatchFacade : IBatchSet<TEntity, TKey>
     {
+        /// <summary>The native position of a queued delete that the caller's scope cannot see.</summary>
+        private const int NotDispatched = -1;
+
         private readonly RepositoryFacade<TEntity, TKey> _outer;
         private IBatchSet<TEntity, TKey>? _native;
         private readonly List<TEntity> _adds = new();
@@ -1510,20 +1521,48 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                         ct));
             }
 
+            // A batch delete removes exactly what the single scoped Delete would (DATA-0124). Native deletes match on
+            // identity alone, so an id outside the caller's managed or read scope is never dispatched; it reports
+            // Missing, as the single Delete reports false. deleteSlots maps each queued delete to its native position.
+            // A soft remove is lowered below through the canonical remove path, which scopes each id itself.
+            var lowerSoftDeletes = _outer._deleteOverride is not null && _deletes.Count != 0;
             var removeContexts = new List<EntityLifecycleContext<TEntity>>(_deletes.Count);
+            var deletes = new List<TKey>(_deletes.Count);
+            var deleteSlots = new int[_deletes.Count];
             if (_outer._lifecycle is { HasRemove: true })
             {
-                foreach (var id in _deletes)
+                for (var i = 0; i < _deletes.Count; i++)
                 {
-                    var entity = await _outer.ReadOne(id, segmentation, ct);
-                    if (entity is not null)
-                        removeContexts.Add(await _outer._lifecycle.BeginRemove(entity, ct));
+                    var entity = await _outer.ReadOne(_deletes[i], segmentation, ct);
+                    if (entity is null)
+                    {
+                        deleteSlots[i] = NotDispatched;
+                        continue;
+                    }
+                    var context = await _outer._lifecycle.BeginRemove(entity, ct);
+                    removeContexts.Add(context);
+                    deleteSlots[i] = deletes.Count;
+                    deletes.Add(context.Current.Id);
+                }
+            }
+            else
+            {
+                var managed = lowerSoftDeletes || _deletes.Count == 0 ? null : _outer.ReadScopeFilter(segmentation);
+                var visible = managed is null ? null : (await _outer.VisibleIds(_deletes, managed, ct)).ToHashSet();
+                for (var i = 0; i < _deletes.Count; i++)
+                {
+                    if (visible is not null && !visible.Contains(_deletes[i]))
+                    {
+                        deleteSlots[i] = NotDispatched;
+                        continue;
+                    }
+                    deleteSlots[i] = deletes.Count;
+                    deletes.Add(_deletes[i]);
                 }
             }
 
             var adds = addContexts.Count == 0 ? _adds : addContexts.Select(context => context.Current).ToList();
             var updates = updateContexts.Count == 0 ? _updates : updateContexts.Select(context => context.Current).ToList();
-            var deletes = removeContexts.Count == 0 ? _deletes : removeContexts.Select(context => context.Current.Id).ToList();
 
             // A batch is still an Entity write: apply the same compiled identity/timestamp contributors as Upsert.
             foreach (var entity in adds) { ct.ThrowIfCancellationRequested(); _outer.WritePlanFor(entity).ApplyAll(entity); }
@@ -1537,7 +1576,6 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             // A soft remove is an update, not a native delete. Lower it through the canonical remove path so
             // operation overrides, managed scope and Lifecycle retain exactly the same meaning as Entity.Remove().
             // This necessarily spans multiple writes; fail closed when the caller explicitly requires atomicity.
-            var lowerSoftDeletes = _outer._deleteOverride is not null && deletes.Count != 0;
             if (!lowerSoftDeletes)
                 foreach (var id in deletes) native.Delete(id);
 
@@ -1572,20 +1610,27 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                     typeof(TEntity).FullName ?? typeof(TEntity).Name,
                     "Complete item outcomes were reported by a batch that did not qualify that execution seam.",
                     DataCommitOutcome.Unknown);
+
+            var completedRemoves = removeContexts;
             if (nativeCapabilities.HasFlag(BatchExecutionCapabilities.CompleteItemOutcomes) && !lowerSoftDeletes)
             {
-                ValidateCompleteOutcomes(
-                    result,
-                    adds.Count,
-                    updates.Count,
-                    lowerSoftDeletes ? 0 : deletes.Count);
+                ValidateCompleteOutcomes(result, adds.Count, updates.Count, deletes.Count);
+                var byNativeIndex = new BatchItemResult[result.Items.Count];
+                foreach (var item in result.Items) byNativeIndex[item.Index] = item;
+                // A dispatched delete the store reports Missing (removed concurrently) removed nothing, so its
+                // AfterRemove does not run — the single Delete completes only when the row was removed.
+                if (removeContexts.Count != 0)
+                    completedRemoves = removeContexts
+                        .Where((_, slot) =>
+                            byNativeIndex[adds.Count + updates.Count + slot].Outcome == BatchItemOutcome.Applied)
+                        .ToList();
                 result = result with
                 {
-                    Items = RemapCompleteOutcomes(result.Items, explicitUpdateCount, adds.Count, updates.Count)
+                    HasCompleteItemOutcomes = true,
+                    Items = RemapCompleteOutcomes(byNativeIndex, explicitUpdateCount, adds.Count, updates.Count, deleteSlots)
                 };
             }
 
-            var completedRemoves = removeContexts;
             if (lowerSoftDeletes)
             {
                 completedRemoves = new List<EntityLifecycleContext<TEntity>>(removeContexts.Count);
@@ -1634,30 +1679,27 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         }
 
         private IReadOnlyList<BatchItemResult> RemapCompleteOutcomes(
-            IReadOnlyList<BatchItemResult> nativeItems,
+            BatchItemResult[] byNativeIndex,
             int explicitUpdateCount,
             int addCount,
-            int updateCount)
+            int updateCount,
+            int[] deleteSlots)
         {
-            var byNativeIndex = new BatchItemResult[nativeItems.Count];
-            foreach (var item in nativeItems) byNativeIndex[item.Index] = item;
-
             var logical = new BatchItemResult[_logicalOperations.Count];
             for (var logicalIndex = 0; logicalIndex < _logicalOperations.Count; logicalIndex++)
             {
                 var (operation, localIndex) = _logicalOperations[logicalIndex];
-                var nativeIndex = operation switch
+                var outcome = operation switch
                 {
-                    BatchOperation.Add => localIndex,
-                    BatchOperation.Update => addCount + localIndex,
-                    BatchOperation.Mutate => addCount + explicitUpdateCount + localIndex,
-                    BatchOperation.Delete => addCount + updateCount + localIndex,
+                    BatchOperation.Add => byNativeIndex[localIndex].Outcome,
+                    BatchOperation.Update => byNativeIndex[addCount + localIndex].Outcome,
+                    BatchOperation.Mutate => byNativeIndex[addCount + explicitUpdateCount + localIndex].Outcome,
+                    BatchOperation.Delete => deleteSlots[localIndex] == NotDispatched
+                        ? BatchItemOutcome.Missing
+                        : byNativeIndex[addCount + updateCount + deleteSlots[localIndex]].Outcome,
                     _ => throw new ArgumentOutOfRangeException(nameof(operation))
                 };
-                logical[logicalIndex] = new BatchItemResult(
-                    logicalIndex,
-                    operation,
-                    byNativeIndex[nativeIndex].Outcome);
+                logical[logicalIndex] = new BatchItemResult(logicalIndex, operation, outcome);
             }
             return logical;
         }
@@ -1669,6 +1711,10 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             int deleteCount)
         {
             var nativeOperationCount = checked(addCount + updateCount + deleteCount);
+            // A batch whose every operation was out of scope dispatches nothing; an empty native receipt is complete.
+            if (nativeOperationCount == 0 && result.Items.Count == 0 &&
+                result.Added == 0 && result.Updated == 0 && result.Deleted == 0)
+                return;
             if (!result.HasCompleteItemOutcomes || result.Items.Count != nativeOperationCount)
                 throw Rejected("A complete-outcome batch must return one item for every native operation.");
 

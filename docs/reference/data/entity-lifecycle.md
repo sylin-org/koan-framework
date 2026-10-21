@@ -74,6 +74,11 @@ not create a framework-induced partial batch. With handlers configured, Koan per
 `AfterUpsert` corresponds to a real completed write; without handlers, adapters retain their native
 bulk path.
 
+`Batch().Delete(id)` runs `BeforeRemove` only for ids the caller can read in its current scope, and
+only those are deleted; an invisible or missing id reports `Missing` and runs no handler. When the
+provider reports complete item outcomes, `AfterRemove` runs for each delete it reports `Applied`
+(DATA-0124).
+
 Lifecycle does not claim cross-provider batch atomicity. `BatchOptions.RequireAtomic` remains an
 adapter contract. In particular, an atomic batch containing soft deletes rejects because soft delete
 is lowered to multiple canonical updates rather than falsely reported as one atomic native delete.
