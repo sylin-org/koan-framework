@@ -615,6 +615,57 @@ public sealed class EntityTransferDslSpec
         act.Should().Throw<InvalidOperationException>();
     }
 
+    /// <summary>
+    /// NK-110. A blank axis was turned into "inherit", so inside an ambient partition no endpoint could name the base
+    /// set. An empty axis now names its base value, and an axis left out still inherits.
+    /// </summary>
+    [Fact]
+    public async Task Transfer_EmptyPartition_NamesTheBaseSet_AndAnOmittedOneInherits()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        await new TransferTodo { Id = "base", Title = "base", Active = true }.Save();
+        using (runtime.UsePartition("hot")) await new TransferTodo { Id = "hot", Title = "hot", Active = true }.Save();
+
+        using (runtime.UsePartition("hot"))
+        {
+            var fromBase = await TransferTodo.Copy().From(partition: "").To(partition: "archive").Run();
+            fromBase.ResolvedFrom!.Container.Should().Be("TransferTodo");
+            var inherited = await TransferTodo.Copy().To(partition: "dest").Run();
+            inherited.ResolvedFrom!.Container.Should().Be("TransferTodo#hot");
+        }
+
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Select(todo => todo.Id).Should().Equal("base");
+        using (runtime.UsePartition("dest"))
+            (await TransferTodo.All()).Select(todo => todo.Id).Should().Equal("hot");
+    }
+
+    /// <summary>
+    /// NK-110. The two routing axes inherited separately, so To(adapter:) inside an ambient source carried both and threw.
+    /// Naming one of them names the route: the other is not inherited.
+    /// </summary>
+    [Fact]
+    public async Task Transfer_NamingAnAdapterInsideAnAmbientSource_ReachesThatAdapter()
+    {
+        await using var runtime = await CreateRuntime(settings: Archive);
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (EntityContext.Source("Archive"))
+        {
+            await new TransferTodo { Id = "archived", Title = "archived", Active = true }.Save();
+            var result = await TransferTodo.Copy().To(adapter: TransferAdapterFactory.ProviderId, partition: "dest").Run();
+            result.ResolvedFrom!.Source.Should().Be("Archive");
+            result.ResolvedTo!.Source.Should().Be("Default");
+        }
+
+        using (runtime.UsePartition("dest"))
+            (await TransferTodo.Get("archived")).Should().NotBeNull();
+    }
+
     [Fact]
     public async Task Batch_BoundsProviderPagesAndDestinationWrites()
     {

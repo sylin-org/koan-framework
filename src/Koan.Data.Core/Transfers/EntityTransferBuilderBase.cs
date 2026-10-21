@@ -336,9 +336,9 @@ public abstract class EntityTransferBuilderBase<TEntity, TKey, TBuilder>
     {
         if (context is not { } value) return "the ambient context";
         var axes = new List<string>(3);
-        if (value.Source is not null) axes.Add($"source '{value.Source}'");
-        if (value.Adapter is not null) axes.Add($"adapter '{value.Adapter}'");
-        if (value.Partition is not null) axes.Add($"partition '{value.Partition}'");
+        if (value.Source is not null) axes.Add(value.Source.Length == 0 ? "the default source" : $"source '{value.Source}'");
+        if (value.Adapter is not null) axes.Add(value.Adapter.Length == 0 ? "no adapter override" : $"adapter '{value.Adapter}'");
+        if (value.Partition is not null) axes.Add(value.Partition.Length == 0 ? "the base partition" : $"partition '{value.Partition}'");
         return axes.Count == 0 ? "the ambient context" : string.Join(", ", axes);
     }
 

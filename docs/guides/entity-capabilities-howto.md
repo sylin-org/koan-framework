@@ -1123,6 +1123,12 @@ whole read is copied exactly once while other writers change the source; an Enti
 one materialized query, and the result's `Warnings` say so. `ReadCount`, `CopiedCount` and `DeletedCount` are
 64-bit (DATA-0151).
 
+An axis left out of `From()` or `To()` inherits the ambient `EntityContext`; an empty one names its base value:
+`source: ""` is the default source and `partition: ""` the base partition. Naming a source or an adapter names the
+route, so the other of the two is not inherited: `To(adapter: "mongo")` inside `EntityContext.Source("Preview")`
+reaches MongoDB's default store, and `From(source: "", partition: "")` reads the base set under any ambient scope
+([DATA-0153](../decisions/DATA-0153-transfer-endpoints-can-name-the-base-set.md)).
+
 Endpoints are compared as the physical places they reach, not as written. `From(source: "Default").To()`, a
 source name in another letter case, a source that shares the default connection (`ConnectionString: auto` or the
 provider-wide connection), a partition spelled in another case, or a
