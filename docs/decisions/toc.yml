@@ -610,3 +610,5 @@
       href: SEC-0018-mcp-self-description-is-gated-like-web.md
     - name: SEC-0019 Delete bounds evaluate counterpart Read constraints through the Data facade
       href: SEC-0019-delete-bounds-evaluate-counterpart-read-constraints.md
+    - name: SEC-0020 The open default is the product stance, and its posture is stated in the facts
+      href: SEC-0020-the-open-default-is-the-product-stance.md

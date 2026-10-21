@@ -85,6 +85,12 @@ Referencing `Koan.Web` registers `IAuthorize` and the entity-floor rung, so `[Au
 the ladder falls through to `AuthorizeOptions.DefaultDecision` — `Allow`, the open default the `Project`
 half above is the counterweight to.
 
+The open default is the product stance ([SEC-0020](../decisions/SEC-0020-the-open-default-is-the-product-stance.md)):
+a bare entity and controller expose every verb, including `DELETE /all`. Close what you mean to close with `[Access(remove: ...)]`
+(per action), an `EntityAccess<T>` (per row), `[McpEntity(AllowMutations = false)]` (MCP mutations) or
+`Koan:Web:Authorization:DefaultDecision=Forbid` (the whole host). The posture a host resolves to is the runtime fact
+`koan.web.authorization.default` at `/.well-known/Koan/facts`.
+
 Declaring capability policy is what adds the RBAC and named-policy rungs on top:
 
 ```csharp

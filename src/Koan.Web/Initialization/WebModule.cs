@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Koan.Core;
+using Koan.Core.Composition;
 using Koan.Core.Extensions;
 using Koan.Core.Modules;
 using Koan.Web.Authorization;
@@ -74,6 +76,20 @@ public sealed class WebModule : KoanModule
         // Ensure MVC discovers controllers from this assembly
         services.AddKoanControllersFrom<Controllers.HealthController>();
         Transformers.Initialization.WebTransformersBootstrap.Register(services);
+    }
+
+    // SEC-0020: state the posture an undeclared entity or verb resolves to, so Allow (the default) is read rather
+    // than inferred. Narrowing is Koan:Web:Authorization:DefaultDecision=Forbid, [Access] or an EntityAccess<T>.
+    public override void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)
+    {
+        var decision = services.GetService<IOptions<AuthorizeOptions>>()?.Value.DefaultDecision ?? AuthorizeDefault.Allow;
+        composition.AddObservation(
+            Infrastructure.KoanWebConstants.Authorization.DefaultDecisionFactCode,
+            "web:authorization",
+            "An entity or verb that declares no [Access] gate, EntityAccess<T> or authorization provider resolves to " +
+            $"{decision} (Koan:Web:Authorization:DefaultDecision).",
+            Infrastructure.KoanWebConstants.Authorization.DefaultDecisionFactReason,
+            typeof(WebModule).FullName ?? nameof(WebModule));
     }
 
     public override void Report(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

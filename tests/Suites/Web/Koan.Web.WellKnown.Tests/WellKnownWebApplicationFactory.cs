@@ -21,6 +21,9 @@ public sealed class WellKnownWebApplicationFactory : IAsyncLifetime
 {
     private IHost? _host;
 
+    /// <summary>Configuration added after the defaults; set before <see cref="InitializeAsync"/>.</summary>
+    public IReadOnlyDictionary<string, string?> Settings { get; init; } = new Dictionary<string, string?>();
+
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
     public HttpClient CreateClient()
@@ -46,7 +49,7 @@ public sealed class WellKnownWebApplicationFactory : IAsyncLifetime
                     ["Koan:BackgroundServices:Enabled"] = "false",
                     ["Koan:Web:ExposeObservabilitySnapshot"] = "true",
                     ["Logging:LogLevel:Default"] = "Warning",
-                }))
+                }).AddInMemoryCollection(Settings))
                 .ConfigureServices(services =>
                 {
                     services.AddKoan();

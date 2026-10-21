@@ -69,6 +69,10 @@ public static class KoanWebConstants
 
     public static class Authorization
     {
+        // SEC-0020: the runtime fact stating what an entity or verb nothing declares resolves to.
+        public const string DefaultDecisionFactCode = "koan.web.authorization.default";
+        public const string DefaultDecisionFactReason = "authorize-default-decision";
+
         // ARCH-0092 / SEC-0012: [Authorize(Policy = "scope:<x>")] on an entity lowers to the scope grant <x>.
         public const string ScopePolicyPrefix = "scope:";
     }
