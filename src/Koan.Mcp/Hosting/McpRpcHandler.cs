@@ -65,6 +65,9 @@ public sealed class McpRpcHandler
 
     public const string DefaultProtocolVersion = "2025-06-18";
 
+    /// <summary>The provider this handler resolves from; transports open per-listing scopes from it (SEC-0011).</summary>
+    internal IServiceProvider Services => _services;
+
     internal InitializeResult BuildInitializeResult(InitializeParams? parameters)
     {
         var app = Koan.Core.KoanEnv.CurrentSnapshot.Application;

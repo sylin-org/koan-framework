@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading;
@@ -7,6 +8,7 @@ using Koan.Mcp.Execution;
 using Koan.Mcp.Options;
 using Koan.Mcp.Resources;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -108,10 +110,15 @@ public sealed class McpRpcDispatcher
     private async Task<JObject> HandleToolsList(JsonRpcEnvelope envelope, ClaimsPrincipal principal, McpRpcHandler handler, CancellationToken cancellationToken)
     {
         var response = await handler.ListTools(cancellationToken);
-        var filtered = response.Tools.Where(t => IsToolVisible(t, principal)).ToArray();
-        if (filtered.Length != response.Tools.Count)
+        using var visibility = McpVerbVisibility.For(handler.Services.GetService<IServiceScopeFactory>(), _gateCache, principal);
+        var filtered = new List<McpRpcHandler.ToolDescriptor>(response.Tools.Count);
+        foreach (var tool in response.Tools)
         {
-            response = new McpRpcHandler.ToolsListResponse { Tools = filtered, Next = response.Next };
+            if (await IsToolVisible(tool, principal, visibility, cancellationToken)) filtered.Add(tool);
+        }
+        if (filtered.Count != response.Tools.Count)
+        {
+            response = new McpRpcHandler.ToolsListResponse { Tools = filtered.ToArray(), Next = response.Next };
         }
         return Wrap(envelope.Id, JToken.FromObject(response, JsonSerializer.Create(SerializerSettings)));
     }
@@ -172,14 +179,15 @@ public sealed class McpRpcDispatcher
         return Wrap(envelope.Id, JToken.FromObject(handler.ReadResourceFor(uri, principal), JsonSerializer.Create(SerializerSettings)));
     }
 
-    // SEC-0004 Phase 3.3b: tools/list must not advertise what the gate will deny. An ENTITY tool is visible iff the
-    // SAME [Access] gate the data layer enforces coarsely allows the principal (McpEntityGate). A CUSTOM verb
+    // SEC-0011: tools/list must not advertise what the call will deny. An ENTITY tool is visible iff the authorization
+    // ladder the endpoint enforces (grants, added providers, the default decision) allows the principal. A CUSTOM verb
     // consults McpToolAccessPolicy (its scope filter). The principal is never null at a remote edge.
-    private bool IsToolVisible(McpRpcHandler.ToolDescriptor tool, ClaimsPrincipal principal)
+    private async Task<bool> IsToolVisible(McpRpcHandler.ToolDescriptor tool, ClaimsPrincipal principal,
+        McpVerbVisibility visibility, CancellationToken cancellationToken)
     {
         if (_registry.TryGetTool(tool.Name, out var registration, out var definition))
         {
-            return McpEntityGate.CoarseAllows(_gateCache, registration.EntityType, definition.Operation, principal);
+            return await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken);
         }
 
         if (_customTools.TryGet(tool.Name, out var custom))

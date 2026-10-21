@@ -8,6 +8,7 @@ using Koan.Core.Hosting.App;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -34,17 +35,32 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
     private readonly McpCustomToolRegistry _customTools;
     private readonly IAccessGateCache _gateCache;
     private readonly IOptions<McpServerOptions> _options;
+    private readonly IServiceScopeFactory? _scopes;
 
+    /// <summary>SEC-0011: verbs are listed by the authorization ladder of a fresh scope from <paramref name="scopes"/>,
+    /// the decision the endpoint enforces.</summary>
     public SelfResourceProvider(
         McpEntityRegistry registry,
         McpCustomToolRegistry customTools,
         IAccessGateCache gateCache,
-        IOptions<McpServerOptions> options)
+        IOptions<McpServerOptions> options,
+        IServiceScopeFactory scopes)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _customTools = customTools ?? throw new ArgumentNullException(nameof(customTools));
         _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
         _options = options ?? throw new ArgumentNullException(nameof(options));
+        _scopes = scopes; // null only through the obsolete constructor
+    }
+
+    [Obsolete("Lists verbs by the compiled gate alone, which skips agent grants, the default decision and added authorization providers. Pass an IServiceScopeFactory (SEC-0011).")]
+    public SelfResourceProvider(
+        McpEntityRegistry registry,
+        McpCustomToolRegistry customTools,
+        IAccessGateCache gateCache,
+        IOptions<McpServerOptions> options)
+        : this(registry, customTools, gateCache, options, scopes: null!)
+    {
     }
 
     public IEnumerable<McpResourceDescriptor> List(ClaimsPrincipal? user)
@@ -64,7 +80,8 @@ public sealed class SelfResourceProvider : IMcpResourceProvider
         }
 
         var app = KoanEnv.CurrentSnapshot.Application;
-        var visible = EntityProjection.Visible(_registry, _gateCache, user);
+        using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(_scopes, _gateCache, user);
+        var visible = EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult();
         var visibleCustomTools = CustomToolProjection.Visible(_customTools, _options.Value, user);
 
         var entities = new JArray(visible.Select(v => new JObject

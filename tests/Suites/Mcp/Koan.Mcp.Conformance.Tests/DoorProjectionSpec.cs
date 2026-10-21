@@ -34,7 +34,8 @@ public sealed class DoorProjectionSpec : IClassFixture<DoorEntityFixture>
     private EntityCatalogResourceProvider Provider() => new(
         _fx.Services.GetRequiredService<McpEntityRegistry>(),
         _fx.Services.GetRequiredService<Koan.Data.Core.Relationships.IRelationshipMetadata>(),
-        _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>());
+        _fx.Services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>(),
+        _fx.Services.GetRequiredService<IServiceScopeFactory>());
 
     private static JObject Entity(JObject doc, string name)
         => ((JArray)doc["entities"]!).OfType<JObject>().First(e => e["name"]?.Value<string>() == name);

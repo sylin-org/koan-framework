@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -22,15 +23,29 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
     private readonly McpEntityRegistry _registry;
     private readonly Koan.Data.Core.Relationships.IRelationshipMetadata _metadata;
     private readonly IAccessGateCache _gateCache;
+    private readonly IServiceScopeFactory? _scopes;
 
+    /// <summary>SEC-0011: verbs are listed by the authorization ladder of a fresh scope from <paramref name="scopes"/>,
+    /// the decision the endpoint enforces.</summary>
     public EntityCatalogResourceProvider(
         McpEntityRegistry registry,
         Koan.Data.Core.Relationships.IRelationshipMetadata metadata,
-        IAccessGateCache gateCache)
+        IAccessGateCache gateCache,
+        IServiceScopeFactory scopes)
     {
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
         _gateCache = gateCache ?? throw new ArgumentNullException(nameof(gateCache));
+        _scopes = scopes; // null only through the obsolete constructor
+    }
+
+    [Obsolete("Lists verbs by the compiled gate alone, which skips agent grants, the default decision and added authorization providers. Pass an IServiceScopeFactory (SEC-0011).")]
+    public EntityCatalogResourceProvider(
+        McpEntityRegistry registry,
+        Koan.Data.Core.Relationships.IRelationshipMetadata metadata,
+        IAccessGateCache gateCache)
+        : this(registry, metadata, gateCache, scopes: null!)
+    {
     }
 
     public IEnumerable<McpResourceDescriptor> List(ClaimsPrincipal? user)
@@ -52,7 +67,8 @@ public sealed class EntityCatalogResourceProvider : IMcpResourceProvider
         var entities = new JArray();
 
         // Shared per-grant projection (null principal = local-trust full; concrete principal = per grant).
-        var visible = EntityProjection.Visible(_registry, _gateCache, user);
+        using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(_scopes, _gateCache, user);
+        var visible = EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult();
 
         // AN7: edges are governed at the catalog level by target-type visibility — an edge pointing at a
         // type this grant cannot see is absent (walled-means-silent). Build the visible-type → name map once.

@@ -38,9 +38,9 @@ public sealed class EntityRequestContextBuilder
             var opts = provider.GetService<IOptions<OriginOptions>>()?.Value ?? OriginOptions.Empty;
             principal = OriginStamp.Apply(principal, OriginResolver.FromHttpContext(httpContext, opts));
         }
-        else if (!OriginStamp.IsStamped(principal))
+        else
         {
-            principal = OriginStamp.Apply(principal, OriginTier.Remote);
+            principal = NonHttpPrincipal(principal);
         }
 
         return new EntityRequestContext(provider, options, cancellationToken, httpContext, principal)
@@ -48,6 +48,16 @@ public sealed class EntityRequestContextBuilder
             AuthenticationRejected = httpContext?.Features
                 .Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure is not null
         };
+    }
+
+    /// <summary>
+    /// The principal a non-HTTP caller (MCP) is authorized as: the edge's own origin stamp, or <c>remote</c> when it
+    /// carries none. Listings that advertise a verb evaluate this same principal (SEC-0011).
+    /// </summary>
+    public static ClaimsPrincipal NonHttpPrincipal(ClaimsPrincipal? user)
+    {
+        var principal = user ?? new ClaimsPrincipal();
+        return OriginStamp.IsStamped(principal) ? principal : OriginStamp.Apply(principal, OriginTier.Remote);
     }
 }
 

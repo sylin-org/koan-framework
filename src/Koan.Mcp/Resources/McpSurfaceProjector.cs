@@ -6,6 +6,7 @@ using Koan.Mcp.CustomTools;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 
@@ -30,13 +31,24 @@ public sealed class McpSurfaceProjector
     private readonly McpCustomToolRegistry _customTools;
     private readonly IAccessGateCache _gateCache;
     private readonly IOptions<McpServerOptions> _serverOptions;
+    private readonly IServiceScopeFactory? _scopes;
 
-    public McpSurfaceProjector(McpEntityRegistry registry, McpCustomToolRegistry customTools, IAccessGateCache gateCache, IOptions<McpServerOptions> serverOptions)
+    /// <summary>SEC-0011: verbs are listed by the authorization ladder of a fresh scope from <paramref name="scopes"/>,
+    /// the decision the endpoint enforces.</summary>
+    public McpSurfaceProjector(McpEntityRegistry registry, McpCustomToolRegistry customTools, IAccessGateCache gateCache,
+        IOptions<McpServerOptions> serverOptions, IServiceScopeFactory scopes)
     {
         _registry = registry;
         _customTools = customTools;
         _gateCache = gateCache;
         _serverOptions = serverOptions;
+        _scopes = scopes; // null only through the obsolete constructor
+    }
+
+    [System.Obsolete("Lists verbs by the compiled gate alone, which skips agent grants, the default decision and added authorization providers. Pass an IServiceScopeFactory (SEC-0011).")]
+    public McpSurfaceProjector(McpEntityRegistry registry, McpCustomToolRegistry customTools, IAccessGateCache gateCache, IOptions<McpServerOptions> serverOptions)
+        : this(registry, customTools, gateCache, serverOptions, scopes: null!)
+    {
     }
 
     /// <summary>Project the per-caller surface document for <paramref name="user"/>.</summary>
@@ -45,7 +57,8 @@ public sealed class McpSurfaceProjector
         var app = KoanEnv.CurrentSnapshot.Application;
 
         var entities = new JArray();
-        foreach (var (registration, verbs, doors) in EntityProjection.Visible(_registry, _gateCache, user))
+        using var visibility = Koan.Mcp.Execution.McpVerbVisibility.For(_scopes, _gateCache, user);
+        foreach (var (registration, verbs, doors) in EntityProjection.Visible(_registry, _gateCache, visibility, user).GetAwaiter().GetResult())
         {
             var tools = new JArray();
             foreach (var verb in verbs)

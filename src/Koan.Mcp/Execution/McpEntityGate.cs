@@ -24,7 +24,9 @@ namespace Koan.Mcp.Execution;
 public static class McpEntityGate
 {
     /// <summary>Does the entity's compiled gate coarsely allow <paramref name="operation"/> for
-    /// <paramref name="user"/>? A <c>null</c> principal (STDIO local-trust) is always allowed.</summary>
+    /// <paramref name="user"/>? A <c>null</c> principal (STDIO local-trust) is always allowed.
+    /// <para>The compiled gate is one rung of the ladder the endpoint enforces; it does not see agent grants, the
+    /// default decision or added providers. Listings ask the ladder instead (SEC-0011).</para></summary>
     public static bool CoarseAllows(IAccessGateCache gateCache, Type entityType, EntityEndpointOperationKind operation, ClaimsPrincipal? user)
     {
         if (gateCache is null) throw new ArgumentNullException(nameof(gateCache));

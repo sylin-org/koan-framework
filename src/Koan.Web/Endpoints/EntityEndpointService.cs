@@ -81,13 +81,9 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         // external PDP/ReBAC rung joins the ladder — and the gate decision stays consistent within the request.
         var key = "Koan.Access.Gate." + action;
         if (context.Items.TryGetValue(key, out var cached)) return (AuthorizeDecision?)cached;
-        var decision = await _authorize.AuthorizeAsync(new AuthorizeRequest
-        {
-            Subject = context.User,
-            Action = action,
-            Resource = typeof(TEntity),
-        }).ConfigureAwait(false);
-        var result = decision is AuthorizeDecision.Allow ? null : decision;
+        // SEC-0011: the same decision every MCP listing asks before advertising this verb.
+        var result = await EntityAuthorization.Decide(_authorize, context.User, action, typeof(TEntity))
+            .ConfigureAwait(false);
         context.Items[key] = result;
         return result;
     }

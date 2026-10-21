@@ -548,3 +548,5 @@
       href: SEC-0009-privacy-safe-identity-erasure.md
     - name: SEC-0010 MCP renders the endpoint's refusal as a failed tool call
       href: SEC-0010-mcp-renders-the-enforced-refusal.md
+    - name: SEC-0011 MCP listings ask the authorization ladder the call enforces
+      href: SEC-0011-mcp-listings-ask-the-enforcing-ladder.md
