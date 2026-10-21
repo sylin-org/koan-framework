@@ -160,6 +160,12 @@ counterpart Read bound runs as a scoped Data query, so only rows the caller can 
 manifest's `remove` follows the row's read evidence (SEC-0019). A `/new` template has no persisted
 identity and refuses a counterpart realization before its template callback.
 
+The delete verbs check the delete bound on the loaded rows, then delete. Where the Data adapter declares a
+conditional delete and pushes the bound completely, the bound also travels with the delete as its guard
+(DATA-0157), so a row reassigned between the check and the delete is not removed and the call answers 404
+or counts it out. A counterpart bound, or an adapter without the capability, keeps the checked delete, which
+is not atomic. Update and Patch still check the update bound and then save (NK-293 remains open for them).
+
 ## Ordered response hooks
 
 `IEmitHook<T>` runs in ascending `Order`. `EmitDecision.With(payload)` passes the replacement to

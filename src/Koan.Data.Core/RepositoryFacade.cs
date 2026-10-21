@@ -1430,7 +1430,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             throw new NotSupportedException("Conditional deletion cannot run in a deferred coordination scope.");
 
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity conditional delete", ct, ensureReadiness: false);
-        DemandUnscopedConditional(operationScope.Segmentation);
+        // DATA-0156: the active read scope joins the caller's guard in the same statement, so a conditional delete under
+        // a scope stays atomic instead of being refused. A scope with a counterpart predicate cannot travel and refuses.
+        DemandRowScope(ReadScopeFilter(operationScope.Segmentation));
         if (_sourcePlan.UsesLegacyProvisioningReadiness) await _inner.EnsureReady(ct);
         var entity = await ReadOne(id, operationScope.Segmentation, ct);
         if (entity is null) return false;
@@ -1441,12 +1443,19 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         if (!Equals(routing, EntityContext.Current) ||
             (_resolveRoute is not null && _resolveRoute()?.RepositoryIdentity != _routeBinding?.RepositoryIdentity))
             throw new InvalidOperationException("Conditional deletion routing changed during preparation. Start a new operation in the intended scope.");
-        DemandUnscopedConditional(_segmentation.Bind("entity conditional delete"));
+        var scope = DemandRowScope(ReadScopeFilter(_segmentation.Bind("entity conditional delete")));
         ct.ThrowIfCancellationRequested();
-        var deleted = await conditional.ConditionalDeleteAsync(id, frozen, ct);
+        var deleted = await conditional.ConditionalDeleteAsync(id, scope is null ? frozen : Filter.All(frozen, scope), ct);
         if (deleted && context is not null) await Lifecycle!.CompleteRemove(context);
         return deleted;
     }
+
+    private static Filter? DemandRowScope(Filter? scope)
+        => Filter.HasCounterpart(scope)
+            ? throw new NotSupportedException(
+                $"Conditional deletion for '{typeof(TEntity).Name}' cannot carry the active read scope, because it holds a " +
+                "counterpart predicate. Use Remove, which checks the scope before it deletes.")
+            : scope;
 
     private void DemandUnscopedConditional(DataSegmentationBinding segmentation)
     {

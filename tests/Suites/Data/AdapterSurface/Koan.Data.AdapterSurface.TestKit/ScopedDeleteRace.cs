@@ -71,6 +71,30 @@ public static class ScopedDeleteRace
         }
     }
 
+    /// <summary>A guarded delete under a scope carries the scope too: it cannot remove another scope's row and is no
+    /// longer refused for the scope's sake.</summary>
+    public static async Task AssertConditionalDeleteCarriesScopeAsync()
+    {
+        try
+        {
+            using var _part = EntityContext.Partition("race-if-" + Guid.CreateVersion7().ToString("n"));
+            RaceDoc mine, theirs;
+            using (Scope("A")) mine = await new RaceDoc { Title = "same" }.Save();
+            using (Scope("B")) theirs = await new RaceDoc { Title = "same" }.Save();
+
+            using (Scope("A"))
+            {
+                (await Data<RaceDoc, string>.DeleteIf(theirs.Id, row => row.Title == "same")).Should().BeFalse();
+                (await Data<RaceDoc, string>.DeleteIf(mine.Id, row => row.Title == "same")).Should().BeTrue();
+            }
+            using (Scope("B")) (await RaceDoc.Get(theirs.Id)).Should().NotBeNull("scope A's guarded delete must not remove it");
+        }
+        finally
+        {
+            _scope.Value = null;
+        }
+    }
+
     /// <summary>The axis report says whether this adapter carries the scope into its deletes or checks first.</summary>
     public static void AssertDeclared(IServiceProvider services, bool atStore)
     {

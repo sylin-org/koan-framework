@@ -238,6 +238,41 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         return rows;
     }
 
+    // NK-293 / DATA-0156: the delete bound was checked on the loaded rows, and the delete then runs by identity. Where
+    // the adapter deletes under a stored-row guard and the bound is a row predicate it pushes completely, the bound
+    // travels with the delete, so a row that left the principal's scope after the check is not removed and reads as
+    // a 404. Otherwise the checked delete stands; it is not atomic.
+    private static IConditionalDeleteRepository<TEntity, TKey>? GuardedDeletes(Filter? bound)
+    {
+        if (bound is null || Filter.HasCounterpart(bound) || EntityContext.Current?.TransactionCoordinator is not null)
+            return null;
+        if (Data<TEntity, TKey>.As<IConditionalDeleteRepository<TEntity, TKey>>() is not { } conditional) return null;
+        var support = DataCaps.Describe(conditional, conditional.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter)
+            ?? FilterSupport.None;
+        return FilterSplitter.Split(bound, support, typeof(TEntity)).Residual is null ? conditional : null;
+    }
+
+    private static async Task<bool> DeleteWithin(TKey id, Filter? bound, CancellationToken ct)
+    {
+        if (GuardedDeletes(bound) is { } guarded)
+        {
+            // Data refuses a guard it cannot honour (an identity or field shape) before it writes anything.
+            try { return await guarded.ConditionalDeleteAsync(id, bound!, ct); }
+            catch (NotSupportedException) { }
+        }
+        return await Data<TEntity, TKey>.Delete(id, ct);
+    }
+
+    private static async Task<int> DeleteManyWithin(IReadOnlyCollection<TKey> ids, Filter? bound, CancellationToken ct)
+    {
+        if (GuardedDeletes(bound) is { } guarded)
+        {
+            try { return await guarded.ConditionalDeleteMany(ids as IReadOnlyList<TKey> ?? ids.ToList(), bound!, ct); }
+            catch (NotSupportedException) { }
+        }
+        return await Data<TEntity, TKey>.DeleteMany(ids, ct);
+    }
+
     // Read visibility is independent of mutation authority. Inspect actual mutation declarations,
     // not the presence of an access realization, and reuse the request-bound accumulators.
     private (AccessFilter<TEntity>? Create, AccessFilter<TEntity>? Update) MutationConstraints(EntityRequestContext context)
@@ -1032,7 +1067,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityModelResult<TEntity>(context, model, model);
         }
 
-        var ok = await Data<TEntity, TKey>.Delete(request.Id, context.CancellationToken);
+        var ok = await DeleteWithin(request.Id, bound, context.CancellationToken);
         if (!ok)
         {
             return new EntityModelResult<TEntity>(context, null, null, new NotFoundResult());
@@ -1086,7 +1121,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(context, new { wouldDelete = targets.Count });
         }
 
-        var deleted = await Data<TEntity, TKey>.DeleteMany(targets, context.CancellationToken);
+        var deleted = await DeleteManyWithin(targets, bound, context.CancellationToken);
         await AuditMutation(context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
         if (hooked && !await AfterDeleteAll(hookContext, rows))
             return await ModelShortCircuit(context, hookContext);
@@ -1121,11 +1156,12 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
             return new EntityEndpointResult(request.Context, null, fieldDenied);
 
         var accessor = ResolveAccessor(request.Context);
-        if (accessor is not null)
+        var bound = accessor is null ? null : DeleteBound(accessor);
+        if (bound is not null)
         {
             // SEC-0004: a mass delete cannot exceed the principal's rows — AND the Constrain predicate into the
             // user's filter before it ever reaches the adapter (agent-safety).
-            filter = Filter.And(filter, DeleteBound(accessor)) ?? filter;
+            filter = Filter.And(filter, bound) ?? filter;
         }
 
         var items = await Data<TEntity, TKey>.All(QueryDefinition.All.Where(filter), request.Context.CancellationToken);
@@ -1146,7 +1182,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
         }
 
         if (ids.Count == 0) return new EntityEndpointResult(request.Context, new { deleted = 0 });
-        var removedByPredicate = await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+        var removedByPredicate = await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
         await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
         if (hooked && !await AfterDeleteAll(hookContext, items))
             return await ModelShortCircuit(request.Context, hookContext);
@@ -1180,7 +1216,7 @@ internal sealed class EntityEndpointService<TEntity, TKey> : IEntityEndpointServ
                 request.Context.Items[EntityMutationProbe.AffectedCountKey] = ids.Count;
                 return new EntityEndpointResult(request.Context, new { wouldDelete = ids.Count });
             }
-            var deletedBounded = ids.Count == 0 ? 0 : await Data<TEntity, TKey>.DeleteMany(ids, request.Context.CancellationToken);
+            var deletedBounded = ids.Count == 0 ? 0 : await DeleteManyWithin(ids, bound, request.Context.CancellationToken);
             await AuditMutation(request.Context, EntityAuthorizeActions.Remove, "").ConfigureAwait(false);
             if (hooked && !await AfterDeleteAll(hookContext, rows))
                 return await ModelShortCircuit(request.Context, hookContext);

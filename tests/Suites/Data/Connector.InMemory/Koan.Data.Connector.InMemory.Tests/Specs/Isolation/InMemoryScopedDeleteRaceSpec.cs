@@ -17,4 +17,12 @@ public sealed class InMemoryScopedDeleteRaceSpec(InMemoryFixture fixture, ITestO
         ScopedDeleteRace.AssertDeclared(host.Services, atStore: true);
         await ScopedDeleteRace.AssertAtomicAsync();
     }
+
+    [Fact(DisplayName = "InMemory: a guarded delete under a scope carries the scope instead of being refused (NK-293)")]
+    public async Task Guarded_delete_carries_the_scope()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(ScopedDeleteRace.Declare, ScopedDeleteRace.Configure);
+        await ScopedDeleteRace.AssertConditionalDeleteCarriesScopeAsync();
+    }
 }

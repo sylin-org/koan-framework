@@ -263,6 +263,8 @@ validation:
   `IConditionalBatchDelete.DeleteIf(id, scope)` inside a native batch, which then needs no visibility read. A row that
   leaves the scope after any check is not removed. Other adapters, and scopes holding a counterpart predicate, keep the
   check-then-delete; `IAxisScopeDiagnostics.ScopedDeletesAtStore` reports which path an entity takes.
+- `ConditionalDeleteAsync` (and `Data<T,K>.DeleteIf`) under an active read scope ANDs that scope into the caller's
+  guard instead of refusing (DATA-0157). A scope holding a counterpart predicate still refuses.
 - A transfer resolves each endpoint, under its applied context, to a `TransferPlace`: elected provider, the factory's
   `ResolveStoreIdentity` for the routed source (or the plan's connection identity when the adapter declares none) and
   the provider's `ResolveStorage` container. Places with one provider and one container name, compared without case,

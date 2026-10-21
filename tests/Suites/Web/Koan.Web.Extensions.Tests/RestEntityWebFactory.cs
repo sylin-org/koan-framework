@@ -67,6 +67,9 @@ public sealed class RestEntityWebFactory : IAsyncLifetime
                     services.AddScoped<EntityAccess<Sprocket>, SprocketAccess>();
                     services.AddScoped<EntityAccess<Order>, OrderAccess>();
                     services.AddScoped<EntityAccess<Journal>, JournalAccess>();
+                    // NK-293: an owner change between the delete bound check and the delete (DeleteBoundRaceSpec).
+                    services.AddScoped<EntityAccess<Dossier>, DossierAccess>();
+                    services.AddSingleton<Koan.Data.Core.Decorators.IDataRepositoryDecorator, DossierRace>();
                     services.AddScoped<Koan.Web.Hooks.IModelHook<Locker>, LockerDeleteHook>();
                     // WEB-0074: the one supported meaning of ?q= - an application hook that turns it into a filter.
                     services.AddSingleton<Koan.Web.Hooks.IRequestOptionsHook<Gizmo>, GizmoLabelSearch>();
