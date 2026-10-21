@@ -357,6 +357,84 @@ public sealed class EntityTransferDslSpec
         mirrored.Tags.Should().Equal(["target"], "a stored collection replaces the seeded one");
     }
 
+    /// <summary>
+    /// NK-011 / NK-013. Without a source partition, MoveToPartition deleted from a partition literally named "root",
+    /// so a move out of the base set left the row in place and became a silent copy.
+    /// </summary>
+    [Fact]
+    public async Task MoveToPartition_FromTheBaseSet_RemovesTheBaseRow()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var todo = await new TransferTodo { Title = "base", Active = true }.Save();
+
+        await todo.MoveToPartition<TransferTodo, string>("archive");
+
+        (await TransferTodo.Get(todo.Id)).Should().BeNull("the row left the base set");
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.Get(todo.Id)).Should().NotBeNull();
+    }
+
+    /// <summary>NK-011 / NK-013. A move whose source is its target upserted the row and then deleted it.</summary>
+    [Fact]
+    public async Task MoveToPartition_IntoItsOwnAmbientPartition_IsRefusedAndKeepsTheRow()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        using (runtime.UsePartition("archive"))
+        {
+            var todo = await new TransferTodo { Title = "archived", Active = true }.Save();
+
+            var refusal = await Record.ExceptionAsync(() => todo.MoveToPartition<TransferTodo, string>("archive"));
+
+            (await TransferTodo.Get(todo.Id)).Should().NotBeNull("a move onto its own container must not delete it");
+            refusal.Should().BeOfType<ArgumentException>();
+        }
+    }
+
+    [Fact]
+    public async Task MoveToPartition_FromAnExplicitPartition_RemovesItThere()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        TransferTodo todo;
+        using (runtime.UsePartition("hot"))
+            todo = await new TransferTodo { Title = "hot", Active = true }.Save();
+
+        await todo.MoveToPartition<TransferTodo, string>("archive", fromPartition: "hot");
+
+        using (runtime.UsePartition("hot"))
+            (await TransferTodo.Get(todo.Id)).Should().BeNull();
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.Get(todo.Id)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task MoveToPartition_InfersTheStringKeyAndReportsAMissingSourceRow()
+    {
+        await using var runtime = await CreateRuntime();
+        await Reset(runtime);
+        runtime.BindHost();
+
+        var saved = await new TransferTodo { Title = "saved", Active = true }.Save();
+        var unsaved = new TransferTodo { Title = "never saved", Active = true };
+
+        (await saved.MoveToPartition("archive")).Should().BeTrue();
+        (await unsaved.MoveToPartition("archive")).Should().BeFalse("the base set held no row to remove");
+        (await saved.MoveToPartition("dest", fromPartition: "archive", copy: true)).Should().BeTrue();
+
+        using (runtime.UsePartition("archive"))
+            (await TransferTodo.All()).Should().HaveCount(2);
+        using (runtime.UsePartition("dest"))
+            (await TransferTodo.Get(saved.Id)).Should().NotBeNull();
+    }
+
     [Fact]
     public async Task To_WithSourceAndAdapter_ShouldThrow()
     {

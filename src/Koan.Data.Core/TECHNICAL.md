@@ -256,6 +256,10 @@ validation:
   re-reads those rows from the destination when it replays them into the source, so the source receives the row the
   destination's adapter materializes (runtime family type, defaults, non-public setters, dictionary keys) and never a
   JSON round trip of the entity. A winner deleted from the destination in between is skipped.
+- `entity.MoveToPartition(to, fromPartition?, copy?)` takes its source from `fromPartition`, else the ambient
+  partition, else the base set. A source that resolves to the target's own container (the same `TransferPlace`
+  comparison as transfers) throws `ArgumentException` before anything is written; the result is `false` when a move
+  found no source row to remove. A string-keyed overload infers the key type.
 - The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
