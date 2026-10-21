@@ -16,6 +16,12 @@ The Entity surface has two deliberate planes:
 - `entity.Cache.Evict()` and its finite/stream forms address concrete entries;
 - `EntityType.Cache.Explain/Flush/Count/Any` inspect policy or operate on policy-derived tags.
 
+Every entry the Entity cache decorator writes also carries one entity tag (`koan:entity:{route}:{entity}`).
+`DeleteAll`, every `RemoveAll` strategy and every instruction that is not a schema or `Read` instruction flush
+that tag after the store call, and after a failed one, because they cannot name the ids they removed (NK-040). Entries
+written before this tag existed age out by TTL. A `Read`-labelled instruction that writes on a store without a
+raw-read lane is not flushed.
+
 MCP operational flush remains a separately governed and audited type/global control plane. Entry
 eviction is not automatically projected as an agent mutation.
 

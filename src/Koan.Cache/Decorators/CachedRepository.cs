@@ -47,6 +47,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private readonly ILogger<CachedRepository<TEntity, TKey>> _logger;
     private readonly string _entityName;
     private readonly string? _routeNamespace;
+    private readonly string _entityTag;
 
     public CachedRepository(
         IDataRepository<TEntity, TKey> inner,
@@ -69,7 +70,45 @@ internal sealed class CachedRepository<TEntity, TKey> :
         _rawQuery = inner as IRawQueryRepository<TEntity, TKey>;
         _instructionExecutor = inner as IInstructionExecutor<TEntity>;
         _entityName = plan.EntityName;
+        // NK-040: every entry this cache writes for the entity carries one entity tag, so a mass delete can retire them
+        // all without enumerating ids. The tag is bound to the active segmentation exactly like the entry keys.
+        _entityTag = $"koan:entity:{_routeNamespace ?? "default"}:{_entityName}";
     }
+
+    /// <summary>The policy's entry options plus the entity tag every cached entry carries.</summary>
+    private CacheEntryOptions EntryOptions() => _entityPolicy.ToOptions().WithTags(_entityTag);
+
+    /// <summary>
+    /// Retire every cached entry of the entity. Mass deletes and row-changing instructions cannot name the ids they
+    /// removed, so they flush the entity tag rather than leave deleted rows served until their TTL (NK-040).
+    /// </summary>
+    private async ValueTask FlushEntity(CancellationToken ct)
+    {
+        if (_entityPolicy.Strategy is CacheStrategy.NoCache) return;
+        await _cacheClient.FlushTags([_entityTag], typeof(TEntity), ct);
+    }
+
+    private async Task<T> FlushingAfter<T>(Func<Task<T>> operation, CancellationToken ct)
+    {
+        T result;
+        try
+        {
+            result = await operation();
+        }
+        catch
+        {
+            // A failed mass delete may still have removed rows; never leave them cached.
+            await FlushEntity(CancellationToken.None);
+            throw;
+        }
+        await FlushEntity(ct);
+        return result;
+    }
+
+    private static bool ChangesRows(Instruction instruction) =>
+        instruction.Name is not (DataInstructions.EnsureCreated or RelationalInstructions.SchemaEnsureCreated or
+            RelationalInstructions.SchemaValidate) &&
+        instruction.EffectiveEffect() != Koan.Data.Abstractions.Sources.DataOperationEffect.Read;
 
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
     // else the legacy-marker bridge).
@@ -98,7 +137,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return await _inner.Get(id, ct);
         }
 
-        var options = _entityPolicy.ToOptions();
+        var options = EntryOptions();
         switch (effectiveStrategy)
         {
             case CacheStrategy.GetOrSet:
@@ -267,27 +306,11 @@ internal sealed class CachedRepository<TEntity, TKey> :
         return count;
     }
 
-    public async Task<int> DeleteAll(CancellationToken ct = default)
-    {
-        var count = await _inner.DeleteAll(ct);
-        if (count > 0)
-        {
-            _logger.LogDebug("DeleteAll detected for {Entity}. Cached entries cannot be enumerated automatically; downstream policies should prefer tag-based invalidation.", _entityName);
-        }
+    public Task<int> DeleteAll(CancellationToken ct = default)
+        => FlushingAfter(() => _inner.DeleteAll(ct), ct);
 
-        return count;
-    }
-
-    public async Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
-    {
-        var removed = await _inner.RemoveAll(strategy, ct);
-        if (removed > 0)
-        {
-            _logger.LogDebug("RemoveAll({Strategy}) invoked for {Entity}; cached entries should be invalidated via tags.", strategy, _entityName);
-        }
-
-        return removed;
-    }
+    public Task<long> RemoveAll(RemoveStrategy strategy, CancellationToken ct = default)
+        => FlushingAfter(() => _inner.RemoveAll(strategy, ct), ct);
 
     public IBatchSet<TEntity, TKey> CreateBatch()
     {
@@ -307,7 +330,9 @@ internal sealed class CachedRepository<TEntity, TKey> :
             throw new NotSupportedException($"Repository for {_entityName} does not support instruction execution.");
         }
 
-        return await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct);
+        return ChangesRows(instruction)
+            ? await FlushingAfter(() => _instructionExecutor.ExecuteAsync<TResult>(instruction, ct), ct)
+            : await _instructionExecutor.ExecuteAsync<TResult>(instruction, ct);
     }
 
     public Task EnsureReady(CancellationToken ct = default) => _inner.EnsureReady(ct);
@@ -344,7 +369,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
         {
             case CacheStrategy.GetOrSet:
             case CacheStrategy.SetOnly:
-                var options = _entityPolicy.ToOptions();
+                var options = EntryOptions();
                 await _cacheClient.SetAsync(key.Value, entity, options, typeof(TEntity), ct);
                 break;
             case CacheStrategy.GetOnly:
