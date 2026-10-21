@@ -3,6 +3,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Koan.Core.Hosting.App;
+using Koan.Core.Semantics.Segmentation;
 using Koan.Data.Abstractions;
 using Koan.Data.Backup.Abstractions;
 using Koan.Data.Backup.Infrastructure;
@@ -12,6 +14,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Polymorphism;
 using Koan.Storage.Abstractions;
 using Koan.Storage.Keys;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Backup.Core;
 
@@ -33,6 +36,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         var createdAt = DateTimeOffset.UtcNow;
         var archiveId = Guid.CreateVersion7().ToString();
         var sourcePartition = request.Partition ?? EntityContext.Current?.Partition;
+        var archiveScope = ScopeOf<TEntity>("backup create");
         var descriptor = BackupArchiveNaming.Create(name, createdAt, archiveId);
         var tempPath = CreateTempPath();
 
@@ -59,7 +63,8 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
                         sourcePartition,
                         recordCount,
                         BackupConstants.DataEntry,
-                        contentHash);
+                        contentHash,
+                        archiveScope);
 
                     await WriteManifest(archive, manifest, ct);
                 }
@@ -112,6 +117,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
         {
             await Download(storageKey, request.StorageProfile, tempPath, ct);
             var manifest = await ValidateArchive<TEntity, TKey>(tempPath, ct);
+            if (!request.AcrossScopes) DemandSameScope<TEntity>(manifest);
             var targetPartition = request.TargetPartition ?? manifest.SourcePartition;
             var restored = await ApplyArchive<TEntity, TKey>(tempPath, targetPartition, request.BatchSize, ct);
 
@@ -198,7 +204,7 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
             using var archive = new ZipArchive(file, ZipArchiveMode.Read);
             var manifest = await ReadManifest(archive, ct);
 
-            if (manifest.FormatVersion != BackupConstants.FormatVersion)
+            if (manifest.FormatVersion is not (BackupConstants.FormatVersion or BackupConstants.LegacyFormatVersion))
                 throw new InvalidDataException($"Backup format {manifest.FormatVersion} is not supported.");
             if (string.IsNullOrWhiteSpace(manifest.ArchiveId)
                 || string.IsNullOrWhiteSpace(manifest.Name)
@@ -319,6 +325,47 @@ internal sealed class BackupService(IStorageService storage) : IBackupService
                 throw new InvalidDataException("The backup data contains an empty record.");
             yield return line;
         }
+    }
+
+    /// <summary>
+    /// The hard segmentation bound for <typeparamref name="TEntity"/> now, as dimension → digest. Binding refuses a
+    /// required dimension that is missing, exactly as the Entity read or write would.
+    /// </summary>
+    private static Dictionary<string, string> ScopeOf<TEntity>(string operation)
+    {
+        var scope = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (AppHost.Current?.GetService<SegmentationPlan>() is not { IsEmpty: false } plan) return scope;
+        foreach (var binding in plan.For(typeof(TEntity)).Bind(operation))
+            scope[binding.DimensionId] = Convert.ToHexString(SHA256.HashData(
+                Encoding.UTF8.GetBytes($"{binding.DimensionId}\0{binding.Value}"))).ToLowerInvariant();
+        return scope;
+    }
+
+    /// <summary>
+    /// Refuses to restore an archive into a scope other than the one it was taken in (NK-084): its rows would be written
+    /// under, and stamped with, the current tenant. A format 1 archive recorded no scope, so it restores without the
+    /// override only where nothing is bound now.
+    /// </summary>
+    private static void DemandSameScope<TEntity>(BackupArchiveManifest manifest)
+    {
+        var current = ScopeOf<TEntity>("backup restore");
+        if (manifest.Scope is null)
+        {
+            if (current.Count == 0) return;
+            throw new InvalidOperationException(
+                $"Backup '{manifest.Name}' is a format {manifest.FormatVersion} archive, which did not record the tenant it " +
+                "was taken under, and a tenant is bound now. Restoring it would write its rows as the current tenant's. " +
+                "If you have checked that it belongs here, restore it with RestoreRequest.AcrossScopes = true.");
+        }
+
+        var same = manifest.Scope.Count == current.Count &&
+                   manifest.Scope.All(entry => current.TryGetValue(entry.Key, out var value) &&
+                                               string.Equals(value, entry.Value, StringComparison.Ordinal));
+        if (!same)
+            throw new InvalidOperationException(
+                $"Backup '{manifest.Name}' was taken under a different tenant or segmentation scope than the current one. " +
+                "Restoring it here would copy its rows into this tenant. Restore it under the scope it was taken in, or, " +
+                "as a deliberate administrative copy, with RestoreRequest.AcrossScopes = true.");
     }
 
     private static string TypeIdentity(Type type)

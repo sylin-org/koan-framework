@@ -18,8 +18,10 @@ migration, encryption, or transactions.
    fact (DATA-0113): a provider advertising bounded paging is streamed a page at a time; a provider that does not
    — InMemory, JSON, Redis — is read with one explicitly materialized query, because those keep the whole set
    resident anyway and refusing would make backup untryable on the pillar's floor adapter.
-4. Write `manifest.json` with format version, collision-proof archive ID, stable assembly/type identities, source
-   partition, record count, data entry, and checksum.
+4. Write `manifest.json` with format version (2), collision-proof archive ID, stable assembly/type identities, source
+   partition, record count, data entry, checksum, and the scope: one entry per hard segmentation dimension bound for
+   the Entity at creation (the tenant), each value a SHA-256 digest of the dimension and its value. Binding refuses a
+   required dimension that is missing, as the Entity read would.
 5. Close the ZIP and publish the complete seekable file through host-scoped `IStorageService.Put` in the `backups`
    container. The returned `BackupReceipt` includes logical-data integrity and provider object evidence.
 6. Remove temporary storage in `finally`. Cleanup is best-effort and never replaces the operation result.
@@ -36,12 +38,16 @@ Restore downloads the object to a fresh temporary file and completes a validatio
 partition or calling `UpsertMany`:
 
 - ZIP and manifest must parse;
-- format version, Entity identity, and key identity must match the generic operation;
+- format version (1 or 2), Entity identity, and key identity must match the generic operation;
 - the declared fixed data entry must exist;
 - every non-empty JSON line must deserialize to the current Entity type; and
 - observed count and logical SHA-256 must match the manifest.
 
-Any failure throws `InvalidDataException` and zero records are mutated. A second pass deserializes validated records
+Any failure throws `InvalidDataException` and zero records are mutated. The archive's scope must then equal the scope
+bound now, or the restore throws `InvalidOperationException` before any write: archives are stored host-scoped and a
+restore writes under the current tenant, so restoring tenant A's archive under tenant B would copy A's rows into B
+(NK-084). A format 1 archive recorded no scope and restores without the override only where nothing is bound.
+`RestoreRequest.AcrossScopes = true` is the administrative override for a deliberate copy or a checked legacy archive. A second pass deserializes validated records
 into bounded batches and applies `Data<TEntity,TKey>.UpsertMany`. The target is
 `RestoreRequest.TargetPartition ?? manifest.SourcePartition`.
 
