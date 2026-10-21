@@ -72,6 +72,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private readonly FilterSupport _filterCaps;
     private readonly bool _skipReadPushabilityCheck;
     private readonly OperationOverrideDescriptor? _deleteOverride;
+    private readonly Filter? _notYetDeleted;
     private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
     private readonly IConditionalDeleteRepository<TEntity, TKey>? _scopedDeletes;
 
@@ -131,6 +132,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // The delete operation-override (soft-delete) is a per-(type) constant — registered boot-time, AppliesTo is a
         // static predicate — so resolve it ONCE here (mirrors _managed), not per delete (no per-op registry lock).
         _deleteOverride = OperationOverrideRegistry.ForDelete(typeof(TEntity));
+        _notYetDeleted = _deleteOverride is null ? null : NotYetOverridden(_deleteOverride);
         _lifecycle = lifecycle;
     }
 
@@ -355,6 +357,15 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         => _deleteOverride is not null && !OperationOverrideBypass.IsBypassedFor(typeof(TEntity), id)
             ? _deleteOverride
             : null;
+
+    /// <summary>
+    /// The rows a soft delete can still change: those not already in the override's state (field absent or different).
+    /// A soft delete selects only these, so it counts what it changed, and a mass delete inside a scope that shows
+    /// deleted rows (<c>WithDeleted</c>) still runs out of rows instead of rewriting the same page forever (NK-100).
+    /// </summary>
+    private static Filter NotYetOverridden(OperationOverrideDescriptor ov) => Filter.Any(
+        Filter.On(FieldPath.Of(ov.Field), FilterOperator.Exists, FilterValue.Of(false)),
+        Filter.On(FieldPath.Of(ov.Field), FilterOperator.Ne, FilterValue.Of(ov.OnDeleteValue)));
 
     /// <summary>
     /// Re-persist a VISIBLE (already read-scoped) row with the override's state field set (e.g. <c>__deleted=true</c>),
@@ -1128,7 +1139,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         {
             // Soft-delete: load the VISIBLE (read-scoped) row, re-persist with the override field set. The load is
             // still IDOR-scoped, so a soft-delete can only soft-remove a row the caller can see.
-            var scoped = managed is null ? QueryDefinition.All.Where(Filter.Eq(_idField, id)) : ScopedById(id, managed);
+            var scoped = ScopedById(id, Filter.And(managed, _notYetDeleted)!);
             var res = await RequireQuery().Query(scoped, ct);
             if (res.Items.Count == 0) return false;
             await OverrideUpsert(res.Items[0], ov, segmentation, ct);
@@ -1190,9 +1201,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
         if (ov is not null)
         {
-            var scoped = managed is null
-                ? QueryDefinition.All.Where(Filter.In(_idField, idList.Cast<object?>().ToList()))
-                : ScopedByIds(idList, managed);
+            var scoped = ScopedByIds(idList, Filter.And(managed, _notYetDeleted)!);
             var soft = await RequireQuery().Query(scoped, ct);
             foreach (var row in soft.Items) await OverrideUpsert(row, ov, segmentation, ct);
             return soft.Items.Count;
@@ -1241,7 +1250,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            var managed = ReadScopeFilter(segmentation);
+            var managed = Filter.And(ReadScopeFilter(segmentation), _notYetDeleted);
             var query = QueryDefinition.All
                 .WithSort<TEntity>(sort => sort.OrderBy(entity => entity.Id))
                 .WithPagination(1, pageSize)

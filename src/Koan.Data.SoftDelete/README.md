@@ -36,6 +36,8 @@ controller, option, or manual registration is required.
 
 - Ordinary `Remove`, batch deletion, and `RemoveAll` set Koan's managed `__deleted` field instead of physically
   removing visible `[SoftDelete]` rows. Ordinary Entity reads hide those rows automatically.
+- A soft delete changes only rows not yet deleted and counts only those. Inside `WithDeleted()`, `Remove`, `DeleteAll`
+  and `RemoveAll` skip rows already in the recycle bin, so a mass delete there finishes and reports what it changed.
 - `T.WithDeleted()` opens the recycle bin only for `T`; it cannot reveal deleted rows from another Entity type.
   Nested scopes compose and unwind with the async flow.
 - Load a deleted row inside `WithDeleted()`, then call `.Restore()` to make it visible. Call `.HardDelete()` to purge

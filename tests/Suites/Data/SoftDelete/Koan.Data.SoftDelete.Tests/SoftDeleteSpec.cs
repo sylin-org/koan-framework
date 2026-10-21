@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Data.Abstractions;
@@ -150,6 +151,29 @@ public sealed class SoftDeleteSpec(SqliteFixture fixture, ITestOutputHelper outp
         await Doc.RemoveAll();
         (await Doc.All()).Should().BeEmpty();
         using (Doc.WithDeleted()) (await Doc.All()).Should().HaveCount(3);
+    }
+
+    [Fact(DisplayName = "Inside WithDeleted, RemoveAll and DeleteAll terminate and count only newly soft-deleted rows (NK-100)")]
+    public async Task Mass_delete_inside_with_deleted_terminates()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition());
+
+        var gone = await new Doc { Title = "gone" }.Save();
+        await new Doc { Title = "a" }.Save();
+        await new Doc { Title = "b" }.Save();
+        (await Doc.Remove(gone.Id)).Should().BeTrue();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+
+        using (Doc.WithDeleted())
+        {
+            (await Doc.RemoveAll(RemoveStrategy.Safe, timeout.Token)).Should().Be(2, "the already-deleted row is not deleted again");
+            (await Data<Doc, string>.DeleteAll(timeout.Token)).Should().Be(0, "every row is already soft-deleted");
+            (await Doc.Remove(new[] { gone.Id }, timeout.Token)).Should().Be(0);
+            (await Doc.All(timeout.Token)).Should().HaveCount(3, "soft deletion keeps every row");
+        }
+        (await Doc.All(timeout.Token)).Should().BeEmpty();
     }
 
     [Fact(DisplayName = "Batch delete preserves soft-delete semantics")]
