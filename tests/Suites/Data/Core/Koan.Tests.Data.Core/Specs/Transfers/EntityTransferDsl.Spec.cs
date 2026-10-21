@@ -28,8 +28,6 @@ public sealed class EntityTransferDslSpec
         "dest",
         "mirror",
         "filtered",
-        "sync",
-        "sync-target",
         "reporting",
         "secondary"
     ];
@@ -143,8 +141,12 @@ public sealed class EntityTransferDslSpec
         }
     }
 
+    /// <summary>
+    /// NK-277. Two specs named a batched and a synced delete strategy that do not exist; both ran the one deferred delete.
+    /// A Move copies every batch first and deletes only after the last destination write.
+    /// </summary>
     [Fact]
-    public async Task Move_BatchedStrategy_RespectsBatching()
+    public async Task Move_DeletesOnlyAfterCopyCompletes_WithBatchOfOne()
     {
         await using var runtime = await CreateRuntime();
         await Reset(runtime);
@@ -159,6 +161,10 @@ public sealed class EntityTransferDslSpec
             }
         }
 
+        var repository = runtime.Services.GetRequiredService<TransferAdapterFactory>()
+            .Repository<TransferTodo>();
+        repository.ResetObservations();
+
         var result = await TransferTodo.Move()
             .From(partition: "batch")
             .To(partition: "dest")
@@ -167,39 +173,13 @@ public sealed class EntityTransferDslSpec
 
         result.CopiedCount.Should().Be(4);
         result.DeletedCount.Should().Be(4);
+        repository.Calls.Count(call => call == "upsert:dest").Should().Be(4, "each batch of one is its own destination write");
+        repository.Calls.Count(call => call == "delete:batch").Should().Be(4);
+        repository.Calls.FindLastIndex(call => call == "upsert:dest")
+            .Should().BeLessThan(repository.Calls.FindIndex(call => call == "delete:batch"),
+                "no source row is deleted before the last destination write");
 
         using (runtime.UsePartition("batch"))
-        {
-            (await TransferTodo.All()).Should().BeEmpty();
-        }
-    }
-
-    [Fact]
-    public async Task Move_SyncedStrategy_RemovesAsItGoes()
-    {
-        await using var runtime = await CreateRuntime();
-        await Reset(runtime);
-
-        runtime.BindHost();
-
-        using (runtime.UsePartition("sync"))
-        {
-            for (var i = 0; i < 2; i++)
-            {
-                await new TransferTodo { Title = $"Sync {i}", Active = true, UpdatedAt = DateTime.UtcNow }.Save();
-            }
-        }
-
-        var result = await TransferTodo.Move()
-            .From(partition: "sync")
-            .To(partition: "sync-target")
-            .Batch(1)
-            .Run();
-
-        result.CopiedCount.Should().Be(2);
-        result.DeletedCount.Should().Be(2);
-
-        using (runtime.UsePartition("sync"))
         {
             (await TransferTodo.All()).Should().BeEmpty();
         }
@@ -1533,6 +1513,7 @@ public sealed class EntityTransferDslSpec
         public int UpsertManyCalls { get; private set; }
         public int MaxRequestedPageSize { get; private set; }
         public int MaxUpsertManyCount { get; private set; }
+        public List<string> Calls { get; } = [];
 
         public void ResetObservations()
         {
@@ -1545,6 +1526,7 @@ public sealed class EntityTransferDslSpec
             UpsertManyCalls = 0;
             MaxRequestedPageSize = 0;
             MaxUpsertManyCount = 0;
+            Calls.Clear();
         }
 
         public void Describe(ICapabilities capabilities)
@@ -1586,6 +1568,7 @@ public sealed class EntityTransferDslSpec
         public Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
         {
             UpsertManyCalls++;
+            Calls.Add($"upsert:{EntityContext.Current?.Partition}");
             var count = 0;
             var set = Current();
             foreach (var model in models)
@@ -1614,6 +1597,7 @@ public sealed class EntityTransferDslSpec
             var before = BeforeNextDeleteMany;
             BeforeNextDeleteMany = null;
             before?.Invoke();
+            Calls.Add($"delete:{EntityContext.Current?.Partition}");
             var count = 0;
             var set = Current();
             foreach (var id in ids)
