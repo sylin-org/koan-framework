@@ -96,6 +96,10 @@ public static class ServiceCollectionExtensions
             var logger = sp.GetService<Microsoft.Extensions.Logging.ILogger<DataSourceRegistry>>();
             registry.DiscoverFromConfiguration(config, logger);
             registry.Freeze();
+            // NK-060: a source plan carries the physical store its provider resolves, not the declaration's spelling.
+            // The catalog is read when the first plan is minted, after composition, never while building the registry.
+            registry.BindPhysicalIdentity((source, adapter) =>
+                sp.GetRequiredService<Routing.DataProviderCatalog>().Find(adapter)?.ResolveStoreIdentity(sp, source));
             return registry;
         });
         services.TryAddSingleton(sp => new Readiness.DataSourceReadinessCoordinator(

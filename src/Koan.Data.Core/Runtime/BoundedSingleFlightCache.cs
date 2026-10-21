@@ -52,6 +52,25 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
         }
     }
 
+    /// <summary>
+    /// Reads a value that has finished being created, without creating one. A creation in progress on this thread (a
+    /// factory that re-enters the cache) reads as absent; one in progress on another thread is awaited.
+    /// </summary>
+    public bool TryGetCompleted(TKey key, out TValue value)
+    {
+        Pending? entry;
+        lock (_gate)
+        {
+            if (!_entries.TryGetValue(key, out entry))
+            {
+                value = default!;
+                return false;
+            }
+        }
+
+        return entry.TryRead(out value);
+    }
+
     internal int Count
     {
         get { lock (_gate) return _entries.Count; }
@@ -80,6 +99,15 @@ internal sealed class BoundedSingleFlightCache<TKey, TValue> where TKey : notnul
                     _factory = null;
                 }
                 return _value;
+            }
+        }
+
+        public bool TryRead(out TValue value)
+        {
+            lock (_gate)
+            {
+                value = _value;
+                return _factory is null;
             }
         }
     }

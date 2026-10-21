@@ -40,6 +40,11 @@ public sealed class DataSourceRegistry
     private ImmutableDictionary<string, SourceDefinition> _sources =
         ImmutableDictionary.Create<string, SourceDefinition>(StringComparer.OrdinalIgnoreCase);
     private int _frozen;
+    private Func<string, string, string?>? _physicalIdentity;
+
+    // The (registry, source, adapter) keys this thread is minting, so a provider that re-enters the registry while it
+    // resolves its store gets a provisional plan instead of recursing into its own mint.
+    [ThreadStatic] private static HashSet<(DataSourceRegistry, PlanKey)>? Minting;
 
     public DataSourceRegistry() : this(Constants.Defaults.SourceEntries, Constants.Defaults.SourcePlanEntries) { }
 
@@ -186,22 +191,119 @@ public sealed class DataSourceRegistry
     internal void Freeze() => Interlocked.Exchange(ref _frozen, 1);
 
     /// <summary>
-    /// Returns the immutable source plan for an already elected adapter and optional resolved physical route.
-    /// Raw connection material is reduced to a one-way identity and is never retained by the plan.
+    /// Binds how the host resolves a source's physical store: the elected provider's
+    /// <see cref="Abstractions.IDataAdapterFactory.ResolveStoreIdentity"/>, through its own route resolution. Bound once,
+    /// at host composition; a registry with no binding keeps the declared identity.
+    /// </summary>
+    internal void BindPhysicalIdentity(Func<string, string, string?> resolve)
+    {
+        ArgumentNullException.ThrowIfNull(resolve);
+        if (Interlocked.CompareExchange(ref _physicalIdentity, resolve, null) is not null)
+            throw new InvalidOperationException("The host already bound how source plans resolve their physical store.");
+    }
+
+    /// <summary>
+    /// Returns the one immutable plan for a source and an already elected adapter. The plan is minted once, from the
+    /// physical store the provider resolves for that source (NK-060), and every consumer (adapter resolution, the route
+    /// authority, cutover, the operation horizon, Direct) receives the same plan. Raw connection material is reduced to a
+    /// one-way identity and is never retained by the plan.
+    /// <para>
+    /// <paramref name="resolvedConnection"/> is a provider's own resolved route. It receives the minted plan once the
+    /// source is minted; while it is being minted (the provider resolves its route to answer), it receives a provisional
+    /// plan with the same policy, derived from that connection and never cached.
+    /// </para>
     /// </summary>
     public DataSourcePlan GetPlan(string name, string adapter, string? resolvedConnection = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentException.ThrowIfNullOrWhiteSpace(adapter);
 
-        var source = GetSource(name);
-        var connectionIdentity = Identity(resolvedConnection ?? source?.ConnectionString);
-        var key = new PlanKey(Normalize(name), Normalize(adapter), connectionIdentity);
-        // Literal/resolved connection values can be unbounded Direct input. They are compiled for the
-        // owning session but never admitted to the host source-plan cache.
+        var key = new PlanKey(Normalize(name), Normalize(adapter));
         if (resolvedConnection is not null)
-            return CompilePlan(name, adapter, connectionIdentity, source);
-        return _plans.GetOrAdd(key, () => CompilePlan(name, adapter, connectionIdentity, source));
+            return _plans.TryGetCompleted(key, out var minted)
+                ? minted
+                : CompilePlan(name, adapter, Identity(resolvedConnection), GetSource(name));
+        TryMint(name, adapter, out var plan, out _);
+        return plan;
+    }
+
+    /// <summary>
+    /// Mints the plan for a source and adapter, or returns a provisional plan with the declared identity when the
+    /// provider cannot resolve the source now. A provisional plan is not cached, so the next call resolves again.
+    /// </summary>
+    internal bool TryMint(string name, string adapter, out DataSourcePlan plan, out Exception? failure)
+    {
+        var key = new PlanKey(Normalize(name), Normalize(adapter));
+        failure = null;
+        if (Minting is { } active && active.Contains((this, key)))
+        {
+            // A provider that asks for its own plan while answering where its store is gets the declared plan.
+            plan = DeclaredPlan(name, adapter);
+            return false;
+        }
+
+        try
+        {
+            plan = _plans.GetOrAdd(key, () => Mint(name, adapter, key));
+            return true;
+        }
+        catch (UnresolvedSourceException unresolved)
+        {
+            failure = unresolved.InnerException;
+            plan = DeclaredPlan(name, adapter);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The plan derived from the source declaration alone: the identity Koan recorded before sources were minted from
+    /// their physical store, <c>none</c> for a source without a generic connection string. Used to recognise a route
+    /// record saved by an earlier version; never cached.
+    /// </summary>
+    internal DataSourcePlan DeclaredPlan(string name, string adapter)
+    {
+        var source = GetSource(name);
+        return CompilePlan(name, adapter, Identity(source?.ConnectionString), source);
+    }
+
+    /// <summary>
+    /// The plan for a literal connection a caller supplies (Direct <c>WithConnectionString</c>). It is compiled for the
+    /// owning session and never admitted to the host cache, because literal values are unbounded input.
+    /// </summary>
+    internal DataSourcePlan LiteralPlan(string name, string adapter, string connection)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentException.ThrowIfNullOrWhiteSpace(adapter);
+        return CompilePlan(name, adapter, Identity(connection), GetSource(name));
+    }
+
+    private DataSourcePlan Mint(string name, string adapter, PlanKey key)
+    {
+        var source = GetSource(name);
+        var minting = Minting ??= [];
+        minting.Add((this, key));
+        try
+        {
+            string? physical;
+            try
+            {
+                physical = Volatile.Read(ref _physicalIdentity)?.Invoke(name, adapter);
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                // The provider cannot resolve this source (a declared source without a connection, an unreachable
+                // discovery). Opening the route reports that to the caller; the plan only needs its identity, so it
+                // stays provisional and is resolved again on the next request.
+                throw new UnresolvedSourceException(error);
+            }
+
+            var identity = string.IsNullOrWhiteSpace(physical) ? Identity(source?.ConnectionString) : physical;
+            return CompilePlan(name, adapter, identity, source);
+        }
+        finally
+        {
+            minting.Remove((this, key));
+        }
     }
 
     /// <summary>
@@ -344,5 +446,8 @@ public sealed class DataSourceRegistry
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
-    private readonly record struct PlanKey(string Source, string Adapter, string ConnectionIdentity);
+    private readonly record struct PlanKey(string Source, string Adapter);
+
+    private sealed class UnresolvedSourceException(Exception inner)
+        : Exception("The provider could not resolve the source's physical store.", inner);
 }

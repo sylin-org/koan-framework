@@ -75,6 +75,16 @@ public sealed class CouchDbAdapterFactory : IDataAdapterFactory, IDataAdapterSet
             mapping);
     }
 
+    /// <summary>
+    /// The resolved endpoint and database prefix, the parts that place a database. Credentials do not. The value is a
+    /// one-way digest; an endpoint spelled two ways yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return DataSourceRegistry.IdentityOf($"{Provider}\n{route.Endpoint.ToLowerInvariant()}\n{route.DatabasePrefix}");
+    }
+
     internal CouchDbRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

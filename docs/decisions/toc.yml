@@ -400,6 +400,8 @@
       href: DATA-0145-mongo-index-keys-use-the-stored-field-names.md
     - name: DATA-0146 PostgreSQL index names fit 63 bytes without collisions, and a declared name is qualified per partition table
       href: DATA-0146-postgres-index-names-fit-63-bytes-and-are-qualified-per-partition.md
+    - name: DATA-0147 Each source is minted once from the store its provider resolves, and every consumer uses that plan
+      href: DATA-0147-each-source-is-minted-once-from-its-physical-store.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

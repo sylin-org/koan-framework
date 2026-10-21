@@ -126,6 +126,9 @@ validation:
 - `DataSourceRegistry` compiles the elected adapter, typed `StorageLifecycle`, typed `Access`, a redacted
   connection identity, adapter settings, and route identity into one immutable host-owned `DataSourcePlan`.
   Runtime arguments may narrow that plan but cannot elevate it; the ordinary default is `Managed + ReadWrite`.
+  The plan is minted once per (source, adapter), at start, and its connection identity is the store the provider
+  resolves (`IDataAdapterFactory.ResolveStoreIdentity`), so gates, cutover, drift detection and Direct key on one
+  physical identity; a route record saved under the older declared identity is rewritten once on load (DATA-0147).
 - `RepositoryFacade` applies the plan's typed operation-effect gate before cancellation observation,
   segmentation/guard callbacks, readiness, Entity lifecycle, or provider dispatch. A constrained source never
   enters the provisioning-ready seam, which serves `Managed + ReadWrite` alone.

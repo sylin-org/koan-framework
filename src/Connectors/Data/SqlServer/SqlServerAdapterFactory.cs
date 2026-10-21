@@ -83,6 +83,16 @@ public sealed class SqlServerAdapterFactory : IDataAdapterFactory, IDataSourceIn
         });
     }
 
+    /// <summary>
+    /// The resolved connection and schema, the parts that place a table. The value is a one-way digest; a server spelled
+    /// two ways yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return DataSourceRegistry.IdentityOf($"{Provider}\n{route.ConnectionString}\n{route.Schema}");
+    }
+
     internal SqlServerRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

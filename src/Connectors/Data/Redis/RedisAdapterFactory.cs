@@ -69,6 +69,24 @@ public sealed class RedisAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
     public IDataSourceIntegration CreateSource(IServiceProvider services, string source) =>
         new RedisSourceIntegration(ResolveRoute(services, source));
 
+    /// <summary>
+    /// The resolved endpoint and logical database, the parts that place a key. It reads configuration only and never
+    /// opens a connection. The value is a one-way digest; an endpoint spelled two ways yields two values, so a Move
+    /// between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var registry = services.GetRequiredService<DataSourceRegistry>();
+        var defaults = services.GetRequiredService<IOptions<RedisOptions>>().Value;
+        var resolvedSource = string.IsNullOrWhiteSpace(source) ? Constants.DefaultSource : source;
+        var connection = AdapterConnectionResolver.ResolveRoutedConnection(
+            configuration, registry, Provider, resolvedSource,
+            services.GetRequiredService<IRedisConnectionProvider>().DefaultConnectionString, this);
+        var database = Setting(configuration, registry, resolvedSource, "Database", defaults.Database);
+        return DataSourceRegistry.IdentityOf($"{Provider}\n{connection.Trim()}\n{database}");
+    }
+
     internal RedisRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

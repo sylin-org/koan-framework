@@ -106,6 +106,16 @@ public sealed class CockroachAdapterFactory : IDataAdapterFactory, IDataSourceIn
         }, services.GetRequiredService<IStorageNameResolver>(), this);
     }
 
+    /// <summary>
+    /// The resolved connection and search path, the parts that place a table. The value is a one-way digest; a store
+    /// spelled two ways yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return DataSourceRegistry.IdentityOf($"{Provider}\n{route.ConnectionString}\n{route.SearchPath}");
+    }
+
     internal CockroachRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

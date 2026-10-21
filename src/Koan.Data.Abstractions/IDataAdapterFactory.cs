@@ -26,8 +26,10 @@ public interface IDataAdapterFactory : IAdapterFactory
     /// whatever their names or connection-string spellings; the value never carries raw connection material.
     /// Together with <see cref="Naming.INamingProvider.ResolveStorage"/> it says where a record operation lands, so
     /// an operation over two endpoints (a transfer) can tell when they are one place. Resolving it performs no I/O.
-    /// <see langword="null"/> means the adapter cannot tell; the framework then falls back to the source plan's
-    /// connection identity, which compares declarations rather than resolved connections.
+    /// It is also the <c>ConnectionIdentity</c> of the source plan the framework mints once per source and adapter, so
+    /// operation gates, cutover and route drift detection key on the store the route opens (NK-060).
+    /// <see langword="null"/> means the adapter cannot tell; the plan then keeps the identity of the source declaration's
+    /// generic connection string, which compares declarations rather than resolved connections.
     /// </summary>
     string? ResolveStoreIdentity(IServiceProvider services, string source) => null;
 

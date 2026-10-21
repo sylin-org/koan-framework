@@ -106,6 +106,13 @@ public sealed class DuckDbAdapterFactory : IDataAdapterFactory, IDataSourceInteg
         where TEntity : class, IEntity<TKey>
         where TKey : notnull => new DuckDbRepository<TEntity, TKey>(services, ResolveRoute(services, source), this);
 
+    /// <summary>
+    /// The resolved connection, which names the database file. The value is a one-way digest; a file spelled two ways
+    /// yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+        => DataSourceRegistry.IdentityOf($"{Provider}\n{ResolveRoute(services, source).ConnectionString}");
+
     internal DuckDbRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

@@ -43,7 +43,14 @@ public sealed class KoanDataCoreModule : KoanModule
         var hasState = routeOptions is not null &&
                        Routing.DefaultDataRouteAuthority.HasDurableState(routeOptions, environment);
         if (providers is { Candidates.Count: > 0 } || !string.IsNullOrWhiteSpace(configuredDefault) || hasState)
+        {
+            // NK-060: mint every declared source once, from the store its provider resolves, before any route binds it.
+            if (providers is not null && sources is not null)
+                foreach (var name in sources.GetSourceNames())
+                    if (providers.Find(sources.GetSource(name)?.Adapter) is { } factory)
+                        _ = sources.GetPlan(name, providers.Describe(factory).Id);
             _ = services.GetRequiredService<Routing.DefaultDataRouteAuthority>().Current;
+        }
         // ARCH-0101 §8: the boot-refuses-leaky-axis pre-flight. Loud warning in Development (boot continues), boot
         // refusal in Production. No-op when no always-on predicate axis is registered (off = byte-identical).
         var env = services.GetRequiredService<IHostEnvironment>();

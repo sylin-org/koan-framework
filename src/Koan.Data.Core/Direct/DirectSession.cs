@@ -347,7 +347,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             : !string.IsNullOrWhiteSpace(configured?.Adapter)
                 ? configured.Adapter
                 : sourceName;
-        var plan = registry.GetPlan(sourceName, adapterHint, _connectionString);
+        var plan = SourcePlan(registry, sourceName, adapterHint, _connectionString);
         plan.Demand(effect, operation);
         _ceilingPlan = plan;
         return _ceilingPlan;
@@ -360,12 +360,26 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         string operation)
     {
         var registry = _sp.GetService<DataSourceRegistry>();
-        var resolved = registry?.GetPlan(route.Source, route.Provider, route.ConnectionString)
+        var resolved = (registry is null
+                           ? null
+                           : SourcePlan(registry, route.Source, route.Provider, route.ConnectionString))
             ?? ceiling
             ?? DataSourcePlan.Default;
         resolved.Demand(effect, operation);
         _sp.GetService<DataDiagnostics>()?.ObserveSourcePlan(resolved);
         return resolved;
+    }
+
+    // NK-060: a route a data adapter resolves (Direct(source:) or Direct(adapter:)) binds the source's minted plan, the
+    // one Entity repositories, the route authority and the horizon gates use, so a maintenance window on that database
+    // closes Direct too. A literal connection, or a provider no data adapter owns, is planned from its own text.
+    private DataSourcePlan SourcePlan(DataSourceRegistry registry, string source, string provider, string? connection)
+    {
+        var providers = _sp.GetService<Routing.DataProviderCatalog>();
+        var factory = providers?.Find(provider);
+        var adapter = factory is null ? provider : providers!.Describe(factory).Id;
+        if (_connectionString is null && factory is not null) return registry.GetPlan(source, adapter);
+        return connection is null ? registry.GetPlan(source, adapter) : registry.LiteralPlan(source, adapter, connection);
     }
 
     private static DbCommand CreateCommand(DbConnection connection, string sql, IReadOnlyDictionary<string, object?>? parameters, DbTransaction? tx)

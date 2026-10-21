@@ -101,6 +101,16 @@ public sealed class CouchbaseAdapterFactory : IDataAdapterFactory, IDataSourceIn
             mapping);
     }
 
+    /// <summary>
+    /// The resolved cluster connection, bucket and scope, the parts that place a collection. The value is a one-way
+    /// digest; a cluster spelled two ways yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+    {
+        var route = ResolveRoute(services, source);
+        return DataSourceRegistry.IdentityOf($"{Provider}\n{route.ConnectionString}\n{route.Bucket}\n{route.DefaultScope}");
+    }
+
     internal CouchbaseRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

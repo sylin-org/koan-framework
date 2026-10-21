@@ -275,11 +275,21 @@ public sealed class DefaultDataRouteAuthority
         var selected = _providers.Find(record.Adapter)
             ?? throw InvalidRecord($"Adapter '{record.Adapter}' is no longer referenced.");
         var candidate = _providers.Describe(selected);
-        var plan = _sources.GetPlan(source.Name, candidate.Id);
-        if (!string.Equals(plan.RouteIdentity, record.RouteIdentity, StringComparison.Ordinal) ||
-            !string.Equals(plan.ConnectionIdentity, record.ConnectionIdentity, StringComparison.Ordinal))
-            throw InvalidRecord(
-                $"Configured source '{source.Name}' no longer matches its saved physical identity.");
+        var minted = _sources.TryMint(source.Name, candidate.Id, out var plan, out var unresolved);
+        if (!Matches(plan, record))
+        {
+            // NK-060: a record saved before sources were minted from their physical store carries the identity derived
+            // from the declaration (`none` for a source without a generic connection string). It is accepted once, when
+            // it still matches that declaration, and rewritten with the resolved identity. Anything else is drift.
+            if (!minted || !Matches(_sources.DeclaredPlan(source.Name, candidate.Id), record))
+                throw unresolved is not null
+                    ? new InvalidOperationException(
+                        $"Koan could not resolve the physical store of source '{source.Name}' to verify the durable " +
+                        $"Data route control record '{_statePath}'. Restore the source's connection, then restart.",
+                        unresolved)
+                    : InvalidRecord($"Configured source '{source.Name}' no longer matches its saved physical identity.");
+            record = Upgrade(record, plan);
+        }
 
         var generations = record.Generations ?? new Dictionary<string, long>(StringComparer.Ordinal);
         var generation = generations.GetValueOrDefault(plan.RouteIdentity);
@@ -304,6 +314,90 @@ public sealed class DefaultDataRouteAuthority
             SelectionReceipt(plan.Adapter),
             quarantined,
             new Dictionary<string, long>(generations, StringComparer.Ordinal));
+    }
+
+    private static bool Matches(DataSourcePlan plan, RouteControlRecord record)
+        => string.Equals(plan.RouteIdentity, record.RouteIdentity, StringComparison.Ordinal) &&
+           string.Equals(plan.ConnectionIdentity, record.ConnectionIdentity, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Rewrites a record saved under declared identities with the minted ones: the active route, every tracked
+    /// generation, every quarantined route and the saved transition target, so a quarantine survives the upgrade. A
+    /// route identity that belongs to no configured source and adapter is kept as written.
+    /// </summary>
+    private RouteControlRecord Upgrade(RouteControlRecord record, DataSourcePlan active)
+    {
+        var renamed = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [record.RouteIdentity] = active.RouteIdentity
+        };
+        var pending = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var route in record.Generations?.Keys ?? Enumerable.Empty<string>()) pending.Add(route);
+        foreach (var route in record.QuarantinedRoutes ?? []) pending.Add(route);
+        if (record.Transition is { } saved) pending.Add(saved.TargetRouteIdentity);
+        pending.ExceptWith(renamed.Keys);
+        foreach (var name in _sources.GetSourceNames())
+        {
+            if (pending.Count == 0) break;
+            foreach (var provider in _providers.Candidates)
+            {
+                var declared = _sources.DeclaredPlan(name, provider.Id);
+                if (!pending.Remove(declared.RouteIdentity)) continue;
+                renamed[declared.RouteIdentity] = _sources.GetPlan(name, provider.Id).RouteIdentity;
+            }
+        }
+
+        string Rename(string route) => renamed.TryGetValue(route, out var current) ? current : route;
+        var generations = new Dictionary<string, long>(StringComparer.Ordinal);
+        foreach (var (route, generation) in record.Generations ?? [])
+            generations[Rename(route)] = generation;
+        var upgraded = record with
+        {
+            RouteIdentity = active.RouteIdentity,
+            ConnectionIdentity = active.ConnectionIdentity,
+            Generations = generations,
+            QuarantinedRoutes = (record.QuarantinedRoutes ?? []).Select(Rename).Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal).ToArray(),
+            Transition = record.Transition is { } transition
+                ? transition with { TargetRouteIdentity = Rename(transition.TargetRouteIdentity) }
+                : null
+        };
+        try
+        {
+            Persist(upgraded);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A read-only control directory booted before this upgrade. The upgraded identities are held in memory and
+            // reach the file with the next durable change, so the host keeps starting.
+        }
+        return upgraded;
+    }
+
+    private void Persist(RouteControlRecord record)
+    {
+        var directory = Path.GetDirectoryName(_statePath)
+            ?? throw new InvalidOperationException("The Data route state path has no parent directory.");
+        var temporary = Path.Combine(directory, $".{Path.GetFileName(_statePath)}.{Guid.CreateVersion7():N}.tmp");
+        try
+        {
+            using (var stream = new FileStream(
+                       temporary,
+                       FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None,
+                       16 * 1024,
+                       FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(stream, record, Json);
+                stream.Flush(flushToDisk: true);
+            }
+            File.Replace(temporary, _statePath, destinationBackupFileName: null);
+        }
+        finally
+        {
+            if (File.Exists(temporary)) File.Delete(temporary);
+        }
     }
 
     private async Task Save(RouteControlRecord record)

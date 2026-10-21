@@ -89,6 +89,13 @@ public sealed class MySqlAdapterFactory : IDataAdapterFactory, IDataSourceIntegr
         });
     }
 
+    /// <summary>
+    /// The resolved connection, normalized with its database. The value is a one-way digest; a server spelled two ways
+    /// yields two values, so a Move between them is refused (DATA-0143).
+    /// </summary>
+    public string? ResolveStoreIdentity(IServiceProvider services, string source)
+        => DataSourceRegistry.IdentityOf($"{Provider}\n{ResolveRoute(services, source).ConnectionString}");
+
     internal MySqlRoute ResolveRoute(IServiceProvider services, string source)
     {
         var configuration = services.GetRequiredService<IConfiguration>();

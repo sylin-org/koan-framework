@@ -151,8 +151,53 @@ public sealed class SourcePolicySpec
             "Default", "spy", "configured", new Dictionary<string, string>()));
 
         registry.GetPlan("Default", "spy").Should().BeSameAs(registry.GetPlan("Default", "spy"));
-        registry.GetPlan("Default", "spy", "literal-a")
-            .Should().NotBeSameAs(registry.GetPlan("Default", "spy", "literal-a"));
+        registry.LiteralPlan("Default", "spy", "literal-a")
+            .Should().NotBeSameAs(registry.LiteralPlan("Default", "spy", "literal-a"));
+        // A provider's own resolved route receives the one minted plan.
+        registry.GetPlan("Default", "spy", "configured").Should().BeSameAs(registry.GetPlan("Default", "spy"));
+    }
+
+    [Fact]
+    public void A_source_is_minted_once_from_the_store_its_provider_resolves()
+    {
+        var registry = new DataSourceRegistry();
+        registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
+            "Default", "spy", "", new Dictionary<string, string>()));
+        registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
+            "Archive", "spy", "", new Dictionary<string, string>()));
+        var calls = 0;
+        registry.BindPhysicalIdentity((source, _) =>
+        {
+            calls++;
+            return DataSourceRegistry.IdentityOf("store\n" + source);
+        });
+
+        var first = registry.GetPlan("Default", "spy");
+        var second = registry.GetPlan("Archive", "spy");
+
+        first.ConnectionIdentity.Should().NotBe("none").And.NotBe(second.ConnectionIdentity);
+        registry.GetPlan("default", "SPY").Should().BeSameAs(first);
+        calls.Should().Be(2);
+        registry.DeclaredPlan("Default", "spy").ConnectionIdentity.Should().Be("none");
+    }
+
+    [Fact]
+    public void A_source_its_provider_cannot_resolve_stays_provisional_and_is_resolved_again()
+    {
+        var registry = new DataSourceRegistry();
+        registry.RegisterSource(new DataSourceRegistry.SourceDefinition(
+            "Default", "spy", "declared", new Dictionary<string, string>()));
+        var available = false;
+        registry.BindPhysicalIdentity((_, _) => available
+            ? DataSourceRegistry.IdentityOf("resolved")
+            : throw new InvalidOperationException("No connection string found."));
+
+        registry.TryMint("Default", "spy", out var provisional, out var failure).Should().BeFalse();
+        failure.Should().BeOfType<InvalidOperationException>();
+        provisional.ConnectionIdentity.Should().Be(registry.DeclaredPlan("Default", "spy").ConnectionIdentity);
+
+        available = true;
+        registry.GetPlan("Default", "spy").ConnectionIdentity.Should().Be(DataSourceRegistry.IdentityOf("resolved"));
     }
 
     [Fact]
