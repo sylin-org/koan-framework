@@ -45,6 +45,20 @@ internal static class WebProvenanceItems
         DefaultValue: "(derived from each request)",
         DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.HttpPipeline", "Koan.Web.Auth.Server", "Koan.Mcp", "Koan.Web.OpenGraph", "Koan.Web.Auth.Connector.Atproto" });
 
+    internal static readonly ProvenanceItem KeyRingDirectory = new(
+        ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.KeyRingDirectory,
+        "Key Ring Directory",
+        "The folder the ASP.NET Data Protection key ring persists in, under the application name the folder remembers, so a rebuilt container, a renamed application and every instance over it share the keys. Unset leaves the ring where ASP.NET puts it.",
+        DefaultValue: "(ASP.NET default location)",
+        DefaultConsumers: new[] { "Koan.Web.Auth", "Koan.Web.Auth.Connector.Atproto" });
+
+    internal static readonly ProvenanceItem KeyRingApplicationName = new(
+        ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.KeyRingApplicationName,
+        "Key Ring Application Name",
+        "The application name the key ring folder's keys are scoped to, pinned. Unset, the folder remembers the name it was first written under; a pinned name the folder does not hold refuses the start.",
+        DefaultValue: "(remembered by the folder)",
+        DefaultConsumers: new[] { "Koan.Web.Auth", "Koan.Web.Auth.Connector.Atproto" });
+
     internal static readonly ProvenanceItem TrustedProxies = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.TrustedProxies,
         "Trusted Proxies",

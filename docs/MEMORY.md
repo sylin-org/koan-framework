@@ -668,6 +668,9 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   test output. Run them with `-p:NuGetAudit=false` before concluding anything about a change. Test outputs also
   live in `%TEMP%\Koan-framework\tests\<project>\` — shared by every worktree of this repository.
   (2026-10-19)
+- **`--no-incremental` cannot build a test project here.** Rebuild's Clean deletes the restored assets in that shared
+  `%TEMP%` output, so the build fails `NETSDK1004`; prove warnings with `--no-incremental` on the source project, and
+  treat a `NETSDK1004` as a missing restore, not a defect. (2026-10-29)
 - **"The facade is the gate" is a claim about every verb, so the proof needs a leg per verb.** ARCH-0103 dismissed the
   batch-delete IDOR on exactly that argument, and the batch was the one facade verb that forwarded caller ids to an
   identity-only native delete: `Batch().Delete(otherTenantsId)` deleted the row on SQLite, InMemory and Json. The

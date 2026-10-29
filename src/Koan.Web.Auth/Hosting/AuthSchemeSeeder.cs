@@ -133,9 +133,9 @@ internal static class AuthSchemeSeeder
                 }
                 // WEB-0078: a still-relative endpoint lives under the request's path base, where Koan serves it. A
                 // rooted path resolved against BaseAddress would discard the base, so the endpoint carries it.
-                ctx.Options.TokenEndpoint = UnderPathBase(ctx.Options.TokenEndpoint, request.PathBase);
-                ctx.Options.UserInformationEndpoint = UnderPathBase(ctx.Options.UserInformationEndpoint, request.PathBase);
-                var url = UnderPathBase(ctx.RedirectUri, request.PathBase);
+                ctx.Options.TokenEndpoint = ReturnUrlPolicy.UnderPathBase(ctx.Options.TokenEndpoint, request.PathBase);
+                ctx.Options.UserInformationEndpoint = ReturnUrlPolicy.UnderPathBase(ctx.Options.UserInformationEndpoint, request.PathBase);
+                var url = ReturnUrlPolicy.UnderPathBase(ctx.RedirectUri, request.PathBase);
                 if (ctx.Properties.Items.TryGetValue("prompt", out var prompt) && !string.IsNullOrWhiteSpace(prompt))
                     url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(url, "prompt", prompt!);
                 ctx.Response.Redirect(url);
@@ -156,6 +156,18 @@ internal static class AuthSchemeSeeder
                 }
                 ApplyClaims(ctx.Identity!, user);
                 await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
+            },
+            // WEB-0080: when the application names a failure landing, a sign-in that cannot complete lands there with a
+            // sanitized code; otherwise the maintained handler's own answer stands.
+            OnRemoteFailure = ctx =>
+            {
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.Failed)) ctx.HandleResponse();
+                return Task.CompletedTask;
+            },
+            OnAccessDenied = ctx =>
+            {
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.AccessDenied)) ctx.HandleResponse();
+                return Task.CompletedTask;
             }
         };
         return o;
@@ -234,6 +246,17 @@ internal static class AuthSchemeSeeder
                 var user = JObject.Parse(json);
                 ApplyClaims(identity, user);
                 await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
+            },
+            // WEB-0080: the same failure landing as the OAuth2 handler.
+            OnRemoteFailure = ctx =>
+            {
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.Failed)) ctx.HandleResponse();
+                return Task.CompletedTask;
+            },
+            OnAccessDenied = ctx =>
+            {
+                if (SignInFailureReturn.Redirect(ctx.HttpContext, ctx.Properties, SignInFailure.AccessDenied)) ctx.HandleResponse();
+                return Task.CompletedTask;
             }
         };
         return o;
@@ -310,14 +333,6 @@ internal static class AuthSchemeSeeder
         if (resolved is null || !pathBase.HasValue || string.Equals(resolved, endpoint, StringComparison.Ordinal)) return resolved;
         if (!Uri.TryCreate(resolved, UriKind.Absolute, out var uri)) return resolved;
         return $"{uri.GetLeftPart(UriPartial.Authority)}{pathBase}{uri.PathAndQuery}";
-    }
-
-    /// <summary>A rooted relative URL under <paramref name="pathBase"/>; an absolute URL, an empty one, or one already under it is unchanged.</summary>
-    private static string UnderPathBase(string url, PathString pathBase)
-    {
-        if (!pathBase.HasValue || string.IsNullOrEmpty(url) || !url.StartsWith('/')) return url;
-        if (new PathString(url.Split('?', 2)[0]).StartsWithSegments(pathBase)) return url;
-        return pathBase + url;
     }
 
     private static string? ResolveSelfHostedBackchannelBase(IServer server)

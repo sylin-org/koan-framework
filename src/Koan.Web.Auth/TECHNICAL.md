@@ -52,7 +52,17 @@ declaring a custom `Type` does not implement configuration-only provider IDs: th
 corresponding scheme. Normalized protocol and merged provider options remain owned by the compiled plan. There is no
 second custom protocol startup lifecycle and no per-request protocol discovery.
 
-The unmodified challenge controller applies the existing return-URL policy before invoking the named handler.
+The unmodified challenge controller applies the existing return-URL policy before invoking the named handler, and
+carries the failure landing named beside `return` (`failure`, a rooted path checked by `SignInFailureReturn.TryAccept`)
+in the authentication properties (WEB-0080). `TryAccept` admits only printable ASCII from the characters a path and a
+query carry, percent-decodes the path and the query, and refuses a host (`//`), a `.` or `..` segment, a backslash, an
+encoded slash or backslash in the path, an encoded control or non-ASCII byte, a fragment and a query that names
+`error`; the same rule validates `Koan:Web:Auth:ReturnUrl:FailurePath` at start, so no accepted landing can leave the
+base path, carry a second code or fail as a header. `SignInFailureReturn.Redirect` resolves that value, then
+`Koan:Web:Auth:ReturnUrl:FailurePath`, under the request's path base, and sends the person there with the
+`SignInFailure` code in `error` and `Cache-Control: no-store`; it answers false and leaves the response alone when
+nothing is named. The seeded OAuth2 and OIDC handlers ask it from `OnRemoteFailure` and `OnAccessDenied`; a
+connector asks it at its own failure sites.
 Protocol-specific initiation input is available through the handler's request; the connector owns validation and
 must bind any security-relevant value into its protected transaction state rather than trusting callback query
 parameters. Custom handlers own their protocol's remote validation, subject mapping, external linkage, and any token

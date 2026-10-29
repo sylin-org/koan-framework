@@ -9,6 +9,7 @@ using Koan.Web.Auth.Connector.Atproto.Options;
 using Koan.Web.Auth.Connector.Atproto.Protocol;
 using Koan.Web.Auth.Connector.Atproto.Storage;
 using Koan.Web.Auth.Extensions;
+using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Extensions;
@@ -47,10 +48,14 @@ public sealed class AtprotoAuthModule : KoanModule
             options.CorrelationCookie.HttpOnly = true;
             options.Events = new RemoteAuthenticationEvents
             {
+                // WEB-0080: the handler sends a failed callback to the application's landing itself; this answers the
+                // failures the base handler raises, the same way when a landing is named, else as before.
                 OnRemoteFailure = context =>
                 {
                     context.HandleResponse();
+                    if (SignInFailureReturn.Redirect(context.HttpContext, context.Properties, SignInFailure.Failed)) return Task.CompletedTask;
                     context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    context.Response.Headers.CacheControl = "no-store";
                     return context.Response.WriteAsJsonAsync(new { error = "atproto_authentication_failed" });
                 }
             };

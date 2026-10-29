@@ -16,6 +16,24 @@ public static class AuthConstants
         public const string ConnectionsUnlink = "/me/connections/{provider}/{keyHash}";
     }
 
+    /// <summary>The query keys of the challenge and of the failure landing (WEB-0080).</summary>
+    public static class Query
+    {
+        /// <summary>Where a completed sign-in returns to.</summary>
+        public const string Return = "return";
+        /// <summary>Where a failed sign-in lands: a rooted path of this application.</summary>
+        public const string Failure = "failure";
+        /// <summary>The key the landing receives the sanitized failure code in.</summary>
+        public const string Error = "error";
+    }
+
+    /// <summary>Keys Koan carries in <c>AuthenticationProperties.Items</c> across a sign-in.</summary>
+    public static class Items
+    {
+        /// <summary>The failure landing named on the challenge (WEB-0080).</summary>
+        public const string FailurePath = ".koan.failure";
+    }
+
     // Development helpers used by first-party samples/providers
     public static class Dev
     {

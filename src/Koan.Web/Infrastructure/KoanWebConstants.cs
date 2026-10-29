@@ -86,6 +86,27 @@ public static class KoanWebConstants
         public const string DerivedFactReason = "base-url-derived-from-request";
     }
 
+    public static class KeyRing
+    {
+        // WEB-0079: the runtime fact stating where the Data Protection key ring lives.
+        public const string FactCode = "koan.web.keyring";
+        public const string FactSubject = "web:keyring";
+        public const string PersistedFactReason = "key-ring-persisted";
+        public const string DefaultFactReason = "key-ring-default";
+        public const string ApplicationFactReason = "key-ring-application";
+
+        // The file in the key ring folder that remembers the application name its keys are scoped to; not *.xml, so
+        // the file-system repository never reads it as a key.
+        public const string ApplicationNameFile = "koan-application-name.txt";
+
+        // The start's write probe: a file name unique to the attempt follows the prefix.
+        public const string ProbePrefix = ".koan-keyring-probe-";
+
+        // ASP.NET Data Protection's payload header (big-endian): the 128-bit id of the key that protected the payload
+        // follows it.
+        public const uint PayloadMagicHeader = 0x09F0C9F0;
+    }
+
     public static class Routes
     {
         // Health

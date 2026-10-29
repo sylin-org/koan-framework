@@ -13,6 +13,7 @@ using Koan.Core;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
 using Koan.Web.Auth.Connector.Atproto.Options;
 using Koan.Web.Auth.Connector.Atproto.Storage;
+using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
@@ -72,18 +73,19 @@ public sealed class AtprotoSessions
         using var resolver = Resolver(identifier);
         var input = identifier;
         if (development && options.DevelopmentHandles.TryGetValue(identifier, out var mapped)) input = mapped;
-        var document = await resolver.ResolveAsync(input, ct);
-        if (input.StartsWith("did:", StringComparison.Ordinal) && input != document.Id) throw new InvalidOperationException("Resolved AT identity is inconsistent.");
+        var document = await Classified(SignInFailure.HandleUnresolved, "AT identity could not be resolved.", () => resolver.ResolveAsync(input, ct));
+        if (input.StartsWith("did:", StringComparison.Ordinal) && input != document.Id)
+            throw new AtprotoSignInException(SignInFailure.HandleUnresolved, "Resolved AT identity is inconsistent.");
         if (!identifier.StartsWith("did:", StringComparison.Ordinal) && !document.AlsoKnownAs.Any(x => x.Equals("at://" + identifier, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("AT handle does not reverse-bind to the resolved DID.");
-        var pds = document.PdsEndpoint ?? throw new InvalidOperationException("AT identity has no PDS service.");
+            throw new AtprotoSignInException(SignInFailure.HandleUnresolved, "AT handle does not reverse-bind to the resolved DID.");
+        var pds = document.PdsEndpoint ?? throw new AtprotoSignInException(SignInFailure.HandleUnresolved, "AT identity has no PDS service.");
         network.Validate(new Uri(pds));
         using var discovery = new AuthorizationServerDiscovery(network.Client, TimeSpan.Zero);
-        var issuer = await discovery.DiscoverAuthorizationServerAsync(pds, ct);
+        var issuer = await Classified(SignInFailure.ProviderUnreachable, "AT authorization server could not be discovered.", () => discovery.DiscoverAuthorizationServerAsync(pds, ct));
         network.Validate(new Uri(issuer));
-        var metadata = await discovery.GetMetadataAsync(issuer, ct);
+        var metadata = await Classified(SignInFailure.ProviderUnreachable, "AT authorization server metadata could not be read.", () => discovery.GetMetadataAsync(issuer, ct));
         if (metadata.Issuer != issuer || string.IsNullOrWhiteSpace(metadata.PushedAuthorizationRequestEndpoint))
-            throw new InvalidOperationException("AT authorization server metadata is inconsistent or lacks required PAR.");
+            throw new AtprotoSignInException(SignInFailure.ProviderUnreachable, "AT authorization server metadata is inconsistent or lacks required PAR.");
         foreach (var endpoint in new[] { metadata.AuthorizationEndpoint, metadata.TokenEndpoint, metadata.PushedAuthorizationRequestEndpoint }) network.Validate(new Uri(endpoint!));
         string? verifiedHandle = null;
         if (document.Handle is { } handle)
@@ -125,9 +127,21 @@ public sealed class AtprotoSessions
         var scope = string.Join(' ', scopes.Distinct(StringComparer.Ordinal));
         var binding = new Binding(identity.Did, identity.Pds, identity.Issuer, scope, protectedProperties);
         using var oauth = OAuth(scope, identity.Did);
-        var authorization = await oauth.AuthorizeAsync(identity.Did, JsonSerializer.Serialize(binding), ct);
+        var authorization = await Classified(SignInFailure.ProviderUnreachable, "AT authorization request could not be pushed.",
+            () => oauth.AuthorizeAsync(identity.Did, JsonSerializer.Serialize(binding), ct));
         RequirePar(authorization, ClientId);
         return authorization;
+    }
+
+    /// <summary>
+    /// Run one sign-in step and classify anything it throws as <paramref name="failure"/> (WEB-0080), keeping the
+    /// cause server-side. A step that already classified itself passes through.
+    /// </summary>
+    private static async Task<T> Classified<T>(SignInFailure failure, string message, Func<Task<T>> step)
+    {
+        try { return await step(); }
+        catch (Exception error) when (error is not OperationCanceledException and not AtprotoSignInException)
+        { throw new AtprotoSignInException(failure, message, error); }
     }
 
     internal static void RequirePar(string authorization, string clientId)
@@ -145,17 +159,19 @@ public sealed class AtprotoSessions
         if (!Enabled) throw new InvalidOperationException("AT provider is inactive.");
         network.Validate(new Uri(server));
         using var discovery = new AuthorizationServerDiscovery(network.Client, TimeSpan.Zero);
-        string issuer;
-        try { issuer = await discovery.DiscoverAuthorizationServerAsync(server, ct); }
-        catch (OAuthException error) when (error.ErrorCode == "resource_metadata_fetch_failed")
+        var issuer = await Classified(SignInFailure.ProviderUnreachable, "AT authorization server could not be discovered.", async () =>
         {
-            // An entryway such as bsky.social is an authorization server, not a PDS.
-            // Server-first discovery also permits its own AS metadata when no resource metadata exists.
-            issuer = server;
-        }
-        var metadata = await discovery.GetMetadataAsync(issuer, ct);
+            try { return await discovery.DiscoverAuthorizationServerAsync(server, ct); }
+            catch (OAuthException error) when (error.ErrorCode == "resource_metadata_fetch_failed")
+            {
+                // An entryway such as bsky.social is an authorization server, not a PDS.
+                // Server-first discovery also permits its own AS metadata when no resource metadata exists.
+                return server;
+            }
+        });
+        var metadata = await Classified(SignInFailure.ProviderUnreachable, "AT authorization server metadata could not be read.", () => discovery.GetMetadataAsync(issuer, ct));
         if (metadata.Issuer != issuer || string.IsNullOrWhiteSpace(metadata.PushedAuthorizationRequestEndpoint))
-            throw new InvalidOperationException("AT authorization server metadata is inconsistent or lacks required PAR.");
+            throw new AtprotoSignInException(SignInFailure.ProviderUnreachable, "AT authorization server metadata is inconsistent or lacks required PAR.");
         foreach (var endpoint in new[] { issuer, metadata.AuthorizationEndpoint, metadata.TokenEndpoint, metadata.PushedAuthorizationRequestEndpoint }) network.Validate(new Uri(endpoint!));
         var explicitScopes = properties.Items.TryGetValue(Constants.RequestedScopes, out var requested);
         var scopes = ScopesForSignIn(explicitScopes, explicitScopes ? JsonSerializer.Deserialize<string[]>(requested!)! : [Constants.BaseScope], null, AllowedScopes);
@@ -182,7 +198,7 @@ public sealed class AtprotoSessions
                     ["state"] = state, ["code_challenge"] = challenge, ["code_challenge_method"] = "S256",
                     ["scope"] = scope, ["dpop_jkt"] = key.Thumbprint
                 });
-                using var response = await network.Send(request, ct);
+                using var response = await Classified(SignInFailure.ProviderUnreachable, "AT authorization request could not be pushed.", () => network.Send(request, ct));
                 if (response.Headers.TryGetValues("DPoP-Nonce", out var values)) nonce = values.FirstOrDefault();
                 using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                 if (response.IsSuccessStatusCode && body.RootElement.TryGetProperty("request_uri", out var requestUri) && !string.IsNullOrWhiteSpace(requestUri.GetString()))
@@ -258,7 +274,7 @@ public sealed class AtprotoSessions
 
     internal string BrowserProperties(string state)
     {
-        var pending = store.Peek(state) ?? throw new InvalidOperationException("Invalid or expired AT authorization state.");
+        var pending = store.Peek(state) ?? throw new AtprotoSignInException(SignInFailure.CallbackMismatch, "Invalid or expired AT authorization state.");
         return JsonSerializer.Deserialize<Binding>(pending.AppState!)!.Properties;
     }
 
@@ -266,10 +282,18 @@ public sealed class AtprotoSessions
     {
         var parameters = HttpUtility.ParseQueryString(query);
         var state = parameters["state"] ?? "";
-        var pending = store.Peek(state) ?? throw new InvalidOperationException("Invalid or expired AT authorization state.");
+        var pending = store.Peek(state) ?? throw new AtprotoSignInException(SignInFailure.CallbackMismatch, "Invalid or expired AT authorization state.");
         var binding = JsonSerializer.Deserialize<Binding>(pending.AppState!)!;
+        if (parameters["error"] is { } refused)
+        {
+            // The provider answered our own state with an error instead of a code: the person refused, or the provider
+            // could not finish. Either way the sign-in is over; the state is spent and the code says which.
+            await store.ConsumeAsync(state, ct);
+            throw new AtprotoSignInException(refused == "access_denied" ? SignInFailure.AccessDenied : SignInFailure.Failed,
+                "AT authorization was not granted.");
+        }
         if (parameters.GetValues("state")?.Length != 1 || parameters.GetValues("iss")?.Length != 1 || parameters["iss"] != binding.Issuer || pending.Issuer != binding.Issuer)
-        { await store.ConsumeAsync(state, ct); throw new InvalidOperationException("AT callback issuer mismatch."); }
+        { await store.ConsumeAsync(state, ct); throw new AtprotoSignInException(SignInFailure.CallbackMismatch, "AT callback issuer mismatch."); }
         var staging = new VerifiedSessionStore(store, binding.Did is null ? async (value, token) =>
         {
             // The SDK assumes the initial server is the PDS. Resolve the authenticated

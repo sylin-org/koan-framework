@@ -20,8 +20,10 @@ explicitly listed in `DevelopmentHandles`. For Docker Desktop, set
 `DevelopmentConnectHost` to `host.docker.internal` to reach the exact origins in
 `DevelopmentAllowedOrigins` through the host. This changes only the socket
 destination; issuer URLs, HTTP Host, TLS identity and DPoP audiences stay intact.
-Neither setting is accepted outside Development. Failed discovery or PAR returns
-a sanitized HTTP 400 retry page, without exposing the provider response.
+Neither setting is accepted outside Development. Failed discovery or PAR sends
+the person to the application's failure landing when one is named (below), and
+otherwise returns a sanitized HTTP 400 retry page, without exposing the provider
+response.
 
 Declare the application's public URL once; the client-metadata URL and the callback derive from it
 (WEB-0078):
@@ -53,6 +55,15 @@ selection on its own authorization page. Keep
 for other providers or a specific account.
 Koan validates the return destination and creates its ordinary authentication
 cookie after the connector verifies correlation, issuer, account DID and PDS.
+
+Name where a failed sign-in lands beside `return` — `&failure=/sign-in`, a rooted
+path of the application in printable ASCII, with no `.` or `..` segment, no encoded
+slash and no `error` of its own, placed under its base path — or for every provider in
+`Koan:Web:Auth:ReturnUrl:FailurePath` (WEB-0080). A sign-in that cannot start or
+cannot be verified then sends the person there with one code in the query, never
+the provider's text: `/sign-in?error=provider_unreachable`, `handle_unresolved`,
+`access_denied` (the person refused), `callback_mismatch` or `sign_in_failed`.
+With nothing named the connector answers its own HTTP 400.
 Use `AtprotoClaimTypes.Did` for protocol identity even if a local identity module
 reconciles `ClaimTypes.NameIdentifier`. `AtprotoClaimTypes.Handle` is optional and
 is emitted only after bidirectional handle verification. Neither email nor a
@@ -114,10 +125,13 @@ identifier check. Neither API exposes stored OAuth secrets or the raw HttpClient
 
 ### Custody and development
 
-Persist the session directory and the ASP.NET Data Protection key ring. Protocol
-state and sessions are encrypted with that key ring; token/key material is not
-stored in the browser cookie. Protect the key ring for the deployment account
-(for example DPAPI on Windows or a managed encryptor in a service deployment).
+Persist the session directory and the ASP.NET Data Protection key ring: set
+`Koan:Web:KeyRingDirectory` to a folder on the same persistent storage (WEB-0079),
+so a rebuilt container, or a renamed application, still reads the sessions it
+protected. Protocol state and
+sessions are encrypted with that key ring; token/key material is not stored in
+the browser cookie. Protect the key ring for the deployment account (the folder's
+permissions, or an encryptor added through ASP.NET's `IDataProtectionBuilder`).
 A process-exclusive file lock rejects a second host using the same session
 directory. This initial storage implementation is single-process; it does not
 claim distributed refresh coordination.

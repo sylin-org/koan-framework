@@ -135,6 +135,7 @@ Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the o
 |---|---|---|---|
 | HTTP conventions and `EntityController<T>` | `Sylin.Koan.Web` | — | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/web/index.md) |
 | Run at one public URL, under a path, behind one proxy | `Sylin.Koan.Web` | `Koan:Web:ApplicationUrl`, and `Koan:Web:TrustedProxies` behind a proxy | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#public-url-and-proxy) |
+| Keep sign-in cookies and protected sessions across a rebuilt container | `Sylin.Koan.Web` | `Koan:Web:KeyRingDirectory` on persistent storage | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web/README.md#key-ring) |
 | Shaping, hooks, and projection add-ons | `Sylin.Koan.Web.Extensions` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
 | OpenAPI description | `Sylin.Koan.Web.OpenApi` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |
 | Server-sent events | `Sylin.Koan.Web.Sse` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Web.Extensions/README.md) |

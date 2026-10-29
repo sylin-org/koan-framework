@@ -26,7 +26,12 @@ internal static class ServiceCollectionExtensions
     internal static IServiceCollection AddKoanWebAuth(this IServiceCollection services)
     {
         // Bind from configuration by section path at runtime (no IConfiguration required here)
-        services.AddKoanOptions<AuthOptions>(AuthOptions.SectionPath);
+        // WEB-0080: a configured failure landing is a rooted path of this application; anything else refuses the start.
+        services.AddKoanOptions<AuthOptions>(AuthOptions.SectionPath)
+            .Validate(options => options.ReturnUrl.FailurePath is null || SignInFailureReturn.Accepts(options.ReturnUrl.FailurePath),
+                $"{AuthOptions.SectionPath}:ReturnUrl:FailurePath must be a rooted path of this application, such as /sign-in, where a failed sign-in lands; " +
+                "it is printable ASCII, names no host, no '.' or '..' segment, no backslash or encoded slash and no fragment, " +
+                "and its query does not name 'error', which carries the failure code.");
         services.AddKoanOptions<AuthLifecycleOptions>(AuthLifecycleOptions.SectionPath);
         services.AddKoanOptions<ChallengeOptions>(ChallengeOptions.SectionPath);
 
@@ -232,7 +237,7 @@ internal static class ServiceCollectionExtensions
             if (redirect is not null)
             {
                 var query = QueryHelpers.ParseQuery(redirect.Query);
-                if (query.TryGetValue("return", out var rr) && rr.Count > 0)
+                if (query.TryGetValue(AuthConstants.Query.Return, out var rr) && rr.Count > 0)
                 {
                     returnUrl = rr[0];
                 }

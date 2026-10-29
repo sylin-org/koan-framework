@@ -29,6 +29,26 @@ public sealed class KoanWebOptions
     /// </summary>
     public IList<string> TrustedProxies { get; } = new List<string>();
 
+    /// <summary>
+    /// WEB-0079: the folder the ASP.NET Data Protection key ring persists in, absolute or relative to the content
+    /// root. When set, the ring lives there under the application name the folder remembers, so a rebuilt container,
+    /// a renamed application and every instance over the same folder read what was protected before; the folder is
+    /// created (owner-only on Unix) and proved writable at start, and one that cannot be refuses the start. Unset (the
+    /// default) leaves the ring where ASP.NET puts it. An application's own <c>PersistKeysTo…</c> wins over it.
+    /// Configure via: Koan:Web:KeyRingDirectory (env: Koan__Web__KeyRingDirectory).
+    /// </summary>
+    public string? KeyRingDirectory { get; set; }
+
+    /// <summary>
+    /// WEB-0079: the application name the key ring in <see cref="KeyRingDirectory"/> is scoped to, pinned. Unset (the
+    /// default), the folder remembers the name it was first written under, the application's code, and every later
+    /// start reads it back, so renaming the application never orphans its keys. A pinned name the folder does not
+    /// hold refuses the start, since every key in it would become unreadable. An application's own
+    /// <c>SetApplicationName</c> wins over it.
+    /// Configure via: Koan:Web:KeyRingApplicationName (env: Koan__Web__KeyRingApplicationName).
+    /// </summary>
+    public string? KeyRingApplicationName { get; set; }
+
     // When set, a very light in-pipeline handler responds to GET {HealthPath} with { status: "ok" }.
     public string HealthPath { get; set; } = Infrastructure.KoanWebConstants.Routes.ApiHealth;
 

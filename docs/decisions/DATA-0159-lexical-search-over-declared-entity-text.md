@@ -47,8 +47,12 @@ with excerpts:
    index in step with every write of the row inside the same write unit and answers a bounded, ranked term search.
    The repository that declares it implements `ILexicalSearchRepository<TEntity,TKey>`: `Search(LexicalQuery, scope)`,
    `Rebuild()`, `Status()`. `LexicalQuery` is bounded by construction — a page from 1, a size between 1 and 1,000, a
-   snippet window between 1 and 64 words — and its terms are the letter-or-digit runs of the text, so no store ever
-   parses query grammar a caller typed. Every term is optional; a row holding more of them ranks higher.
+   page that starts no deeper than 10,000 matches (`MaximumOffset`; amended 2026-10-29: a store ranks every match and
+   discards the ones before the page, so a page past that point is a scan nobody reads, and a page whose offset would
+   exceed the bound or overflow is refused when the query is built, by `LexicalQuery` and by `LexicalSearchQuery.Page`,
+   naming the bound and the latest page the size allows), a snippet window between 1 and 64 words — and its terms are
+   the letter-or-digit runs of the text, so no store ever parses query grammar a caller typed. Every term is optional;
+   a row holding more of them ranks higher.
 3. **The accessor follows ARCH-0135.** `Post.Lexical` is a C# 14 static extension member on every string-keyed
    `Entity<T>`, delivering the stateless `LexicalStatics<T>`: `Search(text, s => s.Top(20).Snippet())` answers
    `LexicalMatch<string>` (identity, score, snippet) best first, `Find(...)` loads the entities in rank order through the
@@ -131,6 +135,9 @@ with excerpts:
   the GIN index exists under `LX_`, rows that existed before the declaration are current at once and `Rebuild` answers
   their count, and under a `Validate` DDL policy the row lands while `Search` and `Rebuild` refuse naming the column
   and the index.
+- `LexicalPageBoundSpec` (Koan.Tests.Data.Core): a page whose offset would overflow and one past the maximum offset
+  are refused by `LexicalQuery` and `LexicalSearchQuery.Page` naming the bound; the deepest allowed page builds and
+  runs on SQLite, answering nothing past the only match.
 - `LexicalDeclarationSpec` (Koan.Tests.Data.Core): the JSON and InMemory routes refuse the first save of a declaring
   entity naming `query.lexical`, the adapter and the corrections, holding nothing, and refuse the search; the
   composition facts carry `data:lexical:memo` with `provider:sqlite`, `fields:Title,Body`, `language:english` and the

@@ -248,6 +248,17 @@ translation in Web.
   override. `Koan:Web:TrustedProxies` names the proxies whose `X-Forwarded-Proto` and `X-Forwarded-For` are believed
   for one hop; empty honours none. See WEB-0078 and the
   [Koan.Web README](../../../src/Koan.Web/README.md#public-url-and-proxy).
+- `Koan:Web:KeyRingDirectory` names the folder the ASP.NET Data Protection key ring persists in, so cookies and
+  protected sessions survive a rebuilt container and every instance over the folder shares them. The folder remembers
+  the application name its keys are scoped to (`koan-application-name.txt`), so renaming the application keeps them;
+  `Koan:Web:KeyRingApplicationName` pins that name, and a pin the folder does not hold refuses the start. The folder
+  is created owner-only on Unix and proved writable at start. An application's own `PersistKeysTo…` or
+  `SetApplicationName` wins, and the `koan.web.keyring` fact says which is in effect. See WEB-0079 and the
+  [Koan.Web README](../../../src/Koan.Web/README.md#key-ring).
+- `Koan:Web:Auth:ReturnUrl:FailurePath` names the page a failed sign-in lands on for every provider, a rooted path
+  of the application placed under its base path; the person arrives with one sanitized code in `error`. A challenge
+  names its own with `failure=` beside `return`. A landing that could leave the application or its base path, or
+  that already names `error`, refuses the start (or answers 400 at the challenge). See WEB-0080.
 - `GET /health/live` reports process liveness without dependency checks.
 - `GET /health/ready` reports aggregated dependency readiness and returns 503 when a critical
   component is unhealthy.

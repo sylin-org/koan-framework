@@ -65,4 +65,23 @@ public sealed class ReturnUrlPolicyTests
         r.Url.Should().Be("/");
         r.IsLocal.Should().BeTrue();
     }
+
+    /// <summary>
+    /// WEB-0078: a URL Koan builds carries the configured path base unless it begins with that exact path base,
+    /// compared ordinally at a segment boundary, because a proxy may route the path base case-sensitively.
+    /// </summary>
+    [Theory]
+    [InlineData("/sign-in", "/tangent/sign-in")]
+    [InlineData("/tangent", "/tangent")]
+    [InlineData("/tangent/sign-in", "/tangent/sign-in")]
+    [InlineData("/tangent?from=home", "/tangent?from=home")]
+    [InlineData("/TANGENT/x", "/tangent/TANGENT/x")]
+    [InlineData("/Tangent", "/tangent/Tangent")]
+    [InlineData("/tangential/x", "/tangent/tangential/x")]
+    [InlineData("https://idp.example/token", "https://idp.example/token")]
+    [InlineData("sign-in", "sign-in")]
+    public void A_built_url_is_placed_under_the_exact_path_base(string url, string expected)
+    {
+        ReturnUrlPolicy.UnderPathBase(url, new Microsoft.AspNetCore.Http.PathString("/tangent")).Should().Be(expected);
+    }
 }

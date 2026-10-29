@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 
 namespace Koan.Web.Auth.Infrastructure;
 
@@ -28,6 +29,21 @@ public static class ReturnUrlPolicy
         // absolute configured fallback — is a deliberate cross-origin redirect (plain Redirect).
         var isLocal = Uri.TryCreate(url, UriKind.Relative, out _);
         return new Resolution(url, isLocal);
+    }
+
+    /// <summary>
+    /// WEB-0078: a rooted relative URL placed under <paramref name="pathBase"/>; an absolute URL, an empty one, a
+    /// non-rooted one, or one that already begins with the exact path base (ordinal, at a segment boundary) is
+    /// unchanged. The comparison is ordinal because a proxy may route the path base case-sensitively, so
+    /// <c>/TANGENT/x</c> under <c>/tangent</c> becomes <c>/tangent/TANGENT/x</c>.
+    /// </summary>
+    public static string UnderPathBase(string url, PathString pathBase)
+    {
+        if (!pathBase.HasValue || string.IsNullOrEmpty(url) || !url.StartsWith('/')) return url;
+        var prefix = pathBase.ToUriComponent();
+        if (url.StartsWith(prefix, StringComparison.Ordinal) && (url.Length == prefix.Length || url[prefix.Length] is '/' or '?' or '#'))
+            return url;
+        return prefix + url;
     }
 
     private static string Sanitize(string? candidate, IReadOnlyList<string>? allowList, string fallback)

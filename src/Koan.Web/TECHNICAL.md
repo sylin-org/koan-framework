@@ -47,6 +47,24 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   Test IdP's issuer read; without a configured value it returns the request's scheme, host and path base, warns once
   in Staging, Test and CI, and refuses in Production with a correction (the host still boots; only the consumer that
   asked fails).
+- `Koan:Web:KeyRingDirectory` names the folder the Data Protection key ring persists in (WEB-0079). `KoanWebKeyRing`
+  resolves it once against the content root and supplies two defaults the application's own configuration overrides:
+  as the `IConfigureOptions<KeyManagementOptions>` hook it sets `FileSystemXmlRepository` over the folder only when no
+  repository is configured yet, and as the registered `IApplicationDiscriminator` it answers the application name the
+  folder remembers, which ASP.NET's `DataProtectionOptionsSetup` uses as `ApplicationDiscriminator` unless
+  `SetApplicationName` replaces it (unset, it answers the host's own discriminator, so nothing changes). The name is
+  settled once: the first start writes `Koan:Web:KeyRingApplicationName` or `ApplicationIdentitySnapshot.Code` into
+  `koan-application-name.txt`, created with `FileMode.CreateNew` (exclusive on every platform) as one line ending in
+  a newline, so instances starting together agree on exactly one name; every later start reads it back, sharing the
+  file fully and retrying briefly while it is unreadable, empty or unterminated; a pin that differs refuses.
+  `WebModule.Start` creates the folder (0700 on Unix), writes and removes a probe whose name is unique to the attempt,
+  settles the name and protects one value with the provider in force, which loads Koan's ring when it is the one in
+  force; any of those failing refuses the start naming the key. The `koan.web.keyring` fact and
+  `KoanWebKeyRing.Directory`/`ApplicationName`/`IsPersisted` read the resolved `IDataProtectionProvider`,
+  `KeyManagementOptions` and `DataProtectionOptions`: the configured repository counts only when the provider in force
+  protects with a key it holds (the key id after ASP.NET's payload header), so an ephemeral or replaced provider is
+  reported as the application's, with no key it uses in the folder. The fact also names the application's
+  repository or name override and an existing folder whose mode is wider than owner-only.
 - Auth cookies take the request's path base as their `Path` (the session cookie through the cookie builder's default,
   the correlation and nonce cookies through `RequestSchemeAdaptiveCookieBuilder`), so a host under `/app` issues
   cookies scoped to `/app`.

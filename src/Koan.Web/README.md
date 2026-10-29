@@ -107,6 +107,32 @@ boots. The startup facts state which applies (`koan.web.baseurl`).
 is honoured. The public host is the base URL's, so `X-Forwarded-Host` is not read. `IsProxiedApi` is a separate,
 older switch: it only tells Koan that the proxy emits the security headers.
 
+### Key ring
+
+Every auth cookie and every protected sign-in state is encrypted with the ASP.NET Data Protection key ring. Set
+`Koan:Web:KeyRingDirectory` to the folder it persists in, absolute or relative to the content root:
+
+```json
+{ "Koan": { "Web": { "KeyRingDirectory": "/data/keys" } } }
+```
+
+Keys then live there under the application name the folder remembers, so a container rebuilt from its image, a
+renamed application and every instance over the same folder read what was protected before. The first start over a
+folder writes the name it uses, the application's code, into `koan-application-name.txt`, and every later start reads
+it back; `Koan:Web:KeyRingApplicationName` pins the name instead, and a pin the folder does not hold refuses the start,
+since every key in it would become unreadable. Koan creates the folder at start (owner-only, 0700, on Unix; an
+existing folder's mode is left alone and reported when it is wider), proves it writable and loads the ring, and a
+folder this process cannot use refuses the start with a correction naming the key. Unset, the ring stays where
+ASP.NET keeps it, which a rebuilt container does not keep.
+
+The application's own Data Protection configuration wins, whether made before or after `AddKoan()`: a
+`PersistKeysTo…` call replaces Koan's folder, a `SetApplicationName` call replaces the remembered name, and
+`UseEphemeralDataProtectionProvider` or an `IDataProtectionProvider` of its own leaves no key it uses in the
+folder. The facts state
+what is in effect (`koan.web.keyring`), naming the application's override when there is one. The keys are written in
+clear, as ASP.NET's own file-system ring is; the folder's permissions protect them, and an application that needs an
+encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
+
 ## Boundaries and failures
 
 - A constrained Create branch uses atomic insertion. An identity collision returns existence-hiding

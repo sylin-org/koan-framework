@@ -142,7 +142,8 @@ public sealed class BaseUrlPathBaseSpec
         public static async Task<BaseUrlHost> Start(
             IReadOnlyDictionary<string, string?> settings,
             Action<IServiceCollection>? configure = null,
-            string environment = "Test")
+            string environment = "Test",
+            Action<IServiceCollection>? beforeKoan = null)
         {
             var host = Host.CreateDefaultBuilder()
                 .ConfigureWebHost(web =>
@@ -160,6 +161,7 @@ public sealed class BaseUrlPathBaseSpec
                     }).AddInMemoryCollection(settings));
                     web.ConfigureServices(services =>
                     {
+                        beforeKoan?.Invoke(services);
                         services.AddKoan();
                         configure?.Invoke(services);
                     });

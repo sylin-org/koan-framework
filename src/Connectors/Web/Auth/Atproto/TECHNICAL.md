@@ -44,6 +44,14 @@ explicit scope challenges retain their exact requested set.
 6. The principal carries protocol DID/optional verified handle claims, links the
    existing external-identity store, and enters Koan's cookie lifecycle. No OAuth
    credential is placed in AuthenticationProperties tokens.
+7. A step that fails throws `AtprotoSignInException` carrying the Web Auth
+   `SignInFailure` for its phase (WEB-0080): identity resolution is
+   `HandleUnresolved`; discovery, metadata and the pushed request are
+   `ProviderUnreachable`; an unknown state, a failed correlation or an issuer
+   mismatch is `CallbackMismatch`; a callback answering our state with
+   `error=access_denied` is `AccessDenied`. Both the challenge and the callback ask
+   `SignInFailureReturn` first and send the person to the application's landing
+   with the code when one is named; otherwise the connector's own 400 answers.
 
 The protected file store atomically consumes one-use state and replaces the
 encrypted document. Its process lock makes its single-host guarantee explicit.

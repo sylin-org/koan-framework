@@ -33,6 +33,27 @@ public sealed class WebModule : KoanModule
             sp.GetRequiredService<IOptions<Options.KoanWebOptions>>().Value.ApplicationUrl,
             sp.GetService<IHostEnvironment>(),
             sp.GetService<ILogger<Hosting.KoanWebBaseUrl>>()));
+        // WEB-0079: where the Data Protection key ring lives. One owner reads Koan:Web:KeyRingDirectory; when it is set
+        // the ring persists there under the application name the folder remembers, and Start proves the folder usable
+        // before anything is protected. The owner supplies defaults the application's own configuration overrides: the
+        // key repository when none is configured, and the application discriminator ASP.NET falls back to, which
+        // delegates to the host's own when the key is unset. Unset, nothing changes.
+        services.AddDataProtection();
+        var hostDiscriminator = services.LastOrDefault(static descriptor =>
+            descriptor.ServiceType == typeof(Microsoft.AspNetCore.DataProtection.Infrastructure.IApplicationDiscriminator) && !descriptor.IsKeyedService);
+        services.TryAddSingleton(sp => new Hosting.KoanWebKeyRing(
+            sp,
+            sp.GetRequiredService<IOptions<Options.KoanWebOptions>>(),
+            sp.GetService(typeof(Koan.Core.Hosting.App.ApplicationIdentitySnapshot)) is Koan.Core.Hosting.App.ApplicationIdentitySnapshot identity
+                ? identity.Code
+                : Koan.Core.Hosting.App.ApplicationIdentitySnapshot.Empty.Code,
+            sp.GetService<IHostEnvironment>(),
+            sp.GetService<ILoggerFactory>(),
+            hostDiscriminator is null ? null : (Microsoft.AspNetCore.DataProtection.Infrastructure.IApplicationDiscriminator)Instantiate(sp, hostDiscriminator)));
+        services.AddSingleton<IConfigureOptions<Microsoft.AspNetCore.DataProtection.KeyManagement.KeyManagementOptions>>(
+            sp => sp.GetRequiredService<Hosting.KoanWebKeyRing>());
+        services.AddSingleton<Microsoft.AspNetCore.DataProtection.Infrastructure.IApplicationDiscriminator>(
+            sp => sp.GetRequiredService<Hosting.KoanWebKeyRing>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Hosting.IKoanWebPipelineContributor, Context.WebContextPipelineContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadFilterContributor, Context.WebContextReadFilterContributor>());
 
@@ -86,6 +107,19 @@ public sealed class WebModule : KoanModule
         Transformers.Initialization.WebTransformersBootstrap.Register(services);
     }
 
+    // WEB-0079: the key ring's folder is created, proved writable and loaded before the host serves, so a folder this
+    // process cannot use is a corrective start failure rather than a failed first sign-in.
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        services.GetRequiredService<Hosting.KoanWebKeyRing>().Prepare();
+        return Task.CompletedTask;
+    }
+
+    private static object Instantiate(IServiceProvider services, ServiceDescriptor descriptor)
+        => descriptor.ImplementationInstance
+           ?? descriptor.ImplementationFactory?.Invoke(services)
+           ?? ActivatorUtilities.CreateInstance(services, descriptor.ImplementationType!);
+
     // SEC-0020: state the posture an undeclared entity or verb resolves to, so Allow (the default) is read rather
     // than inferred. Narrowing is Koan:Web:Authorization:DefaultDecision=Forbid, [Access] or an EntityAccess<T>.
     public override void ReportComposition(KoanCompositionBuilder composition, IServiceProvider services)
@@ -113,6 +147,16 @@ public sealed class WebModule : KoanModule
                 ? Infrastructure.KoanWebConstants.BaseUrl.ConfiguredFactReason
                 : Infrastructure.KoanWebConstants.BaseUrl.DerivedFactReason,
             typeof(WebModule).FullName ?? nameof(WebModule));
+
+        // WEB-0079: state where the key ring lives, as in effect, so an operator reads it instead of discovering it at a
+        // rebuild, including when the application's own Data Protection configuration replaced Koan's folder or name.
+        var keyRing = services.GetRequiredService<Hosting.KoanWebKeyRing>();
+        composition.AddObservation(
+            Infrastructure.KoanWebConstants.KeyRing.FactCode,
+            Infrastructure.KoanWebConstants.KeyRing.FactSubject,
+            keyRing.Statement,
+            keyRing.FactReason,
+            typeof(WebModule).FullName ?? nameof(WebModule));
     }
 
     public override void Report(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -137,6 +181,14 @@ public sealed class WebModule : KoanModule
         var applicationUrl = Koan.Core.Configuration.ReadWithSource(
             cfg,
             $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ApplicationUrl}",
+            "");
+        var keyRingDirectory = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.KeyRingDirectory}",
+            "");
+        var keyRingApplicationName = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.KeyRingApplicationName}",
             "");
         var trustedProxies = cfg.GetSection($"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.TrustedProxies}")
             .GetChildren().Select(child => child.Value).Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
@@ -170,6 +222,26 @@ public sealed class WebModule : KoanModule
                 Hosting.KoanWebBaseUrl.TryNormalize(applicationUrl.Value, out var normalizedUrl) ? normalizedUrl : applicationUrl.Value,
                 sourceKey: applicationUrl.ResolvedKey,
                 usedDefault: applicationUrl.UsedDefault);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyRingDirectory.Value))
+        {
+            module.AddSetting(
+                WebProvenanceItems.KeyRingDirectory,
+                global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(keyRingDirectory),
+                keyRingDirectory.Value,
+                sourceKey: keyRingDirectory.ResolvedKey,
+                usedDefault: keyRingDirectory.UsedDefault);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyRingApplicationName.Value))
+        {
+            module.AddSetting(
+                WebProvenanceItems.KeyRingApplicationName,
+                global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(keyRingApplicationName),
+                keyRingApplicationName.Value,
+                sourceKey: keyRingApplicationName.ResolvedKey,
+                usedDefault: keyRingApplicationName.UsedDefault);
         }
 
         if (trustedProxies.Length > 0)

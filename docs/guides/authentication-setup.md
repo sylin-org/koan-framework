@@ -199,7 +199,9 @@ and agent grants are authorization concerns, introduced by
 ## Built-in application endpoints
 
 - `GET /.well-known/auth/providers` — eligible provider discovery;
-- `GET /auth/{provider}/challenge?return=/path` — begin sign-in;
+- `GET /auth/{provider}/challenge?return=/path&failure=/sign-in` — begin sign-in; `failure` is optional and names
+  the application's own page a failed sign-in lands on, with a sanitized code in `error`
+  (`Koan:Web:Auth:ReturnUrl:FailurePath` names one for every provider);
 - `/auth/{provider}/callback` — handler-owned callback registered with the provider;
 - `GET /me` — current-user projection, or 401;
 - `GET|POST /auth/logout?return=/path` — local sign-out.

@@ -6,7 +6,9 @@ namespace Koan.Data.Core.Lexical;
 /// Compact declaration of one lexical search — the <c>s => s.Top(20).Snippet()</c> shape passed to
 /// <see cref="LexicalStatics{T}.Search"/> and <see cref="LexicalStatics{T}.Find"/>. Fluent like
 /// <c>SemanticSearchQuery</c>, scoped to the entity-level knobs. A search is bounded by construction: a declaration
-/// that names neither <see cref="Top"/> nor <see cref="Page"/> is refused.
+/// that names neither <see cref="Top"/> nor <see cref="Page"/> is refused, and a page is refused here, before any
+/// store runs it, when its size is over <see cref="LexicalQuery.MaximumSize"/> or it starts deeper than
+/// <see cref="LexicalQuery.MaximumOffset"/> matches.
 /// </summary>
 public sealed class LexicalSearchQuery
 {
@@ -20,10 +22,7 @@ public sealed class LexicalSearchQuery
     /// <summary>Page <paramref name="page"/> (from 1) of <paramref name="size"/> matches, best first.</summary>
     public LexicalSearchQuery Page(int page, int size)
     {
-        if (page <= 0) throw new ArgumentOutOfRangeException(nameof(page), page, "A lexical search page starts at 1.");
-        if (size <= 0 || size > LexicalQuery.MaximumSize)
-            throw new ArgumentOutOfRangeException(nameof(size), size,
-                $"A lexical search page holds between 1 and {LexicalQuery.MaximumSize} matches.");
+        LexicalQuery.RequirePage(page, size);
         _page = page;
         _size = size;
         return this;

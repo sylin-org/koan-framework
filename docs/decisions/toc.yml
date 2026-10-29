@@ -478,6 +478,10 @@
       href: WEB-0077-every-delete-verb-raises-the-delete-hooks.md
     - name: WEB-0078 Koan.Web owns one canonical base URL, and serves under its path
       href: WEB-0078-one-canonical-base-url.md
+    - name: WEB-0079 The Data Protection key ring persists where the application says
+      href: WEB-0079-the-key-ring-persists-where-the-application-says.md
+    - name: WEB-0080 A failed sign-in returns to the application's own page with a sanitized code
+      href: WEB-0080-a-failed-sign-in-returns-to-the-application.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

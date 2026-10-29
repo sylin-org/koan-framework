@@ -7,21 +7,25 @@ namespace Koan.Data.Abstractions.Lexical;
 /// <para>Every term is optional and a row holding more of them ranks higher, so a two-word query answers the rows
 /// holding both words before the rows holding one. The terms are the maximal letter-or-digit runs of the text,
 /// compared without case; punctuation and query operators are not part of the grammar, so a store never sees text it
-/// could misparse. A query is bounded by construction: a page has a size, the size has a ceiling, and a snippet has a
-/// window.</para>
+/// could misparse. A query is bounded by construction: a page has a size, the size has a ceiling, a page starts no
+/// deeper than <see cref="MaximumOffset"/> matches into the ranking, and a snippet has a window.</para>
 /// </summary>
 public sealed record LexicalQuery
 {
     /// <summary>The largest page a search answers. A larger page is a scan with a bound in name only.</summary>
     public const int MaximumSize = 1_000;
 
+    /// <summary>
+    /// The deepest point a page may start at: how many ranked matches may precede it. A store ranks every match
+    /// and discards the ones before the page, so a page that starts past this point is a scan the caller cannot
+    /// read anyway; it is refused when the query is built, not when the store runs it.
+    /// </summary>
+    public const int MaximumOffset = 10_000;
+
     public LexicalQuery(string text, int page, int size, LexicalSnippet? snippet = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
-        if (page <= 0) throw new ArgumentOutOfRangeException(nameof(page), page, "A lexical search page starts at 1.");
-        if (size <= 0 || size > MaximumSize)
-            throw new ArgumentOutOfRangeException(nameof(size), size,
-                $"A lexical search page holds between 1 and {MaximumSize} matches.");
+        Offset = RequirePage(page, size);
         Terms = SplitTerms(text);
         if (Terms.Count == 0)
             throw new ArgumentException("A lexical search needs at least one term made of letters or digits.", nameof(text));
@@ -29,6 +33,25 @@ public sealed record LexicalQuery
         Page = page;
         Size = size;
         Snippet = snippet;
+    }
+
+    /// <summary>
+    /// Check one page declaration and answer its offset: the page starts at 1, the size is between 1 and
+    /// <see cref="MaximumSize"/>, and the matches before the page number at most <see cref="MaximumOffset"/>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The page or the size is outside those bounds.</exception>
+    public static int RequirePage(int page, int size)
+    {
+        if (page <= 0) throw new ArgumentOutOfRangeException(nameof(page), page, "A lexical search page starts at 1.");
+        if (size <= 0 || size > MaximumSize)
+            throw new ArgumentOutOfRangeException(nameof(size), size,
+                $"A lexical search page holds between 1 and {MaximumSize} matches.");
+        var offset = (long)(page - 1) * size;
+        if (offset > MaximumOffset)
+            throw new ArgumentOutOfRangeException(nameof(page), page,
+                $"A lexical search page starts at most {MaximumOffset} matches deep; page {page} of {size} would skip {offset}. " +
+                $"Ask for a page no later than {MaximumOffset / size + 1} at this size, or narrow the search.");
+        return (int)offset;
     }
 
     /// <summary>The text as the caller gave it.</summary>
@@ -46,8 +69,8 @@ public sealed record LexicalQuery
     /// <summary>How a snippet is cut and marked, or <see langword="null"/> for matches without one.</summary>
     public LexicalSnippet? Snippet { get; }
 
-    /// <summary>How many ranked matches precede this page.</summary>
-    public int Offset => checked((Page - 1) * Size);
+    /// <summary>How many ranked matches precede this page; at most <see cref="MaximumOffset"/>.</summary>
+    public int Offset { get; }
 
     private static IReadOnlyList<string> SplitTerms(string text)
     {

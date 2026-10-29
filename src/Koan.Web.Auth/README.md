@@ -41,6 +41,13 @@ await app.RunAsync();
 Register `https://your-app/auth/google/callback` with Google. Start sign-in at
 `GET /auth/google/challenge?return=/`.
 
+Say where a failed sign-in lands, beside `return` (`&failure=/sign-in`) or for every provider in
+`Koan:Web:Auth:ReturnUrl:FailurePath`: a rooted path of the application in printable ASCII, with no `.` or `..`
+segment, no backslash or encoded slash, no fragment and no `error` in its own query, placed under its base path. The person
+then arrives there with one code in the query — `provider_unreachable`, `handle_unresolved`, `access_denied`,
+`callback_mismatch` or `sign_in_failed` — and never the provider's text. Nothing named keeps each handler's own
+failure answer.
+
 ## Meaningful behavior
 
 - `GET /.well-known/auth/providers` returns eligible providers only.
@@ -75,6 +82,9 @@ optional built-in handler applies an email-keyed allow/revoke file at sign-in
 - Missing external subject identifiers, identity-link persistence failures, and security-bearing lifecycle-handler
   failures reject the sign-in flow.
 - Cookie validation failures reject the principal. Sign-out cleanup alone is best-effort.
+- A failure landing that could leave the application or its base path, could not be a `Location` header, or already
+  names `error` is refused: at the challenge with 400, in configuration at startup naming the key. The landing
+  receives one sanitized code, not the provider's response.
 
 ## Boundaries
 
