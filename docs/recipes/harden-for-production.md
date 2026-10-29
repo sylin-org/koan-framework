@@ -60,8 +60,13 @@ this is configuration, not construction.
 ## Declare the posture
 
 - Secrets move to environment or a secret provider; literals and user-secrets do not ship.
-- Security headers are on by default; behind a reverse proxy, say so (`IsProxiedApi`) so they are
-  emitted exactly once.
+- The public URL is declared once: `Koan:Web:ApplicationUrl` (scheme, host, and the path when the
+  application lives under one). Koan then serves only under that path, and the issuer, MCP resource,
+  card URLs and atproto client metadata all derive from it instead of from the request `Host` header.
+- Behind a reverse proxy, name it: `Koan:Web:TrustedProxies` is the one proxy (IP or CIDR) whose
+  `X-Forwarded-Proto` and `X-Forwarded-For` are believed, one hop. Nothing declared, nothing believed.
+- Security headers are on by default; when the proxy emits them instead, say so (`IsProxiedApi`) so
+  they are emitted exactly once.
 - Tenancy posture closes: unscoped operations fail instead of resolving a development tenant.
 - Sensitive string fields take classification attributes - encrypted at rest, keys scoped by
   segmentation, Development zero-config, production backed by your key provider.

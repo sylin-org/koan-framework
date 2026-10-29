@@ -3,30 +3,33 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
 using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Hosting;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
 /// <summary>
 /// OIDC IdP surface for the dev <c>test-oidc</c> provider (WEB-0071 / E5 chunk 4): the discovery document and
 /// the JWKS (the ES256 public key from <see cref="JwtTokenService"/>). The maintained OpenIdConnectHandler
-/// fetches these to validate the signed <c>id_token</c> the token endpoint mints. Issuer + endpoint URLs are
-/// derived from the request so they match the handler's resolved Authority regardless of host/port.
+/// fetches these to validate the signed <c>id_token</c> the token endpoint mints. The issuer is the application's
+/// base URL (<see cref="KoanWebBaseUrl"/>, WEB-0078), which is what the minted <c>id_token</c> carries; the
+/// endpoints are derived from the request that fetched this document — the handler's back-channel address — under
+/// its path base, so the handler reaches them wherever it reached the document.
 /// </summary>
-public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions> opts, JwtTokenService jwt, IHostEnvironment env) : ControllerBase
+public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions> opts, JwtTokenService jwt, IHostEnvironment env, KoanWebBaseUrl baseUrl) : ControllerBase
 {
     [HttpGet(Constants.Routes.Discovery)]
     public IActionResult Discovery()
     {
         if (!opts.Value.IsActive(env)) return NotFound();
-        var baseUrl = new Uri($"{Request.Scheme}://{Request.Host}").GetLeftPart(UriPartial.Authority)
-            + Constants.Routes.Base;
+        var issuer = baseUrl.Resolve(Request) + Constants.Routes.Base;
+        var reached = $"{Request.Scheme}://{Request.Host}{Request.PathBase}{Constants.Routes.Base}";
         return Ok(new
         {
-            issuer = baseUrl,
-            authorization_endpoint = $"{baseUrl}/authorize",
-            token_endpoint = $"{baseUrl}/token",
-            userinfo_endpoint = $"{baseUrl}/userinfo",
-            jwks_uri = $"{baseUrl}/jwks",
+            issuer,
+            authorization_endpoint = $"{reached}/authorize",
+            token_endpoint = $"{reached}/token",
+            userinfo_endpoint = $"{reached}/userinfo",
+            jwks_uri = $"{reached}/jwks",
             response_types_supported = new[] { "code" },
             subject_types_supported = new[] { "public" },
             id_token_signing_alg_values_supported = new[] { "ES256" },

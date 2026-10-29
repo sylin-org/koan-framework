@@ -71,7 +71,8 @@ internal static class ServiceCollectionExtensions
                 // Allow HTTP in Development/container scenarios; production should run behind HTTPS/terminator
                 o.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
                 o.Cookie.SameSite = SameSiteMode.Lax;
-                o.Cookie.Path = "/";
+                // WEB-0078: no explicit Path, so the cookie builder scopes it to the request's path base (the
+                // application's root under Koan:Web:ApplicationUrl), or "/" when there is none.
                 o.Cookie.Name = ".AspNetCore.Koan.cookie";
                 o.SlidingExpiration = true;
 

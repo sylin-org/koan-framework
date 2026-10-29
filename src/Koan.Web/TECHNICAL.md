@@ -35,6 +35,21 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
 ## Configuration
 
 - `KoanWebOptions` and `WebPipelineOptions` bind under `Koan:Web`; they shape the pipeline that already composed, rather than switching capabilities on
+- `Koan:Web:ApplicationUrl` is the one canonical base URL (WEB-0078). `KoanWebBaseUrl` parses it once — lowercase
+  scheme and host, port only when not the default, the path percent-encoded as `Configured` and decoded as
+  `PathBase`, no trailing slash; a query, fragment, `%2F` or an unspecified listen address stops boot — and
+  `KoanWebStartupFilter` applies it first: `UseForwardedHeaders` for `Koan:Web:TrustedProxies` (X-Forwarded-Proto and
+  X-Forwarded-For, one hop, only the declared proxies), then `UsePathBase` with the base URL's path and a guard that
+  answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
+  and every contributor stage, so nothing is served at the root. `KoanWebBaseUrl.Resolve(HttpContext)` is what
+  Auth.Server (`Issuer` default), MCP (`ResourceUri` default, authorization-server and metadata URLs), OpenGraph
+  (`og:url`, `og:image`, canonical), the atproto connector (`ClientId` default), the dev token's audience and the
+  Test IdP's issuer read; without a configured value it returns the request's scheme, host and path base, warns once
+  in Staging, Test and CI, and refuses in Production with a correction (the host still boots; only the consumer that
+  asked fails).
+- Auth cookies take the request's path base as their `Path` (the session cookie through the cookie builder's default,
+  the correlation and nonce cookies through `RequestSchemeAdaptiveCookieBuilder`), so a host under `/app` issues
+  cookies scoped to `/app`.
 - Runtime facts are exposed automatically in Development. Set
   `Koan:Web:ExposeObservabilitySnapshot=true` for an intentional non-Development exposure.
 - Avoid inline endpoints; keep routing in controllers

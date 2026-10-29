@@ -6,11 +6,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Koan.Web.Auth.Connector.Test.Infrastructure;
 using Koan.Web.Auth.Connector.Test.Options;
+using Koan.Web.Hosting;
 using System.Net;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
-public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger) : ControllerBase
+public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger, KoanWebBaseUrl baseUrl) : ControllerBase
 {
   [HttpGet(Constants.Routes.Authorize)]
     public IActionResult Authorize([FromQuery] string response_type, [FromQuery] string client_id, [FromQuery] string redirect_uri, [FromQuery] string? scope, [FromQuery] string? state, [FromQuery] string? code_challenge, [FromQuery] string? code_challenge_method, [FromQuery] string? prompt, [FromQuery] string? nonce)
@@ -31,8 +32,9 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     // Render simple HTML form when no user cookie or when forced via prompt.
   if (forceLogin || !Request.Cookies.TryGetValue(Constants.CookieUser, out var userCookie) || string.IsNullOrWhiteSpace(userCookie))
         {
-      // Serve a dedicated static HTML to keep SoC clean
-            const string url = Constants.Routes.Login;
+      // Serve a dedicated static HTML to keep SoC clean. WEB-0078: under the application's path base, so the
+      // browser lands on the page Koan serves rather than a root the pipeline answers 404.
+            var url = Request.PathBase + Constants.Routes.Login;
             var queryParams = new Dictionary<string, string?>();
             queryParams["client_id"] = client_id;
             queryParams["redirect_uri"] = redirect_uri;
@@ -83,9 +85,10 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
       // Accepted when AllowedRedirectUris is empty:
       // - Any absolute URL whose path is exactly "/auth/test/callback" (host/port agnostic)
       // - The relative path "/auth/test/callback"
-      // Accept any provider callback shape /auth/{id}/callback (covers test + test-oidc); dev-only convenience.
+      // Accept any provider callback shape /auth/{id}/callback (covers test + test-oidc), under the application's
+      // path base when it has one (WEB-0078); dev-only convenience.
       var path = redirect.AbsolutePath;
-      if (path.StartsWith("/auth/", StringComparison.Ordinal) && path.EndsWith("/callback", StringComparison.Ordinal))
+      if (path.Contains("/auth/", StringComparison.Ordinal) && path.EndsWith("/callback", StringComparison.Ordinal))
       {
         isAllowed = true;
       }
@@ -102,9 +105,8 @@ public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> op
     var profile = new UserProfile(parts.ElementAtOrDefault(0) ?? "dev", parts.ElementAtOrDefault(1) ?? "dev@example.com", null);
     var (roles, perms, extraClaims) = ParseExtras(o);
     var isOpenId = !string.IsNullOrWhiteSpace(scope) && scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("openid", StringComparer.OrdinalIgnoreCase);
-    var issuer = isOpenId
-        ? new Uri($"{Request.Scheme}://{Request.Host}").GetLeftPart(UriPartial.Authority) + Constants.Routes.Base
-        : null;
+    // WEB-0078: the id_token's issuer is the application's base URL — what the handler validates against.
+    var issuer = isOpenId ? baseUrl.Resolve(Request) + Constants.Routes.Base : null;
     var code = store.IssueCode(profile, TimeSpan.FromMinutes(5), code_challenge, roles, perms, extraClaims, nonce, isOpenId, issuer);
     var uri = new UriBuilder(redirect);
     var existingQuery = QueryHelpers.ParseQuery(uri.Query);

@@ -16,19 +16,24 @@ public static class KoanWeb
     public static class Urls
     {
         /// <summary>
-        /// Gets the application base URL suitable for display in logs and boot reports.
-        /// Uses localhost replacements for container-internal wildcards (0.0.0.0, +, *).
+        /// The application's base URL. When <c>Koan:Web:ApplicationUrl</c> is set this is that value, normalised the
+        /// way <see cref="Hosting.KoanWebBaseUrl"/> holds it (scheme, host, port when not the default, decoded path,
+        /// no trailing slash) and authoritative for the pipeline and every absolute URL Koan writes (WEB-0078).
+        /// Otherwise it is a display value for logs and boot reports: the first <c>ASPNETCORE_URLS</c> entry with
+        /// container-internal wildcards (0.0.0.0, +, *) replaced by localhost, or Koan's conventional default.
+        /// Inside a request, prefer <see cref="Hosting.KoanWebBaseUrl.Resolve(Microsoft.AspNetCore.Http.HttpContext)"/>,
+        /// which also derives from the live request when nothing is configured.
         /// </summary>
         /// <param name="cfg">Configuration instance (optional)</param>
         /// <param name="env">Host environment (optional)</param>
-        /// <returns>Base URL like "http://localhost:5080" or configured override</returns>
+        /// <returns>Base URL like "https://www.example.com/app" or "http://localhost:5080"</returns>
         public static string Base(IConfiguration? cfg = null, IHostEnvironment? env = null)
         {
-            // 1. Explicit configuration override (highest priority)
-            var configUrl = Configuration.Read<string?>(cfg, Infrastructure.ConfigurationConstants.Web.Keys.ApplicationUrl, null);
+            // 1. The configured public URL (authoritative; see KoanWebBaseUrl)
+            var configUrl = Configuration.Read<string?>(cfg, Infrastructure.ConfigurationConstants.Web.Section + ":" + Infrastructure.ConfigurationConstants.Web.Keys.ApplicationUrl, null);
             if (!string.IsNullOrEmpty(configUrl))
             {
-                return NormalizeUrl(configUrl);
+                return Hosting.KoanWebBaseUrl.TryNormalize(configUrl, out var normalized) ? normalized! : NormalizeUrl(configUrl);
             }
 
             // 2. ASPNETCORE_URLS environment variable (most reliable during startup)

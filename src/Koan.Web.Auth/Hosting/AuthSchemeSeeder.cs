@@ -52,6 +52,9 @@ internal static class AuthSchemeSeeder
 
         var oauthPost = new OAuthPostConfigureOptions<OAuthOptions, OAuthHandler<OAuthOptions>>(dp);
         var oidcPost = new OpenIdConnectPostConfigureOptions(dp);
+        // WEB-0078: a relative provider endpoint resolved against the bound address at boot sits under the
+        // application's configured path base; one left relative follows the request's path base at challenge time.
+        var pathBase = sp.GetService<Koan.Web.Hosting.KoanWebBaseUrl>()?.PathBase ?? PathString.Empty;
 
         foreach (var route in plan.Routes.Where(static route => route.Info.Eligible))
         {
@@ -63,14 +66,14 @@ internal static class AuthSchemeSeeder
 
             if (type == AuthProviderProtocols.OAuth2)
             {
-                var opts = BuildOAuthOptions(id, cfg);
+                var opts = BuildOAuthOptions(id, cfg, pathBase);
                 oauthPost.PostConfigure(id, opts);   // MUST precede TryAdd (see remarks)
                 oauthCache.TryAdd(id, opts);
                 schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OAuthHandler<OAuthOptions>)));
             }
             else if (type == AuthProviderProtocols.Oidc)
             {
-                var opts = BuildOidcOptions(id, cfg, sp);
+                var opts = BuildOidcOptions(id, cfg, sp, pathBase);
                 oidcPost.PostConfigure(id, opts);    // MUST precede TryAdd (see remarks)
                 oidcCache.TryAdd(id, opts);
                 schemes.AddScheme(new AuthenticationScheme(id, cfg.DisplayName ?? id, typeof(OpenIdConnectHandler)));
@@ -87,25 +90,26 @@ internal static class AuthSchemeSeeder
         }
     }
 
-    private static OAuthOptions BuildOAuthOptions(string id, ProviderOptions cfg)
+    private static OAuthOptions BuildOAuthOptions(string id, ProviderOptions cfg, PathString pathBase)
     {
         var o = new OAuthOptions
         {
             SignInScheme = AuthenticationExtensions.CookieScheme,
-            // Browser-facing: relative is fine (the browser resolves it). Server-facing endpoints get resolved.
+            // Browser-facing: relative is fine (the redirect below roots it at the request's path base).
+            // Server-facing endpoints get resolved.
             AuthorizationEndpoint = cfg.AuthorizationEndpoint ?? "",
-            TokenEndpoint = ResolveServerAbsolute(cfg.TokenEndpoint) ?? "",
-            UserInformationEndpoint = ResolveServerAbsolute(cfg.UserInfoEndpoint) ?? "",
+            TokenEndpoint = ResolveServerAbsolute(cfg.TokenEndpoint, pathBase) ?? "",
+            UserInformationEndpoint = ResolveServerAbsolute(cfg.UserInfoEndpoint, pathBase) ?? "",
             ClientId = cfg.ClientId ?? "",
             ClientSecret = cfg.ClientSecret ?? "",
             CallbackPath = $"/auth/{id}/callback",
             UsePkce = true, // parity gap: the hand-rolled OAuth2 path shipped NO PKCE
         };
-        // WEB-0071: broaden the correlation cookie Path to root so it is returned on the templated
-        // /auth/{id}/callback (the default narrows it to the callback path → "Correlation failed").
-        o.CorrelationCookie.Path = "/";
-        // Cookie storability follows the app's FRONT-CHANNEL request scheme (per request), not the provider's
-        // back-channel endpoint — see RequestSchemeAdaptiveCookieBuilder.
+        // WEB-0071: broaden the correlation cookie Path to the application root so it is returned on the templated
+        // /auth/{id}/callback (the default narrows it to the callback path → "Correlation failed"). WEB-0078: the
+        // root is the request's path base, or "/" — RequestSchemeAdaptiveCookieBuilder resolves it per request.
+        // Cookie storability likewise follows the app's FRONT-CHANNEL request scheme, not the provider's
+        // back-channel endpoint.
         o.CorrelationCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.CorrelationCookie);
         if (cfg.Scopes is { Length: > 0 })
         {
@@ -121,13 +125,17 @@ internal static class AuthSchemeSeeder
                 // before the callback's token exchange. Absolute provider endpoints ignore BaseAddress, so this is a
                 // no-op for real providers. (ASPNETCORE_URLS is unreliable in a container — the request is the truth.)
                 var backchannel = ctx.Options.Backchannel;
+                var request = ctx.HttpContext.Request;
                 if (backchannel.BaseAddress is null)
                 {
-                    var req = ctx.HttpContext.Request;
-                    try { backchannel.BaseAddress = new Uri($"{req.Scheme}://{req.Host}"); }
+                    try { backchannel.BaseAddress = new Uri($"{request.Scheme}://{request.Host}"); }
                     catch { /* best effort — absolute endpoints don't need it */ }
                 }
-                var url = ctx.RedirectUri;
+                // WEB-0078: a still-relative endpoint lives under the request's path base, where Koan serves it. A
+                // rooted path resolved against BaseAddress would discard the base, so the endpoint carries it.
+                ctx.Options.TokenEndpoint = UnderPathBase(ctx.Options.TokenEndpoint, request.PathBase);
+                ctx.Options.UserInformationEndpoint = UnderPathBase(ctx.Options.UserInformationEndpoint, request.PathBase);
+                var url = UnderPathBase(ctx.RedirectUri, request.PathBase);
                 if (ctx.Properties.Items.TryGetValue("prompt", out var prompt) && !string.IsNullOrWhiteSpace(prompt))
                     url = Microsoft.AspNetCore.WebUtilities.QueryHelpers.AddQueryString(url, "prompt", prompt!);
                 ctx.Response.Redirect(url);
@@ -153,7 +161,7 @@ internal static class AuthSchemeSeeder
         return o;
     }
 
-    private static OpenIdConnectOptions BuildOidcOptions(string id, ProviderOptions cfg, IServiceProvider sp)
+    private static OpenIdConnectOptions BuildOidcOptions(string id, ProviderOptions cfg, IServiceProvider sp, PathString pathBase)
     {
         // A RELATIVE authority (the self-hosted Test IdP's /.testoauth, served by this same app) is resolved
         // per-request from the live host via RequestHostOidcConfigurationManager (boot-time ASPNETCORE_URLS is
@@ -161,7 +169,7 @@ internal static class AuthSchemeSeeder
         // ship an absolute authority used directly.
         var selfHosted = !string.IsNullOrEmpty(cfg.Authority)
             && !Uri.IsWellFormedUriString(cfg.Authority, UriKind.Absolute);
-        var authority = selfHosted ? "" : (ResolveServerAbsolute(cfg.Authority) ?? cfg.Authority ?? "");
+        var authority = selfHosted ? "" : (ResolveServerAbsolute(cfg.Authority, pathBase) ?? cfg.Authority ?? "");
         var o = new OpenIdConnectOptions
         {
             SignInScheme = AuthenticationExtensions.CookieScheme,
@@ -178,11 +186,10 @@ internal static class AuthSchemeSeeder
             CallbackPath = $"/auth/{id}/callback",
             GetClaimsFromUserInfoEndpoint = true, // roles/perms/extras come from userinfo (UserInfoMapper)
         };
-        // WEB-0071: broaden the correlation + nonce cookie Path to root so they return on the templated callback.
-        o.CorrelationCookie.Path = "/";
-        o.NonceCookie.Path = "/";
-        // Both adapt to the front-channel request scheme per request (see RequestSchemeAdaptiveCookieBuilder) — so a
-        // real https provider behind a plain-http dev host still gets storable (Lax) cookies.
+        // WEB-0071: broaden the correlation + nonce cookie Path to the application root (WEB-0078: the request's path
+        // base, or "/") so they return on the templated callback. Both adapt to the front-channel request scheme per
+        // request (see RequestSchemeAdaptiveCookieBuilder) — so a real https provider behind a plain-http dev host
+        // still gets storable (Lax) cookies.
         o.CorrelationCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.CorrelationCookie);
         o.NonceCookie = RequestSchemeAdaptiveCookieBuilder.Wrap(o.NonceCookie);
         if (selfHosted)
@@ -196,7 +203,8 @@ internal static class AuthSchemeSeeder
                 cfg.Authority!,
                 http,
                 o,
-                () => ResolveSelfHostedBackchannelBase(server));
+                () => ResolveSelfHostedBackchannelBase(server),
+                sp.GetService<Koan.Web.Hosting.KoanWebBaseUrl>());
         }
         if (cfg.Scopes is { Length: > 0 })
         {
@@ -290,11 +298,27 @@ internal static class AuthSchemeSeeder
     /// be made in-network absolute. Delegates to <see cref="ServerAddressResolver"/>, which understands Kestrel's
     /// wildcard bind forms (<c>http://+:8080</c>) that <see cref="Uri"/> cannot parse. Absolute endpoints pass through.
     /// </summary>
-    private static string? ResolveServerAbsolute(string? endpoint) => ServerAddressResolver.ToAbsolute(
-        endpoint,
-        Environment.GetEnvironmentVariable("ASPNETCORE_URLS"),
-        Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"),
-        Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
+    private static string? ResolveServerAbsolute(string? endpoint, PathString pathBase)
+    {
+        var resolved = ServerAddressResolver.ToAbsolute(
+            endpoint,
+            Environment.GetEnvironmentVariable("ASPNETCORE_URLS"),
+            Environment.GetEnvironmentVariable("ASPNETCORE_HTTPS_PORTS"),
+            Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
+        // A relative endpoint that became absolute against the bound address sits under the configured path base
+        // (WEB-0078); one that stayed relative follows the request's path base at challenge time (UnderPathBase).
+        if (resolved is null || !pathBase.HasValue || string.Equals(resolved, endpoint, StringComparison.Ordinal)) return resolved;
+        if (!Uri.TryCreate(resolved, UriKind.Absolute, out var uri)) return resolved;
+        return $"{uri.GetLeftPart(UriPartial.Authority)}{pathBase}{uri.PathAndQuery}";
+    }
+
+    /// <summary>A rooted relative URL under <paramref name="pathBase"/>; an absolute URL, an empty one, or one already under it is unchanged.</summary>
+    private static string UnderPathBase(string url, PathString pathBase)
+    {
+        if (!pathBase.HasValue || string.IsNullOrEmpty(url) || !url.StartsWith('/')) return url;
+        if (new PathString(url.Split('?', 2)[0]).StartsWithSegments(pathBase)) return url;
+        return pathBase + url;
+    }
 
     private static string? ResolveSelfHostedBackchannelBase(IServer server)
     {

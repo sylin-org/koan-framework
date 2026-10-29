@@ -77,6 +77,15 @@ public static class KoanWebConstants
         public const string ScopePolicyPrefix = "scope:";
     }
 
+    public static class BaseUrl
+    {
+        // WEB-0078: the runtime fact stating which base URL the host serves under and derives absolute URLs from.
+        public const string FactCode = "koan.web.baseurl";
+        public const string FactSubject = "web:baseurl";
+        public const string ConfiguredFactReason = "base-url-configured";
+        public const string DerivedFactReason = "base-url-derived-from-request";
+    }
+
     public static class Routes
     {
         // Health

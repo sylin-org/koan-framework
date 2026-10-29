@@ -1,7 +1,9 @@
 using Koan.Core;
 using Koan.Web.Auth.Server.Options;
 using Koan.Security.Trust.Issuer;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -49,7 +51,7 @@ internal static class DevTokenEndpoint
         var resource = ctx.Request.Query["resource"].ToString();
         if (string.IsNullOrWhiteSpace(resource))
         {
-            resource = $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}/mcp";
+            resource = DefaultMcpResource(ctx);
         }
         else if (!Uri.TryCreate(resource, UriKind.Absolute, out var parsed)
             || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
@@ -87,6 +89,26 @@ internal static class DevTokenEndpoint
     }
 
     // Accepts space- OR comma-delimited input; null when the query param was absent (so the session value is kept).
+    /// <summary>
+    /// WEB-0078: the identity the MCP edge enforces (<c>McpResourceIdentity.Resolve</c>): the configured
+    /// <c>Koan:Mcp:ResourceUri</c>, else the application's base URL plus the MCP route. This package does not reference
+    /// Koan.Mcp, so it reads the same configuration keys the edge binds rather than its own idea of the host.
+    /// </summary>
+    private static string DefaultMcpResource(HttpContext ctx)
+    {
+        var configuration = ctx.RequestServices.GetService<IConfiguration>();
+        var configured = configuration?["Koan:Mcp:ResourceUri"];
+        if (!string.IsNullOrWhiteSpace(configured)) return configured.TrimEnd('/');
+
+        var route = configuration?["Koan:Mcp:HttpRoute"];
+        route = string.IsNullOrWhiteSpace(route) ? "/mcp" : route.TrimEnd('/');
+        if (route.Length == 0) route = "/mcp";
+
+        var baseUrl = ctx.RequestServices.GetService<KoanWebBaseUrl>();
+        var origin = baseUrl?.Resolve(ctx) ?? $"{ctx.Request.Scheme}://{ctx.Request.Host}{ctx.Request.PathBase}";
+        return origin + route;
+    }
+
     private static IReadOnlyCollection<string>? ParseList(string? raw)
         => string.IsNullOrWhiteSpace(raw)
             ? null

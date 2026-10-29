@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Protocols;
@@ -14,8 +15,10 @@ namespace Koan.Web.Auth.Hosting;
 /// the very first challenge. The live request owns the browser-facing issuer and authorization endpoint; the app's
 /// bound server address owns discovery, token, userinfo, and JWKS traffic. Keeping those two addresses distinct is
 /// what makes the simulator work behind a proxy or in a container, where the browser's <c>localhost</c> or public DNS
-/// name is not necessarily reachable from the application process. Forwarded headers make
-/// <see cref="HttpRequest.Scheme"/>/<see cref="HttpRequest.Host"/> the external scheme/host behind a proxy.
+/// name is not necessarily reachable from the application process. The public issuer is the application's base
+/// URL (<see cref="KoanWebBaseUrl"/>, WEB-0078: <c>Koan:Web:ApplicationUrl</c> when set, else the request's scheme,
+/// host and path base), and the back-channel discovery request carries the request's path base so it reaches the
+/// provider under the path Koan serves.
 /// </summary>
 internal sealed class RequestHostOidcConfigurationManager : IConfigurationManager<OpenIdConnectConfiguration>
 {
@@ -23,6 +26,7 @@ internal sealed class RequestHostOidcConfigurationManager : IConfigurationManage
     private readonly IHttpContextAccessor _http;
     private readonly OpenIdConnectOptions _options;
     private readonly Func<string?> _resolveBackchannelBase;
+    private readonly KoanWebBaseUrl? _baseUrl;
     private readonly object _gate = new();
     private ConfigurationManager<OpenIdConnectConfiguration>? _inner;
     private string? _builtForBackchannelBase;
@@ -31,32 +35,39 @@ internal sealed class RequestHostOidcConfigurationManager : IConfigurationManage
         string relativeAuthority,
         IHttpContextAccessor http,
         OpenIdConnectOptions options,
-        Func<string?> resolveBackchannelBase)
+        Func<string?> resolveBackchannelBase,
+        KoanWebBaseUrl? baseUrl = null)
     {
         _relativeAuthority = "/" + relativeAuthority.Trim('/');
         _http = http;
         _options = options;
         _resolveBackchannelBase = resolveBackchannelBase;
+        _baseUrl = baseUrl;
     }
 
     public async Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel)
     {
-        var publicBase = ResolvePublicBase();
-        var backchannelBase = ResolveBackchannelBase(publicBase);
+        var request = CurrentRequest();
+        var publicBase = ResolvePublicBase(request);
+        var pathBase = request.PathBase;
+        // The back-channel reaches the provider through the bound address, under the same path base the public
+        // request carries, because Koan serves nothing outside it (WEB-0078).
+        var backchannelBase = ResolveBackchannelBase(publicBase) + pathBase;
         var discovered = await Inner(backchannelBase).GetConfigurationAsync(cancel).ConfigureAwait(false);
-        return Project(discovered, publicBase);
+        return Project(discovered, publicBase, pathBase);
     }
 
     public void RequestRefresh() => _inner?.RequestRefresh();
 
-    private string ResolvePublicBase()
-    {
-        var req = _http.HttpContext?.Request
+    private HttpRequest CurrentRequest()
+        => _http.HttpContext?.Request
             ?? throw new InvalidOperationException(
                 "Koan.Web.Auth: the self-hosted OIDC provider's authority is relative and there is no active request " +
                 "to resolve it against. A challenge must originate from an HTTP request.");
-        return new Uri($"{req.Scheme}://{req.Host}").GetLeftPart(UriPartial.Authority);
-    }
+
+    private string ResolvePublicBase(HttpRequest req)
+        => _baseUrl?.Resolve(req)
+           ?? new Uri($"{req.Scheme}://{req.Host}").GetLeftPart(UriPartial.Authority) + req.PathBase;
 
     private string ResolveBackchannelBase(string publicBase)
     {
@@ -90,14 +101,14 @@ internal sealed class RequestHostOidcConfigurationManager : IConfigurationManage
         }
     }
 
-    private OpenIdConnectConfiguration Project(OpenIdConnectConfiguration discovered, string publicBase)
+    private OpenIdConnectConfiguration Project(OpenIdConnectConfiguration discovered, string publicBase, PathString pathBase)
     {
         // Clone the discovered document before projecting the two front-channel values. ConfigurationManager caches
         // its instance, and mutating it would leak one request host into another host-header/proxy context.
         var projected = new OpenIdConnectConfiguration(OpenIdConnectConfiguration.Write(discovered))
         {
             Issuer = $"{publicBase}{_relativeAuthority}",
-            AuthorizationEndpoint = ToPublicEndpoint(discovered.AuthorizationEndpoint, publicBase),
+            AuthorizationEndpoint = ToPublicEndpoint(discovered.AuthorizationEndpoint, publicBase, pathBase),
             JsonWebKeySet = discovered.JsonWebKeySet,
         };
         foreach (var signingKey in discovered.SigningKeys)
@@ -108,9 +119,13 @@ internal sealed class RequestHostOidcConfigurationManager : IConfigurationManage
         return projected;
     }
 
-    private static string ToPublicEndpoint(string endpoint, string publicBase)
+    // The discovered endpoint sits under the back-channel's path base; the public base already carries it.
+    private static string ToPublicEndpoint(string endpoint, string publicBase, PathString pathBase)
     {
         if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)) return endpoint;
-        return $"{publicBase}{uri.PathAndQuery}";
+        var relative = uri.PathAndQuery;
+        if (pathBase.HasValue && relative.StartsWith(pathBase.Value!, StringComparison.OrdinalIgnoreCase))
+            relative = relative[pathBase.Value!.Length..];
+        return $"{publicBase}{relative}";
     }
 }

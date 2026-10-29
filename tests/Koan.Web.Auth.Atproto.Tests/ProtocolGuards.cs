@@ -7,6 +7,7 @@ using Koan.Web.Auth.Connector.Atproto.Protocol;
 using Koan.Web.Auth.Connector.Atproto.Storage;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -60,7 +61,7 @@ public sealed class ProtocolGuards
         using var network = new AtprotoHttp(settings, environment);
         var auth = new AuthOptions();
         auth.Providers["atproto"] = new ProviderOptions { ClientId = "http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A5220%2Fauth%2Fatproto%2Fcallback" };
-        var sessions = new AtprotoSessions(store, network, settings, Microsoft.Extensions.Options.Options.Create(auth), new ServerCatalog(), environment);
+        var sessions = new AtprotoSessions(store, network, settings, Microsoft.Extensions.Options.Options.Create(auth), new ServerCatalog(), environment, new KoanWebBaseUrl(null));
         var redirect = await sessions.StartServer(origin, new AuthenticationProperties(), "protected-browser-correlation", CancellationToken.None);
         Assert.Equal(2, attempts);
         Assert.NotNull(pushed);
@@ -101,14 +102,14 @@ public sealed class ProtocolGuards
     public void Development_exceptions_are_rejected_in_production()
     {
         var options = new AtprotoOptions { DevelopmentAllowedOrigins = ["http://localhost:2582"] };
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Production"));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
         Assert.Contains(validator.Validate("atproto", Provider()), x => x.Contains("require Development"));
     }
 
     [Fact]
     public void Unsupported_provider_overlay_is_corrective()
     {
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
         var errors = validator.Validate("atproto", new ProviderOptions { ClientId = "https://app.example/auth/atproto/client-metadata.json", CallbackPath = "/different", ClientSecret = "never-in-error" });
         Assert.Contains(errors, x => x.Contains("CallbackPath"));
         Assert.DoesNotContain(errors, x => x.Contains("never-in-error"));
@@ -117,8 +118,56 @@ public sealed class ProtocolGuards
     [Fact]
     public void Public_configuration_accepts_no_secret_or_fixed_issuer()
     {
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
         Assert.Empty(validator.Validate("atproto", Provider()));
+    }
+
+    // WEB-0078: the client identity derives from the application's canonical base URL; ClientId is an override.
+
+    [Fact]
+    public void Client_identity_derives_from_the_application_url_including_its_path()
+    {
+        var baseUrl = new KoanWebBaseUrl("https://www.example.com/tangent");
+
+        var clientId = AtprotoClientIdentity.Derive(baseUrl, ["atproto"], development: false);
+
+        Assert.Equal("https://www.example.com/tangent/auth/atproto/client-metadata.json", clientId);
+        Assert.Equal("https://www.example.com/tangent/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(clientId!));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), baseUrl);
+        Assert.Empty(validator.Validate("atproto", new ProviderOptions { Scopes = ["atproto"] }));
+    }
+
+    [Fact]
+    public void A_loopback_application_url_derives_the_localhost_profile_in_development_only()
+    {
+        var baseUrl = new KoanWebBaseUrl("http://localhost:5220/tangent");
+
+        var clientId = AtprotoClientIdentity.Derive(baseUrl, ["atproto", "transition:generic"], development: true);
+
+        Assert.Equal("http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A5220%2Ftangent%2Fauth%2Fatproto%2Fcallback&scope=atproto%20transition%3Ageneric", clientId);
+        Assert.Equal("http://127.0.0.1:5220/tangent/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(clientId!));
+        var development = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Development"), baseUrl);
+        Assert.Empty(development.Validate("atproto", new ProviderOptions { Scopes = ["atproto", "transition:generic"] }));
+        Assert.Null(AtprotoClientIdentity.Derive(baseUrl, ["atproto"], development: false));
+        var production = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), baseUrl);
+        Assert.Contains(production.Validate("atproto", new ProviderOptions { Scopes = ["atproto"] }), x => x.Contains("Koan:Web:ApplicationUrl"));
+    }
+
+    [Fact]
+    public void Without_an_application_url_or_a_client_id_the_correction_names_both()
+    {
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
+        var errors = validator.Validate("atproto", new ProviderOptions { Scopes = ["atproto"] });
+        Assert.Contains(errors, x => x.Contains("Koan:Web:ApplicationUrl") && x.Contains("ClientId"));
+    }
+
+    [Fact]
+    public void An_explicit_client_id_still_overrides_the_derived_one()
+    {
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), new KoanWebBaseUrl("https://www.example.com/tangent"));
+        var explicitId = "https://other.example/auth/atproto/client-metadata.json";
+        Assert.Empty(validator.Validate("atproto", new ProviderOptions { ClientId = explicitId, Scopes = ["atproto"] }));
+        Assert.Equal("https://other.example/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(explicitId));
     }
 
     [Fact]
@@ -267,7 +316,7 @@ public sealed class ProtocolGuards
     {
         var options = new AtprotoOptions { DevelopmentPlcDirectory = directory ? "http://localhost:2582" : null,
             DevelopmentConnectHost = connection ? "host.docker.internal" : null };
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Production"));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
         Assert.Contains(validator.Validate("atproto", Provider()), x => x.Contains("require Development"));
     }
 
@@ -275,7 +324,7 @@ public sealed class ProtocolGuards
     public void Invalid_development_routes_are_corrective_configuration_errors()
     {
         var options = new AtprotoOptions { DevelopmentPlcDirectory = "http://unlisted.example", DevelopmentConnectHost = "http://proxy.example/path" };
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Development"));
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(options), new EnvironmentStub("Development"), new KoanWebBaseUrl(null));
         var errors = validator.Validate("atproto", Provider());
         Assert.Contains(errors, x => x.Contains("DevelopmentPlcDirectory"));
         Assert.Contains(errors, x => x.Contains("DevelopmentConnectHost"));

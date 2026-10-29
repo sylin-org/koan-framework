@@ -9,11 +9,11 @@ public sealed class AuthServerOptions
     public const string SectionPath = "Koan:Web:Auth:Server";
 
     /// <summary>
-    /// SEC-0006 — the AS's canonical public origin (e.g. <c>https://app.example.com</c>), used as the discovery
+    /// SEC-0006 — the AS's public origin (e.g. <c>https://app.example.com</c>), used as the discovery
     /// <c>issuer</c> and to build every externally-advertised endpoint URL (authorize/token/device/jwks +
-    /// the device <c>verification_uri</c>). When set it is authoritative and the request <c>Host</c> header is
-    /// ignored — the correct, host-spoof-proof posture behind a proxy. When unset (Development), URLs derive
-    /// from the live request host.
+    /// the device <c>verification_uri</c>). An explicit override: when unset, the issuer is the application's
+    /// canonical base URL, <c>Koan:Web:ApplicationUrl</c> (WEB-0078), path included — authoritative and
+    /// host-spoof-proof behind a proxy. With neither set (Development), URLs derive from the live request host.
     /// </summary>
     public string? Issuer { get; set; }
 

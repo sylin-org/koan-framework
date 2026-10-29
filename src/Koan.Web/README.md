@@ -82,6 +82,31 @@ Runtime facts use the same schema as startup, health, and `koan://facts`. Outsid
 `Koan:Web:ExposeObservabilitySnapshot` deliberately and protect `GET /.well-known/Koan/facts` as an operational
 surface. Static-file wiring stays dormant in API-only hosts that have no real web root.
 
+### Public URL and proxy
+
+Set `Koan:Web:ApplicationUrl` to the one public URL the application answers at — scheme, host and optional path:
+
+```json
+{ "Koan": { "Web": { "ApplicationUrl": "https://www.example.com/app", "TrustedProxies": ["10.0.0.5"] } } }
+```
+
+When it is set it is authoritative. Koan serves the application under its path and nothing at the root (routes,
+static files, `/health` and its alias, the well-known documents all live under `/app`), and every absolute URL Koan
+writes derives from it: the authorization server's issuer, the MCP resource identity, OpenGraph card URLs, the atproto
+client metadata. Each of those keeps its explicit override (`Issuer`, `ResourceUri`, `ClientId`) for the rare case
+where it must differ. The value is held normalised — lowercase scheme and host, the port only when it is not the
+default, the path percent-encoded in canonical form, no trailing slash — and a value that is not the public URL
+(not absolute http(s), a query or fragment, an encoded `/`, or a listen address such as `0.0.0.0`) stops boot with
+a correction. Read it in code through `KoanWebBaseUrl` (injected) or `KoanWeb.Urls.Base()`. When it is unset, URLs
+derive from each request's scheme, host and path base, which is the Development posture; Staging, Test and CI say
+so once, and Production refuses the first absolute URL anyone asks for, naming the key, while the host itself still
+boots. The startup facts state which applies (`koan.web.baseurl`).
+
+`Koan:Web:TrustedProxies` names the reverse proxies (IP addresses or CIDR networks) whose `X-Forwarded-Proto` and
+`X-Forwarded-For` Koan believes, for one hop, at the head of its pipeline. Nothing declared means no forwarded header
+is honoured. The public host is the base URL's, so `X-Forwarded-Host` is not read. `IsProxiedApi` is a separate,
+older switch: it only tells Koan that the proxy emits the security headers.
+
 ## Boundaries and failures
 
 - A constrained Create branch uses atomic insertion. An identity collision returns existence-hiding

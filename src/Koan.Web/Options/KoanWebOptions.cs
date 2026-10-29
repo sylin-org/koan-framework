@@ -11,6 +11,24 @@ public sealed class KoanWebOptions
     // If true, the module will automatically hook middleware via an IStartupFilter.
     public bool AutoUse { get; set; } = true;
 
+    /// <summary>
+    /// WEB-0078: the application's one public base URL - scheme, host and optional path, e.g.
+    /// <c>https://www.example.com/app</c>. When set it is authoritative: the pipeline serves under its path and
+    /// nothing outside it, and every absolute URL Koan writes (issuer, MCP resource, OpenGraph card, atproto client
+    /// metadata) derives from it. When unset, URLs derive from each request's scheme, host and path base.
+    /// Read it through <see cref="Hosting.KoanWebBaseUrl"/> or <see cref="KoanWeb.Urls"/>.
+    /// Configure via: Koan:Web:ApplicationUrl (env: Koan__Web__ApplicationUrl).
+    /// </summary>
+    public string? ApplicationUrl { get; set; }
+
+    /// <summary>
+    /// WEB-0078: the reverse proxies whose <c>X-Forwarded-Proto</c> and <c>X-Forwarded-For</c> are believed, as IP
+    /// addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header. The public host is
+    /// <see cref="ApplicationUrl"/>'s, so <c>X-Forwarded-Host</c> is not read.
+    /// Configure via: Koan:Web:TrustedProxies:0=10.0.0.5
+    /// </summary>
+    public IList<string> TrustedProxies { get; } = new List<string>();
+
     // When set, a very light in-pipeline handler responds to GET {HealthPath} with { status: "ok" }.
     public string HealthPath { get; set; } = Infrastructure.KoanWebConstants.Routes.ApiHealth;
 

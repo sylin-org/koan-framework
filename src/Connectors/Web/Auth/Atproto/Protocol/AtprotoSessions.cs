@@ -16,6 +16,7 @@ using Koan.Web.Auth.Connector.Atproto.Storage;
 using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -30,20 +31,22 @@ public sealed class AtprotoSessions
     private readonly AtprotoOptions options;
     private readonly IOptions<AuthOptions> auth;
     private readonly IAuthProviderCatalog catalog;
+    private readonly KoanWebBaseUrl baseUrl;
     private readonly bool development;
     private readonly ConcurrentDictionary<string, ATProtoOAuthClient> clients = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly AtprotoDns dns = new();
 
     internal AtprotoSessions(ProtectedAtprotoStore store, AtprotoHttp network, IOptions<AtprotoOptions> options,
-        IOptions<AuthOptions> auth, IAuthProviderCatalog catalog, IHostEnvironment environment)
-    { this.store = store; this.network = network; this.options = options.Value; this.auth = auth; this.catalog = catalog; development = KoanEnv.Gate.DevelopmentOnly(environment); }
+        IOptions<AuthOptions> auth, IAuthProviderCatalog catalog, IHostEnvironment environment, KoanWebBaseUrl baseUrl)
+    { this.store = store; this.network = network; this.options = options.Value; this.auth = auth; this.catalog = catalog; this.baseUrl = baseUrl; development = KoanEnv.Gate.DevelopmentOnly(environment); }
 
-    internal string ClientId => auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId ?? throw new InvalidOperationException("AT provider ClientId is not configured.");
+    /// <summary>The configured client-metadata URL, else the one derived from the application's base URL (WEB-0078).</summary>
+    internal string ClientId => auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId
+        ?? AtprotoClientIdentity.Derive(baseUrl, AllowedScopes, development)
+        ?? throw new InvalidOperationException($"AT provider ClientId is not configured and {AtprotoClientIdentity.BaseUrlKey} is not set.");
     internal string[] AllowedScopes => catalog.Find(Constants.Provider)?.Scopes.ToArray() ?? [Constants.BaseScope];
-    internal string RedirectUri => new Uri(ClientId).Scheme == "https"
-        ? new Uri(ClientId).GetLeftPart(UriPartial.Authority) + Constants.Callback
-        : HttpUtility.ParseQueryString(new Uri(ClientId).Query)["redirect_uri"]!;
+    internal string RedirectUri => AtprotoClientIdentity.RedirectUri(ClientId);
     internal bool Enabled => catalog.Find(Constants.Provider)?.Eligible == true;
 
     /// <summary>Validated, non-secret information about a durable AT session.</summary>

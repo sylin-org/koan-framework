@@ -242,6 +242,12 @@ translation in Web.
 
 ## Operator-facing behavior
 
+- `Koan:Web:ApplicationUrl` is the application's one public URL (scheme, host, optional path). When set, Koan serves
+  only under its path — `/health`, the well-known documents and static files included — and every absolute URL it
+  writes (issuer, MCP resource, OpenGraph card, atproto client metadata) derives from it; each keeps its own
+  override. `Koan:Web:TrustedProxies` names the proxies whose `X-Forwarded-Proto` and `X-Forwarded-For` are believed
+  for one hop; empty honours none. See WEB-0078 and the
+  [Koan.Web README](../../../src/Koan.Web/README.md#public-url-and-proxy).
 - `GET /health/live` reports process liveness without dependency checks.
 - `GET /health/ready` reports aggregated dependency readiness and returns 503 when a critical
   component is unhealthy.

@@ -23,25 +23,29 @@ destination; issuer URLs, HTTP Host, TLS identity and DPoP audiences stay intact
 Neither setting is accepted outside Development. Failed discovery or PAR returns
 a sanitized HTTP 400 retry page, without exposing the provider response.
 
-Configure the public metadata URL:
+Declare the application's public URL once; the client-metadata URL and the callback derive from it
+(WEB-0078):
 
 ```json
 {
-  "Koan": { "Web": { "Auth": {
-    "Providers": { "atproto": {
-      "ClientId": "https://your-app.example/auth/atproto/client-metadata.json",
-      "Scopes": ["atproto"]
-    }},
-    "Atproto": { "SessionDirectory": "/private/persistent/atproto" }
-  }}}
+  "Koan": { "Web": {
+    "ApplicationUrl": "https://your-app.example",
+    "Auth": {
+      "Providers": { "atproto": { "Scopes": ["atproto"] } },
+      "Atproto": { "SessionDirectory": "/private/persistent/atproto" }
+    }
+  }}
 }
 ```
 
-Serve that HTTPS metadata URL publicly and keep the callback at
-`https://your-app.example/auth/atproto/callback`. The connector derives both from
-trusted configuration, never the incoming Host header. This first connector uses
-the public OAuth client profile, with no client secret or confidential-client key;
-provider session lifetime limits still apply.
+With `ApplicationUrl` set to `https://your-app.example`, the connector serves and advertises
+`https://your-app.example/auth/atproto/client-metadata.json` and uses the callback
+`https://your-app.example/auth/atproto/callback`; under `https://your-app.example/app` both sit under
+`/app`. A loopback `http://localhost:<port>` base URL derives the AT Protocol localhost development
+profile, in Development only. `Providers:atproto:ClientId` remains an explicit override of the metadata
+URL, which must still end in `/auth/atproto/client-metadata.json`. The connector derives everything from
+trusted configuration, never the incoming Host header. This first connector uses the public OAuth client
+profile, with no client secret or confidential-client key; provider session lifetime limits still apply.
 
 Send the browser to `/auth/atproto/challenge?return=<path>` for Bluesky account
 selection on its own authorization page. Keep

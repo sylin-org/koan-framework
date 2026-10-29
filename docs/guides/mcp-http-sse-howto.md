@@ -177,7 +177,9 @@ HTTP authentication defaults on in Production and containers. Development may be
 inspection. For a production edge:
 
 1. serve MCP over HTTPS;
-2. configure `ResourceUri` to the externally stable `/mcp` audience when behind a proxy;
+2. set `Koan:Web:ApplicationUrl` to the application's public URL, so the `/mcp` audience, the authorization-server
+   URL and the protected-resource metadata derive from it behind a proxy (WEB-0078); `ResourceUri` remains an
+   explicit override of the audience alone;
 3. reference `Koan.Web.Auth.Server` for Koan's OAuth 2.1 authorization-server/resource-server path,
    or register the application’s external bearer scheme;
 4. declare Entity access and custom-tool scopes for business authority;
@@ -196,7 +198,7 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | `EnableLegacySseTransport` | `false` | Host the earlier `/sse` + `/rpc` two-endpoint edge for clients that use it |
 | `HttpRoute` | `/mcp` | Shared base route for MCP over HTTP |
 | `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
-| `ResourceUri` | unset | Fixed OAuth resource/audience identifier |
+| `ResourceUri` | unset | Explicit OAuth resource/audience identifier; unset, it is `Koan:Web:ApplicationUrl` + `HttpRoute` |
 | `MaxConcurrentSessions` | `100` | Bound active HTTP sessions |
 | `SessionIdleTimeout` | `30 minutes` | Reclaim idle sessions after this interval |
 | `EnableCors` | `false` | Enable the MCP CORS policy |

@@ -12,6 +12,7 @@ public static class ConfigurationConstants
             public const string ContentSecurityPolicy = nameof(ContentSecurityPolicy);
             public const string AutoMapControllers = nameof(AutoMapControllers);
             public const string ApplicationUrl = nameof(ApplicationUrl);
+            public const string TrustedProxies = nameof(TrustedProxies);
         }
     }
 

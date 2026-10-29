@@ -48,8 +48,9 @@ pillar's `IIssuer` to mint ES256 access tokens; it does not own login-provider m
 derived from the authenticated session and approved scopes, not from caller-supplied roles.
 
 Tokens are bound to the requested resource. The MCP resource-server edge validates the signature, issuer, lifetime,
-and exact audience before the normal Koan access pipeline evaluates declarations. `Issuer`, when configured, is the
-canonical public origin used for metadata and advertised endpoints; otherwise Development derives it from the request.
+and exact audience before the normal Koan access pipeline evaluates declarations. The origin used for metadata and
+advertised endpoints is `Issuer` when configured, else the application's canonical base URL (`Koan:Web:ApplicationUrl`,
+WEB-0078, path included); with neither, Development derives it from the request.
 
 ## Signing-key lifecycle and failure posture
 

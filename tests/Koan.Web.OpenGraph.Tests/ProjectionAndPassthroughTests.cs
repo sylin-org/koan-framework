@@ -1,5 +1,6 @@
 using System.IO;
 using AwesomeAssertions;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Xunit;
 
@@ -46,7 +47,7 @@ public sealed class ProjectionAndPassthroughTests
     {
         var options = new OpenGraphOptions { Enabled = false, ShellPath = "anything" };
         var renderer = new OpenGraphCardRenderer(
-            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry());
+            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry(), new KoanWebBaseUrl(null));
 
         var result = await renderer.RenderShellAsync(NavRequest("/work/abc"));
 
@@ -58,7 +59,7 @@ public sealed class ProjectionAndPassthroughTests
     {
         var options = new OpenGraphOptions { Enabled = true, ShellPath = Path.Combine(Path.GetTempPath(), "does-not-exist-" + System.Guid.NewGuid().ToString("N") + ".html") };
         var renderer = new OpenGraphCardRenderer(
-            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry());
+            new TestOptionsMonitor<OpenGraphOptions>(options), new ShellCache(), new SocialCardRegistry(), new KoanWebBaseUrl(null));
 
         var result = await renderer.RenderShellAsync(NavRequest("/work/abc"));
 

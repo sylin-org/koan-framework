@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Logging;
 using Koan.Data.Core;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
@@ -17,15 +18,18 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
     private readonly IOptionsMonitor<OpenGraphOptions> _options;
     private readonly ShellCache _shellCache;
     private readonly SocialCardRegistry _cards;
+    private readonly KoanWebBaseUrl _baseUrl;
 
     public OpenGraphCardRenderer(
         IOptionsMonitor<OpenGraphOptions> options,
         ShellCache shellCache,
-        SocialCardRegistry cards)
+        SocialCardRegistry cards,
+        KoanWebBaseUrl baseUrl)
     {
         _options = options;
         _shellCache = shellCache;
         _cards = cards;
+        _baseUrl = baseUrl;
     }
 
     public async Task<string?> RenderShellAsync(HttpRequest request, CancellationToken ct = default)
@@ -90,7 +94,7 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         return null; // no matching route: default card
     }
 
-    private static string BuildHead(SocialCardSnapshot? snapshot, OpenGraphOptions options, HttpRequest request)
+    private string BuildHead(SocialCardSnapshot? snapshot, OpenGraphOptions options, HttpRequest request)
     {
         var title = Truncate(snapshot?.Title ?? options.SiteName, options.MaxTitleLength);
         var description = Truncate(snapshot?.Description ?? options.DefaultDescription, options.MaxDescriptionLength);
@@ -167,7 +171,9 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         return max == 1 ? "…" : value[..(max - 1)].TrimEnd() + "…";
     }
 
-    private static string? Absolutize(string? pathOrUrl, HttpRequest request)
+    // WEB-0078: a root-relative path is rooted at the application's base URL (Koan:Web:ApplicationUrl when set,
+    // path included; else the request's scheme, host and path base), never at the bare request host.
+    private string? Absolutize(string? pathOrUrl, HttpRequest request)
     {
         if (string.IsNullOrEmpty(pathOrUrl))
         {
@@ -181,6 +187,6 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         }
 
         var path = pathOrUrl[0] == '/' ? pathOrUrl : "/" + pathOrUrl;
-        return $"{request.Scheme}://{request.Host.Value}{path}";
+        return _baseUrl.Resolve(request) + path;
     }
 }

@@ -25,6 +25,14 @@ public sealed class WebModule : KoanModule
         WebPillarManifest.EnsureRegistered();
         services.AddKoanWeb();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.IStartupFilter, Hosting.KoanWebStartupFilter>());
+
+        // WEB-0078: the one canonical base URL. Parsed once from Koan:Web:ApplicationUrl; the startup filter serves
+        // under its path and every pillar that writes an absolute URL reads it from here. An unparseable value is a
+        // corrective boot failure, not a request-time surprise.
+        services.TryAddSingleton(sp => new Hosting.KoanWebBaseUrl(
+            sp.GetRequiredService<IOptions<Options.KoanWebOptions>>().Value.ApplicationUrl,
+            sp.GetService<IHostEnvironment>(),
+            sp.GetService<ILogger<Hosting.KoanWebBaseUrl>>()));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<Hosting.IKoanWebPipelineContributor, Context.WebContextPipelineContributor>());
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IReadFilterContributor, Context.WebContextReadFilterContributor>());
 
@@ -90,6 +98,21 @@ public sealed class WebModule : KoanModule
             $"{decision} (Koan:Web:Authorization:DefaultDecision).",
             Infrastructure.KoanWebConstants.Authorization.DefaultDecisionFactReason,
             typeof(WebModule).FullName ?? nameof(WebModule));
+
+        // WEB-0078: state the base URL the host serves under, so an operator reads it instead of inferring it.
+        var key = $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ApplicationUrl}";
+        var baseUrl = services.GetRequiredService<Hosting.KoanWebBaseUrl>();
+        composition.AddObservation(
+            Infrastructure.KoanWebConstants.BaseUrl.FactCode,
+            Infrastructure.KoanWebConstants.BaseUrl.FactSubject,
+            baseUrl.IsConfigured
+                ? $"The application's base URL is {baseUrl.Configured} ({key}); absolute URLs derive from it" +
+                  (baseUrl.PathBase.HasValue ? $", and a request outside {baseUrl.PathBase} answers 404." : ".")
+                : $"No base URL is configured ({key}); absolute URLs derive from each request's scheme, host and path base.",
+            baseUrl.IsConfigured
+                ? Infrastructure.KoanWebConstants.BaseUrl.ConfiguredFactReason
+                : Infrastructure.KoanWebConstants.BaseUrl.DerivedFactReason,
+            typeof(WebModule).FullName ?? nameof(WebModule));
     }
 
     public override void Report(global::Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
@@ -111,6 +134,12 @@ public sealed class WebModule : KoanModule
             cfg,
             $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.AutoMapControllers}",
             true);
+        var applicationUrl = Koan.Core.Configuration.ReadWithSource(
+            cfg,
+            $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ApplicationUrl}",
+            "");
+        var trustedProxies = cfg.GetSection($"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.TrustedProxies}")
+            .GetChildren().Select(child => child.Value).Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
 
         module.AddSetting(
             WebProvenanceItems.SecureHeadersEnabled,
@@ -132,6 +161,26 @@ public sealed class WebModule : KoanModule
             autoMap.Value,
             sourceKey: autoMap.ResolvedKey,
             usedDefault: autoMap.UsedDefault);
+
+        if (!string.IsNullOrWhiteSpace(applicationUrl.Value))
+        {
+            module.AddSetting(
+                WebProvenanceItems.ApplicationUrl,
+                global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions.FromConfigurationValue(applicationUrl),
+                Hosting.KoanWebBaseUrl.TryNormalize(applicationUrl.Value, out var normalizedUrl) ? normalizedUrl : applicationUrl.Value,
+                sourceKey: applicationUrl.ResolvedKey,
+                usedDefault: applicationUrl.UsedDefault);
+        }
+
+        if (trustedProxies.Length > 0)
+        {
+            module.AddSetting(
+                WebProvenanceItems.TrustedProxies,
+                global::Koan.Core.Hosting.Bootstrap.ProvenancePublicationMode.Settings,
+                string.Join(", ", trustedProxies),
+                sourceKey: $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.TrustedProxies}",
+                usedDefault: false);
+        }
 
         if (!string.IsNullOrWhiteSpace(csp.Value))
         {

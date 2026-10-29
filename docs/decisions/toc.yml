@@ -472,6 +472,8 @@
       href: WEB-0076-every-paged-entity-read-is-bounded.md
     - name: WEB-0077 Every delete verb raises the model delete hooks
       href: WEB-0077-every-delete-verb-raises-the-delete-hooks.md
+    - name: WEB-0078 Koan.Web owns one canonical base URL, and serves under its path
+      href: WEB-0078-one-canonical-base-url.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

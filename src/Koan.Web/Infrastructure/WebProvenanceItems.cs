@@ -19,7 +19,7 @@ internal static class WebProvenanceItems
     internal static readonly ProvenanceItem ProxiedApi = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.IsProxiedApi,
         "Proxied API",
-        "Marks the app as sitting behind a reverse proxy so forwarded headers and base URLs are honored.",
+        "Marks the app as sitting behind a reverse proxy that emits the security headers, so Koan omits its own.",
         DefaultValue: "false",
         DefaultConsumers: PipelineConsumers);
 
@@ -41,7 +41,14 @@ internal static class WebProvenanceItems
     internal static readonly ProvenanceItem ApplicationUrl = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.ApplicationUrl,
         "Application Base URL",
-        "Explicit override for application base URL. When set, takes precedence over ASPNETCORE_URLS detection. Used for generating absolute URLs in container environments.",
-        DefaultValue: "(detected from ASPNETCORE_URLS)",
-        DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.Admin", "Koan.Web.OpenApi" });
+        "The application's public base URL (scheme, host, optional path). When set it is authoritative: the pipeline serves under its path only, and every absolute URL Koan writes derives from it. When unset, URLs derive from each request.",
+        DefaultValue: "(derived from each request)",
+        DefaultConsumers: new[] { "Koan.Web.Urls", "Koan.Web.HttpPipeline", "Koan.Web.Auth.Server", "Koan.Mcp", "Koan.Web.OpenGraph", "Koan.Web.Auth.Connector.Atproto" });
+
+    internal static readonly ProvenanceItem TrustedProxies = new(
+        ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.TrustedProxies,
+        "Trusted Proxies",
+        "Reverse proxies (IP or CIDR) whose X-Forwarded-Proto and X-Forwarded-For are honoured for one hop. Empty honours none.",
+        DefaultValue: "(none)",
+        DefaultConsumers: PipelineConsumers);
 }

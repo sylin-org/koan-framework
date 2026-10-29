@@ -57,7 +57,8 @@ pre-registered clients and are matched exactly.
 
 ## Production posture
 
-Set `Koan:Web:Auth:Server:Issuer` to the canonical public origin behind a proxy. Outside Development, Koan persists and
+Set `Koan:Web:ApplicationUrl` to the application's public URL; the issuer and every advertised endpoint derive from it,
+path included (WEB-0078). `Koan:Web:Auth:Server:Issuer` remains an explicit override. Outside Development, Koan persists and
 rotates encrypted-at-rest signing keys through the configured Data provider; startup fails closed if only an ephemeral
 key is available unless that unsafe posture is explicitly acknowledged. OAuth clients, codes, requests, grants, and
 keys are Entity-backed, so a durable Data provider is part of a real deployment.

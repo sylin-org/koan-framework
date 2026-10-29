@@ -6,6 +6,7 @@ using Koan.Web.Auth.Connector.Atproto.Protocol;
 using Koan.Web.Auth.Connector.Atproto.Storage;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
@@ -46,7 +47,7 @@ public sealed class LocalProviderLifecycle
         var options = Microsoft.Extensions.Options.Options.Create(configured);
         using var store = new ProtectedAtprotoStore(services.GetRequiredService<IDataProtectionProvider>(), options, environment);
         using var network = new AtprotoHttp(options, environment);
-        var sessions = new AtprotoSessions(store, network, options, Microsoft.Extensions.Options.Options.Create(auth), new Catalog(), environment);
+        var sessions = new AtprotoSessions(store, network, options, Microsoft.Extensions.Options.Options.Create(auth), new Catalog(), environment, new KoanWebBaseUrl(null));
         var previous = await store.GetAsync(did);
         Assert.NotNull(previous);
         var oldAccess = previous.TokenSet.AccessToken;

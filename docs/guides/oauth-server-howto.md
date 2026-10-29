@@ -179,7 +179,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Issuer` | _(request host)_ | The AS's canonical public origin — authoritative for the discovery issuer + every advertised endpoint when set (host-spoof-proof behind a proxy). |
+| `Issuer` | _(`Koan:Web:ApplicationUrl`, else the request host)_ | An explicit override of the AS's public origin for the discovery issuer + every advertised endpoint. Normally unset: the issuer is the application's canonical base URL, path included (WEB-0078), which is already host-spoof-proof behind a proxy. |
 | `ConsentPath` / `DonePath` | `/me/connect` · `/me/connect/done` | Your two app pages. |
 | `AccessTokenLifetime` | `15 min` | Issued access-token lifetime. |
 | `RefreshTokenLifetime` | `30 days` | Refresh-token / backing-grant lifetime. |

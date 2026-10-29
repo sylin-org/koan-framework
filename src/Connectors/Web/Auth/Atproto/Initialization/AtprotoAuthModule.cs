@@ -12,6 +12,7 @@ using Koan.Web.Auth.Extensions;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Extensions;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -34,13 +35,14 @@ public sealed class AtprotoAuthModule : KoanModule
         services.AddSingleton<ProtectedAtprotoStore>();
         services.AddSingleton(sp => new AtprotoSessions(sp.GetRequiredService<ProtectedAtprotoStore>(), sp.GetRequiredService<AtprotoHttp>(),
             sp.GetRequiredService<IOptions<AtprotoOptions>>(), sp.GetRequiredService<IOptions<AuthOptions>>(),
-            sp.GetRequiredService<IAuthProviderCatalog>(), sp.GetRequiredService<IHostEnvironment>()));
+            sp.GetRequiredService<IAuthProviderCatalog>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<KoanWebBaseUrl>()));
         services.AddKoanControllersFrom<AtprotoMetadataController>();
         services.AddAuthentication().AddScheme<AtprotoAuthenticationOptions, AtprotoAuthenticationHandler>(Constants.Provider, options =>
         {
             options.SignInScheme = AuthenticationExtensions.CookieScheme;
             options.CallbackPath = Constants.Callback;
-            options.CorrelationCookie.Path = "/";
+            // WEB-0078: no explicit Path, so the correlation cookie is scoped to the request's path base plus the
+            // callback path, which is where the callback lands under Koan:Web:ApplicationUrl.
             options.CorrelationCookie.SameSite = SameSiteMode.Lax;
             options.CorrelationCookie.HttpOnly = true;
             options.Events = new RemoteAuthenticationEvents

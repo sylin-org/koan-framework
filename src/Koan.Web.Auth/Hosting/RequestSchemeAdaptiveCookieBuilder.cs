@@ -5,7 +5,8 @@ namespace Koan.Web.Auth.Hosting;
 
 /// <summary>
 /// WEB-0071 — a correlation/nonce cookie whose SameSite/Secure policy adapts to the APP'S FRONT-CHANNEL request
-/// scheme at write time, not to a provider's back-channel endpoint scheme guessed at boot.
+/// scheme at write time, not to a provider's back-channel endpoint scheme guessed at boot. WEB-0078 — its path is
+/// the application root: the request's path base under <c>Koan:Web:ApplicationUrl</c>, or <c>/</c>.
 /// </summary>
 /// <remarks>
 /// The maintained OAuth/OIDC handler writes the correlation (and OIDC nonce) cookie during the challenge via
@@ -38,9 +39,18 @@ internal sealed class RequestSchemeAdaptiveCookieBuilder : CookieBuilder
     public override CookieOptions Build(HttpContext context, DateTimeOffset expiresFrom)
     {
         var options = base.Build(context, expiresFrom);
+        if (context is null) return options;
+
+        // The application root, not the callback path: the cookie must return on the templated /auth/{id}/callback,
+        // and must not leak outside the application when it runs under a path base.
+        if (Path is null)
+        {
+            options.Path = context.Request.PathBase.HasValue ? context.Request.PathBase.Value : "/";
+        }
+
         // Front-channel request, not the provider endpoint, decides storability. Over plain http a SameSite=None
         // cookie can't be Secure, so the browser would drop it — relax to Lax (sufficient for the GET callback).
-        if (context is not null && !context.Request.IsHttps)
+        if (!context.Request.IsHttps)
         {
             options.SameSite = SameSiteMode.Lax;
             options.Secure = false;
