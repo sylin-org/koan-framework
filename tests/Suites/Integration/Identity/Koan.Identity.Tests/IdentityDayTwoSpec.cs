@@ -1,12 +1,17 @@
 using System.Security.Claims;
 using AwesomeAssertions;
 using Koan.Data.Core;
+using Koan.Identity.Access;
 using Koan.Identity.Audit;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
+using Koan.Identity.Roles;
 using Koan.Identity.Web;
 using Koan.Tenancy;
+using Koan.Web.Auth.Flow;
 using Koan.Web.Authorization;
+using Koan.Web.Hooks;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
@@ -178,6 +183,165 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
             _fx.Services.GetRequiredService<Koan.Identity.Roles.RoleCollection>());
         access.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = impersonatingOperator } };
         ((await access.Grant("anyone", new IdentityAccessController.GrantRequest("koan:admin"), default)).Result as ObjectResult)?.StatusCode.Should().Be(403, "role grant is guarded while impersonating");
+    }
+
+    [Fact]
+    public async Task Simulated_principals_carry_exactly_the_role_claims_a_real_sign_in_carries()
+    {
+        var roles = _fx.Services.GetRequiredService<RoleCollection>();
+        var suffix = Guid.NewGuid().ToString("N");
+        var target = $"parity-target:{suffix}";
+        var actor = $"parity-actor:{suffix}";
+        await new Identity { Id = target, DisplayName = "Parity target" }.Save();
+        await new Identity { Id = actor, DisplayName = "Parity actor" }.Save();
+        await roles.Define($"role:parity-reader:{suffix}", "Reader", ["global:read"]);
+        await roles.Add($"role:parity-reader:{suffix}", target);
+        await roles.Define($"role:parity-operator:{suffix}", "Operator", ["global:operate"]);
+        await roles.Add($"role:parity-operator:{suffix}", actor);
+        try
+        {
+            // The implicit roles exist with permissions: their permissions reach the bag, never a role claim.
+            await roles.Define(RoleTokens.Everyone, "Everyone", ["global:everyone_parity"]);
+            await roles.Define(RoleTokens.Authenticated, "Authenticated", ["global:authenticated_parity"]);
+            var targetSignIn = await SignInRoles(target);
+            var actorSignIn = await SignInRoles(actor);
+            targetSignIn.Should().Equal($"role:parity-reader:{suffix}");
+            (await roles.Bag(target, true)).Permissions.Should().Contain(["global:everyone_parity", "global:authenticated_parity"]);
+
+            using var scope = _fx.Services.CreateScope();
+            var resolver = scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>();
+            (await resolver.ResolveAsync(target)).Capabilities.Should().Contain(["global:everyone_parity", "global:authenticated_parity"],
+                "the implicit roles' permissions stay in the effective view");
+            var authorize = new CapturingAuthorize();
+            await new AccessExplainer(resolver, authorize, roles).CanAsync(target, "read", "Orders");
+            RoleClaims(authorize.Principal!).Should().Equal(targetSignIn, "the forward explainer simulates what a sign-in would carry");
+
+            var impersonation = _fx.Services.GetRequiredService<ImpersonationService>();
+            var grant = await impersonation.RequestAsync(actor, target, "parity", null);
+            await impersonation.ApproveAsync(grant.Id, $"parity-approver:{suffix}", TimeSpan.FromMinutes(10));
+            var signIns = new CapturingAuthentication();
+            var controller = WithServices(new ImpersonationController(impersonation, resolver), signIns,
+                new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor)], "test")));
+            (await controller.Start(grant.Id, default)).Should().BeOfType<OkObjectResult>();
+            RoleClaims(signIns.Principal!).Should().Equal(targetSignIn, "an impersonation session carries the target's sign-in roles");
+
+            controller = WithServices(new ImpersonationController(impersonation, resolver), signIns, signIns.Principal!);
+            (await controller.Stop(default)).Should().BeOfType<OkObjectResult>();
+            RoleClaims(signIns.Principal!).Should().Equal(actorSignIn, "stopping restores the actor's sign-in roles");
+        }
+        finally
+        {
+            await roles.Delete(RoleTokens.Everyone);
+            await roles.Delete(RoleTokens.Authenticated);
+        }
+    }
+
+    [Fact]
+    public async Task Role_and_overwrite_writes_are_refused_while_impersonating_and_succeed_otherwise()
+    {
+        var roles = _fx.Services.GetRequiredService<RoleCollection>();
+        var options = _fx.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<RoleOptions>>();
+        var suffix = Guid.NewGuid().ToString("N");
+        var key = $"role:guarded:{suffix}";
+        var resource = $"resource:guarded:{suffix}";
+        var impersonating = new ClaimsPrincipal(
+            ImpersonationClaims.BuildImpersonatedIdentity($"guard-target:{suffix}", $"guard-op:{suffix}", [IdentityRoles.Operator]));
+        var operatorPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, $"guard-op:{suffix}"), new Claim(ClaimTypes.Role, IdentityRoles.Operator)], "test"));
+        RoleManagementController RoleRoutes(ClaimsPrincipal user) => WithUser(new RoleManagementController(roles, options), user);
+        PermissionOverwriteController OverwriteRoutes(ClaimsPrincipal user) => WithUser(new PermissionOverwriteController(roles), user);
+        using var scope = _fx.Services.CreateScope();
+        IdentityAccessController AccessRoutes(ClaimsPrincipal user) => WithUser(new IdentityAccessController(
+            scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>(),
+            scope.ServiceProvider.GetRequiredService<AccessExplainer>(), roles), user);
+        var save = new RoleManagementController.SaveRoleRequest("Guarded", ["global:post"]);
+        var deny = new PermissionOverwriteController.SaveOverwriteRequest(null, ["global:post"]);
+
+        Refused((await RoleRoutes(impersonating).Put(key, save, default)).Result, "roles");
+        (await roles.Get(key)).Should().BeNull();
+        (await RoleRoutes(operatorPrincipal).Put(key, save, default)).Result.Should().BeOfType<OkObjectResult>();
+        Refused((await RoleRoutes(impersonating).Patch(key, save with { Name = "Renamed" }, default)).Result, "roles");
+        (await RoleRoutes(operatorPrincipal).Patch(key, save with { Name = "Renamed" }, default)).Result.Should().BeOfType<OkObjectResult>();
+        Refused((await RoleRoutes(impersonating).AddMember(key, $"guard-member:{suffix}", default)).Result, "roles");
+        (await RoleRoutes(operatorPrincipal).AddMember(key, $"guard-member:{suffix}", default)).Result.Should().BeOfType<OkObjectResult>();
+        Refused((await RoleRoutes(impersonating).RemoveMember(key, $"guard-member:{suffix}", default)).Result, "roles");
+        (await RoleRoutes(operatorPrincipal).RemoveMember(key, $"guard-member:{suffix}", default)).Result.Should().BeOfType<OkObjectResult>();
+
+        Refused((await OverwriteRoutes(impersonating).Put(OverwriteSubjectKind.Role, key, resource, deny, default)).Result, "overwrites");
+        (await roles.Overwrites(resource)).Should().BeEmpty();
+        (await OverwriteRoutes(operatorPrincipal).Put(OverwriteSubjectKind.Role, key, resource, deny, default)).Result.Should().BeOfType<OkObjectResult>();
+        Refused(await OverwriteRoutes(impersonating).Delete(OverwriteSubjectKind.Role, key, resource, default), "overwrites");
+        (await OverwriteRoutes(operatorPrincipal).Delete(OverwriteSubjectKind.Role, key, resource, default)).Should().BeOfType<NoContentResult>();
+
+        await roles.Add(key, $"guard-member:{suffix}");
+        Refused(await AccessRoutes(impersonating).Revoke($"guard-member:{suffix}", key, default), "roles");
+        (await AccessRoutes(operatorPrincipal).Revoke($"guard-member:{suffix}", key, default)).Should().BeOfType<NoContentResult>();
+
+        Refused(await RoleRoutes(impersonating).Delete(key, default), "roles");
+        (await roles.Get(key)).Should().NotBeNull();
+        (await RoleRoutes(operatorPrincipal).Delete(key, default)).Should().BeOfType<NoContentResult>();
+    }
+
+    private static void Refused(object? result, string what)
+    {
+        var refused = result.Should().BeOfType<ObjectResult>().Subject;
+        refused.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        refused.Value!.ToString().Should().Contain($"changing {what} is blocked while impersonating");
+    }
+
+    private static T WithUser<T>(T controller, ClaimsPrincipal user) where T : ControllerBase
+    {
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
+        return controller;
+    }
+
+    private static T WithServices<T>(T controller, IAuthenticationService authentication, ClaimsPrincipal user) where T : ControllerBase
+    {
+        var services = new ServiceCollection().AddSingleton(authentication).BuildServiceProvider();
+        controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user, RequestServices = services } };
+        return controller;
+    }
+
+    private async Task<IReadOnlyList<string>> SignInRoles(string subject)
+    {
+        using var scope = _fx.Services.CreateScope();
+        var identity = new ClaimsIdentity("test");
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, subject));
+        await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(new Koan.Web.Auth.Contributors.AuthSignInContext
+        {
+            Provider = "test",
+            Identity = identity,
+            Services = scope.ServiceProvider,
+            HttpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider },
+        }, default);
+        return RoleClaims(new ClaimsPrincipal(identity));
+    }
+
+    private static IReadOnlyList<string> RoleClaims(ClaimsPrincipal principal)
+        => principal.FindAll(ClaimTypes.Role).Select(claim => claim.Value).Order(StringComparer.Ordinal).ToList();
+
+    private sealed class CapturingAuthorize : IAuthorize
+    {
+        public ClaimsPrincipal? Principal { get; private set; }
+        public Task<AuthorizeDecision> AuthorizeAsync(AuthorizeRequest request, CancellationToken ct = default)
+        {
+            Principal = request.Subject;
+            return Task.FromResult<AuthorizeDecision>(AuthorizeDecision.Allowed());
+        }
+    }
+
+    private sealed class CapturingAuthentication : IAuthenticationService
+    {
+        public ClaimsPrincipal? Principal { get; private set; }
+        public Task SignInAsync(HttpContext context, string? scheme, ClaimsPrincipal principal, AuthenticationProperties? properties)
+        {
+            Principal = principal;
+            return Task.CompletedTask;
+        }
+        public Task<AuthenticateResult> AuthenticateAsync(HttpContext context, string? scheme) => throw new NotSupportedException();
+        public Task ChallengeAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) => throw new NotSupportedException();
+        public Task ForbidAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) => throw new NotSupportedException();
+        public Task SignOutAsync(HttpContext context, string? scheme, AuthenticationProperties? properties) => throw new NotSupportedException();
     }
 
     [Fact]

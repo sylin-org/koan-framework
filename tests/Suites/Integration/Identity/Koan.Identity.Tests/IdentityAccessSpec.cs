@@ -105,6 +105,19 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     }
 
     [Fact]
+    public async Task Role_permissions_appear_among_the_effective_capabilities()
+    {
+        const string id = "role-permission-capability-user";
+        await new Identity { Id = id, DisplayName = "Role permission" }.Save();
+        await Roles.GrantAsync(id, "koan:permission-holder");
+
+        using var scope = _fx.Services.CreateScope();
+        var access = await NewResolver(scope).ResolveAsync(id);
+
+        access.Capabilities.Should().Contain("global:test", "a role's permission is something the person can do");
+    }
+
+    [Fact]
     public async Task Resolver_detects_role_overlap_across_sources()
     {
         // Two sources confer the same role (e.g. a global IdentityRole + a per-tenant Membership) — the role-explosion

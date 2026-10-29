@@ -63,6 +63,7 @@ public sealed class IdentityErasureSpec : IdentityHostScopedSpec
         var roles = _fixture.Services.GetRequiredService<RoleCollection>();
         await roles.Define("koan:reader", "Reader", ["global:read"]);
         await roles.Add("koan:reader", identityId);
+        await roles.Overwrite("erase-delight-resource", OverwriteSubjectKind.Person, identityId, [], ["global:read"]);
         await new ImpersonationGrant
         {
             Actor = identityId,
@@ -149,6 +150,7 @@ public sealed class IdentityErasureSpec : IdentityHostScopedSpec
         JsonConvert.SerializeObject(complete).Should().NotContain(identityId).And.NotContain(marker);
         (await TestIdentityErasureRow.Query(row => row.IdentityId == identityId)).Should().BeEmpty();
         (await Membership.Query(row => row.IdentityId == identityId)).Should().BeEmpty();
+        (await roles.Overwrites("erase-delight-resource")).Should().BeEmpty("a person's overwrites are core-owned person rows");
         using (Tenant.Use(tenantId))
             (await AgentGrant.Query(row => row.Subject == identityId)).Should().BeEmpty();
 

@@ -27,7 +27,7 @@ internal sealed class AgentGrantAccessContributor : IEffectiveAccessContributor
         var now = DateTimeOffset.UtcNow;
         return grants
             .Where(g => g.IsActive(now))
-            .Select(g => new AccessFact("AgentGrant", "capability", g.Capability, g.Resource, "tenant", nameof(AgentGrant), g.Id, g.ExpiresAt))
+            .Select(g => new AccessFact("AgentGrant", AccessFactKind.Capability, g.Capability, g.Resource, "tenant", nameof(AgentGrant), g.Id, g.ExpiresAt))
             .ToList();
     }
 }

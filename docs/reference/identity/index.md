@@ -25,6 +25,7 @@ Entity state separated by tenant or classification boundary.
 | Apply the same access policy to REST and agent projections | `[Access(...)]` on the Entity or action | [Authentication setup](../../guides/authentication-setup.md) |
 | Add Google, Microsoft, or Discord sign-in | reference the provider package and configure client credentials | provider package README |
 | Test OAuth/OIDC deterministically | reference `Sylin.Koan.Web.Auth.Connector.Test` | [Test connector README](../../../src/Connectors/Web/Auth/Test/README.md) |
+| Give roles permissions, and allow or deny them per container (Discord's overwrites) | `roles.Overwrite(...)`, then `bag.On(resourceId, overwrites, now)` | [Identity README](../../../src/Koan.Identity/README.md) |
 | Scope Entity work to one tenant | `using var scope = Tenant.Use(tenantId);` | [Tenancy](../../guides/tenancy-howto.md) |
 | Classify and transform protected fields at rest | declare the supported classification attribute and provider | [Product surface](../product-surface.md) |
 

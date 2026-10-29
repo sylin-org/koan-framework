@@ -18,7 +18,7 @@ public sealed class EffectiveAccessResolver
             facts.AddRange(await contributor.ContributeAsync(identityId, ct).ConfigureAwait(false));
 
         var overlaps = facts
-            .Where(f => f.Kind == "role")
+            .Where(f => f.Kind == AccessFactKind.Role)
             .GroupBy(f => f.Value)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)

@@ -648,3 +648,5 @@
       href: SEC-0019-delete-bounds-evaluate-counterpart-read-constraints.md
     - name: SEC-0020 The open default is the product stance, and its posture is stated in the facts
       href: SEC-0020-the-open-default-is-the-product-stance.md
+    - name: SEC-0021 A resource allows and denies beyond what roles grant, through overwrites resolved in Discord's order
+      href: SEC-0021-resource-overwrites-resolve-in-discord-order.md

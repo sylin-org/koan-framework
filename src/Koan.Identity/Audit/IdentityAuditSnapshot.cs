@@ -49,6 +49,16 @@ internal static class IdentityAuditSnapshot
         {
             role.Id, role.Name, Permissions = role.Permissions.Count, Members = role.Members.Count, Metadata = role.Metadata.Keys.Order(), role.UpdatedAt,
         }),
+        PermissionOverwrite overwrite => JsonConvert.SerializeObject(new
+        {
+            overwrite.ResourceId,
+            SubjectKind = overwrite.SubjectKind.ToString(),
+            Role = overwrite.SubjectKind == OverwriteSubjectKind.Role ? overwrite.SubjectId : null,
+            overwrite.Allow,
+            overwrite.Deny,
+            overwrite.ExpiresAt,
+            overwrite.UpdatedAt,
+        }),
         ImpersonationGrant grant => JsonConvert.SerializeObject(new
         {
             grant.ApprovedAt,

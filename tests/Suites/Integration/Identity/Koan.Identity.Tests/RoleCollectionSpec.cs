@@ -14,7 +14,7 @@ public sealed class RoleCollectionSpec : IdentityHostScopedSpec
 
     [Fact] public void Intersection_is_pure_and_any_of()
     {
-        var bag = new RoleBag("person:one", true, ["global:topic_read"]);
+        var bag = new RoleBag("person:one", true, [], ["global:topic_read"]);
         Role.CanDo(PermissionCriteria.Any("global:no", "global:topic_read"), bag).Should().BeTrue();
         Role.CanDo(PermissionCriteria.Any("global:no"), bag).Should().BeFalse();
     }
@@ -47,6 +47,24 @@ public sealed class RoleCollectionSpec : IdentityHostScopedSpec
         (await Roles.Bag("person:auth", true)).Tokens.Should().Contain([RoleTokens.Everyone, RoleTokens.Authenticated]);
     }
 
+    [Fact] public async Task Everyone_role_permissions_compile_into_every_bag_and_its_change_reaches_cached_bags()
+    {
+        try
+        {
+            await Roles.Define(RoleTokens.Everyone, "Everyone", ["global:everyone_read"]);
+            var person = await Roles.Bag("person:everyone-bag", true);
+            var visitor = await Roles.Bag(null, false);
+            person.Tokens.Should().Contain("global:everyone_read");
+            visitor.Tokens.Should().Contain("global:everyone_read");
+
+            await Roles.SetPermissions(RoleTokens.Everyone, ["global:everyone_write"]);
+            (await Roles.Bag("person:everyone-bag", true)).Tokens.Should().Contain("global:everyone_write").And.NotContain("global:everyone_read");
+            (await Roles.Bag(null, false)).Tokens.Should().Contain("global:everyone_write").And.NotContain("global:everyone_read");
+        }
+        finally { await Roles.Delete(RoleTokens.Everyone); }
+        (await Roles.Bag(null, false)).Tokens.Should().ContainSingle().Which.Should().Be(RoleTokens.Everyone);
+    }
+
     [Fact] public async Task Hot_bag_is_reused_without_membership_fetch()
     {
         var first = await Roles.Bag("person:hot", true);
@@ -56,7 +74,7 @@ public sealed class RoleCollectionSpec : IdentityHostScopedSpec
     [Fact] public void Loaded_resource_hook_selects_criteria_from_entity()
     {
         var post = new TestPost("global:topic_read");
-        var bag = new RoleBag("person:reader", true, ["global:topic_read"]);
+        var bag = new RoleBag("person:reader", true, [], ["global:topic_read"]);
         RoleResourceAuthorization.CanDo(post, bag, value => PermissionCriteria.Any(value.ReadPermission)).Should().BeTrue();
     }
 

@@ -10,6 +10,12 @@ namespace Koan.Identity.Impersonation;
 /// </summary>
 public static class ImpersonationGuard
 {
+    /// <summary>Defining, changing or deleting a server role, or changing its members.</summary>
+    public const string RoleManage = "role.manage";
+
+    /// <summary>Setting, removing or revoking from a per-resource overwrite.</summary>
+    public const string OverwriteManage = "overwrite.manage";
+
     /// <summary>
     /// The verbs that must never be performed under impersonation. This set equals what is actually ENFORCED on
     /// the request path (no aspirational labels) — each has a controller that 403s on it while impersonating.
@@ -20,6 +26,8 @@ public static class ImpersonationGuard
         "identity.delete",   // IdentityAdminController.Delete
         "identity.suspend",  // IdentityAdminController.Suspend
         "role.grant",        // IdentityAccessController.Grant
+        RoleManage,          // RoleManagementController writes, IdentityAccessController.Revoke
+        OverwriteManage,     // PermissionOverwriteController writes
         "impersonate.start", // ImpersonationController.Request (no nested impersonation)
     };
 

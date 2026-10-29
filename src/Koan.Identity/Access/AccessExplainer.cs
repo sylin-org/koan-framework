@@ -27,11 +27,19 @@ public sealed class AccessExplainer
     /// <summary>Reverse: the facts contributing to <paramref name="identityId"/>'s access on <paramref name="resourceName"/>.</summary>
     public async Task<IReadOnlyList<AccessFact>> WhyAsync(string identityId, string resourceName, CancellationToken ct = default)
     {
+        resourceName = RoleContract.Require(resourceName, nameof(resourceName));
         var access = await _resolver.ResolveAsync(identityId, ct).ConfigureAwait(false);
-        return access.Facts
-            .Where(f => f.Resource == "*" || string.Equals(f.Resource, resourceName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        return access.Facts.Where(f => AppliesTo(f, resourceName)).ToList();
     }
+
+    /// <summary>
+    /// Whether a fact holds on <paramref name="resourceName"/>: a wildcard fact everywhere; an agent grant as the gate
+    /// matches it (<see cref="AgentGrant.AppliesTo"/>, entity names without case); every other resource id, opaque,
+    /// exactly as resolution compares it.
+    /// </summary>
+    private static bool AppliesTo(AccessFact fact, string resourceName)
+        => fact.Resource == "*" || string.Equals(fact.Resource, resourceName,
+            fact.RowType == nameof(AgentGrant) ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     /// <summary>
     /// Forward: "can X do <paramref name="action"/> on <paramref name="resource"/>?" via the SAME
@@ -61,7 +69,24 @@ public sealed class AccessExplainer
         return new AccessDecision(allowed, reason, access.Facts);
     }
 
-    /// <summary>One-click revoke: <c>Remove()</c> the contributing row.</summary>
+    /// <summary>
+    /// "Can X use <paramref name="permission"/> on <paramref name="resourceId"/>, and if not, why?" Resolves X's cached
+    /// bag against the resource's cached overwrites (<see cref="RoleBag.On"/>) and returns the deciding fact: the
+    /// overwrite whose deny withheld the permission, revocable through its <see cref="AccessFactRef"/>, or the fact that
+    /// no role X holds grants it.
+    /// </summary>
+    public async Task<AccessDecision> Explain(string identityId, string resourceId, string permission, CancellationToken ct = default)
+    {
+        if (_roles is null) return new AccessDecision(false, "no role collection is registered", []);
+        var bag = await _roles.Bag(identityId, authenticated: true, ct).ConfigureAwait(false);
+        var overwrites = await _roles.Overwrites(resourceId, ct).ConfigureAwait(false);
+        return bag.On(resourceId, overwrites, DateTimeOffset.UtcNow).Explain(permission);
+    }
+
+    /// <summary>
+    /// One-click revoke of exactly the contributing fact: a role membership, an agent grant, or one permission of an
+    /// overwrite (<see cref="AccessFact.Ref"/>), which removes the overwrite only when nothing is left in it.
+    /// </summary>
     public async Task<bool> RevokeAsync(AccessFactRef fact, CancellationToken ct = default)
     {
         switch (fact.RowType)
@@ -70,6 +95,11 @@ public sealed class AccessExplainer
                 if (_roles is null || string.IsNullOrWhiteSpace(fact.Subject)) return false;
                 try { await _roles.Remove(fact.RowId, fact.Subject, ct).ConfigureAwait(false); return true; }
                 catch (KeyNotFoundException) { return false; }
+            case nameof(PermissionOverwrite):
+                // One row holds several facts: removing the row for one of them would also lift its denies. Only the
+                // named permission leaves the named list; a handle that names no valid permission revokes nothing.
+                if (_roles is null || fact.Kind is not (AccessFactKind.Permission or AccessFactKind.Deny)) return false;
+                return await _roles.RevokeFromOverwrite(fact.RowId, fact.Kind == AccessFactKind.Deny, fact.Value, ct).ConfigureAwait(false);
             case nameof(AgentGrant):
                 var grant = await AgentGrant.Get(fact.RowId, ct).ConfigureAwait(false);
                 if (grant is null) return false;

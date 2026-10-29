@@ -16,7 +16,7 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
     {
         var owned = await LoadAsync(identityId, ct).ConfigureAwait(false);
         var count = (owned.Person is null ? 0 : 1) + owned.Emails.Count + owned.Sessions.Count +
-                    owned.ExternalLinks.Count + owned.Roles.Count + owned.ImpersonationGrants.Count;
+                    owned.ExternalLinks.Count + owned.Roles.Count + owned.Overwrites.Count + owned.ImpersonationGrants.Count;
         return new IdentityErasureOwnerPlan(
             Owner,
             Order,
@@ -42,6 +42,12 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         var linkCount = await RemoveAll(owned.ExternalLinks, ct).ConfigureAwait(false);
         var roleCount = 0;
         foreach (var role in owned.Roles) { await roles.Remove(role.Id, identityId, ct); roleCount++; }
+        var overwriteCount = 0;
+        foreach (var overwrite in owned.Overwrites)
+        {
+            if (await roles.RemoveOverwrite(overwrite.ResourceId, OverwriteSubjectKind.Person, identityId, ct).ConfigureAwait(false))
+                overwriteCount++;
+        }
         var impersonationCount = await RemoveAll(owned.ImpersonationGrants, ct).ConfigureAwait(false);
         var identityCount = owned.Person is not null && await owned.Person.Remove(ct).ConfigureAwait(false) ? 1 : 0;
 
@@ -58,6 +64,7 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
                 [IdentityErasureConstants.Counts.Sessions] = sessionCount,
                 [IdentityErasureConstants.Counts.ExternalLinks] = linkCount,
                 [IdentityErasureConstants.Counts.GlobalRoles] = roleCount,
+                [IdentityErasureConstants.Counts.PermissionOverwrites] = overwriteCount,
                 [IdentityErasureConstants.Counts.ImpersonationGrants] = impersonationCount,
             },
         };
@@ -70,10 +77,11 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         var sessions = await Session.Query(session => session.IdentityId == identityId, ct).ConfigureAwait(false);
         var links = await ExternalIdentityLink.Query(link => link.IdentityId == identityId, ct).ConfigureAwait(false);
         var roleRows = await roles.ForPerson(identityId, ct).ConfigureAwait(false);
+        var overwrites = await roles.OverwritesOf(OverwriteSubjectKind.Person, identityId, ct).ConfigureAwait(false);
         var impersonation = await ImpersonationGrant.Query(
             grant => grant.Actor == identityId || grant.Target == identityId,
             ct).ConfigureAwait(false);
-        return new OwnedRows(person, emails, sessions, links, roleRows, impersonation);
+        return new OwnedRows(person, emails, sessions, links, roleRows, overwrites, impersonation);
     }
 
     private static async Task<int> RemoveAll<TEntity>(IReadOnlyList<TEntity> rows, CancellationToken ct)
@@ -98,5 +106,6 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         IReadOnlyList<Session> Sessions,
         IReadOnlyList<ExternalIdentityLink> ExternalLinks,
         IReadOnlyList<Role> Roles,
+        IReadOnlyList<PermissionOverwrite> Overwrites,
         IReadOnlyList<ImpersonationGrant> ImpersonationGrants);
 }

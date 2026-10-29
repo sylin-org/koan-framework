@@ -60,7 +60,71 @@ public sealed class RoleWebSpec
         finally { if (File.Exists(database)) File.Delete(database); }
     }
 
-    private static async Task<IHost> Start(string database)
+    [Fact]
+    public async Task A_member_bound_answers_409_with_its_correction()
+    {
+        var database = Path.Combine(Path.GetTempPath(), $"koan-role-bound-web-{Guid.CreateVersion7():n}.db");
+        try
+        {
+            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxMembersPerRole"] = "1" });
+            using var client = host.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
+            Authorize(client, "operator:web", true);
+            (await client.PutAsJsonAsync("/api/identity/roles/role:small", new { name = "Small", permissions = new[] { "global:post" } }))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+            (await client.PutAsync("/api/identity/roles/role:small/members/person:one", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var full = await client.PutAsync("/api/identity/roles/role:small/members/person:two", null);
+            full.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await full.Content.ReadAsStringAsync()).Should().Contain("MaxMembersPerRole").And.Contain("Remove a member, or raise the bound");
+        }
+        finally { if (File.Exists(database)) File.Delete(database); }
+    }
+
+    [Fact]
+    public async Task Web_complement_manages_overwrites_beside_the_role_routes()
+    {
+        var database = Path.Combine(Path.GetTempPath(), $"koan-overwrite-web-{Guid.CreateVersion7():n}.db");
+        try
+        {
+            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxOverwritesPerResource"] = "2" });
+            using var client = host.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
+            const string resource = "tangent/the workshop";
+            var query = $"?resource={Uri.EscapeDataString(resource)}";
+            (await client.GetAsync($"/api/identity/overwrites{query}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            Authorize(client, "person:visitor", false);
+            (await client.GetAsync($"/api/identity/overwrites{query}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+            Authorize(client, "operator:web", true);
+            (await client.GetStringAsync("/api/identity/roles/descriptor")).Should().Contain(RoleTokens.Administrator).And.Contain("maxOverwritesPerResource");
+            (await client.PutAsJsonAsync("/api/identity/roles/role:guests", new { name = "Guests", permissions = new[] { "global:post" } }))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var saved = await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:guests{query}", new { deny = new[] { "global:post" } });
+            saved.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await saved.Content.ReadAsStringAsync()).Should().Contain(resource).And.Contain("global:post");
+            (await client.PutAsJsonAsync($"/api/identity/overwrites/person/person:web{query}", new { allow = new[] { "global:post" } }))
+                .StatusCode.Should().Be(HttpStatusCode.OK);
+            var listed = await client.GetStringAsync($"/api/identity/overwrites{query}");
+            listed.Should().Contain("role:guests").And.Contain("person:web");
+
+            var full = await client.PutAsJsonAsync($"/api/identity/overwrites/role/everyone{query}", new { allow = new[] { "global:view" } });
+            full.StatusCode.Should().Be(HttpStatusCode.Conflict);
+            (await full.Content.ReadAsStringAsync()).Should().Contain("MaxOverwritesPerResource");
+            (await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:missing{query}", new { allow = new[] { "global:post" } }))
+                .StatusCode.Should().Be(HttpStatusCode.NotFound);
+            (await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:guests{query}", new { allow = new[] { RoleTokens.Administrator } }))
+                .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+            (await client.DeleteAsync($"/api/identity/overwrites/person/person:web{query}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+            (await client.DeleteAsync($"/api/identity/overwrites/person/person:web{query}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+            (await client.GetStringAsync($"/api/identity/overwrites{query}")).Should().NotContain("person:web");
+        }
+        finally { if (File.Exists(database)) File.Delete(database); }
+    }
+
+    private static async Task<IHost> Start(string database, Dictionary<string, string?>? settings = null)
     {
         var builder = Host.CreateDefaultBuilder().ConfigureWebHost(web =>
         {
@@ -70,7 +134,7 @@ public sealed class RoleWebSpec
                 ["Koan:Environment"] = "Test", ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
                 ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={database};Pooling=False",
                 ["Koan:BackgroundServices:Enabled"] = "false", ["Logging:LogLevel:Default"] = "Warning",
-            }));
+            }.Concat(settings ?? [])));
             web.ConfigureServices(services =>
             {
                 services.AddKoan();

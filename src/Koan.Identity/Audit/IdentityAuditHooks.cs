@@ -22,6 +22,7 @@ internal static class IdentityAuditHooks
         Hook<ExternalIdentityLink>("ExternalIdentityLink", e => e.IdentityId);
         Hook<Session>("Session", e => e.IdentityId);
         Hook<Role>("Role", e => e.Id, e => e.UpdatedBy);
+        Hook<PermissionOverwrite>("PermissionOverwrite", e => e.SubjectId, e => e.UpdatedBy);
         Hook<Impersonation.ImpersonationGrant>("ImpersonationGrant", e => e.Target);
     }
 

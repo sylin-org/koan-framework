@@ -53,6 +53,7 @@ public sealed class IdentityAccessController : ControllerBase
     [HttpDelete("roles/{roleKey}")]
     public async Task<IActionResult> Revoke([FromRoute] string id, [FromRoute] string roleKey, CancellationToken ct)
     {
+        if (ImpersonationGuard.IsBlocked(User, ImpersonationGuard.RoleManage)) return StatusCode(403, new { error = "changing roles is blocked while impersonating" });
         try { await _roles.Remove(roleKey, id, ct); return NoContent(); }
         catch (KeyNotFoundException) { return NotFound(); }
     }

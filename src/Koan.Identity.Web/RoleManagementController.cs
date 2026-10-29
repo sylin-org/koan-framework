@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.Extensions.Options;
+using Koan.Identity.Impersonation;
 using Koan.Identity.Roles;
 
 namespace Koan.Identity.Web;
@@ -19,7 +20,8 @@ public sealed class RoleManagementController(RoleCollection roles, IOptions<Role
     public ActionResult<object> Descriptor() => Ok(new
     {
         tokens = new { everyone = RoleTokens.Everyone, authenticated = RoleTokens.Authenticated,
-            rolePrefix = RoleTokens.RolePrefix, groupPrefix = RoleTokens.GroupPrefix, globalPrefix = RoleTokens.GlobalPrefix },
+            rolePrefix = RoleTokens.RolePrefix, groupPrefix = RoleTokens.GroupPrefix, globalPrefix = RoleTokens.GlobalPrefix,
+            administrator = RoleTokens.Administrator },
         limits = options.Value,
     });
 
@@ -51,12 +53,13 @@ public sealed class RoleManagementController(RoleCollection roles, IOptions<Role
     [HttpPut("{key}")]
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<ActionResult<Role>> Put(string key, [FromBody] SaveRoleRequest request, CancellationToken ct)
-        => Ok(await roles.Define(key, request.Name, request.Permissions, request.Metadata, ct));
+        => Impersonating() ?? (ActionResult<Role>)Ok(await roles.Define(key, request.Name, request.Permissions, request.Metadata, ct));
 
     [HttpPatch("{key}")]
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<ActionResult<Role>> Patch(string key, [FromBody] SaveRoleRequest request, CancellationToken ct)
     {
+        if (Impersonating() is { } refused) return refused;
         try { return Ok(await roles.Update(key, request.Name, request.Permissions, request.Metadata, ct)); }
         catch (KeyNotFoundException) { return NotFound(); }
     }
@@ -64,7 +67,7 @@ public sealed class RoleManagementController(RoleCollection roles, IOptions<Role
     [HttpDelete("{key}")]
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<IActionResult> Delete(string key, CancellationToken ct)
-        => await roles.Delete(key, ct) ? NoContent() : NotFound();
+        => Impersonating() ?? (await roles.Delete(key, ct) ? NoContent() : (IActionResult)NotFound());
 
     [HttpGet("{key}/members")]
     [Authorize(Roles = IdentityRoles.Operator)]
@@ -80,17 +83,25 @@ public sealed class RoleManagementController(RoleCollection roles, IOptions<Role
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<ActionResult<Role>> AddMember(string key, string personId, CancellationToken ct)
     {
+        if (Impersonating() is { } refused) return refused;
         try { return Ok(await roles.Add(key, personId, ct)); }
         catch (KeyNotFoundException) { return NotFound(); }
+        catch (RoleBoundException bound) { return Conflict(new { error = bound.Message }); }
     }
 
     [HttpDelete("{key}/members/{personId}")]
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<ActionResult<Role>> RemoveMember(string key, string personId, CancellationToken ct)
     {
+        if (Impersonating() is { } refused) return refused;
         try { return Ok(await roles.Remove(key, personId, ct)); }
         catch (KeyNotFoundException) { return NotFound(); }
     }
+
+    /// <summary>SEC-0007 D8: a role write is refused while the caller impersonates.</summary>
+    private ObjectResult? Impersonating() => ImpersonationGuard.IsBlocked(User, ImpersonationGuard.RoleManage)
+        ? StatusCode(StatusCodes.Status403Forbidden, new { error = "changing roles is blocked while impersonating" })
+        : null;
 }
 
 internal sealed class RoleManagementExceptionFilter : IExceptionFilter
