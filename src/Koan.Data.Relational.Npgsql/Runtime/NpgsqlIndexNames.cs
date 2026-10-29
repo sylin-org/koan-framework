@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text;
 using Koan.Core.Naming;
 using Koan.Data.Relational.Orchestration;
@@ -22,24 +21,16 @@ internal static class NpgsqlIndexNames
     private static readonly CompositionPolicy Policy = new("_", VerbatimParticleFormatter.Instance, MaximumBytes);
 
     /// <summary>
-    /// The name this index is created under (DATA-0146). A derived name already carries its container, so it is only
-    /// fitted to 63 bytes with a hash, never cut. A declared name (<c>[Index(Name = ...)]</c>) is the application's and
-    /// is used as written, except on a partition table, where it is qualified by a hash of the table name: one
-    /// declaration then yields one index per partition table instead of one for the whole schema.
+    /// The name this index is created under (DATA-0146): the relational rule for stores whose index names span their
+    /// containers (<see cref="RelationalIndexNames"/>) under PostgreSQL's 63-byte limit. A derived name is only fitted
+    /// with a hash, never cut; a declared name is used as written on the entity's own table and qualified by a hash of
+    /// the table name on a partition table.
     /// </summary>
-    internal static string Name(RelationalTableDefinition table, RelationalIndexDefinition index, bool partitioned)
-    {
-        if (!index.NameDeclared || !partitioned)
-            return IdentifierComposer.Compose(index.Name, [], Policy);
-        Span<Particle> qualifier = [new Particle(0, "table", Hash(table.Name))];
-        return IdentifierComposer.Compose(index.Name, qualifier, Policy);
-    }
+    internal static string Name(RelationalTableDefinition table, RelationalIndexDefinition index, bool partitioned) =>
+        RelationalIndexNames.Name(table, index, partitioned, MaximumBytes);
 
     /// <summary>A derived name fitted to 63 bytes the way <see cref="Name"/> fits one: a readable prefix and a hash of the whole.</summary>
     internal static string Fit(string name) => IdentifierComposer.Compose(name, [], Policy);
-
-    private static string Hash(string value) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0, 4).ToLowerInvariant();
 
     /// <summary>The name PostgreSQL stores: at most 63 UTF-8 bytes, cut at a character boundary.</summary>
     internal static string Effective(string name)

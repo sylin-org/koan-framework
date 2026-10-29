@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
+using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Transactions;
+using Microsoft.Data.Sqlite;
 
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 
@@ -10,6 +12,8 @@ namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 /// DATA-0158: on one SQLite route <c>EntityContext.Transaction</c> commits every tracked Save and Remove, across
 /// entity types, inside one native transaction begun immediate. A failure anywhere before the commit leaves nothing
 /// durable, and a scope that asks for <see cref="TransactionGuarantee.Atomic"/> gets exactly that or a refusal.
+/// DATA-0161: a failure before the native transaction opens reports <see cref="DataCommitOutcome.NotCommitted"/>; only
+/// a failure of the native commit itself is <see cref="DataCommitOutcome.Unknown"/>.
 /// </summary>
 public sealed class SqliteAtomicCommitSpec(SqliteFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<SqliteFixture>(fixture, output)
@@ -23,6 +27,23 @@ public sealed class SqliteAtomicCommitSpec(SqliteFixture fixture, ITestOutputHel
     {
         public string Sku { get; set; } = "";
         public bool FailOnSave { get; set; }
+    }
+
+    [Storage(Name = "KOAN_ATOMIC_CLAIMANT")]
+    public sealed class Claimant : Entity<Claimant>
+    {
+        [Index(Name = "ix_atomic_claimed_code")] public string Code { get; set; } = "";
+    }
+
+    [Storage(Name = "KOAN_ATOMIC_INTRUDER")]
+    public sealed class Intruder : Entity<Intruder>
+    {
+        [Index(Name = "ix_atomic_claimed_code")] public string Code { get; set; } = "";
+    }
+
+    public sealed class Receipt : Entity<Receipt>
+    {
+        public string Note { get; set; } = "";
     }
 
     private static void FailFlaggedLines() =>
@@ -205,5 +226,107 @@ public sealed class SqliteAtomicCommitSpec(SqliteFixture fixture, ITestOutputHel
             EntityContext.CurrentTransaction.Capabilities.Has(TxCaps.Local).Should().BeFalse();
             await EntityContext.Rollback();
         }
+    }
+
+    [Fact]
+    public async Task A_provisioning_failure_before_the_native_transaction_opens_reports_not_committed()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync(FailFlaggedLines);
+        // The two entities declare one index name, and Claimant's own table holds it first, so Intruder's own table
+        // cannot be provisioned: the coordinator fails before it opens the native transaction.
+        await new Claimant { Code = "c-1" }.Save();
+        var order = new Order { Title = "never" };
+        var intruder = new Intruder { Code = "c-1" };
+        TransactionException failure;
+
+        using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+        {
+            await order.Save();
+            await intruder.Save();
+            var commit = () => EntityContext.Commit();
+            failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+        }
+
+        failure.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted, "nothing was dispatched, so nothing can have landed");
+        failure.CompletedOperationCount.Should().Be(0);
+        failure.Message.Should().Contain("before any tracked operation was dispatched");
+        failure.InnerException!.Message.Should().Contain("already owned by SQLite table 'KOAN_ATOMIC_CLAIMANT'");
+        (await Order.Get(order.Id)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_native_transaction_that_cannot_begin_reports_not_committed()
+    {
+        RequireBackingStore();
+        var path = Path.Combine(Path.GetTempPath(), $"koan-sqlite-atomic-begin-{Guid.CreateVersion7():n}.db");
+        try
+        {
+            await using var host = await BootAsync(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+                ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={path}",
+                ["Koan:Data:Sqlite:BusyTimeout"] = "00:00:01",
+            });
+            using var _ = Lease(NewPartition("atomic-begin"));
+            // Saved outside the scope, so the table is provisioned and the scope needs no schema work of its own.
+            var order = await new Order { Title = "kept" }.Save();
+
+            // Another writer holds the database's write lock, so BEGIN IMMEDIATE waits out the busy timeout and fails.
+            await using var holder = new SqliteConnection($"Data Source={path};Pooling=False");
+            await holder.OpenAsync();
+            await using (var begin = holder.CreateCommand())
+            {
+                begin.CommandText = "BEGIN IMMEDIATE";
+                await begin.ExecuteNonQueryAsync();
+            }
+
+            TransactionException failure;
+            using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+            {
+                order.Title = "blocked";
+                await order.Save();
+                var commit = () => EntityContext.Commit();
+                failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+            }
+
+            await using (var rollback = holder.CreateCommand())
+            {
+                rollback.CommandText = "ROLLBACK";
+                await rollback.ExecuteNonQueryAsync();
+            }
+
+            failure.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted, "the native transaction never began");
+            failure.CompletedOperationCount.Should().Be(0);
+            (await Order.Get(order.Id))!.Title.Should().Be("kept");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            foreach (var file in new[] { path, path + "-wal", path + "-shm" })
+                if (File.Exists(file)) File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task A_failure_of_the_native_commit_itself_still_reports_unknown()
+    {
+        RequireBackingStore();
+        using var cancel = new CancellationTokenSource();
+        // The last dispatched row cancels the commit's token, so the native commit is the step that fails.
+        await using var host = await BootAsync(() => Receipt.Lifecycle.AfterUpsert(_ => cancel.Cancel()));
+        using var _ = Lease(NewPartition("atomic-commit-failure"));
+        var receipt = new Receipt { Note = "dispatched before the commit failed" };
+        TransactionException failure;
+
+        using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+        {
+            await receipt.Save();
+            var commit = () => EntityContext.Commit(cancel.Token);
+            failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+        }
+
+        failure.CommitOutcome.Should().Be(DataCommitOutcome.Unknown, "a failed commit cannot say whether the store committed");
+        failure.Message.Should().Contain("while committing its native transaction");
     }
 }

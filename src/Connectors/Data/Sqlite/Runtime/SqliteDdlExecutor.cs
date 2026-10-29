@@ -12,11 +12,23 @@ namespace Koan.Data.Connector.Sqlite.Runtime;
 /// opens non-creating and reports an unreachable database as an absent table, which is literally true and keeps
 /// a look from becoming a write. Only the mutating members open a connection that may create the file, and the
 /// orchestrator does not call them until consent has been established.</para>
+///
+/// <para>SQLite index names are database-wide, so every index is created under the relational rule for such stores
+/// (<see cref="RelationalIndexNames"/>, DATA-0160): a declared name as written on the entity's own table, qualified by
+/// a hash of the table name on a partition table.</para>
 /// </summary>
+/// <param name="route">The source the schema belongs to.</param>
+/// <param name="connections">The owner of every connection the connector opens, the ambient atomic commit's included.</param>
+/// <param name="dialect">The dialect whose read each index expression repeats.</param>
+/// <param name="partitioned">
+/// Whether the table is a partition of its entity, so that a declared index name, shared by every partition table, is
+/// qualified to belong to this one.
+/// </param>
 internal sealed class SqliteDdlExecutor(
     SqliteRoute route,
     SqliteConnections connections,
-    SqliteDialect dialect) : IRelationalDdlExecutor, IAsyncDisposable
+    SqliteDialect dialect,
+    bool partitioned = false) : IRelationalDdlExecutor, IAsyncDisposable
 {
     private SqliteConnection? _writer;
     private SqliteTransaction? _writerTransaction;
@@ -115,21 +127,26 @@ internal sealed class SqliteDdlExecutor(
             .Select(part => dialect.Read(part.Path, MappingValueShape.Scalar, part.PhysicalType)
                 .Replace("koan_row.", string.Empty, StringComparison.Ordinal))
             .ToArray();
+        var name = RelationalIndexNames.Name(table, index, partitioned);
         var expected = $"CREATE {(index.Unique ? "UNIQUE " : string.Empty)}INDEX " +
-                       $"{SqliteDialect.Quote(index.Name)} ON {SqliteDialect.Quote(table.Name)} " +
+                       $"{SqliteDialect.Quote(name)} ON {SqliteDialect.Quote(table.Name)} " +
                        $"({string.Join(", ", expressions)})";
 
         var connection = await Writer(ct).ConfigureAwait(false);
-        var (owner, actual) = await Inspect(connection, _writerTransaction, index.Name, ct).ConfigureAwait(false);
+        var (owner, actual) = await Inspect(connection, _writerTransaction, name, ct).ConfigureAwait(false);
+        // Each container's copy of a declared name has a name of its own, so another table holding this one is either a
+        // second entity declaring the same name or a partition table that took it before partition copies were named.
         if (owner is not null && !string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                $"Index '{index.Name}' for {table} is already owned by SQLite table '{owner}'. " +
-                "SQLite index names are database-wide; choose a name unique across containers.");
+                $"Index '{name}' for {table} is already owned by SQLite table '{owner}'. SQLite index names are " +
+                "database-wide, so two entities cannot declare one name: give one of them another [Index(Name = ...)], " +
+                "or omit the name so Koan derives one from the table. If that table is a partition of this entity, the " +
+                $"index was built before each partition table took a copy of its own; drop it with DROP INDEX {SqliteDialect.Quote(name)};");
         if (actual is not null && Equivalent(actual, expected)) return;
 
         // One statement, so a stale index is never dropped without its replacement being written.
         await Execute(
-            actual is null ? expected : $"DROP INDEX {SqliteDialect.Quote(index.Name)}; {expected}",
+            actual is null ? expected : $"DROP INDEX {SqliteDialect.Quote(name)}; {expected}",
             ct).ConfigureAwait(false);
     }
 
@@ -138,10 +155,12 @@ internal sealed class SqliteDdlExecutor(
         RelationalIndexDefinition index,
         CancellationToken ct = default)
     {
+        // The name the index would have been created under on this table, so a partition table's predecessor is its own.
+        var name = RelationalIndexNames.Name(table, index, partitioned);
         var connection = await Writer(ct).ConfigureAwait(false);
-        var (owner, _) = await Inspect(connection, _writerTransaction, index.Name, ct).ConfigureAwait(false);
+        var (owner, _) = await Inspect(connection, _writerTransaction, name, ct).ConfigureAwait(false);
         return owner is not null && string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase)
-            ? new RelationalIndexState(index.Name, $"DROP INDEX {SqliteDialect.Quote(index.Name)};")
+            ? new RelationalIndexState(name, $"DROP INDEX {SqliteDialect.Quote(name)};")
             : null;
     }
 

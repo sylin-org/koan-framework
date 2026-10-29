@@ -42,6 +42,14 @@ Index plans carry the same binding and encoding identities as filter/write plans
 rewrite-free behavior, and TTL are executed only when `IRelationalStoreFeatures` proves the matching native profile;
 unsupported TTL metadata is never lowered as an ordinary index.
 
+A store whose index names span its containers (PostgreSQL schemas, SQLite databases) creates each index under
+`RelationalIndexNames.Name`, the one rule for such stores (DATA-0146, DATA-0160): a derived name, which carries its
+table, is fitted to the store's limit; a declared `[Index(Name = ...)]` is used as written on the entity's own table and
+qualified by a hash of the table name on a partition table, so one declaration yields one index per container. The plan
+keeps the declared name; the executor applies the rule, because the repository builds it per container and so it alone
+knows whether its table is a partition. PostgreSQL passes its 63-byte limit, SQLite none; CockroachDB, whose names are
+per table, keeps the declared names.
+
 Under row-scoped segmentation, on a store whose features declare `SupportsManagedFieldIndexParts` (SQLite, Npgsql), the
 orchestrator leads every unique, non-primary index with the managed fields (`__koan_tenant`) read inside the document
 root, under a name of its own fitted to 63 bytes, and keeps the global

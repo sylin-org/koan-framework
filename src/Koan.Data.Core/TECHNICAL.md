@@ -316,7 +316,9 @@ validation:
   `NotCommitted` with zero completed operations; elsewhere it is sequential dispatch whose failure reports completed
   operation count, commit outcome, retry disposition, and replay disposition without claiming native atomicity. A
   scope opened with `TransactionGuarantee.Atomic` refuses, at tracking time, any operation that cannot join the native
-  transaction (DATA-0158).
+  transaction (DATA-0158). A failure before the first operation is dispatched (resolving routes, provisioning stores,
+  beginning the native transaction) reports `NotCommitted`; only a failure of the native commit itself or of sequential
+  dispatch reports `Unknown` (DATA-0161).
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

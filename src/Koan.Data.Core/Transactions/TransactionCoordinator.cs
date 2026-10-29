@@ -172,6 +172,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
 
         var stopwatch = Stopwatch.StartNew();
+        // Until dispatch begins nothing this scope tracked can have reached a store, so a failure resolving its routes,
+        // entering their horizon, provisioning their stores or beginning the native transaction leaves nothing durable
+        // (NotCommitted). Only a failure from dispatch on can leave an outcome the coordinator cannot know.
+        var dispatching = false;
 
         try
         {
@@ -194,6 +198,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             {
                 // Execute operations sequentially inside one declared route horizon. This does not create a native
                 // transaction, so a later failure can leave an earlier operation durable.
+                dispatching = true;
                 await ExecuteOperations(scope: null, ct).ConfigureAwait(false);
             }
             else
@@ -214,6 +219,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 await using var scope = await atomic.Provider
                     .BeginAtomicCommit(_services, atomic.Source, ct)
                     .ConfigureAwait(false);
+                dispatching = true;
                 await ExecuteOperations(atomic, ct).ConfigureAwait(false);
                 await CommitNative(scope, atomic, ct).ConfigureAwait(false);
             }
@@ -242,6 +248,15 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _isCompleted = true;
 
             if (ex is TransactionException or NotSupportedException) throw;
+            if (!dispatching)
+                throw new TransactionException(
+                    $"Deferred coordination '{Name}' failed before any tracked operation was dispatched; none of them is " +
+                    "durable, and it will not be replayed.",
+                    Name,
+                    failedAdapter: null,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.NotCommitted,
+                    ex);
             throw new TransactionException(
                 $"Deferred coordination '{Name}' failed. Its commit outcome is unknown and it will not be replayed.",
                 Name,

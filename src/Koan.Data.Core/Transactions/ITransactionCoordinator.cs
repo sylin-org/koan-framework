@@ -63,8 +63,11 @@ public interface ITransactionCoordinator
 
     /// <summary>
     /// Execute all tracked operations. When they all target one route whose provider commits atomically, they run
-    /// inside one native transaction and a failure leaves nothing durable (<see cref="DataCommitOutcome.NotCommitted"/>).
-    /// Otherwise they run sequentially: a failure can leave partial state and reports an unknown commit outcome. The
+    /// inside one native transaction and a failure leaves nothing durable (<see cref="DataCommitOutcome.NotCommitted"/>),
+    /// except a failure of the native commit itself, whose outcome is <see cref="DataCommitOutcome.Unknown"/>.
+    /// Otherwise they run sequentially: a failure can leave partial state and reports an unknown commit outcome. A
+    /// failure before the first operation is dispatched — resolving routes, provisioning stores, beginning the native
+    /// transaction — leaves nothing durable on either path and reports <see cref="DataCommitOutcome.NotCommitted"/>. The
     /// coordinator never replays dispatched work.
     /// </summary>
     /// <exception cref="TransactionException">If any operation fails after zero or more earlier operations completed</exception>

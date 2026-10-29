@@ -78,6 +78,19 @@ does not name the index. A database built before keeps its global unique index; 
 for every other. Confirm the new index with `SELECT name, sql FROM sqlite_master WHERE tbl_name = '<table>'`, then drop
 the old one.
 
+## Index names
+
+SQLite index names are database-wide, so every keyed index is created under the relational rule for such stores, the
+one PostgreSQL follows ([DATA-0160](../../../../docs/decisions/DATA-0160-sqlite-qualifies-declared-index-names-per-partition-table.md)).
+A derived name (`IX_<table>_<members>`) carries its table, which carries its partition. A name declared with
+`[Index(Name = ...)]` is used as written on the entity's own table and becomes `<name>_<eight-character hash of the
+table name>` on a partition table, so every partition table holds its own copy of each declared index and the entity's
+own table keeps the names its queries are proven against. Two entities that declare one name are refused on their own
+tables, naming the table that holds it. A partition table provisioned before its entity's own table by an earlier
+build can hold the unqualified name itself; the entity's own table is then refused with the `DROP INDEX` statement
+that frees the name. Koan drops nothing on its own; `SELECT name, sql FROM sqlite_master WHERE type = 'index' AND
+tbl_name = '<table>'` lists what a table holds.
+
 ## Bulk and batch
 
 Constrained single-item endpoint creates use `IInsertOnlyRepository.Insert`. SQLite executes `INSERT OR ABORT`,
@@ -112,7 +125,10 @@ scope ends, `SqliteRepository.Open` returns that connection and transaction for 
 and `SqliteDdlExecutor` describes and writes schema over it, so a lifecycle read sees the rows written earlier in the
 scope and a schema statement does not wait on the lock the scope holds. The coordinator dispatches in call order and
 commits once; a failed operation disposes the scope, which rolls the transaction back, and the readiness of any
-target the scope itself provisioned is invalidated. Raw reads (`QueryRaw`, `CountRaw`, Read-labelled SQL) keep their
+target the scope itself provisioned is invalidated. A failure before the transaction begins — a table that cannot be
+provisioned, or `BEGIN IMMEDIATE` waiting out the busy timeout behind another writer — reports `NotCommitted`; only a
+failed `COMMIT` reports `Unknown`
+([DATA-0161](../../../../docs/decisions/DATA-0161-a-commit-that-fails-before-dispatch-reports-not-committed.md)). Raw reads (`QueryRaw`, `CountRaw`, Read-labelled SQL) keep their
 own `query_only` connection and see committed state only. `UpsertMany`, `DeleteMany`, conditional bulk deletes and
 `Batch().Save` join the ambient transaction instead of beginning their own.
 

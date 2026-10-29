@@ -426,6 +426,10 @@
       href: DATA-0158-sqlite-posture-and-atomic-commit.md
     - name: DATA-0159 An entity's declared text is indexed lexically by the store that holds it
       href: DATA-0159-lexical-search-over-declared-entity-text.md
+    - name: DATA-0160 SQLite qualifies a declared index name per partition table, by the one relational rule PostgreSQL follows
+      href: DATA-0160-sqlite-qualifies-declared-index-names-per-partition-table.md
+    - name: DATA-0161 A deferred commit that fails before it dispatches anything reports NotCommitted
+      href: DATA-0161-a-commit-that-fails-before-dispatch-reports-not-committed.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

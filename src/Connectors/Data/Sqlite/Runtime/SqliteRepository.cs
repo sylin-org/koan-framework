@@ -521,8 +521,12 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         if (!validation.IsServiceable) throw Mismatch(validation.Plan.Table, validation.Corrective);
     }
 
-    private SqliteDdlExecutor Ddl(SqliteEntityPlan<TEntity, TKey> plan) =>
-        new(_route, _connections, plan.Dialect);
+    // An ambient partition names a different table of the same entity, so a declared index name is qualified for it.
+    private SqliteDdlExecutor Ddl(SqliteEntityPlan<TEntity, TKey> plan) => new(
+        _route,
+        _connections,
+        plan.Dialect,
+        partitioned: !string.IsNullOrWhiteSpace(EntityContext.Current?.Partition));
 
     private SchemaMismatchException Mismatch(
         RelationalTableDefinition table,

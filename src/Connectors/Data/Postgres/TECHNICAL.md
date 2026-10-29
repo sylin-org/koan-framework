@@ -88,6 +88,8 @@ name match. Koan therefore names every index so a declared index can exist, then
   and ends in `_` plus an eight-character hash of the whole name, so names that used to be cut alike stay distinct.
 - A name you declare with `[Index(Name = ...)]` is used as written on the entity's own table. On a partition table it is
   qualified, `<name>_<eight-character hash of the table name>`, so the declaration creates one index per partition table.
+  This is the relational rule SQLite follows too (`RelationalIndexNames`,
+  [DATA-0160](../../../../docs/decisions/DATA-0160-sqlite-qualifies-declared-index-names-per-partition-table.md)).
 - After each create the catalog is asked what the name holds. A name owned by another table (two entities that declare
   the same name), a non-unique index under a unique declaration or a different key count is refused with the remedy.
 
