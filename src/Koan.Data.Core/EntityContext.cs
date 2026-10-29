@@ -144,6 +144,16 @@ public static class EntityContext
         string? transaction = null,
         CacheBehavior? cacheBehavior = null,
         bool preserveTransaction = true)
+        => Push(source, adapter, partition, transaction, cacheBehavior, preserveTransaction, TransactionGuarantee.Coordinated);
+
+    private static IDisposable Push(
+        string? source,
+        string? adapter,
+        string? partition,
+        string? transaction,
+        CacheBehavior? cacheBehavior,
+        bool preserveTransaction,
+        TransactionGuarantee guarantee)
     {
         var prev = Current;
 
@@ -175,7 +185,7 @@ public static class EntityContext
         // Create a new coordinator only when starting a new transaction
         if (!string.IsNullOrWhiteSpace(transaction))
         {
-            coordinatorForScope = CreateTransactionCoordinator(transaction);
+            coordinatorForScope = CreateTransactionCoordinator(transaction, guarantee);
             activeCoordinator = coordinatorForScope;
         }
 
@@ -226,10 +236,13 @@ public static class EntityContext
     /// <summary>
     /// Start a named deferred-coordination scope. Single and collection Save/Remove are held until <see cref="Commit"/>,
     /// then executed in call order under the context each was issued in; every write that cannot be deferred refuses
-    /// inside the scope. This is not a native or distributed atomic transaction. A failed commit can leave a durable
-    /// prefix, and <see cref="Rollback"/> discards only operations not yet dispatched. By default disposal rolls back
-    /// pending work; auto-commit on dispose is an explicit option, which also commits when an exception leaves the
-    /// block and throws a failed commit from Dispose.
+    /// inside the scope. When every held operation targets one route whose provider commits atomically (SQLite), Commit
+    /// runs them inside one native transaction, so they commit or roll back together across entity types; otherwise
+    /// Commit dispatches them sequentially, a failed commit can leave a durable prefix, and <see cref="Rollback"/>
+    /// discards only operations not yet dispatched. A scope that must have the native transaction asks for
+    /// <see cref="TransactionGuarantee.Atomic"/>. By default disposal rolls back pending work; auto-commit on dispose
+    /// is an explicit option, which also commits when an exception leaves the block and throws a failed commit from
+    /// Dispose.
     /// </summary>
     /// <param name="name">Transaction name for correlation and telemetry</param>
     /// <returns>A disposable scope that discards pending work on disposal unless auto-commit is configured</returns>
@@ -237,8 +250,20 @@ public static class EntityContext
     public static IDisposable Transaction(string name) => With(transaction: name);
 
     /// <summary>
-    /// Execute the current scope's tracked operations sequentially across adapters. This completion boundary
-    /// is non-atomic and can fail after earlier operations have committed.
+    /// Start a named scope with an explicit <paramref name="guarantee"/>. With <see cref="TransactionGuarantee.Atomic"/>
+    /// every Save/Remove tracked in the scope must land on one route whose provider declares
+    /// <c>write.atomicCommit</c>; the first operation that cannot is refused with a <see cref="NotSupportedException"/>
+    /// naming the correction, before any write, and Commit is one native transaction or nothing.
+    /// </summary>
+    /// <param name="name">Transaction name for correlation and telemetry</param>
+    /// <param name="guarantee">What the scope promises at Commit</param>
+    public static IDisposable Transaction(string name, TransactionGuarantee guarantee) =>
+        Push(null, null, null, name, null, preserveTransaction: true, guarantee);
+
+    /// <summary>
+    /// Execute the current scope's tracked operations: inside one native transaction when they all target one route
+    /// that commits atomically, otherwise sequentially across adapters, where the completion boundary is non-atomic
+    /// and can fail after earlier operations have committed.
     /// Idempotent no-op when there is no active transaction (or it has already completed) — calling Commit
     /// without a transaction, or twice, never throws.
     /// </summary>
@@ -265,10 +290,10 @@ public static class EntityContext
         return current.TransactionCoordinator.Rollback(ct);
     }
 
-    private static ITransactionCoordinator CreateTransactionCoordinator(string name)
+    private static ITransactionCoordinator CreateTransactionCoordinator(string name, TransactionGuarantee guarantee)
     {
         var factory = AppHost.GetRequiredService<ITransactionCoordinatorFactory>(TransactionOperation);
-        return factory.Create(name);
+        return factory.Create(name, guarantee);
     }
 
     private sealed class TransactionScope : IDisposable

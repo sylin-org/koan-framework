@@ -11,8 +11,9 @@ namespace Koan.Data.Core.Transactions;
 public static class TxCaps
 {
     /// <summary>
-    /// A genuine native local transaction. The logical Entity coordinator does not publish this token;
-    /// Direct/provider transaction implementations may publish it only when they own a native boundary.
+    /// A genuine native local transaction. The Entity coordinator publishes it only for a scope opened with
+    /// <see cref="TransactionGuarantee.Atomic"/>, whose commit is one native transaction or a refusal; Direct/provider
+    /// transaction implementations may publish it when they own a native boundary.
     /// </summary>
     public static readonly Capability Local = new("tx.local");
 

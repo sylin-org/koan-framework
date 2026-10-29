@@ -51,6 +51,9 @@ public static class DataCaps
         public static readonly Capability BulkDelete = new("write.bulkDelete");
         /// <summary>Provider supports atomic batches.</summary>
         public static readonly Capability AtomicBatch = new("write.atomicBatch");
+        /// <summary>Provider runs every record write a deferred coordination scope dispatches to one of its sources
+        /// inside one native transaction, across entity types — see <see cref="Transactions.IAtomicCommitProvider"/>.</summary>
+        public static readonly Capability AtomicCommit = new("write.atomicCommit");
         /// <summary>Provider returns an exact insert/update result from its native upsert boundary.</summary>
         public static readonly Capability MutationOutcomes = new("write.mutationOutcomes");
         /// <summary>Provider atomically inserts an absent identity without replacing an existing row.</summary>

@@ -13,6 +13,7 @@ public static class Constants
     internal const int UniqueConstraint = 2067;
     internal const int BusyCode = 5;
     internal const int LockedCode = 6;
+    internal const int ReadOnlyCode = 8;
     internal const string UniqueConstraintFailure = "UNIQUE constraint failed: ";
 
     public static class Configuration
@@ -35,6 +36,12 @@ public static class Constants
             public const string ProviderDdlPolicy = DefaultSourceSection + ":DdlPolicy";
             public const string SchemaMatching = Section + ":SchemaMatchingMode";
             public const string ProviderSchemaMatching = DefaultSourceSection + ":SchemaMatchingMode";
+            public const string JournalMode = Section + ":JournalMode";
+            public const string ProviderJournalMode = DefaultSourceSection + ":JournalMode";
+            public const string BusyTimeout = Section + ":BusyTimeout";
+            public const string ProviderBusyTimeout = DefaultSourceSection + ":BusyTimeout";
+            public const string Synchronous = Section + ":Synchronous";
+            public const string ProviderSynchronous = DefaultSourceSection + ":Synchronous";
         }
     }
 }

@@ -15,11 +15,13 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
     private readonly TransactionOptions _options;
     private readonly IServiceProvider _services;
     private readonly DataOperationHorizon _operationHorizon;
+    private readonly DataProviderCatalog _providers;
 
     public TransactionCoordinatorFactory(
         IDataService dataService,
         IServiceProvider services,
         DataOperationHorizon operationHorizon,
+        DataProviderCatalog providers,
         ILogger<TransactionCoordinator> logger,
         IOptions<TransactionOptions> options)
     {
@@ -28,9 +30,10 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
+        _providers = providers ?? throw new ArgumentNullException(nameof(providers));
     }
 
-    public ITransactionCoordinator Create(string name)
+    public ITransactionCoordinator Create(string name, TransactionGuarantee guarantee = TransactionGuarantee.Coordinated)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Transaction name cannot be null or empty", nameof(name));
@@ -40,7 +43,9 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
             _dataService,
             _services,
             _operationHorizon,
+            _providers,
             _logger,
-            _options);
+            _options,
+            guarantee);
     }
 }

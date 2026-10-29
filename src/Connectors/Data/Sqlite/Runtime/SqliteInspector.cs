@@ -153,12 +153,8 @@ internal sealed class SqliteInspector(SqliteRoute route, SqliteConnections conne
         return relational;
     }
 
-    private async Task<SqliteConnection> Open(CancellationToken ct)
-    {
-        var connection = connections.Create(route.ConnectionString, route.Source, nonCreating: true);
-        try { await connection.OpenAsync(ct).ConfigureAwait(false); return connection; }
-        catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
-    }
+    private Task<SqliteConnection> Open(CancellationToken ct) =>
+        connections.Open(route.ConnectionString, route.Source, ct, nonCreating: true);
 
     private static int Continuation(string? value) => string.IsNullOrWhiteSpace(value) ? 0 :
         int.TryParse(value, out var offset) && offset >= 0 ? offset :

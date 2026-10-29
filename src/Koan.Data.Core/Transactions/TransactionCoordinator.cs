@@ -6,14 +6,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Capabilities;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Failures;
+using Koan.Data.Abstractions.Transactions;
 using Microsoft.Extensions.Logging;
 using Koan.Data.Core.Routing;
 
 namespace Koan.Data.Core.Transactions;
 
 /// <summary>
-/// Coordinates deferred entity operations without claiming native or distributed atomicity.
+/// Coordinates deferred entity operations. Commit is one native transaction when every tracked operation targets one
+/// route whose provider is an <see cref="IAtomicCommitProvider"/>; otherwise it is sequential dispatch that claims
+/// neither native nor distributed atomicity.
 /// </summary>
 internal sealed class TransactionCoordinator : ITransactionCoordinator
 {
@@ -27,24 +31,38 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private readonly object _lock = new();
     private readonly IServiceProvider _services;
     private readonly DataOperationHorizon _operationHorizon;
+    private readonly DataProviderCatalog _providers;
+    // The one route an Atomic scope has admitted so far; a second route is refused at tracking time.
+    private AtomicRoute? _requiredRoute;
 
     public string Name { get; }
     public bool IsCompleted => _isCompleted;
+    public TransactionGuarantee Guarantee { get; }
 
     public TransactionCoordinator(
         string name,
         IDataService dataService,
         IServiceProvider services,
         DataOperationHorizon operationHorizon,
+        DataProviderCatalog providers,
         ILogger<TransactionCoordinator> logger,
-        TransactionOptions options)
+        TransactionOptions options,
+        TransactionGuarantee guarantee)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
-
+        _providers = providers ?? throw new ArgumentNullException(nameof(providers));
+        Guarantee = guarantee;
+        // Deferred coordination is useful but is neither a native local transaction nor distributed atomicity. An
+        // Atomic scope commits through one native transaction or refuses, so it owns a native boundary (TxCaps.Local).
+        Capabilities = CapabilitySet.Build("transaction", c =>
+        {
+            c.Add(TxCaps.DeferredCoordination);
+            if (guarantee == TransactionGuarantee.Atomic) c.Add(TxCaps.Local);
+        });
     }
 
     public void TrackSave<TEntity, TKey>(TEntity entity, EntityContext.ContextState context)
@@ -130,6 +148,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     private void TrackOperation(ITrackedOperation operation)
     {
+        // An Atomic scope refuses before the operation joins, so nothing it could not commit atomically is ever held.
+        if (Guarantee == TransactionGuarantee.Atomic) RequireAtomicRoute(operation);
         StartWorkTelemetry();
         // Check max operations limit before the operation joins the unit of work.
         if (_operations.Count + 1 > _options.MaxTrackedOperations)
@@ -161,17 +181,42 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 _operations.Count,
                 Adapters.Count);
 
-            var bindings = _operations
+            var resolved = _operations
                 .Select(operation => operation.ResolveDataBinding(_services))
-                .OfType<DataRouteBinding>()
                 .ToArray();
+            var bindings = resolved.OfType<DataRouteBinding>().ToArray();
+            var atomic = ResolveAtomicRoute(resolved);
             await using var operationHorizon = await _operationHorizon
                 .EnterMany(bindings, $"deferred transaction '{Name}'", ct)
                 .ConfigureAwait(false);
 
-            // Execute operations sequentially inside one declared route horizon. This does not create a native
-            // transaction, so a later failure can leave an earlier operation durable.
-            await ExecuteOperations(ct).ConfigureAwait(false);
+            if (atomic is null)
+            {
+                // Execute operations sequentially inside one declared route horizon. This does not create a native
+                // transaction, so a later failure can leave an earlier operation durable.
+                await ExecuteOperations(scope: null, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Atomic commit '{TransactionName}' runs its {OperationCount} operations in one native transaction on route '{Source}' ({Adapter})",
+                    Name,
+                    _operations.Count,
+                    atomic.Source,
+                    atomic.Adapter);
+                // Schema provisioning runs before the native transaction opens: a table created inside it would
+                // roll back with a failed commit while readiness remembered it as provisioned, and a second
+                // connection could not create it while the transaction holds the write lock.
+                foreach (var operation in _operations)
+                    await operation.EnsureReady(ct).ConfigureAwait(false);
+                // The provider establishes the native transaction in this flow before its first await, so every
+                // operation dispatched below — and every read a lifecycle hook makes on the way — runs inside it.
+                await using var scope = await atomic.Provider
+                    .BeginAtomicCommit(_services, atomic.Source, ct)
+                    .ConfigureAwait(false);
+                await ExecuteOperations(atomic, ct).ConfigureAwait(false);
+                await CommitNative(scope, atomic, ct).ConfigureAwait(false);
+            }
 
             _isCompleted = true;
             stopwatch.Stop();
@@ -183,6 +228,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
             _activity?.SetStatus(ActivityStatusCode.Ok);
             _activity?.SetTag("transaction.outcome", "committed");
+            _activity?.SetTag("transaction.atomic", atomic is not null);
             _activity?.SetTag("transaction.duration_ms", stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
@@ -195,7 +241,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _activity?.SetTag("transaction.outcome", "failed");
             _isCompleted = true;
 
-            if (ex is TransactionException) throw;
+            if (ex is TransactionException or NotSupportedException) throw;
             throw new TransactionException(
                 $"Deferred coordination '{Name}' failed. Its commit outcome is unknown and it will not be replayed.",
                 Name,
@@ -254,10 +300,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    // Deferred coordination is useful but is neither a native local transaction nor distributed atomicity.
-    public CapabilitySet Capabilities { get; } = CapabilitySet.Build(
-        "transaction",
-        c => c.Add(TxCaps.DeferredCoordination));
+    public CapabilitySet Capabilities { get; }
 
     public IReadOnlyList<string> Adapters => _operations.Select(static operation => operation.GetAdapterHint()).Distinct().ToArray();
 
@@ -279,7 +322,90 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _activity?.Id ?? "unknown");
     }
 
-    private async Task ExecuteOperations(CancellationToken ct)
+    /// <summary>One route a native transaction can cover, and the provider that opens it.</summary>
+    private sealed record AtomicRoute(IAtomicCommitProvider Provider, string Adapter, string Source, string ConnectionIdentity);
+
+    private AtomicRoute? AtomicRouteOf(DataRouteBinding binding) =>
+        _providers.Find(binding.Plan.Adapter) is IAtomicCommitProvider provider
+            ? new AtomicRoute(provider, binding.Plan.Adapter, binding.Plan.Source, binding.Plan.ConnectionIdentity)
+            : null;
+
+    private static bool SameRoute(AtomicRoute left, AtomicRoute right) =>
+        string.Equals(left.Adapter, right.Adapter, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(left.ConnectionIdentity, right.ConnectionIdentity, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Admits <paramref name="operation"/> into an Atomic scope, or refuses it with the correction: the one route a
+    /// native transaction covers is the first one tracked, and every later operation must land on it through a
+    /// provider that commits atomically.
+    /// </summary>
+    private void RequireAtomicRoute(ITrackedOperation operation)
+    {
+        var binding = operation.ResolveDataBinding(_services);
+        if (binding is null)
+            throw Refuse($"the {operation.GetAdapterHint()} operation is a vector operation, which cannot join a native transaction. " +
+                         "Save the vector outside the scope, or use TransactionGuarantee.Coordinated");
+        var route = AtomicRouteOf(binding) ?? throw Refuse(
+            $"route '{binding.Plan.Source}' on provider '{binding.Plan.Adapter}' cannot commit atomically: the provider does " +
+            $"not declare '{DataCaps.Write.AtomicCommit.Id}'. Route the scope to a provider that does (SQLite declares it), " +
+            "or use TransactionGuarantee.Coordinated, which dispatches sequentially and can leave a durable prefix");
+        if (_requiredRoute is null) _requiredRoute = route;
+        else if (!SameRoute(_requiredRoute, route))
+            throw Refuse($"it already covers route '{_requiredRoute.Source}' ({_requiredRoute.Adapter}) and cannot also cover " +
+                         $"route '{route.Source}' ({route.Adapter}): one native transaction covers one route. Keep the scope " +
+                         "to one route, or use TransactionGuarantee.Coordinated");
+    }
+
+    private NotSupportedException Refuse(string reason) =>
+        new($"Transaction '{Name}' requires an atomic commit (TransactionGuarantee.Atomic), but {reason}.");
+
+    /// <summary>
+    /// The one route every tracked operation targets through a provider that commits atomically, or null when the
+    /// scope must dispatch sequentially. An Atomic scope admitted each operation at tracking time, so here it can only
+    /// confirm the route it already holds.
+    /// </summary>
+    private AtomicRoute? ResolveAtomicRoute(IReadOnlyList<DataRouteBinding?> bindings)
+    {
+        AtomicRoute? route = null;
+        foreach (var binding in bindings)
+        {
+            var candidate = binding is null ? null : AtomicRouteOf(binding);
+            if (candidate is null || route is not null && !SameRoute(route, candidate))
+            {
+                if (Guarantee == TransactionGuarantee.Atomic)
+                    throw Refuse("its tracked operations no longer resolve to one route that commits atomically");
+                return null;
+            }
+            route ??= candidate;
+        }
+        return route;
+    }
+
+    private async Task CommitNative(IAtomicCommitScope scope, AtomicRoute route, CancellationToken ct)
+    {
+        try
+        {
+            await scope.Commit(ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Transaction '{TransactionName}' native commit failed on route '{Source}' ({Adapter})",
+                Name,
+                route.Source,
+                route.Adapter);
+            throw new TransactionException(
+                $"Atomic commit '{Name}' failed while committing its native transaction on route '{route.Source}'. " +
+                "Its commit outcome is unknown and it will not be replayed.",
+                Name,
+                route.Adapter,
+                completedOperationCount: 0,
+                DataCommitOutcome.Unknown,
+                ex);
+        }
+    }
+
+    private async Task ExecuteOperations(AtomicRoute? scope, CancellationToken ct)
     {
         var executedAdapters = new List<string>();
         var completedOperations = 0;
@@ -313,6 +439,25 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 await operation.Execute(ct).ConfigureAwait(false);
                 completedOperations++;
                 if (!executedAdapters.Contains(adapter)) executedAdapters.Add(adapter);
+            }
+            catch (Exception ex) when (scope is not null)
+            {
+                // Inside a native transaction nothing is durable yet: disposing the scope without a commit rolls back
+                // every operation dispatched so far, this one included.
+                _logger.LogError(ex,
+                    "Transaction '{TransactionName}' operation failed on route '{Source}' ({Adapter}); the native transaction rolls back",
+                    Name,
+                    scope.Source,
+                    scope.Adapter);
+
+                throw new TransactionException(
+                    $"Atomic commit '{Name}' failed on operation {completedOperations + 1} of {_operations.Count}; " +
+                    "its native transaction was rolled back and nothing is durable.",
+                    Name,
+                    adapter,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.NotCommitted,
+                    ex);
             }
             catch (Exception ex)
             {

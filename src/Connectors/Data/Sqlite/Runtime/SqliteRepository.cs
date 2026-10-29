@@ -86,7 +86,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await Get(connection, null, plan, id, ct).ConfigureAwait(false);
+        return await Get(connection, plan, id, ct).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<TEntity?>> GetMany(IEnumerable<TKey> ids, CancellationToken ct = default)
@@ -125,7 +125,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "upsert");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        await Upsert(connection, null, plan, model, ct).ConfigureAwait(false);
+        await Upsert(connection, plan, model, ct).ConfigureAwait(false);
         return model;
     }
 
@@ -140,7 +140,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         var generated = plan.Mapping.Identity.IsGenerated && EqualityComparer<TKey>.Default.Equals(model.Id, default!);
         var write = generated ? plan.Commands.Insert(model) : plan.Commands.Update(model);
-        await using var command = PrepareInsert(connection, null, plan, write, includeConflict: false);
+        await using var command = PrepareInsert(connection, plan, write, includeConflict: false);
         // Override any external table conflict policy, including REPLACE. A trigger's IGNORE is
         // not an identity collision receipt, so zero affected rows remain an unverified failure.
         command.CommandText = command.CommandText.Insert("INSERT".Length, " OR ABORT");
@@ -186,7 +186,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "bulk upsert");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
+        var work = connection.In(transaction);
         var writeRoots = plan.Mapping.Bindings
             .Select(static binding => binding.PhysicalPath.Name)
             .Distinct(StringComparer.Ordinal)
@@ -198,9 +199,9 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         for (var offset = 0; offset < values.Count; offset += dispatchSize)
         {
             var count = Math.Min(dispatchSize, values.Count - offset);
-            await UpsertDispatch(connection, transaction, plan, values, offset, count, ct).ConfigureAwait(false);
+            await UpsertDispatch(work, plan, values, offset, count, ct).ConfigureAwait(false);
         }
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        await transaction.Commit(ct).ConfigureAwait(false);
         return values.Count;
     }
 
@@ -213,7 +214,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
+        var work = connection.In(transaction);
         var width = Math.Max(1, plan.IdentityRoots.Count);
         var dispatchSize = Math.Max(1, Math.Min(
             Infrastructure.Constants.MaximumBatchItems,
@@ -221,13 +223,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var deleted = 0;
         for (var offset = 0; offset < values.Count; offset += dispatchSize)
             deleted += await Delete(
-                connection,
-                transaction,
+                work,
                 plan,
                 values.Skip(offset).Take(dispatchSize).ToArray(),
                 guard: null,
                 ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        await transaction.Commit(ct).ConfigureAwait(false);
         return deleted;
     }
 
@@ -393,7 +394,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         await Ready(plan, ct).ConfigureAwait(false);
         _route.Policy.Demand(DataOperationEffect.Write, "conditional bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
+        var work = connection.In(transaction);
         var width = Math.Max(1, plan.IdentityRoots.Count);
         var guardParameters = Where(plan, guard).Values.Count;
         var dispatchSize = Math.Max(1, Math.Min(
@@ -402,13 +404,12 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         var deleted = 0;
         for (var offset = 0; offset < ids.Count; offset += dispatchSize)
             deleted += await Delete(
-                connection,
-                transaction,
+                work,
                 plan,
                 ids.Skip(offset).Take(dispatchSize).ToArray(),
                 guard,
                 ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        await transaction.Commit(ct).ConfigureAwait(false);
         return deleted;
     }
 
@@ -479,6 +480,10 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     private async Task Ready(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
         var target = plan.Target;
+        // A schema provisioned inside an atomic commit rolls back with it (DATA-0158), so readiness must forget the
+        // target when the unit rolls back; the next use provisions it again.
+        _connections.CurrentUnit(_route.ConnectionString, _route.Source)
+            ?.OnRollback(target, () => _readiness.InvalidateShape(_route.Policy, target));
         if (_route.Policy.UsesLegacyProvisioningReadiness)
         {
             await _readiness.Provision(
@@ -554,39 +559,74 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         });
     }
 
-    private async Task<SqliteConnection> Open(CancellationToken ct)
+    /// <summary>
+    /// The session an operation runs in. Inside an atomic commit that covers this route (DATA-0158) it is the ambient
+    /// native transaction's own connection, shared by every read and write of the scope so a lifecycle read sees the
+    /// rows written earlier in it; otherwise a connection this operation opens and owns.
+    /// </summary>
+    private async Task<Session> Open(CancellationToken ct)
     {
-        var connection = _connections.Create(_route.ConnectionString, _route.Source);
-        try { await connection.OpenAsync(ct).ConfigureAwait(false); return connection; }
-        catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
+        if (_connections.CurrentUnit(_route.ConnectionString, _route.Source) is { } unit)
+            return new Session(unit.Connection, unit.Transaction, Owned: false);
+        return new Session(
+            await _connections.Open(_route.ConnectionString, _route.Source, ct).ConfigureAwait(false),
+            null,
+            Owned: true);
     }
 
     // The connection a raw read runs on (WEB-0074): the engine refuses any write through it. query_only is connection
     // state and a pooled connection goes back to its pool still holding it, so this one is never pooled - it is closed
-    // for real when the read ends and no ordinary caller can inherit the mode.
-    private async Task<SqliteConnection> OpenReadOnly(CancellationToken ct)
+    // for real when the read ends and no ordinary caller can inherit the mode. It never joins an atomic commit: the
+    // mode would fence the unit's own writes, so a raw read inside the scope sees committed state only.
+    private async Task<Session> OpenReadOnly(CancellationToken ct)
     {
-        var connection = _connections.Create(_route.ConnectionString, _route.Source, pooled: false);
+        var connection = await _connections.Open(_route.ConnectionString, _route.Source, ct, pooled: false)
+            .ConfigureAwait(false);
         try
         {
-            await connection.OpenAsync(ct).ConfigureAwait(false);
             await using var fence = connection.CreateCommand();
             fence.CommandText = "PRAGMA query_only = ON";
             await fence.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-            return connection;
+            return new Session(connection, null, Owned: true);
         }
         catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
     }
 
+    /// <summary>A connection and the transaction its commands run in; disposal closes only a connection the session owns.</summary>
+    private readonly record struct Session(SqliteConnection Connection, SqliteTransaction? Transaction, bool Owned) : IAsyncDisposable
+    {
+        public SqliteCommand CreateCommand()
+        {
+            var command = Connection.CreateCommand();
+            command.Transaction = Transaction;
+            return command;
+        }
+
+        /// <summary>The transaction a multi-statement operation runs in: the ambient one when it exists, else a new one.</summary>
+        public async ValueTask<Unit> Begin(CancellationToken ct) => Transaction is not null
+            ? new Unit(Transaction, Owned: false)
+            : new Unit((SqliteTransaction)await Connection.BeginTransactionAsync(ct).ConfigureAwait(false), Owned: true);
+
+        public Session In(Unit unit) => new(Connection, unit.Transaction, Owned: false);
+
+        public ValueTask DisposeAsync() => Owned ? Connection.DisposeAsync() : ValueTask.CompletedTask;
+    }
+
+    /// <summary>A transaction an operation begun itself and commits, or the ambient one it joined and leaves alone.</summary>
+    private readonly record struct Unit(SqliteTransaction Transaction, bool Owned) : IAsyncDisposable
+    {
+        public Task Commit(CancellationToken ct) => Owned ? Transaction.CommitAsync(ct) : Task.CompletedTask;
+
+        public ValueTask DisposeAsync() => Owned ? Transaction.DisposeAsync() : ValueTask.CompletedTask;
+    }
+
     private static async Task<TEntity?> Get(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         TKey id,
         CancellationToken ct)
     {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        await using var command = session.CreateCommand();
         var predicate = IdentityPredicate(command, plan, plan.Commands.Get(id).Identity, "key_");
         command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row WHERE {predicate} LIMIT 1";
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -594,15 +634,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
     private static async Task Upsert(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         TEntity model,
         CancellationToken ct)
     {
         var generated = plan.Mapping.Identity.IsGenerated && EqualityComparer<TKey>.Default.Equals(model.Id, default!);
         var write = generated ? plan.Commands.Insert(model) : plan.Commands.Update(model);
-        await using var command = PrepareInsert(connection, transaction, plan, write, includeConflict: !generated);
+        await using var command = PrepareInsert(session, plan, write, includeConflict: !generated);
         if (generated)
         {
             command.CommandText += $" RETURNING {SqliteDialect.Quote(plan.IdentityRoots.Single())}";
@@ -615,16 +654,14 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
     private static async Task UpsertDispatch(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         IReadOnlyList<TEntity> models,
         int offset,
         int count,
         CancellationToken ct)
     {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        await using var command = session.CreateCommand();
         var generated = new bool[count];
         var statements = new string[count];
         var requiresOutcomes = ManagedFieldWriteScope.Current is { Count: > 0 };
@@ -636,8 +673,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             requiresOutcomes |= generated[local];
             var write = generated[local] ? plan.Commands.Insert(model) : plan.Commands.Update(model);
             await using var statement = PrepareInsert(
-                connection,
-                transaction,
+                session,
                 plan,
                 write,
                 includeConflict: !generated[local],
@@ -695,15 +731,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
     }
 
     private static SqliteCommand PrepareInsert(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         RelationalCommandPlan write,
         bool includeConflict,
         string parameterPrefix = "insert_")
     {
-        var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        var command = session.CreateCommand();
         var all = write.Identity.Concat(write.Values).ToArray();
         var groups = all.GroupBy(static value => value.Binding.PhysicalPath.Name, StringComparer.Ordinal).ToArray();
         var columns = new List<string>(groups.Length);
@@ -775,15 +809,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
 
     /// <summary>Deletes <paramref name="ids"/>; with a <paramref name="guard"/>, only the rows that still match it.</summary>
     private static async Task<int> Delete(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         IReadOnlyList<TKey> ids,
         Filter? guard,
         CancellationToken ct)
     {
-        await using var command = connection.CreateCommand();
-        command.Transaction = transaction;
+        await using var command = session.CreateCommand();
         var predicates = ids.Select((id, index) =>
             IdentityPredicate(command, plan, plan.Commands.Delete(id).Identity, $"d{index}_")).ToArray();
         var identities = string.Join(" OR ", predicates);
@@ -848,13 +880,13 @@ internal sealed class SqliteRepository<TEntity, TKey> :
         "ORDER BY " + string.Join(", ", plan.IdentityRoots.Select(root => $"koan_row.{SqliteDialect.Quote(root)}"));
 
     private async Task<long> Count(
-        SqliteConnection connection,
+        Session session,
         SqliteEntityPlan<TEntity, TKey> plan,
         string? where,
         IReadOnlyList<object?> values,
         CancellationToken ct)
     {
-        await using var command = connection.CreateCommand();
+        await using var command = session.CreateCommand();
         command.CommandText = $"SELECT COUNT(1) FROM {plan.QualifiedTable} AS koan_row" +
                               (where is null ? string.Empty : $" WHERE {where}");
         AddParameters(command, values, "p");
@@ -1058,7 +1090,8 @@ internal sealed class SqliteRepository<TEntity, TKey> :
             await repository.Ready(plan, ct).ConfigureAwait(false);
             repository._route.Policy.Demand(DataOperationEffect.Write, "batch");
             await using var connection = await repository.Open(ct).ConfigureAwait(false);
-            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+            await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
+            var work = connection.In(transaction);
             var outcomes = new List<BatchItemResult>(_operations.Count);
             var added = 0;
             var updated = 0;
@@ -1069,25 +1102,25 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                 switch (operation.Kind)
                 {
                     case BatchOperation.Add:
-                        await Upsert(connection, transaction, plan, operation.Entity!, ct).ConfigureAwait(false);
+                        await Upsert(work, plan, operation.Entity!, ct).ConfigureAwait(false);
                         added++;
                         outcomes.Add(new BatchItemResult(index, operation.Kind, BatchItemOutcome.Applied));
                         break;
                     case BatchOperation.Update:
-                        await Upsert(connection, transaction, plan, operation.Entity!, ct).ConfigureAwait(false);
+                        await Upsert(work, plan, operation.Entity!, ct).ConfigureAwait(false);
                         updated++;
                         outcomes.Add(new BatchItemResult(index, operation.Kind, BatchItemOutcome.Applied));
                         break;
                     case BatchOperation.Mutate:
                     {
-                        var current = await Get(connection, transaction, plan, operation.Id!, ct).ConfigureAwait(false);
+                        var current = await Get(work, plan, operation.Id!, ct).ConfigureAwait(false);
                         if (current is null)
                         {
                             outcomes.Add(new BatchItemResult(index, operation.Kind, BatchItemOutcome.Missing));
                             break;
                         }
                         operation.Mutate!(current);
-                        await Upsert(connection, transaction, plan, current, ct).ConfigureAwait(false);
+                        await Upsert(work, plan, current, ct).ConfigureAwait(false);
                         updated++;
                         outcomes.Add(new BatchItemResult(index, operation.Kind, BatchItemOutcome.Applied));
                         break;
@@ -1095,7 +1128,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                     case BatchOperation.Delete:
                     {
                         var count = await SqliteRepository<TEntity, TKey>.Delete(
-                            connection, transaction, plan, [operation.Id!], operation.Guard, ct).ConfigureAwait(false);
+                            work, plan, [operation.Id!], operation.Guard, ct).ConfigureAwait(false);
                         deleted += count;
                         outcomes.Add(new BatchItemResult(index, operation.Kind,
                             count == 0 ? BatchItemOutcome.Missing : BatchItemOutcome.Applied));
@@ -1105,7 +1138,7 @@ internal sealed class SqliteRepository<TEntity, TKey> :
                         throw new ArgumentOutOfRangeException();
                 }
             }
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
+            await transaction.Commit(ct).ConfigureAwait(false);
             return new BatchResult(added, updated, deleted)
             {
                 Atomicity = BatchAtomicity.Atomic,

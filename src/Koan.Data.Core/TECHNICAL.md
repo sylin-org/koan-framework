@@ -311,8 +311,12 @@ validation:
   stamp only. Stored values, OnSave timestamps included, arrive unchanged; the audit callback runs outside the scope.
   `.Fidelity(TransferFidelity.Semantic)` restores Save semantics for one transfer. Cutover keeps its own execution
   owner (DATA-0111).
-- The shared transaction coordinator is sequential deferred coordination only. Its failure reports completed
-  operation count, commit outcome, retry disposition, and replay disposition; it does not claim native atomicity.
+- The shared transaction coordinator is deferred coordination. On one route whose provider implements
+  `IAtomicCommitProvider` and declares `write.atomicCommit`, its commit is one native transaction and a failure reports
+  `NotCommitted` with zero completed operations; elsewhere it is sequential dispatch whose failure reports completed
+  operation count, commit outcome, retry disposition, and replay disposition without claiming native atomicity. A
+  scope opened with `TransactionGuarantee.Atomic` refuses, at tracking time, any operation that cannot join the native
+  transaction (DATA-0158).
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

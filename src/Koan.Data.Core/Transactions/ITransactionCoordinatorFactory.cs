@@ -10,5 +10,6 @@ public interface ITransactionCoordinatorFactory
     /// Create a new transaction coordinator with the specified name.
     /// </summary>
     /// <param name="name">Transaction name for correlation and telemetry</param>
-    ITransactionCoordinator Create(string name);
+    /// <param name="guarantee">What the scope promises at commit</param>
+    ITransactionCoordinator Create(string name, TransactionGuarantee guarantee = TransactionGuarantee.Coordinated);
 }

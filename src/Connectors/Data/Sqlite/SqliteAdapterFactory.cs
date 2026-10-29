@@ -3,6 +3,7 @@ using Koan.Core.Services;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Sources;
+using Koan.Data.Abstractions.Transactions;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Connector.Sqlite.Runtime;
 using Koan.Data.Core;
@@ -24,7 +25,11 @@ namespace Koan.Data.Connector.Sqlite;
     Scheme = "file", Host = "", EndpointPort = 0,
     UriPattern = "Data Source={path}", LocalScheme = "file", LocalHost = "", LocalPort = 0,
     LocalPattern = "Data Source={path}")]
-public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceIntegrationFactory, IDataAdapterSetup
+public sealed class SqliteAdapterFactory :
+    IDataAdapterFactory,
+    IDataSourceIntegrationFactory,
+    IDataAdapterSetup,
+    IAtomicCommitProvider
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["sqlite3"];
@@ -101,6 +106,17 @@ public sealed class SqliteAdapterFactory : IDataAdapterFactory, IDataSourceInteg
                 return ((SqliteConnection)connection).BeginTransaction(deferred: true);
             },
             new SqliteInspector(route, connections));
+    }
+
+    /// <summary>
+    /// One native transaction over the route (DATA-0158): <c>BEGIN IMMEDIATE</c> on a dedicated connection that every
+    /// repository, schema and lifecycle read of this route in the calling flow then shares until the scope is disposed.
+    /// </summary>
+    public ValueTask<IAtomicCommitScope> BeginAtomicCommit(IServiceProvider services, string source, CancellationToken ct)
+    {
+        var route = ResolveRoute(services, source);
+        route.Policy.Demand(DataOperationEffect.Write, "atomic commit");
+        return services.GetRequiredService<SqliteConnections>().BeginUnit(route.ConnectionString, route.Source, ct);
     }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(

@@ -25,6 +25,12 @@ internal interface ITrackedOperation
     string GetAdapterHint();
 
     DataRouteBinding? ResolveDataBinding(IServiceProvider services);
+
+    /// <summary>
+    /// Provision and validate the operation's store under the context it was issued in, outside any transaction, so
+    /// an atomic commit opens its native transaction over a schema that is already there (DATA-0158).
+    /// </summary>
+    Task EnsureReady(CancellationToken ct);
 }
 
 /// <summary>
@@ -108,6 +114,13 @@ internal sealed class SaveOperation<TEntity, TKey> : ITrackedOperation
             services,
             services.GetRequiredService<DataSourceRegistry>()).Binding;
     }
+
+    public async Task EnsureReady(CancellationToken ct)
+    {
+        using var _ = _carriers.Enter(_context);
+        await Koan.Core.Hosting.App.AppHost.GetRequiredService<IDataService>("deferred transaction readiness")
+            .GetRepository<TEntity, TKey>().EnsureReady(ct).ConfigureAwait(false);
+    }
 }
 
 /// <summary>
@@ -145,6 +158,13 @@ internal sealed class DeleteOperation<TEntity, TKey> : ITrackedOperation
         return AdapterResolver.ResolveDecisionForEntity<TEntity>(
             services,
             services.GetRequiredService<DataSourceRegistry>()).Binding;
+    }
+
+    public async Task EnsureReady(CancellationToken ct)
+    {
+        using var _ = _carriers.Enter(_context);
+        await Koan.Core.Hosting.App.AppHost.GetRequiredService<IDataService>("deferred transaction readiness")
+            .GetRepository<TEntity, TKey>().EnsureReady(ct).ConfigureAwait(false);
     }
 }
 
@@ -223,6 +243,8 @@ internal sealed class VectorSaveOperation<TEntity, TKey> : ITrackedOperation
     }
 
     public DataRouteBinding? ResolveDataBinding(IServiceProvider services) => null;
+
+    public Task EnsureReady(CancellationToken ct) => Task.CompletedTask;
 }
 
 /// <summary>
@@ -287,4 +309,6 @@ internal sealed class VectorDeleteOperation<TEntity, TKey> : ITrackedOperation
     }
 
     public DataRouteBinding? ResolveDataBinding(IServiceProvider services) => null;
+
+    public Task EnsureReady(CancellationToken ct) => Task.CompletedTask;
 }

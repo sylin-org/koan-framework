@@ -112,7 +112,9 @@ public sealed class TransactionDeferralSpec
             {
                 if (context.Current.CancelAfter) cancel.Cancel();
             }));
-        using var route = EntityContext.Partition($"tx-cancel-{Guid.CreateVersion7():n}");
+        // Sequential dispatch is the contract of a route without write.atomicCommit (DATA-0158); the default route
+        // here is SQLite, which rolls a cancelled commit back, so the proof pins the JSON route.
+        using var route = EntityContext.With(adapter: "json", partition: $"tx-cancel-{Guid.CreateVersion7():n}");
         TransactionException failure;
 
         using (EntityContext.Transaction("cancelled"))
@@ -137,7 +139,8 @@ public sealed class TransactionDeferralSpec
                 context.Current.Title == "fails"
                     ? throw new InvalidOperationException("deliberate commit failure")
                     : EntityLifecycleResult.Proceed()));
-        using var route = EntityContext.Partition($"tx-auto-{Guid.CreateVersion7():n}");
+        // On the JSON route the failed dispatch reports Unknown; on SQLite it would roll back and report NotCommitted.
+        using var route = EntityContext.With(adapter: "json", partition: $"tx-auto-{Guid.CreateVersion7():n}");
 
         var scope = EntityContext.Transaction("auto-commit");
         await new FailingTodo { Title = "fails" }.Save();

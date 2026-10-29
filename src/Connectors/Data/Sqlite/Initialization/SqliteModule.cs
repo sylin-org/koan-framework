@@ -26,6 +26,31 @@ public sealed class SqliteModule : KoanModule
         DefaultValue: "auto",
         DefaultConsumers: ["Koan.Data.Connector.Sqlite.SqliteAdapterFactory"]);
 
+    // The posture every connection the connector opens carries (DATA-0158), published so an operator sees the mode in
+    // effect from the startup facts and not only from the database header.
+    private static readonly ProvenanceItem JournalMode = new(
+        Constants.Configuration.Keys.JournalMode,
+        "SQLite Journal Mode",
+        "Journal mode set on every writable file database the connector opens.",
+        DefaultValue: nameof(SqliteJournalMode.Wal),
+        AcceptableValues: Enum.GetNames<SqliteJournalMode>(),
+        DefaultConsumers: ["Koan.Data.Connector.Sqlite.Runtime.SqliteConnections"]);
+
+    private static readonly ProvenanceItem BusyTimeout = new(
+        Constants.Configuration.Keys.BusyTimeout,
+        "SQLite Busy Timeout",
+        "How long a connection waits for a lock another connection holds.",
+        DefaultValue: "00:00:30",
+        DefaultConsumers: ["Koan.Data.Connector.Sqlite.Runtime.SqliteConnections"]);
+
+    private static readonly ProvenanceItem Synchronous = new(
+        Constants.Configuration.Keys.Synchronous,
+        "SQLite Synchronous",
+        "Durability flush level set on every connection the connector opens.",
+        DefaultValue: nameof(SqliteSynchronous.Full),
+        AcceptableValues: Enum.GetNames<SqliteSynchronous>(),
+        DefaultConsumers: ["Koan.Data.Connector.Sqlite.Runtime.SqliteConnections"]);
+
     public override void Register(IServiceCollection services)
     {
         services.AddKoanOptions<SqliteOptions>();
@@ -61,5 +86,29 @@ public sealed class SqliteModule : KoanModule
             usedDefaultOverride: automatic,
             sourceKeyOverride: configured.ResolvedKey ?? Constants.Configuration.Keys.ConnectionString,
             sanitizeOverride: !automatic);
+        PublishPosture(module, configuration, JournalMode,
+            Constants.Configuration.Keys.ProviderJournalMode, Constants.Configuration.Keys.JournalMode);
+        PublishPosture(module, configuration, BusyTimeout,
+            Constants.Configuration.Keys.ProviderBusyTimeout, Constants.Configuration.Keys.BusyTimeout);
+        PublishPosture(module, configuration, Synchronous,
+            Constants.Configuration.Keys.ProviderSynchronous, Constants.Configuration.Keys.Synchronous);
+    }
+
+    /// <summary>
+    /// A posture setting reads the Default-source provider key before the connector key, as
+    /// <see cref="SqliteOptionsSetup"/> does, and reports the default it falls back to.
+    /// </summary>
+    private static void PublishPosture(
+        ProvenanceModuleWriter module,
+        IConfiguration configuration,
+        ProvenanceItem item,
+        string providerKey,
+        string connectorKey)
+    {
+        var scoped = Configuration.ReadWithSource<string?>(configuration, providerKey, null);
+        var configured = string.IsNullOrWhiteSpace(scoped.Value)
+            ? Configuration.ReadWithSource<string?>(configuration, connectorKey, item.DefaultValue)
+            : scoped;
+        module.PublishConfigValue(item, configured, displayOverride: configured.Value ?? item.DefaultValue);
     }
 }

@@ -866,11 +866,15 @@ Sometimes you need to collect several operations, validate the complete intended
 from one explicit commit point—creating a project with initial tasks, synchronizing two stores, or
 importing a batch of related records.
 
-Koan's ambient transaction support is a deferred coordinator, not a native or distributed transaction.
-Operations are tracked in memory and executed sequentially on commit, in the order the application issued
-them, each under the context it was issued in (tenant, data axes, source, adapter, partition). A later
-failure can therefore leave the successfully completed prefix durable, and `TransactionException.CompletedOperationCount`
-says how long it is, cancellation included.
+Koan's ambient transaction support is a deferred coordinator. Operations are tracked in memory and executed
+on commit, in the order the application issued them, each under the context it was issued in (tenant, data
+axes, source, adapter, partition). When every tracked operation targets one route whose provider declares
+`write.atomicCommit` (SQLite does), the commit is one native transaction: the operations land together or
+not at all, across entity types, and a failure reports `DataCommitOutcome.NotCommitted` with nothing durable.
+On any other shape — two routes, a provider without the token, a vector operation — the commit is sequential
+dispatch, not a native or distributed transaction: a later failure can leave the successfully completed
+prefix durable, and `TransactionException.CompletedOperationCount` says how long it is, cancellation included
+(DATA-0158).
 
 Inside the scope, single and collection `Save`/`Remove` (`items.Save()`, `items.Remove()`, `Todo.Remove(ids)`,
 `SaveReplacing`) defer until `Commit`. Every other write refuses before it writes, because it cannot wait:
@@ -880,6 +884,7 @@ conditional writes, and `Copy`/`Move`/`Mirror`. Run those outside the transactio
 **Key features:**
 - Explicit commit point, with optional auto-commit on dispose
 - Named transactions for telemetry correlation
+- One native transaction across entity types on a route that commits atomically; required on demand
 - Can sequence work across different adapters without claiming atomicity
 
 **Recipe**
@@ -955,6 +960,28 @@ using (EntityContext.Transaction("batch-import"))
 }
 ```
 
+**Requiring one native transaction:**
+
+A writer that must commit several entity types per command, or nothing, asks for the guarantee. The scope
+then refuses, with the correction, the first operation that cannot join one native transaction — a second
+route, a provider that does not declare `write.atomicCommit`, a vector save — before anything is held:
+
+```csharp
+using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+{
+    await order.Save(ct);
+    await line.Save(ct);
+    await EntityContext.Commit(ct);   // BEGIN IMMEDIATE … COMMIT on the one SQLite route, or nothing
+}
+```
+
+On a route that cannot give it, the first `Save` throws `NotSupportedException`: "Transaction 'writer'
+requires an atomic commit (TransactionGuarantee.Atomic), but route 'Default' on provider 'json' cannot
+commit atomically: the provider does not declare 'write.atomicCommit'. Route the scope to a provider that
+does (SQLite declares it), or use TransactionGuarantee.Coordinated, which dispatches sequentially and can
+leave a durable prefix." `EntityContext.CurrentTransaction.Capabilities` carries `TxCaps.Local` for such a
+scope and not for a coordinated one.
+
 **Cross-adapter coordination:**
 
 ```csharp
@@ -991,13 +1018,14 @@ if (EntityContext.InTransaction && EntityContext.CurrentTransaction is { } trans
 
 **Important notes:**
 
-⚠️ **Non-atomic coordination:** Koan provides sequential deferred execution with error reporting, not a
-native or distributed transaction. If operation A completes and operation B fails, A remains durable;
-`Rollback` can discard only work that has not yet been dispatched.
+⚠️ **Atomic on one route only:** on one route whose provider declares `write.atomicCommit`, the commit is one
+native transaction and a failure leaves nothing durable. Across routes or providers, Koan provides sequential
+deferred execution with error reporting, not a distributed transaction: if operation A completes and
+operation B fails, A remains durable, and `Rollback` can discard only work that has not yet been dispatched.
+`TransactionGuarantee.Atomic` turns the first shape into a requirement and refuses the second.
 
-⚠️ **Need atomic Entity writes?** For one Entity root on a provider that advertises native atomic batch
-support, use `Entity.Batch().Save(new BatchOptions(RequireAtomic: true))`. Koan does not currently expose
-an Entity-level atomic transaction spanning different Entity roots or data sources.
+⚠️ **Need atomic writes for one Entity root elsewhere?** On a provider that advertises native atomic batch
+support, use `Entity.Batch().Save(new BatchOptions(RequireAtomic: true))`.
 
 ⚠️ **No nested transactions:** Attempting to nest throws `InvalidOperationException`.
 

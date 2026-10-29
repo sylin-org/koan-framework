@@ -24,6 +24,9 @@ public interface ITransactionCoordinator
     /// </summary>
     bool IsCompleted { get; }
 
+    /// <summary>What the scope promises at <see cref="Commit"/>.</summary>
+    TransactionGuarantee Guarantee { get; }
+
     /// <summary>
     /// Track an entity save operation for deferred execution.
     /// </summary>
@@ -59,9 +62,10 @@ public interface ITransactionCoordinator
         where TKey : notnull;
 
     /// <summary>
-    /// Execute all tracked operations across all adapters.
-    /// Executes tracked operations sequentially. A failure can leave partial state and reports an unknown commit
-    /// outcome; the coordinator never replays dispatched work.
+    /// Execute all tracked operations. When they all target one route whose provider commits atomically, they run
+    /// inside one native transaction and a failure leaves nothing durable (<see cref="DataCommitOutcome.NotCommitted"/>).
+    /// Otherwise they run sequentially: a failure can leave partial state and reports an unknown commit outcome. The
+    /// coordinator never replays dispatched work.
     /// </summary>
     /// <exception cref="TransactionException">If any operation fails after zero or more earlier operations completed</exception>
     Task Commit(CancellationToken ct = default);

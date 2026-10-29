@@ -19,6 +19,8 @@ internal sealed class SqliteDdlExecutor(
     SqliteDialect dialect) : IRelationalDdlExecutor, IAsyncDisposable
 {
     private SqliteConnection? _writer;
+    private SqliteTransaction? _writerTransaction;
+    private bool _ownsWriter;
 
     /// <summary>
     /// The database itself could not be opened, which is why nothing was described.
@@ -30,18 +32,27 @@ internal sealed class SqliteDdlExecutor(
 
     public async Task<RelationalTableShape?> Describe(RelationalTableDefinition table, CancellationToken ct = default)
     {
-        await using var connection = connections.Create(route.ConnectionString, route.Source, nonCreating: true);
-        try
+        // Inside an atomic commit (DATA-0158) the description reads the unit's own connection: a table the same scope
+        // just created is visible only there, and a second connection would wait on the lock the unit holds.
+        var unit = connections.CurrentUnit(route.ConnectionString, route.Source);
+        SqliteConnection? owned = null;
+        if (unit is null)
         {
-            await connection.OpenAsync(ct).ConfigureAwait(false);
-        }
-        catch (SqliteException)
-        {
-            DatabaseUnreachable = true;
-            return null;
+            try
+            {
+                owned = await connections.Open(route.ConnectionString, route.Source, ct, nonCreating: true)
+                    .ConfigureAwait(false);
+            }
+            catch (SqliteException)
+            {
+                DatabaseUnreachable = true;
+                return null;
+            }
         }
 
-        await using var command = connection.CreateCommand();
+        await using var _ = owned;
+        await using var command = (owned ?? unit!.Connection).CreateCommand();
+        command.Transaction = unit?.Transaction;
         command.CommandText = $"PRAGMA table_info({SqliteDialect.Quote(table.Name)})";
         var columns = new Dictionary<string, RelationalColumnState?>(StringComparer.OrdinalIgnoreCase);
         var key = new List<(long Ordinal, string Name)>();
@@ -109,7 +120,7 @@ internal sealed class SqliteDdlExecutor(
                        $"({string.Join(", ", expressions)})";
 
         var connection = await Writer(ct).ConfigureAwait(false);
-        var (owner, actual) = await Inspect(connection, index.Name, ct).ConfigureAwait(false);
+        var (owner, actual) = await Inspect(connection, _writerTransaction, index.Name, ct).ConfigureAwait(false);
         if (owner is not null && !string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
                 $"Index '{index.Name}' for {table} is already owned by SQLite table '{owner}'. " +
@@ -128,7 +139,7 @@ internal sealed class SqliteDdlExecutor(
         CancellationToken ct = default)
     {
         var connection = await Writer(ct).ConfigureAwait(false);
-        var (owner, _) = await Inspect(connection, index.Name, ct).ConfigureAwait(false);
+        var (owner, _) = await Inspect(connection, _writerTransaction, index.Name, ct).ConfigureAwait(false);
         return owner is not null && string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase)
             ? new RelationalIndexState(index.Name, $"DROP INDEX {SqliteDialect.Quote(index.Name)};")
             : null;
@@ -137,25 +148,37 @@ internal sealed class SqliteDdlExecutor(
     public async ValueTask DisposeAsync()
     {
         if (_writer is null) return;
-        await _writer.DisposeAsync().ConfigureAwait(false);
+        if (_ownsWriter) await _writer.DisposeAsync().ConfigureAwait(false);
         _writer = null;
+        _writerTransaction = null;
     }
 
+    /// <summary>
+    /// The connection DDL is spoken over: the ambient atomic commit's when one covers this route (DATA-0158), so the
+    /// schema change lands in the same native transaction as the rows, else one this executor opens and owns.
+    /// </summary>
     private async Task<SqliteConnection> Writer(CancellationToken ct)
     {
         if (_writer is not null) return _writer;
+        if (connections.CurrentUnit(route.ConnectionString, route.Source) is { } unit)
+        {
+            _writerTransaction = unit.Transaction;
+            _ownsWriter = false;
+            return _writer = unit.Connection;
+        }
         connections.PrepareManaged(route.ConnectionString);
-        var connection = connections.Create(route.ConnectionString, route.Source);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
-        return _writer = connection;
+        _ownsWriter = true;
+        return _writer = await connections.Open(route.ConnectionString, route.Source, ct).ConfigureAwait(false);
     }
 
     private static async Task<(string? Owner, string? Sql)> Inspect(
         SqliteConnection connection,
+        SqliteTransaction? transaction,
         string index,
         CancellationToken ct)
     {
         await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = "SELECT tbl_name, sql FROM sqlite_master WHERE type = 'index' AND name = @name";
         command.Parameters.AddWithValue("@name", index);
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -167,6 +190,7 @@ internal sealed class SqliteDdlExecutor(
     {
         var connection = await Writer(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
+        command.Transaction = _writerTransaction;
         command.CommandText = sql;
         await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }

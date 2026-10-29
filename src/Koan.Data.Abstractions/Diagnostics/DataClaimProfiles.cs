@@ -26,6 +26,7 @@ public static class DataClaimProfiles
     public const string RegisteredReads = "Registered Reads";
     public const string ProviderBoundedPaging = "Provider-bounded paging";
     public const string AtomicBatch = "Atomic batch";
+    public const string AtomicCommit = "Atomic commit";
     public const string ConditionalReplace = "Conditional replace";
     public const string ConditionalDelete = "Conditional delete";
     public const string Durability = "Durability";

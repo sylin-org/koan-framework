@@ -1,9 +1,11 @@
+using System.Collections.Concurrent;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Connector.Sqlite.Infrastructure;
 using Koan.Data.Connector.Sqlite.Runtime;
 using Koan.Data.Core;
 using Koan.Data.Core.Diagnostics;
 using Koan.Data.Core.Routing;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Connector.Sqlite;
 
@@ -12,17 +14,22 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
     private readonly IServiceProvider _services;
     private readonly SqliteAdapterFactory _factory;
     private readonly SqliteConnections _connections;
+    private readonly IOptions<SqliteOptions> _options;
+    // The journal mode each probed source's database reported, so readiness shows the mode in effect, not the one asked for.
+    private readonly ConcurrentDictionary<string, string> _journalModes = new(StringComparer.OrdinalIgnoreCase);
 
     public SqliteHealthContributor(
         IServiceProvider services,
         IDataDiagnostics diagnostics,
         DataProviderCatalog providers,
         DataDefaultProviderPlan defaultProvider,
-        SqliteConnections connections)
+        SqliteConnections connections,
+        IOptions<SqliteOptions> options)
         : base(Constants.Provider, services, diagnostics, defaultProvider)
     {
         _services = services;
         _connections = connections;
+        _options = options;
         _factory = providers.Find(Constants.Provider) as SqliteAdapterFactory
             ?? throw new InvalidOperationException("The SQLite provider is absent from the host Data catalog.");
     }
@@ -37,14 +44,33 @@ internal sealed class SqliteHealthContributor : DataAdapterHealthContributorBase
         // An external store is different: its absence is a real dependency failure and still fails.
         if (route.Policy.StorageLifecycle == StorageLifecycle.Managed && IsAwaitingProvisioning(route.ConnectionString))
         {
+            _journalModes.TryRemove(source, out _);
             return;
         }
 
-        await using var connection = _connections.Create(route.ConnectionString, route.Source, nonCreating: true);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using var connection = await _connections.Open(route.ConnectionString, route.Source, ct, nonCreating: true)
+            .ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT 1";
         _ = await command.ExecuteScalarAsync(ct).ConfigureAwait(false);
+        // A read-only connection cannot change the journal mode, so what it reads is the mode the database holds.
+        var journalMode = await SqliteConnections.ReadJournalMode(connection, ct).ConfigureAwait(false);
+        if (journalMode is null) _journalModes.TryRemove(source, out _);
+        else _journalModes[source] = journalMode;
+    }
+
+    /// <summary>The configured posture, and per probed source the journal mode its database reported.</summary>
+    protected override IReadOnlyDictionary<string, object?> HealthyData(IReadOnlyCollection<string> sources)
+    {
+        var data = new Dictionary<string, object?>(base.HealthyData(sources), StringComparer.Ordinal);
+        var posture = _options.Value;
+        data["journalMode"] = SqliteConnections.Spell(posture.JournalMode);
+        data["busyTimeout"] = posture.BusyTimeout.ToString();
+        data["synchronous"] = SqliteConnections.Spell(posture.Synchronous);
+        data["journalModes"] = string.Join(",", sources
+            .Where(_journalModes.ContainsKey)
+            .Select(source => $"{source}={_journalModes[source]}"));
+        return data;
     }
 
     /// <summary>

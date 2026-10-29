@@ -422,6 +422,8 @@
       href: DATA-0156-scoped-deletes-carry-the-scope-to-the-store.md
     - name: DATA-0157 A guarded delete folds the active scope, and a Web delete bound travels with the delete
       href: DATA-0157-guarded-deletes-fold-the-scope-and-web-delete-bounds-travel.md
+    - name: DATA-0158 SQLite carries a declared posture on every connection, and a transaction scope on one atomic route commits natively
+      href: DATA-0158-sqlite-posture-and-atomic-commit.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

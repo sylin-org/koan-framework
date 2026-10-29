@@ -4,7 +4,7 @@ title: Koan.Data.Connector.Sqlite - Technical Reference
 description: SQLite gold-reference adapter for managed and externally mapped data.
 packages: [Sylin.Koan.Data.Connector.Sqlite]
 source: src/Connectors/Data/Sqlite/
-last_updated: 2026-07-28
+last_updated: 2026-10-29
 ---
 
 ## Execution model
@@ -98,6 +98,34 @@ result in input order, including provider-generated identities. Oversized batche
 dispatch. `DeleteMany` uses one predicate command. The Entity batch surface uses one transaction and reports a
 complete ordered outcome for every queued operation; mutate-by-id necessarily reads the target inside that same
 transaction.
+
+## Atomic commit
+
+The factory implements `IAtomicCommitProvider` and declares `write.atomicCommit`
+([DATA-0158](../../../../docs/decisions/DATA-0158-sqlite-posture-and-atomic-commit.md)). When every operation an
+`EntityContext.Transaction` scope tracked resolves to one SQLite route, the coordinator provisions each operation's
+table outside any transaction, then asks the factory for one native transaction: `BEGIN IMMEDIATE` on a dedicated
+unpooled connection, which `SqliteConnections` makes ambient for the calling flow before its first await. The unit is
+keyed by the store identity the coordinator admits routes with (an anchored, case-folded file path; one in-memory
+database per source), so two sources that spell one file differently share the one unit. Until the
+scope ends, `SqliteRepository.Open` returns that connection and transaction for every read and write of the route,
+and `SqliteDdlExecutor` describes and writes schema over it, so a lifecycle read sees the rows written earlier in the
+scope and a schema statement does not wait on the lock the scope holds. The coordinator dispatches in call order and
+commits once; a failed operation disposes the scope, which rolls the transaction back, and the readiness of any
+target the scope itself provisioned is invalidated. Raw reads (`QueryRaw`, `CountRaw`, Read-labelled SQL) keep their
+own `query_only` connection and see committed state only. `UpsertMany`, `DeleteMany`, conditional bulk deletes and
+`Batch().Save` join the ambient transaction instead of beginning their own.
+
+## Connection posture
+
+`SqliteConnections` applies the host posture (`SqliteOptions.JournalMode`, `BusyTimeout`, `Synchronous`) as each
+connection it creates opens, through the connection's state change, so a Direct session or a read lane that opens the
+connection itself gets it too. `busy_timeout` and `synchronous` are set on every connection, and `BusyTimeout` also sets
+the connection's `DefaultTimeout`, because Microsoft.Data.Sqlite retries `SQLITE_BUSY` until its own command timeout
+whatever the pragma says; `journal_mode` only on a writable file connection, since an in-memory database has no WAL and a read-only connection cannot change the file.
+A database that refuses the requested mode is logged once with the mode it kept. The store-distinctness probe
+(`ProveDistinct`) does not take the posture: it promises to write nothing, and setting the journal mode writes the
+header. Readiness reads `PRAGMA journal_mode` on its non-creating probe and reports it per source.
 
 ## Connection ownership
 

@@ -21,6 +21,49 @@ var open = await Todo.Query(item => !item.Done, ct);
 The zero-configuration target is `.koan/data/Koan.sqlite`. SQLite creates it on first elected use; merely loading
 the connector does not touch disk. File, private-memory, and named shared-memory connection strings are supported.
 
+## Posture
+
+Every connection the connector opens carries one declared posture, bound from `Koan:Data:Sqlite`:
+
+```json
+{
+  "Koan": {
+    "Data": {
+      "Sqlite": {
+        "JournalMode": "Wal",
+        "BusyTimeout": "00:00:30",
+        "Synchronous": "Full"
+      }
+    }
+  }
+}
+```
+
+`JournalMode` (`Wal`, `Delete`, `Truncate`, `Persist`, `Memory`, `Off`) is set on every writable file database and
+stays in the file; an in-memory database and a read-only connection keep the mode they have. `BusyTimeout` is how long
+a connection waits for another connection's lock: it bounds SQLite's own wait and the driver's busy retry, rounded up
+to whole seconds. `Synchronous` (`Full`, `Normal`, `Extra`, `Off`) is the flush level;
+`Normal` trades the last transactions before a power loss for throughput under WAL. The same keys under
+`Koan:Data:Sources:Default:sqlite` take precedence. A value outside the choices refuses at boot naming the key. The
+startup facts show the three settings; `/health/ready` shows them beside the journal mode each source's database holds.
+
+## Commit several entity types at once
+
+On one SQLite route, `EntityContext.Transaction` commits everything it tracked inside one native transaction, begun
+immediate, so the saves and removes of several entity types land together or not at all. A scope that must have that
+asks for it, and is refused with the correction on a route that cannot give it:
+
+```csharp
+using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+{
+    await order.Save(ct);
+    await line.Save(ct);
+    await EntityContext.Commit(ct);   // one BEGIN IMMEDIATE … COMMIT; a failure anywhere leaves nothing durable
+}
+```
+
+See [DATA-0158](../../../../docs/decisions/DATA-0158-sqlite-posture-and-atomic-commit.md).
+
 ## Inspect and name useful reads
 
 Use provider-neutral storage vocabulary to see what a source contains:

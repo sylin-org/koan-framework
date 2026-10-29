@@ -93,7 +93,9 @@ public sealed class TransactionErrorHandlingSpec
         var third = new DeferredFailureEntity { Id = "third" };
         TransactionException failure;
 
-        using (EntityContext.Partition(partition))
+        // Sequential dispatch is the contract of a route without write.atomicCommit (DATA-0158); the default route
+        // here is SQLite, which commits atomically, so the proof pins the JSON route.
+        using (EntityContext.With(adapter: "json", partition: partition))
         using (EntityContext.Transaction("partial-prefix"))
         {
             await first.Save();
@@ -109,7 +111,7 @@ public sealed class TransactionErrorHandlingSpec
         failure.RetryDisposition.Should().Be(DataRetryDisposition.Never);
         failure.ReplayDisposition.Should().Be(DataReplayDisposition.Never);
 
-        using (EntityContext.Partition(partition))
+        using (EntityContext.With(adapter: "json", partition: partition))
         {
             (await DeferredFailureEntity.Get(first.Id)).Should().NotBeNull(
                 "deferred coordination does not roll back an operation completed before a later failure");

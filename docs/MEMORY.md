@@ -695,3 +695,10 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   cross.** Deferral lived per verb in `Data<T,K>`, and every verb that did not opt in quietly ran at once. Data now
   defers what it can, and any write that still reaches the facade guard under an ambient coordinator is by
   construction one that could not be deferred, so the guard refuses it. (DATA-0131, 2026-10-21)
+- **A native transaction is an ambient the adapter owns, and two things leak out of it: the schema and the
+  ambient itself.** Dispatching a scope's writes inside one SQLite `BEGIN IMMEDIATE` is only the start. Readiness
+  provisions tables on its own connection, which then waits on the write lock the scope holds, so provisioning runs
+  before the transaction opens; a table a lifecycle write still creates inside it rolls back with it while readiness
+  remembers it as provisioned, so the unit invalidates what it provisioned on rollback. And an `AsyncLocal` assigned
+  inside an `async` method never reaches the caller: the ambient is set synchronously, in the caller's flow, before
+  the first await, through a box the asynchronous open fills in later. (DATA-0158, 2026-10-29)

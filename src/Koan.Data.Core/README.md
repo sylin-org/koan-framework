@@ -210,9 +210,11 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 - Transfers carry rows exactly by default: stored values and OnSave timestamps arrive unchanged, and no Lifecycle or
   write stamp runs for the transfer's reads and writes. Tenancy, policy, isolation and receipts still apply.
   `.Fidelity(TransferFidelity.Semantic)` writes each row as a Save instead (DATA-0149).
-- Ambient `EntityContext.Transaction` is deferred sequential coordination, not a native or distributed transaction.
-  A failed commit can leave its completed prefix durable; rollback discards only undispatched work. For one Entity
-  root, `BatchOptions(RequireAtomic: true)` is the qualified all-or-nothing seam.
+- Ambient `EntityContext.Transaction` is deferred coordination. On one route whose provider declares
+  `write.atomicCommit` (SQLite) its commit is one native transaction across entity types; elsewhere it is sequential
+  dispatch, a failed commit can leave its completed prefix durable, and rollback discards only undispatched work.
+  `TransactionGuarantee.Atomic` makes the native transaction a requirement that is refused where it cannot be met
+  (DATA-0158). For one Entity root, `BatchOptions(RequireAtomic: true)` is the per-root all-or-nothing seam.
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
 - `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
@@ -285,10 +287,14 @@ rollback. This protects one destination row, not equality with another document 
 Operations enlisted in a Koan transaction are deferred, not executed inline. Each tracked write
 restores the source, adapter, and partition captured when it was enlisted; an explicitly selected
 default partition clears that axis instead of inheriting the commit caller's scope. Commit runs the
-tracked operations sequentially and returns a Task. A dispatched-operation failure carries a
-`TransactionException` with completed count, unknown commit outcome, and retry/replay dispositions.
-This is deferred coordination: it does not claim atomicity across stores, and
-executing a tracked operation suppresses the surrounding transaction to prevent recursive enlistment.
+tracked operations in call order and returns a Task. When they all target one route whose provider
+declares `write.atomicCommit`, they run inside one native transaction: a failure rolls it back and the
+`TransactionException` reports `NotCommitted` with zero completed operations. Otherwise they run
+sequentially, and a dispatched-operation failure carries a `TransactionException` with completed count,
+unknown commit outcome, and retry/replay dispositions. `EntityContext.Transaction(name,
+TransactionGuarantee.Atomic)` requires the native transaction and refuses, when the operation is
+tracked, anything that cannot join it (DATA-0158). Coordination never claims atomicity across stores,
+and executing a tracked operation suppresses the surrounding transaction to prevent recursive enlistment.
 
 ## Insert without replacement
 
