@@ -133,6 +133,69 @@ internal sealed class NpgsqlDdlExecutor(
             : null;
     }
 
+    /// <summary>
+    /// Adds the stored generated <c>tsvector</c> column and its GIN index (<see cref="NpgsqlLexical"/>), or replaces
+    /// the column when its recorded recipe differs from the declaration. The server computes the column for every row
+    /// the table already holds, so the index is current as soon as it exists.
+    /// </summary>
+    public async Task CreateLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default)
+    {
+        var column = NpgsqlDialect.Quote(NpgsqlLexical.ColumnName);
+        var stamp = NpgsqlLexical.Stamp(dialect, lexical);
+        var held = await LexicalStamp(table, ct).ConfigureAwait(false);
+        if (held is not null && !string.Equals(held, stamp, StringComparison.Ordinal))
+        {
+            // Dropping the column drops the index that depends on it; both are built again below.
+            await Execute($"ALTER TABLE {Qualify(table)} DROP COLUMN {column}", ct).ConfigureAwait(false);
+            held = null;
+        }
+        if (held is null)
+            await Execute(
+                $"ALTER TABLE {Qualify(table)} ADD COLUMN {column} tsvector " +
+                $"GENERATED ALWAYS AS ({NpgsqlLexical.Vector(dialect, lexical)}) STORED; " +
+                $"COMMENT ON COLUMN {Qualify(table)}.{column} IS '{stamp.Replace("'", "''", StringComparison.Ordinal)}'",
+                ct).ConfigureAwait(false);
+        await Execute(
+            $"CREATE INDEX IF NOT EXISTS {NpgsqlDialect.Quote(NpgsqlLexical.IndexName(table))} " +
+            $"ON {Qualify(table)} USING GIN ({column})",
+            ct).ConfigureAwait(false);
+    }
+
+    public async Task<bool> HasLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default)
+    {
+        var held = await LexicalStamp(table, ct).ConfigureAwait(false);
+        if (!string.Equals(held, NpgsqlLexical.Stamp(dialect, lexical), StringComparison.Ordinal)) return false;
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM pg_indexes WHERE schemaname = @schema AND tablename = @table AND indexname = @name";
+        command.Parameters.AddWithValue("schema", table.Schema);
+        command.Parameters.AddWithValue("table", table.Name);
+        command.Parameters.AddWithValue("name", NpgsqlLexical.IndexName(table));
+        return await command.ExecuteScalarAsync(ct).ConfigureAwait(false) is not null;
+    }
+
+    /// <summary>The recipe recorded on the lexical column, or <see langword="null"/> when the table has no such column.</summary>
+    private async Task<string?> LexicalStamp(RelationalTableDefinition table, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT coalesce(col_description(c.oid, a.attnum), '')
+              FROM pg_attribute AS a
+              JOIN pg_class AS c ON c.oid = a.attrelid
+              JOIN pg_namespace AS n ON n.oid = c.relnamespace
+             WHERE n.nspname = @schema AND c.relname = @table AND a.attname = @column AND NOT a.attisdropped
+            """;
+        command.Parameters.AddWithValue("schema", table.Schema);
+        command.Parameters.AddWithValue("table", table.Name);
+        command.Parameters.AddWithValue("column", NpgsqlLexical.ColumnName);
+        return await command.ExecuteScalarAsync(ct).ConfigureAwait(false) as string;
+    }
+
     private async Task<IReadOnlyList<NpgsqlIndexNames.CatalogEntry>> Catalog(string schema, string name, CancellationToken ct)
     {
         await using var command = connection.CreateCommand();

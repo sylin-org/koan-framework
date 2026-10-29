@@ -11,6 +11,7 @@ PostgreSQL provider for Koan managed entities and existing relational data.
 - JSON projection, filter, and paging pushdowns where supported
 - Schema helpers (create table/index) via Koan.Data.Relational
 - Provider-bounded Entity streams through `DataCaps.Query.ProviderBoundedPaging`
+- Ranked word search over `[Lexical]` properties through a stored `tsvector` column and a GIN index (`DataCaps.Query.Lexical`)
 - Compact flat, structured, nested-path, composite-key, and generated-key maps
 - Read-only fail-fast safety and non-creating `StorageLifecycle.External`
 - Provider-neutral container inspection and bounded record sampling
@@ -76,6 +77,20 @@ var containers = await legacy.Inspect().Containers(100, null, ct);
 ```
 
 Opaque SQL requires a configured read lane. PostgreSQL executes it in a native read-only transaction.
+
+Mark the string properties to search and PostgreSQL keeps the index itself, computed on every write:
+
+```csharp
+public sealed class Post : Entity<Post>
+{
+    [Lexical] public string Title { get; set; } = "";
+    [Lexical] public string Body { get; set; } = "";
+}
+
+var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet(), ct);
+```
+
+See [DATA-0159](../../../../docs/decisions/DATA-0159-lexical-search-over-declared-entity-text.md).
 
 ## Usage - safe snippets
 

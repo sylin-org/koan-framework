@@ -82,6 +82,31 @@ public interface IRelationalDdlExecutor
         Task.FromResult<RelationalIndexState?>(null);
 
     /// <summary>
+    /// Builds the entity's lexical index, or brings one the store already holds to the declaration: a store whose
+    /// index covers different values or another language replaces the structures, and the rows are indexed again by
+    /// the rebuild verb. Idempotent for an index that already matches.
+    ///
+    /// <para>The default refuses, on the reasoning of <see cref="CreateIndex"/>: the orchestrator asks only a store that
+    /// answered <see cref="IRelationalStoreFeatures.SupportsLexicalIndex"/>.</para>
+    /// </summary>
+    Task CreateLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default) =>
+        throw new NotSupportedException(
+            $"{GetType().Name} declares lexical-index support but cannot spell index '{lexical.Name}' for {table}.");
+
+    /// <summary>
+    /// Whether the store holds the lexical index <see cref="CreateLexicalIndex"/> would build for this declaration.
+    /// The default answers false, which validation reports as unverified; only a store that builds one answers.
+    /// </summary>
+    Task<bool> HasLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default) =>
+        Task.FromResult(false);
+
+    /// <summary>
     /// Rebuilds a projected column the store already holds, so that it computes what the mapping now says.
     ///
     /// <para>This is the one column an existing table can be corrected into rather than merely told about. A

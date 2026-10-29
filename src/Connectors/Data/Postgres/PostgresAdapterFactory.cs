@@ -30,7 +30,7 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
     public IReadOnlyCollection<string> Aliases => ["postgresql", "npgsql"];
     public IReadOnlyCollection<string> ReferenceIdentities => ["Koan.Data.Connector.Postgres"];
 
-    public void DescribeClaims(IDataClaims claims) => NpgsqlFeatures.Declare(claims);
+    public void DescribeClaims(IDataClaims claims) => NpgsqlFeatures.Declare(claims, lexical: true);
 
     public DataAdapterSetupDescriptor DescribeSetup() => new("PostgreSQL",
     [
@@ -100,7 +100,8 @@ public sealed class PostgresAdapterFactory : IDataAdapterFactory, IDataSourceInt
             DdlPolicy = route.Options.DdlPolicy,
             SchemaMatching = route.Options.SchemaMatching,
             AllowProductionDdl = route.Options.AllowProductionDdl,
-            SourcePlan = route.Plan
+            SourcePlan = route.Plan,
+            SupportsLexicalIndex = true
         }, services.GetRequiredService<IStorageNameResolver>(), this);
     }
 

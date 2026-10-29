@@ -7,9 +7,15 @@ namespace Koan.Data.Relational.Npgsql.Runtime;
 /// Named per route rather than fixed, because this runtime serves both PostgreSQL and CockroachDB and a refusal
 /// has to say which one refused.
 /// </param>
-internal sealed class NpgsqlStoreFeatures(string providerName) : IRelationalStoreFeatures
+/// <param name="lexical">
+/// Whether the route keeps a lexical index (<see cref="NpgsqlLexical"/>); the factory decides, because the generated
+/// column and the GIN index are PostgreSQL's and CockroachDB answers the same wire with a different store.
+/// </param>
+internal sealed class NpgsqlStoreFeatures(string providerName, bool lexical = false) : IRelationalStoreFeatures
 {
     public string ProviderName => providerName;
+
+    public bool SupportsLexicalIndex => lexical;
 
     public bool SupportsJsonFunctions => true;
 

@@ -122,6 +122,7 @@ Additive data behavior:
 |---|---|---|---|
 | Recoverable deletion (restore removed Entities) | `Sylin.Koan.Data.SoftDelete` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.SoftDelete/README.md) |
 | Move the active default store, verifiably | `Sylin.Koan.Data.Cutover` | — | [README](https://github.com/sylin-org/koan-framework/blob/main/src/Koan.Data.Cutover/README.md) · [Guide](https://github.com/sylin-org/koan-framework/blob/main/docs/guides/data/default-route-cutover.md) |
+| Ranked word search over an Entity's declared text (`[Lexical]`, `Entity.Lexical.Search`) | `Sylin.Koan.Data.Core` | **SQLite or PostgreSQL** as the Entity's store | [Reference](https://github.com/sylin-org/koan-framework/blob/main/docs/reference/data/index.md#search-declared-text) |
 
 Do not hand-roll a deleted flag, a restore endpoint, or a copy script when the owning package exists.
 

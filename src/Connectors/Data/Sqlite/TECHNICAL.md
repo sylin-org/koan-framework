@@ -116,6 +116,28 @@ target the scope itself provisioned is invalidated. Raw reads (`QueryRaw`, `Coun
 own `query_only` connection and see committed state only. `UpsertMany`, `DeleteMany`, conditional bulk deletes and
 `Batch().Save` join the ambient transaction instead of beginning their own.
 
+## Lexical index
+
+An entity's `[Lexical]` properties are served by one FTS5 external-content table per table
+([DATA-0159](../../../../docs/decisions/DATA-0159-lexical-search-over-declared-entity-text.md)): a view
+`<table>__koan_lexical_source` reads each declared value out of the document with the same `json_extract` a filter
+emits, the virtual table `<table>__koan_lexical` (`content=` that view, `content_rowid=koan_rowid`, tokenizer
+`porter unicode61` for `english`, `unicode61` for any other language) indexes it, and three triggers
+(`<table>__koan_lexical_ai`, `_au`, `_ad`) keep it in step with every insert, update and delete of the row. The triggers
+run inside the row's own statement, so the index entry lands in whatever write unit the row does — a single `Save`,
+`UpsertMany`, a batch, or the ambient atomic commit — and a write that fails or rolls back takes its entry with it.
+The structures are created on first use under the same DDL consent as a declared index; a set that no longer matches
+the declaration is dropped and created again, empty, and readiness reports the index as not current until
+`Rebuild` (`INSERT INTO <fts>(<fts>) VALUES ('rebuild')`) fills it. `Status` compares the count of `<fts>_docsize` with
+the row count.
+
+A search or a rebuild first confirms, once per table, that the schema holds the five objects; on a route whose DDL
+policy did not build them it refuses naming the index, the objects and the policy correction, and `Status` answers
+`Exists = false`. A search joins the virtual table to the row on rowid, matches every term as a quoted phrase joined by OR, orders by
+`bm25` and then by identity, and pages with `LIMIT`/`OFFSET`; the score answered is the negated `bm25`, so higher ranks
+first. A snippet is FTS5's `snippet()` over the view, at most 64 tokens. The caller's read scope (the tenant, the
+not-yet-deleted predicate) is translated by the same filter translator and ANDed in.
+
 ## Connection posture
 
 `SqliteConnections` applies the host posture (`SqliteOptions.JournalMode`, `BusyTimeout`, `Synchronous`) as each
@@ -144,6 +166,9 @@ Connection and provenance output are redacted.
 - SQLite attached databases are not inferred from mapping namespaces.
 - Provider exceptions surface directly; commands are not replayed after failure.
 - Native bulk accepts at most 4,096 items and 30,000 parameters per dispatch.
+- A lexical index is keyed by the row's rowid. A `VACUUM` of a table with a text primary key may renumber rows; run
+  `Rebuild` after one. `Inspect()` lists the index's view and shadow tables beside the application's containers, and a
+  `DELETE FROM` of a declaring table deletes row by row because the delete trigger runs.
 - A host accepts at most 256 distinct in-memory source targets. A repository keeps at most 512 compiled entity plans,
   one per partition table; past that it drops the least recently used plan and compiles it again on that partition's
   next use, so a partition per customer or per day keeps working (NK-170).

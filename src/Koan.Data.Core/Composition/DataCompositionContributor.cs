@@ -24,6 +24,7 @@ internal static class DataCompositionFacts
         ContributeSourcePlans(builder, services, source);
         ContributeDefaultRoute(builder, services, source);
         ContributeLifecycle(builder, services, source);
+        ContributeLexical(builder, services, source);
     }
 
     // Projects the canonical host-owned default decision. Named configured sources remain
@@ -76,10 +77,54 @@ internal static class DataCompositionFacts
 
     private static void ContributeEntities(KoanCompositionBuilder builder)
     {
-        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IEntity))
-                     .Where(static type => type.IsClass && !type.IsAbstract && !type.ContainsGenericParameters)
-                     .OrderBy(static type => type.FullName ?? type.Name, StringComparer.Ordinal))
-            builder.AddEntity(ShortTypeName(type.FullName ?? type.Name));
+        foreach (var type in DiscoveredEntities())
+            builder.AddEntity(
+                ShortTypeName(type.FullName ?? type.Name),
+                LexicalMetadata.Get(type) is null ? null : [LexicalTrait]);
+    }
+
+    /// <summary>The trait an entity carries in the lockfile when it declares a lexical index.</summary>
+    internal const string LexicalTrait = "Lexical";
+
+    private static IEnumerable<Type> DiscoveredEntities() =>
+        KoanRegistry.GetDiscoveredImplementors(typeof(IEntity))
+            .Where(static type => type.IsClass && !type.IsAbstract && !type.ContainsGenericParameters)
+            .OrderBy(static type => type.FullName ?? type.Name, StringComparer.Ordinal);
+
+    /// <summary>
+    /// Which entities declare a lexical index, over which properties and language, and which provider their route
+    /// elects to keep it. Whether that provider can, and whether the index is current, are runtime answers: the first
+    /// is refused at the entity's first write, the second is read by the <c>data:lexical</c> health contributor.
+    /// </summary>
+    private static void ContributeLexical(KoanCompositionBuilder builder, IServiceProvider services, string source)
+    {
+        var registry = services.GetService<DataSourceRegistry>();
+        foreach (var type in DiscoveredEntities())
+        {
+            if (LexicalMetadata.Get(type) is not { } lexical) continue;
+            var shortName = ShortTypeName(type.FullName ?? type.Name);
+            var subject = $"data:lexical:{shortName.ToLowerInvariant()}";
+            string? provider = null;
+            if (registry is not null)
+            {
+                try { provider = Lexical.LexicalRoutes.ResolveProvider(type, services, registry); }
+                catch (InvalidOperationException) { }
+            }
+            var tokens = new List<string>
+            {
+                $"fields:{string.Join(',', lexical.Fields)}",
+                $"language:{lexical.Language}"
+            };
+            if (provider is not null) tokens.Add($"provider:{provider}");
+            builder.AddCapability(subject, tokens);
+            builder.AddObservation(
+                Constants.Diagnostics.Codes.LexicalSelected,
+                subject,
+                $"'{shortName}' declares a lexical index over {string.Join(", ", lexical.Fields)} ({lexical.Language})" +
+                (provider is null ? " with no elected provider." : $", kept by provider '{provider}'."),
+                Constants.Diagnostics.Reasons.EntityAttribute,
+                source);
+        }
     }
 
     private static void ContributeDefaultRoute(

@@ -424,6 +424,8 @@
       href: DATA-0157-guarded-deletes-fold-the-scope-and-web-delete-bounds-travel.md
     - name: DATA-0158 SQLite carries a declared posture on every connection, and a transaction scope on one atomic route commits natively
       href: DATA-0158-sqlite-posture-and-atomic-commit.md
+    - name: DATA-0159 An entity's declared text is indexed lexically by the store that holds it
+      href: DATA-0159-lexical-search-over-declared-entity-text.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

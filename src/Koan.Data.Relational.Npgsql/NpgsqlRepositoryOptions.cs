@@ -23,4 +23,11 @@ public sealed class NpgsqlRepositoryOptions
     /// skip is refused (NK-056). CockroachDB scopes index names to their table and sets false.
     /// </summary>
     public bool IndexNamesAreSchemaWide { get; init; } = true;
+
+    /// <summary>
+    /// Whether this store keeps a lexical index: a stored generated <c>tsvector</c> column with a GIN index, which
+    /// PostgreSQL holds and CockroachDB does not in the form this runtime spells. The factory that sets it also
+    /// declares <c>query.lexical</c> in its claims.
+    /// </summary>
+    public bool SupportsLexicalIndex { get; init; }
 }

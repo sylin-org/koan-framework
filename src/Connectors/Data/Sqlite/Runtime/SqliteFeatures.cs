@@ -16,6 +16,7 @@ internal static class SqliteFeatures
         DataCaps.Query.ProviderBoundedPaging,
         DataCaps.Query.Filter,
         DataCaps.Query.FilterExecution,
+        DataCaps.Query.Lexical,
         DataCaps.Write.BulkUpsert,
         DataCaps.Write.BulkDelete,
         DataCaps.Write.AtomicBatch,

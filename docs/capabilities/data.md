@@ -30,6 +30,7 @@ keeps saying `Recipe` while everything underneath changes.
 | "emails/keys/regions keep arriving dirty" - trim and casing | [field hygiene](data/field-hygiene.md) |
 | "backups / disaster recovery" | [backups](data/backups.md) |
 | "search by meaning" | [semantic search](ai/semantic-search.md) |
+| "find records by the words they contain" - ranked, with excerpts | [lexical search](../reference/data/index.md#search-declared-text) |
 | "what can an `Entity<T>` become?" - the full hook map | [Entity capability hooks](data/entities.md) |
 | "create only if absent, or replace only the revision I read" | [Data write contracts](../../src/Koan.Data.Core/README.md) |
 | "change a few fields and preserve the rest" | [PATCH an Entity](../guides/patch-capabilities-howto.md) |

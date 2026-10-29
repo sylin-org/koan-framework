@@ -25,7 +25,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Sqlite.Runtime;
 
-internal sealed class SqliteRepository<TEntity, TKey> :
+internal sealed partial class SqliteRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,

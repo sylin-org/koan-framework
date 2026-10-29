@@ -106,7 +106,7 @@ public static class MappingPlanCompiler
                 .Select(binding => compiled.Single(candidate => candidate.Id == binding.Id))
                 .ToArray();
             var plan = new MappingPlan(planId, descriptor, ordered, entityFactory, composite);
-            plan.InitializeIndexes(MappingIndexCompiler.Compile(plan));
+            plan.InitializeIndexes(MappingIndexCompiler.Compile(plan), MappingLexicalCompiler.Compile(plan));
             return plan;
         }
         catch (MappingCompilationException) { throw; }

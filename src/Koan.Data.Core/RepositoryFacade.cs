@@ -75,6 +75,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private readonly Filter? _notYetDeleted;
     private readonly EntityLifecyclePlan<TEntity, TKey>? _lifecycle;
     private readonly IConditionalDeleteRepository<TEntity, TKey>? _scopedDeletes;
+    // Why this entity cannot be written or searched here: it declares a lexical index its route cannot keep. Null for
+    // an entity without the declaration (the common path pays one memoized lookup) and for a route that keeps it.
+    private readonly string? _lexicalRefusal;
 
     /// <summary>
     /// The Lifecycle this operation runs: none for an exact transfer's own reads and writes (DATA-0149), else the
@@ -134,6 +137,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         _deleteOverride = OperationOverrideRegistry.ForDelete(typeof(TEntity));
         _notYetDeleted = _deleteOverride is null ? null : NotYetOverridden(_deleteOverride);
         _lifecycle = lifecycle;
+        _lexicalRefusal = LexicalRefusal();
     }
 
     private bool HasNonDefaultReadContributor()
@@ -540,6 +544,10 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // segmentation callbacks, cross-cutting guards, readiness, lifecycle, or provider work.
         _sourcePlan.Demand(effect, operation);
         RefuseImmediateWriteInDeferredScope(effect, operation);
+        // A declared lexical index the route cannot keep refuses the first write, before anything is held, so the
+        // application never runs on a store that cannot search what it declared.
+        if (effect != DataOperationEffect.Read && _lexicalRefusal is not null)
+            throw new NotSupportedException(_lexicalRefusal);
         ct.ThrowIfCancellationRequested();
         DataOperationLease? lease = null;
         try

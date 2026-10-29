@@ -42,6 +42,14 @@ public interface IRelationalStoreFeatures
     bool SupportsNativeTtl => false;
 
     /// <summary>
+    /// Whether the store keeps a lexical index over an entity's declared text, in step with every write of the row
+    /// inside the same write unit, and answers a ranked term search over it. A store that answers true also declares
+    /// <c>query.lexical</c> on its repository and spells the index through
+    /// <see cref="IRelationalDdlExecutor.CreateLexicalIndex"/>.
+    /// </summary>
+    bool SupportsLexicalIndex => false;
+
+    /// <summary>
     /// Whether a value of this type can serve as an index key here.
     ///
     /// <para>Some stores cap what a key may hold. SQL Server reads a mapped scalar out of the document as

@@ -64,6 +64,20 @@ Named routes use the standard `Koan:Data:Sources:<name>` configuration. Secrets 
 - Offset paging is not snapshot isolation and does not provide mutation-safe traversal, resume tokens,
   or a public cursor.
 
+## Lexical index
+
+An entity's `[Lexical]` properties are served by one stored generated column `__koan_lexical tsvector`
+(`to_tsvector('<language>'::regconfig, coalesce(<field>, '') || ' ' || ...)`, each field read the way a filter reads it)
+and a GIN index `LX_<table>`, fitted to 63 bytes like every index name
+([DATA-0159](../../../../docs/decisions/DATA-0159-lexical-search-over-declared-entity-text.md)). The server computes
+the column on every write and for every row the table already holds, so the index is current as soon as it exists and
+`Rebuild` answers the row count without re-deriving anything. The column's recipe is recorded as its comment; a changed
+declaration drops and re-adds the column and its index. A search or a rebuild first confirms, once per table, that
+the catalog holds the column with that recipe and the index; on a route whose DDL policy did not build them it refuses
+naming both and the policy correction. A search runs `websearch_to_tsquery` over the OR-joined terms,
+filters with `@@`, orders by `ts_rank_cd` and then identity, pages with `LIMIT`/`OFFSET`, and cuts snippets with
+`ts_headline` over the same text. CockroachDB shares this runtime and keeps the feature off.
+
 ## Index names
 
 PostgreSQL index names are unique per schema and are cut to 63 bytes, and `CREATE INDEX IF NOT EXISTS` skips on any

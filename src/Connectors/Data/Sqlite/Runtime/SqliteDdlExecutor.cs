@@ -145,6 +145,82 @@ internal sealed class SqliteDdlExecutor(
             : null;
     }
 
+    /// <summary>
+    /// Builds the view, the FTS5 table and the three triggers of <see cref="SqliteLexical"/>, or replaces the set when
+    /// any of them differs from the declaration (a field added, a language changed). A replaced index is empty until the
+    /// rebuild verb fills it, and readiness says so. Everything is spoken in one statement batch over the writer, so an
+    /// atomic commit that provisions the table provisions its index too.
+    /// </summary>
+    public async Task CreateLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default)
+    {
+        var expected = SqliteLexical.Objects(dialect, table, lexical);
+        var connection = await Writer(ct).ConfigureAwait(false);
+        var actual = await InspectLexical(connection, _writerTransaction, expected, ct).ConfigureAwait(false);
+        var matching = expected.Count(item =>
+            actual.TryGetValue(item.Name, out var held) && held is not null && Equivalent(held, item.Sql));
+        if (matching == expected.Count) return;
+
+        var statements = new List<string>();
+        // Triggers first, then the table, then the view: each drop frees what the next one depends on.
+        foreach (var item in expected.Reverse())
+            if (actual.ContainsKey(item.Name)) statements.Add(SqliteLexical.Drop(item.Name, item.Type));
+        statements.AddRange(expected.Select(static item => item.Sql + ";"));
+        await Execute(string.Join(" ", statements), ct).ConfigureAwait(false);
+    }
+
+    public async Task<bool> HasLexicalIndex(
+        RelationalTableDefinition table,
+        RelationalLexicalDefinition lexical,
+        CancellationToken ct = default)
+    {
+        var expected = SqliteLexical.Objects(dialect, table, lexical);
+        // Inside a unit the description reads the unit's own connection, as Describe does; otherwise a non-creating one.
+        var unit = connections.CurrentUnit(route.ConnectionString, route.Source);
+        SqliteConnection? owned = null;
+        if (unit is null)
+        {
+            try
+            {
+                owned = await connections.Open(route.ConnectionString, route.Source, ct, nonCreating: true)
+                    .ConfigureAwait(false);
+            }
+            catch (SqliteException)
+            {
+                return false;
+            }
+        }
+        await using var _ = owned;
+        var actual = await InspectLexical(owned ?? unit!.Connection, unit?.Transaction, expected, ct).ConfigureAwait(false);
+        return expected.All(item =>
+            actual.TryGetValue(item.Name, out var held) && held is not null && Equivalent(held, item.Sql));
+    }
+
+    /// <summary>The statement the schema holds for each of the index's objects, keyed by object name; a missing object is absent.</summary>
+    private static async Task<Dictionary<string, string?>> InspectLexical(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        IReadOnlyList<(string Name, string Type, string Sql)> expected,
+        CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        var names = new List<string>();
+        for (var index = 0; index < expected.Count; index++)
+        {
+            names.Add($"@n{index}");
+            command.Parameters.AddWithValue($"@n{index}", expected[index].Name);
+        }
+        command.CommandText = $"SELECT name, sql FROM sqlite_master WHERE name IN ({string.Join(", ", names)})";
+        var held = new Dictionary<string, string?>(StringComparer.Ordinal);
+        await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+            held[reader.GetString(0)] = reader.IsDBNull(1) ? null : reader.GetString(1);
+        return held;
+    }
+
     public async ValueTask DisposeAsync()
     {
         if (_writer is null) return;

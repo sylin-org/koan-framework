@@ -40,6 +40,12 @@ public static class DataCaps
         /// mutation-safe iteration.
         /// </summary>
         public static readonly Capability ProviderBoundedPaging = new("query.paging.providerBounded");
+        /// <summary>
+        /// Provider keeps a lexical index over an entity's <c>[Lexical]</c> string properties, in step with every write
+        /// of the row inside the same write unit, and answers a bounded term search ranked by relevance with optional
+        /// snippets — see <see cref="Lexical.ILexicalSearchRepository{TEntity,TKey}"/>.
+        /// </summary>
+        public static readonly Capability Lexical = new("query.lexical");
     }
 
     /// <summary>Write negotiation tokens.</summary>

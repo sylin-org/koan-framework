@@ -702,3 +702,8 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   remembers it as provisioned, so the unit invalidates what it provisioned on rollback. And an `AsyncLocal` assigned
   inside an `async` method never reaches the caller: the ambient is set synchronously, in the caller's flow, before
   the first await, through a box the asynchronous open fills in later. (DATA-0158, 2026-10-29)
+- **A store-kept index rides the row's own statement, so no write path has to know it exists.** Maintaining SQLite's
+  FTS5 table from the repository would have touched every write path (single, bulk, batch, conditional, transfers) and
+  still missed the next one; triggers on the table, and a generated column on PostgreSQL, put the entry in whatever
+  write unit the row is in, the ambient atomic commit included. FTS5's auxiliary functions and `MATCH` name the
+  virtual table itself, never an alias of it. (DATA-0159, 2026-10-29)

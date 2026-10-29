@@ -29,4 +29,10 @@ internal sealed class SqliteStoreFeatures : IRelationalStoreFeatures
     public bool SupportsManagedFieldIndexParts => true;
 
     public bool SupportsNativeTtl => false;
+
+    /// <summary>
+    /// The bundled engine includes FTS5, and an external-content table over a view of the document keeps one copy of
+    /// the text while its triggers run inside the row's own statement (<see cref="SqliteLexical"/>).
+    /// </summary>
+    public bool SupportsLexicalIndex => true;
 }

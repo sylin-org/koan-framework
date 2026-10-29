@@ -62,6 +62,8 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(sp => new Koan.Data.Abstractions.Naming.StorageNameCache(
             sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<DataRuntimeOptions>>().Value.StorageNameCacheEntries));
         services.AddSingleton<IAggregateIdentityManager, AggregateIdentityManager>();
+        // Readiness reports whether each declared lexical index covers every row; inert without a declaration.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, Lexical.LexicalIndexHealthContributor>());
         services.TryAddSingleton(Koan.Core.Semantics.Segmentation.SegmentationPlan.Empty);
 
         // The data core is tenancy-agnostic: it exposes the generic Pipeline.IStorageGuard seam (DATA-0105 §0).

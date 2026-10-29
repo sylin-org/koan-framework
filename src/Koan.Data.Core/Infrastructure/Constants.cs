@@ -12,6 +12,7 @@ public static class Constants
             public const string StreamExecution = "koan.data.stream.execution";
             public const string QueryFallback = "koan.data.query.fallback";
             public const string LifecycleSelected = "koan.data.lifecycle.selected";
+            public const string LexicalSelected = "koan.data.lexical.selected";
             public const string SourcePlanSelected = "koan.data.source.plan.selected";
             public const string SourceClaimsSelected = "koan.data.source.claims.selected";
             public const string DefaultRouteSelected = "koan.data.route.default.selected";

@@ -28,14 +28,22 @@ public static class NpgsqlFeatures
         DataCaps.Isolation.DatabaseScoped
     ];
 
-    public static void Declare(IDataClaims claims)
+    /// <summary>Declares the runtime's capabilities as a provider's claims.</summary>
+    /// <param name="claims">The claim set the provider's factory describes itself into.</param>
+    /// <param name="lexical">Whether the provider keeps a lexical index (<see cref="DataCaps.Query.Lexical"/>); PostgreSQL does, CockroachDB does not.</param>
+    public static void Declare(IDataClaims claims, bool lexical = false)
     {
         foreach (var capability in All) claims.Capability(capability);
+        if (lexical) claims.Capability(DataCaps.Query.Lexical);
     }
 
-    public static void Describe(ICapabilities capabilities)
+    /// <summary>Describes a repository's capabilities, with the filter and execution details every relational store carries.</summary>
+    /// <param name="capabilities">The capability set the repository describes itself into.</param>
+    /// <param name="lexical">Whether this route keeps a lexical index (<see cref="DataCaps.Query.Lexical"/>).</param>
+    public static void Describe(ICapabilities capabilities, bool lexical = false)
     {
         foreach (var capability in All) capabilities.Add(capability);
+        if (lexical) capabilities.Add(DataCaps.Query.Lexical);
         capabilities
             .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default)
             .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native));

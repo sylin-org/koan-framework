@@ -26,7 +26,7 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Data.Relational.Npgsql;
 
-public sealed class NpgsqlRepository<TEntity, TKey> :
+public sealed partial class NpgsqlRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IQueryRepository<TEntity, TKey>,
     IRawQueryRepository<TEntity, TKey>,
@@ -71,7 +71,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
         _options = options;
         _readiness = services.GetRequiredService<DataSourceReadinessCoordinator>();
         _schema = services.GetRequiredService<IRelationalSchemaOrchestrator>();
-        _features = new NpgsqlStoreFeatures(options.ProviderName);
+        _features = new NpgsqlStoreFeatures(options.ProviderName, options.SupportsLexicalIndex);
         _schemaPolicy = new RelationalSchemaPolicy
         {
             Ddl = options.DdlPolicy,
@@ -121,7 +121,7 @@ public sealed class NpgsqlRepository<TEntity, TKey> :
 
     public StorageOptimizationInfo OptimizationInfo { get; }
 
-    public void Describe(ICapabilities capabilities) => NpgsqlFeatures.Describe(capabilities);
+    public void Describe(ICapabilities capabilities) => NpgsqlFeatures.Describe(capabilities, _features.SupportsLexicalIndex);
 
     public Task EnsureReady(CancellationToken ct = default) => Ready(ct);
 

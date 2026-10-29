@@ -76,6 +76,7 @@ candidate settings without changing the active source.
 | Replace the revision the caller observed | `entity.ReplaceIf(stored => stored.Revision == expected, ct: ct)` | Qualified native conditional replacement; never creates a missing row |
 | Delete | `entity.Remove(ct)` | One logical removal |
 | A finite batch | `Todo.UpsertMany(items, ct)` | Atomicity depends on the provider capability |
+| The rows whose declared text holds these words, ranked | `Post.Lexical.Search(text, s => s.Top(20), ct)` | Store-kept index; SQLite and PostgreSQL |
 
 Use `Entity<T, TKey>` when the identifier is not the default string key. The lower-level
 `Data<TEntity, TKey>` facade, direct provider instructions, and raw access are expert escape hatches,
@@ -94,6 +95,32 @@ save. These operations protect the destination identity; they do not make a sepa
 atomic with its write. See the [Data contract](../../../src/Koan.Data.Core/README.md) for receipts,
 supported providers, deferred route restoration, and completion-failure limits, and the
 [PATCH guide](../../guides/patch-capabilities-howto.md) for partial HTTP updates.
+
+## Search declared text
+
+Mark the string properties whose words should be found, and the store that holds the entity keeps the index in step
+with every write — SQLite through an FTS5 table, PostgreSQL through a `tsvector` column under a GIN index:
+
+```csharp
+public sealed class Post : Entity<Post>
+{
+    [Lexical] public string Title { get; set; } = "";
+    [Lexical] public string Body { get; set; } = "";
+}
+
+var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet(), ct);   // ids, scores, excerpts
+var posts = await Post.Lexical.Find("copper lantern", s => s.Page(2, 20), ct);              // entities in rank order
+```
+
+Every word is optional and a row holding more of them ranks higher. A search is bounded by construction: the
+declaration names `Top(size)` or `Page(page, size)`, a page holds at most 1,000 matches, and a snippet window holds at
+most 64 words. Rows written before the declaration are indexed by `Post.Lexical.Rebuild(ct)`; `Post.Lexical.Status(ct)`
+says exactly whether the index covers every row, and the `data:lexical` readiness report says what it last measured,
+at most once per `DataRuntimeOptions.LexicalReadinessInterval` (five minutes) per entity, so a probe never counts a
+whole table. A store that cannot keep the index refuses the entity's first write, naming `query.lexical` and the
+correction; a route whose DDL policy did not build it refuses the search, naming the missing structure and the policy. This is search by the words a row holds;
+[semantic search](../../capabilities/ai/semantic-search.md) is search by meaning. See
+[DATA-0159](../../decisions/DATA-0159-lexical-search-over-declared-entity-text.md).
 
 ## Keep a polymorphic family in one set
 

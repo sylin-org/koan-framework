@@ -64,6 +64,25 @@ using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
 
 See [DATA-0158](../../../../docs/decisions/DATA-0158-sqlite-posture-and-atomic-commit.md).
 
+## Search declared text
+
+Mark the string properties to search and SQLite keeps an FTS5 index over them, in step with every save and remove
+inside the same write unit as the row:
+
+```csharp
+public sealed class Post : Entity<Post>
+{
+    [Lexical] public string Title { get; set; } = "";
+    [Lexical] public string Body { get; set; } = "";
+}
+
+var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet(), ct);
+```
+
+Every word is optional and a row holding more of them ranks higher; a snippet marks the matched words. Rows that
+existed before the declaration are indexed by `Post.Lexical.Rebuild(ct)`, and `Post.Lexical.Status(ct)` says whether
+the index covers every row. See [DATA-0159](../../../../docs/decisions/DATA-0159-lexical-search-over-declared-entity-text.md).
+
 ## Inspect and name useful reads
 
 Use provider-neutral storage vocabulary to see what a source contains:

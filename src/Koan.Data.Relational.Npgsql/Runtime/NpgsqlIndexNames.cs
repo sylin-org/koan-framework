@@ -35,6 +35,9 @@ internal static class NpgsqlIndexNames
         return IdentifierComposer.Compose(index.Name, qualifier, Policy);
     }
 
+    /// <summary>A derived name fitted to 63 bytes the way <see cref="Name"/> fits one: a readable prefix and a hash of the whole.</summary>
+    internal static string Fit(string name) => IdentifierComposer.Compose(name, [], Policy);
+
     private static string Hash(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)), 0, 4).ToLowerInvariant();
 

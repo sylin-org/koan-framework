@@ -11,11 +11,13 @@ public sealed class RelationalSchemaPlan
         RelationalTableDefinition table,
         IEnumerable<RelationalIndexDefinition> indexes,
         IEnumerable<string> unprovedClaims,
-        IEnumerable<string> refusedRequirements)
+        IEnumerable<string> refusedRequirements,
+        RelationalLexicalDefinition? lexical = null)
     {
         Mapping = mapping;
         Table = table;
         Indexes = Array.AsReadOnly(indexes.ToArray());
+        Lexical = lexical;
         UnprovedClaims = Array.AsReadOnly(unprovedClaims.ToArray());
         RefusedRequirements = Array.AsReadOnly(refusedRequirements.ToArray());
     }
@@ -23,6 +25,9 @@ public sealed class RelationalSchemaPlan
     public MappingPlan Mapping { get; }
     public RelationalTableDefinition Table { get; }
     public IReadOnlyList<RelationalIndexDefinition> Indexes { get; }
+
+    /// <summary>The entity's lexical index as this store spells it, or <see langword="null"/> when it declares none.</summary>
+    public RelationalLexicalDefinition? Lexical { get; }
 
     /// <summary>Mapped intent this store cannot realize, named so it is degraded rather than silently dropped.</summary>
     public IReadOnlyList<string> UnprovedClaims { get; }

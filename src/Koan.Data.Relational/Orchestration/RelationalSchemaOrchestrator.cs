@@ -104,7 +104,21 @@ internal sealed class RelationalSchemaOrchestrator(
             mapping.Container.Name,
             columns,
             mapping.Identity.Parts.Select(static part => part.PhysicalPath.Name).ToArray());
-        var plan = new RelationalSchemaPlan(mapping, table, indexes, unproved, refused);
+        // A lexical index is declared beside the keyed indexes and served from a structure of its own. A store that
+        // cannot keep one records the claim as unproved and builds nothing; the Data facade refuses the entity's first
+        // write on such a route, so the shortfall is never discovered under load.
+        RelationalLexicalDefinition? lexical = null;
+        if (mapping.Lexical is { } declared)
+        {
+            lexical = new RelationalLexicalDefinition(
+                declared.Name,
+                declared.Bindings.Select(static binding => new RelationalIndexPart(
+                    binding.PhysicalPath, binding.PhysicalType, EncodingId(binding))).ToArray(),
+                declared.Language);
+            if (!features.SupportsLexicalIndex) unproved.Add($"Lexical:{declared.Name}");
+        }
+
+        var plan = new RelationalSchemaPlan(mapping, table, indexes, unproved, refused, lexical);
         RelationalPlanGuard.Validate(mapping, plan);
         return plan;
     }
@@ -177,6 +191,17 @@ internal sealed class RelationalSchemaOrchestrator(
         // has said this container cannot serve the shape at all.
         found.AddRange(shape.Incompatible.Select(static detail => new RelationalSchemaFinding(
             "Container", RelationalSchemaFindingKind.Drift, detail, Corrective: true)));
+
+        // The index is reported, never required: reads and writes through the mapping work without it, and the search
+        // verb says so itself when it is missing. Its absence degrades readiness so an operator under a validate-only
+        // DDL policy sees what to build.
+        if (plan.Lexical is { } lexical && features.SupportsLexicalIndex &&
+            !await ddl.HasLexicalIndex(plan.Table, lexical, ct).ConfigureAwait(false))
+            found.Add(new RelationalSchemaFinding(
+                $"Lexical:{lexical.Name}",
+                RelationalSchemaFindingKind.Unverified,
+                $"Lexical index {lexical.Name} is not present.",
+                Corrective: false));
 
         return new RelationalSchemaValidation(plan, tableExists: true, found.Concat(refusals).Concat(unverified));
     }
@@ -260,6 +285,9 @@ internal sealed class RelationalSchemaOrchestrator(
                 if (index.Unscoped is { } global) await ReportGlobal(plan.Table, index, global, ddl, ct).ConfigureAwait(false);
             }
         }
+
+        if (plan.Lexical is { } lexical && features.SupportsLexicalIndex && IsDdlAllowed(policy))
+            await ddl.CreateLexicalIndex(plan.Table, lexical, ct).ConfigureAwait(false);
 
         return await ValidateAsync(mapping, ddl, features, policy, ct).ConfigureAwait(false);
     }

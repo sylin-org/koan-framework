@@ -15,6 +15,7 @@ public sealed class MappingPlan
     private readonly CompositeIdentityPlan? _compositeIdentity;
     private readonly MappingBindingPlan[] _writeBindings;
     private IReadOnlyList<MappingIndexPlan> _indexes = Array.Empty<MappingIndexPlan>();
+    private MappingLexicalPlan? _lexical;
 
     internal MappingPlan(
         string id,
@@ -59,10 +60,14 @@ public sealed class MappingPlan
     public IReadOnlyList<MappingBindingPlan> Bindings { get; }
     public IReadOnlyList<MappingIndexPlan> Indexes => _indexes;
 
-    internal void InitializeIndexes(MappingIndexPlan[] indexes)
+    /// <summary>The entity's lexical index, or <see langword="null"/> when it declares no <c>[Lexical]</c> property.</summary>
+    public MappingLexicalPlan? Lexical => _lexical;
+
+    internal void InitializeIndexes(MappingIndexPlan[] indexes, MappingLexicalPlan? lexical)
     {
         if (_indexes.Count != 0) throw new InvalidOperationException($"Mapping plan '{Id}' indexes are already initialized.");
         _indexes = Array.AsReadOnly(indexes);
+        _lexical = lexical;
     }
 
     public MappingUsePlan Use(MappingPath logicalPath, MappingConsumer consumer)

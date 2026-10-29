@@ -23,7 +23,7 @@ using Koan.Data.Core.Transfers;
 
 namespace Koan.Data.Core;
 
-public static class Data<TEntity, TKey>
+public static partial class Data<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {

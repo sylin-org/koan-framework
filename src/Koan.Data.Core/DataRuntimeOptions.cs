@@ -28,4 +28,11 @@ public sealed class DataRuntimeOptions
 
     /// <summary>Maximum polymorphic Entity views admitted by one host.</summary>
     public int VariantRepositoryEntries { get; set; } = Infrastructure.Constants.Defaults.VariantRepositoryEntries;
+
+    /// <summary>
+    /// How often the <c>data:lexical</c> readiness contributor measures whether each declared lexical index is current.
+    /// A measurement counts the entity's container, so a probe runs it at most once per interval per entity and
+    /// answers the last measurement in between; <c>Entity.Lexical.Status()</c> is always exact.
+    /// </summary>
+    public TimeSpan LexicalReadinessInterval { get; set; } = TimeSpan.FromMinutes(5);
 }
