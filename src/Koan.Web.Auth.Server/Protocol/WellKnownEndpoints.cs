@@ -9,8 +9,9 @@ namespace Koan.Web.Auth.Server.Protocol;
 
 /// <summary>
 /// SEC-0006 Phase 3 — discovery. RFC 8414 Authorization-Server metadata (+ an OIDC-form mirror for clients that
-/// only probe <c>/.well-known/openid-configuration</c>) and the public ES256 JWKS. All derived from the live
-/// request host so the advertised endpoints match where the client actually reached the AS.
+/// only probe <c>/.well-known/openid-configuration</c>) and the public ES256 JWKS. The issuer is the one every token
+/// carries (<see cref="AuthServerIssuer"/>, SEC-0023); the endpoints derive from the server's public origin
+/// (<see cref="RequestHost"/>).
 /// </summary>
 internal static class WellKnownEndpoints
 {
@@ -18,13 +19,15 @@ internal static class WellKnownEndpoints
     {
         var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
         var root = RequestHost.Root(ctx);
+        // SEC-0023 — the issuer every token carries; the endpoints live at the server's public origin.
+        var issuer = ctx.RequestServices.GetRequiredService<AuthServerIssuer>().For(ctx);
 
-        var grantTypes = new List<string> { "authorization_code", "urn:ietf:params:oauth:grant-type:device_code" };
-        if (options.EnableRefreshTokens) grantTypes.Add("refresh_token");
+        var grantTypes = new List<string> { OAuthGrantTypes.AuthorizationCode, OAuthGrantTypes.DeviceCode };
+        if (options.EnableRefreshTokens) grantTypes.Add(OAuthGrantTypes.RefreshToken);
 
         var doc = new Dictionary<string, object?>
         {
-            ["issuer"] = root,
+            ["issuer"] = issuer,
             ["authorization_endpoint"] = root + AuthServerRoutes.Authorize,
             ["token_endpoint"] = root + AuthServerRoutes.Token,
             ["device_authorization_endpoint"] = root + AuthServerRoutes.Device,

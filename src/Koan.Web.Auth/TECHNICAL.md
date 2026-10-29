@@ -52,14 +52,22 @@ declaring a custom `Type` does not implement configuration-only provider IDs: th
 corresponding scheme. Normalized protocol and merged provider options remain owned by the compiled plan. There is no
 second custom protocol startup lifecycle and no per-request protocol discovery.
 
-The unmodified challenge controller applies the existing return-URL policy before invoking the named handler, and
+The challenge controller resolves `return` through `ReturnUrlPolicy.Resolve(HttpContext, …)` before invoking the
+named handler, which redirects to `AuthenticationProperties.RedirectUri` without checking it again (SEC-0029): a local
+path — one leading `/`, printable ASCII without spaces, a path that after percent-decoding (up to three passes) names no
+host and holds no backslash and no `.` or `..` segment, beginning with the application's path base at a segment
+boundary — or an http(s) URL with an allow-listed prefix is kept; anything else becomes the default landing,
+`ReturnUrl:DefaultPath` under the base path once (`ReturnUrlPolicy.DefaultLanding`), or as it is when it is an absolute
+http(s) URL. Logout resolves its `return` the same way, so a refused value lands on the default instead of reaching
+`LocalRedirect`. The cookie's login redirect names the page asked for under the base path. The controller also
 carries the failure landing named beside `return` (`failure`, a rooted path checked by `SignInFailureReturn.TryAccept`)
 in the authentication properties (WEB-0080). `TryAccept` admits only printable ASCII from the characters a path and a
 query carry, percent-decodes the path and the query, and refuses a host (`//`), a `.` or `..` segment, a backslash, an
 encoded slash or backslash in the path, an encoded control or non-ASCII byte, a fragment and a query that names
 `error`; the same rule validates `Koan:Web:Auth:ReturnUrl:FailurePath` at start, so no accepted landing can leave the
 base path, carry a second code or fail as a header. `SignInFailureReturn.Redirect` resolves that value, then
-`Koan:Web:Auth:ReturnUrl:FailurePath`, under the request's path base, and sends the person there with the
+`Koan:Web:Auth:ReturnUrl:FailurePath`, under the application's path base exactly once (SEC-0027), and sends the person
+there with the
 `SignInFailure` code in `error` and `Cache-Control: no-store`; it answers false and leaves the response alone when
 nothing is named. The seeded OAuth2 and OIDC handlers ask it from `OnRemoteFailure` and `OnAccessDenied`; a
 connector asks it at its own failure sites.
@@ -72,6 +80,32 @@ semantics. A registered scheme proves composition only, not that these security 
 The framework cookie scheme is `Koan.cookie`. Challenge and access-denied responses pass through the discovered
 `IKoanAuthFlowHandler` pipeline. JSON/API requests receive the built-in JSON challenge behavior; interactive requests
 redirect to the elected provider when one exists.
+
+## Resource edge
+
+`Koan.resource` (`AuthenticationExtensions.ResourceServerScheme`, SEC-0025) is registered with the cookie and stays
+inert until `Koan:Web:Auth:ResourceServer:Enabled`; `ResourceServerComposition` then makes it the default authenticate,
+challenge and forbid scheme, leaving the default, sign-in and sign-out schemes on `Koan.cookie`. Its
+`ForwardDefaultSelector` forwards every operation of a request without an `Authorization` header to the cookie; a
+request with one is the handler's alone. The handler authenticates through Trust's `KoanBearerResource` for
+`ResourceServer:Resource`, else the base URL `KoanWebBaseUrl.Resolve` answers (which refuses a request-derived origin in
+Production, WEB-0078), and turns a header that carries no bearer into a failure. Its challenge answers 401 with
+`Bearer error="invalid_token"` after a failed authentication and a bare `Bearer` otherwise; its forbid is ASP.NET's 403.
+`RejectedBearerFilter`, a global MVC authorization filter, challenges through the same scheme before any controller
+action or Razor Page when the header was not accepted, so an anonymous page does not read a rejected agent as a
+visitor. It skips an action whose endpoint metadata carries `ResourceServerExemptAttribute`: the embedded authorization
+server's controller carries it, since its endpoints never authenticate by bearer and owe a client their own protocol
+answers (a refresh, a registration, a device request, the discovery documents). Endpoints outside MVC — minimal APIs,
+`MapRazorComponents`, the MCP edge — get the 401 only when they require an authenticated caller, or answer in their own
+terms. A `Resource` that is not an absolute URI refuses the start. The
+composition facts carry `koan.auth.resourceserver.enabled` with the resource while it is on.
+
+A path Koan writes for the browser follows one rule (`ApplicationPaths`, SEC-0027): an application-relative, rooted
+path gets the application's path base — the configured base URL's, canonical, else the request's — exactly once, even
+when the path begins with the path base's own segment. The cookie's login redirect builds its provider challenge URL
+that way, the discovery document's `challengeUrl`, the default landing and the failure landing are written that way;
+`IAuthProviderCatalog.ChallengePath` stays the application-relative route. `ReturnUrlPolicy.UnderPathBase`, which keeps a
+URL that already carries the base, remains only for the self-hosted development provider's own endpoints.
 
 ## Lifecycle failure semantics
 

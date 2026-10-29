@@ -41,9 +41,15 @@ await app.RunAsync();
 Register `https://your-app/auth/google/callback` with Google. Start sign-in at
 `GET /auth/google/challenge?return=/`.
 
+`return`, on the challenge and on `/auth/logout`, is honoured only when it is a local path of the application — one
+leading `/`, printable ASCII, no host after percent-decoding (`//`, `/\`), no backslash, no `.` or `..` segment, under
+the base path — or an absolute URL whose prefix is in `Koan:Web:Auth:ReturnUrl:AllowList`. Anything else, and no
+`return` at all, lands on `Koan:Web:Auth:ReturnUrl:DefaultPath` (`/`) under the base path, never on the value.
+
 Say where a failed sign-in lands, beside `return` (`&failure=/sign-in`) or for every provider in
 `Koan:Web:Auth:ReturnUrl:FailurePath`: a rooted path of the application in printable ASCII, with no `.` or `..`
-segment, no backslash or encoded slash, no fragment and no `error` in its own query, placed under its base path. The person
+segment, no backslash or encoded slash, no fragment and no `error` in its own query, application-relative: the base
+path is added once, so `/sign-in` under `/me` lands on `/me/sign-in`. The person
 then arrives there with one code in the query — `provider_unreachable`, `handle_unresolved`, `access_denied`,
 `callback_mismatch` or `sign_in_failed` — and never the provider's text. Nothing named keeps each handler's own
 failure answer.
@@ -61,6 +67,29 @@ failure answer.
 
 Web Auth can also run a configuration-only OIDC/OAuth2 provider. No generic connector package is needed; set `Type`,
 provider endpoints or `Authority`, `ClientId`, and `ClientSecret` under `Koan:Web:Auth:Providers:{id}`.
+
+## Accept the application's own bearer on its pages
+
+An application whose people approve agents through `Sylin.Koan.Web.Auth.Server` lets those agents read its ordinary
+pages as the person with one setting:
+
+```json
+{ "Koan": { "Web": { "Auth": { "ResourceServer": { "Enabled": true } } } } }
+```
+
+A request that carries an `Authorization` header is then authenticated by its bearer alone, never by a session cookie
+it also carries. The token is accepted only when its audience is the application's base URL (`Koan:Web:ApplicationUrl`,
+with or without a trailing slash), or `Koan:Web:Auth:ResourceServer:Resource` when set; its subject becomes the same
+`ClaimTypes.NameIdentifier` the person's session carries, so every page and gate answers for the agent as for the
+person. A token that is expired, tampered, foreign or issued for another resource answers 401 with
+`WWW-Authenticate: Bearer error="invalid_token"` wherever an endpoint requires an authenticated caller, and before any
+MVC controller action or Razor Page that admits anonymous callers; a minimal-API or `MapRazorComponents` endpoint that
+admits anonymous callers runs as a visitor instead. The embedded authorization server's protocol endpoints never
+authenticate by bearer, so they keep their own answers when a client attaches a stale token. A request without the
+header keeps the session cookie. The MCP edge keeps its own resource (`/mcp`) on the same rule.
+
+Under a base URL with a path, the login redirect and the discovery document's `challengeUrl` carry the path once
+(`/notes/auth/google/challenge`).
 
 ## Claims and role refresh
 

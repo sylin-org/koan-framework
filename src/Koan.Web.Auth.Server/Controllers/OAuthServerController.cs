@@ -1,15 +1,19 @@
 using Koan.Web.Auth.Server.Hosting;
 using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Protocol;
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Koan.Web.Auth.Server.Controllers;
 
 /// <summary>
 /// Controller-owned HTTP boundary for the embedded OAuth 2.1 authorization server. Protocol mechanics remain in
-/// their concern-specific handlers; this type is the single route/method inventory.
+/// their concern-specific handlers; this type is the single route/method inventory. Its endpoints never authenticate by
+/// bearer (the person decides by the session, SEC-0026), so Web Auth's resource edge leaves them their own protocol
+/// answers when a client attaches a stale token (SEC-0025).
 /// </summary>
 [ApiController]
+[ResourceServerExempt]
 [ApiExplorerSettings(IgnoreApi = true)]
 public sealed class OAuthServerController : ControllerBase
 {

@@ -33,10 +33,10 @@ Measured by a consumer that renders one sign-in page as a resource of its own an
 1. **The application names the landing.** Per challenge, beside `return`: `GET /auth/{provider}/challenge?return=
    /home&failure=/sign-in`, carried to the handler in `AuthenticationProperties.Items[".koan.failure"]`. For every
    provider, in configuration: `Koan:Web:Auth:ReturnUrl:FailurePath`. The per-challenge value wins. A landing is a
-   rooted path of this application (`/sign-in`, `/sign-in?from=home`), placed under the request's path base unless it
-   begins with that exact path base, compared ordinally at a segment boundary since a proxy may route it
-   case-sensitively (`ReturnUrlPolicy.UnderPathBase`, WEB-0078; `/TANGENT/x` lands on `/tangent/TANGENT/x`), so a
-   sign-in under `/tangent` lands on `/tangent/sign-in`. It must stay there and be a valid header: it is written in printable ASCII from the characters
+   rooted, application-relative path (`/sign-in`, `/sign-in?from=home`), placed under the application's path base
+   exactly once — the configured base URL's, else the request's (amended by SEC-0027; this record first kept a landing
+   that already began with the exact path base) — so a sign-in under `/tangent` lands on `/tangent/sign-in`,
+   `/TANGENT/x` on `/tangent/TANGENT/x` and `/tangent/sign-in` on `/tangent/tangent/sign-in`. It must stay there and be a valid header: it is written in printable ASCII from the characters
    a path and a query carry (RFC 3986 `pchar`, `/`, `?`, `%`), and after percent-decoding it names no host (`//`), no
    `.` or `..` segment, no backslash, no encoded slash or backslash in its path, no control character and no
    character outside printable ASCII, so `/../admin`, `/%2e%2e/admin`, `/a%2Fb` and `/é` are refused; a fragment is

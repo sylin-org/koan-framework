@@ -650,3 +650,19 @@
       href: SEC-0020-the-open-default-is-the-product-stance.md
     - name: SEC-0021 A resource allows and denies beyond what roles grant, through overwrites resolved in Discord's order
       href: SEC-0021-resource-overwrites-resolve-in-discord-order.md
+    - name: SEC-0022 Signing keys persist in Development where the key ring does
+      href: SEC-0022-signing-keys-persist-in-development-where-the-key-ring-does.md
+    - name: SEC-0023 A token carries the issuer its authorization server states
+      href: SEC-0023-a-token-carries-the-issuer-its-server-states.md
+    - name: SEC-0024 The device grant is a client's explicit permission
+      href: SEC-0024-the-device-grant-is-a-clients-explicit-permission.md
+    - name: SEC-0025 An application accepts its own bearer on its pages
+      href: SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md
+    - name: SEC-0026 The authorization server decides by the person's session, never by a bearer
+      href: SEC-0026-the-authorization-server-decides-by-the-session.md
+    - name: SEC-0027 The authorization server's consent flow lives under the base URL's path
+      href: SEC-0027-the-consent-flow-lives-under-the-base-path.md
+    - name: SEC-0028 A server-rendered consent page reads Koan's answer, and the done page knows the outcome
+      href: SEC-0028-a-consent-page-reads-koans-answer.md
+    - name: SEC-0029 A sign-in or logout return is a local path of the application
+      href: SEC-0029-a-return-is-a-local-path-of-the-application.md

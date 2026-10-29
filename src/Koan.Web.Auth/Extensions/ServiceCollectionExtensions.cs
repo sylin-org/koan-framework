@@ -4,9 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
@@ -31,7 +33,11 @@ internal static class ServiceCollectionExtensions
             .Validate(options => options.ReturnUrl.FailurePath is null || SignInFailureReturn.Accepts(options.ReturnUrl.FailurePath),
                 $"{AuthOptions.SectionPath}:ReturnUrl:FailurePath must be a rooted path of this application, such as /sign-in, where a failed sign-in lands; " +
                 "it is printable ASCII, names no host, no '.' or '..' segment, no backslash or encoded slash and no fragment, " +
-                "and its query does not name 'error', which carries the failure code.");
+                "and its query does not name 'error', which carries the failure code.")
+            // SEC-0025: the resource a token's audience must name is an absolute URI.
+            .Validate(options => options.ResourceServer.Resource is null || Uri.TryCreate(options.ResourceServer.Resource, UriKind.Absolute, out _),
+                $"{AuthOptions.SectionPath}:ResourceServer:Resource must be the absolute URI a token's audience names, such as https://www.example.com/app; " +
+                "remove it to use the application's base URL (Koan:Web:ApplicationUrl).");
         services.AddKoanOptions<AuthLifecycleOptions>(AuthLifecycleOptions.SectionPath);
         services.AddKoanOptions<ChallengeOptions>(ChallengeOptions.SectionPath);
 
@@ -101,7 +107,8 @@ internal static class ServiceCollectionExtensions
                         if (selection is not null && selection.Eligible && !string.IsNullOrWhiteSpace(selection.ChallengePath))
                         {
                             var returnUrl = ResolveReturnUrl(ctx);
-                            defaultRedirect = BuildChallengeUrl(selection.ChallengePath, returnUrl);
+                            // SEC-0027: Koan's challenge route gets the application's path base exactly once.
+                            defaultRedirect = BuildChallengeUrl(ApplicationPaths.Under(ctx.HttpContext, selection.ChallengePath), returnUrl);
                         }
 
                         var flowCtx = new AuthChallengeContext
@@ -184,7 +191,15 @@ internal static class ServiceCollectionExtensions
                         await dispatcher.DispatchSignOut(signOutCtx, ctx.HttpContext.RequestAborted);
                     }
                 };
-            });
+            })
+            // SEC-0025: the resource edge of ordinary requests. Registered always; it becomes the default authenticate,
+            // challenge and forbid scheme only when Koan:Web:Auth:ResourceServer:Enabled says so (ResourceServerComposition),
+            // and it forwards every request without an Authorization header to the cookie.
+            .AddScheme<AuthenticationSchemeOptions, ResourceServerHandler>(
+                Extensions.AuthenticationExtensions.ResourceServerScheme,
+                o => o.ForwardDefaultSelector = ResourceServerHandler.Forward);
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<AuthenticationOptions>, ResourceServerComposition>());
+        services.Configure<MvcOptions>(mvc => mvc.Filters.Add<RejectedBearerFilter>());
         return services;
     }
 
@@ -254,9 +269,10 @@ internal static class ServiceCollectionExtensions
 
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
+            // The page asked for, as the browser addresses it: under the application's path base (SEC-0027).
             var path = context.Request.Path.HasValue ? context.Request.Path.Value ?? "/" : "/";
             var qs = context.Request.QueryString.HasValue ? context.Request.QueryString.Value : "";
-            returnUrl = string.IsNullOrWhiteSpace(qs) ? path : path + qs;
+            returnUrl = ApplicationPaths.Under(context.HttpContext, string.IsNullOrWhiteSpace(qs) ? path : path + qs);
         }
 
         if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var abs))

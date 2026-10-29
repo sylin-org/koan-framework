@@ -74,6 +74,7 @@ internal static class DcrEndpoint
             Id = "dcr_" + OpaqueToken.New(16),
             ClientName = clientName, // untrusted display-only
             RedirectUris = redirectUris,
+            GrantTypes = [OAuthGrantTypes.AuthorizationCode], // never the device grant, whatever the request asks
             IsDynamic = true,
             CreatedUtc = now,
             ExpiresUtc = now + options.DynamicClientLifetime,
@@ -90,7 +91,7 @@ internal static class DcrEndpoint
             client_name = client.ClientName,
             redirect_uris = client.RedirectUris,
             token_endpoint_auth_method = "none",
-            grant_types = new[] { "authorization_code" },
+            grant_types = client.GrantTypes,
             response_types = new[] { "code" },
         }, cancellationToken: ctx.RequestAborted);
     }

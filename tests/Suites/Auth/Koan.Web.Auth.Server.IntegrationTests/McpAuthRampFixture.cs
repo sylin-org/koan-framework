@@ -37,6 +37,8 @@ public sealed class McpAuthRampFixture : IAsyncLifetime
         _host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration(b => b.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
+                ["Koan:Data:Sources:Default:ConnectionString"] = "memory://mcp-auth-ramp",
                 ["ConnectionStrings:Redis"] = "localhost:0", // offline-only, mirrors the bootstrap specs
             }))
             .ConfigureWebHostDefaults(web =>

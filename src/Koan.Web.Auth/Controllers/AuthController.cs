@@ -30,12 +30,11 @@ public sealed class AuthController(IAuthProviderCatalog providers, IOptions<Auth
         if (string.IsNullOrWhiteSpace(provider)) return NotFound();
         if (providers.Find(provider) is not { Eligible: true }) return NotFound();
 
-        // SEC-0001 §10: the allow-list is the security boundary. Resolve the return URL HERE, before handing
-        // it to the handler — the handler redirects to AuthenticationProperties.RedirectUri WITHOUT
-        // re-validating it (an unvalidated pass-through would reintroduce an open redirect).
-        var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
-        var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
-        var ru = ReturnUrlPolicy.Resolve(returnUrl, allowed, def).Url;
+        // SEC-0001 §10 / SEC-0029: the allow-list is the security boundary. Resolve the return URL HERE, before
+        // handing it to the handler — the handler redirects to AuthenticationProperties.RedirectUri WITHOUT
+        // re-validating it. Only a local path under the application or an allow-listed absolute URL passes;
+        // anything else lands on the default landing under the base path (SEC-0027), never on the value.
+        var ru = ReturnUrlPolicy.Resolve(HttpContext, returnUrl, authOptions.Value.ReturnUrl).Url;
 
         var props = new AuthenticationProperties { RedirectUri = ru };
         // WEB-0080: the failure landing is a rooted path of this application, carried to the handler so a sign-in
@@ -73,10 +72,9 @@ public sealed class AuthController(IAuthProviderCatalog providers, IOptions<Auth
         }
         catch { /* ignore */ }
 
-        var allowed = authOptions.Value.ReturnUrl.AllowList ?? [];
-        var def = authOptions.Value.ReturnUrl.DefaultPath ?? "/";
         // SEC-0001 §10: an allow-listed absolute return must use Redirect; LocalRedirect rejects any URL with a host.
-        var (url, isLocal) = ReturnUrlPolicy.Resolve(returnUrl, allowed, def);
+        // SEC-0029: a refused value lands on the default landing, so LocalRedirect only ever sees a local path.
+        var (url, isLocal) = ReturnUrlPolicy.Resolve(HttpContext, returnUrl, authOptions.Value.ReturnUrl);
         return isLocal ? LocalRedirect(url) : Redirect(url);
     }
 }

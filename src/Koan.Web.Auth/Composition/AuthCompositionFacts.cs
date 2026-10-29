@@ -2,6 +2,7 @@ using Koan.Core.Composition;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Auth.Composition;
 
@@ -14,6 +15,21 @@ internal static class AuthCompositionFacts
 
         builder.AddConfigKey($"{AuthOptions.SectionPath}:{nameof(AuthOptions.Providers)}");
         builder.AddConfigKey($"{AuthOptions.SectionPath}:{nameof(AuthOptions.PreferredProviderId)}");
+        builder.AddConfigKey($"{AuthOptions.SectionPath}:{nameof(AuthOptions.ResourceServer)}");
+
+        // SEC-0025: whether ordinary requests accept this application's own bearer, and for which resource.
+        if (services.GetService<IOptions<AuthOptions>>()?.Value.ResourceServer is { Enabled: true } resourceServer)
+        {
+            builder.AddObservation(
+                "koan.auth.resourceserver.enabled",
+                "auth:resource-server",
+                "A request that carries an Authorization header is authenticated by its bearer alone, accepted only when the token's audience is " +
+                (resourceServer.Resource ?? "the application's base URL") +
+                "; its subject is the person's identifier, and a token not accepted answers 401 with Bearer error=\"invalid_token\". " +
+                "Every other request keeps the session cookie.",
+                resourceServer.Resource is null ? "base-url" : "configured-resource",
+                source);
+        }
 
         foreach (var provider in plan.Providers)
         {

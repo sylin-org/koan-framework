@@ -93,6 +93,8 @@ GET /oauth/request/{rid}
 - **Allow** → `POST /oauth/request/{rid}/approve`. **Deny** → `POST /oauth/request/{rid}/deny`.
 - The framework responds with the redirect to follow (a `302` for a form post, or `200 { "redirect": "…" }` for a `fetch()` — navigate the top window to it). The device flow lands the user on the terminal page; the device, which was polling, now has its token.
 
+A page rendered on the server can ask the same question in process: `ConsentPage.Find(HttpContext, rid ?? userCode)` answers the pending request (client, scopes, resource, the user code or redirect) with the paths Allow and Deny post to, normalising a typed user code and sharing the endpoint's per-address allowance; the terminal page reads `await ConsentPage.Outcome(HttpContext)` — `Approved`, `Denied`, or null for anything this server did not write for the person reading it ([SEC-0028](../decisions/SEC-0028-a-consent-page-reads-koans-answer.md)).
+
 The `rid` is a high-entropy, single-use handle **bound to the initiating browser** (an httpOnly `Lax` cookie); approval requires an authenticated session. You never implement `/oauth/authorize`, `/oauth/token`, `/oauth/device`, `/oauth/register`, the consent endpoints, the discovery docs, or token minting — those are framework endpoints.
 
 ## The flows (what the client does)
@@ -132,6 +134,8 @@ the server matches exactly.
 ### Device Authorization Grant (RFC 8628, headless clients)
 `POST /oauth/device` → `{ device_code, user_code, verification_uri, verification_uri_complete, interval }`. The user enters the `user_code` on the consent page (the same seam); the device polls `POST /oauth/token` (grant `urn:ietf:params:oauth:grant-type:device_code`) through `authorization_pending` / `slow_down` until it gets the token.
 
+Only a client allowed the grant may start it: pre-register it with `GrantTypes = [OAuthGrantTypes.DeviceCode]`. A client that names no grant is allowed the code grant only, and a dynamically registered client never gets the device grant; either is answered `unauthorized_client` ([SEC-0024](../decisions/SEC-0024-the-device-grant-is-a-clients-explicit-permission.md)).
+
 ### Refresh (stay connected)
 `POST /oauth/token` (grant `refresh_token`) rotates the token. Refresh tokens are **on by default** so a client is not forced to re-pop the browser every 15 minutes — made safe by rotation with reuse-detection (replaying a rotated token revokes the whole family) and backed by a **revocable grant** (see Security, below). **Consent is remembered** — a re-connect with a live grant skips the consent page.
 
@@ -154,6 +158,20 @@ With `Koan:Mcp:RequireAuthentication=true`, the MCP HTTP edge (Streamable HTTP b
 `Koan:Mcp:ResourceUri` is the **canonical** resource id and is authoritative when set — it defeats a spoofed `Host` header. Leave it unset only in Development, where it derives from the request host.
 
 Once the bearer identity lands in `context.User`, the existing **gate · constrain · project · origin · grant** chain ([SEC-0004](../decisions/SEC-0004-capability-authorization-gate-constrain-project.md) / [SEC-0005](../decisions/SEC-0005-governed-agent-access-grants-audit-door.md)) runs **unchanged** — the token is identity; your `[Access]` declarations are the authorization.
+
+## The application's own pages as a resource
+
+When a client should read the application's ordinary pages as the person who approved it, request the token with
+`resource` set to the application's base URL and turn on Web Auth's resource edge:
+
+```jsonc
+"Koan": { "Web": { "Auth": { "ResourceServer": { "Enabled": true } } } }
+```
+
+A request with an `Authorization` header is then authenticated by its bearer alone; the token is accepted only for the
+base URL (or `Koan:Web:Auth:ResourceServer:Resource`), its subject is the person's `ClaimTypes.NameIdentifier`, and a
+token that is not accepted answers 401 with `Bearer error="invalid_token"`. The authorization server's own
+authorize and consent endpoints keep deciding by the person's session alone ([SEC-0026](../decisions/SEC-0026-the-authorization-server-decides-by-the-session.md)). See [SEC-0025](../decisions/SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md).
 
 ## Testing locally before a full client: `/oauth/dev-token`
 
@@ -179,8 +197,8 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Issuer` | _(`Koan:Web:ApplicationUrl`, else the request host)_ | An explicit override of the AS's public origin for the discovery issuer + every advertised endpoint. Normally unset: the issuer is the application's canonical base URL, path included (WEB-0078), which is already host-spoof-proof behind a proxy. |
-| `ConsentPath` / `DonePath` | `/me/connect` · `/me/connect/done` | Your two app pages. |
+| `Issuer` | _(`Koan:Security:Trust:Issuer`, else `Koan:Web:ApplicationUrl`, else the request host)_ | An explicit override of the AS's public origin for the discovery issuer + every advertised endpoint. Normally unset: the issuer is the application's canonical base URL, path included (WEB-0078), which is already host-spoof-proof behind a proxy. Every access token carries the issuer the metadata states as `iss` ([SEC-0023](../decisions/SEC-0023-a-token-carries-the-issuer-its-server-states.md)). |
+| `ConsentPath` / `DonePath` | `/me/connect` · `/me/connect/done` | Your two app pages, application-relative: under a base URL with a path Koan adds the path once, in its redirects and absolute URLs alike ([SEC-0027](../decisions/SEC-0027-the-consent-flow-lives-under-the-base-path.md)). |
 | `AccessTokenLifetime` | `15 min` | Issued access-token lifetime. |
 | `RefreshTokenLifetime` | `30 days` | Refresh-token / backing-grant lifetime. |
 | `EnableRefreshTokens` | `true` | Rotating refresh tokens. |
@@ -192,7 +210,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 ## The security model in one breath
 
-- **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key.)
+- **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key unless the application names a key ring folder, `Koan:Web:KeyRingDirectory`, in which case the keys persist there too and a local install's tokens outlive a restart.)
 - **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are consented as-requested; the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate and custom `[McpTool(RequiredScopes)]` read (not the inert `Koan.permission`).
 - **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` at the edge.
 - **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed.

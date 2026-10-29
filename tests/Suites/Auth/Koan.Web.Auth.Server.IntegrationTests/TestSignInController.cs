@@ -15,11 +15,11 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 public sealed class TestSignInController : ControllerBase
 {
     [HttpGet("/test/signin")]
-    public async Task<IActionResult> SignIn()
+    public async Task<IActionResult> SignIn([FromQuery] string? sub = null)
     {
         var identity = new ClaimsIdentity(new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, "alice"),
+            new Claim(ClaimTypes.NameIdentifier, string.IsNullOrEmpty(sub) ? "alice" : sub),
             new Claim(ClaimTypes.Name, "Alice"),
             new Claim(ClaimTypes.Email, "alice@example.com"),
             new Claim(ClaimTypes.Role, "admin"),

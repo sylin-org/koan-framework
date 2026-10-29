@@ -11,6 +11,7 @@ public sealed class AuthOptions
     public RateLimitOptions RateLimit { get; init; } = new();
     public TokensOptions Tokens { get; init; } = new();
     public ReConsentOptions ReConsent { get; init; } = new();
+    public ResourceServerOptions ResourceServer { get; init; } = new();
     public string? PreferredProviderId { get; init; }
 
     // Providers keyed by id (e.g., google, microsoft, discord, corp-saml)

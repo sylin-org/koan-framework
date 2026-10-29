@@ -17,6 +17,8 @@ using Koan.Web.Auth.Server.Keys;
 using Koan.Web.Auth.Server.Options;
 using Koan.Web.Auth.Server.Protocol;
 using Koan.Web.Extensions;
+using Koan.Web.Hosting;
+using Koan.Web.Infrastructure;
 
 namespace Koan.Web.Auth.Server;
 
@@ -40,20 +42,31 @@ public sealed class AuthServerModule : KoanModule
         // One controller owns the complete OAuth HTTP surface; protocol handlers remain transport-thin.
         services.AddKoanControllersFrom<OAuthServerController>();
         services.TryAddSingleton<Protocol.FixedWindowRateLimiter>();
+        // SEC-0023 — the issuer the metadata states is the one Trust stamps on every token and Koan.bearer accepts.
+        services.TryAddSingleton<AuthServerIssuer>();
+        services.TryAddSingleton<IIssuerIdentifier>(sp => sp.GetRequiredService<AuthServerIssuer>());
         services.AddHostedService<Protocol.OAuthArtifactCleanupService>();
 
-        // SEC-0006 D1 — the key lifecycle. The persisted, encrypted-at-rest, rotating ES256 store is the active
-        // tier OUTSIDE Development (so tokens survive restart and the JWKS is stable); Development keeps the
-        // zero-config ephemeral key (Trust's default). Replace the Trust default with an environment-aware
-        // factory; AddDataProtection guarantees the at-rest protector exists.
+        // SEC-0006 D1 / SEC-0022 — the key lifecycle. The persisted, encrypted-at-rest, rotating ES256 store is the
+        // active tier outside Development (so tokens survive restart and the JWKS is stable), and in Development too
+        // when the application names a persistent key ring folder (WEB-0079); otherwise Development keeps the
+        // zero-config ephemeral key (Trust's default). AddDataProtection guarantees the at-rest protector exists.
         services.AddDataProtection();
         services.AddSingleton<PersistedIssuerKeyStore>();
         services.Replace(ServiceDescriptor.Singleton<IIssuerKeyStore>(sp =>
-            KoanEnv.Gate.DevelopmentOnly(sp.GetRequiredService<IHostEnvironment>())
-                ? new EphemeralIssuerKeyStore()
-                : sp.GetRequiredService<PersistedIssuerKeyStore>()));
+            PersistsSigningKeys(sp.GetRequiredService<IHostEnvironment>(), sp.GetService<KoanWebKeyRing>()?.IsConfigured == true)
+                ? sp.GetRequiredService<PersistedIssuerKeyStore>()
+                : new EphemeralIssuerKeyStore()));
         services.AddHostedService<IssuerKeyRotationService>();
     }
+
+    /// <summary>
+    /// SEC-0022 — whether the signing keys persist: always outside Development, and in Development when the
+    /// application names a persistent key ring folder (<c>Koan:Web:KeyRingDirectory</c>, WEB-0079), so a local install's
+    /// tokens outlive a restart exactly where its cookies do. Without a folder, Development keeps an ephemeral key.
+    /// </summary>
+    internal static bool PersistsSigningKeys(IHostEnvironment env, bool keyRingNamed)
+        => keyRingNamed || !KoanEnv.Gate.DevelopmentOnly(env);
 
     /// <summary>
     /// SEC-0006 D1 fail-closed boot guard + the persisted-key initialization. Outside Development the AS must
@@ -101,13 +114,22 @@ public sealed class AuthServerModule : KoanModule
 
         using var scope = AppHost.PushScope(services);
 
-        if (await OAuthClient.Get(DevExplorerClientId, ct) is not null) return; // idempotent — already seeded
+        var existing = await OAuthClient.Get(DevExplorerClientId, ct);
+        if (existing is not null)
+        {
+            // Idempotent — already seeded. A row seeded before clients named their grants is given the device grant.
+            if (existing.AllowsGrant(OAuthGrantTypes.DeviceCode)) return;
+            existing.GrantTypes = [.. existing.GrantTypes, OAuthGrantTypes.DeviceCode];
+            await existing.Save(ct);
+            return;
+        }
 
         var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
         await new OAuthClient
         {
             Id = DevExplorerClientId,
             ClientName = "Koan Dev Explorer",
+            GrantTypes = [OAuthGrantTypes.DeviceCode], // the exerciser plays the device grant, and only that
             IsDynamic = false,  // not loopback-constrained, not swept by the dynamic-client GC
             ExpiresUtc = null,  // no expiry (it is re-seeded idempotently on every dev boot)
             CreatedUtc = now,
@@ -117,8 +139,12 @@ public sealed class AuthServerModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
+        var keyRingNamed = !string.IsNullOrWhiteSpace(cfg[$"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.KeyRingDirectory}"]);
+        var keys = PersistsSigningKeys(env, keyRingNamed)
+            ? "persisted + rotating ES256 key (encrypted-at-rest)"
+            : "ephemeral ES256 key (name Koan:Web:KeyRingDirectory to keep it across restarts)";
         module.AddNote(KoanEnv.Gate.DevelopmentOnly(env)
-            ? $"Embedded OAuth 2.1 AS — ephemeral ES256 key; dev-token endpoint (GET {AuthServerRoutes.DevToken}) ENABLED."
-            : "Embedded OAuth 2.1 AS — persisted + rotating ES256 key (encrypted-at-rest); dev-token endpoint is dev-only (404 here).");
+            ? $"Embedded OAuth 2.1 AS — {keys}; dev-token endpoint (GET {AuthServerRoutes.DevToken}) ENABLED."
+            : $"Embedded OAuth 2.1 AS — {keys}; dev-token endpoint is dev-only (404 here).");
     }
 }

@@ -2,9 +2,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using Koan.Data.Core;
 using Koan.Security.Trust.Issuer;
+using Koan.Web.Auth.Extensions;
 using Koan.Web.Auth.Providers;
-using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Options;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +19,8 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// <c>/oauth/request/{rid}</c> consent seam (+approve/deny), and <c>/oauth/token</c> (auth-code grant → ES256
 /// token). The app owns only page rendering. D4 (bound, single-use, PKCE-mandatory codes), D6 (down-scope; roles
 /// from the session, never the request), D7 (consent hardening: browser-bound rid, anti-forgery, clickjacking).
+/// SEC-0026: authorize, the consent seam, approve and deny read the person from the session scheme explicitly, so a
+/// bearer the application's default scheme accepts never signs anyone in here.
 /// </summary>
 internal static class OAuthProtocolEndpoints
 {
@@ -49,6 +52,11 @@ internal static class OAuthProtocolEndpoints
 
         // From here redirect_uri is trusted: protocol errors go back to the client per RFC 6749 §4.1.2.1.
         var state = q["state"].ToString();
+        if (!client.AllowsGrant(OAuthGrantTypes.AuthorizationCode))
+        {
+            RedirectError(ctx, redirectUri, "unauthorized_client", "This client is not allowed the authorization code grant.", state);
+            return;
+        }
         if (!string.Equals(q["response_type"].ToString(), "code", StringComparison.Ordinal))
         {
             RedirectError(ctx, redirectUri, "unsupported_response_type", "Only response_type=code is supported.", state);
@@ -71,9 +79,11 @@ internal static class OAuthProtocolEndpoints
 
         var scopeList = q["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        // D9 — remembered consent: a signed-in user who already granted this (client, scope-set) and whose grant
-        // is still live skips the consent page; the code is minted directly. New scopes / a revoked grant re-prompt.
-        if (options.RememberConsent && ctx.User?.Identity?.IsAuthenticated == true && Subject(ctx.User) is { } rememberedSub
+        // D9 — remembered consent: a person signed in by their session who already granted this (client, scope-set)
+        // and whose grant is still live skips the consent page; the code is minted directly. New scopes / a revoked
+        // grant re-prompt. SEC-0026: the session alone — a bearer for the person never stands in for the browser.
+        var session = await Session(ctx);
+        if (options.RememberConsent && session is not null && Subject(session) is { } rememberedSub
             && await OAuthGrants.FindLiveAsync(rememberedSub, clientId, scopeList, resource, now, ctx.RequestAborted) is not null)
         {
             var remembered = new AuthorizationCode
@@ -84,9 +94,9 @@ internal static class OAuthProtocolEndpoints
                 CodeChallenge = challenge,
                 Resource = resource,
                 Subject = rememberedSub,
-                SubjectName = ctx.User.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
-                SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
-                Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
+                SubjectName = session.FindFirst(ClaimTypes.Name)?.Value ?? session.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
+                SubjectEmail = session.FindFirst(ClaimTypes.Email)?.Value ?? session.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
+                Roles = session.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
                 GrantedScopes = scopeList,
                 ExpiresUtc = now + options.AuthorizationCodeLifetime,
             };
@@ -113,17 +123,18 @@ internal static class OAuthProtocolEndpoints
         };
         await consent.Save(ctx.RequestAborted);
 
-        // Bind to this browser (httpOnly; Lax defeats cross-site POST forgery of the approval).
+        // Bind to this browser (httpOnly; Lax defeats cross-site POST forgery of the approval). SEC-0027: the cookie and
+        // the consent page sit under the application's path base, so the approval under that path carries the cookie.
         ctx.Response.Cookies.Append(BindingCookiePrefix + consent.Id, binding, new CookieOptions
         {
             HttpOnly = true,
             SameSite = SameSiteMode.Lax,
             Secure = ctx.Request.IsHttps,
-            Path = AuthServerRoutes.OAuthBase,
+            Path = AppPaths.BindingCookie(ctx),
             MaxAge = options.ConsentRequestLifetime,
         });
 
-        ctx.Response.Redirect(QueryHelpers.AddQueryString(AppPaths.Consent(ctx, options), "rid", consent.Id));
+        ctx.Response.Redirect(QueryHelpers.AddQueryString(AppPaths.Under(ctx, AppPaths.Consent(ctx, options)), "rid", consent.Id));
     }
 
     // ---- GET /oauth/request/{rid|user_code} (the consent seam — auth-code OR device, unified) ------------
@@ -132,26 +143,17 @@ internal static class OAuthProtocolEndpoints
     {
         ApplyAntiFraming(ctx);
         if (await RejectOversizedId(ctx, rid)) return;
-        var now = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
 
-        var consent = await ConsentRequest.Get(rid, ctx.RequestAborted);
-        if (consent is not null && !consent.IsExpired(now) && consent.IsPending)
+        // SEC-0028: the same lookup an application's server-rendered page makes — a rid, else a typed user code
+        // (normalised, rate-limited so this can't be used to brute-force codes).
+        var lookup = await ConsentPage.Find(ctx, rid, ctx.RequestAborted);
+        if (lookup.Throttled) { await TooManyAttempts(ctx); return; }
+        if (lookup.Request is not { } pending)
         {
-            await WriteConsentContext(ctx, consent.ClientId, consent.Scope, consent.Resource, userCode: null);
+            await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
             return;
         }
-
-        // Device flow: the id is the typed user_code. Rate-limit so this can't be used to brute-force codes.
-        var options = ctx.RequestServices.GetRequiredService<IOptions<AuthServerOptions>>().Value;
-        if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
-        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
-        if (device is not null)
-        {
-            await WriteConsentContext(ctx, device.ClientId, device.Scope, device.Resource, userCode: UserCode.Format(device.UserCode));
-            return;
-        }
-
-        await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
+        await WriteConsentContext(ctx, pending);
     }
 
     // ---- POST /oauth/request/{rid|user_code}/approve --------------------------------------------------
@@ -169,8 +171,8 @@ internal static class OAuthProtocolEndpoints
         {
             if (consent.IsExpired(now) || !consent.IsPending) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
             if (!VerifyBinding(ctx, rid, consent)) { await JsonError(ctx, StatusCodes.Status403Forbidden, "invalid_request", "This request was not initiated by this browser."); return; }
-            var sub = await RequireSubjectAsync(ctx);
-            if (sub is null) return;
+            if (await RequireSession(ctx) is not { } consenting) return;
+            var (sub, person) = consenting;
 
             var granted = consent.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             var code = new AuthorizationCode
@@ -181,9 +183,9 @@ internal static class OAuthProtocolEndpoints
                 CodeChallenge = consent.CodeChallenge,
                 Resource = consent.Resource,
                 Subject = sub,
-                SubjectName = ctx.User!.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
-                SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
-                Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
+                SubjectName = person.FindFirst(ClaimTypes.Name)?.Value ?? person.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
+                SubjectEmail = person.FindFirst(ClaimTypes.Email)?.Value ?? person.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
+                Roles = person.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
                 GrantedScopes = granted,
                 ExpiresUtc = now + options.AuthorizationCodeLifetime,
             };
@@ -199,21 +201,22 @@ internal static class OAuthProtocolEndpoints
         // Device flow (user_code). No browser binding (the verifying browser is NOT the device) — the auth session
         // is the authority; rate-limited against user_code brute force (D8).
         if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
-        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
+        var device = await ConsentPage.FindPendingDevice(rid, now, ctx.RequestAborted);
         if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
-        var subject = await RequireSubjectAsync(ctx);
-        if (subject is null) return;
+        if (await RequireSession(ctx) is not { } signedIn) return;
+        var (subject, approver) = signedIn;
 
         device.Status = DeviceCode.StatusApproved;
         device.Subject = subject;
-        device.SubjectName = ctx.User!.FindFirst(ClaimTypes.Name)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Name)?.Value;
-        device.SubjectEmail = ctx.User.FindFirst(ClaimTypes.Email)?.Value ?? ctx.User.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
-        device.Roles = ctx.User.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList();
+        device.SubjectName = approver.FindFirst(ClaimTypes.Name)?.Value ?? approver.FindFirst(JwtRegisteredClaimNames.Name)?.Value;
+        device.SubjectEmail = approver.FindFirst(ClaimTypes.Email)?.Value ?? approver.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
+        device.Roles = approver.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList();
         device.GrantedScopes = device.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         await device.Save(ctx.RequestAborted);
 
-        // The device (polling /oauth/token) gets the token; the user's browser just goes to the "you can close" page.
-        await WriteRedirectResult(ctx, RequestHost.Url(ctx, AppPaths.Done(ctx, options)));
+        // The device (polling /oauth/token) gets the token; the user's browser goes to the "you can close" page, which
+        // can tell what happened (SEC-0028).
+        await WriteRedirectResult(ctx, ConsentPage.DoneUrl(ctx, options, ConsentOutcome.Approved, subject));
     }
 
     // ---- POST /oauth/request/{rid|user_code}/deny -----------------------------------------------------
@@ -238,11 +241,13 @@ internal static class OAuthProtocolEndpoints
         }
 
         if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
-        var device = await FindPendingDevice(rid, now, ctx.RequestAborted);
+        var device = await ConsentPage.FindPendingDevice(rid, now, ctx.RequestAborted);
         if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+        // SEC-0028: a person decides a device request either way, so every outcome the done page reads names them.
+        if (await RequireSession(ctx) is not { } denying) return;
         device.Status = DeviceCode.StatusDenied;
         await device.Save(ctx.RequestAborted);
-        await WriteRedirectResult(ctx, RequestHost.Url(ctx, AppPaths.Done(ctx, options)));
+        await WriteRedirectResult(ctx, ConsentPage.DoneUrl(ctx, options, ConsentOutcome.Denied, denying.Subject));
     }
 
     // ---- POST /oauth/token (authorization_code | device_code grants) ----------------------------------
@@ -253,9 +258,9 @@ internal static class OAuthProtocolEndpoints
         var grant = form["grant_type"].ToString();
         switch (grant)
         {
-            case "authorization_code": await TokenAuthCode(ctx, form); return;
-            case "urn:ietf:params:oauth:grant-type:device_code": await TokenDeviceCode(ctx, form); return;
-            case "refresh_token": await TokenRefresh(ctx, form); return;
+            case OAuthGrantTypes.AuthorizationCode: await TokenAuthCode(ctx, form); return;
+            case OAuthGrantTypes.DeviceCode: await TokenDeviceCode(ctx, form); return;
+            case OAuthGrantTypes.RefreshToken: await TokenRefresh(ctx, form); return;
             default: await JsonError(ctx, StatusCodes.Status400BadRequest, "unsupported_grant_type", "Unsupported grant_type."); return;
         }
     }
@@ -470,67 +475,68 @@ internal static class OAuthProtocolEndpoints
         return a.Length == b.Length && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(a, b);
     }
 
-    // The subject is the signed-in cookie user; the app authenticates first (provider pills) and returns here.
-    // Returns the subject, or null after writing a 401 (the caller returns).
-    private static async Task<string?> RequireSubjectAsync(HttpContext ctx)
+    // SEC-0026 — the person who decides is the one signed in by their session (Koan.cookie), read explicitly: whatever
+    // the application's default scheme produced — a bearer for the same person included — never decides here.
+    internal static async Task<ClaimsPrincipal?> Session(HttpContext ctx)
     {
-        if (ctx.User?.Identity?.IsAuthenticated != true)
+        var result = await ctx.AuthenticateAsync(AuthenticationExtensions.CookieScheme);
+        return result.Succeeded && result.Principal?.Identity?.IsAuthenticated == true ? result.Principal : null;
+    }
+
+    // The subject is the person signed in by their session; the app authenticates first (provider pills) and returns
+    // here. Returns the subject and the session principal, or null after writing a 401 (the caller returns).
+    private static async Task<(string Subject, ClaimsPrincipal Person)?> RequireSession(HttpContext ctx)
+    {
+        if (await Session(ctx) is not { } person)
         {
             await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "Sign in before approving the request.");
             return null;
         }
-        var sub = Subject(ctx.User);
-        if (sub is null)
+        if (Subject(person) is not { } sub)
+        {
             await JsonError(ctx, StatusCodes.Status401Unauthorized, "login_required", "The session principal has no subject.");
-        return sub;
+            return null;
+        }
+        return (sub, person);
     }
 
-    private static async Task WriteConsentContext(HttpContext ctx, string clientId, string scope, string resource, string? userCode)
+    private static async Task WriteConsentContext(HttpContext ctx, PendingConsent pending)
     {
-        var client = await OAuthClient.Get(clientId, ctx.RequestAborted);
         var catalog = ctx.RequestServices.GetService<IAuthProviderCatalog>();
         var providers = catalog?.Providers
             .Where(static provider => provider.Eligible)
-            .Select(static provider => new
+            .Select(provider => new
             {
                 id = provider.Id,
                 name = provider.DisplayName,
                 protocol = provider.Protocol,
                 icon = provider.Icon,
-                challengeUrl = provider.ChallengePath
+                // SEC-0027: a link the consent page renders, so under the application's path base.
+                challengeUrl = provider.ChallengePath is { } challenge ? AppPaths.Under(ctx, challenge) : null
             })
             .ToArray() ?? [];
-        var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(s => new { id = s, description = s }).ToArray();
+        var scopes = pending.Scopes.Select(s => new { id = s, description = s }).ToArray();
 
         await ctx.Response.WriteAsJsonAsync(new
         {
-            client = new { name = client?.ClientName ?? clientId, verified = false },
+            client = new { name = pending.ClientName, verified = false },
             scopes,
-            resource,
-            user_code = userCode,
-            user = new { loggedIn = ctx.User?.Identity?.IsAuthenticated == true },
+            resource = pending.Resource,
+            user_code = pending.UserCode,
+            user = new { loggedIn = await Session(ctx) is not null },
             providers,
         }, cancellationToken: ctx.RequestAborted);
     }
 
-    private static async Task<DeviceCode?> FindPendingDevice(string userCodeInput, DateTimeOffset now, CancellationToken ct)
-    {
-        var normalized = UserCode.Normalize(userCodeInput);
-        if (normalized.Length == 0) return null;
-        var matches = await DeviceCode.Query(d => d.UserCode == normalized, ct);
-        return matches.FirstOrDefault(d => d.IsPending && !d.IsExpired(now));
-    }
-
     private static async Task<bool> RateLimitUserCodeAsync(HttpContext ctx, AuthServerOptions options, DateTimeOffset now)
     {
-        var limiter = ctx.RequestServices.GetRequiredService<FixedWindowRateLimiter>();
-        var ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        if (limiter.TryAcquire("usercode:" + ip, options.UserCodeVerificationRateLimitPerMinute, TimeSpan.FromMinutes(1), now))
-            return true;
-        await JsonError(ctx, StatusCodes.Status429TooManyRequests, "slow_down", "Too many verification attempts.");
+        if (ConsentPage.TryAcquireUserCode(ctx, options, now)) return true;
+        await TooManyAttempts(ctx);
         return false;
     }
+
+    private static Task TooManyAttempts(HttpContext ctx)
+        => JsonError(ctx, StatusCodes.Status429TooManyRequests, "slow_down", "Too many verification attempts.");
 
     // Reject absurd ids (a 1MB user_code / rid) before any DB access or allocation. Valid ids are <= 64 chars.
     private static async Task<bool> RejectOversizedId(HttpContext ctx, string? id)
@@ -540,7 +546,7 @@ internal static class OAuthProtocolEndpoints
         return true;
     }
 
-    private static string? Subject(ClaimsPrincipal user)
+    internal static string? Subject(ClaimsPrincipal user)
         => user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value
            ?? user.FindFirst("sub")?.Value;
@@ -584,7 +590,7 @@ internal static class OAuthProtocolEndpoints
     }
 
     private static void ClearBinding(HttpContext ctx, string rid)
-        => ctx.Response.Cookies.Delete(BindingCookiePrefix + rid, new CookieOptions { Path = AuthServerRoutes.OAuthBase });
+        => ctx.Response.Cookies.Delete(BindingCookiePrefix + rid, new CookieOptions { Path = AppPaths.BindingCookie(ctx) });
 
     private static void ApplyAntiFraming(HttpContext ctx)
     {

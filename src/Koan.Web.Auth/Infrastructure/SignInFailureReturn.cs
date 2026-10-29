@@ -18,8 +18,9 @@ namespace Koan.Web.Auth.Infrastructure;
 /// the handler keeps its own answer.
 /// </summary>
 /// <remarks>
-/// A landing is a rooted path of this application (<c>/sign-in</c>, <c>/sign-in?from=home</c>), placed under the
-/// request's path base when it is not already there (WEB-0078). It is written in printable ASCII from the characters a
+/// A landing is a rooted, application-relative path (<c>/sign-in</c>, <c>/sign-in?from=home</c>), placed under the
+/// application's path base exactly once (SEC-0027): <c>/sign-in</c> under <c>/me</c> is <c>/me/sign-in</c>, and
+/// <c>/me/sign-in</c> is <c>/me/me/sign-in</c>. It is written in printable ASCII from the characters a
 /// path and a query carry, and, after percent-decoding, names no host (<c>//</c>), no <c>.</c> or <c>..</c> segment,
 /// no backslash, no encoded slash, no control character and no character outside printable ASCII; its query does not
 /// name <c>error</c>, which carries the code. Anything else is refused: the landing is where this application's own
@@ -116,9 +117,9 @@ public static class SignInFailureReturn
     public static bool Accepts(string? candidate) => TryAccept(candidate, out _, out _);
 
     /// <summary>
-    /// The landing named for this sign-in, under the request's path base, or null when the application named none:
-    /// the per-challenge value carried in <paramref name="properties"/> first, then the configured
-    /// <see cref="ReturnUrlOptions.FailurePath"/>.
+    /// The landing named for this sign-in, under the application's path base exactly once (SEC-0027), or null when the
+    /// application named none: the per-challenge value carried in <paramref name="properties"/> first, then the
+    /// configured <see cref="ReturnUrlOptions.FailurePath"/>.
     /// </summary>
     public static string? Landing(HttpContext context, AuthenticationProperties? properties)
     {
@@ -128,7 +129,7 @@ public static class SignInFailureReturn
             landing = carried;
         landing ??= context.RequestServices.GetService<IOptions<AuthOptions>>()?.Value.ReturnUrl.FailurePath;
         if (!Accepts(landing)) return null;
-        return ReturnUrlPolicy.UnderPathBase(landing!, context.Request.PathBase);
+        return ApplicationPaths.Under(context, landing!);
     }
 
     /// <summary>The landing for this sign-in with <paramref name="failure"/>'s code in its query, or null when none is named.</summary>

@@ -12,7 +12,7 @@ public sealed class DiscoveryController(IAuthProviderCatalog providers) : Contro
     {
         var descriptors = providers.Providers
             .Where(static provider => provider.Eligible)
-            .Select(static provider => new ProviderDescriptor
+            .Select(provider => new ProviderDescriptor
             {
                 Id = provider.Id,
                 Name = provider.DisplayName,
@@ -20,7 +20,8 @@ public sealed class DiscoveryController(IAuthProviderCatalog providers) : Contro
                 Enabled = true,
                 State = "Healthy",
                 Icon = provider.Icon,
-                ChallengeUrl = provider.ChallengePath,
+                // SEC-0027: a link the browser follows, so Koan's route under the application's path base, once.
+                ChallengeUrl = provider.ChallengePath is { } challenge ? ApplicationPaths.Under(HttpContext, challenge) : null,
                 Scopes = provider.Scopes,
                 Priority = provider.Priority
             })

@@ -9,10 +9,11 @@ using Microsoft.Extensions.Logging;
 namespace Koan.Mcp.Hosting;
 
 /// <summary>
-/// SEC-0006 D2/D3 — the MCP edge as an OAuth resource server. It authenticates the <c>Koan.bearer</c> scheme
-/// <b>explicitly</b> (rather than via <c>RequireAuthorization</c>) so it owns its own challenge: a resource
-/// server must emit an RFC 9728 <c>WWW-Authenticate</c> pointing at its protected-resource metadata, which the
-/// shared bearer scheme cannot know. On success the bearer identity is placed in <see cref="HttpContext.User"/>
+/// SEC-0006 D2/D3 — the MCP edge as an OAuth resource server. It authenticates the bearer for its own resource
+/// <b>explicitly</b> (rather than via <c>RequireAuthorization</c>) through Trust's <see cref="KoanBearerResource"/>, the
+/// mechanism Web Auth's resource edge for ordinary requests shares (SEC-0025), so it owns its own challenge: a
+/// resource server must emit an RFC 9728 <c>WWW-Authenticate</c> pointing at its protected-resource metadata, which
+/// the shared bearer scheme cannot know. On success the bearer identity is placed in <see cref="HttpContext.User"/>
 /// — from there the existing OriginStamp → session → SEC-0004/0005 chain runs unchanged (D3).
 /// </summary>
 internal static class McpEdgeAuth
@@ -39,26 +40,20 @@ internal static class McpEdgeAuth
             return false;
         }
 
-        // Explicitly run the trust-fabric bearer scheme (it is non-default — the default scheme is the cookie).
-        var result = await context.AuthenticateAsync(KoanBearerDefaults.AuthenticationScheme);
+        // Explicitly run the trust-fabric bearer for THIS resource (the bearer scheme is non-default). SEC-0006 D2 —
+        // the RFC 8707 audience must name this resource: an authentic token for another resource (a sibling API, the
+        // application's own pages, a service-mesh aud=koan token) is rejected here — the confused-deputy fix. A
+        // conformant client re-authorizes with resource=<this> on the challenge. No token at all is a plain challenge.
+        var resource = McpResourceIdentity.Resolve(context, baseRoute, configuredResource);
+        var result = await KoanBearerResource.Authenticate(context, resource);
         if (!result.Succeeded || result.Principal?.Identity?.IsAuthenticated != true)
         {
-            await WriteChallenge(context, baseRoute, "unauthorized");
+            if (result.None) await WriteChallenge(context, baseRoute, "unauthorized");
+            else await WriteChallenge(context, baseRoute, KoanBearerResource.InvalidToken, error: KoanBearerResource.InvalidToken);
             return false;
         }
 
         context.User = result.Principal;
-
-        // SEC-0006 D2 — enforce the RFC 8707 audience: the token must be bound to THIS resource. An authentic
-        // token for another resource (a sibling API, a service-mesh aud=koan token) is rejected here — the
-        // confused-deputy fix. A conformant client re-authorizes with resource=<this> on the challenge.
-        var resource = McpResourceIdentity.Resolve(context, baseRoute, configuredResource);
-        if (!McpResourceIdentity.AudienceMatches(context.User, resource))
-        {
-            await WriteChallenge(context, baseRoute, "invalid_token", error: "invalid_token", description: "audience");
-            return false;
-        }
-
         return true;
     }
 
@@ -80,7 +75,7 @@ internal static class McpEdgeAuth
     private static async Task WriteChallenge(HttpContext context, string baseRoute, string body,
         string? error = null, string? description = null)
     {
-        context.Response.Headers.WWWAuthenticate = McpResourceIdentity.BuildChallenge(context, baseRoute, error, description);
+        context.Response.Headers.WWWAuthenticate = KoanBearerResource.Challenge(error, description, McpResourceIdentity.MetadataUrl(context, baseRoute));
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         await context.Response.WriteAsJsonAsync(new { error = body }, cancellationToken: context.RequestAborted);
     }

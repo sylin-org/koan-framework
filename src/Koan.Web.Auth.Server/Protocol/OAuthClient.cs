@@ -16,6 +16,13 @@ public sealed class OAuthClient : Entity<OAuthClient>
     /// <summary>The exact redirect URIs this client may use. Exact-string match, no normalization.</summary>
     public List<string> RedirectUris { get; set; } = new();
 
+    /// <summary>
+    /// The grants this client may use (RFC 7591 <c>grant_types</c>, values from <see cref="OAuthGrantTypes"/>). Empty
+    /// means <see cref="OAuthGrantTypes.AuthorizationCode"/> only, RFC 7591's default. The Device Authorization Grant is
+    /// allowed only to a client that names <see cref="OAuthGrantTypes.DeviceCode"/>; dynamic registration never does.
+    /// </summary>
+    public List<string> GrantTypes { get; set; } = new();
+
     /// <summary>True when this client was created via open dynamic registration (constrains it to loopback redirects).</summary>
     public bool IsDynamic { get; set; }
 
@@ -25,6 +32,12 @@ public sealed class OAuthClient : Entity<OAuthClient>
     public DateTimeOffset? ExpiresUtc { get; set; }
 
     public bool IsActive(DateTimeOffset now) => ExpiresUtc is null || ExpiresUtc.Value > now;
+
+    /// <summary>True when this client may use <paramref name="grantType"/>: one it names, or the code grant when it names none.</summary>
+    public bool AllowsGrant(string grantType)
+        => GrantTypes.Count == 0
+            ? string.Equals(grantType, OAuthGrantTypes.AuthorizationCode, StringComparison.Ordinal)
+            : GrantTypes.Contains(grantType, StringComparer.Ordinal);
 
     /// <summary>RFC 6749 / SEC-0006 D4 — exact-string redirect match (no scheme/host/path normalization).</summary>
     public bool AllowsRedirect(string redirectUri)

@@ -19,7 +19,9 @@ await app.RunAsync();
 
 No authorization-server registration, middleware, endpoint mapping, issuer construction, or bearer configuration is
 required. The application supplies two ordinary pages: a consent page at `/me/connect` and a terminal page at
-`/me/connect/done`. Change those paths with `Koan:Web:Auth:Server:ConsentPath` and `DonePath`.
+`/me/connect/done`. Change those paths with `Koan:Web:Auth:Server:ConsentPath` and `DonePath`. They are
+application-relative: under a base URL with a path (`Koan:Web:ApplicationUrl = https://example.test/notes`) the server
+sends the person to `/notes/me/connect` and scopes its browser-binding cookie to `/notes/oauth`.
 
 ## Meaningful behavior
 
@@ -33,7 +35,36 @@ required. The application supplies two ordinary pages: a consent page at `/me/co
 - Refresh tokens rotate with reuse detection and remain backed by a revocable grant.
 
 The consent page reads `rid` or `user_code`, renders the framework's request projection, and posts Allow or Deny. The
-framework owns every protocol decision and response around that page.
+framework owns every protocol decision and response around that page. Only the person's session decides: the server
+reads the `Koan.cookie` session itself at authorize, at the request projection and at approve and deny, so a bearer
+token — even one for the same person, accepted on the application's pages — never approves anything.
+
+## Render the consent page on the server
+
+A page rendered on the server asks Koan in process instead of reading its entities:
+
+```csharp
+using Koan.Web.Auth.Server.Protocol;
+
+[HttpGet("/consent")]
+public async Task<IActionResult> Consent(string? rid, [FromQuery(Name = "user_code")] string? code, CancellationToken ct)
+{
+    var lookup = await ConsentPage.Find(HttpContext, rid ?? code, ct);
+    if (lookup.Throttled) return StatusCode(429);
+    if (lookup.Request is not { } pending) return NotFound();
+    // pending.ClientName (untrusted display text), pending.Scopes, pending.Resource, pending.UserCode or
+    // pending.RedirectUri; the Allow form posts to pending.Approve and the Deny form to pending.Deny.
+    return View(pending);
+}
+
+[HttpGet("/consent/done")]
+public async Task<IActionResult> Done() => View(await ConsentPage.Outcome(HttpContext)); // Approved, Denied or null
+```
+
+`Find` takes a `rid` or a user code as a person typed it (any case, with or without its hyphen) and counts a user-code
+lookup against the same per-address allowance as Koan's own `/oauth/request/{id}`. Approve and deny of a Device-flow
+request both need the person signed in, and land on the done page with an `outcome` only this server can write, bound
+to that person; `Outcome` reads it, and answers null for a plain, altered, expired or other person's value.
 
 ## Pre-register a client
 
@@ -55,12 +86,29 @@ await new OAuthClient
 Dynamic clients are restricted to loopback redirects. Deliberate non-loopback redirects belong only on explicitly
 pre-registered clients and are matched exactly.
 
+A client is allowed the grants it names in `GrantTypes`; naming none allows the code grant only. The Device
+Authorization Grant is allowed only to a client that names it, and dynamic registration never does:
+
+```csharp
+await new OAuthClient
+{
+    Id = "operations-cli",
+    ClientName = "Operations CLI",
+    GrantTypes = [OAuthGrantTypes.DeviceCode],
+    CreatedUtc = DateTimeOffset.UtcNow
+}.Save();
+```
+
 ## Production posture
 
 Set `Koan:Web:ApplicationUrl` to the application's public URL; the issuer and every advertised endpoint derive from it,
-path included (WEB-0078). `Koan:Web:Auth:Server:Issuer` remains an explicit override. Outside Development, Koan persists and
+path included (WEB-0078), and every access token carries that issuer as `iss`, so a verifier that reads the metadata
+and the JWKS accepts it (SEC-0023). `Koan:Web:Auth:Server:Issuer` remains an explicit override, and a named
+`Koan:Security:Trust:Issuer` is kept as the issuer when the server's own is unset. Outside Development, Koan persists and
 rotates encrypted-at-rest signing keys through the configured Data provider; startup fails closed if only an ephemeral
-key is available unless that unsafe posture is explicitly acknowledged. OAuth clients, codes, requests, grants, and
+key is available unless that unsafe posture is explicitly acknowledged. In Development the keys persist the same way
+when the application names a key ring folder (`Koan:Web:KeyRingDirectory`, WEB-0079), so a local install's tokens
+outlive a restart; with no folder named, Development keeps an ephemeral key (SEC-0022). OAuth clients, codes, requests, grants, and
 keys are Entity-backed, so a durable Data provider is part of a real deployment.
 
 Startup reporting states whether the key is ephemeral or persisted and whether the development token endpoint is

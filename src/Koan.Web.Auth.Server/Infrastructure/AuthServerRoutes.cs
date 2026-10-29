@@ -5,7 +5,8 @@ internal static class AuthServerRoutes
 {
     public const string OAuthBase = "/oauth";
     public const string Authorize = OAuthBase + "/authorize";
-    public const string Request = OAuthBase + "/request/{rid}";
+    public const string RequestId = "{rid}";
+    public const string Request = OAuthBase + "/request/" + RequestId;
     public const string Approve = Request + "/approve";
     public const string Deny = Request + "/deny";
     public const string Token = OAuthBase + "/token";

@@ -179,7 +179,9 @@ inspection. For a production edge:
 1. serve MCP over HTTPS;
 2. set `Koan:Web:ApplicationUrl` to the application's public URL, so the `/mcp` audience, the authorization-server
    URL and the protected-resource metadata derive from it behind a proxy (WEB-0078); `ResourceUri` remains an
-   explicit override of the audience alone;
+   explicit override of the audience alone. A token is accepted when its audience names that resource, with or
+   without one trailing slash; one that is expired, foreign or issued for another resource — the application's own
+   pages included — answers 401 with `error="invalid_token"` (SEC-0025);
 3. reference `Koan.Web.Auth.Server` for Koan's OAuth 2.1 authorization-server/resource-server path,
    or register the application’s external bearer scheme;
 4. declare Entity access and custom-tool scopes for business authority;

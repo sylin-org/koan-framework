@@ -34,29 +34,74 @@ model around the protocol handlers.
 are Entity-backed. The client row ID is `client_id`. All clients are public and token metadata advertises only
 `token_endpoint_auth_methods_supported: ["none"]`; there is no dormant confidential-client flag or secret path.
 
-Dynamic registration forces loopback redirect URIs, applies source/global rate limits, and assigns an expiry.
-Entity-first pre-registration may declare deliberate non-loopback redirects and no expiry. Every redirect URI is an
-exact-string match. PKCE-S256 is mandatory for authorization-code clients.
+Dynamic registration forces loopback redirect URIs and the code grant only, applies source/global rate limits, and
+assigns an expiry. Entity-first pre-registration may declare deliberate non-loopback redirects, no expiry, and the
+grants the client may use. Every redirect URI is an exact-string match. PKCE-S256 is mandatory for authorization-code
+clients.
+
+`OAuthClient.GrantTypes` (values from `OAuthGrantTypes`) is the client's permission: empty allows the code grant only,
+RFC 7591's default; `/oauth/device` answers `unauthorized_client` to a client that does not name
+`OAuthGrantTypes.DeviceCode`, and `/oauth/authorize` to one whose named grants leave out the code grant (SEC-0024).
 
 Short-lived opaque protocol artifacts are single-use and cleaned in the background. Refresh rotates on every use;
 replay revokes the token family. Remembered consent depends on a live revocable grant and an unchanged scope set.
 
+## Consent page seam in process
+
+`ConsentPage` is the in-process form of the `/oauth/request/{id}` seam (SEC-0028), and that endpoint answers from it.
+`Find(context, id)` returns a `ConsentLookup`: a pending, unexpired `ConsentRequest` by `rid` without spending any
+allowance, else — after one attempt against `UserCodeVerificationRateLimitPerMinute` for the address (key
+`usercode:{address}`, shared with the endpoint, approve and deny) — a pending, unexpired `DeviceCode` by the normalised
+user code, or `Throttled`. A `PendingConsent` carries the id approve and deny address (the `rid`, or the normalised
+user code), the client id and its registered name (or the id), scopes, resource, the display user code or the redirect,
+and the approve and deny paths under the application's path base. Ids longer than 128 characters find nothing.
+
+A Device-flow approval or denial needs the person's session, and redirects to the done page with `outcome`: a
+time-limited Data Protection payload (purpose `Koan.Web.Auth.Server.ConsentOutcome.v1`, lifetime
+`ConsentRequestLifetime`) holding the outcome and the deciding session's subject. `Outcome(context)` unprotects it and
+answers only to the session of that subject; anything else reads as null. The code flow's decisions
+return to the client's redirect, as before.
+
 ## Identity, issuer, and resource boundaries
 
-The authorization server consumes the existing `Koan.cookie` principal established by Web Auth. It uses the Trust
+The authorization server consumes the existing `Koan.cookie` principal established by Web Auth, and reads it
+explicitly: `/oauth/authorize` (remembered consent), the `/oauth/request/{rid}` projection, approve and deny
+authenticate the person through `Koan.cookie` themselves, so whatever the application's default scheme produced — a
+bearer for the same person through Web Auth's resource edge included — never signs anyone in there (SEC-0026). It uses the Trust
 pillar's `IIssuer` to mint ES256 access tokens; it does not own login-provider mechanics. Issued authority is
 derived from the authenticated session and approved scopes, not from caller-supplied roles.
 
 Tokens are bound to the requested resource. The MCP resource-server edge validates the signature, issuer, lifetime,
-and exact audience before the normal Koan access pipeline evaluates declarations. The origin used for metadata and
-advertised endpoints is `Issuer` when configured, else the application's canonical base URL (`Koan:Web:ApplicationUrl`,
+and exact audience before the normal Koan access pipeline evaluates declarations. The origin used for advertised
+endpoints is `Issuer` when configured, else the application's canonical base URL (`Koan:Web:ApplicationUrl`,
 WEB-0078, path included); with neither, Development derives it from the request.
+
+Every path the server writes for the browser follows one rule (SEC-0027, Web Auth's `ApplicationPaths`): it is
+application-relative and gets the application's path base — the configured base URL's, canonical as configured, else
+the request's — exactly once. That holds for the redirect from `/oauth/authorize` to the consent page, the
+browser-binding cookie's `Path` (`{path base}/oauth`, set and cleared alike), each provider's `challengeUrl` in the
+request projection, and `PendingConsent.Approve` and `Deny`, also when a route's first segment equals the path base
+(`/oauth/oauth/request/{rid}/approve` under `/oauth`). `ConsentPath` and `DonePath` are application-relative too: one
+written with the path base in it gets it again, in the redirect and in the absolute URLs alike. Absolute URLs — the
+device `verification_uri`, the done redirect and the advertised endpoints — are the public origin above, which already
+carries the path base once, plus the application-relative path.
+
+`OAuthServerController` carries `ResourceServerExemptAttribute`: its endpoints never authenticate by bearer, so Web
+Auth's resource edge leaves them their own protocol answers when a client attaches a stale token (SEC-0025).
+
+The issuer identifier is one value, `AuthServerIssuer` (SEC-0023): `Issuer` when configured, else the application's
+named `Koan:Security:Trust:Issuer`, else the base URL as above. The metadata states it; the server registers it as
+Trust's `IIssuerIdentifier`, so every token the application issues carries it as `iss` and `Koan.bearer` accepts it.
+An outside verifier that reads the metadata and the JWKS therefore accepts the tokens. Where Production refuses to
+derive the base URL, the metadata refuses with the correction and a token keeps Trust's own name.
 
 ## Signing-key lifecycle and failure posture
 
-Development uses an ephemeral per-process issuer and may expose `/oauth/dev-token` and the well-known development
-client. Other environments replace that default with `PersistedIssuerKeyStore`, protected through ASP.NET Data
-Protection and backed by Koan Data. Keys rotate on `KeyRotationInterval`; retired keys remain in JWKS for `KeyOverlap`.
+Development uses an ephemeral per-process issuer unless the application names a persistent key ring folder
+(`Koan:Web:KeyRingDirectory`, WEB-0079), and may expose `/oauth/dev-token` and the well-known development client. Other
+environments, and Development with a key ring folder named, replace that default with `PersistedIssuerKeyStore`,
+protected through ASP.NET Data Protection and backed by Koan Data (SEC-0022). Keys rotate on `KeyRotationInterval`
+wherever they persist; retired keys remain in JWKS for `KeyOverlap`.
 
 Startup fails closed outside Development when the effective key store is ephemeral unless
 `AllowEphemeralKeyOutsideDevelopment` explicitly acknowledges that token and JWKS continuity will be lost. Persisted

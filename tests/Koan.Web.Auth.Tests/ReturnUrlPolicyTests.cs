@@ -1,5 +1,9 @@
 using AwesomeAssertions;
 using Koan.Web.Auth.Infrastructure;
+using Koan.Web.Auth.Options;
+using Koan.Web.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Koan.Web.Auth.Tests;
@@ -64,6 +68,61 @@ public sealed class ReturnUrlPolicyTests
         var r = ReturnUrlPolicy.Resolve("http://myhost.test/", System.Array.Empty<string>(), "/");
         r.Url.Should().Be("/");
         r.IsLocal.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// SEC-0029: a value a browser reads as another host, or one that leaves the application, is never a landing; it
+    /// falls back to the default landing.
+    /// </summary>
+    [Theory]
+    [InlineData("//evil.example/x")]
+    [InlineData(@"/\evil.example")]
+    [InlineData("https://evil.example")]
+    [InlineData("%2F%2Fevil.example")]
+    [InlineData("/%2F%2Fevil.example")]
+    [InlineData("/%252F%252Fevil.example")]
+    [InlineData("/%5Cevil.example")]
+    [InlineData("/\t/evil.example")]
+    [InlineData("/notes/../evil")]
+    [InlineData("/notes/%2e%2e/evil")]
+    [InlineData("/other/x")]
+    [InlineData("/notesy/x")]
+    [InlineData("javascript:alert(1)")]
+    public void A_value_that_could_leave_the_application_is_refused(string candidate)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, AllowList, "/notes/", new PathString("/notes"));
+        r.Url.Should().Be("/notes/");
+        r.IsLocal.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("/notes")]
+    [InlineData("/notes/")]
+    [InlineData("/notes/topics/a%20b?from=home#top")]
+    public void A_local_path_under_the_base_is_kept(string candidate)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, AllowList, "/notes/", new PathString("/notes"));
+        r.Url.Should().Be(candidate);
+        r.IsLocal.Should().BeTrue();
+    }
+
+    /// <summary>SEC-0027: the default landing is application-relative and gets the configured base exactly once.</summary>
+    [Theory]
+    [InlineData("/", "/notes/")]
+    [InlineData("/notes", "/notes/notes")]
+    [InlineData("home", "/notes/home")]
+    [InlineData("https://partner.example.com/cb", "https://partner.example.com/cb")]
+    public void The_default_landing_gets_the_base_once(string defaultPath, string expected)
+    {
+        var context = new DefaultHttpContext
+        {
+            RequestServices = new ServiceCollection()
+                .AddSingleton(new KoanWebBaseUrl("https://example.test/notes"))
+                .BuildServiceProvider(),
+        };
+
+        ReturnUrlPolicy.DefaultLanding(context, defaultPath).Should().Be(expected);
+        ReturnUrlPolicy.Resolve(context, "//evil.example", new ReturnUrlOptions { DefaultPath = defaultPath }).Url.Should().Be(expected);
     }
 
     /// <summary>

@@ -24,7 +24,9 @@ public sealed class TrustModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
-        services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath);
+        services.AddKoanOptions<TrustIssuerOptions>(TrustIssuerOptions.SectionPath)
+            .Validate(options => options.Issuer is null || !string.IsNullOrWhiteSpace(options.Issuer),
+                $"{TrustIssuerOptions.SectionPath}:{nameof(TrustIssuerOptions.Issuer)} must name the issuer when it is set; remove it to use the one the application's authorization server states.");
 
         // One issuer, one algorithm, one key lifecycle seam. The default random per-process key is safe for
         // direct/single-host use. Auth Server replaces the store with its persisted rotating implementation

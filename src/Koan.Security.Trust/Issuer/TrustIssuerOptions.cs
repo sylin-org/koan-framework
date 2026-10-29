@@ -10,9 +10,13 @@ public sealed class TrustIssuerOptions
 {
     public const string SectionPath = "Koan:Security:Trust";
 
-    /// <summary>Token issuer (<c>iss</c>).</summary>
-    [Required(AllowEmptyStrings = false)]
-    public string Issuer { get; init; } = "koan-dev";
+    /// <summary>
+    /// The issuer (<c>iss</c>) the application names, or null when it names none. Unnamed, a token carries the issuer an
+    /// owner above Trust states through <see cref="IIssuerIdentifier"/> — the embedded authorization server's, its base
+    /// URL — else <c>koan-dev</c>. Named, it is kept: the authorization server states it too unless its own
+    /// <c>Koan:Web:Auth:Server:Issuer</c> is set (SEC-0023). Whatever is stated, the bearer scheme also accepts this name.
+    /// </summary>
+    public string? Issuer { get; init; }
 
     /// <summary>Token audience (<c>aud</c>).</summary>
     [Required(AllowEmptyStrings = false)]

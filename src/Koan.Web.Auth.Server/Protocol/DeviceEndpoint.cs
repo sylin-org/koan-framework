@@ -32,6 +32,13 @@ internal static class DeviceEndpoint
             await Error(ctx, "invalid_client", "Unknown client.");
             return;
         }
+        // A client is allowed the device grant only by naming it: a self-registered client never is, so it cannot put
+        // a self-chosen name in front of a person's consent page through this flow (RFC 6749 §5.2).
+        if (!client.AllowsGrant(OAuthGrantTypes.DeviceCode))
+        {
+            await Error(ctx, "unauthorized_client", "This client is not allowed the Device Authorization Grant.");
+            return;
+        }
         if (string.IsNullOrWhiteSpace(resource))
         {
             await Error(ctx, "invalid_request", "A resource indicator (RFC 8707) is required.");
