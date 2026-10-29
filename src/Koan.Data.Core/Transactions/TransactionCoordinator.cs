@@ -174,8 +174,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         var stopwatch = Stopwatch.StartNew();
         // Until dispatch begins nothing this scope tracked can have reached a store, so a failure resolving its routes,
         // entering their horizon, provisioning their stores or beginning the native transaction leaves nothing durable
-        // (NotCommitted). Only a failure from dispatch on can leave an outcome the coordinator cannot know.
+        // (NotCommitted), a NotSupportedException a store raises included. Only a failure from dispatch on can leave an
+        // outcome the coordinator cannot know.
         var dispatching = false;
+        // The scope's own refusal of its guarantee (DATA-0158 rule 4) escapes as itself, as it does at tracking time.
+        NotSupportedException? refusal = null;
 
         try
         {
@@ -189,7 +192,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
                 .Select(operation => operation.ResolveDataBinding(_services))
                 .ToArray();
             var bindings = resolved.OfType<DataRouteBinding>().ToArray();
-            var atomic = ResolveAtomicRoute(resolved);
+            var atomic = ResolveAtomicRoute(resolved, out refusal);
+            if (refusal is not null) throw refusal;
             await using var operationHorizon = await _operationHorizon
                 .EnterMany(bindings, $"deferred transaction '{Name}'", ct)
                 .ConfigureAwait(false);
@@ -247,7 +251,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _activity?.SetTag("transaction.outcome", "failed");
             _isCompleted = true;
 
-            if (ex is TransactionException or NotSupportedException) throw;
+            if (ex is TransactionException || ReferenceEquals(ex, refusal)) throw;
             if (!dispatching)
                 throw new TransactionException(
                     $"Deferred coordination '{Name}' failed before any tracked operation was dispatched; none of them is " +
@@ -377,10 +381,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     /// <summary>
     /// The one route every tracked operation targets through a provider that commits atomically, or null when the
     /// scope must dispatch sequentially. An Atomic scope admitted each operation at tracking time, so here it can only
-    /// confirm the route it already holds.
+    /// confirm the route it already holds; when it cannot, <paramref name="refusal"/> is the scope's refusal.
     /// </summary>
-    private AtomicRoute? ResolveAtomicRoute(IReadOnlyList<DataRouteBinding?> bindings)
+    private AtomicRoute? ResolveAtomicRoute(IReadOnlyList<DataRouteBinding?> bindings, out NotSupportedException? refusal)
     {
+        refusal = null;
         AtomicRoute? route = null;
         foreach (var binding in bindings)
         {
@@ -388,7 +393,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             if (candidate is null || route is not null && !SameRoute(route, candidate))
             {
                 if (Guarantee == TransactionGuarantee.Atomic)
-                    throw Refuse("its tracked operations no longer resolve to one route that commits atomically");
+                    refusal = Refuse("its tracked operations no longer resolve to one route that commits atomically");
                 return null;
             }
             route ??= candidate;

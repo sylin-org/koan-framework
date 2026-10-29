@@ -874,9 +874,12 @@ not at all, across entity types, and a failure reports `DataCommitOutcome.NotCom
 On any other shape — two routes, a provider without the token, a vector operation — the commit is sequential
 dispatch, not a native or distributed transaction: a later failure can leave the successfully completed
 prefix durable, and `TransactionException.CompletedOperationCount` says how long it is, cancellation included
-(DATA-0158). On either shape a failure before the first operation is dispatched — a store that cannot be
-provisioned, a native transaction that cannot begin — reports `NotCommitted`; `Unknown` is reserved for a failure
-of the native commit itself or of sequential dispatch, where some work may have landed (DATA-0161).
+(DATA-0158). A failure before the first operation is dispatched reports `NotCommitted`: on the atomic shape a store
+that cannot be provisioned (a `NotSupportedException` from the store included) or a native transaction that cannot
+begin, on either shape a route that cannot be resolved. On the sequential shape a store is provisioned inside the first
+operation, so a store that cannot be provisioned there reports `Unknown` with no completed operation. `Unknown` is
+reserved for a failure of the native commit itself or of sequential dispatch, where some work may have landed
+(DATA-0161).
 
 Inside the scope, single and collection `Save`/`Remove` (`items.Save()`, `items.Remove()`, `Todo.Remove(ids)`,
 `SaveReplacing`) defer until `Commit`. Every other write refuses before it writes, because it cannot wait:

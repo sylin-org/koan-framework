@@ -24,8 +24,8 @@ namespace Koan.Web.Auth.Integration.Tests;
 /// <c>Koan:Web:Auth:ResourceServer:Enabled</c>: a token issued for the base URL (with or without its trailing slash)
 /// authenticates a page as its subject, under <see cref="System.Security.Claims.ClaimTypes.NameIdentifier"/>; a token
 /// for another audience, or tampered, answers 401 with <c>Bearer error="invalid_token"</c> on an anonymous page and on
-/// a protected one; a request with an <c>Authorization</c> header is never authenticated by the session cookie it also
-/// carries; one without keeps the cookie. A configured resource identifier replaces the base URL, and without the
+/// a protected one; a request with a <c>Bearer</c> header is never authenticated by the session cookie it also
+/// carries; one without, or with a header of another scheme, keeps the cookie. A configured resource identifier replaces the base URL, and without the
 /// setting nothing changes.
 /// </summary>
 public sealed class ResourceEdgeSpec
@@ -73,11 +73,39 @@ public sealed class ResourceEdgeSpec
                 res.Headers.WwwAuthenticate.ToString().Should().Be("Bearer error=\"invalid_token\"");
             }
         }
+    }
 
-        using var basic = new HttpRequestMessage(HttpMethod.Get, PathBase + "/edge/whoami");
-        basic.Headers.Authorization = new AuthenticationHeaderValue("Basic", "YWxpY2U6c2VjcmV0");
-        (await client.SendAsync(basic, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
-            "an Authorization header that carries no bearer authenticates nobody");
+    /// <summary>
+    /// The edge engages only on a <c>Bearer</c> header. A reverse proxy that passes its own <c>Basic</c> credentials
+    /// upstream leaves the request to the session: a signed-in person still reads as themselves, a request with nothing
+    /// else reads as a visitor, and a rejected bearer still answers 401.
+    /// </summary>
+    [Fact]
+    public async Task An_authorization_header_of_another_scheme_is_left_to_the_session()
+    {
+        await using var app = await Start(new() { ["Koan:Web:Auth:ResourceServer:Enabled"] = "true" });
+        using var browser = app.NewClient();
+        (await browser.GetAsync(PathBase + "/edge/signin", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        foreach (var path in new[] { "/edge/protected", "/edge/whoami" })
+        {
+            using var res = await browser.SendAsync(Basic(path), Ct);
+            res.StatusCode.Should().Be(HttpStatusCode.OK, $"{path} with a proxy's Basic header and a session");
+            using var doc = await Json(res);
+            doc.RootElement.GetProperty("id").GetString().Should().Be("alice", "the session authenticates");
+        }
+
+        using var visitor = app.NewClient();
+        using (var res = await visitor.SendAsync(Basic("/edge/whoami"), Ct))
+        {
+            res.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var doc = await Json(res);
+            doc.RootElement.GetProperty("authenticated").GetBoolean().Should().BeFalse("a Basic header alone is a visitor");
+        }
+
+        using var rejected = await browser.SendAsync(Get("/edge/whoami", "not-a-token"), Ct);
+        rejected.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        rejected.Headers.WwwAuthenticate.ToString().Should().Be("Bearer error=\"invalid_token\"");
     }
 
     [Fact]
@@ -147,6 +175,13 @@ public sealed class ResourceEdgeSpec
     {
         var request = new HttpRequestMessage(HttpMethod.Get, PathBase + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return request;
+    }
+
+    private static HttpRequestMessage Basic(string path)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, PathBase + path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", "cHJveHk6c2VjcmV0");
         return request;
     }
 

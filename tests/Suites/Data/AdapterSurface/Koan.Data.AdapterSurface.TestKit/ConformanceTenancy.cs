@@ -11,7 +11,7 @@ namespace Koan.Data.AdapterSurface.TestKit;
 /// <summary>
 /// A row-scoped <c>tenant</c> dimension contributed exactly as <c>Koan.Tenancy</c> contributes its own (one hard
 /// segmentation dimension, realized by Data as the managed field <c>__koan_tenant</c>), for
-/// <see cref="ConformanceMember"/> only, and only in a host composed while <see cref="ConformanceTenancy.Segmented"/> is
+/// <see cref="ConformanceMember"/> and <see cref="ConformanceNamedMember"/> only, and only in a host composed while <see cref="ConformanceTenancy.Segmented"/> is
 /// set. The connector suites do not reference <c>Koan.Tenancy</c>, so this is how they run the
 /// DATA-0150 specs under row-scoped tenancy without scoping every other entity they use.
 /// </summary>
@@ -27,8 +27,8 @@ public sealed class ConformanceTenancyModule : KoanModule, IContributeTo<Segment
         static () => ConformanceTenancy.Current is { Length: > 0 } tenant
             ? SegmentationValue.For(tenant)
             : SegmentationValue.Missing,
-        static type => type == typeof(ConformanceMember),
-        "Run the ConformanceMember operation inside ConformanceTenancy.Use(...).");
+        static type => type == typeof(ConformanceMember) || type == typeof(ConformanceNamedMember),
+        "Run the ConformanceMember or ConformanceNamedMember operation inside ConformanceTenancy.Use(...).");
     }
 }
 
@@ -65,4 +65,12 @@ public sealed class ConformanceMember : Entity<ConformanceMember>
 {
     [Index(Unique = true)]
     public string Email { get; set; } = "";
+}
+
+/// <summary>The DATA-0150 entity whose unique index the application names, as <c>[Index(Name = ...)]</c> declares it.</summary>
+[Storage(Name = "KOAN_CONFORMANCE_NAMED_MEMBER")]
+public sealed class ConformanceNamedMember : Entity<ConformanceNamedMember>
+{
+    [Index(Name = "ux_conformance_named_code", Unique = true)]
+    public string Code { get; set; } = "";
 }

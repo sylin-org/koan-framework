@@ -55,11 +55,108 @@ public sealed class ReturnUrlPolicyTests
     }
 
     [Fact]
-    public void Allowlist_match_is_prefix_and_case_insensitive()
+    public void Allowlist_match_ignores_the_case_of_scheme_and_host_and_redirects_to_the_parsed_url()
     {
         var r = ReturnUrlPolicy.Resolve("HTTP://MyHost.test/page?x=1", AllowList, "/");
-        r.Url.Should().Be("HTTP://MyHost.test/page?x=1");
+        r.Url.Should().Be("http://myhost.test/page?x=1");
         r.IsLocal.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// SEC-0029 §2: an entry names an origin, so a URL that merely starts with the entry's text is another origin — a
+    /// longer host, userinfo that puts the real host after <c>@</c> (encoded or not), another port — and falls back.
+    /// </summary>
+    [Theory]
+    [InlineData("https://app.example.evil.com/")]
+    [InlineData("https://app.example@evil.com/")]
+    [InlineData("https://app.example%2F@evil.com/")]
+    [InlineData("https://app.example:8443/")]
+    [InlineData("http://app.example/")]
+    [InlineData("https://user@app.example/")]
+    public void A_look_alike_of_an_allow_listed_origin_is_refused(string candidate)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, ["https://app.example"], "/");
+        r.Url.Should().Be("/");
+        r.IsLocal.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("https://app.example", "https://app.example/")]
+    [InlineData("https://app.example/dashboard?tab=1#top", "https://app.example/dashboard?tab=1#top")]
+    [InlineData("https://APP.example:443/x", "https://app.example/x")]
+    public void A_return_on_the_exact_allow_listed_origin_is_kept(string candidate, string expected)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, ["https://app.example"], "/");
+        r.Url.Should().Be(expected);
+        r.IsLocal.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("https://partner.example.com/cb", true)]
+    [InlineData("https://partner.example.com/cb/done?x=1", true)]
+    [InlineData("https://partner.example.com/cbx", false)]
+    [InlineData("https://partner.example.com/other", false)]
+    [InlineData("https://partner.example.com/cb/../admin", false)]
+    [InlineData("https://partner.example.com/cb%2F..%2Fadmin", false)]
+    [InlineData("https://partner.example.com/cb/..%2Fadmin", false)]
+    [InlineData("https://partner.example.com/cb/%2E%2E%2Fadmin", false)]
+    [InlineData("https://partner.example.com/cb/%252E%252E%252Fadmin", false)]
+    [InlineData("https://partner.example.com/cb/a%5Cb", false)]
+    [InlineData("https://partner.example.com/cb/x%20y", true)]
+    public void An_entry_with_a_path_admits_only_paths_under_it_at_a_segment_boundary(string candidate, bool kept)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, AllowList, "/");
+        (r.Url != "/").Should().Be(kept);
+    }
+
+    /// <summary>
+    /// SEC-0029 §2: a host spelled in Unicode that IDNA maps to an allow-listed host (full-width letters here) is that
+    /// host, and the redirect names it in the ASCII form that was compared, so the <c>Location</c> header is valid.
+    /// </summary>
+    [Theory]
+    [InlineData("https://ａｐｐ.example/x", "https://app.example/x")]
+    [InlineData("https://ａｐｐ.example/caf%C3%A9?q=%C3%A9#top", "https://app.example/caf%C3%A9?q=%C3%A9#top")]
+    public void A_unicode_spelling_of_an_allowed_host_redirects_to_the_ascii_form_compared(string candidate, string expected)
+    {
+        var r = ReturnUrlPolicy.Resolve(candidate, ["https://app.example"], "/");
+        r.Url.Should().Be(expected);
+        r.Url.Should().MatchRegex("^[!-~]+$", "a Location header is printable ASCII");
+        r.IsLocal.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("https://app.example", true)]
+    [InlineData("https://app.example/", true)]
+    [InlineData("https://partner.example.com/cb", true)]
+    [InlineData("http://localhost:5220", true)]
+    [InlineData("app.example", false)]
+    [InlineData("/cb", false)]
+    [InlineData("ftp://app.example", false)]
+    [InlineData("https://user@app.example", false)]
+    [InlineData("https://app.example?next=1", false)]
+    [InlineData("https://app.example/#top", false)]
+    [InlineData("", false)]
+    public void An_allow_list_entry_is_an_absolute_http_origin_with_an_optional_path(string entry, bool valid)
+    {
+        ReturnUrlPolicy.IsAllowListEntry(entry).Should().Be(valid);
+    }
+
+    /// <summary>SEC-0029 §3: the default landing is a local path, or an absolute URL under an allow-list entry.</summary>
+    [Theory]
+    [InlineData("/", true)]
+    [InlineData("/home", true)]
+    [InlineData("home", true)]
+    [InlineData("/home?welcome=1", true)]
+    [InlineData("https://partner.example.com/cb/landing", true)]
+    [InlineData("//evil.example", false)]
+    [InlineData(@"/\evil.example", false)]
+    [InlineData("/%2F%2Fevil.example", false)]
+    [InlineData("/a/../b", false)]
+    [InlineData("https://evil.example/", false)]
+    [InlineData("https://partner.example.com.evil.com/cb", false)]
+    public void A_default_path_is_a_local_path_or_an_allow_listed_url(string defaultPath, bool valid)
+    {
+        ReturnUrlPolicy.AcceptsDefaultPath(defaultPath, AllowList).Should().Be(valid);
     }
 
     [Fact]
@@ -112,6 +209,7 @@ public sealed class ReturnUrlPolicyTests
     [InlineData("/notes", "/notes/notes")]
     [InlineData("home", "/notes/home")]
     [InlineData("https://partner.example.com/cb", "https://partner.example.com/cb")]
+    [InlineData("https://ｐａｒｔｎｅｒ.example.com/cb", "https://partner.example.com/cb")]
     public void The_default_landing_gets_the_base_once(string defaultPath, string expected)
     {
         var context = new DefaultHttpContext

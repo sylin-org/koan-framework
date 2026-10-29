@@ -88,7 +88,8 @@ table name>` on a partition table, so every partition table holds its own copy o
 own table keeps the names its queries are proven against. Two entities that declare one name are refused on their own
 tables, naming the table that holds it. A partition table provisioned before its entity's own table by an earlier
 build can hold the unqualified name itself; the entity's own table is then refused with the `DROP INDEX` statement
-that frees the name. Koan drops nothing on its own; `SELECT name, sql FROM sqlite_master WHERE type = 'index' AND
+that frees the name. Such a partition table's unqualified name is also what DATA-0150's warning reports when that
+table's global unique index is the one left behind. Koan drops nothing on its own; `SELECT name, sql FROM sqlite_master WHERE type = 'index' AND
 tbl_name = '<table>'` lists what a table holds.
 
 ## Bulk and batch

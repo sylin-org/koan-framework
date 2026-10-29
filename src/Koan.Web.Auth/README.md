@@ -43,8 +43,11 @@ Register `https://your-app/auth/google/callback` with Google. Start sign-in at
 
 `return`, on the challenge and on `/auth/logout`, is honoured only when it is a local path of the application — one
 leading `/`, printable ASCII, no host after percent-decoding (`//`, `/\`), no backslash, no `.` or `..` segment, under
-the base path — or an absolute URL whose prefix is in `Koan:Web:Auth:ReturnUrl:AllowList`. Anything else, and no
-`return` at all, lands on `Koan:Web:Auth:ReturnUrl:DefaultPath` (`/`) under the base path, never on the value.
+the base path — or an absolute URL on the exact origin (scheme, host and port) of an entry in
+`Koan:Web:Auth:ReturnUrl:AllowList`, without userinfo, at or under the entry's path. Anything else, and no `return` at
+all, lands on `Koan:Web:Auth:ReturnUrl:DefaultPath` (`/`) under the base path, never on the value. An allow-list entry
+is an origin with an optional path (`https://partner.example.com/callback`) and no userinfo, query or fragment;
+`DefaultPath` is an application-relative local path or an allow-listed URL. Anything else refuses the start.
 
 Say where a failed sign-in lands, beside `return` (`&failure=/sign-in`) or for every provider in
 `Koan:Web:Auth:ReturnUrl:FailurePath`: a rooted path of the application in printable ASCII, with no `.` or `..`
@@ -77,16 +80,20 @@ pages as the person with one setting:
 { "Koan": { "Web": { "Auth": { "ResourceServer": { "Enabled": true } } } } }
 ```
 
-A request that carries an `Authorization` header is then authenticated by its bearer alone, never by a session cookie
-it also carries. The token is accepted only when its audience is the application's base URL (`Koan:Web:ApplicationUrl`,
+A request that carries a `Bearer` `Authorization` header is then authenticated by its bearer alone, never by a session
+cookie it also carries. A header of another scheme — the `Basic` credentials a reverse proxy passes upstream — carries
+no token the edge could accept and is left to the session, so a signed-in person behind such a proxy still reads as
+themselves. The token is accepted only when its audience is the application's base URL (`Koan:Web:ApplicationUrl`,
 with or without a trailing slash), or `Koan:Web:Auth:ResourceServer:Resource` when set; its subject becomes the same
 `ClaimTypes.NameIdentifier` the person's session carries, so every page and gate answers for the agent as for the
 person. A token that is expired, tampered, foreign or issued for another resource answers 401 with
 `WWW-Authenticate: Bearer error="invalid_token"` wherever an endpoint requires an authenticated caller, and before any
 MVC controller action or Razor Page that admits anonymous callers; a minimal-API or `MapRazorComponents` endpoint that
 admits anonymous callers runs as a visitor instead. The embedded authorization server's protocol endpoints never
-authenticate by bearer, so they keep their own answers when a client attaches a stale token. A request without the
-header keeps the session cookie. The MCP edge keeps its own resource (`/mcp`) on the same rule.
+authenticate by the application's bearer, so they keep their own answers when a client attaches a stale token. A
+provider endpoint that checks a token of its own must carry `[ResourceServerExempt]`, or the edge refuses that token
+before the endpoint sees it; the dev Test provider's authorize, token, userinfo and discovery endpoints carry it. A
+request without a bearer keeps the session cookie. The MCP edge keeps its own resource (`/mcp`) on the same rule.
 
 Under a base URL with a path, the login redirect and the discovery document's `challengeUrl` carry the path once
 (`/notes/auth/google/challenge`).

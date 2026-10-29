@@ -1,3 +1,4 @@
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -11,6 +12,7 @@ using System.Net;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
+[ResourceServerExempt] // SEC-0025: a provider endpoint answering its own token, not the application's resource.
 public sealed class AuthorizeController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, IHostEnvironment env, ILogger<AuthorizeController> logger, KoanWebBaseUrl baseUrl) : ControllerBase
 {
   [HttpGet(Constants.Routes.Authorize)]

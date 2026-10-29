@@ -1,3 +1,4 @@
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -15,6 +16,7 @@ namespace Koan.Web.Auth.Connector.Test.Controllers;
 /// endpoints are derived from the request that fetched this document — the handler's back-channel address — under
 /// its path base, so the handler reaches them wherever it reached the document.
 /// </summary>
+[ResourceServerExempt] // SEC-0025: a provider endpoint answering its own token, not the application's resource.
 public sealed class OidcDiscoveryController(IOptionsSnapshot<TestProviderOptions> opts, JwtTokenService jwt, IHostEnvironment env, KoanWebBaseUrl baseUrl) : ControllerBase
 {
     [HttpGet(Constants.Routes.Discovery)]

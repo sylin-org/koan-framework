@@ -64,6 +64,26 @@ public sealed class ReturnLandingSpec : IClassFixture<BaseUrlAuthSwapFixture>
         logout.Headers.Location!.OriginalString.Should().Be(Base + "/");
     }
 
+    /// <summary>
+    /// SEC-0029 §5: the path base matches without regard to case, so a browser may ask <c>/TANGENT/edge/protected</c>.
+    /// After sign-in it lands back on that page, under the base in its configured spelling, where the cookie applies.
+    /// </summary>
+    [Fact]
+    public async Task A_page_asked_with_another_casing_of_the_base_is_where_sign_in_lands()
+    {
+        using var client = _fx.NewClient();
+        using var protectedPage = new HttpRequestMessage(HttpMethod.Get, "/TANGENT/edge/protected");
+        protectedPage.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/html"));
+        using var login = await client.SendAsync(protectedPage, TestContext.Current.CancellationToken);
+        login.StatusCode.Should().Be(HttpStatusCode.Redirect);
+
+        var landing = await SignInLanding(client, login.Headers.Location!.OriginalString);
+        landing.Should().Be(Base + "/edge/protected");
+
+        using var page = await client.GetAsync(landing, TestContext.Current.CancellationToken);
+        page.StatusCode.Should().Be(HttpStatusCode.OK, "the person is signed in on the page they asked for");
+    }
+
     /// <summary>Follows challenge → authorize → callback and answers where the callback sends the person.</summary>
     private async Task<string> SignInLanding(HttpClient client, string challenge)
     {

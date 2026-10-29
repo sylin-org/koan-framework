@@ -155,13 +155,21 @@ internal sealed class SqliteDdlExecutor(
         RelationalIndexDefinition index,
         CancellationToken ct = default)
     {
-        // The name the index would have been created under on this table, so a partition table's predecessor is its own.
-        var name = RelationalIndexNames.Name(table, index, partitioned);
+        // The name the index would have been created under on this table, so a partition table's predecessor is its own;
+        // on a partition table also the declared name as written, which a build before per-partition copies gave the
+        // first container it provisioned. Either counts only when this table holds it.
         var connection = await Writer(ct).ConfigureAwait(false);
-        var (owner, _) = await Inspect(connection, _writerTransaction, name, ct).ConfigureAwait(false);
-        return owner is not null && string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase)
-            ? new RelationalIndexState(name, $"DROP INDEX {SqliteDialect.Quote(name)};")
-            : null;
+        var name = RelationalIndexNames.Name(table, index, partitioned);
+        string[] candidates = partitioned && index.NameDeclared
+            ? [name, RelationalIndexNames.Name(table, index, partitioned: false)]
+            : [name];
+        foreach (var candidate in candidates)
+        {
+            var (owner, _) = await Inspect(connection, _writerTransaction, candidate, ct).ConfigureAwait(false);
+            if (owner is not null && string.Equals(owner, table.Name, StringComparison.OrdinalIgnoreCase))
+                return new RelationalIndexState(candidate, $"DROP INDEX {SqliteDialect.Quote(candidate)};");
+        }
+        return null;
     }
 
     /// <summary>

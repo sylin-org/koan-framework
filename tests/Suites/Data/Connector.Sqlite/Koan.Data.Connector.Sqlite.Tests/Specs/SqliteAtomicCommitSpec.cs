@@ -1,10 +1,13 @@
+using Koan.Core;
 using System.Collections.Generic;
 using System.IO;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core.Transactions;
+using Koan.Testing.Integration;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 
@@ -39,6 +42,11 @@ public sealed class SqliteAtomicCommitSpec(SqliteFixture fixture, ITestOutputHel
     public sealed class Intruder : Entity<Intruder>
     {
         [Index(Name = "ix_atomic_claimed_code")] public string Code { get; set; } = "";
+    }
+
+    public sealed class Pinned : Entity<Pinned>
+    {
+        public string Label { get; set; } = "";
     }
 
     public sealed class Receipt : Entity<Receipt>
@@ -252,6 +260,43 @@ public sealed class SqliteAtomicCommitSpec(SqliteFixture fixture, ITestOutputHel
         failure.CompletedOperationCount.Should().Be(0);
         failure.Message.Should().Contain("before any tracked operation was dispatched");
         failure.InnerException!.Message.Should().Contain("already owned by SQLite table 'KOAN_ATOMIC_CLAIMANT'");
+        (await Order.Get(order.Id)).Should().BeNull();
+    }
+
+    /// <summary>
+    /// DATA-0161: a store that refuses to provision with <see cref="NotSupportedException"/> before dispatch is a
+    /// failure before dispatch like any other — <see cref="DataCommitOutcome.NotCommitted"/> with the refusal inside —
+    /// not an exception without an outcome. An explicit SQLite map pins one container and refuses an ambient partition.
+    /// </summary>
+    [Fact]
+    public async Task A_store_refusing_to_provision_before_dispatch_reports_not_committed_with_its_refusal_inside()
+    {
+        RequireBackingStore();
+        await using var host = await KoanIntegrationHost.Configure()
+            .WithSettings(Fixture.SettingsForBoot())
+            .ConfigureServices(services => services.AddKoan(koan =>
+                koan.Data.Source("Default").Map<Pinned>(map => map
+                    .Container("KOAN_ATOMIC_PINNED")
+                    .Key(item => item.Id).Name("ID")
+                    .Property(item => item.Label).Name("LABEL"))))
+            .StartAsync(TestContext.Current.CancellationToken);
+        using var _ = Lease(NewPartition("atomic-pinned"));
+        var order = new Order { Title = "never" };
+        TransactionException failure;
+
+        using (EntityContext.Transaction("writer", TransactionGuarantee.Atomic))
+        {
+            await order.Save();
+            await new Pinned { Label = "pinned" }.Save();
+            var commit = () => EntityContext.Commit();
+            failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+        }
+
+        failure.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted, "nothing was dispatched, so nothing can have landed");
+        failure.CompletedOperationCount.Should().Be(0);
+        failure.Message.Should().Contain("before any tracked operation was dispatched");
+        failure.InnerException.Should().BeOfType<NotSupportedException>()
+            .Which.Message.Should().Contain("cannot accept an ambient partition");
         (await Order.Get(order.Id)).Should().BeNull();
     }
 

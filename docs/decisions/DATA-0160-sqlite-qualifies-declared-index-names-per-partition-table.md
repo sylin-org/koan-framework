@@ -61,7 +61,12 @@ the partition.
 2. **SQLite applies it to every index it keys by name.** `SqliteDdlExecutor` is told by the repository whether the
    table is a partition of its entity (an ambient partition selects the table) and creates, inspects, replaces and finds
    every keyed index under the rule's name. `FindIndex`, which DATA-0150 uses to report the global unique index an
-   earlier build left behind, looks for the name that index would have had on that table. The lexical index of
+   earlier build left behind, looks for the name that index would have had on that table and, on a partition table
+   whose index name is declared, for the declared name as written: a build before this record gave that name to the
+   first container it provisioned, which may be a partition table (`Legacy#audit` holding `ux_code`). Either name
+   counts only when this table holds it, so another table's index is never reported for this one. A partition table
+   that holds both reports the qualified one first; once it is dropped, the next start that provisions the table
+   reports the other, as DATA-0150 rule 3 reports on every such start. The lexical index of
    DATA-0159 is untouched: its view, FTS5 table and triggers are named from the table (`<table>__koan_lexical...`), so
    each container already has its own, and a partition of an entity that declares both `[Lexical]` and named indexes
    provisions and searches its own rows.
@@ -105,6 +110,12 @@ the partition.
   the unqualified name blocks the entity's own table with the `DROP INDEX` statement, and after that statement the
   entity's own table provisions; a partition of an entity with a lexical index and a named index searches only its own
   rows. Five of the six failed before this change; the refusal of two entities passed before and after.
+- `SqliteUniqueIndexTenancySpec.A_partition_table_holding_the_unqualified_global_index_is_reported` (Connector.Sqlite,
+  K8, rule 2's lookup): a partition table holding the declared unique name `ux_conformance_named_code` unqualified, as a
+  build before DATA-0150 and this record left it, gains its scoped index after an upgrade with row-scoped tenancy, and
+  DATA-0150's warning names `ux_conformance_named_code` with `DROP INDEX "ux_conformance_named_code";`; after that
+  statement a second tenant saves the value one tenant holds. Before the lookup considered the unqualified name the
+  warning was absent.
 - `RelationalIndexNamesSpec` (Data.Relational, no store): the declared, qualified, derived, unlimited and 63-byte forms.
 - `NpgsqlIndexNamesSpec` and `PostgresIndexNameSpec` (container) pass unchanged against the shared rule, so PostgreSQL's
   names did not move.

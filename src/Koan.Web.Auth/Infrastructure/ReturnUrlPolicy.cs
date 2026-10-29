@@ -9,7 +9,7 @@ namespace Koan.Web.Auth.Infrastructure;
 /// <summary>
 /// SEC-0001 §10 — single source of truth for resolving a post-authentication return URL and the
 /// kind of redirect it warrants. The allow-list is the security boundary (WEB-0043): a local path of
-/// this application, or an absolute URL whose prefix is allow-listed (the cross-origin case the
+/// this application, or an absolute URL under an allow-listed origin and path (the cross-origin case the
 /// allow-list exists to support), is accepted; anything else falls back to the default landing, never
 /// to the value.
 /// <para>
@@ -42,19 +42,115 @@ public static class ReturnUrlPolicy
     }
 
     /// <summary>
-    /// <paramref name="candidate"/> when it is a local path under <paramref name="pathBase"/> or an allow-listed
-    /// absolute URL, else <paramref name="fallback"/>.
+    /// <paramref name="candidate"/> when it is a local path under <paramref name="pathBase"/>, or, as parsed, when it is
+    /// an absolute URL under an allow-listed entry (<see cref="AllowListed"/>); else <paramref name="fallback"/>.
     /// </summary>
     public static Resolution Resolve(string? candidate, IReadOnlyList<string>? allowList, string fallback, PathString pathBase = default)
     {
         if (IsLocalPath(candidate, pathBase)) return new Resolution(candidate!, true);
-        if (!string.IsNullOrWhiteSpace(candidate)
-            && Uri.TryCreate(candidate, UriKind.Absolute, out var absolute)
-            && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps)
-            && allowList is not null
-            && allowList.Any(p => candidate.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
-            return new Resolution(candidate, false); // allow-listed absolute (cross-origin) URL
+        if (AllowListed(candidate, allowList) is { } absolute)
+            return new Resolution(absolute, false); // allow-listed absolute (cross-origin) URL
         return new Resolution(fallback, fallback.StartsWith('/') && !fallback.StartsWith("//", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// SEC-0029 §2 — <paramref name="candidate"/> as the ASCII URL that was compared (<see cref="Compared"/>), when it is
+    /// an absolute http(s) URL without userinfo whose scheme, host (in its IDNA form) and port equal an allow-list
+    /// entry's and whose path, holding no encoded slash or backslash and no <c>.</c> or <c>..</c> segment after
+    /// percent-decoding, lies under the entry's path at a segment boundary; else null. Origins are compared, not strings:
+    /// under <c>https://app.example</c>, <c>https://app.example.evil.com/</c>, <c>https://app.example@evil.com/</c> and
+    /// <c>https://app.example:8443/</c> are other origins, and under <c>https://partner.example.com/cb</c>,
+    /// <c>/cb/..%2Fadmin</c> is refused because a server that decodes before it resolves dot segments serves
+    /// <c>/admin</c>. The caller redirects to the returned URL, so the browser receives exactly what was compared.
+    /// </summary>
+    private static string? AllowListed(string? candidate, IReadOnlyList<string>? allowList)
+    {
+        if (string.IsNullOrWhiteSpace(candidate) || allowList is null || allowList.Count == 0) return null;
+        if (!TryAbsoluteHttp(candidate, out var absolute) || absolute.UserInfo.Length > 0) return null;
+        if (!SegmentsArePlain(absolute.AbsolutePath) || Compared(absolute) is not { } compared) return null;
+        foreach (var entry in allowList)
+        {
+            if (!IsAllowListEntry(entry) || !TryAbsoluteHttp(entry, out var origin)) continue;
+            if (!string.Equals(absolute.Scheme, origin.Scheme, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(absolute.IdnHost, origin.IdnHost, StringComparison.OrdinalIgnoreCase)
+                || absolute.Port != origin.Port)
+                continue;
+            var under = origin.AbsolutePath.TrimEnd('/');
+            var path = absolute.AbsolutePath;
+            if (under.Length == 0
+                || path.StartsWith(under, StringComparison.Ordinal) && (path.Length == under.Length || path[under.Length] == '/'))
+                return compared;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// SEC-0029 §2 — true when <paramref name="entry"/> can be an allow-list entry: an absolute http(s) URL naming an
+    /// origin and, optionally, a path under it, with no userinfo, query or fragment. Any other entry refuses the start.
+    /// </summary>
+    internal static bool IsAllowListEntry(string? entry) =>
+        !string.IsNullOrWhiteSpace(entry)
+        && entry.IndexOfAny(['?', '#']) < 0
+        && TryAbsoluteHttp(entry, out var origin)
+        && origin.UserInfo.Length == 0
+        && origin.Query.Length == 0
+        && origin.Fragment.Length == 0;
+
+    /// <summary>
+    /// SEC-0029 §3 — true when <paramref name="defaultPath"/> can be <c>ReturnUrl:DefaultPath</c>: an application-relative
+    /// path that, rooted as <see cref="DefaultLanding"/> roots it, is a local path (<see cref="IsLocalPath"/>), or an
+    /// absolute URL under an entry of <paramref name="allowList"/>. Any other value refuses the start, so the default
+    /// landing never leaves the application except through the allow-list.
+    /// </summary>
+    internal static bool AcceptsDefaultPath(string? defaultPath, IReadOnlyList<string>? allowList)
+    {
+        if (string.IsNullOrWhiteSpace(defaultPath)) return true;
+        if (TryAbsoluteHttp(defaultPath, out var absolute))
+            return AllowListed(defaultPath, allowList) is not null && Compared(absolute) is not null;
+        return IsLocalPath(defaultPath.StartsWith('/') ? defaultPath : "/" + defaultPath);
+    }
+
+    /// <summary>
+    /// The URL built from exactly what the allow-list compares: scheme, the host's IDNA (ASCII) form, the port when it is
+    /// not the scheme's default, and the escaped path, query and fragment. A Unicode spelling of a host
+    /// (<c>ａｐｐ.example</c>) is therefore written as the host it was compared as (<c>app.example</c>), and the result is
+    /// a valid <c>Location</c> header; null when it would still not be printable ASCII.
+    /// </summary>
+    private static string? Compared(Uri absolute)
+    {
+        var host = absolute.IdnHost;
+        if (absolute.HostNameType == UriHostNameType.IPv6 && !host.StartsWith('[')) host = $"[{host}]";
+        var port = absolute.IsDefaultPort ? string.Empty : $":{absolute.Port}";
+        var url = $"{absolute.Scheme}://{host}{port}{absolute.PathAndQuery}{absolute.Fragment}";
+        return url.All(static c => c is > ' ' and <= '~') ? url : null;
+    }
+
+    /// <summary>
+    /// True when no segment of <paramref name="escapedPath"/>, percent-decoded with the local-path rule's passes, holds a
+    /// slash, a backslash or a control character, or is <c>.</c> or <c>..</c>.
+    /// </summary>
+    private static bool SegmentsArePlain(string escapedPath)
+    {
+        foreach (var segment in escapedPath.Split('/'))
+        {
+            var decoded = segment;
+            for (var pass = 0; pass < MaximumDecodingPasses && decoded.Contains('%'); pass++)
+                decoded = Uri.UnescapeDataString(decoded);
+            if (decoded is "." or ".." || decoded.Any(static c => c is '/' or '\\' or < ' ' or (char)0x7F)) return false;
+        }
+        return true;
+    }
+
+    private static bool TryAbsoluteHttp(string value, out Uri absolute)
+    {
+        if (Uri.TryCreate(value, UriKind.Absolute, out var parsed)
+            && (parsed.Scheme == Uri.UriSchemeHttp || parsed.Scheme == Uri.UriSchemeHttps))
+        {
+            absolute = parsed;
+            return true;
+        }
+        absolute = null!;
+        return false;
     }
 
     /// <summary>
@@ -66,9 +162,8 @@ public static class ReturnUrlPolicy
     {
         ArgumentNullException.ThrowIfNull(context);
         if (string.IsNullOrWhiteSpace(defaultPath)) return ApplicationPaths.Under(context, "/");
-        if (Uri.TryCreate(defaultPath, UriKind.Absolute, out var absolute)
-            && (absolute.Scheme == Uri.UriSchemeHttp || absolute.Scheme == Uri.UriSchemeHttps))
-            return defaultPath;
+        // An absolute default is written as the allow-list compared it at start (SEC-0029 §2), so its host is ASCII.
+        if (TryAbsoluteHttp(defaultPath, out var absolute)) return Compared(absolute) ?? ApplicationPaths.Under(context, "/");
         return ApplicationPaths.Under(context, defaultPath.StartsWith('/') ? defaultPath : "/" + defaultPath);
     }
 

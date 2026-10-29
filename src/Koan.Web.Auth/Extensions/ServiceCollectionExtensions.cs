@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -34,6 +35,16 @@ internal static class ServiceCollectionExtensions
                 $"{AuthOptions.SectionPath}:ReturnUrl:FailurePath must be a rooted path of this application, such as /sign-in, where a failed sign-in lands; " +
                 "it is printable ASCII, names no host, no '.' or '..' segment, no backslash or encoded slash and no fragment, " +
                 "and its query does not name 'error', which carries the failure code.")
+            // SEC-0029 §2: an allow-list entry names an origin, and optionally a path under it, and nothing else.
+            .Validate(options => options.ReturnUrl.AllowList.All(ReturnUrlPolicy.IsAllowListEntry),
+                $"{AuthOptions.SectionPath}:ReturnUrl:AllowList entries must each be an absolute http(s) URL naming the origin a return " +
+                "may leave the application for, optionally with a path under it, such as https://partner.example.com or " +
+                "https://partner.example.com/callback; an entry carries no userinfo, query or fragment.")
+            // SEC-0029 §3: the default landing stays in the application unless the allow-list says otherwise.
+            .Validate(options => ReturnUrlPolicy.AcceptsDefaultPath(options.ReturnUrl.DefaultPath, options.ReturnUrl.AllowList),
+                $"{AuthOptions.SectionPath}:ReturnUrl:DefaultPath must be an application-relative path such as / or /home, which the " +
+                "base path is added to; it names no host ('//' or '/\\'), no '.' or '..' segment and no backslash, and is printable " +
+                "ASCII. An absolute URL is accepted only under an entry of ReturnUrl:AllowList.")
             // SEC-0025: the resource a token's audience must name is an absolute URI.
             .Validate(options => options.ResourceServer.Resource is null || Uri.TryCreate(options.ResourceServer.Resource, UriKind.Absolute, out _),
                 $"{AuthOptions.SectionPath}:ResourceServer:Resource must be the absolute URI a token's audience names, such as https://www.example.com/app; " +
@@ -292,7 +303,26 @@ internal static class ServiceCollectionExtensions
             returnUrl = "/" + returnUrl.TrimStart('/');
         }
 
-        return returnUrl;
+        return WithConfiguredPathBase(context.HttpContext, returnUrl);
+    }
+
+    /// <summary>
+    /// SEC-0029 §5: the page asked for, named with the path base in its configured spelling. <c>UsePathBase</c> matches
+    /// the base without regard to case and keeps the request's spelling, so the cookie handler names
+    /// <c>/TANGENT/x</c> for a request to it under <c>/tangent</c>. The authentication cookie is scoped to the configured
+    /// spelling and a browser matches a cookie's path by case, so the person must land on <c>/tangent/x</c>, which is
+    /// also the spelling the local-path rule accepts. A return that does not begin with the request's path base is
+    /// unchanged.
+    /// </summary>
+    private static string WithConfiguredPathBase(HttpContext context, string returnUrl)
+    {
+        var requested = context.Request.PathBase.ToUriComponent();
+        var configured = ApplicationPaths.PathBase(context).ToUriComponent();
+        if (requested.Length == 0 || string.Equals(requested, configured, StringComparison.Ordinal)) return returnUrl;
+        if (!returnUrl.StartsWith(requested, StringComparison.Ordinal)
+            || returnUrl.Length > requested.Length && returnUrl[requested.Length] is not ('/' or '?' or '#'))
+            return returnUrl;
+        return configured + returnUrl[requested.Length..];
     }
 
     private static string BuildChallengeUrl(string challengePath, string? returnUrl)

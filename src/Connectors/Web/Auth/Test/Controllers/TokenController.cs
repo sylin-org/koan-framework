@@ -1,3 +1,4 @@
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ using System.Text;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
+[ResourceServerExempt] // SEC-0025: a provider endpoint answering its own token, not the application's resource.
 public sealed class TokenController(IOptionsSnapshot<TestProviderOptions> opts, DevTokenStore store, JwtTokenService jwt, IHostEnvironment env, ILogger<TokenController> logger) : ControllerBase
 {
     public sealed record TokenRequest(string grant_type, string? code, string? redirect_uri, string client_id, string? client_secret, string? code_verifier, string? scope);

@@ -1,3 +1,4 @@
+using Koan.Web.Auth.Infrastructure;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -7,6 +8,7 @@ using Koan.Web.Auth.Connector.Test.Options;
 
 namespace Koan.Web.Auth.Connector.Test.Controllers;
 
+[ResourceServerExempt] // SEC-0025: a provider endpoint answering its own token, not the application's resource.
 public sealed class UserInfoController(DevTokenStore store, IHostEnvironment env, IOptionsSnapshot<TestProviderOptions> opts, ILogger<UserInfoController> logger) : ControllerBase
 {
     [HttpGet(Constants.Routes.UserInfo)]

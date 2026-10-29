@@ -56,10 +56,19 @@ The challenge controller resolves `return` through `ReturnUrlPolicy.Resolve(Http
 named handler, which redirects to `AuthenticationProperties.RedirectUri` without checking it again (SEC-0029): a local
 path — one leading `/`, printable ASCII without spaces, a path that after percent-decoding (up to three passes) names no
 host and holds no backslash and no `.` or `..` segment, beginning with the application's path base at a segment
-boundary — or an http(s) URL with an allow-listed prefix is kept; anything else becomes the default landing,
+boundary — or an absolute URL under an allow-list entry is kept; anything else becomes the default landing,
 `ReturnUrl:DefaultPath` under the base path once (`ReturnUrlPolicy.DefaultLanding`), or as it is when it is an absolute
-http(s) URL. Logout resolves its `return` the same way, so a refused value lands on the default instead of reaching
-`LocalRedirect`. The cookie's login redirect names the page asked for under the base path. The controller also
+http(s) URL. An allow-list entry is compared as an origin: the parsed URL is http(s) without userinfo, its scheme, host
+and port equal the entry's (the host in its IDNA form), each path segment percent-decoded holds no slash, backslash or
+control character and is not `.` or `..`, and its path is the entry's path or under it at a segment boundary; the
+redirect is built from what was compared (scheme, `IdnHost`, a non-default port, escaped path, query and fragment), so
+the browser receives exactly that and the `Location` header is ASCII. An absolute `DefaultPath` lands in the same form. Start validation refuses an
+entry that is not an absolute http(s) URL without userinfo, query or fragment (`ReturnUrlPolicy.IsAllowListEntry`) and a
+`DefaultPath` that, rooted, is not a local path and is not an allow-listed URL (`ReturnUrlPolicy.AcceptsDefaultPath`).
+Logout resolves its `return` the same way, so a refused value lands on the default instead of reaching
+`LocalRedirect`. The cookie's login redirect names the page asked for under the base path in its configured spelling:
+`UsePathBase` matches the base without regard to case and keeps the request's spelling, so the request's base at the
+head of the cookie handler's return is replaced by the configured one, where the authentication cookie applies. The controller also
 carries the failure landing named beside `return` (`failure`, a rooted path checked by `SignInFailureReturn.TryAccept`)
 in the authentication properties (WEB-0080). `TryAccept` admits only printable ASCII from the characters a path and a
 query carry, percent-decodes the path and the query, and refuses a host (`//`), a `.` or `..` segment, a backslash, an
@@ -86,15 +95,17 @@ redirect to the elected provider when one exists.
 `Koan.resource` (`AuthenticationExtensions.ResourceServerScheme`, SEC-0025) is registered with the cookie and stays
 inert until `Koan:Web:Auth:ResourceServer:Enabled`; `ResourceServerComposition` then makes it the default authenticate,
 challenge and forbid scheme, leaving the default, sign-in and sign-out schemes on `Koan.cookie`. Its
-`ForwardDefaultSelector` forwards every operation of a request without an `Authorization` header to the cookie; a
-request with one is the handler's alone. The handler authenticates through Trust's `KoanBearerResource` for
+`ForwardDefaultSelector` forwards every operation of a request without a `Bearer` `Authorization` header — none, or
+one of another scheme such as a proxy's `Basic` credentials — to the cookie (`ResourceServerHandler.CarriesBearer`,
+the scheme compared without case); a request with one is the handler's alone. The handler authenticates through Trust's `KoanBearerResource` for
 `ResourceServer:Resource`, else the base URL `KoanWebBaseUrl.Resolve` answers (which refuses a request-derived origin in
 Production, WEB-0078), and turns a header that carries no bearer into a failure. Its challenge answers 401 with
 `Bearer error="invalid_token"` after a failed authentication and a bare `Bearer` otherwise; its forbid is ASP.NET's 403.
 `RejectedBearerFilter`, a global MVC authorization filter, challenges through the same scheme before any controller
 action or Razor Page when the header was not accepted, so an anonymous page does not read a rejected agent as a
-visitor. It skips an action whose endpoint metadata carries `ResourceServerExemptAttribute`: the embedded authorization
-server's controller carries it, since its endpoints never authenticate by bearer and owe a client their own protocol
+visitor. It answers only a request that carries a bearer, and skips an action whose endpoint metadata carries
+`ResourceServerExemptAttribute`: the dev Test provider's protocol controllers carry it, since they check a token of
+their own, and the embedded authorization server's controller carries it, since its endpoints never authenticate by bearer and owe a client their own protocol
 answers (a refresh, a registration, a device request, the discovery documents). Endpoints outside MVC — minimal APIs,
 `MapRazorComponents`, the MCP edge — get the 401 only when they require an authenticated caller, or answer in their own
 terms. A `Resource` that is not an absolute URI refuses the start. The

@@ -28,6 +28,10 @@ the issuer. The consuming handler keeps exact issuer, audience, signature and no
 Userinfo emits `sub`, `id`, username, email, roles, permissions, and custom claims. Web Auth maps roles to
 `ClaimTypes.Role`, permissions to `Koan.permission`, and extra claims one-for-one.
 
+The authorize, token, userinfo and discovery controllers carry `[ResourceServerExempt]` (SEC-0025): they check the
+provider's own token, not the application's, so with `Koan:Web:Auth:ResourceServer:Enabled` the edge leaves them alone
+and the OAuth handler's userinfo call with the provider's opaque bearer completes the sign-in.
+
 ## Options
 
 Configuration section: `Koan:Web:Auth:TestProvider`.
