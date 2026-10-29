@@ -215,6 +215,12 @@ public static class AppBootstrapper
         var serviceDiscoveryAdapters = KoanRegistry.GetServiceDiscoveryAdapters();
         var semanticDescriptors = KoanRegistry.GetSemanticModuleDescriptors();
 
+        // The registry is complete only here: an assembly's descriptors arrive when its module initializer first runs
+        // or when the scan above reaches it, so services read from the registry any earlier would depend on which
+        // application code the process happened to run before composing (ARCH-0139).
+        Koan.Core.BackgroundServices.KoanBackgroundServicesBootstrap.RegisterDiscovered(services, backgroundServices);
+        Koan.Core.Orchestration.ServiceDiscoveryBootstrap.RegisterDiscovered(services, serviceDiscoveryAdapters);
+
         // Filter and validate every descriptor before invoking any factory, then complete the entire
         // construction barrier before registration begins.
         var constitution = SemanticActivationCompiler.Compile(referenceManifest, semanticDescriptors, applicationAssembly);

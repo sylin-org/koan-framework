@@ -99,6 +99,10 @@ were considered rather than missed:
 - **`IssuerKeyRotationService`** — a background schedule with no work to do in Development. No surface
   is being gated, so no gate applies.
 
+> **Amended 2026-10-29.** SEC-0022 made `IssuerKeyRotationService` depend on `IIssuerKeyStore` instead of the
+> environment, so it no longer reads it and is no longer an exception; `EnvironmentGateConformanceSpec` lists the
+> remaining two.
+
 The MCP transports' plaintext warning (`IsProduction && !InContainer && !IsHttps` — "production with
 no TLS-terminating proxy in front") stays a transport-local heuristic. It is one concept in one pillar
 and does not earn a framework name.

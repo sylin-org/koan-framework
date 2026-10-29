@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- An application assembly as a test process meets it: its generated module initializer exists and has not run.
+       Koan.Tests.Integration.Bootstrap copies it into its own folder under the test output, out of reach of a
+       default-context scan, and only UntouchedApplicationServiceSpec loads it, into an isolated load context. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Koan.Core.Registry.Generators\Koan.Core.Registry.Generators.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

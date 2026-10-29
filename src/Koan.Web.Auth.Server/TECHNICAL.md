@@ -42,6 +42,10 @@ clients.
 `OAuthClient.GrantTypes` (values from `OAuthGrantTypes`) is the client's permission: empty allows the code grant only,
 RFC 7591's default; `/oauth/device` answers `unauthorized_client` to a client that does not name
 `OAuthGrantTypes.DeviceCode`, and `/oauth/authorize` to one whose named grants leave out the code grant (SEC-0024).
+The device grant is read again at every later step of a device request: `ConsentPage.Find` and `GET /oauth/request/{id}`,
+the device approval, and the `device_code` exchange each refuse a request whose client is missing, expired, or no longer
+names `OAuthGrantTypes.DeviceCode` (`unauthorized_client`; `ClientNotAllowed` from `Find`). A device denial is still
+accepted, since it grants nothing.
 
 Short-lived opaque protocol artifacts are single-use and cleaned in the background. Refresh rotates on every use;
 replay revokes the token family. Remembered consent depends on a live revocable grant and an unchanged scope set.
@@ -52,7 +56,8 @@ replay revokes the token family. Remembered consent depends on a live revocable 
 `Find(context, id)` returns a `ConsentLookup`: a pending, unexpired `ConsentRequest` by `rid` without spending any
 allowance, else — after one attempt against `UserCodeVerificationRateLimitPerMinute` for the address (key
 `usercode:{address}`, shared with the endpoint, approve and deny) — a pending, unexpired `DeviceCode` by the normalised
-user code, or `Throttled`. A `PendingConsent` carries the id approve and deny address (the `rid`, or the normalised
+user code, or `Throttled`, or `ClientNotAllowed` (without the request) when that device request's client is not
+allowed the device grant. A `PendingConsent` carries the id approve and deny address (the `rid`, or the normalised
 user code), the client id and its registered name (or the id), scopes, resource, the display user code or the redirect,
 and the approve and deny paths under the application's path base. Ids longer than 128 characters find nothing.
 

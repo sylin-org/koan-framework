@@ -122,6 +122,9 @@ Discovery is part of the ordinary bootstrap:
 builder.Services.AddKoan();
 ```
 
+Every service in an assembly the host reaches is registered, whether or not any of that assembly's code has run yet, so
+a test that composes a host before touching the application gets the same services as the server (ARCH-0139).
+
 Configuration disables the whole set, bounds startup, or turns off one service by name:
 
 ```json

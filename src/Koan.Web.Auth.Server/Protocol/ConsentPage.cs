@@ -33,7 +33,8 @@ public static class ConsentPage
     /// The request waiting under <paramref name="id"/>: a code-flow <c>rid</c>, or a Device-flow user code in any case,
     /// with or without its hyphen or spaces. A user-code lookup counts against the address's
     /// <c>UserCodeVerificationRateLimitPerMinute</c>, shared with Koan's own request endpoint and its approve and deny;
-    /// past it the answer is <see cref="ConsentLookup.Throttled"/>.
+    /// past it the answer is <see cref="ConsentLookup.Throttled"/>. A device request whose client is not allowed the
+    /// Device Authorization Grant is answered <see cref="ConsentLookup.ClientNotAllowed"/>, without the request.
     /// </summary>
     public static async Task<ConsentLookup> Find(HttpContext context, string? id, CancellationToken ct = default)
     {
@@ -54,6 +55,10 @@ public static class ConsentPage
         if (!TryAcquireUserCode(context, options, now)) return new(null, Throttled: true);
         var device = await FindPendingDevice(id, now, ct);
         if (device is null) return new(null, Throttled: false);
+        // SEC-0024: the client's permission is read again here, so a request made before it lost the device grant never
+        // puts its name in front of the person.
+        if (!await OAuthClient.Allows(device.ClientId, OAuthGrantTypes.DeviceCode, now, ct))
+            return new(null, Throttled: false) { ClientNotAllowed = true };
         return new(await Pending(context, device.UserCode, device.ClientId, device.Scope, device.Resource,
             UserCode.Format(device.UserCode), redirectUri: null, ct), Throttled: false);
     }

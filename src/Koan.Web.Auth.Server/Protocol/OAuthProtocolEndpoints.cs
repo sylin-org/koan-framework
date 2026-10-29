@@ -148,6 +148,7 @@ internal static class OAuthProtocolEndpoints
         // (normalised, rate-limited so this can't be used to brute-force codes).
         var lookup = await ConsentPage.Find(ctx, rid, ctx.RequestAborted);
         if (lookup.Throttled) { await TooManyAttempts(ctx); return; }
+        if (lookup.ClientNotAllowed) { await DeviceGrantRefused(ctx); return; }
         if (lookup.Request is not { } pending)
         {
             await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
@@ -203,6 +204,8 @@ internal static class OAuthProtocolEndpoints
         if (!await RateLimitUserCodeAsync(ctx, options, now)) return;
         var device = await ConsentPage.FindPendingDevice(rid, now, ctx.RequestAborted);
         if (device is null) { await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request."); return; }
+        // SEC-0024: the client must still be allowed the device grant when the person decides, not only when it asked.
+        if (!await OAuthClient.Allows(device.ClientId, OAuthGrantTypes.DeviceCode, now, ctx.RequestAborted)) { await DeviceGrantRefused(ctx); return; }
         if (await RequireSession(ctx) is not { } signedIn) return;
         var (subject, approver) = signedIn;
 
@@ -322,6 +325,13 @@ internal static class OAuthProtocolEndpoints
         if (!string.Equals(form["client_id"].ToString(), device.ClientId, StringComparison.Ordinal))
         {
             await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "client_id does not match the device authorization.");
+            return;
+        }
+        // SEC-0024 / RFC 6749 §5.2: a device code is exchanged only for a client still allowed the device grant, whatever
+        // was decided while it had it.
+        if (!await OAuthClient.Allows(device.ClientId, OAuthGrantTypes.DeviceCode, now, ctx.RequestAborted))
+        {
+            await DeviceGrantRefused(ctx);
             return;
         }
         if (device.IsExpired(now))
@@ -537,6 +547,12 @@ internal static class OAuthProtocolEndpoints
 
     private static Task TooManyAttempts(HttpContext ctx)
         => JsonError(ctx, StatusCodes.Status429TooManyRequests, "slow_down", "Too many verification attempts.");
+
+    private static Task DeviceGrantRefused(HttpContext ctx)
+        => JsonError(ctx, StatusCodes.Status400BadRequest, "unauthorized_client", DeviceGrantRefusal);
+
+    /// <summary>The description of every <c>unauthorized_client</c> refusal of the device grant (SEC-0024).</summary>
+    internal const string DeviceGrantRefusal = "This client is not allowed the Device Authorization Grant.";
 
     // Reject absurd ids (a 1MB user_code / rid) before any DB access or allocation. Valid ids are <= 64 chars.
     private static async Task<bool> RejectOversizedId(HttpContext ctx, string? id)

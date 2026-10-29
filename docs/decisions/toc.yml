@@ -220,6 +220,8 @@
       href: ARCH-0137-segmentation-coverage-is-checked-at-composition.md
     - name: ARCH-0138 Module discovery failures are boot failures, and only active modules contribute
       href: ARCH-0138-module-discovery-failures-are-boot-failures.md
+    - name: ARCH-0139 Registry-driven services register after discovery, whatever code ran first
+      href: ARCH-0139-registry-driven-services-register-after-discovery.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

@@ -725,6 +725,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Web.Auth.Atproto.Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AtprotoIdentity", "samples\AtprotoIdentity\AtprotoIdentity.csproj", "{FF9F1E92-949B-4D0A-8347-E3161531B602}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Koan.Tests.Integration.Bootstrap.UntouchedApplication", "tests\Suites\Integration\Bootstrap\Koan.Tests.Integration.Bootstrap.UntouchedApplication\Koan.Tests.Integration.Bootstrap.UntouchedApplication.csproj", "{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -3769,6 +3771,18 @@ Global
 		{FF9F1E92-949B-4D0A-8347-E3161531B602}.Release|x64.Build.0 = Release|Any CPU
 		{FF9F1E92-949B-4D0A-8347-E3161531B602}.Release|x86.ActiveCfg = Release|Any CPU
 		{FF9F1E92-949B-4D0A-8347-E3161531B602}.Release|x86.Build.0 = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|x64.Build.0 = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Debug|x86.Build.0 = Debug|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|x64.ActiveCfg = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|x64.Build.0 = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|x86.ActiveCfg = Release|Any CPU
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -4123,6 +4137,7 @@ Global
 		{8DD2A662-0884-4FEA-93FE-4508E4081614} = {5061AAE9-E215-31AA-A38A-26EE60D40E02}
 		{24186910-E59C-4286-80BC-87F56C731A8C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{FF9F1E92-949B-4D0A-8347-E3161531B602} = {5D20AA90-6969-D8BD-9DCD-8634F4692FDA}
+		{CAEB2C2D-074D-4785-90B7-A930B1DEE9E7} = {7B16C914-355C-931B-D371-F343A038ACCC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {669C5778-BFAE-4972-B427-0AFF99562045}

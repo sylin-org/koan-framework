@@ -49,10 +49,16 @@ internal static class ServiceDiscoveryBootstrap
                 provider.GetRequiredService<IServiceDiscoveryCoordinator>(),
                 provider.GetRequiredService<IConfiguration>(),
                 provider.GetRequiredService<ILogger<OrchestrationAwareServiceDiscovery>>()));
+    }
 
-        // Auto-register all IServiceDiscoveryAdapter implementations discovered at compile time
-        var adapters = KoanRegistry.GetServiceDiscoveryAdapters();
-
+    /// <summary>
+    /// Registers the discovered <see cref="IServiceDiscoveryAdapter"/> implementations. Module initialization calls this
+    /// once its assembly scan has handed every reachable assembly's descriptors to the registry (ARCH-0139).
+    /// </summary>
+    public static void RegisterDiscovered(
+        IServiceCollection services,
+        IEnumerable<KoanRegistry.ServiceDiscoveryAdapterDescriptor> adapters)
+    {
         foreach (var adapter in adapters)
         {
             services.TryAddSingleton(typeof(IServiceDiscoveryAdapter), adapter.ServiceType);

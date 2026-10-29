@@ -7,7 +7,8 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 
 /// <summary>
 /// An application's server-rendered consent and done pages, reduced to what they ask Koan: the consent page finds the
-/// pending request by <c>rid</c> or typed user code and answers it as JSON (with where Allow and Deny post); the done
+/// pending request by <c>rid</c> or typed user code and answers it as JSON (with where Allow and Deny post), or refuses
+/// with 403 a device request whose client is not allowed the device grant; the done
 /// page answers the outcome it reads from its own address. Mounted at <c>/consent</c> and <c>/consent/done</c>, the
 /// paths <see cref="ConsentPageFixture"/> names.
 /// </summary>
@@ -19,6 +20,7 @@ public sealed class TestConsentPageController : ControllerBase
     {
         var lookup = await ConsentPage.Find(HttpContext, rid ?? userCode, ct);
         if (lookup.Throttled) return StatusCode(429);
+        if (lookup.ClientNotAllowed) return StatusCode(403);
         return lookup.Request is { } pending ? Ok(pending) : NotFound();
     }
 

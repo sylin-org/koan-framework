@@ -51,6 +51,7 @@ public async Task<IActionResult> Consent(string? rid, [FromQuery(Name = "user_co
 {
     var lookup = await ConsentPage.Find(HttpContext, rid ?? code, ct);
     if (lookup.Throttled) return StatusCode(429);
+    if (lookup.ClientNotAllowed) return View("NotAllowed"); // a device request whose client lacks the device grant
     if (lookup.Request is not { } pending) return NotFound();
     // pending.ClientName (untrusted display text), pending.Scopes, pending.Resource, pending.UserCode or
     // pending.RedirectUri; the Allow form posts to pending.Approve and the Deny form to pending.Deny.
@@ -87,7 +88,9 @@ Dynamic clients are restricted to loopback redirects. Deliberate non-loopback re
 pre-registered clients and are matched exactly.
 
 A client is allowed the grants it names in `GrantTypes`; naming none allows the code grant only. The Device
-Authorization Grant is allowed only to a client that names it, and dynamic registration never does:
+Authorization Grant is allowed only to a client that names it, and dynamic registration never does. The permission is
+read when a device code is requested, looked up, approved and exchanged, so removing the grant also stops the client's
+requests already waiting:
 
 ```csharp
 await new OAuthClient

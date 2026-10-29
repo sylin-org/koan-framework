@@ -36,7 +36,7 @@ internal static class DeviceEndpoint
         // a self-chosen name in front of a person's consent page through this flow (RFC 6749 §5.2).
         if (!client.AllowsGrant(OAuthGrantTypes.DeviceCode))
         {
-            await Error(ctx, "unauthorized_client", "This client is not allowed the Device Authorization Grant.");
+            await Error(ctx, "unauthorized_client", OAuthProtocolEndpoints.DeviceGrantRefusal);
             return;
         }
         if (string.IsNullOrWhiteSpace(resource))

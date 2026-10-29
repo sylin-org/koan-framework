@@ -56,3 +56,45 @@ Measured by a consumer's security review of its consent page.
   its redirect.
 - `OAuthDeviceFlowSpec`, `OAuthHardeningSpec` and `DevExplorerClientSeedSpec` run the device flow with clients that name
   the grant, and the seeded explorer client.
+
+## Amendment (2026-10-29) — the permission is read at every step
+
+Item 2 checked the device grant only when a code was requested. A pending device code made for a client that lacked
+the grant — before this record, or before an operator removed it — could still be looked up by the consent page,
+approved, and exchanged for the person's token. Measured by a consumer's review of its consent page.
+
+**A device request finishes only for a client still allowed the device grant.**
+
+5. `ConsentPage.Find` answers a device request whose client is missing, expired or not allowed `DeviceCode` with
+   `ClientNotAllowed` and no request, and `GET /oauth/request/{id}` answers it `400 unauthorized_client`. The request is
+   withheld rather than returned with a flag, because the reason for this record is that such a client must not put its
+   self-chosen name in front of a person: a page that forgets to read a flag would still render it, while a page that
+   ignores `ClientNotAllowed` shows nothing. `ClientNotAllowed` lets the page say why it refuses.
+6. Approving that request answers `400 unauthorized_client` and leaves it pending, before the person is asked to sign
+   in. Denying it is still accepted: a denial grants nothing.
+7. The token endpoint answers a `device_code` whose client is not allowed `DeviceCode` with `400 unauthorized_client`
+   (RFC 6749 §5.2), whatever was decided while the client had the grant, after checking that the `client_id` matches.
+8. `OAuthClient.Allows` (internal) is the one reading of the rule for these steps: the client exists, is active, and
+   `AllowsGrant(DeviceCode)`.
+
+The code flow is unchanged: its grant is checked at `/oauth/authorize` and its request is bound to the browser and the
+client's registered redirect.
+
+### Compatibility
+
+- Removing `DeviceCode` from a client's `GrantTypes`, or letting it expire, now also stops its device requests already
+  waiting or approved. A client with the grant is unaffected.
+- `ConsentLookup` gains `ClientNotAllowed`, an `init` property outside its positional members, so the two-argument
+  constructor and two-element deconstruction compile and bind unchanged. A page that ignores it treats such a request
+  as not found.
+
+### Evidence
+
+- `DeviceGrantSpec` (Koan.Web.Auth.Server.IntegrationTests): a client allowed the grant starts a device request, then
+  loses the grant; the application's consent page, built on `ConsentPage.Find`, refuses it (`ClientNotAllowed`),
+  `GET /oauth/request/{code}` and a signed-in approval answer `unauthorized_client` and leave the request pending, and
+  the poll answers `unauthorized_client`. A request approved while the client had the grant is refused at the token
+  endpoint once the grant is gone; before it was removed the page found it and the approval succeeded. Both specs
+  failed before this amendment: the page found the request, and the approved code was exchanged for a token.
+- `ConsentLookupCompatibilitySpec` (same suite): `new ConsentLookup(request, throttled)` and
+  `var (request, throttled) = lookup` still compile, and `ClientNotAllowed` defaults to false.

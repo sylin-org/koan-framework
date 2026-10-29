@@ -39,6 +39,14 @@ public sealed class OAuthClient : Entity<OAuthClient>
             ? string.Equals(grantType, OAuthGrantTypes.AuthorizationCode, StringComparison.Ordinal)
             : GrantTypes.Contains(grantType, StringComparer.Ordinal);
 
+    /// <summary>
+    /// True when the client <paramref name="clientId"/> exists, is active at <paramref name="now"/> and may use
+    /// <paramref name="grantType"/>. Read at every step of a device request, so a client that loses the grant cannot
+    /// finish a request it started while it had it (SEC-0024).
+    /// </summary>
+    internal static async Task<bool> Allows(string clientId, string grantType, DateTimeOffset now, CancellationToken ct)
+        => await Get(clientId, ct) is { } client && client.IsActive(now) && client.AllowsGrant(grantType);
+
     /// <summary>RFC 6749 / SEC-0006 D4 — exact-string redirect match (no scheme/host/path normalization).</summary>
     public bool AllowsRedirect(string redirectUri)
         => RedirectUris.Any(u => string.Equals(u, redirectUri, StringComparison.Ordinal));

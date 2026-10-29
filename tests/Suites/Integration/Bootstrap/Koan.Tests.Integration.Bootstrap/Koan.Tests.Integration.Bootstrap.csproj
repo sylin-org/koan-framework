@@ -27,5 +27,19 @@
     <!-- Deterministic bootstrap contracts: no pillar or infrastructure modules belong in this lane. -->
     <ProjectReference Include="..\..\..\..\..\src\Koan.Testing.Hosting\Koan.Testing.Hosting.csproj" />
     <ProjectReference Include="..\..\..\..\..\src\Koan.Core\Koan.Core.csproj" />
+    <!-- Built first but neither referenced nor copied beside the test assembly: a default-context AddKoan() scans the
+         output's loose Koan.*.dll files, and would load it there. CopyUntouchedApplication puts it in its own folder,
+         from which only UntouchedApplicationServiceSpec's isolated load context loads it. -->
+    <ProjectReference Include="..\Koan.Tests.Integration.Bootstrap.UntouchedApplication\Koan.Tests.Integration.Bootstrap.UntouchedApplication.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+    <UntouchedApplicationProject Include="..\Koan.Tests.Integration.Bootstrap.UntouchedApplication\Koan.Tests.Integration.Bootstrap.UntouchedApplication.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyUntouchedApplication" AfterTargets="Build">
+    <MSBuild Projects="@(UntouchedApplicationProject)" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_UntouchedApplicationAssembly" />
+    </MSBuild>
+    <Copy SourceFiles="@(_UntouchedApplicationAssembly)" DestinationFolder="$(OutDir)untouched-application" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

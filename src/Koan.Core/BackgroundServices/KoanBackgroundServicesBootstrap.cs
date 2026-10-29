@@ -24,9 +24,20 @@ internal static class KoanBackgroundServicesBootstrap
         // Register service registry
         services.TryAddSingleton<IServiceRegistry, ServiceRegistry>();
 
-        // Discover and register all background services using generated descriptors
-        var discoveredServices = KoanRegistry.GetBackgroundServices();
+        // Add the orchestrator as a health contributor
+        services.AddSingleton<IHealthContributor>(
+            provider => (IHealthContributor)provider.GetRequiredService<KoanBackgroundServiceOrchestrator>());
+    }
 
+    /// <summary>
+    /// Registers the discovered background services. Module initialization calls this once its assembly scan has handed
+    /// every reachable assembly's descriptors to the registry, so the result does not depend on which application code
+    /// ran before composition (ARCH-0139).
+    /// </summary>
+    public static void RegisterDiscovered(
+        IServiceCollection services,
+        IEnumerable<KoanRegistry.BackgroundServiceDescriptor> discoveredServices)
+    {
         foreach (var serviceInfo in discoveredServices)
         {
             if (!ShouldRegisterService(serviceInfo))
@@ -34,10 +45,6 @@ internal static class KoanBackgroundServicesBootstrap
 
             RegisterBackgroundService(services, serviceInfo);
         }
-
-        // Add the orchestrator as a health contributor
-        services.AddSingleton<IHealthContributor>(
-            provider => (IHealthContributor)provider.GetRequiredService<KoanBackgroundServiceOrchestrator>());
     }
 
     public static void Report(Koan.Core.Provenance.ProvenanceModuleWriter module)

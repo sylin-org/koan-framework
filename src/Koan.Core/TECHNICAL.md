@@ -145,3 +145,8 @@ One host composes one background-service orchestrator. AddKoan binds `Koan:Backg
 `Services:<service-name>:Enabled` controls an individual child, and `StartupTimeoutSeconds` and
 `FailFastOnStartupFailure` read the same bound options. The orchestrator is registered once as a
 singleton; the hosted-service instance and a directly resolved instance are the same object.
+
+`AddKoanCore()` registers the orchestrator; the discovered background services and service-discovery adapters are
+registered by module initialization, after its assembly scan has put every reachable assembly's descriptors in
+`KoanRegistry` (ARCH-0139). A host composed before any of the application's code ran therefore has the application's
+services; a collection given only `AddKoanCore()` and never composed has none.

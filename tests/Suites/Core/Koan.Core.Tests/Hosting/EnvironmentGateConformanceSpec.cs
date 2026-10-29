@@ -51,9 +51,6 @@ public sealed class EnvironmentGateConformanceSpec
             ["src/Koan.Web.Auth.Server/Keys/IssuerKeyGuard.cs"] =
                 (2, "ARCH-0128 exception: guards Production AND Staging (both issue tokens real clients "
                   + "hold), with its own acknowledgement rather than the shared flag."),
-            ["src/Koan.Web.Auth.Server/Keys/IssuerKeyRotationService.cs"] =
-                (1, "ARCH-0128 exception: a background schedule with no work to do in Development. No "
-                  + "surface is gated, so no gate applies."),
         };
 
     /// <summary>
