@@ -213,31 +213,23 @@ internal sealed class JobCoordinator : IJobCoordinator
         return Handle(rec.Id);
     }
 
-    /// <summary>Cancel the work item's jobs until the item is quiet (JOBS-0010). Each pass marks the running jobs first
-    /// and then cancels the queued ones, held for a chain predecessor or not — so a successor released by a completion
-    /// a mark lost to is queued when the second half of the pass reads it — and the passes repeat, a bounded number of
-    /// times, until one finds no job of the item it has not handled yet. A step that started running in between is
-    /// marked, and its handler hears it (on this node at once, elsewhere at its next renewal).</summary>
+    /// <summary>Cancel the work item's jobs (JOBS-0010): the running ones are marked first and the queued ones cancelled
+    /// after, since a chain's successor is queued before its predecessor settles. A run marked in time stops its successor
+    /// itself; a run that settled first has its successor queued for the second read.</summary>
     public async Task CancelWorkAsync(string workType, string workId, CancellationToken ct)
     {
         var item = JobDataRoute.From(EntityContext.Current).Query(workType, workId);
         var now = _clock.GetUtcNow();
-        var handled = new HashSet<string>(StringComparer.Ordinal);
-        for (var pass = 1; pass <= Constants.Submission.CancelPasses; pass++)
-        {
-            var acted = await CancelEach(item with { Status = JobStatus.Running }, handled, now, ct)
-                        + await CancelEach(item with { Status = JobStatus.Queued }, handled, now, ct);
-            if (acted == 0) return;
-        }
+        await CancelEach(item with { Status = JobStatus.Running }, now, ct);
+        await CancelEach(item with { Status = JobStatus.Queued }, now, ct);
     }
 
-    /// <summary>Hand every job of one status to <see cref="CancelOne"/>, a bounded page at a time; returns how many this
-    /// call had not handled before. A cancelled queued job leaves the queued set, so a page is read again until it holds
-    /// only handled jobs — which inside a transaction, where the writes wait for the commit, moves on to the next page;
-    /// a marked running job stays, so its pages advance the same way.</summary>
-    private async Task<int> CancelEach(JobQuery query, HashSet<string> handled, DateTimeOffset now, CancellationToken ct)
+    /// <summary>Cancel every job of one status, a bounded page at a time. A cancelled queued job leaves the queued set, so
+    /// a page is read again until it holds only handled jobs — which inside a transaction, where the writes wait for the
+    /// commit, moves on to the next page; a marked running job stays, so its pages advance the same way.</summary>
+    private async Task CancelEach(JobQuery query, DateTimeOffset now, CancellationToken ct)
     {
-        var acted = 0;
+        var handled = new HashSet<string>(StringComparer.Ordinal);
         for (var page = 1; ;)
         {
             var rows = await _ledger.Query(query with { Page = page, Size = Constants.Submission.CancelPageSize }, ct);
@@ -246,55 +238,10 @@ internal sealed class JobCoordinator : IJobCoordinator
             {
                 if (!handled.Add(rec.Id)) continue;
                 fresh++;
-                await CancelOne(rec, now, ct, handled);
+                await _orchestrator.CancelAsync(rec, now, ct);
             }
-            acted += fresh;
-            if (rows.Count < Constants.Submission.CancelPageSize) return acted;
+            if (rows.Count < Constants.Submission.CancelPageSize) return;
             if (fresh == 0) page++;
-        }
-    }
-
-    /// <summary>Cancel one job, landing on whatever state it is in when the write lands (JOBS-0010): a queued job — held
-    /// for its chain predecessor or not — is cancelled, a running one is marked and its handler on this node signalled,
-    /// and a settled one is left alone. Each write is a compare on the revision read; a miss reads the job again, a
-    /// bounded number of times, so a cancellation that meets a requeue already landed still cancels. A job found settled
-    /// after a miss may have released the chain successor its run appended: that successor is cancelled or marked at
-    /// once, rather than left for the next pass.</summary>
-    private async Task CancelOne(JobRecord? current, DateTimeOffset now, CancellationToken ct, HashSet<string> handled, int depth = 0)
-    {
-        var id = current?.Id;
-        for (var attempt = 0; attempt <= Constants.Submission.CancelRereads && current is not null; attempt++)
-        {
-            switch (current.Status)
-            {
-                case JobStatus.Queued:
-                    current.CancelRequestedAt = now;
-                    current.HeldBy = null;
-                    current.ReleaseCoalesceSlot();
-                    current.Transitions.Add(new JobTransition { At = now, From = current.Status, To = JobStatus.Cancelled, Note = "cancelled (pre-run)" });
-                    current.Status = JobStatus.Cancelled;
-                    current.LastSettledAt = now;
-                    if (await _ledger.Update(current, ct)) return;
-                    break;
-                case JobStatus.Running:
-                    if (current.CancelRequestedAt is null)
-                    {
-                        current.CancelRequestedAt = now;
-                        if (!await _ledger.Update(current, ct)) break;
-                    }
-                    _orchestrator.SignalCancel(current.Id);
-                    return;
-                default:
-                    if (attempt > 0 && depth < Constants.Submission.CancelPasses
-                        && current.SettledBy is { } run && current.Status is JobStatus.Completed or JobStatus.Failed)
-                    {
-                        var successor = JobRecord.SuccessorId(current.Id, run);
-                        if (handled.Add(successor))
-                            await CancelOne(await _ledger.Get(successor, ct), now, ct, handled, depth + 1);
-                    }
-                    return;
-            }
-            current = await _ledger.Get(id!, ct);
         }
     }
 
@@ -308,44 +255,24 @@ internal sealed class JobCoordinator : IJobCoordinator
     public Task<IReadOnlyList<JobRecord>> WhereAsync(JobQuery query, CancellationToken ct) => _ledger.Query(query, ct);
 
     /// <summary>A handle that reads its job's outcome from the ledger and hears a settlement this process makes, so a job
-    /// the ledger has since evicted or purged still reports the outcome it reached. A submission coalesced into another
-    /// job is followed to the job that serves it. An outcome nobody can read any more is unknown, never a failure
-    /// (JOBS-0010).</summary>
+    /// the ledger has since evicted or purged still reports the outcome it reached. An outcome nobody can read any more has
+    /// no status, and is never a failure (JOBS-0010).</summary>
     public JobHandle Handle(string jobId) => new(jobId, async (timeout, ct) =>
     {
         using var watch = _completions.Hear(jobId);
         var deadline = _clock.GetUtcNow() + timeout;
-        for (var hops = 0; ;)
+        while (true)
         {
-            if (watch.Heard.IsCompleted) return Settled(jobId, await watch.Heard);
-            var following = watch.Following;
-            var r = await _ledger.Get(following, ct);
-            if (r is { IsTerminal: true, ServedBy: { } serving })
-            {
-                if (++hops > Constants.Work.MaxServedHops)
-                    return new JobOutcome.Unknown($"Job {jobId} was served by a chain of more than {Constants.Work.MaxServedHops} coalesced jobs.");
-                watch.Follow(following, serving);
-                continue;
-            }
-            if (r is { IsTerminal: true }) return new JobOutcome.Settled(r.Status, r.LastError, ServedBy(jobId, following));
+            var r = await _ledger.Get(jobId, ct);
+            if (watch.Heard.IsCompleted) return await watch.Heard;
             if (r is null)
-            {
-                if (watch.Heard.IsCompleted) return Settled(jobId, await watch.Heard);
-                // A job coalesced into another moves the watch on before the ledger can evict it: follow it.
-                if (!string.Equals(watch.Following, following, StringComparison.Ordinal)) continue;
-                return new JobOutcome.Unknown("The ledger does not hold this job: it was never submitted, or it settled and " +
-                                              "was evicted or purged before its outcome was read.");
-            }
-            if (_clock.GetUtcNow() >= deadline) return new JobOutcome.TimedOut(r.Status, ServedBy(jobId, following));
+                return new JobOutcome(null, "The ledger does not hold this job: it was never submitted, or it settled and " +
+                                            "was evicted or purged before its outcome was read.");
+            if (r.IsTerminal) return new JobOutcome(r.Status, r.LastError);
+            if (_clock.GetUtcNow() >= deadline) return new JobOutcome(r.Status);
             await Task.WhenAny(watch.Heard, Task.Delay(TimeSpan.FromMilliseconds(50), _clock, ct));
             ct.ThrowIfCancellationRequested();
         }
-
-        static JobOutcome Settled(string jobId, JobCompletions.Settlement heard)
-            => new JobOutcome.Settled(heard.Status, heard.Error, ServedBy(jobId, heard.JobId));
-
-        static string? ServedBy(string jobId, string settledBy)
-            => string.Equals(jobId, settledBy, StringComparison.Ordinal) ? null : settledBy;
     });
 
     private static string? Correlation() => Activity.Current?.TraceId.ToString();

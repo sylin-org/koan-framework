@@ -26,7 +26,7 @@ public sealed class InMemoryLedgerSpec(ITestOutputHelper output)
     public async Task a_handle_hears_the_outcome_of_a_job_evicted_when_it_settled()
     {
         // JOBS-0010: with no settled history kept, the ledger forgets a job the moment it settles; a handle waiting on it
-        // still hears its real outcome, and a handle that asks afterwards is told the outcome is unknown, never Dead.
+        // still hears its real outcome, and a handle that asks afterwards is told nobody can read it, never Dead.
         GreetJob.Reset();
         await using var host = await JobsHarness.StartInMemoryAsync(o => o.InMemoryTerminalCapacity = 0);
         var handle = await new GreetJob { Name = "evicted" }.Job.Submit();
@@ -34,12 +34,12 @@ public sealed class InMemoryLedgerSpec(ITestOutputHelper output)
         await host.Drain();
 
         var outcome = await waiting.WaitAsync(TimeSpan.FromSeconds(10));
-        outcome.Should().BeOfType<JobOutcome.Settled>().Which.Status.Should().Be(JobStatus.Completed);
+        outcome.Status.Should().Be(JobStatus.Completed);
         outcome.Succeeded.Should().BeTrue();
 
         var late = await host.Coordinator.Handle(handle.JobId).Completion(TimeSpan.FromMinutes(1)).WaitAsync(TimeSpan.FromSeconds(10));
-        late.Should().BeOfType<JobOutcome.Unknown>("the ledger no longer holds the job and nobody here heard it settle")
-            .Which.Reason.Should().Contain("evicted");
+        late.Status.Should().BeNull("the ledger no longer holds the job and nobody here heard it settle");
+        late.Error.Should().Contain("evicted");
         late.Succeeded.Should().BeFalse();
     }
 
@@ -56,7 +56,7 @@ public sealed class InMemoryLedgerSpec(ITestOutputHelper output)
         var claimed = (await ledger.ClaimNext("owner", now, now.AddMinutes(1), [], default))!;
         using var settling = completions.Hear(claimed.Id);
         claimed.Status = JobStatus.Completed;
-        (await ledger.TrySettle(claimed, claimed.ClaimToken!, default)).Should().NotBeNull();
+        (await ledger.Update(claimed, default)).Should().BeTrue();
         (await ledger.Get(claimed.Id, default)).Should().BeNull("no settled history is kept");
         settling.Heard.IsCompleted.Should().BeTrue("the ledger told the settlement before it evicted the row");
         (await settling.Heard).Status.Should().Be(JobStatus.Completed);

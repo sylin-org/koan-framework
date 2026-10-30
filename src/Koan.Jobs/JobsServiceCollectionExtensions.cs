@@ -72,8 +72,7 @@ public static class JobsServiceCollectionExtensions
 
         return new RoutingJobLedger(
             new InMemoryJobLedger(options, completions),
-            new DataJobLedger(options, registry, completions: completions,
-                logger: services.GetService<Microsoft.Extensions.Logging.ILogger<DataJobLedger>>()),
+            new DataJobLedger(options, registry, services.GetServices<Koan.Data.Abstractions.Failures.IDataFailureClassifier>(), completions),
             registry);
     }
 

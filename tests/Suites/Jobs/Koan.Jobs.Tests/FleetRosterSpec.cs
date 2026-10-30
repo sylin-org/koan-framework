@@ -103,20 +103,18 @@ public sealed class FleetRosterSpec
         var claimedByB = await host.Ledger.ClaimNext("node-b", Now(host), Now(host) + TimeSpan.FromMinutes(10), Array.Empty<string>(), default);
         claimedByB.Should().NotBeNull();
 
-        // Zombie A wakes and tries to settle with its stale record — the fence bounces it.
-        var zombieRecord = claimedByA!;
-        zombieRecord.Status = JobStatus.Completed;
-        zombieRecord.Owner = null;
-        zombieRecord.LastSettledAt = Now(host);
-        (await host.Ledger.TrySettle(zombieRecord, zombieRecord.ClaimToken!, default)).Should().BeNull(
+        // Zombie A wakes and tries to settle with its stale record — the revision compare bounces it.
+        void Settle(JobRecord row)
+        {
+            row.Status = JobStatus.Completed;
+            row.Owner = null;
+            row.LastSettledAt = Now(host);
+        }
+        (await new ClaimedRow(host.Ledger, claimedByA!).Write(Settle, default)).Should().BeNull(
             "the row was reclaimed; a revived zombie cannot clobber the new claimant");
 
         // The legitimate owner settles fine.
-        var legitimate = claimedByB!;
-        legitimate.Status = JobStatus.Completed;
-        legitimate.Owner = null;
-        legitimate.LastSettledAt = Now(host);
-        (await host.Ledger.TrySettle(legitimate, legitimate.ClaimToken!, default)).Should().NotBeNull();
+        (await new ClaimedRow(host.Ledger, claimedByB!).Write(Settle, default)).Should().NotBeNull();
     }
 
     [Fact]

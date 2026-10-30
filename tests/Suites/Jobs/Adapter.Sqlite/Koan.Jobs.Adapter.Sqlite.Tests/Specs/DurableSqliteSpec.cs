@@ -39,36 +39,6 @@ public sealed class DurableSqliteSpec
     }
 
     [Fact]
-    public async Task duplicates_from_concurrent_transactions_run_once()
-    {
-        // JOBS-0010: two transactions that submit one key at once cannot see each other before they commit, so both commit
-        // a job; the first claim absorbs the other, and the key runs once.
-        DedupeJob.Reset();
-        await using var host = await JobsHarness.StartSqliteAsync();
-        var id = new DedupeJob { Key = "concurrent" }.Id;
-        var bothSubmitted = new Barrier(2);
-        await Task.WhenAll(Enumerable.Range(0, 2).Select(i => Task.Run(async () =>
-        {
-            using (EntityContext.Transaction($"concurrent-{i}"))
-            {
-                await new DedupeJob { Id = id, Key = "concurrent" }.Job.Submit();
-                bothSubmitted.SignalAndWait(TimeSpan.FromSeconds(10));
-                await EntityContext.Commit();
-            }
-        })));
-
-        var rows = await JobRecord.Query(r => r.WorkType == typeof(DedupeJob).FullName!);
-        rows.Should().HaveCount(2);
-        await host.Drain();
-
-        DedupeJob.Executions.Should().Be(1);
-        var settled = await JobRecord.Query(r => r.WorkType == typeof(DedupeJob).FullName!);
-        settled.Should().ContainSingle(r => r.Status == JobStatus.Completed);
-        settled.Should().ContainSingle(r => r.Status == JobStatus.Cancelled)
-            .Which.LastError.Should().Contain("Coalesced into job");
-    }
-
-    [Fact]
     public async Task cancelling_inside_a_transaction_pages_through_every_queued_job()
     {
         // JOBS-0010: cancellation reads a work item's queued jobs a page at a time. Inside a transaction the writes wait

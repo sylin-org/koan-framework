@@ -11,11 +11,9 @@ namespace Koan.Jobs;
 /// restart.
 /// <para>The volatile tier keeps its rows in structures shaped by the reads it serves (JOBS-0010): queued rows per lane
 /// in claim order and, across lanes, the open ones in visible order; running rows with the work items and pool members
-/// they hold; the coalescing slots and groups of unclaimed submissions; the coalesce keys whose job runs; each work
-/// item's jobs; the active jobs of each work type, counted in one step per write; and settled rows in a history of at
-/// most <see cref="JobsOptions.InMemoryTerminalCapacity"/>, the oldest evicted first. A claim walks each lane's due rows
-/// from its head and stops at the first claimable one; a job whose coalesce key runs, or waits for a deferral, is not
-/// claimable, and a claimed job serves the other queued jobs of its key (JOBS-0010).</para>
+/// they hold; the coalescing groups of queued jobs; each work item's jobs; the active jobs of each work type, counted in
+/// one step per write; and settled rows in a history of at most <see cref="JobsOptions.InMemoryTerminalCapacity"/>, the
+/// oldest evicted first. A claim walks each lane's due rows from its head and stops at the first claimable one.</para>
 /// <para>A stored row is never changed in place: every write stores a new copy. So a read by job id, a status read by work
 /// item, a count and a query read without the claim lock and never wait for a claim; a query that names no work item
 /// scans the rows outside the lock, keeping only the rows up to its page.</para>
@@ -32,10 +30,7 @@ internal sealed class InMemoryJobLedger : IJobLedger
     private readonly HashSet<string> _running = new(StringComparer.Ordinal);
     private readonly Dictionary<(string Type, string Id, JobDataRoute Route), int> _busy = new();
     private readonly Dictionary<string, int> _memberLoad = new(StringComparer.Ordinal);
-    private readonly Dictionary<Guid, string> _slots = new();
     private readonly Dictionary<Guid, HashSet<string>> _groups = new();
-    private readonly Dictionary<Guid, string> _runKeys = new();
-    private readonly SortedSet<string> _held = new(StringComparer.Ordinal);
     private readonly LinkedList<string> _settled = new();
     private readonly Dictionary<string, LinkedListNode<string>> _settledNodes = new(StringComparer.Ordinal);
     private readonly Dictionary<string, JobGateRecord> _gates = new(StringComparer.Ordinal);
@@ -44,7 +39,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
     private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
     private readonly Func<string, double> _weight;
     private readonly int _settledCapacity;
-    private readonly TimeSpan _archiveAfter;
     private readonly JobCompletions? _completions;
 
     public InMemoryJobLedger(IOptions<JobsOptions>? options = null, JobCompletions? completions = null)
@@ -52,7 +46,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
         var weights = options?.Value.LaneWeights;
         _weight = weights is null ? _ => 1.0 : lane => weights.GetValueOrDefault(lane, 1.0);
         _settledCapacity = Math.Max(0, options?.Value.InMemoryTerminalCapacity ?? new JobsOptions().InMemoryTerminalCapacity);
-        _archiveAfter = options?.Value.ArchiveAfter ?? new JobsOptions().ArchiveAfter;
         _completions = completions;
     }
 
@@ -88,35 +81,12 @@ internal sealed class InMemoryJobLedger : IJobLedger
             var stored = Own(record);
             if (record.CoalesceKey is { } key)
             {
-                var group = JobRecord.SlotFor(key);
-                if (QueuedOf(group).FirstOrDefault() is { } queued) return Task.FromResult<JobRecord?>(queued.Clone());
-                stored.CoalesceSlot = group;
+                if (QueuedOf(JobRecord.SlotFor(key)).FirstOrDefault() is { } queued) return Task.FromResult<JobRecord?>(queued.Clone());
             }
             Put(stored);
             record.Revision = stored.Revision;
             return Task.FromResult<JobRecord?>(null);
         }
-    }
-
-    /// <summary>One end-of-claim owner write, as on the durable tier, taken whole under the lock.</summary>
-    public Task<JobRecord?> TryRequeue(JobRecord record, string claimToken, CancellationToken ct)
-    {
-        lock (_gate) return Task.FromResult(EndClaim(record, claimToken));
-    }
-
-    /// <summary>The write that ends a claim (JOBS-0010): only while the row carries <paramref name="claimToken"/>, this
-    /// execution's own fields merged onto the row as stored (<see cref="JobRecord.EndOfClaim"/>). Under the lock.</summary>
-    private JobRecord? EndClaim(JobRecord decided, string claimToken)
-    {
-        if (!_records.TryGetValue(decided.Id, out var stored)
-            || !string.Equals(stored.ClaimToken, claimToken, StringComparison.Ordinal))
-            return null;
-        var row = JobRecord.EndOfClaim(stored, decided, claimToken, _archiveAfter);
-        var revision = Guid.NewGuid();
-        if (row.Transitions.Count > 0) row.Transitions[^1].Revision = revision;
-        Put(row, revision);
-        decided.Revision = revision;
-        return row.Clone();
     }
 
     public Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
@@ -138,7 +108,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
                     if (r.VisibleAt > now) break;
                     if (r.CancelRequestedAt is not null || !OpenTo(r, owner, now)) continue;
                     if (r.Exclusive && _busy.ContainsKey(JobDataRoute.Identity(r))) continue;
-                    if (r.CoalesceGroup is { } key && KeyHeld(key, now)) continue;
                     if (r.PoolKey is not null)
                     {
                         if (pools is null || !pools.TryGetValue(r.PoolKey, out var pool) || FreeMember(pool) is null) continue;
@@ -158,9 +127,7 @@ internal sealed class InMemoryJobLedger : IJobLedger
             if (claimed.PoolKey is not null) claimed.GateKey = FreeMember(pools![claimed.PoolKey]);
 
             claimed.Attempt++;
-            claimed.ClaimToken = Guid.NewGuid().ToString("N");   // this claim's token: every write of its owner is fenced on it
-            claimed.ReleaseCoalesceSlot();   // a claimed job no longer absorbs submissions (JOBS-0006 trailing edge)
-            claimed.TakeRunSlot();           // and no other job of its key runs beside it (JOBS-0010)
+            claimed.ReleaseCoalesceSlot();   // a claimed job no longer takes submissions (JOBS-0006 trailing edge)
             Transition(claimed, JobStatus.Running, now, $"claimed by {owner}");
             claimed.Owner = owner;
             claimed.LeaseUntil = leaseUntil;
@@ -169,11 +136,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
             claimed.ReservedUntil = null;
             Put(claimed);
 
-            // JOBS-0006 / JOBS-0010: this run serves every other queued job of its key; none is deferred past now, or the
-            // key would not have been claimable.
-            if (claimed.CoalesceGroup is { } group)
-                foreach (var other in QueuedOf(group).Where(other => other.Id != claimed.Id).ToList())
-                    Absorb(other, claimed.Id, now);
             _virtual[chosen] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(chosen), _weight(chosen));
             return Task.FromResult<JobRecord?>(claimed.Clone());
         }
@@ -191,80 +153,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
-    public Task Progress(string jobId, string claimToken, double fraction, string? message, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            if (_records.TryGetValue(jobId, out var r) && string.Equals(r.ClaimToken, claimToken, StringComparison.Ordinal))
-            {
-                var next = r.Clone();
-                next.ProgressFraction = fraction;
-                next.ProgressMessage = message;
-                Put(next);
-            }
-        }
-        return Task.CompletedTask;
-    }
-
-    public Task<JobRecord?> RenewLease(string jobId, string claimToken, DateTimeOffset leaseUntil, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            if (!_records.TryGetValue(jobId, out var r) || !string.Equals(r.ClaimToken, claimToken, StringComparison.Ordinal))
-                return Task.FromResult<JobRecord?>(null);
-            var next = r.Clone();
-            next.LeaseUntil = leaseUntil;
-            Put(next);
-            return Task.FromResult<JobRecord?>(next.Clone());
-        }
-    }
-
-    public Task<JobRecord?> TrySettle(JobRecord record, string claimToken, CancellationToken ct)
-    {
-        lock (_gate) return Task.FromResult(EndClaim(record, claimToken));
-    }
-
-    // --- chain successors (JOBS-0010) ---
-
-    public Task<bool> ReleaseHeld(string successorId, string holderToken, bool cancel, DateTimeOffset now, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            if (!_records.TryGetValue(successorId, out var held) || held.Status != JobStatus.Queued
-                || !string.Equals(held.HeldBy, holderToken, StringComparison.Ordinal))
-                return Task.FromResult(false);
-            var row = held.Clone();
-            row.HeldBy = null;
-            if (cancel)
-            {
-                Transition(row, JobStatus.Cancelled, now, "cancelled with its predecessor");
-                row.LastSettledAt = now;
-                row.ExpireAt = _archiveAfter > TimeSpan.Zero ? now + _archiveAfter : null;
-            }
-            Put(row);
-            return Task.FromResult(true);
-        }
-    }
-
-    public Task<bool> DeleteHeld(string successorId, string holderToken, CancellationToken ct)
-    {
-        lock (_gate)
-        {
-            if (!_records.TryGetValue(successorId, out var held) || !string.Equals(held.HeldBy, holderToken, StringComparison.Ordinal))
-                return Task.FromResult(false);
-            Remove(successorId);
-            return Task.FromResult(true);
-        }
-    }
-
-    public Task<IReadOnlyList<JobRecord>> Held(int page, int limit, CancellationToken ct)
-    {
-        if (limit <= 0) return Task.FromResult<IReadOnlyList<JobRecord>>([]);
-        lock (_gate)
-            return Task.FromResult<IReadOnlyList<JobRecord>>(_held.Skip((Math.Max(1, page) - 1) * limit).Take(limit)
-                .Select(id => _records[id].Clone()).ToList());
-    }
-
     // --- reservation dispatch (PMC-056) ---
 
     public Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
@@ -273,8 +161,7 @@ internal sealed class InMemoryJobLedger : IJobLedger
         {
             if (!_records.TryGetValue(jobId, out var r)
                 || r.Status != JobStatus.Queued
-                || r.ReservedFor is not null
-                || r.HeldBy is not null)
+                || r.ReservedFor is not null)
             {
                 return Task.FromResult(false);
             }
@@ -467,9 +354,9 @@ internal sealed class InMemoryJobLedger : IJobLedger
     /// <summary>Store <paramref name="row"/> under a fresh revision, replacing any row with its id, and file it where its
     /// state belongs. The active count of its work type changes in one step. A row that settles is stored, then told to
     /// the waiting handles, then — beyond the settled history — evicted, so a handle reads it or hears it.</summary>
-    private void Put(JobRecord row, Guid? revision = null)
+    private void Put(JobRecord row)
     {
-        row.Revision = revision ?? Guid.NewGuid();
+        row.Revision = Guid.NewGuid();
         var known = _records.TryGetValue(row.Id, out var previous);
         if (known) Unfile(previous!);
         _records[row.Id] = row;
@@ -501,15 +388,11 @@ internal sealed class InMemoryJobLedger : IJobLedger
     {
         switch (row.Status)
         {
-            case JobStatus.Queued when row.HeldBy is not null:
-                _held.Add(row.Id);   // held for its predecessor: in no queue a claim, a reservation or coalescing reads
-                break;
             case JobStatus.Queued:
                 if (!_queued.TryGetValue(row.Lane, out var lane)) _queued[row.Lane] = lane = new SortedSet<JobRecord>(ClaimOrder.Instance);
                 lane.Add(row);
                 if (IsOpen(row)) _open.Add(row);
                 if (row.ReservedFor is not null) _reserved.Add(row.Id);
-                if (row.HoldsCoalesceSlot) _slots[row.CoalesceSlot] = row.Id;
                 if (row.CoalesceGroup is { } joined)
                 {
                     if (!_groups.TryGetValue(joined, out var members)) _groups[joined] = members = new HashSet<string>(StringComparer.Ordinal);
@@ -521,7 +404,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
                 var identity = JobDataRoute.Identity(row);
                 _busy[identity] = _busy.GetValueOrDefault(identity) + 1;
                 if (row.GateKey is { } member) _memberLoad[member] = _memberLoad.GetValueOrDefault(member) + 1;
-                if (row.HoldsRunSlot) _runKeys[row.RunSlot] = row.Id;
                 break;
             case JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled or JobStatus.Dead:
                 _settledNodes[row.Id] = _settled.AddLast(row.Id);
@@ -533,9 +415,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
     {
         switch (row.Status)
         {
-            case JobStatus.Queued when row.HeldBy is not null:
-                _held.Remove(row.Id);
-                break;
             case JobStatus.Queued:
                 if (_queued.TryGetValue(row.Lane, out var lane))
                 {
@@ -544,8 +423,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
                 }
                 _open.Remove(row);
                 _reserved.Remove(row.Id);
-                if (_slots.TryGetValue(row.CoalesceSlot, out var holder) && string.Equals(holder, row.Id, StringComparison.Ordinal))
-                    _slots.Remove(row.CoalesceSlot);
                 if (row.CoalesceGroup is { } left && _groups.TryGetValue(left, out var leftMembers))
                 {
                     leftMembers.Remove(row.Id);
@@ -556,8 +433,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
                 _running.Remove(row.Id);
                 Decrement(_busy, JobDataRoute.Identity(row));
                 if (row.GateKey is { } member) Decrement(_memberLoad, member);
-                if (_runKeys.TryGetValue(row.RunSlot, out var runner) && string.Equals(runner, row.Id, StringComparison.Ordinal))
-                    _runKeys.Remove(row.RunSlot);
                 break;
             case JobStatus.Completed or JobStatus.Failed or JobStatus.Cancelled or JobStatus.Dead:
                 if (_settledNodes.Remove(row.Id, out var node)) _settled.Remove(node);
@@ -568,11 +443,6 @@ internal sealed class InMemoryJobLedger : IJobLedger
     private void CountActive(string workType, long delta) => _active.AddOrUpdate(workType, delta, (_, count) => count + delta);
 
     private static bool IsActive(JobRecord row) => row.Status is JobStatus.Queued or JobStatus.Running;
-
-    /// <summary>True when a job of the key runs, holding its run slot, or a queued job of the key is deferred past
-    /// <paramref name="now"/>: the key's work waits for it (JOBS-0010).</summary>
-    private bool KeyHeld(Guid key, DateTimeOffset now)
-        => _runKeys.ContainsKey(key) || QueuedOf(key).Any(row => row.VisibleAt > now);
 
     /// <summary>A queued row a reservation pass may hand out: unreserved and not asked to cancel.</summary>
     private static bool IsOpen(JobRecord row) => row.ReservedFor is null && row.CancelRequestedAt is null;
@@ -605,28 +475,11 @@ internal sealed class InMemoryJobLedger : IJobLedger
         }
     }
 
-    /// <summary>The queued, uncancelled jobs of a coalescing group, the slot holder first.</summary>
+    /// <summary>The queued, uncancelled jobs of a coalescing group.</summary>
     private IEnumerable<JobRecord> QueuedOf(Guid group)
-    {
-        if (!_groups.TryGetValue(group, out var members)) return [];
-        return members.Select(id => _records[id])
-            .Where(row => row.Status == JobStatus.Queued && row.CancelRequestedAt is null)
-            .OrderByDescending(row => row.HoldsCoalesceSlot);
-    }
-
-    /// <summary>Settle a queued job as coalesced into <paramref name="intoId"/>, which serves its submission; its waiting
-    /// handles move on to that job.</summary>
-    private void Absorb(JobRecord other, string intoId, DateTimeOffset now)
-    {
-        var absorbed = other.Clone();
-        absorbed.ReleaseCoalesceSlot();
-        absorbed.ServedBy = intoId;
-        absorbed.LastError = $"Coalesced into job {intoId}, which serves this submission.";
-        absorbed.LastSettledAt = now;
-        absorbed.ExpireAt = _archiveAfter > TimeSpan.Zero ? now + _archiveAfter : null;
-        Transition(absorbed, JobStatus.Cancelled, now, $"coalesced into {intoId}");
-        Put(absorbed);
-    }
+        => _groups.TryGetValue(group, out var members)
+            ? members.Select(id => _records[id]).Where(row => row.Status == JobStatus.Queued && row.CancelRequestedAt is null)
+            : [];
 
     /// <summary>The first pool member with a free slot, or null.</summary>
     private string? FreeMember(PoolDispatchContext pool)

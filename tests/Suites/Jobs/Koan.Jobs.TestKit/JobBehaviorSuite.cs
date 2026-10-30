@@ -284,10 +284,10 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
-    public async Task a_deferred_idempotent_job_absorbs_a_duplicate_and_runs_after_its_deferral()
+    public async Task a_deferred_idempotent_job_takes_a_duplicate_and_runs_after_its_deferral()
     {
-        // JOBS-0006 / JOBS-0010: a job back in the queue holds its key again, so a duplicate submitted while it waits
-        // coalesces onto it instead of queuing beside it and running at once.
+        // JOBS-0006 / JOBS-0010: a duplicate submitted while a job of its key waits in the queue coalesces onto it instead
+        // of queuing beside it and running at once.
         DeferringJob.Reset();
         await using var host = await CreateHostAsync();
         var item = new DeferringJob { Key = "deferred" };
@@ -302,28 +302,6 @@ public abstract class JobBehaviorSuite
         host.Advance(DeferringJob.Deferral + TimeSpan.FromSeconds(1));
         await host.Drain();
         DeferringJob.Executions.Should().Be(2);
-        (await QueuedOf<DeferringJob>(host)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task a_job_deferring_absorbs_the_duplicate_submitted_while_it_ran()
-    {
-        // JOBS-0006 / JOBS-0010: a duplicate submitted while the job ran queued a trailing execution; when the job defers
-        // instead of completing, the key's work waits for the deferral, and one run after it serves both.
-        DeferringJob.Reset();
-        DeferringJob.SubmitDuplicateWhileRunning = true;
-        await using var host = await CreateHostAsync();
-        await new DeferringJob { Key = "trailing" }.Job.Submit();
-        await host.Drain();
-        await host.Drain();
-
-        DeferringJob.Executions.Should().Be(1, "the duplicate did not run ahead of the deferral");
-        (await QueuedOf<DeferringJob>(host)).Should().HaveCount(2)
-            .And.Contain(row => row.VisibleAt > host.Clock.GetUtcNow(), "the deferred job waits beside the duplicate");
-
-        host.Advance(DeferringJob.Deferral + TimeSpan.FromSeconds(1));
-        await host.Drain();
-        DeferringJob.Executions.Should().Be(2, "one run after the deferral serves both");
         (await QueuedOf<DeferringJob>(host)).Should().BeEmpty();
     }
 
@@ -1003,7 +981,6 @@ public abstract class JobBehaviorSuite
 
         var stolen = await host.JobFor<WaitJob>(id);
         stolen!.Owner = "node-b";
-        stolen.ClaimToken = "claim-of-node-b";
         stolen.LeaseUntil = host.Clock.GetUtcNow() + TimeSpan.FromMinutes(5);
         (await host.Ledger.Update(stolen, default)).Should().BeTrue();
 
@@ -1162,53 +1139,9 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
-    public async Task a_conflicting_change_runs_again_without_spending_an_attempt()
-    {
-        // JOBS-0010: the handler and another writer changed the same member. Nothing is written; the job, which has one
-        // attempt, runs again on the stored item instead of failing, and its chain does not advance until it succeeds.
-        ConflictJob.Reset();
-        await using var host = await CreateHostAsync();
-        var item = new ConflictJob();
-        await item.Job.Submit(ConflictJob.Action);
-        await host.Drain();
-
-        (await ConflictJob.Get(item.Id))!.Result.Should().Be(ConflictJob.Theirs(1), "a conflict writes nothing");
-        var retried = await host.JobFor<ConflictJob>(item.Id);
-        retried!.Status.Should().Be(JobStatus.Queued, "a conflict is stale work, not a failure");
-        retried.Conflicts.Should().Be(1);
-        retried.LastError.Should().Contain("changed while the job ran").And.Contain("runs again on the stored item");
-        ConflictJob.NextRuns.Should().Be(0, "a conflict never advances the chain");
-
-        host.Advance(TimeSpan.FromMinutes(1));
-        await host.Drain();
-        ConflictJob.Executions.Should().Be(2);
-        (await ConflictJob.Get(item.Id))!.Result.Should().Be(ConflictJob.Mine, "the second run wrote on the stored item");
-        ConflictJob.NextRuns.Should().Be(1, "the chain advances once the stage succeeds");
-    }
-
-    [Fact]
-    public async Task conflicts_past_their_bound_dead_letter_as_conflict()
-    {
-        ConflictJob.Reset();
-        ConflictJob.Conflicting = int.MaxValue;
-        await using var host = await CreateHostAsync(o => o.MaxWriteConflicts = 2);
-        var item = new ConflictJob();
-        await item.Job.Submit(ConflictJob.Action);
-        for (var run = 0; run < 3; run++) { await host.Drain(); host.Advance(TimeSpan.FromMinutes(5)); }
-
-        var dead = (await host.Ledger.Query(new JobQuery(WorkType: typeof(ConflictJob).FullName!, WorkId: item.Id), default)).Single();
-        dead.Status.Should().Be(JobStatus.Dead);
-        dead.DeadReason.Should().Be(nameof(DeadReason.Conflict));
-        dead.Conflicts.Should().Be(3);
-        dead.LastError.Should().Contain("MaxWriteConflicts");
-        ConflictJob.NextRuns.Should().Be(0);
-    }
-
-    [Fact]
     public async Task a_nested_record_the_handler_fills_is_written_back()
     {
-        // JOBS-0010: a nested object is guarded member by member where the store pushes nested paths and left out of the
-        // guard where it does not (relational stores); either way the handler's record is written.
+        // JOBS-0010: a nested object the handler fills is one changed member, written back on every store.
         await using var host = await CreateHostAsync();
         var item = new ReceiptJob { Kind = ReceiptKind.Remote, Quantity = 3 };
         await item.Job.Submit();
@@ -1239,6 +1172,8 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_concurrent_change_behind_a_non_public_setter_is_a_conflict()
     {
+        // JOBS-0010: the handler and another writer changed one member. Nothing is written, and the attempt fails: the job
+        // runs again on the stored item.
         StateJob.Reset();
         StateJob.ConflictOnFirstRun = true;
         await using var host = await CreateHostAsync();
@@ -1247,369 +1182,13 @@ public abstract class JobBehaviorSuite
         await host.Drain();
 
         (await StateJob.Get(item.Id))!.State.Should().Be("theirs", "the conflicting run wrote nothing");
-        (await host.JobFor<StateJob>(item.Id))!.LastError.Should().Contain(nameof(StateJob.State).ToLowerInvariant());
+        var retried = await host.JobFor<StateJob>(item.Id);
+        retried!.Status.Should().Be(JobStatus.Queued);
+        retried.LastError.Should().Contain("changed while the job ran").And.Contain(nameof(StateJob.State).ToLowerInvariant());
 
         host.Advance(TimeSpan.FromMinutes(1));
         await host.Drain();
         (await StateJob.Get(item.Id))!.State.Should().Be("done");
-    }
-
-    [Fact]
-    public async Task a_tag_added_between_the_settles_read_and_its_write_survives_a_rename()
-    {
-        // JOBS-0010: the settle's guard is the row as it read it, every member Koan persists that the store can compare
-        // exactly — a one-tag list by its size and its tag — so another writer's tag added after that read misses the
-        // replace and is merged with the handler's rename instead of being overwritten. Where the store's string equality
-        // folds case, a list of strings is not compared exactly, and the settle names it instead.
-        await using var host = await CreateHostAsync();
-        var item = new TaggedJob { Name = "first", Tags = ["a"] };
-        await TaggedJob.Upsert(item);
-
-        var binding = host.Registry.Get(typeof(TaggedJob).FullName!)!;
-        var reads = 0;
-        var racing = binding.WithLoad(async (id, ct) =>
-        {
-            var row = await binding.Load(id, ct);
-            if (Interlocked.Increment(ref reads) == 1)
-            {
-                var other = await TaggedJob.Get(id, ct);
-                other!.Tags.Add("b");
-                await TaggedJob.Upsert(other, ct);
-            }
-            return row;
-        });
-
-        var handled = (await TaggedJob.Get(item.Id))!;
-        var loaded = WorkItemImage.Capture(handled);
-        handled.Name = "renamed";
-        var log = new CapturingLogger();
-        await new WorkItemWriter(log).Persist(racing, item.Id, handled, loaded, default);
-
-        var stored = (await TaggedJob.Get(item.Id))!;
-        stored.Name.Should().Be("renamed");
-        if (binding.GuardSupport().OrdinalStrings)
-            stored.Tags.Should().Equal("a", "b");
-        else
-            log.Messages.Should().Contain(message => message.Contains("Tags", StringComparison.Ordinal)
-                                                     && message.Contains("cannot compare", StringComparison.Ordinal));
-    }
-
-
-    [Theory]
-    [InlineData("reordered")]
-    [InlineData("duplicates")]
-    public async Task a_list_changed_between_the_settles_read_and_its_write_is_caught_or_named(string change)
-    {
-        // JOBS-0010: the guard compares a member exactly or names it as left out, nothing in between. Koan's filter language
-        // compares neither the order of a list nor its duplicates, so another writer's reorder, or a change to which
-        // element repeats, is either kept or named in the log — never silently overwritten.
-        await using var host = await CreateHostAsync();
-        var (before, after) = change == "reordered"
-            ? (new[] { "a", "b" }, new[] { "b", "a" })
-            : (new[] { "a", "a", "b" }, new[] { "a", "b", "b" });
-        var item = new TaggedJob { Name = "first", Tags = [.. before] };
-        await TaggedJob.Upsert(item);
-
-        var binding = host.Registry.Get(typeof(TaggedJob).FullName!)!;
-        var reads = 0;
-        var racing = binding.WithLoad(async (id, ct) =>
-        {
-            var row = await binding.Load(id, ct);
-            if (Interlocked.Increment(ref reads) == 1)
-            {
-                var other = await TaggedJob.Get(id, ct);
-                other!.Tags = [.. after];
-                await TaggedJob.Upsert(other, ct);
-            }
-            return row;
-        });
-
-        var handled = (await TaggedJob.Get(item.Id))!;
-        var loaded = WorkItemImage.Capture(handled);
-        handled.Name = "renamed";
-        var log = new CapturingLogger();
-        await new WorkItemWriter(log).Persist(racing, item.Id, handled, loaded, default);
-
-        var stored = (await TaggedJob.Get(item.Id))!;
-        stored.Name.Should().Be("renamed");
-        var caught = stored.Tags.SequenceEqual(after);
-        var named = log.Messages.Any(message => message.Contains("Tags", StringComparison.Ordinal)
-                                                && message.Contains("cannot compare", StringComparison.Ordinal));
-        (caught || named).Should().BeTrue(
-            $"another writer's {change} list is kept or named as unchecked; stored [{string.Join(",", stored.Tags)}], log: {string.Join(" | ", log.Messages)}");
-    }
-
-    [Fact]
-    public async Task a_member_the_store_cannot_compare_does_not_cost_the_guard_of_the_others()
-    {
-        // JOBS-0010: a time, binary data and a dictionary sit beside a number. Whatever of them the store cannot compare is
-        // left out of the guard and named; the number is still compared, so another writer's change to it survives.
-        await using var host = await CreateHostAsync();
-        var item = new MixedJob { Name = "first", Number = 1 };
-        await MixedJob.Upsert(item);
-
-        var binding = host.Registry.Get(typeof(MixedJob).FullName!)!;
-        var reads = 0;
-        var racing = binding.WithLoad(async (id, ct) =>
-        {
-            var row = await binding.Load(id, ct);
-            if (Interlocked.Increment(ref reads) == 1)
-            {
-                var other = await MixedJob.Get(id, ct);
-                other!.Number = 2;
-                await MixedJob.Upsert(other, ct);
-            }
-            return row;
-        });
-
-        var handled = (await MixedJob.Get(item.Id))!;
-        var loaded = WorkItemImage.Capture(handled);
-        handled.Name = "renamed";
-        await new WorkItemWriter(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance)
-            .Persist(racing, item.Id, handled, loaded, default);
-
-        var stored = (await MixedJob.Get(item.Id))!;
-        stored.Name.Should().Be("renamed");
-        stored.Number.Should().Be(2, "the number is guarded even though other members are not");
-    }
-
-    [Fact]
-    public async Task a_requeue_that_loses_its_fence_leaves_the_queued_duplicate_to_run()
-    {
-        // JOBS-0010: the reaper reads a job as stuck, its owner settles it, and only then does the reaper's reclaim land.
-        // The reclaim compares on the revision it read and changes nothing, so a duplicate queued while the job ran runs.
-        DedupeJob.Reset();
-        await using var host = await CreateHostAsync();
-        var item = new DedupeJob { Key = "fenced" };
-        var first = await item.Job.Submit();
-        var now = host.Clock.GetUtcNow();
-        var claimed = await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default);
-        claimed!.Id.Should().Be(first.JobId);
-        var duplicate = await item.Job.Submit();
-        duplicate.JobId.Should().NotBe(first.JobId, "a submission while the job runs queues a trailing execution");
-
-        var stale = (await host.Ledger.Get(first.JobId, default))!;   // the reaper's read: running under owner-a
-        var settled = stale.Clone();
-        settled.Status = JobStatus.Completed;
-        settled.LastSettledAt = now;
-        (await host.Ledger.TrySettle(settled, claimed.ClaimToken!, default)).Should().NotBeNull();
-
-        stale.Status = JobStatus.Queued;
-        stale.Owner = null;
-        stale.LeaseUntil = null;
-        stale.ClaimToken = null;
-        stale.VisibleAt = now;
-        (await host.Ledger.Update(stale, default)).Should().BeFalse("the job settled after the reaper read it");
-
-        (await host.Ledger.Get(first.JobId, default))!.Status.Should().Be(JobStatus.Completed);
-        (await host.Ledger.Get(duplicate.JobId, default))!.Status.Should().Be(JobStatus.Queued,
-            "a requeue that fails its fence changes nothing");
-        await host.Drain();
-        DedupeJob.Executions.Should().Be(1, "the duplicate ran");
-        (await host.Ledger.Get(duplicate.JobId, default))!.Status.Should().Be(JobStatus.Completed);
-    }
-
-    [Fact]
-    public async Task a_handle_on_a_job_absorbed_at_claim_reports_the_serving_jobs_outcome_and_names_it()
-    {
-        // JOBS-0010: a duplicate submitted while its job runs queues behind it; the job then defers, and the key's work
-        // waits for the deferral. After it, the duplicate — first in claim order — is claimed and serves the deferred
-        // job. The deferred job's handle, waiting with no settled history kept, follows the job that served it and reports
-        // that job's outcome under its name — never a cancellation, never unknown.
-        ServedJob.Reset();
-        await using var host = await CreateHostAsync(o => o.InMemoryTerminalCapacity = 0);
-        var item = new ServedJob { Key = "served" };
-        var first = await item.Job.Submit();
-        var draining = host.Drain();
-        await ServedJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        var duplicate = await item.Job.Submit();
-        duplicate.JobId.Should().NotBe(first.JobId, "a submission while the job runs queues a trailing execution");
-        var waitingFirst = first.Completion(TimeSpan.FromHours(1));
-        var waitingDuplicate = duplicate.Completion(TimeSpan.FromHours(1));
-        ServedJob.Release.TrySetResult();
-        await draining.WaitAsync(TimeSpan.FromSeconds(30));
-        await host.Drain();
-        waitingFirst.IsCompleted.Should().BeFalse("the job has deferred, not settled");
-        waitingDuplicate.IsCompleted.Should().BeFalse("the duplicate waits for the key's deferral");
-
-        host.Advance(ServedJob.Deferral + TimeSpan.FromSeconds(1));
-        await host.Drain();
-        var served = (await waitingFirst.WaitAsync(TimeSpan.FromSeconds(30))).Should().BeOfType<JobOutcome.Settled>().Subject;
-        served.Status.Should().Be(JobStatus.Completed);
-        served.ServedBy.Should().Be(duplicate.JobId);
-        served.Succeeded.Should().BeTrue();
-        var ran = (await waitingDuplicate.WaitAsync(TimeSpan.FromSeconds(30))).Should().BeOfType<JobOutcome.Settled>().Subject;
-        ran.Status.Should().Be(JobStatus.Completed);
-        ran.ServedBy.Should().BeNull();
-        ServedJob.Executions.Should().Be(2);
-    }
-
-    [Fact]
-    public async Task a_requeue_never_overwrites_a_newer_claim_of_the_same_job()
-    {
-        // JOBS-0010: owner-a's requeue lands, and right then owner-b claims the job, defers it five minutes and requeues it.
-        // Nothing owner-a writes from its older copy may land over owner-b's row: the deferral, its count and its reason
-        // stand, and the job does not run ahead of it.
-        DedupeJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        var job = await new DedupeJob { Key = "aba" }.Job.Submit();
-        string? theirToken = null;
-        var now = host.Clock.GetUtcNow();
-        var mine = (await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default))!;
-        mine.Status = JobStatus.Queued;
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.VisibleAt = now;
-        mine.Attempt = Math.Max(0, mine.Attempt - 1);
-
-        interleave.After(row => row.Id == job.JobId && row.Status == JobStatus.Queued, async () =>
-        {
-            var theirs = await host.Ledger.ClaimNext("owner-b", now, now + TimeSpan.FromMinutes(5), [], default);
-            theirs!.Id.Should().Be(job.JobId);
-            theirs.Status = JobStatus.Queued;
-            theirs.Owner = null;
-            theirs.LeaseUntil = null;
-            theirs.VisibleAt = now + TimeSpan.FromMinutes(5);
-            theirs.Reschedules++;
-            theirs.DeferReason = "owner-b deferred five minutes";
-            theirToken = theirs.ClaimToken;
-            (await host.Ledger.TryRequeue(theirs, theirs.ClaimToken!, default)).Should().NotBeNull();
-        });
-        (await host.Ledger.TryRequeue(mine, mine.ClaimToken!, default)).Should().NotBeNull();
-        await interleave.RunRemaining();   // a ledger that writes no Entity rows takes each write whole: step in after it
-
-        var stored = (await host.Ledger.Get(job.JobId, default))!;
-        stored.VisibleAt.Should().Be(now + TimeSpan.FromMinutes(5), "owner-b's deferral stands");
-        stored.Reschedules.Should().Be(1);
-        stored.DeferReason.Should().Be("owner-b deferred five minutes");
-        theirToken.Should().NotBeNull();
-        await host.Drain();
-        DedupeJob.Executions.Should().Be(0, "the job does not run ahead of the deferral");
-    }
-
-    [Fact]
-    public async Task a_key_never_runs_twice_when_its_jobs_are_claimed_beside_a_requeue()
-    {
-        // JOBS-0010: a job runs and a duplicate of its key queues. The job is requeued, and right as that write lands two
-        // other nodes claim: one of them gets the key's work and serves the other job, and the second finds nothing.
-        DedupeJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        var item = new DedupeJob { Key = "twice" };
-        var first = await item.Job.Submit();
-        var now = host.Clock.GetUtcNow();
-        var mine = (await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default))!;
-        var duplicate = await item.Job.Submit();
-        duplicate.JobId.Should().NotBe(first.JobId);
-        mine.Status = JobStatus.Queued;
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.VisibleAt = now;
-        mine.Attempt = Math.Max(0, mine.Attempt - 1);
-
-        var claims = new List<JobRecord?>();
-        interleave.After(row => row.Id == first.JobId && row.Status == JobStatus.Queued, async () =>
-        {
-            claims.Add(await host.Ledger.ClaimNext("owner-b", now, now + TimeSpan.FromMinutes(5), [], default));
-            claims.Add(await host.Ledger.ClaimNext("owner-c", now, now + TimeSpan.FromMinutes(5), [], default));
-        });
-        (await host.Ledger.TryRequeue(mine, mine.ClaimToken!, default)).Should().NotBeNull();
-        await interleave.RunRemaining();
-
-        var running = await host.Ledger.Query(new JobQuery(WorkType: typeof(DedupeJob).FullName!, Status: JobStatus.Running), default);
-        running.Should().ContainSingle("a key runs once at a time");
-        claims.Count(claim => claim is not null).Should().Be(1);
-        (await QueuedOf<DedupeJob>(host)).Should().BeEmpty("the claimed job serves the other");
-    }
-
-    [Fact]
-    public async Task a_case_only_change_between_the_settles_read_and_its_write_is_caught_or_named()
-    {
-        // JOBS-0010: where the store's string equality folds case, a guard on "draft" also matches "Draft", so a string
-        // member is named as unchecked there instead; everywhere else the change is caught.
-        await using var host = await CreateHostAsync();
-        var item = new TitledJob { Name = "first", Title = "draft" };
-        await TitledJob.Upsert(item);
-
-        var binding = host.Registry.Get(typeof(TitledJob).FullName!)!;
-        var reads = 0;
-        var racing = binding.WithLoad(async (id, ct) =>
-        {
-            var row = await binding.Load(id, ct);
-            if (Interlocked.Increment(ref reads) == 1)
-            {
-                var other = await TitledJob.Get(id, ct);
-                other!.Title = "Draft";
-                await TitledJob.Upsert(other, ct);
-            }
-            return row;
-        });
-
-        var handled = (await TitledJob.Get(item.Id))!;
-        var loaded = WorkItemImage.Capture(handled);
-        handled.Name = "renamed";
-        var log = new CapturingLogger();
-        await new WorkItemWriter(log).Persist(racing, item.Id, handled, loaded, default);
-
-        var stored = (await TitledJob.Get(item.Id))!;
-        stored.Name.Should().Be("renamed");
-        var caught = stored.Title == "Draft";
-        var named = log.Messages.Any(message => message.Contains("Title", StringComparison.Ordinal)
-                                                && message.Contains("cannot compare", StringComparison.Ordinal));
-        (caught || named).Should().BeTrue(
-            $"another writer's case-only change is kept or named as unchecked; stored \"{stored.Title}\", log: {string.Join(" | ", log.Messages)}");
-    }
-
-    [Fact]
-    public async Task a_claim_that_loses_its_keys_run_slot_to_a_concurrent_claim_stays_queued()
-    {
-        // JOBS-0010: two queued jobs of one key, and two nodes that read them at once. owner-b is about to write its claim
-        // when owner-c's claim of the other job lands and takes the key's run slot; owner-b's write then meets the slot and
-        // leaves its job queued, and owner-c's run serves it. The key never runs twice.
-        DedupeJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        var now = host.Clock.GetUtcNow();
-        var lease = now + TimeSpan.FromMinutes(5);
-        var item = new DedupeJob { Key = "slot" };
-        var first = await item.Job.Submit();
-        var mine = (await host.Ledger.ClaimNext("owner-a", now, lease, [], default))!;
-        var duplicate = await item.Job.Submit();
-        mine.Status = JobStatus.Queued;
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.VisibleAt = now;
-        (await host.Ledger.TryRequeue(mine, mine.ClaimToken!, default)).Should().NotBeNull();
-        (await QueuedOf<DedupeJob>(host)).Should().HaveCount(2);
-        (await host.Ledger.TryReserve(first.JobId, "owner-b", lease, now, default)).Should().BeTrue("owner-c reads past it");
-
-        var claimedByC = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var triedByB = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        Task<JobRecord?>? claimByC = null;
-        interleave.Before(row => row.Status == JobStatus.Running && row.Owner == "owner-b", async () =>
-        {
-            claimByC = Task.Run(() => host.Ledger.ClaimNext("owner-c", now, lease, [], default));
-            await claimedByC.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        });
-        interleave.After(row => row.Status == JobStatus.Running && row.Owner == "owner-c", async () =>
-        {
-            claimedByC.TrySetResult();
-            await triedByB.Task.WaitAsync(TimeSpan.FromSeconds(30));
-        });
-
-        var byB = await host.Ledger.ClaimNext("owner-b", now, lease, [], default);
-        triedByB.TrySetResult();
-        var byC = claimByC is null
-            ? await host.Ledger.ClaimNext("owner-c", now, lease, [], default)   // a ledger that takes each claim whole
-            : await claimByC.WaitAsync(TimeSpan.FromSeconds(30));
-
-        var running = await host.Ledger.Query(new JobQuery(WorkType: typeof(DedupeJob).FullName!, Status: JobStatus.Running), default);
-        running.Should().ContainSingle("a key runs once at a time");
-        new[] { byB, byC }.Count(claim => claim is not null).Should().Be(1);
-        (await QueuedOf<DedupeJob>(host)).Should().BeEmpty("the job that runs serves the other");
-        var served = running[0].Id == first.JobId ? duplicate.JobId : first.JobId;
-        (await host.Ledger.Get(served, default))!.ServedBy.Should().Be(running[0].Id);
     }
 
     // --- claims, cancellations and chains under interleaving (JOBS-0010) ---
@@ -1639,13 +1218,13 @@ public abstract class JobBehaviorSuite
     {
         // JOBS-0010: another node asks a running job to cancel. The owner's renewal merges its lease onto the row and keeps
         // the request; its deferral then settles the job Cancelled instead of requeueing it.
-        ServedJob.Reset();
+        HeldThenDeferredJob.Reset();
         await using var host = await CreateHostAsync();
         host.Advance(TimeSpan.FromTicks(1_234_567));
-        var item = new ServedJob { Key = "laundered-" + Guid.NewGuid().ToString("N") };
+        var item = new HeldThenDeferredJob { Key = "laundered-" + Guid.NewGuid().ToString("N") };
         var handle = await item.Job.Submit();
         var draining = host.Drain();
-        await ServedJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await HeldThenDeferredJob.Entered.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
         var row = (await host.Ledger.Get(handle.JobId, default))!;
         var lease = row.LeaseUntil;
@@ -1656,13 +1235,13 @@ public abstract class JobBehaviorSuite
         await Until(async () => (await host.Ledger.Get(handle.JobId, default)) is { } r && (r.LeaseUntil > lease || r.IsTerminal), "renewal");
         (await host.Ledger.Get(handle.JobId, default))!.CancelRequestedAt.Should().NotBeNull("the renewal carried the request");
 
-        ServedJob.Release.TrySetResult();
+        HeldThenDeferredJob.Release.TrySetResult();
         await draining.WaitAsync(TimeSpan.FromSeconds(30));
-        host.Advance(ServedJob.Deferral + TimeSpan.FromSeconds(1));
+        host.Advance(HeldThenDeferredJob.Deferral + TimeSpan.FromSeconds(1));
         await host.Drain();
         var after = (await host.Ledger.Get(handle.JobId, default))!;
-        (after.Status == JobStatus.Cancelled && ServedJob.Executions == 1).Should().BeTrue(
-            "status=" + after.Status + ", marker=" + Marker(after) + ", executions=" + ServedJob.Executions);
+        (after.Status == JobStatus.Cancelled && HeldThenDeferredJob.Executions == 1).Should().BeTrue(
+            "status=" + after.Status + ", marker=" + Marker(after) + ", executions=" + HeldThenDeferredJob.Executions);
     }
 
     [Fact]
@@ -1685,7 +1264,7 @@ public abstract class JobBehaviorSuite
         mine.VisibleAt = now;
         JobRecord? requeued = null;
         interleave.Before(row => row.Id == handle.JobId && row.Status == JobStatus.Running && row.CancelRequestedAt != null,
-            async () => requeued = await host.Ledger.TryRequeue(mine, mine.ClaimToken!, default));
+            async () => requeued = await host.Ledger.Update(mine, default) ? mine : null);
 
         await host.Coordinator.CancelWorkAsync(typeof(GreetJob).FullName!, item.Id, default);
         await host.Drain();
@@ -1698,8 +1277,8 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_cancellation_landing_on_the_completion_stops_the_chain()
     {
-        // JOBS-0010: a cancellation lands while stage a's completion is being written. The completion is decided on the row
-        // as stored, so it settles Completed and cancels its held successor instead of releasing it.
+        // JOBS-0010: a cancellation lands while stage a's completion is being written. The completion is applied on the row
+        // as stored, so it settles Completed with the request and its successor is cancelled.
         ChainCancelRaceJob.Reset();
         var interleave = new Interleave();
         await using var host = await CreateHostAsync(configureServices: interleave.Install);
@@ -1720,8 +1299,8 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_cancellation_between_a_completion_and_its_successor_stops_the_chain()
     {
-        // JOBS-0010: a cancellation lands while stage a's successor is being appended. The successor is held for stage a,
-        // whose settlement then reads the request and cancels it.
+        // JOBS-0010: a cancellation lands while stage a's successor is being appended. Stage a's settlement then reads the
+        // request and cancels the successor.
         ChainCancelRaceJob.Reset();
         var interleave = new Interleave();
         await using var host = await CreateHostAsync(configureServices: interleave.Install);
@@ -1742,8 +1321,8 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_settle_whose_answer_is_lost_still_advances_the_chain()
     {
-        // JOBS-0010: stage a's completion lands but its answer is lost. Reading the row again, the settlement finds its own
-        // write by the revision it wrote and releases the successor.
+        // JOBS-0010: stage a's completion lands but its answer is lost. The successor was appended before it, so the chain
+        // advances, and the failure this run then meets finds the claim ended and writes nothing.
         ChainCancelRaceJob.Reset();
         var interleave = new Interleave();
         await using var host = await CreateHostAsync(configureServices: interleave.Install);
@@ -1765,36 +1344,34 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_zombie_of_the_same_node_neither_renews_nor_settles_over_its_reclaim()
     {
-        // JOBS-0010: the same node claims a job, stalls, is reaped and claims the job again. The stalled execution carries
-        // its old claim token, so neither its renewal nor its settlement lands on the new claim's row.
+        // JOBS-0010: the same node claims a job, stalls, is reaped and claims the job again. The stalled execution's write
+        // misses its revision, and the row it reads back runs at another attempt, so nothing it writes lands.
         GreetJob.Reset();
         await using var host = await CreateHostAsync();
         var item = new GreetJob { Name = "zombie" };
         var handle = await item.Job.Submit();
         var now = host.Clock.GetUtcNow();
         var first = (await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(1), [], default))!;
+        var zombie = new ClaimedRow(host.Ledger, first);
         host.Advance(TimeSpan.FromMinutes(2));
         await host.Reap();
         var later = host.Clock.GetUtcNow();
         var second = await host.Ledger.ClaimNext("owner-a", later, later + TimeSpan.FromMinutes(1), [], default);
         second.Should().NotBeNull("the same node claims the requeued job again");
 
-        var zombieRenewed = await host.Ledger.RenewLease(handle.JobId, first.ClaimToken!, later + TimeSpan.FromMinutes(1), default) is not null;
-        first.Owner = null;
-        first.LeaseUntil = null;
-        first.Status = JobStatus.Completed;
-        first.LastSettledAt = later;
-        var zombieSettled = await host.Ledger.TrySettle(first, first.ClaimToken!, default) is not null;
+        (await zombie.Write(row => row.LeaseUntil = later + TimeSpan.FromHours(1), default)).Should().BeNull();
+        (await zombie.Write(row => row.Status = JobStatus.Completed, default)).Should().BeNull();
         var after = (await host.Ledger.Get(handle.JobId, default))!;
-        (zombieRenewed || zombieSettled).Should().BeFalse(
-            "zombie renewed=" + zombieRenewed + ", zombie settled=" + zombieSettled + ", stored status=" + after.Status + ", attempt=" + after.Attempt);
-        after.ClaimToken.Should().Be(second!.ClaimToken);
+        after.Status.Should().Be(JobStatus.Running);
+        after.Attempt.Should().Be(second!.Attempt);
+        after.Revision.Should().Be(second.Revision);
     }
 
     [Fact]
     public async Task lost_renewal_answers_never_cost_the_settlement()
     {
-        // JOBS-0010: two renewals land but their answers are lost. The claim still holds its token, so the settlement lands.
+        // JOBS-0010: two renewals land but their answers are lost. The next write misses, reads the row and finds it still
+        // runs under this claim, so the settlement lands.
         HeldJob.Reset();
         var interleave = new Interleave();
         await using var host = await CreateHostAsync(configureServices: interleave.Install);
@@ -1824,8 +1401,8 @@ public abstract class JobBehaviorSuite
     [Fact]
     public async Task a_stored_claim_reads_back_exactly_as_written()
     {
-        // The claim a ledger returns is the row it stored: its revision and claim token exactly — what every owner write
-        // compares on — and its times to the millisecond, the finest every store keeps (MongoDB keeps no finer).
+        // The claim a ledger returns is the row it stored: its revision exactly — what every owner write compares on — and
+        // its times to the millisecond, the finest every store keeps (MongoDB keeps no finer).
         await using var host = await CreateHostAsync();
         host.Advance(TimeSpan.FromTicks(1_234_567));
         var handle = await new GreetJob { Name = "fidelity" }.Job.Submit();
@@ -1845,30 +1422,7 @@ public abstract class JobBehaviorSuite
         for (var i = 0; i < Math.Min(mine.Transitions.Count, stored.Transitions.Count); i++)
             Same("Transitions[" + i + "].At", mine.Transitions[i].At, stored.Transitions[i].At);
         if (mine.Revision != stored.Revision) differences.Add("Revision");
-        if (mine.ClaimToken != stored.ClaimToken) differences.Add("ClaimToken");
         differences.Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task an_own_progress_write_that_never_landed_never_costs_the_settlement()
-    {
-        // JOBS-0010: the owner's copy is ahead of the row by a progress write that never landed, and a renewal moved the
-        // row on. The settlement merges onto the row as stored and lands.
-        GreetJob.Reset();
-        await using var host = await CreateHostAsync();
-        var handle = await new GreetJob { Name = "progress" }.Job.Submit();
-        var now = host.Clock.GetUtcNow();
-        var mine = (await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(1), [], default))!;
-        mine.ProgressFraction = 0.5;
-        mine.ProgressMessage = "half";
-        (await host.Ledger.RenewLease(handle.JobId, mine.ClaimToken!, now + TimeSpan.FromMinutes(2), default)).Should().NotBeNull();
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.Status = JobStatus.Completed;
-        mine.LastSettledAt = now;
-        var settled = await host.Ledger.TrySettle(mine, mine.ClaimToken!, default);
-        var after = (await host.Ledger.Get(handle.JobId, default))!;
-        (settled is not null && after.Status == JobStatus.Completed).Should().BeTrue("settled=" + settled?.Status + ", status=" + after.Status);
     }
 
     [Fact]
@@ -1900,11 +1454,13 @@ public abstract class JobBehaviorSuite
         await item.Job.Cancel();
         var trailing = await item.Job.Submit();
         trailing.JobId.Should().NotBe(first.JobId, "the running job holds no coalescing slot, so the resubmission queues");
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.Status = JobStatus.Completed;
-        mine.LastSettledAt = now;
-        (await host.Ledger.TrySettle(mine, mine.ClaimToken!, default)).Should().NotBeNull();
+        (await new ClaimedRow(host.Ledger, mine).Write(settled =>
+        {
+            settled.Owner = null;
+            settled.LeaseUntil = null;
+            settled.Status = JobStatus.Completed;
+            settled.LastSettledAt = now;
+        }, default)).Should().NotBeNull();
         await host.Drain();
         var row = (await host.Ledger.Get(trailing.JobId, default))!;
         (row.Status == JobStatus.Completed && DedupeJob.Executions == 1).Should().BeTrue(
@@ -1929,8 +1485,8 @@ public abstract class JobBehaviorSuite
         var o1 = await h1.Completion(TimeSpan.FromSeconds(5));
         var o2 = await h2.Completion(TimeSpan.FromSeconds(5));
         DedupeJob.Executions.Should().Be(1);
-        o1.Should().BeOfType<JobOutcome.Settled>().Which.Status.Should().Be(JobStatus.Cancelled);
-        o2.Should().BeOfType<JobOutcome.Settled>().Which.Status.Should().Be(JobStatus.Completed);
+        o1.Status.Should().Be(JobStatus.Cancelled);
+        o2.Status.Should().Be(JobStatus.Completed);
     }
 
     [Fact]
@@ -1961,8 +1517,8 @@ public abstract class JobBehaviorSuite
     public async Task a_chain_step_runs_once_when_a_stalled_run_and_its_reclaim_both_finish()
     {
         // JOBS-0010: stage a's first run stalls — its renewals fail — and is reaped, and the same node claims it again. Both
-        // runs finish. Stage b runs exactly once, and no held successor is left behind: the one the stalled run appended
-        // under its dead claim is deleted, never released.
+        // runs finish. Both address one successor row, and exclusivity holds it back until stage a settles, so stage b runs
+        // exactly once.
         ChainCancelRaceJob.Reset();
         var unblock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         ChainCancelRaceJob.Unblock = unblock;
@@ -2008,56 +1564,9 @@ public abstract class JobBehaviorSuite
     }
 
     [Fact]
-    public async Task the_handles_of_two_items_with_the_same_key_report_their_own_outcomes()
-    {
-        // JOBS-0010: two items with the same key each get their own job; cancelling one item is that item's outcome only.
-        DedupeJob.Reset();
-        await using var host = await CreateHostAsync();
-        var key = "shared-" + Guid.NewGuid().ToString("N");
-        var w1 = new DedupeJob { Key = key };
-        var w2 = new DedupeJob { Key = key };
-        var h1 = await w1.Job.Submit();
-        var h2 = await w2.Job.Submit();
-        await w1.Job.Cancel();
-        await host.Drain();
-        var o1 = await h1.Completion(TimeSpan.FromSeconds(5));
-        var o2 = await h2.Completion(TimeSpan.FromSeconds(5));
-        var s1 = o1 is JobOutcome.Settled a ? a.Status.ToString() : o1.GetType().Name;
-        var s2 = o2 is JobOutcome.Settled c ? c.Status.ToString() : o2.GetType().Name;
-        (s1 == "Cancelled" && s2 == "Completed").Should().BeTrue(
-            "same job id=" + (h1.JobId == h2.JobId) + ", w1 outcome=" + s1 + ", w2 outcome=" + s2);
-    }
-
-    [Fact]
-    public async Task a_cancellation_survives_the_owners_retry()
-    {
-        // JOBS-0010: a running job is asked to cancel; its owner's retry, merged onto the row as stored, settles it
-        // Cancelled instead of requeueing it, and it never runs again.
-        GreetJob.Reset();
-        await using var host = await CreateHostAsync();
-        var item = new GreetJob { Name = "c" };
-        await item.Job.Submit();
-        var now = host.Clock.GetUtcNow();
-        var mine = (await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default))!;
-        await host.Coordinator.CancelWorkAsync(typeof(GreetJob).FullName!, item.Id, default);
-        (await host.Ledger.Get(mine.Id, default))!.CancelRequestedAt.Should().NotBeNull("the cancellation landed on the running row");
-
-        mine.Owner = null;
-        mine.LeaseUntil = null;
-        mine.LastError = "transient";
-        mine.Status = JobStatus.Queued;
-        mine.VisibleAt = now;
-        var written = await host.Ledger.TryRequeue(mine, mine.ClaimToken!, default);
-        await host.Drain();
-        var after = (await host.Ledger.Get(mine.Id, default))!;
-        (written is { Status: JobStatus.Cancelled } && after.Status == JobStatus.Cancelled && GreetJob.Executions == 0).Should().BeTrue(
-            "written=" + written?.Status + ", status after drain=" + after.Status + ", executions=" + GreetJob.Executions);
-    }
-
-    [Fact]
     public async Task a_cancellation_survives_a_failed_attempt()
     {
-        // JOBS-0010: the cancellation lands while a failed attempt's retry is being written; the retry, decided on the row
+        // JOBS-0010: the cancellation lands while a failed attempt's retry is being written; the retry, applied on the row
         // as stored, settles the job Cancelled.
         FlakyJob.Reset();
         FlakyJob.SucceedAtAttempt = 2;
@@ -2092,12 +1601,12 @@ public abstract class JobBehaviorSuite
         var later = now + TimeSpan.FromMinutes(2);
         var stuck = await host.Ledger.Stuck(later, 10, default);
         stuck.Should().ContainSingle();
-        (await host.Ledger.RenewLease(mine.Id, mine.ClaimToken!, later + TimeSpan.FromMinutes(5), default)).Should().NotBeNull();
+        mine.LeaseUntil = later + TimeSpan.FromMinutes(5);
+        (await host.Ledger.Update(mine, default)).Should().BeTrue();
 
         var row = stuck[0];
         row.Owner = null;
         row.LeaseUntil = null;
-        row.ClaimToken = null;
         row.Status = JobStatus.Queued;
         row.VisibleAt = later;
         var reclaimed = await host.Ledger.Update(row, default);
@@ -2122,14 +1631,17 @@ public abstract class JobBehaviorSuite
         var later = host.Clock.GetUtcNow();
         // owner-a is alive — its roster entry is fresh — so only its lapsed lease makes the reaper look at the job.
         await WorkerNode.Upsert(new WorkerNode { Id = "owner-a", StartedAt = now, LastSeenAt = later }, default);
-        JobRecord? renewed = null;
-        interleave.Before(row => row.Id == mine.Id && row.Status == JobStatus.Queued && row.Owner == null,
-            async () => renewed = await host.Ledger.RenewLease(mine.Id, mine.ClaimToken!, later + TimeSpan.FromMinutes(5), default));
+        var renewed = false;
+        interleave.Before(row => row.Id == mine.Id && row.Status == JobStatus.Queued && row.Owner == null, async () =>
+        {
+            mine.LeaseUntil = later + TimeSpan.FromMinutes(5);
+            renewed = await host.Ledger.Update(mine, default);
+        });
         await host.Reap();
         var stored = (await host.Ledger.Get(mine.Id, default))!;
-        renewed.Should().NotBeNull();
+        renewed.Should().BeTrue();
         stored.Status.Should().Be(JobStatus.Running, "the renewal landed first; owner=" + stored.Owner + ", fired=" + interleave.Fired);
-        stored.ClaimToken.Should().Be(mine.ClaimToken);
+        stored.Owner.Should().Be("owner-a");
     }
 
     [Fact]
@@ -2151,275 +1663,12 @@ public abstract class JobBehaviorSuite
         GreetJob.Executions.Should().Be(0);
     }
 
-    [Fact]
-    public async Task a_losing_serve_key_write_back_never_leaves_the_claim_running_unexecuted()
-    {
-        // JOBS-0010: a job of the key is deferred between a claim's read and its write, so the claim goes back to the queue;
-        // a cancellation lands just before that write-back. The write-back reads the row again and settles it Cancelled —
-        // never leaving it Running with no execution.
-        DedupeJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var item = new DedupeJob { Key = "serve" };
-        var first = await item.Job.Submit();
-        var stored = (await host.Ledger.Get(first.JobId, default))!;
-        var now = host.Clock.GetUtcNow();
-        interleave.Before(row => row.Id == first.JobId && row.Status == JobStatus.Running && row.Owner == "owner-a", () =>
-            host.Ledger.Append(new JobRecord
-            {
-                WorkType = stored.WorkType, WorkId = item.Id, Action = stored.Action, Lane = stored.Lane,
-                CoalesceKey = stored.CoalesceKey, Status = JobStatus.Queued, VisibleAt = now + TimeSpan.FromMinutes(10),
-                FirstSubmittedAt = now, Exclusive = true,
-            }, default));
-        interleave.Before(row => row.Id == first.JobId && row.Status == JobStatus.Queued && row.Owner == null
-                                 && row.Transitions.Count > 0 && (row.Transitions[^1].Note ?? "").StartsWith("waits", StringComparison.Ordinal),
-            () => host.Coordinator.CancelWorkAsync(typeof(DedupeJob).FullName!, item.Id, default));
-
-        var claimed = await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default);
-        var row = (await host.Ledger.Get(first.JobId, default))!;
-        (claimed is null && row.Status == JobStatus.Running && row.Owner == "owner-a").Should().BeFalse(
-            "claimed=" + (claimed is not null) + ", status=" + row.Status + ", owner=" + row.Owner + ", fired=" + interleave.Fired);
-    }
-
-    [Fact]
-    public async Task a_cancel_whose_mark_loses_to_the_completion_still_stops_the_chain()
-    {
-        // JOBS-0010: a cancellation is asked while stage a runs, and stage a completes between the canceller's read and its
-        // mark, so the mark loses. The canceller runs until the work item is quiet: reading a again it finds it settled,
-        // follows a's successor and cancels it. A claim of the successor meanwhile waits for the canceller, as a claim
-        // slower than the canceller's next read does; the canceller never leaves before the successor is stopped.
-        ChainCancelRaceJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var unblock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        ChainCancelRaceJob.Unblock = unblock;
-        var job = new ChainCancelRaceJob();
-        var a = await job.Job.Submit("a");
-        var draining = host.Drain();
-        await Until(() => Task.FromResult(Volatile.Read(ref ChainCancelRaceJob.StepAExecutions) == 1), "stage a runs");
-        var markLost = false;
-        interleave.Before(row => row.Id == a.JobId && row.Status == JobStatus.Running && row.CancelRequestedAt != null, async () =>
-        {
-            unblock.TrySetResult();
-            await Until(async () => (await host.Ledger.Get(a.JobId, default))!.Status == JobStatus.Completed, "stage a settles");
-            markLost = true;
-        });
-        interleave.Before(row => row.WorkId == job.Id && row.Action == "b" && row.Status == JobStatus.Running,
-            () => cancelled.Task.WaitAsync(TimeSpan.FromSeconds(30)));
-
-        await host.Coordinator.CancelWorkAsync(typeof(ChainCancelRaceJob).FullName!, job.Id, default);
-        cancelled.TrySetResult();
-        await draining.WaitAsync(TimeSpan.FromSeconds(30));
-        await host.Drain();
-        await host.Drain();
-        var rows = await host.Ledger.Query(new JobQuery(WorkType: typeof(ChainCancelRaceJob).FullName!), default);
-        markLost.Should().BeTrue("the canceller's mark met stage a's completion");
-        (await ChainCancelRaceJob.Get(job.Id))!.StepBRan.Should().BeFalse(
-            "rows: " + string.Join(" | ", rows.Select(r => r.Action + ":" + r.Status + ":marker=" + Marker(r))));
-    }
-
-    [Fact]
-    public async Task a_failing_serve_key_write_back_never_runs_ahead_of_the_deferral()
-    {
-        // JOBS-0010: a job of the key is deferred between a claim's read and its write, so the claim goes back to the queue
-        // to wait for it, and the store refuses that write-back every time. The claim never runs ahead of the deferral: it
-        // is left to lapse with its lease, and the reaper requeues it.
-        DedupeJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var item = new DedupeJob { Key = "refused-write-back" };
-        var first = await item.Job.Submit();
-        var stored = (await host.Ledger.Get(first.JobId, default))!;
-        var now = host.Clock.GetUtcNow();
-        interleave.Before(row => row.Id == first.JobId && row.Status == JobStatus.Running && row.Owner == "owner-a", () =>
-            host.Ledger.Append(new JobRecord
-            {
-                WorkType = stored.WorkType, WorkId = item.Id, Action = stored.Action, Lane = stored.Lane,
-                CoalesceKey = stored.CoalesceKey, Status = JobStatus.Queued, VisibleAt = now + TimeSpan.FromMinutes(10),
-                FirstSubmittedAt = now, Exclusive = true,
-            }, default));
-        interleave.Refuse(row => row.Id == first.JobId && row.Status == JobStatus.Queued && row.Owner == null
-                                 && row.Transitions.Count > 0 && (row.Transitions[^1].Note ?? "").StartsWith("waits", StringComparison.Ordinal));
-
-        var claimed = await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default);
-        var left = (await host.Ledger.Get(first.JobId, default))!;
-        host.Advance(TimeSpan.FromMinutes(6));
-        await host.Reap();
-        var reaped = (await host.Ledger.Get(first.JobId, default))!;
-        interleave.Fired.Should().Be(1);
-        (claimed is null && left.Status == JobStatus.Running && reaped.Status == JobStatus.Queued).Should().BeTrue(
-            "claimed=" + (claimed is not null) + ", left " + left.Status + " by " + left.Owner + ", after the reaper " + reaped.Status);
-    }
-
-    [Fact]
-    public async Task a_stage_recorded_failed_under_abort_never_releases_its_successor()
-    {
-        // JOBS-0010: stage a succeeds and appends the successor held for its completion; the read that begins its settlement
-        // fails, so with one attempt the stage is recorded Failed and, under OnFailure.Abort, its chain stops. The
-        // settlement closes the successor it does not release, and the reaper never releases one held for a completion
-        // that did not happen.
-        ChainCancelRaceJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(o => o.DefaultMaxAttempts = 1, interleave.Install);
-        SkipWithoutEntityRows(host);
-        var job = new ChainCancelRaceJob();
-        var a = await job.Job.Submit("a");
-        interleave.Before(row => row.WorkId == job.Id && row.Action == "b" && row.HeldBy != null, () =>
-        {
-            interleave.FailRead(row => row.Id == a.JobId && row.Status == JobStatus.Running);
-            return Task.CompletedTask;
-        });
-
-        await host.Drain();
-        await host.Reap();
-        await host.Drain();
-        var rows = await host.Ledger.Query(new JobQuery(WorkType: typeof(ChainCancelRaceJob).FullName!), default);
-        var stageA = rows.Single(r => r.Action == "a");
-        interleave.Fired.Should().Be(2);
-        (stageA.Status == JobStatus.Failed && !(await ChainCancelRaceJob.Get(job.Id))!.StepBRan).Should().BeTrue(
-            "rows: " + string.Join(" | ", rows.Select(r => r.Action + ":" + r.Status + ":" + string.Join(">", r.Transitions.Select(t => t.Note)))));
-        stageA.Transitions.Should().NotContain(t => t.To == JobStatus.Completed, "the completion that did not land is not in its history");
-    }
-
-    [Fact]
-    public async Task a_completion_whose_answer_and_next_read_are_lost_still_advances_the_chain()
-    {
-        // JOBS-0010: stage a's completion lands, its answer is lost, and the read that would recognise it fails too, so the
-        // run meets a failure after its success. Its failure settlement finds the claim ended and writes nothing; the
-        // successor held for the completion is left to the reaper, which finds a completed by that claim and releases it.
-        ChainCancelRaceJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var job = new ChainCancelRaceJob();
-        var a = await job.Job.Submit("a");
-        interleave.After(row => row.Id == a.JobId && row.Status == JobStatus.Completed, () =>
-        {
-            interleave.FailRead(row => row.Id == a.JobId && row.Status == JobStatus.Completed);
-            throw new TimeoutException("the completion committed, its answer was lost");
-        });
-
-        await host.Drain();
-        await host.Reap();
-        await host.Drain();
-        var rows = await host.Ledger.Query(new JobQuery(WorkType: typeof(ChainCancelRaceJob).FullName!), default);
-        interleave.Fired.Should().Be(2);
-        (rows.Single(r => r.Action == "a").Status == JobStatus.Completed && (await ChainCancelRaceJob.Get(job.Id))!.StepBRan).Should().BeTrue(
-            "rows: " + string.Join(" | ", rows.Select(r => r.Action + ":" + r.Status + ":" + string.Join(">", r.Transitions.Select(t => t.Note)))));
-    }
-
-    [Fact]
-    public async Task a_continuing_stage_whose_completion_answer_and_next_read_are_lost_still_advances_the_chain()
-    {
-        // JOBS-0010: as above, for a stage whose chain continues on failure. Its failure settlement finds the claim ended,
-        // keeps the successor its success appended, held on that completion, and leaves it to the reaper, which releases it.
-        ConflictJob.Reset();
-        ConflictJob.Conflicting = 0;
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var item = new ConflictJob();
-        var stage = await item.Job.Submit(ConflictJob.Action);
-        interleave.After(row => row.Id == stage.JobId && row.Status == JobStatus.Completed, () =>
-        {
-            interleave.FailRead(row => row.Id == stage.JobId && row.Status == JobStatus.Completed);
-            throw new TimeoutException("the completion committed, its answer was lost");
-        });
-
-        await host.Drain();
-        await host.Reap();
-        await host.Drain();
-        var rows = await host.Ledger.Query(new JobQuery(WorkType: typeof(ConflictJob).FullName!), default);
-        interleave.Fired.Should().Be(2);
-        (rows.Single(r => r.Id == stage.JobId).Status == JobStatus.Completed && ConflictJob.NextRuns == 1).Should().BeTrue(
-            "rows: " + string.Join(" | ", rows.Select(r => r.Action + ":" + r.Status + ":" + string.Join(">", r.Transitions.Select(t => t.Note)))));
-    }
-
-    [Fact]
-    public async Task a_claim_write_failure_surfaces_for_keyed_and_plain_jobs_alike()
-    {
-        // JOBS-0010: the store refuses a claim's write while reads work. Only the run slot's refusal is a lost claim; any
-        // other failure surfaces from a keyed claim exactly as it does from a plain one.
-        DedupeJob.Reset();
-        GreetJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var keyedItem = new DedupeJob { Key = "refused-claim" };
-        var plainItem = new GreetJob { Name = "refused-claim" };
-        var keyedId = keyedItem.Id;
-        var plainId = plainItem.Id;
-        interleave.Refuse(row => (row.WorkId == keyedId || row.WorkId == plainId) && row.Status == JobStatus.Running);
-        var now = host.Clock.GetUtcNow();
-
-        await keyedItem.Job.Submit();
-        var keyed = await ClaimFailure(host, now);
-        await host.Coordinator.CancelWorkAsync(typeof(DedupeJob).FullName!, keyedId, default);
-        await plainItem.Job.Submit();
-        var plain = await ClaimFailure(host, now);
-        keyed.Should().NotBeNull("the keyed claim's write failed");
-        keyed.Should().Be(plain, "a keyed claim fails as a plain one does");
-    }
-
-    [Fact]
-    public async Task a_release_whose_answer_is_lost_still_reports_the_release()
-    {
-        // JOBS-0010: the write that releases a held successor lands and its answer is lost. Reading the row again, the
-        // release recognises its own write by the revision it wrote and reports the release.
-        GreetJob.Reset();
-        var interleave = new Interleave();
-        await using var host = await CreateHostAsync(configureServices: interleave.Install);
-        SkipWithoutEntityRows(host);
-        var item = new GreetJob { Name = "released" };
-        var handle = await item.Job.Submit();
-        var stored = (await host.Ledger.Get(handle.JobId, default))!;
-        var now = host.Clock.GetUtcNow();
-        var token = Guid.NewGuid().ToString("N");
-        var successorId = JobRecord.SuccessorId(handle.JobId, token);
-        await host.Ledger.Append(new JobRecord
-        {
-            Id = successorId, WorkType = stored.WorkType, WorkId = item.Id, Action = stored.Action, Lane = stored.Lane,
-            Status = JobStatus.Queued, VisibleAt = now, FirstSubmittedAt = now,
-            HeldBy = token, HeldFor = handle.JobId, HeldOn = JobStatus.Completed,
-        }, default);
-        interleave.After(row => row.Id == successorId && row.HeldBy == null,
-            () => throw new TimeoutException("the release committed, its answer was lost"));
-
-        var released = await host.Ledger.ReleaseHeld(successorId, token, cancel: false, now, default);
-        var row = (await host.Ledger.Get(successorId, default))!;
-        interleave.Fired.Should().Be(1);
-        (released && row.HeldBy is null && row.Status == JobStatus.Queued).Should().BeTrue(
-            "released=" + released + ", held by " + (row.HeldBy ?? "none") + ", status=" + row.Status);
-    }
-
-    /// <summary>The type of the failure a claim surfaces, or null when it surfaced none.</summary>
-    private static async Task<Type?> ClaimFailure(JobsHarness host, DateTimeOffset now)
-    {
-        try
-        {
-            await host.Ledger.ClaimNext("owner-a", now, now + TimeSpan.FromMinutes(5), [], default);
-            return null;
-        }
-        catch (Exception failure)
-        {
-            return failure.GetType();
-        }
-    }
-
     /// <summary>Steps other nodes' actions in around writes of job rows, each step once, when a write matches it
-    /// (JOBS-0010), and fails the writes and reads a spec names, as a failing store does. The in-memory ledger writes no
-    /// Entity rows, so no step fires there: a spec runs its remaining steps after the call, which that ledger takes
-    /// whole.</summary>
+    /// (JOBS-0010). The in-memory ledger writes no Entity rows, so no step fires there.</summary>
     private sealed class Interleave
     {
         private readonly List<Step> _before = [];
         private readonly List<Step> _after = [];
-        private readonly List<Step> _reads = [];
-        private readonly List<Func<JobRecord, bool>> _refusals = [];
         private int _fired;
 
         /// <summary>How many steps have run.</summary>
@@ -2431,27 +1680,12 @@ public abstract class JobBehaviorSuite
             Func<Koan.Data.Core.Lifecycle.EntityLifecycleContext<JobRecord>, ValueTask<Koan.Data.Core.Lifecycle.EntityLifecycleResult>> before =
                 async context =>
                 {
-                    ThrowIfRefused(context.Current);
                     await Run(_before, context.Current);
                     return context.Proceed();
                 };
             Func<Koan.Data.Core.Lifecycle.EntityLifecycleContext<JobRecord>, ValueTask> after =
                 context => new ValueTask(Run(_after, context.Current));
-            Func<Koan.Data.Core.Lifecycle.EntityLifecycleContext<JobRecord>, ValueTask> loaded =
-                context => new ValueTask(Run(_reads, context.Current));
-            JobRecord.Lifecycle.BeforeUpsert(before).AfterUpsert(after).AfterLoad(loaded);
-        }
-
-        /// <summary>Fail every write matching <paramref name="when"/>, as a store refusing it.</summary>
-        public void Refuse(Func<JobRecord, bool> when)
-        {
-            lock (_refusals) _refusals.Add(when);
-        }
-
-        /// <summary>Fail the first read whose row matches <paramref name="when"/>, as a store failing it.</summary>
-        public void FailRead(Func<JobRecord, bool> when)
-        {
-            lock (_reads) _reads.Add(new Step(when, () => Task.FromException(new TimeoutException("the store fails the read"))));
+            JobRecord.Lifecycle.BeforeUpsert(before).AfterUpsert(after);
         }
 
         /// <summary>Run <paramref name="then"/> just before the first write matching <paramref name="when"/>.</summary>
@@ -2464,26 +1698,6 @@ public abstract class JobBehaviorSuite
         public void After(Func<JobRecord, bool> when, Func<Task> then)
         {
             lock (_after) _after.Add(new Step(when, then));
-        }
-
-        /// <summary>Run every after-step no write ran.</summary>
-        public async Task RunRemaining()
-        {
-            Step[] steps;
-            lock (_after) steps = _after.ToArray();
-            foreach (var step in steps)
-                if (step.TryFire())
-                {
-                    Interlocked.Increment(ref _fired);
-                    await step.Then();
-                }
-        }
-
-        private void ThrowIfRefused(JobRecord row)
-        {
-            Func<JobRecord, bool>[] refusals;
-            lock (_refusals) refusals = _refusals.ToArray();
-            if (refusals.Any(when => when(row))) throw new InvalidOperationException("the store refuses the write");
         }
 
         private async Task Run(List<Step> steps, JobRecord row)
@@ -2508,22 +1722,6 @@ public abstract class JobBehaviorSuite
 
             public bool TryFire() => Interlocked.CompareExchange(ref _fired, 1, 0) == 0;
         }
-    }
-
-    /// <summary>Keeps every message a writer logs, for the specs that check what a settle names.</summary>
-    private sealed class CapturingLogger : Microsoft.Extensions.Logging.ILogger
-    {
-        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _messages = new();
-
-        public IReadOnlyCollection<string> Messages => _messages;
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
-
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
-            TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => _messages.Enqueue(formatter(state, exception));
     }
 
     [Fact]

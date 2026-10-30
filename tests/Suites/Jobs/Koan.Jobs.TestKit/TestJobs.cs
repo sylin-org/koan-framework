@@ -457,39 +457,6 @@ public sealed class MergeJob : Entity<MergeJob>, IKoanJob<MergeJob>
     }
 }
 
-/// <summary>On each of its first <see cref="Conflicting"/> runs another writer changes <see cref="Result"/> while the
-/// handler changes it to <see cref="Mine"/>: a conflict, which must run again rather than overwrite, never spend the one
-/// attempt it has, and never advance its chain (JOBS-0010).</summary>
-[JobChain(Action, Next)]
-[JobAction(Action, MaxAttempts = 1, OnFailure = OnFailure.Continue)]
-public sealed class ConflictJob : Entity<ConflictJob>, IKoanJob<ConflictJob>
-{
-    public const string Action = "conflict";
-    public const string Next = "after-conflict";
-    public const string Mine = "mine";
-    public static int Executions;
-    public static int NextRuns;
-    public static int Conflicting = 1;
-    public string Result { get; set; } = "";
-
-    public static async Task Execute(ConflictJob job, JobContext ctx, CancellationToken ct)
-    {
-        if (ctx.Action == Next) { Interlocked.Increment(ref NextRuns); return; }
-        var run = Interlocked.Increment(ref Executions);
-        if (run <= Conflicting)
-        {
-            var other = await ConflictJob.Get(job.Id, ct);
-            other!.Result = Theirs(run);
-            await ConflictJob.Upsert(other, ct);
-        }
-        job.Result = Mine;
-    }
-
-    public static string Theirs(int run) => $"theirs-{run}";
-
-    public static void Reset() { Executions = 0; NextRuns = 0; Conflicting = 1; }
-}
-
 /// <summary>State behind a non-public setter, changed through a domain method — persisted by Koan Data, so a settle must
 /// write it back and detect a concurrent change to it (JOBS-0010).</summary>
 public sealed class StateJob : Entity<StateJob>, IKoanJob<StateJob>
@@ -525,8 +492,8 @@ public sealed record JobReceipt
     public required DateTimeOffset At { get; init; }
 }
 
-/// <summary>A work item whose handler fills a nested record that starts null (JOBS-0010): the settle's guard leaves a
-/// nested object out where the store pushes no nested paths, and writes it back on every tier.</summary>
+/// <summary>A work item whose handler fills a nested record that starts null (JOBS-0010): settle writes it back on every
+/// tier.</summary>
 public sealed class ReceiptJob : Entity<ReceiptJob>, IKoanJob<ReceiptJob>
 {
     public ReceiptKind Kind { get; set; }
@@ -540,27 +507,10 @@ public sealed class ReceiptJob : Entity<ReceiptJob>, IKoanJob<ReceiptJob>
     }
 }
 
-/// <summary>A work item holding members a store may not compare exactly — a time, binary data and a dictionary — beside a
-/// plain number (JOBS-0010): leaving some members out of the guard must not cost the guard of the others.</summary>
-public sealed class MixedJob : Entity<MixedJob>, IKoanJob<MixedJob>
-{
-    public string Name { get; set; } = "";
-    public int Number { get; set; }
-    public DateTime When { get; set; } = new(2026, 10, 30, 12, 0, 0, DateTimeKind.Utc);
-    public byte[] Blob { get; set; } = [1, 2, 3];
-    public Dictionary<string, string> Notes { get; set; } = new() { ["a"] = "b" };
-
-    public static Task Execute(MixedJob job, JobContext ctx, CancellationToken ct)
-    {
-        job.Name = "renamed";
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>A keyed job whose first run waits for the test to release it and then defers (JOBS-0006, JOBS-0010): a
-/// duplicate submitted while it runs is absorbed when it defers, and the duplicate's handle follows it.</summary>
+/// <summary>A keyed job whose first run waits for the test to release it and then defers (JOBS-0010): a cancellation can
+/// land on its running row before the deferral is written.</summary>
 [JobIdempotent(nameof(Key))]
-public sealed class ServedJob : Entity<ServedJob>, IKoanJob<ServedJob>
+public sealed class HeldThenDeferredJob : Entity<HeldThenDeferredJob>, IKoanJob<HeldThenDeferredJob>
 {
     public static readonly TimeSpan Deferral = TimeSpan.FromMinutes(5);
     public static int Executions;
@@ -568,7 +518,7 @@ public sealed class ServedJob : Entity<ServedJob>, IKoanJob<ServedJob>
     public static TaskCompletionSource Release = New();
     public string Key { get; set; } = "";
 
-    public static async Task Execute(ServedJob job, JobContext ctx, CancellationToken ct)
+    public static async Task Execute(HeldThenDeferredJob job, JobContext ctx, CancellationToken ct)
     {
         if (Interlocked.Increment(ref Executions) != 1) return;
         Entered.TrySetResult();
@@ -586,52 +536,21 @@ public sealed class ServedJob : Entity<ServedJob>, IKoanJob<ServedJob>
     private static TaskCompletionSource New() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
-/// <summary>A named item with a title and a time: the handler renames it while another writer changes the title's case
-/// or the time's offset (JOBS-0010).</summary>
-public sealed class TitledJob : Entity<TitledJob>, IKoanJob<TitledJob>
-{
-    public string Name { get; set; } = "";
-    public string Title { get; set; } = "";
-    public DateTimeOffset At { get; set; } = new(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
-
-    public static Task Execute(TitledJob job, JobContext ctx, CancellationToken ct)
-    {
-        job.Name = "renamed";
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>A named item with a list of tags: the handler renames it while another writer adds a tag (JOBS-0010).</summary>
-public sealed class TaggedJob : Entity<TaggedJob>, IKoanJob<TaggedJob>
-{
-    public string Name { get; set; } = "";
-    public List<string> Tags { get; set; } = [];
-
-    public static Task Execute(TaggedJob job, JobContext ctx, CancellationToken ct)
-    {
-        job.Name = "renamed";
-        return Task.CompletedTask;
-    }
-}
-
-/// <summary>An idempotent job that defers its first run by five minutes; it can also submit a duplicate of itself while
-/// that first run is in flight (JOBS-0006, JOBS-0010).</summary>
+/// <summary>An idempotent job that defers its first run by five minutes (JOBS-0006, JOBS-0010).</summary>
 [JobIdempotent(nameof(Key))]
 public sealed class DeferringJob : Entity<DeferringJob>, IKoanJob<DeferringJob>
 {
     public static readonly TimeSpan Deferral = TimeSpan.FromMinutes(5);
     public static int Executions;
-    public static bool SubmitDuplicateWhileRunning;
     public string Key { get; set; } = "";
 
-    public static async Task Execute(DeferringJob job, JobContext ctx, CancellationToken ct)
+    public static Task Execute(DeferringJob job, JobContext ctx, CancellationToken ct)
     {
-        if (Interlocked.Increment(ref Executions) != 1) return;
-        if (SubmitDuplicateWhileRunning) await job.Job.Submit(ct: ct);
-        ctx.Reschedule(Deferral);
+        if (Interlocked.Increment(ref Executions) == 1) ctx.Reschedule(Deferral);
+        return Task.CompletedTask;
     }
 
-    public static void Reset() { Executions = 0; SubmitDuplicateWhileRunning = false; }
+    public static void Reset() => Executions = 0;
 }
 
 /// <summary>Two actions on one entity, each in its own lane (so only per-entity serialization can hold them

@@ -47,9 +47,6 @@ internal sealed class RoutingJobLedger : IJobLedger
     public Task<JobRecord?> AppendCoalescing(JobRecord record, CancellationToken ct)
         => For(record.WorkType).AppendCoalescing(record, ct);
 
-    public Task<JobRecord?> TryRequeue(JobRecord record, string claimToken, CancellationToken ct)
-        => For(record.WorkType).TryRequeue(record, claimToken, ct);
-
     // Disjoint job sets: claiming durable-then-volatile never double-claims; gates are mirrored so each honors all.
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
@@ -58,32 +55,6 @@ internal sealed class RoutingJobLedger : IJobLedger
            ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools);
 
     public Task<bool> Update(JobRecord record, CancellationToken ct) => For(record.WorkType).Update(record, ct);
-
-    public async Task Progress(string jobId, string claimToken, double fraction, string? message, CancellationToken ct)
-    {
-        if (await _durable.Get(jobId, ct) is not null) await _durable.Progress(jobId, claimToken, fraction, message, ct);
-        else await _inMemory.Progress(jobId, claimToken, fraction, message, ct);
-    }
-
-    // A running job lives in exactly one ledger; probe durable then volatile like Get.
-    public async Task<JobRecord?> RenewLease(string jobId, string claimToken, DateTimeOffset leaseUntil, CancellationToken ct)
-        => await _durable.RenewLease(jobId, claimToken, leaseUntil, ct)
-           ?? await _inMemory.RenewLease(jobId, claimToken, leaseUntil, ct);
-
-    public Task<JobRecord?> TrySettle(JobRecord record, string claimToken, CancellationToken ct)
-        => For(record.WorkType).TrySettle(record, claimToken, ct);
-
-    // A successor lives in its predecessor's ledger; probe durable then volatile like Get.
-    public async Task<bool> ReleaseHeld(string successorId, string holderToken, bool cancel, DateTimeOffset now, CancellationToken ct)
-        => await _durable.ReleaseHeld(successorId, holderToken, cancel, now, ct)
-           || await _inMemory.ReleaseHeld(successorId, holderToken, cancel, now, ct);
-
-    public async Task<bool> DeleteHeld(string successorId, string holderToken, CancellationToken ct)
-        => await _durable.DeleteHeld(successorId, holderToken, ct)
-           || await _inMemory.DeleteHeld(successorId, holderToken, ct);
-
-    public async Task<IReadOnlyList<JobRecord>> Held(int page, int limit, CancellationToken ct)
-        => Concat(await _durable.Held(page, limit, ct), await _inMemory.Held(page, limit, ct));
 
     // Reservations (PMC-056) live in exactly one tier's ledger, like the rows they point at.
     public async Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)

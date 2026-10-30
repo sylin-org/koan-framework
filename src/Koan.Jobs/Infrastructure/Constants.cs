@@ -16,12 +16,8 @@ internal static class Constants
         // Jobs one cancellation read loads for a work item (JOBS-0010): it pages until a page falls short.
         public const int CancelPageSize = 100;
 
-        // Times a cancellation reads a page or a running job again after a write lost to a change made since its read.
+        // Times a cancellation reads a job again after its write lost to a change made since its read.
         public const int CancelRereads = 3;
-
-        // Passes a cancellation makes over its work item, each marking running jobs and cancelling queued ones, before it
-        // stops even if a pass still found a job it had not handled (JOBS-0010).
-        public const int CancelPasses = 5;
     }
 
     internal static class Worker
@@ -34,13 +30,6 @@ internal static class Constants
         public static readonly TimeSpan LongestWait = TimeSpan.FromDays(1);
     }
 
-    internal static class Settlement
-    {
-        // Reads a settle makes to merge a handler's changes onto a row other writers keep changing before it reports
-        // a conflict: the first read, plus two more for writes that land between a read and its guarded replace.
-        public const int MergeAttempts = 3;
-    }
-
     internal static class Retention
     {
         // Rows one retention read loads and removes at a time (JOBS-0010): the sweep pages until a page falls short.
@@ -50,11 +39,6 @@ internal static class Constants
     internal static class Work
     {
         public const string SingletonId = "__koan_job_singleton__";
-
-        /// <summary>How many coalesced jobs a handle follows to the job that serves its submission (JOBS-0010). A
-        /// submission is absorbed only into a job that has not settled, so a chain stays short; the bound only keeps a
-        /// corrupt ledger from holding a waiter.</summary>
-        public const int MaxServedHops = 16;
     }
 
     internal static class Diagnostics

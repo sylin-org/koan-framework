@@ -1,7 +1,6 @@
 using System.Reflection;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 
@@ -25,8 +24,6 @@ internal sealed class JobTypeBinding
         Func<string, CancellationToken, Task<object?>> load,
         Func<object, CancellationToken, Task> save,
         Func<object, CancellationToken, Task> insert,
-        Func<object, Filter, CancellationToken, Task<bool>> replaceIf,
-        Func<FilterSupport> guardSupport,
         Func<object, JobContext, CancellationToken, Task> execute,
         Func<object, string> getId,
         Func<string, object> newSingleton,
@@ -44,8 +41,6 @@ internal sealed class JobTypeBinding
         Load = load;
         Save = save;
         Insert = insert;
-        ReplaceIf = replaceIf;
-        GuardSupport = guardSupport;
         Execute = execute;
         GetId = getId;
         NewSingleton = newSingleton;
@@ -62,7 +57,7 @@ internal sealed class JobTypeBinding
     /// <summary>Stable type key (the work-item type's full name); stored on each <see cref="JobRecord.WorkType"/>.</summary>
     public string WorkType { get; }
     public Type ClrType { get; }
-    public Func<string, CancellationToken, Task<object?>> Load { get; private set; }
+    public Func<string, CancellationToken, Task<object?>> Load { get; }
     public Func<object, CancellationToken, Task> Save { get; }
 
     /// <summary>Write the work item only when its identity is absent — never over a stored row (JOBS-0010). Atomic where
@@ -70,21 +65,6 @@ internal sealed class JobTypeBinding
     /// save is deferred to the commit.</summary>
     public Func<object, CancellationToken, Task> Insert { get; }
 
-    /// <summary>Replace the stored work item only while it still matches the guard. Throws
-    /// <see cref="NotSupportedException"/> where the store or the entity's scope cannot replace conditionally.</summary>
-    public Func<object, Filter, CancellationToken, Task<bool>> ReplaceIf { get; }
-
-    /// <summary>The operators the work item's store compares natively — what a settle's guard may use.</summary>
-    public Func<FilterSupport> GuardSupport { get; }
-
-    /// <summary>This binding with another loader — how a spec stands another writer between a settle's read and its
-    /// write.</summary>
-    internal JobTypeBinding WithLoad(Func<string, CancellationToken, Task<object?>> load)
-    {
-        var copy = (JobTypeBinding)MemberwiseClone();
-        copy.Load = load;
-        return copy;
-    }
     public Func<object, JobContext, CancellationToken, Task> Execute { get; }
     public Func<object, string> GetId { get; }
     /// <summary>Create a fresh work-item instance with a stable id — used for type-level triggers and scheduled
@@ -247,18 +227,12 @@ internal static class JobTypeBinder
             else
                 await Entity<T>.Insert(item, ct: ct);   // a conflict means another writer created it first: theirs stands
         };
-        Func<object, Filter, CancellationToken, Task<bool>> replaceIf = (o, guard, ct) =>
-            (Data<T, string>.As<IConditionalWriteRepository<T, string>>()
-                ?? throw new NotSupportedException($"The store backing {clr.Name} cannot replace conditionally."))
-            .ConditionalReplaceAsync((T)o, guard, ct);
-        Func<FilterSupport> guardSupport = () =>
-            Data<T, string>.Capabilities.Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
         Func<object, JobContext, CancellationToken, Task> execute = (o, ctx, ct) => T.Execute((T)o, ctx, ct);
         Func<object, string> getId = o => ((T)o).Id;
         Func<string, object> newSingleton = id => { var t = Activator.CreateInstance<T>(); t.Id = id; return t; };
 
         return new JobTypeBinding(
-            clr.FullName!, clr, load, save, insert, replaceIf, guardSupport, execute, getId, newSingleton, chain,
+            clr.FullName!, clr, load, save, insert, execute, getId, newSingleton, chain,
             persist?.Mode ?? JobPersistenceMode.Auto, parallelSafe,
             actions, coalesceProps, gateProp, gateResolver, pool?.PoolName);
     }

@@ -64,9 +64,6 @@ internal sealed class WorkItemImage
             : left.Type == right.Type
               && string.Equals(left.ToString(Formatting.None), right.ToString(Formatting.None), StringComparison.Ordinal);
 
-    /// <summary>True when every member has the same stored form in both images.</summary>
-    public bool SameAs(WorkItemImage other) => ChangedIn(other).Count == 0;
-
     /// <summary>This document with <paramref name="members"/> taken from <paramref name="source"/>, materialized as
     /// <paramref name="type"/> through the serializer persistence restores with.</summary>
     public object With(WorkItemImage source, IEnumerable<string> members, Type type)

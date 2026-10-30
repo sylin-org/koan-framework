@@ -61,7 +61,8 @@ public sealed class JobsOptions
 
     /// <summary>When true (default), the reaper reclaims running jobs of a <em>confirmed-dead</em> worker as soon
     /// as the death timeout expires, instead of waiting for the lease to lapse. Safe because the revived node's
-    /// lease renewal and settlement are ownership-guarded and it abandons without settling (JOBS-0009).</summary>
+    /// lease renewal and settlement compare on a revision the reclaim changed, and it abandons without settling
+    /// (JOBS-0009, JOBS-0010).</summary>
     public bool ReclaimFromConfirmedDead { get; set; } = true;
 
     /// <summary>Reaper sweep cadence (Running &amp;&amp; lease lapsed → reclaim).</summary>
@@ -81,11 +82,6 @@ public sealed class JobsOptions
 
     /// <summary>Spread applied past a deferral's release time to avoid a thundering herd.</summary>
     public TimeSpan RescheduleJitter { get; set; } = TimeSpan.FromSeconds(2);
-
-    /// <summary>How many times a job runs again because the changes it made to its work item conflicted with another
-    /// writer's (JOBS-0010). A conflict is valid work made against a stale item: it never consumes an attempt and never
-    /// advances a chain. Past this bound the job is dead-lettered as <see cref="DeadReason.Conflict"/>.</summary>
-    public int MaxWriteConflicts { get; set; } = 5;
 
     /// <summary>Base delay for exponential retry backoff.</summary>
     public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromSeconds(2);
@@ -131,7 +127,7 @@ public sealed class JobsOptions
     /// durable ledger is governed by <see cref="ArchiveAfter"/>, <see cref="FailedAfter"/> and
     /// <see cref="RetainPerWorkType"/>. Zero keeps none. A <c>JobHandle</c> already waiting on a job hears its outcome when it
     /// settles, because the ledger tells it before it evicts the job; a status read finds no job, and a handle that asks
-    /// after the job was evicted reads <see cref="JobOutcome.Unknown"/>, never a failure.</summary>
+    /// after the job was evicted reads an outcome with no status, never a failure.</summary>
     public int InMemoryTerminalCapacity { get; set; } = 4096;
 
     /// <summary>How often the worker runs the archival sweep.</summary>

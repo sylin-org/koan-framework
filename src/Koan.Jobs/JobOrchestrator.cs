@@ -27,13 +27,9 @@ internal sealed class JobOrchestrator
 
     private readonly string _owner = Guid.CreateVersion7().ToString("N");
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _lanes = new(StringComparer.Ordinal);
-    // JOBS-0010: keyed by claim token, so a zombie execution and its own node's re-claim of the job never share an entry.
-    private readonly ConcurrentDictionary<string, (string JobId, CancellationTokenSource Execution)> _running = new(StringComparer.Ordinal);
-    // JOBS-0010: the chain successor each running claim has appended, held for it, until a settlement closes it.
-    private readonly ConcurrentDictionary<string, string> _heldSuccessors = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _running = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, byte> _unregisteredWorkTypeWarnings = new(StringComparer.Ordinal);
     private readonly JobMetricsRecorder _metrics;
-    private readonly WorkItemWriter _writer;
     private DateTimeOffset _lastAssignAt = DateTimeOffset.MinValue;
 
     public JobOrchestrator(
@@ -50,7 +46,6 @@ internal sealed class JobOrchestrator
         _poolResolvers = poolResolvers.ToList();
         _contextPlan = contextPlan;
         _metrics = new JobMetricsRecorder(_options.MetricsEnabled, _owner, _clock);
-        _writer = new WorkItemWriter(logger);
 
         // PMC-056 corrective boundary: an inline host executes jobs on the caller — there is no fleet roster to
         // reserve against, so reservation dispatch cannot be honored and must refuse rather than silently degrade.
@@ -112,15 +107,40 @@ internal sealed class JobOrchestrator
         }
     }
 
-    /// <summary>Fire the cancellation token of every execution of a job running on this node (the durable marker is set
-    /// by the caller).</summary>
-    public void SignalCancel(string jobId)
+    /// <summary>Cancel one job, landing on whatever state it is in when the write lands (JOBS-0010): a queued job is
+    /// cancelled, a running one is marked and its handler on this node signalled, and a settled one is left alone. Each
+    /// write is a compare on the revision read; a miss reads the job again, a bounded number of times.</summary>
+    public async Task CancelAsync(JobRecord? current, DateTimeOffset now, CancellationToken ct)
     {
-        foreach (var (_, run) in _running)
-            if (string.Equals(run.JobId, jobId, StringComparison.Ordinal))
+        var id = current?.Id;
+        for (var attempt = 0; attempt <= Infrastructure.Constants.Submission.CancelRereads && current is not null; attempt++)
+        {
+            switch (current.Status)
             {
-                try { run.Execution.Cancel(); } catch (ObjectDisposedException) { }
+                case JobStatus.Queued:
+                    current.CancelRequestedAt = now;
+                    current.ReleaseCoalesceSlot();
+                    current.LastSettledAt = now;
+                    current.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
+                    SetStatus(current, JobStatus.Cancelled, now, "cancelled (pre-run)");
+                    if (await _ledger.Update(current, ct)) return;
+                    break;
+                case JobStatus.Running:
+                    if (current.CancelRequestedAt is null)
+                    {
+                        current.CancelRequestedAt = now;
+                        if (!await _ledger.Update(current, ct)) break;
+                    }
+                    if (_running.TryGetValue(current.Id, out var execution))
+                    {
+                        try { execution.Cancel(); } catch (ObjectDisposedException) { }
+                    }
+                    return;
+                default:
+                    return;
             }
+            current = await _ledger.Get(id!, ct);
+        }
     }
 
     /// <summary>The worker's dispatch step (JOBS-0010): claim one ready job and start its execution in the background
@@ -177,10 +197,9 @@ internal sealed class JobOrchestrator
 
     private async Task<JobContext?> ExecuteClaimedAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, CancellationToken workerCt)
     {
-        // JOBS-0010: the token this execution's claim wrote is its authority for every owner write — renewal, progress,
-        // settlement. An execution whose claim was taken over, on another node or on this one, carries a token the row
-        // no longer holds, and every write it tries bounces.
-        var token = rec.ClaimToken ?? throw new InvalidOperationException("Claimed job has no claim token.");
+        // JOBS-0010: every write this execution makes to its row goes through it, and an execution whose claim was taken
+        // over, on another node or on this one, writes nothing.
+        var run = new ClaimedRow(_ledger, rec);
         // Restore the Koan context captured at submit BEFORE loading the (possibly tenant-scoped)
         // work-item, and keep them in scope across load + execute + settle (the conditional auto-save included) so
         // every tenant-scoped read/write runs in the submitted tenant. A restore failure (an unregistered axis, or
@@ -197,7 +216,7 @@ internal sealed class JobOrchestrator
         catch (Exception ex)
         {
             dataScope?.Dispose();
-            await SettleCarrierFailureAsync(rec, token, ex);
+            await SettleCarrierFailureAsync(rec, run, ex);
             return null;
         }
         using var _data = dataScope;
@@ -205,10 +224,10 @@ internal sealed class JobOrchestrator
 
         object? workItem;
         try { workItem = await binding.Load(rec.WorkId, workerCt); }
-        catch (Exception ex) { await SettleFailureAsync(rec, binding, policy, ex, token); return null; }
+        catch (Exception ex) { await SettleFailureAsync(rec, run, binding, policy, ex); return null; }
         // Type-level triggers (TriggerAsync) use an ephemeral singleton that is never persisted; re-create it here.
         workItem ??= rec.WorkId == Infrastructure.Constants.Work.SingletonId ? binding.NewSingleton(rec.WorkId) : null;
-        if (workItem is null) { await SettleFailureAsync(rec, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found."), token); return null; }
+        if (workItem is null) { await SettleFailureAsync(rec, run, binding, policy, new InvalidOperationException($"Work-item {rec.WorkType}/{rec.WorkId} not found.")); return null; }
         Notify(rec.WorkType, JobEventKind.Claimed, workItem, rec);
 
         var loaded = WorkItemImage.Capture(workItem);   // the item as Koan stores it: what settle compares against (JOBS-0010)
@@ -217,18 +236,16 @@ internal sealed class JobOrchestrator
             ? new CancellationTokenSource(to, _clock)
             : new CancellationTokenSource();
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(workerCt, timeoutCts.Token);
-        _running[token] = (rec.Id, linked);
+        _running[rec.Id] = linked;
         if (rec.CancelRequestedAt is not null) { try { linked.Cancel(); } catch (ObjectDisposedException) { } }
 
         using var scope = _scopes.CreateScope();
         Task PersistProgress(string jobId, double fraction, string? message, CancellationToken ct)
-        {
-            // Progress is written for live observers, merged onto the row as stored; this execution's copy keeps its own
-            // last value too, which its settlement writes (JOBS-0010).
-            rec.ProgressFraction = fraction;
-            rec.ProgressMessage = message;
-            return _ledger.Progress(jobId, token, fraction, message, ct);
-        }
+            => run.Write(r =>
+            {
+                r.ProgressFraction = fraction;
+                r.ProgressMessage = message;
+            }, ct);
 
         var ctx = new JobContext(rec.Action, rec.Id, scope.ServiceProvider, _logger, ToState(rec), _clock, linked.Token, PersistProgress);
         // JOBS-0009 lease heartbeat: hold the claim alive while the handler runs. Losing the lease means another
@@ -236,7 +253,7 @@ internal sealed class JobOrchestrator
         var lostLease = 0;
         try
         {
-            using (_ = StartLeaseRenewal(rec, token, linked, () => Volatile.Write(ref lostLease, 1), workerCt))
+            using (_ = StartLeaseRenewal(rec, run, linked, () => Volatile.Write(ref lostLease, 1), workerCt))
             {
                 await binding.Execute(workItem, ctx, linked.Token);
             }
@@ -246,14 +263,12 @@ internal sealed class JobOrchestrator
                 Notify(rec.WorkType, JobEventKind.Abandoned, workItem, rec);
                 return ctx;
             }
-            // The success is decided on a copy of the run's row: a failure that ends its settlement is settled from the row
-            // as the run left it, never from a completion that did not land.
-            await SettleSuccessAsync(rec.Clone(), workItem, binding, policy, ctx, loaded, token);
+            await SettleSuccessAsync(rec, run, workItem, binding, policy, ctx, loaded);
         }
         catch (RescheduleException rex)
         {
             var until = rex.Until ?? _clock.GetUtcNow() + (rex.After ?? TimeSpan.Zero);
-            await ApplyDeferralAsync(rec, binding, policy, until, rex.Gate, rex.Gate ? rex.GateKey : null, hasOverride: rex.Gate, "reschedule-exception", token);
+            await ApplyDeferralAsync(rec, run, policy, until, rex.Gate, rex.Gate ? rex.GateKey : null, hasOverride: rex.Gate, "reschedule-exception");
         }
         catch (OperationCanceledException)
         {
@@ -263,22 +278,19 @@ internal sealed class JobOrchestrator
                 Notify(rec.WorkType, JobEventKind.Abandoned, workItem, rec);
             }
             else if (timeoutCts.IsCancellationRequested)
-                await SettleFailureAsync(rec, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."), token);
+                await SettleFailureAsync(rec, run, binding, policy, new TimeoutException($"Action '{rec.Action}' exceeded its timeout."));
             else if (await IsCancelMarkerSet(rec.Id))
-                await SettleCancelledAsync(rec, token);
+                await SettleCancelledAsync(rec, run);
             else
-                await SettleShutdownAsync(rec, token); // worker stopping — revert for reclaim
+                await SettleShutdownAsync(rec, run); // worker stopping — revert for reclaim
         }
         catch (Exception ex)
         {
-            await SettleFailureAsync(rec, binding, policy, ex, token);
+            await SettleFailureAsync(rec, run, binding, policy, ex);
         }
         finally
         {
-            _running.TryRemove(token, out _);
-            // A successor still held here met an end of claim whose outcome is unknown (the store failed under it): the
-            // reaper decides it, by the settlement it was appended for.
-            _heldSuccessors.TryRemove(token, out _);
+            _running.TryRemove(new KeyValuePair<string, CancellationTokenSource>(rec.Id, linked));
         }
         return ctx;
     }
@@ -289,7 +301,7 @@ internal sealed class JobOrchestrator
     /// renewal that reads a cancellation request — asked on any node — cancels the handler's token too (JOBS-0010). The
     /// loop swallows its own cancellation; transient renewal-write failures are retried next tick — the reaper remains
     /// the bound.</summary>
-    private LeaseHeartbeat StartLeaseRenewal(JobRecord rec, string token, CancellationTokenSource execution, Action onLost, CancellationToken workerCt)
+    private LeaseHeartbeat StartLeaseRenewal(JobRecord rec, ClaimedRow run, CancellationTokenSource execution, Action onLost, CancellationToken workerCt)
     {
         var duration = _options.LeaseDuration;
         if (duration <= TimeSpan.Zero || rec.Id is null)
@@ -309,8 +321,8 @@ internal sealed class JobOrchestrator
                 while (await timer.WaitForNextTickAsync(cts.Token))
                 {
                     JobRecord? renewed;
-                    var now = _clock.GetUtcNow();
-                    try { renewed = await _ledger.RenewLease(jobId, token, now + duration, cts.Token); }
+                    var until = _clock.GetUtcNow() + duration;
+                    try { renewed = await run.Write(r => r.LeaseUntil = until, cts.Token); }
                     catch (OperationCanceledException) when (cts.Token.IsCancellationRequested) { break; }
                     catch (Exception ex)
                     {
@@ -364,32 +376,35 @@ internal sealed class JobOrchestrator
         catch (Exception ex) { _logger.LogDebug(ex, "Job lifecycle observer for {WorkType} threw; treated as consumed.", rec.WorkType); }
     }
 
-    /// <summary>End this execution's claim (PMC-055, JOBS-0010): the ledger merges its decision onto the row as stored,
-    /// only while the row carries its claim token, and returns the row as written — a requeue the job was asked to cancel
-    /// during comes back Cancelled. Null when the claim was taken over: another claim holds the row and nothing was
-    /// written, so a revived zombie never clobbers its successor.</summary>
-    private async Task<JobRecord?> EndClaimAsync(JobRecord rec, string token, string? releasing = null)
+    /// <summary>End this execution's claim (PMC-055, JOBS-0010): <paramref name="decide"/> applies its outcome onto the row
+    /// as stored and ownership is given up. Asked to cancel while it ran, a job its execution would return to the queue — a
+    /// retry, a deferral, a shutdown — settles Cancelled instead; a completion or a failure settles as decided. Null when the
+    /// claim was taken over: nothing was written, so a revived zombie never clobbers its successor.</summary>
+    private async Task<JobRecord?> EndClaimAsync(JobRecord rec, ClaimedRow run, DateTimeOffset now, Action<JobRecord> decide)
     {
-        var written = rec.Status == JobStatus.Queued
-            ? await _ledger.TryRequeue(rec, token, CancellationToken.None)
-            : await _ledger.TrySettle(rec, token, CancellationToken.None);
+        var written = await run.Write(row =>
+        {
+            row.Owner = null;
+            row.LeaseUntil = null;
+            row.ReservedFor = null;
+            row.ReservedUntil = null;
+            decide(row);
+            if (row.Status == JobStatus.Queued && row.CancelRequestedAt is not null)
+            {
+                row.LastSettledAt = now;
+                row.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
+                row.DeferReason = null;
+                SetStatus(row, JobStatus.Cancelled, now, "cancelled (asked while it ran)");
+            }
+        }, CancellationToken.None);
         if (written is null)
             _logger.LogWarning(
                 "Koan.Jobs abandoned settling job {JobId}: its claim was taken over (reclaimed); no write was made.",
                 rec.Id);
-        // An end of claim that lands closes the held successor it does not release: one a failure that aborts, or a
-        // requeue, met after the success path appended it (JOBS-0010). One that did not land leaves it to the reaper, which
-        // decides by the settlement it was held for: the completion it was appended for may have landed, its answer lost.
-        if (_heldSuccessors.TryGetValue(token, out var appended) && !string.Equals(appended, releasing, StringComparison.Ordinal))
-        {
-            _heldSuccessors.TryRemove(token, out _);
-            if (written is not null)
-                await _ledger.DeleteHeld(appended, token, CancellationToken.None);
-        }
         return written;
     }
 
-    /// <summary>A requeue the ledger settled Cancelled, because the job was asked to cancel while it ran (JOBS-0010): the
+    /// <summary>A requeue that settled Cancelled, because the job was asked to cancel while it ran (JOBS-0010): the
     /// cancellation is what happened, so no gate is set and no reschedule is published.</summary>
     private void SettledCancelled(JobRecord written)
     {
@@ -397,60 +412,41 @@ internal sealed class JobOrchestrator
         Notify(written.WorkType, JobEventKind.Cancelled, null, written);
     }
 
-    /// <summary>Append the chain successor this run settles into, held for it (JOBS-0010): queued but never claimed until
-    /// this run's settlement releases it, under an id derived from this job and its claim token, so a run's appends write
-    /// one row and two runs never collide.</summary>
-    private async Task<string> AppendHeldSuccessorAsync(JobRecord rec, string token, JobTypeBinding binding, object workItem, string next,
-        DateTimeOffset now, JobStatus heldOn)
+    /// <summary>Append the chain's next stage before this one settles (JOBS-0010), so a process death between the two costs a
+    /// second run, never the chain: the job runs again and addresses the same row. A job's exclusivity holds the next stage
+    /// back until this one leaves Running.</summary>
+    private async Task<string> AppendSuccessorAsync(JobRecord rec, JobTypeBinding binding, object workItem, string next, DateTimeOffset now)
     {
         var nextPolicy = binding.ResolvePolicy(next, _options);
         // Chain stages inherit the gate key resolved at submit (the chain's gate pool is fixed — §18) and the ambient
         // carrier (ARCH-0100 §7): the successor is appended by the orchestrator, NOT the coordinator, so
         // capture-at-submit never fires for it — propagate the parent's bag verbatim.
         var successor = JobRecordFactory.Create(binding, nextPolicy, workItem, rec.WorkId, next, now, null, rec.CorrelationId, rec.GateKey, rec.AmbientCarrier, JobDataRoute.From(rec));
-        successor.Id = JobRecord.SuccessorId(rec.Id, token);
-        successor.HeldBy = token;
-        successor.HeldFor = rec.Id;
-        successor.HeldOn = heldOn;
+        successor.Id = JobRecord.SuccessorId(rec.Id, next);
         await _ledger.Append(successor, CancellationToken.None);
-        _heldSuccessors[token] = successor.Id;
         return successor.Id;
     }
 
-    /// <summary>Close the chain by order (JOBS-0010): a settlement that landed releases this run's held successor, or
-    /// cancels it when the row as settled carries a cancellation request. One that did not land leaves it to the reaper,
-    /// which decides by what the row shows: a claim taken over, or an earlier end of this claim that landed with its answer
-    /// lost.</summary>
-    private async Task CloseSuccessorAsync(string? successorId, string token, JobRecord? written)
+    /// <summary>A stage that settled asked to cancel stops the chain: the successor it appended is cancelled.</summary>
+    private async Task StopSuccessorIfCancelledAsync(string? successorId, JobRecord written, DateTimeOffset now)
     {
-        if (successorId is null) return;
-        _heldSuccessors.TryRemove(token, out _);
-        if (written is not null)
-            await _ledger.ReleaseHeld(successorId, token, cancel: written.CancelRequestedAt is not null, _clock.GetUtcNow(), CancellationToken.None);
+        if (successorId is not null && written.CancelRequestedAt is not null)
+            await CancelAsync(await _ledger.Get(successorId, CancellationToken.None), now, CancellationToken.None);
     }
 
-    private async Task SettleSuccessAsync(JobRecord rec, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, WorkItemImage? loaded, string token)
+    private async Task SettleSuccessAsync(JobRecord rec, ClaimedRow run, object workItem, JobTypeBinding binding, ResolvedActionPolicy policy, JobContext ctx, WorkItemImage? loaded)
     {
         if (ctx.Signal is JobSignal.Reschedule or JobSignal.Backoff)
         {
             var until = ctx.DeferUntil ?? _clock.GetUtcNow();
-            await ApplyDeferralAsync(rec, binding, policy, until, ctx.Signal == JobSignal.Backoff, ctx.GateKeyOverride, ctx.GateKeyOverrideSet, "cooperative-backoff", token);
+            await ApplyDeferralAsync(rec, run, policy, until, ctx.Signal == JobSignal.Backoff, ctx.GateKeyOverride, ctx.GateKeyOverrideSet, "cooperative-backoff");
             return;
         }
 
         // Write back only what the handler changed on the reference it was given, merged onto the stored row (JOBS-0010):
         // a handler that worked on its own copy left this one clean, and a write another writer made while the job ran
-        // stands. A member both changed is a conflict: the work is valid but stale, so the job runs again on the stored
-        // item, and nothing settles or advances.
-        try
-        {
-            await _writer.Persist(binding, rec.WorkId, workItem, loaded, CancellationToken.None);
-        }
-        catch (WorkItemConflictException conflict)
-        {
-            await SettleConflictAsync(rec, conflict, token);
-            return;
-        }
+        // stands. A member both changed is a conflict, which fails this attempt: the job runs again on the stored item.
+        await WorkItemWriter.Persist(binding, rec.WorkId, workItem, loaded, CancellationToken.None);
 
         var now = _clock.GetUtcNow();
         var next = ctx.Signal switch
@@ -459,94 +455,88 @@ internal sealed class JobOrchestrator
             JobSignal.StopChain => null,
             _ => binding.NextInChain(rec.Action),
         };
-        var successorId = next is null ? null : await AppendHeldSuccessorAsync(rec, token, binding, workItem, next, now, JobStatus.Completed);
+        var successorId = next is null ? null : await AppendSuccessorAsync(rec, binding, workItem, next, now);
 
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastError = null;
-        rec.DeferReason = null;
-        rec.LastSettledAt = now;
-        rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
-        SetStatus(rec, JobStatus.Completed, now, "completed");
-        var written = await EndClaimAsync(rec, token, releasing: successorId);
-        await CloseSuccessorAsync(successorId, token, written);
+        var written = await EndClaimAsync(rec, run, now, row =>
+        {
+            row.LastError = null;
+            row.DeferReason = null;
+            row.LastSettledAt = now;
+            row.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
+            SetStatus(row, JobStatus.Completed, now, "completed");
+        });
         if (written is null) return;
+        await StopSuccessorIfCancelledAsync(successorId, written, now);
         _metrics.Record(rec.WorkType, JobStatus.Completed, now);
         Notify(rec.WorkType, JobEventKind.Completed, workItem, written);
     }
 
-    private async Task SettleFailureAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy, Exception ex, string token)
+    private async Task SettleFailureAsync(JobRecord rec, ClaimedRow run, JobTypeBinding binding, ResolvedActionPolicy policy, Exception ex)
     {
         var now = _clock.GetUtcNow();
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastError = ex.Message;
-        rec.LastSettledAt = now;
-
         if (rec.Attempt < policy.MaxAttempts)
         {
-            rec.VisibleAt = now + RetryDelay(rec.Attempt);
-            SetStatus(rec, JobStatus.Queued, now, $"retry {rec.Attempt}/{policy.MaxAttempts}: {ex.GetType().Name}");
-            if (await EndClaimAsync(rec, token) is { IsTerminal: true } cancelled) SettledCancelled(cancelled);
+            var written = await EndClaimAsync(rec, run, now, row =>
+            {
+                row.LastError = ex.Message;
+                row.LastSettledAt = now;
+                row.VisibleAt = now + RetryDelay(rec.Attempt);
+                SetStatus(row, JobStatus.Queued, now, $"retry {rec.Attempt}/{policy.MaxAttempts}: {ex.GetType().Name}");
+            });
+            if (written is { IsTerminal: true }) SettledCancelled(written);
             return;
         }
 
-        rec.DeadReason = DeadReason.Poison.ToString();
-        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
-        SetStatus(rec, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
         string? successorId = null;
-        // Under OnFailure.Continue the chain advances either way: a successor this run already holds — its success's end of
-        // claim failed, and may have landed — is the one this failure releases, still held on the completion it was
-        // appended for, so the reaper releases it should that completion be what landed.
-        if (policy.OnFailure == OnFailure.Continue && _heldSuccessors.TryGetValue(token, out var held))
-            successorId = held;
-        else if (policy.OnFailure == OnFailure.Continue && binding.NextInChain(rec.Action) is { } next
+        // Under OnFailure.Continue the chain advances either way.
+        if (policy.OnFailure == OnFailure.Continue && binding.NextInChain(rec.Action) is { } next
             && await binding.Load(rec.WorkId, CancellationToken.None) is { } wi)
-            successorId = await AppendHeldSuccessorAsync(rec, token, binding, wi, next, now, JobStatus.Failed);
-        var written = await EndClaimAsync(rec, token, releasing: successorId);
-        await CloseSuccessorAsync(successorId, token, written);
-        if (written is null) return;
+            successorId = await AppendSuccessorAsync(rec, binding, wi, next, now);
+        var failed = await EndClaimAsync(rec, run, now, row =>
+        {
+            row.LastError = ex.Message;
+            row.LastSettledAt = now;
+            row.DeadReason = DeadReason.Poison.ToString();
+            row.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+            SetStatus(row, JobStatus.Failed, now, $"failed after {policy.MaxAttempts} attempts: {ex.Message}");
+        });
+        if (failed is null) return;
+        await StopSuccessorIfCancelledAsync(successorId, failed, now);
         _metrics.Record(rec.WorkType, JobStatus.Failed, now);
-        Notify(rec.WorkType, JobEventKind.Failed, null, written, ex.Message);
+        Notify(rec.WorkType, JobEventKind.Failed, null, failed, ex.Message);
     }
 
     /// <summary>The captured Koan context could not be restored (unknown axis, invalid format/version, or insufficient
     /// trust). Deterministic — retrying would fail identically — so dead-letter immediately rather than run the handler
     /// in a wrong/absent context. The work item is never loaded.</summary>
-    private async Task SettleCarrierFailureAsync(JobRecord rec, string token, Exception ex)
+    private async Task SettleCarrierFailureAsync(JobRecord rec, ClaimedRow run, Exception ex)
     {
         var now = _clock.GetUtcNow();
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastError = ex.Message;
-        rec.LastSettledAt = now;
-        rec.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
-        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
-        SetStatus(rec, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
-        if (await EndClaimAsync(rec, token) is not { } written) return;
+        var written = await EndClaimAsync(rec, run, now, row =>
+        {
+            row.LastError = ex.Message;
+            row.LastSettledAt = now;
+            row.DeadReason = DeadReason.CarrierRestoreFailed.ToString();
+            row.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+            SetStatus(row, JobStatus.Dead, now, $"ambient carrier restore failed: {ex.Message}");
+        });
+        if (written is null) return;
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
         Notify(rec.WorkType, JobEventKind.DeadLettered, null, written, ex.Message);
     }
 
-    private async Task SettleUnregisteredWorkTypeAsync(JobRecord rec, string token)
+    private async Task SettleUnregisteredWorkTypeAsync(JobRecord rec)
     {
         var now = _clock.GetUtcNow();
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastError = $"No job binding is registered for work type '{rec.WorkType}'.";
-        rec.LastSettledAt = now;
-        rec.DeadReason = DeadReason.UnregisteredWorkType.ToString();
-        rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
-        SetStatus(rec, JobStatus.Dead, now, $"unregistered work type: {rec.WorkType}");
-        if (await EndClaimAsync(rec, token) is null) return;
+        var written = await EndClaimAsync(rec, new ClaimedRow(_ledger, rec), now, row =>
+        {
+            row.LastError = $"No job binding is registered for work type '{rec.WorkType}'.";
+            row.LastSettledAt = now;
+            row.DeadReason = DeadReason.UnregisteredWorkType.ToString();
+            row.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+            SetStatus(row, JobStatus.Dead, now, $"unregistered work type: {rec.WorkType}");
+        });
+        if (written is null) return;
         _metrics.Record(rec.WorkType, JobStatus.Dead, now);
         if (_unregisteredWorkTypeWarnings.TryAdd(rec.WorkType, 0))
             _logger.LogWarning(
@@ -560,37 +550,46 @@ internal sealed class JobOrchestrator
                 rec.WorkType);
     }
 
-    private async Task ApplyDeferralAsync(JobRecord rec, JobTypeBinding binding, ResolvedActionPolicy policy,
-        DateTimeOffset until, bool gate, string? gateKeyOverride, bool hasOverride, string reason, string token)
+    private async Task ApplyDeferralAsync(JobRecord rec, ClaimedRow run, ResolvedActionPolicy policy,
+        DateTimeOffset until, bool gate, string? gateKeyOverride, bool hasOverride, string reason)
     {
         var now = _clock.GetUtcNow();
-        // reschedule does NOT consume a retry attempt: undo the claim-time increment.
-        rec.Attempt = Math.Max(0, rec.Attempt - 1);
-        rec.Reschedules++;
-
+        var reschedules = rec.Reschedules + 1;
         var deadlineHit = rec.Deadline is { } dl && now >= dl;
-        var maxHit = policy.MaxReschedules >= 0 && rec.Reschedules > policy.MaxReschedules;
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastSettledAt = now;
+        var maxHit = policy.MaxReschedules >= 0 && reschedules > policy.MaxReschedules;
+
+        void Deferred(JobRecord row)
+        {
+            // reschedule does NOT consume a retry attempt: undo the claim-time increment.
+            row.Attempt = Math.Max(0, row.Attempt - 1);
+            row.Reschedules = reschedules;
+            row.LastSettledAt = now;
+        }
 
         if (deadlineHit || maxHit)
         {
-            rec.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
-            rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
-            SetStatus(rec, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
-            if (await EndClaimAsync(rec, token) is not { } dead) return;
+            var dead = await EndClaimAsync(rec, run, now, row =>
+            {
+                Deferred(row);
+                row.DeadReason = DeadReason.PerpetuallyDeferred.ToString();
+                row.ExpireAt = ExpiryAt(_options.FailedAfter, now);
+                SetStatus(row, JobStatus.Dead, now, deadlineHit ? "deadline exceeded" : "max reschedules exceeded");
+            });
+            if (dead is null) return;
             _metrics.Record(rec.WorkType, JobStatus.Dead, now);
             Notify(rec.WorkType, JobEventKind.DeadLettered, null, dead);
             return;
         }
 
-        rec.DeferReason = reason;
-        rec.VisibleAt = ApplyJitter(until);
-        SetStatus(rec, JobStatus.Queued, now, $"deferred to {rec.VisibleAt:O} ({reason})");
-        if (await EndClaimAsync(rec, token) is not { } written) return;
+        var visibleAt = ApplyJitter(until);
+        var written = await EndClaimAsync(rec, run, now, row =>
+        {
+            Deferred(row);
+            row.DeferReason = reason;
+            row.VisibleAt = visibleAt;
+            SetStatus(row, JobStatus.Queued, now, $"deferred to {visibleAt:O} ({reason})");
+        });
+        if (written is null) return;
         if (written.IsTerminal)
         {
             SettledCancelled(written);   // asked to cancel while it ran: no gate, no reschedule
@@ -606,69 +605,30 @@ internal sealed class JobOrchestrator
         }
     }
 
-    private async Task SettleCancelledAsync(JobRecord rec, string token)
+    private async Task SettleCancelledAsync(JobRecord rec, ClaimedRow run)
     {
         var now = _clock.GetUtcNow();
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastSettledAt = now;
-        rec.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
-        SetStatus(rec, JobStatus.Cancelled, now, "cancelled");
-        if (await EndClaimAsync(rec, token) is not { } written) return;
+        var written = await EndClaimAsync(rec, run, now, row =>
+        {
+            row.LastSettledAt = now;
+            row.ExpireAt = ExpiryAt(_options.ArchiveAfter, now);
+            SetStatus(row, JobStatus.Cancelled, now, "cancelled");
+        });
+        if (written is null) return;
         _metrics.Record(rec.WorkType, JobStatus.Cancelled, now);
         Notify(rec.WorkType, JobEventKind.Cancelled, null, written);
     }
 
-    private async Task SettleShutdownAsync(JobRecord rec, string token)
+    private async Task SettleShutdownAsync(JobRecord rec, ClaimedRow run)
     {
         var now = _clock.GetUtcNow();
-        rec.Attempt = Math.Max(0, rec.Attempt - 1); // worker stopped before completing; don't penalize
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.VisibleAt = now;
-        SetStatus(rec, JobStatus.Queued, now, "requeued (worker shutdown)");
-        if (await EndClaimAsync(rec, token) is { IsTerminal: true } cancelled) SettledCancelled(cancelled);
-    }
-
-    /// <summary>A write conflict means the handler's work was valid but made against a stale item (JOBS-0010). It never
-    /// consumes an attempt and never advances a chain: the job runs again on the stored item after a short delay, up to
-    /// <see cref="JobsOptions.MaxWriteConflicts"/> times, and past that bound it is dead-lettered as
-    /// <see cref="DeadReason.Conflict"/>.</summary>
-    private async Task SettleConflictAsync(JobRecord rec, WorkItemConflictException conflict, string token)
-    {
-        var now = _clock.GetUtcNow();
-        rec.Attempt = Math.Max(0, rec.Attempt - 1);   // a conflict is not a failed attempt: undo the claim-time increment
-        rec.Conflicts++;
-        rec.Owner = null;
-        rec.LeaseUntil = null;
-        rec.ReservedFor = null;
-        rec.ReservedUntil = null;
-        rec.LastSettledAt = now;
-
-        if (rec.Conflicts > _options.MaxWriteConflicts)
+        var written = await EndClaimAsync(rec, run, now, row =>
         {
-            rec.LastError = $"{conflict.Message} The job met a conflicting write {rec.Conflicts} times, more than " +
-                            $"JobsOptions.MaxWriteConflicts ({_options.MaxWriteConflicts}) allows, and stopped.";
-            rec.DeadReason = DeadReason.Conflict.ToString();
-            rec.ExpireAt = ExpiryAt(_options.FailedAfter, now);
-            SetStatus(rec, JobStatus.Dead, now, $"write conflict {rec.Conflicts} exceeded {_options.MaxWriteConflicts}");
-            if (await EndClaimAsync(rec, token) is not { } dead) return;
-            _metrics.Record(rec.WorkType, JobStatus.Dead, now);
-            Notify(rec.WorkType, JobEventKind.DeadLettered, null, dead, rec.LastError);
-            return;
-        }
-
-        rec.LastError = $"{conflict.Message} It runs again on the stored item ({rec.Conflicts}/{_options.MaxWriteConflicts}).";
-        rec.DeferReason = "write-conflict";
-        rec.VisibleAt = now + RetryDelay(rec.Conflicts);
-        SetStatus(rec, JobStatus.Queued, now, $"write conflict {rec.Conflicts}/{_options.MaxWriteConflicts}");
-        if (await EndClaimAsync(rec, token) is not { } written) return;
-        if (written.IsTerminal) SettledCancelled(written);
-        else Notify(rec.WorkType, JobEventKind.Rescheduled, null, written);
+            row.Attempt = Math.Max(0, row.Attempt - 1); // worker stopped before completing; don't penalize
+            row.VisibleAt = now;
+            SetStatus(row, JobStatus.Queued, now, "requeued (worker shutdown)");
+        });
+        if (written is { IsTerminal: true }) SettledCancelled(written);
     }
 
     /// <summary>Archival sweep (§19.3): purge Completed/Cancelled past <c>ArchiveAfter</c>, Failed/Dead past
@@ -723,8 +683,7 @@ internal sealed class JobOrchestrator
 
     /// <summary>Reclaim jobs whose lease lapsed (reaper sweep): revert Running → Queued for re-dispatch. The reaper runs
     /// beside the executions it may reclaim (JOBS-0010), so each reclaim is a compare on the revision the sweep read: a
-    /// row its owner renewed, settled or that another node cancelled since keeps that write. Then held chain successors
-    /// whose holder claim no longer exists are released or deleted.</summary>
+    /// row its owner renewed, settled or that another node cancelled since keeps that write.</summary>
     public async Task ReapAsync(CancellationToken ct = default)
     {
         using var storageScope = JobsStorageScope.Enter();
@@ -732,9 +691,9 @@ internal sealed class JobOrchestrator
         await ReclaimInPages(limit => _ledger.Stuck(now, limit, ct), now, "reclaimed (lease lapsed)", ct);
 
         // PMC-055: a worker confirmed dead by roster silence forfeits its running jobs immediately —
-        // ahead of lease lapse. Safe because the revived node's renewal and settlement are
-        // fenced on their claim token: it abandons without writing. This node never death-reclaims its own
-        // in-flight jobs (its heartbeat governs them; the lease is the only bound).
+        // ahead of lease lapse. Safe because a revived node's writes compare on a revision this reclaim changed: it
+        // abandons without writing. This node never death-reclaims its own in-flight jobs (its heartbeat governs them;
+        // the lease is the only bound).
         if (_options.ReclaimFromConfirmedDead && _options.WorkerDeathTimeout > TimeSpan.Zero)
         {
             var cutoff = now - _options.WorkerDeathTimeout;
@@ -748,8 +707,6 @@ internal sealed class JobOrchestrator
             foreach (var stale in await WorkerNode.Query(w => w.LastSeenAt < cutoff, ct))
                 await stale.Remove(ct);
         }
-
-        await CloseOrphanedSuccessorsAsync(now, ct);
     }
 
     /// <summary>Reclaim a sweep's rows a bounded page at a time. Each reclaim moves its row out of the sweep's set, so the
@@ -768,17 +725,13 @@ internal sealed class JobOrchestrator
 
     /// <summary>End a lapsed claim (JOBS-0010): the row returns to the queue as a compare on the revision the sweep read,
     /// never read again — a renewal, a settlement or a cancellation landing since keeps the row, and the next sweep looks
-    /// again. A job asked to cancel settles Cancelled instead. The reclaim drops the claim token and gives both slots
-    /// back, and the successor the lapsed run appended, held for it, is deleted.</summary>
+    /// again. A job asked to cancel settles Cancelled instead.</summary>
     private async Task<bool> ReclaimAsync(JobRecord row, DateTimeOffset now, string note, CancellationToken ct)
     {
-        var token = row.ClaimToken;
         row.Owner = null;
         row.LeaseUntil = null;
         row.ReservedFor = null;
         row.ReservedUntil = null;
-        row.ClaimToken = null;
-        row.ReleaseRunSlot();
         var cancelled = row.CancelRequestedAt is not null;
         if (cancelled)
         {
@@ -792,7 +745,6 @@ internal sealed class JobOrchestrator
             SetStatus(row, JobStatus.Queued, now, note);
         }
         if (!await _ledger.Update(row, ct)) return false;   // changed since the sweep read it: the next sweep looks again
-        if (token is not null) await _ledger.DeleteHeld(JobRecord.SuccessorId(row.Id, token), token, ct);
         if (cancelled)
         {
             _metrics.Record(row.WorkType, JobStatus.Cancelled, now);
@@ -803,38 +755,6 @@ internal sealed class JobOrchestrator
             Notify(row.WorkType, JobEventKind.Stalled, null, row);
         }
         return true;
-    }
-
-    /// <summary>A held chain successor whose holder claim no longer exists (JOBS-0010) is released only when the
-    /// predecessor it waits for settled with the very status the successor was appended for
-    /// (<see cref="JobRecord.HeldOn"/>: Completed on the success path, Failed under <c>OnFailure.Continue</c>), carries no
-    /// cancellation request, and was settled by that very claim (<see cref="JobRecord.SettledBy"/> equals
-    /// <see cref="JobRecord.HeldBy"/>); otherwise it is deleted. A run that stalled, was reclaimed and whose next run settled
-    /// the job thus never releases a second successor, and a stage recorded Failed under <c>OnFailure.Abort</c> never
-    /// releases the successor its success path appended.</summary>
-    private async Task CloseOrphanedSuccessorsAsync(DateTimeOffset now, CancellationToken ct)
-    {
-        var size = Infrastructure.Constants.Retention.PageSize;
-        for (var page = 1; ; page++)
-        {
-            var held = await _ledger.Held(page, size, ct);
-            var closed = 0;
-            foreach (var successor in held)
-            {
-                if (successor.HeldBy is not { } holder) continue;
-                var predecessor = successor.HeldFor is { } id ? await _ledger.Get(id, ct) : null;
-                if (predecessor is not null && string.Equals(predecessor.ClaimToken, holder, StringComparison.Ordinal))
-                    continue;   // its holder still runs
-                var settledByHolder = predecessor is { CancelRequestedAt: null } && predecessor.Status == successor.HeldOn
-                                      && string.Equals(predecessor.SettledBy, holder, StringComparison.Ordinal);
-                var done = settledByHolder
-                    ? await _ledger.ReleaseHeld(successor.Id, holder, cancel: false, now, ct)
-                    : await _ledger.DeleteHeld(successor.Id, holder, ct);
-                if (done) closed++;
-            }
-            if (held.Count < size) return;
-            if (closed > 0) page--;   // closed rows left the held set: read the same page again
-        }
     }
 
     /// <summary>PMC-055: register this worker in the fleet roster, or heartbeat its existing entry. The worker calls it
@@ -974,7 +894,7 @@ internal sealed class JobOrchestrator
             var binding = _registry.Get(rec.WorkType);
             if (binding is not null) return (rec, binding);
 
-            await SettleUnregisteredWorkTypeAsync(rec, rec.ClaimToken!);
+            await SettleUnregisteredWorkTypeAsync(rec);
         }
 
         return null;
