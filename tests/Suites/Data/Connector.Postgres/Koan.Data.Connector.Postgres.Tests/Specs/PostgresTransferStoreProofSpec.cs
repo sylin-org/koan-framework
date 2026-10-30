@@ -56,7 +56,7 @@ public sealed class PostgresTransferStoreProofSpec(PostgresFixture fixture, ITes
     }
 
     private static string OtherSpelling(string connection) => connection.Contains("127.0.0.1", StringComparison.Ordinal)
-        ? connection.Replace("127.0.0.1", "localhost", StringComparison.Ordinal)
+        ? connection.Replace("127.0.0.1", "127.1", StringComparison.Ordinal)
         : connection.Replace("localhost", "127.0.0.1", StringComparison.OrdinalIgnoreCase);
 
     public sealed class PgProofParcel : Entity<PgProofParcel>

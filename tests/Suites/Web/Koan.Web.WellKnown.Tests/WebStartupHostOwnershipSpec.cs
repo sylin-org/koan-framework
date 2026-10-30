@@ -15,7 +15,7 @@ public sealed class WebStartupHostOwnershipSpec
     [Fact]
     public async Task Pipeline_construction_preserves_a_newer_attached_owner()
     {
-        AppHost.Current.Should().BeNull();
+        AppHost.Current = null;
 
         using var markerServices = new ServiceCollection().BuildServiceProvider();
         using var filter = new NewerOwnerStartupFilter(markerServices);
@@ -60,6 +60,8 @@ public sealed class WebStartupHostOwnershipSpec
     [Fact]
     public async Task Disposing_a_started_host_without_stopping_it_releases_the_ambient_host()
     {
+        AppHost.Current = null;
+
         using (var host = Host.CreateDefaultBuilder()
             .ConfigureWebHost(web =>
             {

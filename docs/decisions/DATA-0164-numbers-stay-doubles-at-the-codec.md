@@ -53,5 +53,7 @@ A typed `decimal` or `double` column holds its value exactly on every store.
 ## Consequences
 
 - Behavioural: on SQL Server `Get("ABC")` no longer finds `"abc"`. Text fields, their equality and their sort are unchanged.
+- A string match on SQL Server follows the collation the store declares through `FilterSupport.OrdinalStrings`, so its default
+  collation folds case in `StartsWith`, `EndsWith` and `Contains`. A literal backslash in a match is an ordinary character.
 - Evidence: `OrdinaryValueConvergence` on SQLite, PostgreSQL, SQL Server and MySQL; `SqlServerExactValueSpec` holds DateTime ticks,
   a DateTime set and concurrent upserts.
