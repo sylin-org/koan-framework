@@ -15,6 +15,6 @@ public sealed class SqlServerFilterConvergenceSpec(SqlServerFixture fixture, ITe
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await FilterConvergence.AssertPushesDownAsync(host.Services);
+        await FilterConvergence.AssertPushesDownAsync(host.Services, foldsCase: true);
     }
 }

@@ -52,6 +52,7 @@ public static class FilterConvergence
         new() { Id = "w1", Name = "Alpha",   Level = 10, Score = 100,  Tier = ConvergenceTier.Pro,        Tags = new() { "ffxiv", "wow" } },
         new() { Id = "w2", Name = "Bravo",   Level = 20, Score = null, Tier = ConvergenceTier.Free,       Tags = new() { "wow" } },
         new() { Id = "w3", Name = "Charlie", Level = 30, Score = 300,  Tier = ConvergenceTier.Enterprise, Tags = new() },
+        new() { Id = "w4b", Name = "Back\\slash", Level = 6, Score = 60, Tier = ConvergenceTier.Free, Tags = new() },
         new() { Id = "w4", Name = "Alfred",  Level = 5,  Score = 50,   Tier = ConvergenceTier.Pro,        Tags = new() { "ffxiv" } },
         new() { Id = "w5", Name = "Bravo",   Level = 25, Score = 250,  Tier = ConvergenceTier.Free,       Tags = new() { "ffxiv", "wow", "gw2" } },
     };
@@ -93,6 +94,7 @@ public static class FilterConvergence
         ("suffix-case-mismatch",      "{ \"Name\": \"*HA\" }"),
         ("contains-case-mismatch",    "{ \"Name\": \"*LPH*\" }"),
         ("contains-case-match",       "{ \"Name\": \"*lph*\" }"),
+        ("contains-backslash",        "{ \"Name\": \"*k\\\\s*\" }"),
         ("suffix-case-match",         "{ \"Name\": \"*vo\" }"),
         ("empty-matches-all",         "{}"),
     };
@@ -102,7 +104,9 @@ public static class FilterConvergence
     /// if any — establish a lease before calling for partitioned stores), then asserts every filter's
     /// adapter id-set equals the in-memory oracle. Throws listing all divergences.
     /// </summary>
-    public static async Task AssertConvergesAsync()
+    /// <param name="foldsCase">The store declares <c>OrdinalStrings</c> false: a string match in the wrong case finds what
+    /// it would in the right one, and the three case-mismatch cases expect that.</param>
+    public static async Task AssertConvergesAsync(bool foldsCase = false)
     {
         foreach (var existing in await Data<ConvergenceWidget, string>.Query("{}")) await existing.Remove();
         await ConvergenceWidget.UpsertMany(Corpus);
@@ -111,8 +115,10 @@ public static class FilterConvergence
         foreach (var (name, json) in Cases())
         {
             var filter = JsonFilterParser.Parse<ConvergenceWidget>(json);
-            var oracle = Corpus.Where(InMemoryFilterEvaluator.Compile<ConvergenceWidget>(filter))
-                               .Select(w => w.Id).OrderBy(x => x).ToArray();
+            var expected = foldsCase && Folded.TryGetValue(name, out var folded)
+                ? folded
+                : InMemoryFilterEvaluator.Compile<ConvergenceWidget>(filter);
+            var oracle = Corpus.Where(expected).Select(w => w.Id).OrderBy(x => x).ToArray();
 
             string[] actual;
             try
@@ -148,9 +154,16 @@ public static class FilterConvergence
     /// residual is expected. That is a declared limit, so the adapter's FilterSupport is what must say so:
     /// this fails when work lands in memory that the declaration implied the store would do.</para>
     /// </summary>
-    public static async Task AssertPushesDownAsync(IServiceProvider services, bool expectsHasContainsPushdown = true)
+    private static readonly Dictionary<string, Func<ConvergenceWidget, bool>> Folded = new()
     {
-        await PushdownGuard.NothingFallsBack(services, "the shared filter corpus", AssertConvergesAsync);
+        ["prefix-case-mismatch"] = w => w.Name.StartsWith("al", StringComparison.OrdinalIgnoreCase),
+        ["suffix-case-mismatch"] = w => w.Name.EndsWith("HA", StringComparison.OrdinalIgnoreCase),
+        ["contains-case-mismatch"] = w => w.Name.Contains("LPH", StringComparison.OrdinalIgnoreCase),
+    };
+
+    public static async Task AssertPushesDownAsync(IServiceProvider services, bool expectsHasContainsPushdown = true, bool foldsCase = false)
+    {
+        await PushdownGuard.NothingFallsBack(services, "the shared filter corpus", () => AssertConvergesAsync(foldsCase));
         // The $like battery rides every suite that proves pushdown, with the receipt each adapter earned:
         // store-executed where declared, residual-and-recorded where not. The expectation is pinned by
         // the calling suite so a silently dropped (or silently added) advertisement fails here.
