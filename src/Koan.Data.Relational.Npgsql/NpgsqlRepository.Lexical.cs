@@ -36,7 +36,7 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> : ILexicalSearchRepo
             parameters.Add("koan_headline", NpgsqlLexical.Headline(snippet));
         }
         parameters.Add("koan_match", NpgsqlLexical.Match(query));
-        var sql = $"{select} FROM {_plan.QualifiedTable}, websearch_to_tsquery({configuration}, @koan_match) AS koan_query " +
+        var sql = $"{select} FROM {_plan.QualifiedTable}, {NpgsqlLexical.QueryFunction(query)}({configuration}, @koan_match) AS koan_query " +
                   $"WHERE {column} @@ koan_query" + (where is null ? string.Empty : $" AND ({where})") +
                   $" ORDER BY koan_score DESC, {string.Join(", ", _plan.IdentityRoots.Select(NpgsqlDialect.Quote))}" +
                   $" LIMIT {query.Size} OFFSET {query.Offset}";

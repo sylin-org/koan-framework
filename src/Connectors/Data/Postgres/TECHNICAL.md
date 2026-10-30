@@ -76,7 +76,13 @@ declaration drops and re-adds the column and its index. A search or a rebuild fi
 the catalog holds the column with that recipe and the index; on a route whose DDL policy did not build them it refuses
 naming both and the policy correction. A search runs `websearch_to_tsquery` over the OR-joined terms,
 filters with `@@`, orders by `ts_rank_cd` and then identity, pages with `LIMIT`/`OFFSET`, and cuts snippets with
-`ts_headline` over the same text. CockroachDB shares this runtime and keeps the feature off.
+`ts_headline` over the same text. A scope (`Within`, a managed read scope) joins the `WHERE` before the page. Read as
+typed (`AsTyped`, [DATA-0165](../../../../docs/decisions/DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md)),
+the query goes to `to_tsquery` as the terms joined by `|`, the one the text ends in as `term:*`; the terms hold letters
+and digits only, so none reads as an operator. The configuration stems it before it compares, so a partial word whose
+stem is not the start of the stored one finds nothing until it is whole: "runnin" against "running", stored as "run". A
+word the configuration drops as a stop word also finds nothing while it is typed. CockroachDB shares this runtime and
+keeps the feature off.
 
 ## Index names
 

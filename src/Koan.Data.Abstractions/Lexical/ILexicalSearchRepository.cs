@@ -15,8 +15,8 @@ public interface ILexicalSearchRepository<TEntity, TKey>
 {
     /// <summary>
     /// The page of matches <paramref name="query"/> asks for, best first, ties broken by identity so two pages over one
-    /// result set neither overlap nor skip. <paramref name="scope"/> is the caller's read scope (the tenant, the
-    /// not-yet-deleted predicate) and every match satisfies it.
+    /// result set neither overlap nor skip. <paramref name="scope"/> is the application's filter with the caller's read
+    /// scope (the tenant, the not-yet-deleted predicate); every match satisfies it, and it is applied before the page.
     /// </summary>
     Task<IReadOnlyList<LexicalMatch<TKey>>> Search(LexicalQuery query, Filter? scope, CancellationToken ct = default);
 

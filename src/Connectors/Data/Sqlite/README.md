@@ -79,7 +79,9 @@ public sealed class Post : Entity<Post>
 var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet(), ct);
 ```
 
-Every word is optional and a row holding more of them ranks higher; a snippet marks the matched words. Rows that
+Every word is optional and a row holding more of them ranks higher; a snippet marks the matched words. `AsTyped()`
+finds the word the text ends in by its start, for a box that answers as someone types, and `Within(post => …)` searches
+only the rows a predicate holds for. Rows that
 existed before the declaration are indexed by `Post.Lexical.Rebuild(ct)`, and `Post.Lexical.Status(ct)` says whether
 the index covers every row. See [DATA-0159](../../../../docs/decisions/DATA-0159-lexical-search-over-declared-entity-text.md).
 

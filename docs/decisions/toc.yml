@@ -440,6 +440,8 @@
       href: DATA-0163-a-class-level-index-names-its-properties.md
     - name: DATA-0164 Numbers stay doubles at the codec, and each adapter handles the rest at its edge
       href: DATA-0164-numbers-stay-doubles-at-the-codec.md
+    - name: DATA-0165 A lexical search reads a word being typed and takes a scope the store applies
+      href: DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

@@ -93,6 +93,48 @@ public sealed class PostgresLexicalSearchSpec(PostgresFixture fixture, ITestOutp
     }
 
     [Fact]
+    public async Task A_text_read_as_typed_finds_the_word_it_ends_in_by_its_start_and_every_other_word_whole()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition("lexical-typed"));
+        var lanterns = await new Post { Title = "Copper lanterns", Body = "The glass is cut" }.Save();
+        var streams = await new Post { Title = "Streams", Body = "Water keeps running" }.Save();
+
+        (await Post.Lexical.Search("lant", s => s.Top(10))).Should().BeEmpty("a word is whole unless the text is read as typed");
+        (await Post.Lexical.Search("lant", s => s.Top(10).AsTyped())).Should().ContainSingle().Which.Id.Should().Be(lanterns.Id);
+        (await Post.Lexical.Find("gla", s => s.Top(10).AsTyped())).Should().ContainSingle().Which.Id.Should().Be(lanterns.Id);
+        (await Post.Lexical.Search("lant streams", s => s.Top(10).AsTyped())).Should().ContainSingle().Which.Id.Should().Be(streams.Id);
+        (await Post.Lexical.Search("lant ", s => s.Top(10).AsTyped())).Should().BeEmpty("a space ends the word");
+        (await Post.Lexical.Search("lant", s => s.Top(1).AsTyped().Snippet(6, "[", "]"))).Should().ContainSingle()
+            .Which.Snippet.Should().Contain("[lanterns]");
+
+        (await Post.Lexical.Search("runnin", s => s.Top(10).AsTyped())).Should().BeEmpty("the stem of the partial word is not the start of 'run'");
+        (await Post.Lexical.Search("running", s => s.Top(10).AsTyped())).Should().ContainSingle().Which.Id.Should().Be(streams.Id);
+    }
+
+    [Fact]
+    public async Task A_search_within_a_predicate_ranks_and_pages_only_the_rows_it_holds_for()
+    {
+        RequireBackingStore();
+        await using var host = await BootAsync();
+        using var _ = Lease(NewPartition("lexical-within"));
+        for (var index = 0; index < 4; index++)
+            await new Post { Title = "lantern lantern lantern", Author = "closed" }.Save();
+        var open = new List<string>();
+        for (var index = 0; index < 3; index++)
+            open.Add((await new Post { Title = "a lantern among other words", Author = "open" }.Save()).Id);
+        var allowed = new HashSet<string> { "open" };
+
+        var first = await Post.Lexical.Search("lantern", s => s.Page(1, 2).Within(post => allowed.Contains(post.Author)));
+        var second = await Post.Lexical.Search("lantern", s => s.Page(2, 2).Within(post => allowed.Contains(post.Author)));
+
+        first.Should().HaveCount(2, "a page is full where such rows remain");
+        second.Should().ContainSingle();
+        first.Concat(second).Select(static match => match.Id).Should().BeEquivalentTo(open);
+    }
+
+    [Fact]
     public async Task Paging_is_bounded_and_two_pages_over_one_result_set_neither_overlap_nor_skip()
     {
         RequireBackingStore();

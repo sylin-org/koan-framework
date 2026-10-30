@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Lexical;
 
 namespace Koan.Data.Core;
@@ -12,11 +13,12 @@ public static partial class Data<TEntity, TKey>
     where TEntity : class, IEntity<TKey>
     where TKey : notnull
 {
-    /// <summary>The page of ranked matches <paramref name="query"/> asks for, within the caller's read scope.</summary>
-    public static Task<IReadOnlyList<LexicalMatch<TKey>>> LexicalSearch(LexicalQuery query, CancellationToken ct = default)
+    /// <summary>The page of ranked matches <paramref name="query"/> asks for, among the rows
+    /// <paramref name="scope"/> holds for and within the caller's read scope.</summary>
+    public static Task<IReadOnlyList<LexicalMatch<TKey>>> LexicalSearch(LexicalQuery query, Filter? scope = null, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return RequireLexical().Search(query, scope: null, ct);
+        return RequireLexical().Search(query, scope, ct);
     }
 
     /// <summary>Indexes every row the container holds and answers how many rows the index now covers.</summary>

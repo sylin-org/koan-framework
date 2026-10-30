@@ -28,7 +28,7 @@ public sealed class LexicalPageBoundSpec
         query.Should().Throw<ArgumentOutOfRangeException>()
             .Which.Message.Should().Contain(LexicalQuery.MaximumOffset.ToString()).And.Contain("narrow the search");
 
-        var declaration = () => new LexicalSearchQuery().Page(page, size);
+        var declaration = () => new LexicalSearchQuery<Note>().Page(page, size);
         declaration.Should().Throw<ArgumentOutOfRangeException>()
             .Which.Message.Should().Contain(LexicalQuery.MaximumOffset.ToString());
     }
@@ -43,7 +43,7 @@ public sealed class LexicalPageBoundSpec
             .Should().Contain(LexicalQuery.MaximumOffset.ToString())
             .And.Contain($"page {deepest + 1} of {LexicalQuery.MaximumSize}")
             .And.Contain($"no later than {deepest}");
-        var declaration = () => new LexicalSearchQuery().Page(deepest + 1, LexicalQuery.MaximumSize);
+        var declaration = () => new LexicalSearchQuery<Note>().Page(deepest + 1, LexicalQuery.MaximumSize);
         declaration.Should().Throw<ArgumentOutOfRangeException>();
 
         new LexicalQuery("bounded", deepest, LexicalQuery.MaximumSize).Offset.Should().Be(LexicalQuery.MaximumOffset);

@@ -110,9 +110,16 @@ public sealed class Post : Entity<Post>
 
 var matches = await Post.Lexical.Search("copper lantern", s => s.Top(20).Snippet(), ct);   // ids, scores, excerpts
 var posts = await Post.Lexical.Find("copper lantern", s => s.Page(2, 20), ct);              // entities in rank order
+var typed = await Post.Lexical.Search("copper lant", s => s.Top(5).AsTyped(), ct);          // the last word by its start
+var mine = await Post.Lexical.Search("copper", s => s.Top(20).Within(post => tangents.Contains(post.TangentId)), ct);
 ```
 
-Every word is optional and a row holding more of them ranks higher. A search is bounded by construction: the
+Every word is optional and a row holding more of them ranks higher. `AsTyped()` reads the text as still being typed:
+the word it ends in also matches as the start of a word, unless a space or punctuation ended it. A stemming language
+stems the partial word first, so one whose stem is not the start of the stored one, such as "runnin" for "running",
+finds nothing until it is whole. `Within(predicate)` searches only the rows a predicate holds for: the store applies it
+before it ranks and pages, so a page is full where such rows remain and says nothing of any other row, and a predicate
+the store cannot run is refused. A search is bounded by construction: the
 declaration names `Top(size)` or `Page(page, size)`, a page holds at most 1,000 matches, and a snippet window holds at
 most 64 words. Rows written before the declaration are indexed by `Post.Lexical.Rebuild(ct)`; `Post.Lexical.Status(ct)`
 says exactly whether the index covers every row, and the `data:lexical` readiness report says what it last measured,
@@ -121,7 +128,8 @@ whole table. A tenant-scoped entity's index is the tenant's to measure, so the r
 Unknown rather than Degraded; `Status` inside the tenant measures it. A store that cannot keep the index refuses the entity's first write, naming `query.lexical` and the
 correction; a route whose DDL policy did not build it refuses the search, naming the missing structure and the policy. This is search by the words a row holds;
 [semantic search](../../capabilities/ai/semantic-search.md) is search by meaning. See
-[DATA-0159](../../decisions/DATA-0159-lexical-search-over-declared-entity-text.md).
+[DATA-0159](../../decisions/DATA-0159-lexical-search-over-declared-entity-text.md) and
+[DATA-0165](../../decisions/DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md).
 
 ## Keep a polymorphic family in one set
 

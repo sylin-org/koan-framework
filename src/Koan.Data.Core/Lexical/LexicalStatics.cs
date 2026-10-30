@@ -14,21 +14,26 @@ public readonly struct LexicalStatics<T> where T : Entity<T>
     /// <summary>
     /// The ranked matches for <paramref name="text"/>: identities with scores, best first, and a snippet when the
     /// declaration asks for one. Every term is optional and a row holding more of them ranks higher. The declaration
-    /// must bound the answer with <c>Top</c> or <c>Page</c>.
+    /// must bound the answer with <c>Top</c> or <c>Page</c>, and may narrow it with <c>Within</c> and read the text as
+    /// still being typed with <c>AsTyped</c>.
     /// </summary>
     public Task<IReadOnlyList<LexicalMatch<string>>> Search(
         string text,
-        Action<LexicalSearchQuery> configure,
+        Action<LexicalSearchQuery<T>> configure,
         CancellationToken ct = default)
-        => Data<T, string>.LexicalSearch(Declare(text, configure), ct);
+    {
+        var declaration = Declare(configure);
+        return Data<T, string>.LexicalSearch(declaration.Build(text), declaration.Scope, ct);
+    }
 
     /// <summary>The entities behind <see cref="Search"/>, loaded in rank order through the ordinary read path.</summary>
     public async Task<IReadOnlyList<T>> Find(
         string text,
-        Action<LexicalSearchQuery> configure,
+        Action<LexicalSearchQuery<T>> configure,
         CancellationToken ct = default)
     {
-        var matches = await Data<T, string>.LexicalSearch(Declare(text, configure), ct).ConfigureAwait(false);
+        var declaration = Declare(configure);
+        var matches = await Data<T, string>.LexicalSearch(declaration.Build(text), declaration.Scope, ct).ConfigureAwait(false);
         if (matches.Count == 0) return [];
         var loaded = await Data<T, string>.GetMany(matches.Select(static match => match.Id), ct).ConfigureAwait(false);
         return loaded.Where(static entity => entity is not null).ToArray()!;
@@ -43,12 +48,12 @@ public readonly struct LexicalStatics<T> where T : Entity<T>
     /// <summary>What the routed store holds of this kind's lexical index now.</summary>
     public Task<LexicalIndexStatus> Status(CancellationToken ct = default) => Data<T, string>.LexicalStatus(ct);
 
-    private static LexicalQuery Declare(string text, Action<LexicalSearchQuery> configure)
+    private static LexicalSearchQuery<T> Declare(Action<LexicalSearchQuery<T>> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
-        var declaration = new LexicalSearchQuery();
+        var declaration = new LexicalSearchQuery<T>();
         configure(declaration);
-        return declaration.Build(text);
+        return declaration;
     }
 }
 

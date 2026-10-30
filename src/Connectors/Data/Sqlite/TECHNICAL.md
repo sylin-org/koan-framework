@@ -148,6 +148,13 @@ the declaration is dropped and created again, empty, and readiness reports the i
 `Rebuild` (`INSERT INTO <fts>(<fts>) VALUES ('rebuild')`) fills it. `Status` compares the count of `<fts>_docsize` with
 the row count.
 
+A search matches each term quoted, joined by `OR`, and joins the matches back to the row, where a scope (`Within`, a
+managed read scope) applies before `ORDER BY bm25` and the page. Read as typed (`AsTyped`,
+[DATA-0165](../../../../docs/decisions/DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md)), the
+term the text ends in carries FTS5's `*` outside its quotes. The `porter` tokenizer stems it before it compares, so a
+partial word whose stem is not the start of the stored one finds nothing until it is whole: "runnin" against "running",
+stored as "run". `unicode61` alone has no such gap. No `prefix=` index serves it, so a one-letter prefix walks its terms.
+
 A search or a rebuild first confirms, once per table, that the schema holds the five objects; on a route whose DDL
 policy did not build them it refuses naming the index, the objects and the policy correction, and `Status` answers
 `Exists = false`. A search joins the virtual table to the row on rowid, matches every term as a quoted phrase joined by OR, orders by

@@ -10,8 +10,10 @@ namespace Koan.Data.Core;
 /// The lexical facet of the facade: the one place the capability is negotiated. An entity that declares
 /// <c>[Lexical]</c> on a route whose provider does not declare <c>query.lexical</c> is refused at its first write,
 /// before anything is held, naming the provider, the token and the corrections; a search on such a route is refused
-/// the same way. A search that is admitted carries the caller's read scope (the tenant, the not-yet-deleted predicate)
-/// to the store, so a match is always a row the caller could read.
+/// the same way. A search that is admitted carries the application's scope and the caller's read scope (the tenant, the
+/// not-yet-deleted predicate) to the store, so a match is always a row the caller could read. The store ranks and pages
+/// what it is told, so a scope it cannot run is refused here: applied after the page, it would leave pages short and
+/// say that other rows matched.
 /// </summary>
 internal sealed partial class RepositoryFacade<TEntity, TKey> : ILexicalSearchRepository<TEntity, TKey>
 {
@@ -19,10 +21,16 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> : ILexicalSearchRe
     private const string LexicalRebuildOperation = "entity lexical rebuild";
     private const string LexicalStatusOperation = "entity lexical status";
 
+    private FilterSupport? _lexicalScopeSupport;
+
     public async Task<IReadOnlyList<LexicalMatch<TKey>>> Search(LexicalQuery query, Filter? scope, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         var lexical = RequireLexical();
+        if (scope is not null && FilterSplitter.Split(scope, LexicalScopeSupport(), typeof(TEntity)).Residual is not null)
+            throw new NotSupportedException(
+                $"A lexical search of {typeof(TEntity).Name} runs its scope in the store, and provider '{_sourcePlan.Adapter}' " +
+                "cannot run all of this one. Compare the entity's own fields with values, or read the matches and judge them yourself.");
         await using var operationScope = await Guard(DataOperationEffect.Read, LexicalSearchOperation, ct);
         var managed = ReadScopeFilter(operationScope.Segmentation);
         var effective = scope is null ? managed : managed is null ? scope : Filter.All(scope, managed);
@@ -58,6 +66,11 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> : ILexicalSearchRe
                $"'{_sourcePlan.Adapter}' does not declare '{DataCaps.Query.Lexical.Id}'. Route the entity to a provider that " +
                "keeps a lexical index (SQLite and PostgreSQL declare it), or remove the [Lexical] declaration.";
     }
+
+    /// <summary>What the store can run of a search's scope: the adapter's own filter support, a type-plane constant read
+    /// once, since the facade's scope support is only inspected for an entity a managed scope could reach.</summary>
+    private FilterSupport LexicalScopeSupport() =>
+        _lexicalScopeSupport ??= DataCaps.Describe(_inner, _inner.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter) ?? FilterSupport.None;
 
     private ILexicalSearchRepository<TEntity, TKey> RequireLexical()
     {

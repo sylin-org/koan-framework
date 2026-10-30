@@ -22,7 +22,7 @@ public sealed record LexicalQuery
     /// </summary>
     public const int MaximumOffset = 10_000;
 
-    public LexicalQuery(string text, int page, int size, LexicalSnippet? snippet = null)
+    public LexicalQuery(string text, int page, int size, LexicalSnippet? snippet = null, bool typed = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(text);
         Offset = RequirePage(page, size);
@@ -33,6 +33,7 @@ public sealed record LexicalQuery
         Page = page;
         Size = size;
         Snippet = snippet;
+        Typing = typed ? TermBeingTyped(text) : null;
     }
 
     /// <summary>
@@ -71,6 +72,25 @@ public sealed record LexicalQuery
 
     /// <summary>How many ranked matches precede this page; at most <see cref="MaximumOffset"/>.</summary>
     public int Offset { get; }
+
+    /// <summary>
+    /// The word someone is still typing, which the store matches as the start of a word: the term the text ends in, on
+    /// a query declared as typed. <see langword="null"/> on any other query, and where the text ends in anything but a
+    /// letter or digit, since the word before it is finished. The store's language still applies, so a partial word is
+    /// stemmed before it is compared: where its stem is not the start of the stored one ("runnin" against "running",
+    /// stored as "run") it finds nothing until the word is whole.
+    /// </summary>
+    public string? Typing { get; }
+
+    /// <summary>Whether <paramref name="term"/>, one of <see cref="Terms"/>, is the word still being typed.</summary>
+    public bool IsTyping(string term) => Typing is not null && string.Equals(term, Typing, StringComparison.OrdinalIgnoreCase);
+
+    private static string? TermBeingTyped(string text)
+    {
+        var start = text.Length;
+        while (start > 0 && char.IsLetterOrDigit(text[start - 1])) start--;
+        return start == text.Length ? null : text[start..];
+    }
 
     private static IReadOnlyList<string> SplitTerms(string text)
     {

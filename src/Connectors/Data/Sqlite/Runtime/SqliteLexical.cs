@@ -68,10 +68,12 @@ internal static class SqliteLexical
     /// <summary>
     /// The FTS5 query for a search: every term quoted as a phrase and joined by OR, so a row holding any term is a
     /// match and a row holding more of them ranks higher. Quoting keeps FTS5's own grammar (<c>*</c>, <c>:</c>,
-    /// <c>NOT</c>) out of reach, and the terms hold letters and digits only.
+    /// <c>NOT</c>) out of reach, and the terms hold letters and digits only. The word still being typed carries FTS5's
+    /// own prefix mark outside its quotes; the tokenizer stems it first, as it stems every term.
     /// </summary>
     internal static string Match(LexicalQuery query) =>
-        string.Join(" OR ", query.Terms.Select(static term => "\"" + term.Replace("\"", "\"\"", StringComparison.Ordinal) + "\""));
+        string.Join(" OR ", query.Terms.Select(term =>
+            "\"" + term.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" + (query.IsTyping(term) ? "*" : string.Empty)));
 
     /// <summary>
     /// The dialect's own read of one indexed value, addressed through <paramref name="prefix"/>: nothing for the view's

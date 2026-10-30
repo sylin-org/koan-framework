@@ -251,6 +251,16 @@ validation:
 - Recursive object graphs reject with a correction; relationships and units of work do not leak into aggregate
   mapping. Mark relationship properties out of storage or map an intentional value subtree through a codec.
 
+## Lexical search ownership
+
+- `Entity.Lexical` is `LexicalStatics<T>`, a thin router over `Data<TEntity,TKey>.LexicalSearch`, `LexicalRebuild` and
+  `LexicalStatus`. `LexicalSearchQuery<TEntity>` declares one search: its page, its snippet, `AsTyped()`, which the
+  stores read from `LexicalQuery.Typing`, and `Within(predicate)`, lowered by `LinqFilterCompiler` to the scope the
+  facet takes (DATA-0159, DATA-0165).
+- The facade is the one owner of what a search may run: it negotiates `query.lexical`, refuses a scope with a residual
+  by the adapter's `FilterSupport`, since a store ranks and pages what it is told, and joins the scope to the managed
+  read scope, so a scope narrows and never widens.
+
 ## Configuration
 
 - Prefer typed Options for tunables; avoid magic values

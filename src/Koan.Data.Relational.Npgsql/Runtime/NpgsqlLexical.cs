@@ -40,9 +40,16 @@ internal static class NpgsqlLexical
 
     /// <summary>
     /// The search text: every term joined by OR, so a row holding any term is a match and a row holding more of them
-    /// ranks higher. <c>websearch_to_tsquery</c> takes it as words and never refuses it.
+    /// ranks higher. <c>websearch_to_tsquery</c> takes it as words and never refuses it. It has no prefix, so a query with
+    /// a word still being typed goes to <c>to_tsquery</c> instead, spelled in that function's grammar: the terms hold
+    /// letters and digits only, so none of them can be read as an operator.
     /// </summary>
-    internal static string Match(LexicalQuery query) => string.Join(" OR ", query.Terms);
+    internal static string Match(LexicalQuery query) => query.Typing is null
+        ? string.Join(" OR ", query.Terms)
+        : string.Join(" | ", query.Terms.Select(term => query.IsTyping(term) ? term + ":*" : term));
+
+    /// <summary>The function that reads <see cref="Match"/> as a <c>tsquery</c>.</summary>
+    internal static string QueryFunction(LexicalQuery query) => query.Typing is null ? "websearch_to_tsquery" : "to_tsquery";
 
     /// <summary>The <c>ts_headline</c> options for a snippet; the markers are quoted so a comma or a quote inside them cannot break the list.</summary>
     internal static string Headline(LexicalSnippet snippet) =>
