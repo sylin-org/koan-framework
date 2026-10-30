@@ -9,6 +9,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../../../Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../../../Koan.Data.Core/Koan.Data.Core.csproj" />
     <ProjectReference Include="../../../../Koan.Web.Auth.Abstractions/Koan.Web.Auth.Abstractions.csproj" />
     <ProjectReference Include="../../../../Koan.Web.Auth/Koan.Web.Auth.csproj" />
     <PackageReference Include="CarpaNet.OAuth" VersionOverride="1.1.0-alpha.5" />

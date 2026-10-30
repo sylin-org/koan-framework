@@ -68,6 +68,9 @@ undeclared: `query.fastCount`/`query.optimizedCount` (conservative v1), vector/F
 remains experimental), and `SupportsRewriteFreeExpressionIndexes = false` — document-expression
 mapped indexes are declined until planner matching is demonstrated.
 
+`Write.ConditionalReplace` is one `UPDATE … WHERE` the identity and the guard, the guard addressing the
+table rather than the alias reads declare; `Write.ConditionalDelete` and `Write.InsertOnly` are not declared.
+
 ## Conformance
 
 `tests/Suites/Data/Connector.DuckDb/` — 49 specs mirroring the SQLite suite: AODB conformance (all

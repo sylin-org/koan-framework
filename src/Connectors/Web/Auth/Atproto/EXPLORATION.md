@@ -1,5 +1,7 @@
 # AT Protocol connector exploration — 9 September 2026
 
+> **Superseded in part by [WEB-0082](../../../../../docs/decisions/WEB-0082-at-sessions-are-rows-in-the-applications-store.md) (2026-10-30):** sessions are rows in the application's store; the session directory and file store this exploration describes are gone.
+
 Follow-up: Docker development and public sign-in. The runtime failure for a real
 handle resolved its public DID through the fixture PLC (404) and escaped the
 challenge as 500. Keep resolution in AtprotoSessions, routing in AtprotoHttp and

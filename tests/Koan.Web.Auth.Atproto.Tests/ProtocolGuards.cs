@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -54,10 +53,10 @@ public sealed class ProtocolGuards
         });
         await provider.StartAsync();
         origin = provider.Urls.Single();
-        var directory = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
-        var settings = Microsoft.Extensions.Options.Options.Create(new AtprotoOptions { SessionDirectory = directory, DevelopmentAllowedOrigins = [origin] });
+        await using var application = await TestStore.Start();
+        var settings = Microsoft.Extensions.Options.Options.Create(new AtprotoOptions { DevelopmentAllowedOrigins = [origin] });
         var environment = new EnvironmentStub("Development");
-        using var store = new ProtectedAtprotoStore(DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(directory, "keys"))), settings, environment);
+        var store = new AtprotoSessionStore(application.Protection());
         using var network = new AtprotoHttp(settings, environment);
         var auth = new AuthOptions();
         auth.Providers["atproto"] = new ProviderOptions { ClientId = "http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A5220%2Fauth%2Fatproto%2Fcallback" };
@@ -68,7 +67,7 @@ public sealed class ProtocolGuards
         Assert.False(pushed.ContainsKey("login_hint"));
         Assert.Equal("S256", pushed["code_challenge_method"].ToString());
         Assert.Equal("atproto", pushed["scope"].ToString());
-        var pending = store.Peek(pushed["state"].ToString());
+        var pending = await store.Peek(pushed["state"].ToString(), TestContext.Current.CancellationToken);
         Assert.NotNull(pending);
         Assert.Equal(origin, pending.Issuer);
         Assert.Contains("protected-browser-correlation", pending.AppState);
@@ -229,30 +228,22 @@ public sealed class ProtocolGuards
     [Fact]
     public async Task Rejected_downscope_keeps_the_previous_durable_session()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
-        var options = Microsoft.Extensions.Options.Options.Create(new AtprotoOptions { SessionDirectory = directory });
-        var protector = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(directory, "keys")));
-        var environment = new EnvironmentStub("Development");
+        var ct = TestContext.Current.CancellationToken;
+        await using var application = await TestStore.Start();
+        var durable = new AtprotoSessionStore(application.Protection());
         const string did = "did:plc:test";
-        using (var durable = new ProtectedAtprotoStore(protector, options, environment))
-        {
-            await durable.StoreAsync(did, new OAuthSessionData { TokenSet = new TokenSet
-                { Sub = did, Scope = "atproto space:read space:write", AccessToken = "previous-test-token" } });
-            var staged = new VerifiedSessionStore(durable);
-            await staged.StoreAsync(did, new OAuthSessionData { TokenSet = new TokenSet
-                { Sub = did, Scope = "atproto", AccessToken = "downscoped-test-token" } });
-            await Assert.ThrowsAsync<AtprotoMissingScopesException>(async () =>
-            {
-                AtprotoSessions.RequireRequestedScopes(staged.GrantedScope, ["atproto", "space:read", "space:write"]);
-                await staged.Commit(did, default);
-            });
-            // The rejected SDK client's cleanup must not delete a previously working session either.
-            await staged.DeleteAsync(did);
-            Assert.Equal("previous-test-token", (await durable.GetAsync(did))!.TokenSet.AccessToken);
-        }
-        using var restored = new ProtectedAtprotoStore(protector, options, environment);
-        Assert.Equal("previous-test-token", (await restored.GetAsync(did))!.TokenSet.AccessToken);
-        Assert.Equal("atproto space:read space:write", (await restored.GetAsync(did))!.TokenSet.Scope);
+        await durable.Commit(did, new OAuthSessionData { TokenSet = new TokenSet
+            { Sub = did, Scope = "atproto space:read space:write", AccessToken = "previous-test-token" } }, null, ct);
+        var staged = new SessionCapture();
+        await staged.StoreAsync(did, new OAuthSessionData { TokenSet = new TokenSet
+            { Sub = did, Scope = "atproto", AccessToken = "downscoped-test-token" } }, ct);
+        Assert.Throws<AtprotoMissingScopesException>(() =>
+            AtprotoSessions.RequireRequestedScopes(staged.Take()!.TokenSet.Scope, ["atproto", "space:read", "space:write"]));
+        // The rejected SDK client's cleanup must not delete a previously working session either.
+        await staged.DeleteAsync(did, ct);
+        var kept = (await new AtprotoSessionStore(application.Protection()).Read(did, ct))!.Grant!;
+        Assert.Equal("previous-test-token", kept.TokenSet.AccessToken);
+        Assert.Equal("atproto space:read space:write", kept.TokenSet.Scope);
     }
 
     [Fact]
@@ -265,22 +256,24 @@ public sealed class ProtocolGuards
     [Fact]
     public async Task State_is_single_use_after_storage_restart_and_sessions_stage_before_verification()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
-        var options = Microsoft.Extensions.Options.Options.Create(new AtprotoOptions { SessionDirectory = directory });
-        var protector = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(directory, "keys")));
-        var environment = new EnvironmentStub("Development");
-        using (var first = new ProtectedAtprotoStore(protector, options, environment))
-            await first.StoreAsync("state", new OAuthStateData { ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1), AppState = "browser" });
-        using var restored = new ProtectedAtprotoStore(protector, options, environment);
-        Assert.Equal("browser", (await restored.ConsumeAsync("state"))!.AppState);
-        Assert.Null(await restored.ConsumeAsync("state"));
-        var staged = new VerifiedSessionStore(restored);
-        await staged.StoreAsync("did:plc:test", new OAuthSessionData { TokenSet = new TokenSet { Sub = "did:plc:test", AccessToken = "not-public" } });
-        Assert.Null(await restored.GetAsync("did:plc:test"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => staged.Commit("did:plc:other", default));
-        await staged.Commit("did:plc:test", default);
-        Assert.NotNull(await restored.GetAsync("did:plc:test"));
-        Assert.DoesNotContain("not-public", await File.ReadAllTextAsync(Path.Combine(directory, "protocol.protected")));
+        var ct = TestContext.Current.CancellationToken;
+        await using var application = await TestStore.Start();
+        await new AtprotoSessionStore(application.Protection()).StoreAsync("state",
+            new OAuthStateData { ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(1), AppState = "browser" }, ct);
+        var restored = new AtprotoSessionStore(application.Protection());
+        Assert.Equal("browser", (await restored.ConsumeAsync("state", ct))!.AppState);
+        Assert.Null(await restored.ConsumeAsync("state", ct));
+        var verified = false;
+        var staged = new SessionCapture(verifyFirst: (_, _) => { verified = true; return Task.CompletedTask; });
+        await staged.StoreAsync("did:plc:test", new OAuthSessionData { TokenSet = new TokenSet { Sub = "did:plc:test", AccessToken = "not-public" } }, ct);
+        Assert.True(verified);
+        Assert.Null(await restored.Read("did:plc:test", ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            staged.StoreAsync("did:plc:other", new OAuthSessionData { TokenSet = new TokenSet { Sub = "did:plc:other" } }, ct));
+        await restored.Commit("did:plc:test", staged.Take()!, null, ct);
+        Assert.NotNull((await restored.Read("did:plc:test", ct))!.Grant);
+        var row = await AtprotoSession.Get(AtprotoSession.KeyFor("did:plc:test"), ct);
+        Assert.DoesNotContain("not-public", row!.Grant);
     }
 
     private static ProviderOptions Provider() => new() { ClientId = "https://app.example/auth/atproto/client-metadata.json", Scopes = ["atproto"] };

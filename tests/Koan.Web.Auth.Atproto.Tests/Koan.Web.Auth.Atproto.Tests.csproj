@@ -10,5 +10,9 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <ProjectReference Include="../../src/Connectors/Web/Auth/Atproto/Koan.Web.Auth.Connector.Atproto.csproj" />
+    <ProjectReference Include="../../src/Connectors/Data/Sqlite/Koan.Data.Connector.Sqlite.csproj" />
+    <!-- A store that replaces conditionally and declares no conditional delete: the managed connector and its engine. -->
+    <ProjectReference Include="../../src/Connectors/Data/DuckDb/Koan.Data.Connector.DuckDb.csproj" />
+    <ProjectReference Include="../../src/Connectors/Data/DuckDb.Native/Koan.Data.Connector.DuckDb.Native.csproj" />
   </ItemGroup>
 </Project>

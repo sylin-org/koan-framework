@@ -12,7 +12,6 @@ using Koan.Web.Auth.Providers;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
@@ -59,7 +58,7 @@ public sealed class StaleClientIdentity
             TestContext.Current.CancellationToken);
 
         Assert.Equal(Did, principal.FindFirstValue(ClaimTypes.NameIdentifier));
-        var replaced = await world.Store.GetAsync(Did, TestContext.Current.CancellationToken);
+        var replaced = (await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant;
         Assert.Equal(World.ClientOf(SecondUrl), replaced!.ClientId);
         Assert.Equal("atproto", replaced.TokenSet.Scope);
     }
@@ -71,9 +70,9 @@ public sealed class StaleClientIdentity
 
         Assert.Null(await world.Sessions.GetSessionMetadata(Did, TestContext.Current.CancellationToken));
         var send = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            world.Sessions.Send(Did, "com.atproto.server.getSession", HttpMethod.Get, ct: TestContext.Current.CancellationToken));
+            world.Sessions.Send(Did, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: TestContext.Current.CancellationToken));
         Assert.Equal("AT authorization is required for this DID.", send.Message);
-        Assert.NotNull(await world.Store.GetAsync(Did, TestContext.Current.CancellationToken));
+        Assert.NotNull((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class StaleClientIdentity
 
         await world.Sessions.Disconnect(Did, TestContext.Current.CancellationToken);
 
-        Assert.Null(await world.Store.GetAsync(Did, TestContext.Current.CancellationToken));
+        Assert.Null((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
         Assert.Equal(World.ClientOf(FirstUrl), world.Provider.Revoked!["client_id"].ToString());
         Assert.Equal("stale-refresh", world.Provider.Revoked!["token"].ToString());
     }
@@ -95,7 +94,7 @@ public sealed class StaleClientIdentity
 
         await world.Sessions.Disconnect(Did, TestContext.Current.CancellationToken);
 
-        Assert.Null(await world.Store.GetAsync(Did, TestContext.Current.CancellationToken));
+        Assert.Null((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
     }
 
     /// <summary>
@@ -104,16 +103,16 @@ public sealed class StaleClientIdentity
     /// </summary>
     private sealed class World : IAsyncDisposable
     {
-        private readonly string _directory;
+        private readonly TestStore _application;
         private readonly AtprotoHttp _network;
 
-        private World(Provider provider, ProtectedAtprotoStore store, AtprotoHttp network, AtprotoSessions sessions, string directory)
+        private World(Provider provider, AtprotoSessionStore store, AtprotoHttp network, AtprotoSessions sessions, TestStore application)
         {
-            Provider = provider; Store = store; _network = network; Sessions = sessions; _directory = directory;
+            Provider = provider; Store = store; _network = network; Sessions = sessions; _application = application;
         }
 
         public Provider Provider { get; }
-        public ProtectedAtprotoStore Store { get; }
+        public AtprotoSessionStore Store { get; }
         public AtprotoSessions Sessions { get; }
 
         public static string ClientOf(string baseUrl) => baseUrl + Constants.Metadata;
@@ -121,15 +120,15 @@ public sealed class StaleClientIdentity
         public static async Task<World> Start(bool revocation = true)
         {
             var provider = await Provider.Start(revocation);
-            var directory = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
+            var application = await TestStore.Start();
             var options = new AtprotoOptions
             {
-                SessionDirectory = directory, DevelopmentAllowedOrigins = [provider.Origin], DevelopmentPlcDirectory = provider.Origin,
+                DevelopmentAllowedOrigins = [provider.Origin], DevelopmentPlcDirectory = provider.Origin,
             };
             options.DevelopmentHandles[Handle] = Did;
             var settings = Microsoft.Extensions.Options.Options.Create(options);
             var environment = new EnvironmentStub("Development");
-            var store = new ProtectedAtprotoStore(DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(directory, "keys"))), settings, environment);
+            var store = new AtprotoSessionStore(application.Protection());
             var network = new AtprotoHttp(settings, environment);
             var baseUrl = new KoanWebBaseUrl(null, environment, store: new MemoryApplicationUrlStore());
             var sessions = new AtprotoSessions(store, network, settings, Microsoft.Extensions.Options.Options.Create(new AuthOptions()),
@@ -137,7 +136,7 @@ public sealed class StaleClientIdentity
 
             await baseUrl.Accept(FirstUrl, TestContext.Current.CancellationToken);
             using var key = await DPoPKeyPair.GenerateAsync();
-            await store.StoreAsync(Did, new OAuthSessionData
+            await store.Commit(Did, new OAuthSessionData
             {
                 ClientId = ClientOf(FirstUrl),
                 RedirectUri = FirstUrl + Constants.Callback,
@@ -148,18 +147,17 @@ public sealed class StaleClientIdentity
                     Issuer = provider.Origin, Sub = Did, Audience = provider.Origin, Scope = "atproto transition:generic",
                     AccessToken = "stale-access", RefreshToken = "stale-refresh", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
                 },
-            }, TestContext.Current.CancellationToken);
+            }, null, TestContext.Current.CancellationToken);
             await baseUrl.Accept(SecondUrl, TestContext.Current.CancellationToken);
 
-            return new World(provider, store, network, sessions, directory);
+            return new World(provider, store, network, sessions, application);
         }
 
         public async ValueTask DisposeAsync()
         {
-            Store.Dispose();
             _network.Dispose();
             await Provider.DisposeAsync();
-            try { Directory.Delete(_directory, recursive: true); } catch (IOException) { }
+            await _application.DisposeAsync();
         }
     }
 

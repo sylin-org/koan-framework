@@ -1,8 +1,11 @@
 using Koan.Core;
+using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Ordering;
 using Koan.Core.Provenance;
+using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Core;
 using Koan.Web.Auth.Connector.Atproto.Controllers;
 using Koan.Web.Auth.Connector.Atproto.Hosting;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
@@ -20,6 +23,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -37,8 +41,11 @@ public sealed class AtprotoAuthModule : KoanModule
         services.AddSingleton(new AuthProviderDefinition(Constants.Provider, new ProviderOptions
         { Type = Constants.Protocol, DisplayName = "AT Protocol", Scopes = [Constants.BaseScope], Priority = 200 }));
         services.AddSingleton<AtprotoHttp>();
-        services.AddSingleton<ProtectedAtprotoStore>();
-        services.AddSingleton(sp => new AtprotoSessions(sp.GetRequiredService<ProtectedAtprotoStore>(), sp.GetRequiredService<AtprotoHttp>(),
+        services.AddSingleton(sp => new AtprotoSessionStore(sp.GetRequiredService<IDataProtectionProvider>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<AtprotoSessionStore>>()));
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddHostedService<AtprotoSessionSweep>();
+        services.AddSingleton(sp => new AtprotoSessions(sp.GetRequiredService<AtprotoSessionStore>(), sp.GetRequiredService<AtprotoHttp>(),
             sp.GetRequiredService<IOptions<AtprotoOptions>>(), sp.GetRequiredService<IOptions<AuthOptions>>(),
             sp.GetRequiredService<IAuthProviderCatalog>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<KoanWebBaseUrl>(),
             sp.GetService<IHttpContextAccessor>()));
@@ -76,7 +83,8 @@ public sealed class AtprotoAuthModule : KoanModule
     /// <summary>
     /// WEB-0081: with nothing configured and an application store, composition cannot see the accepted URL the client
     /// identity derives from. Once Koan.Web has read the store, an eligible provider without an identity it can publish
-    /// refuses the start with the correction composition would have given.
+    /// refuses the start with the correction composition would have given. An eligible provider also refuses to start on
+    /// a store that cannot replace a session row conditionally, since every session write depends on it.
     /// </summary>
     public override Task Start(IServiceProvider services, CancellationToken ct)
     {
@@ -84,12 +92,18 @@ public sealed class AtprotoAuthModule : KoanModule
         if (provider?.Eligible != true) return Task.CompletedTask;
         var clientId = services.GetRequiredService<IOptions<AuthOptions>>().Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId;
         services.GetServices<IAuthProtocol>().OfType<AtprotoProtocol>().Single().EnsureClientIdentity(clientId, provider.Scopes.ToArray());
+        using var host = AppHost.PushScope(services);
+        if (!Data<AtprotoSession, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace))
+            throw new InvalidOperationException(
+                $"Koan Web Auth provider '{Constants.Provider}' keeps each AT session as a row that changes only by a conditional write, " +
+                $"and the store elected for {nameof(AtprotoSession)} cannot replace a row conditionally. Reference a data connector that can " +
+                "(SQLite, PostgreSQL, SQL Server and MongoDB do), or route the entity to one.");
         return Task.CompletedTask;
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        module.AddNote("Native AT Protocol public-client OAuth; verified DID identity, guarded discovery, protected single-process sessions. Web Auth owns provider eligibility and browser cookie lifecycle.");
+        module.AddNote("Native AT Protocol public-client OAuth; verified DID identity, guarded discovery, sessions as protected rows in the application's store, shared by every process over it. Web Auth owns provider eligibility and browser cookie lifecycle.");
     }
 }

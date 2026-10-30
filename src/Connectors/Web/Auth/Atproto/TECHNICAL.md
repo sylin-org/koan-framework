@@ -35,8 +35,8 @@ handle-first or server-first, reads the identity once and uses it for the pushed
 request, its `redirect_uri` and the authorization URL. The callback reads the
 identity current at the callback and uses it for the code exchange and the session
 it saves, so a sign-in in flight across an accept fails closed at its callback (the
-code was issued to the previous identity) and the person signs in again. Restored clients are cached per DID together with the identity they were
-built for; a cached client built for another identity is disposed and rebuilt.
+code was issued to the previous identity) and the person signs in again. Restored clients are cached per DID together
+with the identity they were built for; a cached client built for another identity is disposed and rebuilt.
 
 The identity is checked at composition. A configured base URL is checked there as
 it always was. With nothing configured, the check passes when Koan derives the base
@@ -68,12 +68,15 @@ accepting the previous URL again restores it.
 4. Callback processing validates browser correlation before exchanging a code.
    It requires one state and issuer, exact issuer equality, expected token subject,
    and a fresh subject/PDS/issuer resolution.
-5. SDK session writes go to `VerifiedSessionStore` until those checks and exact
-   requested-scope coverage pass. A missing requested permission produces a
-   sanitized HTTP 400 correction without clearing the previous session. Only
-   then does a per-DID gate commit the protected session and replace its cached
-   client. This is the same gate used by request/refresh and disconnect, preventing
-   an old in-flight refresh from overwriting a newly authorized session.
+5. SDK session writes go to a `SessionCapture`, which persists nothing, until those
+   checks and exact requested-scope coverage pass. A missing requested permission
+   produces a sanitized HTTP 400 correction without touching the previous session.
+   Only then is the grant committed to the DID's row, conditional on the row's
+   version as read, and its client admitted to the cache. An identity-only sign-in
+   that finds a validated broader grant keeps it; a row that changed between the
+   read and the commit is read and decided again, a bounded number of times, so an
+   in-flight refresh never overwrites a newly authorized session and a sign-in never
+   overwrites a grant it did not see.
 6. The principal carries protocol DID/optional verified handle claims, links the
    existing external-identity store, and enters Koan's cookie lifecycle. No OAuth
    credential is placed in AuthenticationProperties tokens.
@@ -86,18 +89,117 @@ accepting the previous URL again restores it.
    `SignInFailureReturn` first and send the person to the application's landing
    with the code when one is named; otherwise the connector's own 400 answers.
 
-The protected file store atomically consumes one-use state and replaces the
-encrypted document. Its process lock makes its single-host guarantee explicit.
+## Sessions and pending authorizations
+
+`AtprotoSessionStore` owns two Entity rows in the application's store, both host-wide
+(`IAmbientExempt`), so an anonymous callback reads them under any tenancy. Nothing is held in
+the process, so every process over one store and key ring behaves alike (WEB-0082); the specs
+stand two connector instances over one Koan host for two processes, since Koan's Entity statics
+are per process.
+
+- **`AtprotoAuthorizationState`** — one row per pending authorization. Its id is the SHA-256
+  of the state, so the state itself is never stored; `Pending` is the protected PKCE verifier,
+  DPoP key and binding; `ExpiresAt` is indexed. `Peek` is one keyed read and answers only a live
+  row. `ConsumeAsync` reads the row and deletes it by id: of concurrent consumers, the one whose
+  delete removed the row receives it. A state that is not well-formed UTF-16 names no row.
+- **`AtprotoSession`** — one row per DID, its id the SHA-256 of the DID and `Did` checked
+  ordinally on read. `Grant` is the protected `OAuthSessionData`; `ExpiresAt`, indexed, is the
+  last grant write plus 14 days, the longest a public client's refresh token lives;
+  `ClaimedUntil` and `ClaimId` mark a grant one process holds to refresh or revoke. `Version`
+  is a fresh random value on every write, never reused. A commit, a claim and the sweep are
+  conditional on the version read; a claim holder's renewals, release and end are conditional on
+  its `ClaimId` instead, and every other write leaves the row without it. A refresh's result is
+  conditional on the protected `Grant` it refreshed from, which only a sign-in, a result or an
+  end writes anew, and clears whatever claim holds the row. A store that cannot replace
+  conditionally is refused at start for an
+  eligible provider. Ending a session is a conditional delete where the store declares one, and
+  otherwise a conditional replace that empties the row to its DID and expires it at once. A
+  write under a claim runs until the store answers or its deadline passes, and is cancelled
+  then; past it, its outcome is unknown, and the fences settle whatever a store that ignores
+  cancellation lands late.
+- **Reading.** `Read` is one keyed read. A grant that cannot be unprotected or deserialized, or
+  that names another subject, is logged and read as no grant for that DID alone; the next
+  sign-in commits over its version. A grant past `ExpiresAt` reads as none.
+- **Claims.** `SessionClaim` takes a new `ClaimId` and a lease of 15 seconds. A renewal falls
+  due 5 seconds after the lease last landed started, on its own task, and lands only while the
+  row carries the claim under an earlier `ClaimedUntil`, so a renewal only ever extends the
+  lease. While the latest has not answered, another starts every third of an interval
+  (`AttemptSpacing`, 1.67 s with the defaults); none is cut off before the end of the lease it
+  serves. A refused renewal is read: still under the claim, a newer renewal superseded it; without
+  it, the claim is lost. Renewals never wait behind the result write, go on while a provider
+  request is in flight, and stop once the claim is settled or lost, or once its lease ended with
+  none landed. A holder that stops keeps others waiting no longer than the lease. Disposing a
+  claim that is not settled releases it, clearing `ClaimId` and `ClaimedUntil`, within the lease
+  it starts in or an interval when less is left.
+- **Refresh.** A request whose stored access token is due within 30 seconds claims the row and
+  starts its refresh only with half a lease left and the row, read again, still under its claim
+  with the grant it was taken on (`Begin`, `RequestRoom`); with less room, it waits an interval
+  for a renewal to give it, and otherwise releases the claim and reads the row again, until the
+  wait bound. The refresh, once sent, runs to its answer whatever the caller's cancellation, since
+  the provider rotates the refresh token as it answers. Its result is stored while the row holds
+  the grant it refreshed from, and clears the claim in the same write — a takeover's too — so no
+  renewal or release, the holder's or a taker's, can land after it. That write keeps one version
+  across its attempts, a third of an interval apart within a window of a lease; a refused attempt
+  reads the row, so one an earlier attempt landed is recognized. When none is known to have
+  landed, the claim is released and the row read once every attempt has answered, or an interval
+  on: a row holding this result means it was stored; one holding another grant is read again;
+  while an attempt is still pending in the store, or when the row cannot be read, the outcome is
+  unknown, logged at Warning, and the request fails with `TimeoutException`; otherwise the row id
+  is logged at Error and the request fails. Others wait, pausing from 50 ms up to 1 s, for the
+  stored grant or for the claim to lapse, for one request timeout at most; then the request
+  fails with `TimeoutException`, logged at Information, having written nothing. A waiter takes
+  over only once the lease lapses, which a working holder prevents for as long as it works: two
+  request timeouts and `ClaimHold` (an interval and three leases), 110 s with the defaults. A
+  provider that answers `invalid_grant` has ended the grant: the row ends and the person signs in
+  again. Any other failure releases the claim and keeps the session. A result refused means the
+  row is read again and the client retired. Retryable failures throw `TimeoutException`; a
+  session that must be signed in again throws `InvalidOperationException`.
+- **Disconnect.** The client and the issuer's revocation endpoint are read before the claim, so
+  the claim covers the revocation request and its nonce retry alone, started as a refresh is. The
+  row ends under the claim's fence only after revocation is confirmed, and a disconnect whose end
+  is refused throws rather than reporting success.
+- **Residuals.** WEB-0082 §3 names what the fences cannot close: a holder taken over while its
+  request is at the provider, whose late result clears a taker that already sent its own refresh,
+  a store whose writes take more than half a lease, which serves no refresh until it speeds up,
+  an answer lost after the provider rotated, and process clocks that differ.
+- **Sweep.** `AtprotoSessionSweep`, a hosted service, runs `Sweep` at start and every ten minutes
+  while the provider is eligible: expired pending authorizations and expired session rows —
+  ended or not refreshed in time — are deleted, 100 rows per read, each pass stopping at a short
+  page or a page that removed nothing. A session row is deleted conditionally on its version
+  where the store allows it; elsewhere it is read again by its key and deleted only if it is
+  still that version, which leaves the window WEB-0082 names. Every process may sweep.
+
+## Clients
+
+A restored or signed-in SDK client is cached per DID in a `ClientCache` of `CachedClients`
+entries. Admitting one past capacity evicts the client used least recently and disposes it;
+the cache never empties itself and never refuses. An operation rents a client and returns it;
+one evicted, replaced or retired while rented is disposed when its last renter returns it. A
+client is reused only while the row still holds the protected grant it was built from and the
+client identity it was built for; otherwise it is retired and rebuilt from the row, resolving
+and checking the identity again. A send that fails retires its client. Requests of one DID run
+concurrently on one client: the SDK's nonce cache is concurrent, a DPoP proof signs with a key
+nothing changes, and a refresh is serialized by the row's claim.
+
 Restoration checks subject, PDS, issuer and the current client identity again. PDS origin
 comparison permits the SDK's equivalent trailing slash after refresh; callback
 issuer comparison remains exact.
+
+## Transport
 
 `AtprotoHttp` checks scheme and origin on every outgoing request and resolves DNS
 inside `SocketsHttpHandler.ConnectCallback`. It rejects private, loopback,
 link-local, documentation, multicast, mapped and selected translation addresses,
 then connects the specific vetted address while the standard handler retains TLS
 hostname verification. Public destinations require HTTPS/default port. Redirects
-and ambient proxies are disabled. Responses and total request time are bounded.
+and ambient proxies are disabled. Two clients share that handler. The protocol client the
+SDK and the connector read discovery, identity, pushed-request, token and revocation
+documents through buffers each response and refuses one longer than
+`MaximumProtocolResponseBytes`, within `RequestTimeoutSeconds`. `Send`, for XRPC and for a
+caller's own request, returns once headers arrive within `RequestTimeoutSeconds` and streams
+the body under the caller's cancellation: with a limit, a declared `Content-Length` over it is
+refused before reading and a body that runs past it fails the read that crosses it, after at
+most one byte beyond the limit; without one, the caller streams it.
 The initial conservative address policy is not a general networking framework.
 Exact development origins are allowed only by the named environment gate.
 
@@ -116,24 +218,39 @@ connection owner. Namespace syntax cannot supply a separate URL; destination
 comes from the verified session. A server action still owns whether it may use a
 particular DID's grant. This service is not an HTTP impersonation endpoint.
 
+## Evidence
+
 Evidence boundaries:
 
 - S01 outside this module proved real OAuth, callback replay denial, native
   cross-PDS Spaces transport, and real refresh after a process restart.
 - This module's focused tests exercise address guards, configuration corrections,
   development exceptions, protected state consumption, staging, permission ceilings,
-  requested-grant completeness and mandatory PAR. Thirty checks pass; the destructive provider lifecycle test
-  is skipped unless explicitly enabled. The generic sample additionally passed
-  real correlation/issuer/state/replay, cookie sign-in and actual process-restart
-  checks. Redacted receipts are in `evidence/`.
-- The opt-in local-provider lifecycle proof opens the stopped sample's protected
-  session using its normal key ring. It adjusts local expiry metadata to cause a
-  real refresh, verifies rotation of both tokens and authenticated `getSession`,
-  then proves checked revocation makes the retained refresh token fail with
-  `invalid_grant`. Explicit provider authentication/consent and restored refresh
-  after reauthorization also passed. It never exports credentials.
-- No production certification, multi-node session guarantee, confidential-client
-  lifetime, A2A/MCP/WebMCP support, or Spaces repository verification is implied.
+  requested-grant completeness and mandatory PAR, and, over a SQLite store with a loopback
+  provider that rotates refresh tokens and ends a grant whose rotated token is replayed, two
+  connector instances standing for two processes: signing in at once and reading each other's
+  sessions, one refresh of a DID across both, a stopped holder's claim taken over within its
+  lease, the claim interleavings (a claim lost mid-refresh, a renewal unrecognized past its
+  bound, loss at the mark, a store cut with a second process sending, a stale renewal after an
+  unrecognized result, a result write stalled within and past its bound, a renewal hung through
+  a short outage, a result that outlasts an outage, a result stored though its release was
+  refused), a refreshed write that fails once still landing,
+  a row this application cannot read failing only its DID, a sign-in replacing a claimed grant,
+  a provider-ended grant, a checked disconnect and one that ended nothing, the paged sweep,
+  pruning on DuckDB, which deletes nothing conditionally, the client cache's bound, eviction
+  and disposal, and streamed responses at every limit from 0 to `long.MaxValue` (WEB-0082). The
+  destructive provider lifecycle test is skipped unless explicitly enabled. The generic
+  sample additionally passed real correlation/issuer/state/replay, cookie sign-in and actual
+  process-restart checks. Redacted receipts are in `evidence/`.
+- The opt-in local-provider lifecycle proof opens the stopped sample's own store and key
+  ring. It expires the stored access token's metadata to cause a real refresh, verifies
+  rotation of both tokens and authenticated `getSession`, then proves checked revocation
+  makes the retained refresh token fail with `invalid_grant`. Its receipts in `evidence/`
+  predate session rows. It never exports credentials.
+- Processes sharing one store are proven as connector instances in one process, against the
+  loopback provider, not as separate processes and not against a public provider.
+  No production certification, confidential-client lifetime, A2A/MCP/WebMCP support, or
+  Spaces repository verification is implied.
 - The public repo MST parser in this SDK cannot verify the current experimental
   Spaces commitment/index format. That is a separate protocol data concern.
 
@@ -149,6 +266,6 @@ as its token audience. The connector uses its PKCE/DPoP primitives for the initi
 mandatory PAR and lets the staged session store resolve/check the subject and set
 the actual PDS before SDK client construction. Existing correlation, one-use state,
 permission ceilings, callback issuer binding and guarded transport remain in force.
-The focused ProtocolGuards run has 36 passing cases, including a real loopback PAR
-nonce exchange with no login hint and negative subject/issuer/PDS binding checks.
-No completed public-provider callback is claimed by that fixture.
+ProtocolGuards includes a real loopback PAR nonce exchange with no login hint and
+negative subject/issuer/PDS binding checks. No completed public-provider callback is
+claimed by that fixture.

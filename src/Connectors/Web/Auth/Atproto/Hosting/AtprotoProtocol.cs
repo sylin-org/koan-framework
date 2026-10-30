@@ -28,9 +28,9 @@ internal sealed class AtprotoProtocol(IOptions<AtprotoOptions> settings, IHostEn
         var development = KoanEnv.Gate.DevelopmentOnly(environment);
         if ((!development) && (configured.DevelopmentAllowedOrigins.Length > 0 || configured.DevelopmentHandles.Count > 0 || configured.DevelopmentPlcDirectory is not null || configured.DevelopmentConnectHost is not null))
             errors.Add($"{Constants.Section}:DevelopmentAllowedOrigins and DevelopmentHandles require Development; remove them outside that environment.");
-        if (configured.MaximumResponseBytes is < 1024 or > 64 * 1024 * 1024 || configured.RequestTimeoutSeconds is < 1 or > 120)
-            errors.Add($"{Constants.Section}:MaximumResponseBytes must be 1024..67108864 and RequestTimeoutSeconds 1..120.");
-        if (string.IsNullOrWhiteSpace(configured.SessionDirectory)) errors.Add($"Set {Constants.Section}:SessionDirectory to durable private storage.");
+        if (configured.MaximumProtocolResponseBytes is < 1024 or > 64 * 1024 * 1024 || configured.RequestTimeoutSeconds is < 1 or > 120)
+            errors.Add($"{Constants.Section}:MaximumProtocolResponseBytes must be 1024..67108864 and RequestTimeoutSeconds 1..120.");
+        if (configured.CachedClients < 1) errors.Add($"{Constants.Section}:CachedClients must be at least 1.");
         foreach (var origin in configured.DevelopmentAllowedOrigins)
             if (!Uri.TryCreate(origin, UriKind.Absolute, out var parsed) || parsed.GetLeftPart(UriPartial.Authority) != origin ||
                 parsed.UserInfo.Length > 0 || parsed.Scheme is not ("http" or "https"))

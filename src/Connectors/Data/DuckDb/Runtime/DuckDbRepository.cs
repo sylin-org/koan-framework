@@ -303,6 +303,8 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         var identity = IdentityPredicate(command, plan, write.Identity, "key_");
         var (condition, values) = Where(plan, guard);
         AddParameters(command, values, "p");
+        // The guard addresses the row through the alias reads declare; an UPDATE names its table instead.
+        condition = condition?.Replace("koan_row.", plan.QualifiedTable + ".", StringComparison.Ordinal);
         command.CommandText = $"UPDATE {plan.QualifiedTable} SET {set} WHERE {identity} AND ({condition})";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
     }

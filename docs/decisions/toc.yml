@@ -494,6 +494,8 @@
       href: WEB-0080-a-failed-sign-in-returns-to-the-application.md
     - name: WEB-0081 An application accepts its URL at runtime
       href: WEB-0081-an-application-accepts-its-url-at-runtime.md
+    - name: WEB-0082 AT sessions are rows in the application's store, refreshed by one process at a time
+      href: WEB-0082-at-sessions-are-rows-in-the-applications-store.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

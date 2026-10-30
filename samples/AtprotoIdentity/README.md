@@ -22,8 +22,9 @@ or local allowed-origin list into a public deployment.
 
 For a public host, set the provider ClientId to its canonical HTTPS metadata URL,
 remove the development exceptions, use the public PLC directory, and persist and
-protect both the session directory and ASP.NET Data Protection key ring. Reuse
-the module README's complete configuration/custody contract.
+protect both the SQLite database, which holds the AT sessions, and the ASP.NET Data
+Protection key ring that protects them. Reuse the module README's complete
+configuration/custody contract.
 
 Inspect `/health/ready`, the startup provider election and
 `/.well-known/Koan/facts`. Cookie logout and upstream disconnection are separate
@@ -32,8 +33,8 @@ actions; this sample's read-only identity page does not add a disconnect API.
 ## Explicit disposable-provider lifecycle proof
 
 After completing ordinary browser sign-in with the disposable fixture's `owner`
-account, stop this sample so its process-exclusive protected store can be opened
-by the test. Run from the repository root, under the same OS account and with the
+account, stop this sample so the test is the only process refreshing and revoking
+its session. Run from the repository root, under the same OS account and with the
 same ASP.NET Data Protection key ring used by the sample:
 
 ```powershell
@@ -52,7 +53,7 @@ account's grant for this sample client. It expires only local access-token
 metadata, proves a real provider refresh rotates both tokens, performs an
 authenticated `getSession`, calls checked upstream revocation, and verifies the
 retained refresh credential now fails with `invalid_grant`. Credentials remain
-in memory or the existing protected store; the receipt contains only booleans,
+in memory or the sample's protected session row; the receipt contains only booleans,
 status codes and the disposable DID.
 
 Start the sample again and explicitly complete browser authentication and

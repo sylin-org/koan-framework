@@ -54,7 +54,7 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
         try
         {
             if (!sessions.Enabled || Request.Query["state"].Count != 1) return Failed(SignInFailure.CallbackMismatch, properties);
-            properties = Options.StateDataFormat.Unprotect(sessions.BrowserProperties(Request.Query["state"].ToString()));
+            properties = Options.StateDataFormat.Unprotect(await sessions.BrowserProperties(Request.Query["state"].ToString(), Context.RequestAborted));
             if (properties is null || !ValidateCorrelationId(properties)) return Failed(SignInFailure.CallbackMismatch, properties);
             var principal = await sessions.Complete(Request.QueryString.ToString(), Context.RequestAborted);
             var did = principal.FindFirst(AtprotoClaimTypes.Did)!.Value;

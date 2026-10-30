@@ -13,6 +13,10 @@ related:
 
 # WEB-0079: The Data Protection key ring persists where the application says
 
+> **Amended by [WEB-0082](WEB-0082-at-sessions-are-rows-in-the-applications-store.md) (2026-10-30):** the atproto
+> connector keeps its sessions as protected rows in the application's store, not in a `SessionDirectory`; the key
+> ring this record persists is what protects them, so it must persist beside the database.
+
 ## Context
 
 Every cookie Koan Web Auth issues, every protected authentication state the OAuth2, OIDC and atproto handlers

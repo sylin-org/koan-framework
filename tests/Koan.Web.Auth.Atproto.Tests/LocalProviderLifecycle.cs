@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CarpaNet.OAuth;
 using CarpaNet.OAuth.Storage;
+using Koan.Core;
 using Koan.Web.Auth.Connector.Atproto.Options;
 using Koan.Web.Auth.Connector.Atproto.Protocol;
 using Koan.Web.Auth.Connector.Atproto.Storage;
@@ -9,6 +10,7 @@ using Koan.Web.Auth.Providers;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -17,7 +19,7 @@ using Xunit;
 
 namespace Koan.Web.Auth.Atproto.Tests;
 
-/// <summary>Explicit, disposable-account-only proof; stop the sample before opening its protected store.</summary>
+/// <summary>Explicit, disposable-account-only proof over the sample's own store; stop the sample before running it.</summary>
 public sealed class LocalProviderLifecycle
 {
     public static bool Enabled => Environment.GetEnvironmentVariable("KOAN_ATPROTO_LIFECYCLE") is "disconnect" or "reauthorized";
@@ -33,33 +35,36 @@ public sealed class LocalProviderLifecycle
         var pds = new Uri(account.GetProperty("pds").GetString()!);
         Assert.True(pds.IsLoopback && pds.Scheme == "http", "This destructive lifecycle proof accepts only disposable loopback provider accounts.");
 
-        // Match the ordinary sample's content-root discriminator and OS key ring. No copied or exported keys.
+        // The sample's own composition over its content root: its store, its content-root discriminator and OS key ring.
+        // No copied or exported keys.
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         { ApplicationName = "AtprotoIdentity", ContentRootPath = sample, EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
         builder.Logging.ClearProviders();
-        builder.Services.AddDataProtection();
-        using var services = builder.Services.BuildServiceProvider();
-        var environment = services.GetRequiredService<IHostEnvironment>();
+        builder.Services.AddKoan();
+        await using var app = builder.Build();
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        var environment = app.Services.GetRequiredService<IHostEnvironment>();
         var configured = builder.Configuration.GetSection("Koan:Web:Auth:Atproto").Get<AtprotoOptions>()!;
         foreach (var item in fixture.RootElement.GetProperty("accounts").EnumerateArray())
             configured.DevelopmentHandles[item.GetProperty("handle").GetString()!] = item.GetProperty("did").GetString()!;
         var auth = builder.Configuration.GetSection("Koan:Web:Auth").Get<AuthOptions>()!;
         var options = Microsoft.Extensions.Options.Options.Create(configured);
-        using var store = new ProtectedAtprotoStore(services.GetRequiredService<IDataProtectionProvider>(), options, environment);
+        var store = new AtprotoSessionStore(app.Services.GetRequiredService<IDataProtectionProvider>());
         using var network = new AtprotoHttp(options, environment);
         var sessions = new AtprotoSessions(store, network, options, Microsoft.Extensions.Options.Options.Create(auth), new Catalog(), environment, new KoanWebBaseUrl(null));
-        var previous = await store.GetAsync(did);
-        Assert.NotNull(previous);
-        var oldAccess = previous.TokenSet.AccessToken;
-        var oldRefresh = previous.TokenSet.RefreshToken;
+        var previous = await store.Read(did, TestContext.Current.CancellationToken);
+        Assert.NotNull(previous?.Grant);
+        var oldAccess = previous.Grant.TokenSet.AccessToken;
+        var oldRefresh = previous.Grant.TokenSet.RefreshToken;
         // Expire local metadata only; the provider receives the original real refresh token and SDK DPoP.
-        previous.TokenSet.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
-        await store.StoreAsync(did, previous);
-        using var response = await sessions.Send(did, "com.atproto.server.getSession", HttpMethod.Get);
+        previous.Grant.TokenSet.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        Assert.NotNull(await store.Commit(did, previous.Grant, previous, TestContext.Current.CancellationToken));
+        using var response = await sessions.Send(did, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: TestContext.Current.CancellationToken);
         Assert.True(response.IsSuccessStatusCode, "The authenticated post-refresh PDS request failed.");
-        using var identity = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        using var identity = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(did, identity.RootElement.GetProperty("did").GetString());
-        var refreshed = await store.GetAsync(did);
+        var refreshed = (await store.Read(did, TestContext.Current.CancellationToken))?.Grant;
         Assert.NotNull(refreshed);
         Assert.True(oldAccess != refreshed.TokenSet.AccessToken, "Real access-token rotation did not occur.");
         Assert.True(oldRefresh != refreshed.TokenSet.RefreshToken, "Real refresh-token rotation did not occur.");
@@ -71,20 +76,21 @@ public sealed class LocalProviderLifecycle
         {
             // Keep the last valid grant only in memory, so revocation is checked beyond local deletion.
             var retained = JsonSerializer.Deserialize<OAuthSessionData>(JsonSerializer.Serialize(refreshed))!;
-            await sessions.Disconnect(did);
-            localSessionRemoved = await store.GetAsync(did) is null;
+            await sessions.Disconnect(did, TestContext.Current.CancellationToken);
+            localSessionRemoved = (await store.Read(did, TestContext.Current.CancellationToken))?.Grant is null;
             Assert.True(localSessionRemoved);
             retained.TokenSet.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
             var memory = new MemoryOAuthSessionStore();
-            await memory.StoreAsync(did, retained);
+            await memory.StoreAsync(did, retained, TestContext.Current.CancellationToken);
             using var provider = new DPoPTokenProvider(network.Client, memory, clientId: retained.ClientId,
                 redirectUri: retained.RedirectUri, scope: retained.Scope);
-            Assert.True(await provider.RestoreSessionAsync(did));
-            try { await provider.GetAccessTokenAsync(); }
+            Assert.True(await provider.RestoreSessionAsync(did, TestContext.Current.CancellationToken));
+            try { await provider.GetAccessTokenAsync(TestContext.Current.CancellationToken); }
             catch (TokenRefreshException error) when (error.InnerException is OAuthException oauth && oauth.ErrorCode == "invalid_grant")
             { revokedRefreshDenied = true; }
             Assert.True(revokedRefreshDenied, "The provider did not reject the revoked refresh grant as invalid_grant.");
-            await Assert.ThrowsAsync<InvalidOperationException>(() => sessions.Send(did, "com.atproto.server.getSession", HttpMethod.Get));
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                sessions.Send(did, "com.atproto.server.getSession", HttpMethod.Get, 64 * 1024, ct: TestContext.Current.CancellationToken));
         }
 
         var receipt = new
@@ -96,7 +102,9 @@ public sealed class LocalProviderLifecycle
             secretsWritten = false
         };
         var output = Environment.GetEnvironmentVariable("KOAN_ATPROTO_RECEIPT") ?? throw new InvalidOperationException("Set KOAN_ATPROTO_RECEIPT.");
-        await File.WriteAllTextAsync(output, JsonSerializer.Serialize(receipt, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
+        await File.WriteAllTextAsync(output, JsonSerializer.Serialize(receipt, new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine,
+            TestContext.Current.CancellationToken);
+        await app.StopAsync(CancellationToken.None);
     }
 
     private sealed class Catalog : IAuthProviderCatalog

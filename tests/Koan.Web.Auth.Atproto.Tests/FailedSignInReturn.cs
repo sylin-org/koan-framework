@@ -204,9 +204,9 @@ public sealed class FailedSignInReturn
     private sealed class KoanHost : IAsyncDisposable
     {
         private readonly IHost _host;
-        private readonly string _sessions;
+        private readonly string _folder;
 
-        private KoanHost(IHost host, string sessions) { _host = host; _sessions = sessions; }
+        private KoanHost(IHost host, string folder) { _host = host; _folder = folder; }
 
         public HttpClient Client
         {
@@ -220,7 +220,9 @@ public sealed class FailedSignInReturn
 
         public static async Task<KoanHost> Start(string providerOrigin, Dictionary<string, string?>? extra = null)
         {
-            var sessions = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
+            // The application's store, where the connector keeps its sessions and pending authorizations.
+            var folder = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(folder);
             var settings = new Dictionary<string, string?>
             {
                 ["Koan:Environment"] = "Development",
@@ -228,7 +230,8 @@ public sealed class FailedSignInReturn
                 ["Logging:LogLevel:Default"] = "Warning",
                 ["Koan:Web:ApplicationUrl"] = "https://www.example.com" + PathBase,
                 ["Koan:Web:Auth:Providers:atproto:Scopes:0"] = "atproto",
-                ["Koan:Web:Auth:Atproto:SessionDirectory"] = sessions,
+                ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+                ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={Path.Combine(folder, "store.sqlite")};Pooling=False",
                 ["Koan:Web:Auth:Atproto:DevelopmentAllowedOrigins:0"] = providerOrigin,
                 ["Koan:Web:Auth:Atproto:DevelopmentPlcDirectory"] = providerOrigin,
                 ["Koan:Web:Auth:Atproto:DevelopmentHandles:" + Handle] = Did,
@@ -247,15 +250,20 @@ public sealed class FailedSignInReturn
                 })
                 .Build();
             try { await host.StartAsync(TestContext.Current.CancellationToken); }
-            catch { host.Dispose(); throw; }
-            return new KoanHost(host, sessions);
+            catch
+            {
+                host.Dispose();
+                try { Directory.Delete(folder, recursive: true); } catch (IOException) { }
+                throw;
+            }
+            return new KoanHost(host, folder);
         }
 
         public async ValueTask DisposeAsync()
         {
             await _host.StopAsync(CancellationToken.None);
             _host.Dispose();
-            try { Directory.Delete(_sessions, recursive: true); } catch (IOException) { }
+            try { Directory.Delete(_folder, recursive: true); } catch (IOException) { }
         }
     }
 }

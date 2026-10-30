@@ -11,6 +11,9 @@ dotnet add package Sylin.Koan.Web.Auth.Connector.Atproto
 
 Keep the application bootstrap ordinary: reference the package and call
 `builder.Services.AddKoan()`; do not register an authentication scheme or callback manually.
+The connector keeps its sessions as rows in the application's own store, so reference a Koan
+data connector that replaces a row conditionally — SQLite, PostgreSQL, SQL Server and MongoDB
+do. An eligible provider over a store that cannot refuses to start and names the correction.
 
 ## Meaningful use
 
@@ -33,8 +36,7 @@ Declare the application's public URL once; the client-metadata URL and the callb
   "Koan": { "Web": {
     "ApplicationUrl": "https://your-app.example",
     "Auth": {
-      "Providers": { "atproto": { "Scopes": ["atproto"] } },
-      "Atproto": { "SessionDirectory": "/private/persistent/atproto" }
+      "Providers": { "atproto": { "Scopes": ["atproto"] } }
     }
   }}
 }
@@ -116,39 +118,64 @@ grant check. Reauthorization is required when the client ID or permission ceilin
 changes.
 
 `AtprotoSessions` in the `.Protocol` namespace sends XRPC through the native
-session using `Send(did, nsid, method, parameters, content, ct)`. It fixes the
-destination to that DID's verified PDS, bounds responses, applies SDK DPoP and
-refresh, and returns a disposable `HttpResponseMessage`. `Disconnect(did)` revokes
-the upstream grant. Ordinary Koan logout clears only the local cookie.
+session using `Send(did, nsid, method, maximumResponseBytes, parameters, content, ct)`.
+It fixes the destination to that DID's verified PDS, applies SDK DPoP and refresh, and
+returns a disposable `HttpResponseMessage` as soon as its headers arrive. The body
+streams: the caller reads no more than `maximumResponseBytes` of it, or all of it when
+that is `null`, for a caller that streams a blob or a long page. A body that declares
+a longer length is refused before it is read; one that runs past the limit fails the
+read that crosses it. `Disconnect(did)` revokes the upstream grant. Ordinary Koan
+logout clears only the local cookie.
 
-For a protocol workflow that uses a different credential, `AtprotoHttp.Send(request, ct)`
-reuses the same network guards while the caller owns headers and credential context.
+```csharp
+using var page = await sessions.Send(did, "com.atproto.repo.listRecords", HttpMethod.Get,
+    maximumResponseBytes: 1024 * 1024, parameters: query, ct: ct);
+using var blob = await sessions.Send(did, "com.atproto.sync.getBlob", HttpMethod.Get,
+    maximumResponseBytes: null, parameters: blobQuery, ct: ct); // streamed by the caller
+```
+
+For a protocol workflow that uses a different credential,
+`AtprotoHttp.Send(request, maximumResponseBytes, ct)` reuses the same network guards and
+the same streaming limit while the caller owns headers and credential context.
 `AtprotoSessions.ResolveDid(did, ct)` returns the SDK DID document after an exact
 identifier check. Neither API exposes stored OAuth secrets or the raw HttpClient.
 
 ## Guarantees and boundaries
 
-### Custody and development
+### Custody and processes
 
-Persist the session directory and the ASP.NET Data Protection key ring: set
-`Koan:Web:KeyRingDirectory` to a folder on the same persistent storage (WEB-0079),
-so a rebuilt container, or a renamed application, still reads the sessions it
-protected. Protocol state and
-sessions are encrypted with that key ring; token/key material is not stored in
-the browser cookie. Protect the key ring for the deployment account (the folder's
-permissions, or an encryptor added through ASP.NET's `IDataProtectionBuilder`).
-A process-exclusive file lock rejects a second host using the same session
-directory. This initial storage implementation is single-process; it does not
-claim distributed refresh coordination.
+Each DID's session — its tokens, DPoP key and the client identity it was granted to — is
+one row of the application's store (WEB-0082), and each pending authorization is one row
+until its callback consumes it or it expires. Every row is protected on its own with the
+ASP.NET Data Protection key ring, so a backup of the database carries the sessions, and the
+key ring must persist beside it: set `Koan:Web:KeyRingDirectory` to a folder on persistent
+storage (WEB-0079), so a rebuilt container, or a renamed application, still reads the
+sessions it protected. Token and key material is never placed in the browser cookie.
+Protect the key ring for the deployment account (the folder's permissions, or an encryptor
+added through ASP.NET's `IDataProtectionBuilder`).
+
+Nothing about a session is held in the process, so every process over the same store and
+key ring can sign people in and read every session; the connector's specs prove this with
+two connector instances over one store in one process, not with separate processes
+(WEB-0082). A grant due for refresh is claimed on its row with a short lease its holder
+renews while it works, fenced by a claim identity, and the refreshed tokens are stored only
+over the grant they replace, so one process refreshes it and the others use the tokens it
+stores; a holder that stops keeps them waiting no longer than the lease. WEB-0082 names what
+this cannot close: a holder cut off from the store for longer than the lease while its
+refresh is at the provider, and an answer lost after the provider rotated the token. A row this
+application cannot read — its key was lost — is that one DID's session gone: the person
+signs in again, and the new grant replaces the row. Sessions not refreshed for 14 days,
+the longest a public client's refresh token lives, ended sessions and expired pending
+authorizations are swept a page at a time every ten minutes.
 
 `Koan:Web:Auth:Atproto` options are:
 
 | Key | Default / meaning |
 | --- | --- |
 | `PlcDirectory` | `https://plc.directory` |
-| `SessionDirectory` | `.koan/atproto`, relative to content root |
-| `MaximumResponseBytes` | 4194304, maximum buffered protocol/XRPC response |
-| `RequestTimeoutSeconds` | 30 |
+| `MaximumProtocolResponseBytes` | 4194304, the largest discovery, identity, pushed-request, token or revocation document the connector reads itself |
+| `RequestTimeoutSeconds` | 30; a sent request's headers arrive within it, and so does each protocol request a refresh or revocation makes |
+| `CachedClients` | 1024 signed-in clients one process keeps ready; past it the one used least recently is closed |
 | `DevelopmentAllowedOrigins` | Empty; exact HTTP(S) origins for a local protocol test network |
 | `DevelopmentHandles` | Empty; explicit local DNS fixture map from handle to DID |
 
@@ -160,6 +187,6 @@ one IP-loopback `redirect_uri` with the canonical callback path and one `scope`
 query value equal to the declared upper bound. See `samples/AtprotoIdentity`.
 
 An inactive reference supplies availability without initiating network traffic or
-opening session storage. Incorrect client/issuer/endpoint settings fail with a
+touching session storage. Incorrect client/issuer/endpoint settings fail with a
 corrective configuration message. Failed browser verification returns a generic
 HTTP 400 without disclosing provider responses or token material.
