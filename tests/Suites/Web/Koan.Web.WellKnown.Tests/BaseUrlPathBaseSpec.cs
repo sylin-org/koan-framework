@@ -174,6 +174,9 @@ public sealed class BaseUrlPathBaseSpec
             }
             catch
             {
+                // A start that fails in module start runs after the host attached itself as AppHost.Current; stopping
+                // releases that lease, so a failed start does not leave the next spec on a disposed provider.
+                try { await host.StopAsync(CancellationToken.None); } catch { /* the start already failed */ }
                 host.Dispose();
                 throw;
             }

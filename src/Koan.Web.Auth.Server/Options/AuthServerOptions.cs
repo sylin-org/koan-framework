@@ -12,8 +12,9 @@ public sealed class AuthServerOptions
     /// SEC-0006 — the AS's public origin (e.g. <c>https://app.example.com</c>), used as the discovery
     /// <c>issuer</c> and to build every externally-advertised endpoint URL (authorize/token/device/jwks +
     /// the device <c>verification_uri</c>). An explicit override: when unset, the issuer is the application's
-    /// canonical base URL, <c>Koan:Web:ApplicationUrl</c> (WEB-0078), path included — authoritative and
-    /// host-spoof-proof behind a proxy. With neither set (Development), URLs derive from the live request host.
+    /// canonical base URL, <c>Koan:Web:ApplicationUrl</c> (WEB-0078), path included, or the URL the application
+    /// accepted (WEB-0081) — authoritative and host-spoof-proof behind a proxy. With neither (Development), URLs derive
+    /// from the live request host.
     /// </summary>
     public string? Issuer { get; set; }
 

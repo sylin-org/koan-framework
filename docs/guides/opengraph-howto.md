@@ -85,7 +85,7 @@ customization is a one-line conditional, which an attribute scheme could not exp
 
 A null or empty `mediaId` collapses to the default. The middleware promotes the path to an absolute
 URL rooted at the application's base URL: `Koan:Web:ApplicationUrl` when it is set (path included,
-WEB-0078), else the request's scheme, host and path base. The same root is used for `og:url` and the
+WEB-0078), else the URL the application accepted (WEB-0081), else the request's scheme, host and path base. The same root is used for `og:url` and the
 canonical link.
 
 ## 3. Configure `Koan:Web:OpenGraph`

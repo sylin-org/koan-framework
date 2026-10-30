@@ -14,10 +14,14 @@ using Koan.Web.Hooks;
 using Koan.Web.Infrastructure;
 using Koan.Web.Pillars;
 using Koan.Core.Hosting.Bootstrap;
+using Koan.Core.Ordering;
 using Koan.Data.Core.Pipeline;
 
 namespace Koan.Web.Initialization;
 
+// WEB-0081: Start reads the application's IApplicationUrlStore, which commonly reads an Entity<T> row, so it runs after
+// the data pillar has started (default-route hydration and the axis pre-flight) whatever the module ids sort to.
+[After(typeof(Koan.Data.Core.Initialization.KoanDataCoreModule))]
 public sealed class WebModule : KoanModule
 {
     public override void Register(IServiceCollection services)
@@ -28,11 +32,20 @@ public sealed class WebModule : KoanModule
 
         // WEB-0078: the one canonical base URL. Parsed once from Koan:Web:ApplicationUrl; the startup filter serves
         // under its path and every pillar that writes an absolute URL reads it from here. An unparseable value is a
-        // corrective boot failure, not a request-time surprise.
+        // corrective boot failure, not a request-time surprise. WEB-0081: the application's own IApplicationUrlStore,
+        // when it registers one, holds the URL it accepted at runtime; Start loads it before the host serves.
         services.TryAddSingleton(sp => new Hosting.KoanWebBaseUrl(
             sp.GetRequiredService<IOptions<Options.KoanWebOptions>>().Value.ApplicationUrl,
             sp.GetService<IHostEnvironment>(),
-            sp.GetService<ILogger<Hosting.KoanWebBaseUrl>>()));
+            sp.GetService<ILogger<Hosting.KoanWebBaseUrl>>(),
+            sp.GetService<Hosting.IApplicationUrlStore>(),
+            sp.GetService<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>()));
+        // WEB-0081: the origins requests arrive on, noted at the head of the pipeline and held in memory, bounded.
+        services.TryAddSingleton(sp => new Hosting.KoanWebOrigins(
+            sp.GetRequiredService<Hosting.KoanWebBaseUrl>(),
+            sp.GetRequiredService<IOptions<Options.KoanWebOptions>>().Value.ObservedOriginLimit,
+            sp.GetService<TimeProvider>(),
+            sp.GetService<ILogger<Hosting.KoanWebOrigins>>()));
         // WEB-0079: where the Data Protection key ring lives. One owner reads Koan:Web:KeyRingDirectory; when it is set
         // the ring persists there under the application name the folder remembers, and Start proves the folder usable
         // before anything is protected. The owner supplies defaults the application's own configuration overrides: the
@@ -108,11 +121,14 @@ public sealed class WebModule : KoanModule
     }
 
     // WEB-0079: the key ring's folder is created, proved writable and loaded before the host serves, so a folder this
-    // process cannot use is a corrective start failure rather than a failed first sign-in.
-    public override Task Start(IServiceProvider services, CancellationToken ct)
+    // process cannot use is a corrective start failure rather than a failed first sign-in. WEB-0081: the accepted base
+    // URL is read from the application's store before the host serves, inside the host's ambient scope so a store over
+    // an Entity reads this host's data; a stored value that is not a public origin refuses the start.
+    public override async Task Start(IServiceProvider services, CancellationToken ct)
     {
         services.GetRequiredService<Hosting.KoanWebKeyRing>().Prepare();
-        return Task.CompletedTask;
+        using var scope = Koan.Core.Hosting.App.AppHost.PushScope(services);
+        await services.GetRequiredService<Hosting.KoanWebBaseUrl>().Load(ct).ConfigureAwait(false);
     }
 
     private static object Instantiate(IServiceProvider services, ServiceDescriptor descriptor)
@@ -133,19 +149,14 @@ public sealed class WebModule : KoanModule
             Infrastructure.KoanWebConstants.Authorization.DefaultDecisionFactReason,
             typeof(WebModule).FullName ?? nameof(WebModule));
 
-        // WEB-0078: state the base URL the host serves under, so an operator reads it instead of inferring it.
-        var key = $"{ConfigurationConstants.Web.Section}:{ConfigurationConstants.Web.Keys.ApplicationUrl}";
-        var baseUrl = services.GetRequiredService<Hosting.KoanWebBaseUrl>();
+        // WEB-0078: state the base URL the host serves under, so an operator reads it instead of inferring it. WEB-0081:
+        // the base URL states it again whenever the application's accepted URL is loaded or changes.
+        var (summary, reason) = services.GetRequiredService<Hosting.KoanWebBaseUrl>().Statement();
         composition.AddObservation(
             Infrastructure.KoanWebConstants.BaseUrl.FactCode,
             Infrastructure.KoanWebConstants.BaseUrl.FactSubject,
-            baseUrl.IsConfigured
-                ? $"The application's base URL is {baseUrl.Configured} ({key}); absolute URLs derive from it" +
-                  (baseUrl.PathBase.HasValue ? $", and a request outside {baseUrl.PathBase} answers 404." : ".")
-                : $"No base URL is configured ({key}); absolute URLs derive from each request's scheme, host and path base.",
-            baseUrl.IsConfigured
-                ? Infrastructure.KoanWebConstants.BaseUrl.ConfiguredFactReason
-                : Infrastructure.KoanWebConstants.BaseUrl.DerivedFactReason,
+            summary,
+            reason,
             typeof(WebModule).FullName ?? nameof(WebModule));
 
         // WEB-0079: state where the key ring lives, as in effect, so an operator reads it instead of discovering it at a

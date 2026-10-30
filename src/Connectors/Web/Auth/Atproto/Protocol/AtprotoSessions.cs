@@ -19,6 +19,7 @@ using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
@@ -33,19 +34,35 @@ public sealed class AtprotoSessions
     private readonly IOptions<AuthOptions> auth;
     private readonly IAuthProviderCatalog catalog;
     private readonly KoanWebBaseUrl baseUrl;
+    private readonly IHttpContextAccessor? http;
     private readonly bool development;
-    private readonly ConcurrentDictionary<string, ATProtoOAuthClient> clients = new();
+    private readonly ConcurrentDictionary<string, CachedClient> clients = new();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> locks = new();
     private readonly AtprotoDns dns = new();
 
     internal AtprotoSessions(ProtectedAtprotoStore store, AtprotoHttp network, IOptions<AtprotoOptions> options,
-        IOptions<AuthOptions> auth, IAuthProviderCatalog catalog, IHostEnvironment environment, KoanWebBaseUrl baseUrl)
-    { this.store = store; this.network = network; this.options = options.Value; this.auth = auth; this.catalog = catalog; this.baseUrl = baseUrl; development = KoanEnv.Gate.DevelopmentOnly(environment); }
+        IOptions<AuthOptions> auth, IAuthProviderCatalog catalog, IHostEnvironment environment, KoanWebBaseUrl baseUrl,
+        IHttpContextAccessor? http = null)
+    { this.store = store; this.network = network; this.options = options.Value; this.auth = auth; this.catalog = catalog; this.baseUrl = baseUrl; this.http = http; development = KoanEnv.Gate.DevelopmentOnly(environment); }
 
-    /// <summary>The configured client-metadata URL, else the one derived from the application's base URL (WEB-0078).</summary>
-    internal string ClientId => auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId
-        ?? AtprotoClientIdentity.Derive(baseUrl, AllowedScopes, development)
-        ?? throw new InvalidOperationException($"AT provider ClientId is not configured and {AtprotoClientIdentity.BaseUrlKey} is not set.");
+    /// <summary>
+    /// The configured client-metadata URL, else the one derived at use from the application's base URL (WEB-0078): the
+    /// configured or accepted one (WEB-0081), else the current request's where Koan derives it. Read at use, so a URL
+    /// the application accepts changes the identity from the next request on.
+    /// </summary>
+    internal string ClientId
+    {
+        get
+        {
+            if (auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId is { } configured) return configured;
+            var root = BaseUrl();
+            return AtprotoClientIdentity.Derive(root, AllowedScopes, development)
+                ?? throw new InvalidOperationException(AtprotoClientIdentity.Correction(root, baseUrl.CanAccept && !baseUrl.IsConfigured));
+        }
+    }
+
+    private string? BaseUrl()
+        => baseUrl.Current ?? (baseUrl.DerivesFromRequests && http?.HttpContext is { } context ? baseUrl.Resolve(context) : null);
     internal string[] AllowedScopes => catalog.Find(Constants.Provider)?.Scopes.ToArray() ?? [Constants.BaseScope];
     internal string RedirectUri => AtprotoClientIdentity.RedirectUri(ClientId);
     internal bool Enabled => catalog.Find(Constants.Provider)?.Eligible == true;
@@ -64,8 +81,8 @@ public sealed class AtprotoSessions
         if (document.Id != did) throw new InvalidOperationException("Resolved AT DID document identifier mismatch.");
         return document;
     }
-    private OAuthSession OAuth(string scope, string did, IOAuthSessionStore? sessions = null) => new(new OAuthClientConfig
-    { ClientId = ClientId, RedirectUri = RedirectUri, Scope = scope, HttpClient = network.Client,
+    private OAuthSession OAuth(string clientId, string scope, string did, IOAuthSessionStore? sessions = null) => new(new OAuthClientConfig
+    { ClientId = clientId, RedirectUri = AtprotoClientIdentity.RedirectUri(clientId), Scope = scope, HttpClient = network.Client,
         StateStore = store, SessionStore = sessions ?? store, IdentityResolver = Resolver(did) });
 
     private async Task<(string Did, string? Handle, string Pds, string Issuer)> Resolve(string identifier, CancellationToken ct)
@@ -104,6 +121,7 @@ public sealed class AtprotoSessions
     internal async Task<string> Start(string identifier, AuthenticationProperties properties, string protectedProperties, CancellationToken ct)
     {
         if (!Enabled) throw new InvalidOperationException("AT provider is inactive.");
+        var clientId = ClientId;
         var explicitlyRequested = properties.Items.TryGetValue(Constants.RequestedScopes, out var requested);
         var scopes = explicitlyRequested
             ? JsonSerializer.Deserialize<string[]>(requested!)! : [Constants.BaseScope];
@@ -116,7 +134,7 @@ public sealed class AtprotoSessions
             try
             {
                 var saved = await store.GetAsync(identity.Did, ct);
-                if (saved is not null && HasBroaderScopes(saved.TokenSet.Scope))
+                if (saved is not null && Current(saved, clientId) && HasBroaderScopes(saved.TokenSet.Scope))
                 {
                     ValidateSaved(saved, identity);
                     scopes = ScopesForSignIn(false, scopes, saved.TokenSet.Scope, AllowedScopes);
@@ -126,10 +144,10 @@ public sealed class AtprotoSessions
         }
         var scope = string.Join(' ', scopes.Distinct(StringComparer.Ordinal));
         var binding = new Binding(identity.Did, identity.Pds, identity.Issuer, scope, protectedProperties);
-        using var oauth = OAuth(scope, identity.Did);
+        using var oauth = OAuth(clientId, scope, identity.Did);
         var authorization = await Classified(SignInFailure.ProviderUnreachable, "AT authorization request could not be pushed.",
             () => oauth.AuthorizeAsync(identity.Did, JsonSerializer.Serialize(binding), ct));
-        RequirePar(authorization, ClientId);
+        RequirePar(authorization, clientId);
         return authorization;
     }
 
@@ -157,6 +175,10 @@ public sealed class AtprotoSessions
     internal async Task<string> StartServer(string server, AuthenticationProperties properties, string protectedProperties, CancellationToken ct)
     {
         if (!Enabled) throw new InvalidOperationException("AT provider is inactive.");
+        // WEB-0081: one client identity for the whole challenge — the pushed request, its redirect_uri and the
+        // authorization URL — even if the application accepts another URL while the request is pushed.
+        var clientId = ClientId;
+        var redirectUri = AtprotoClientIdentity.RedirectUri(clientId);
         network.Validate(new Uri(server));
         using var discovery = new AuthorizationServerDiscovery(network.Client, TimeSpan.Zero);
         var issuer = await Classified(SignInFailure.ProviderUnreachable, "AT authorization server could not be discovered.", async () =>
@@ -194,7 +216,7 @@ public sealed class AtprotoSessions
                 request.Headers.Add("DPoP", await key.CreateProofAsync("POST", metadata.PushedAuthorizationRequestEndpoint, nonce));
                 request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
                 {
-                    ["client_id"] = ClientId, ["redirect_uri"] = RedirectUri, ["response_type"] = "code",
+                    ["client_id"] = clientId, ["redirect_uri"] = redirectUri, ["response_type"] = "code",
                     ["state"] = state, ["code_challenge"] = challenge, ["code_challenge_method"] = "S256",
                     ["scope"] = scope, ["dpop_jkt"] = key.Thumbprint
                 });
@@ -203,8 +225,8 @@ public sealed class AtprotoSessions
                 using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
                 if (response.IsSuccessStatusCode && body.RootElement.TryGetProperty("request_uri", out var requestUri) && !string.IsNullOrWhiteSpace(requestUri.GetString()))
                 {
-                    var authorization = metadata.AuthorizationEndpoint + "?client_id=" + Uri.EscapeDataString(ClientId) + "&request_uri=" + Uri.EscapeDataString(requestUri.GetString()!);
-                    RequirePar(authorization, ClientId);
+                    var authorization = metadata.AuthorizationEndpoint + "?client_id=" + Uri.EscapeDataString(clientId) + "&request_uri=" + Uri.EscapeDataString(requestUri.GetString()!);
+                    RequirePar(authorization, clientId);
                     return authorization;
                 }
                 if (attempt == 0 && nonce is not null && body.RootElement.TryGetProperty("error", out var error) && error.GetString() == "use_dpop_nonce") continue;
@@ -259,7 +281,7 @@ public sealed class AtprotoSessions
         try
         {
             var saved = await store.GetAsync(did, ct);
-            if (saved is null) return null;
+            if (saved is null || !Current(saved, ClientId)) return null;
             var identity = await Resolve(did, ct);
             ValidateSaved(saved, identity);
             // Restore/refresh the OAuth session without issuing a source operation. Scope presence is not source freshness.
@@ -302,11 +324,12 @@ public sealed class AtprotoSessions
             RequireSubjectBinding(null, null, binding.Issuer, resolved.Did, resolved.Pds, resolved.Issuer, resolved.Pds);
             value.TokenSet.Audience = resolved.Pds;
         } : null);
-        var oauth = OAuth(binding.Scope, binding.Did ?? binding.Issuer, staging);
+        var clientId = ClientId;
+        var oauth = OAuth(clientId, binding.Scope, binding.Did ?? binding.Issuer, staging);
         ATProtoOAuthClient? client = null;
         try
         {
-            client = await oauth.CallbackAsync(RedirectUri + query, ct);
+            client = await oauth.CallbackAsync(AtprotoClientIdentity.RedirectUri(clientId) + query, ct);
             var identity = await Resolve(client.Did, ct);
             RequireSubjectBinding(binding.Did, binding.Pds, binding.Issuer, identity.Did, identity.Pds, identity.Issuer, client.BaseUrl.ToString());
             RequireScopes(staging.GrantedScope, AllowedScopes);
@@ -316,7 +339,8 @@ public sealed class AtprotoSessions
             try
             {
                 var saved = await store.GetAsync(client.Did, ct);
-                var preserveGrant = binding.Did is null && !HasBroaderScopes(binding.Scope) && saved is not null && HasBroaderScopes(saved.TokenSet.Scope);
+                var preserveGrant = binding.Did is null && !HasBroaderScopes(binding.Scope) && saved is not null
+                    && Current(saved, clientId) && HasBroaderScopes(saved.TokenSet.Scope);
                 if (preserveGrant)
                 {
                     ValidateSaved(saved!, identity);
@@ -327,8 +351,8 @@ public sealed class AtprotoSessions
                 {
                     await staging.Commit(client.Did, ct);
                     clients.TryGetValue(client.Did, out var replaced);
-                    clients[client.Did] = client;
-                    replaced?.Dispose();
+                    clients[client.Did] = new CachedClient(clientId, client);
+                    replaced?.Client.Dispose();
                 }
             }
             finally { gate.Release(); }
@@ -344,12 +368,21 @@ public sealed class AtprotoSessions
 
     private async Task<ATProtoOAuthClient> Client(string did, CancellationToken ct)
     {
-        if (clients.TryGetValue(did, out var client)) return client;
-        var saved = await store.GetAsync(did, ct) ?? throw new InvalidOperationException("AT authorization is required for this DID.");
+        var clientId = ClientId;
+        if (clients.TryGetValue(did, out var cached))
+        {
+            if (cached.ClientId == clientId) return cached.Client;
+            // WEB-0081: the application's base URL changed since this client was built, so it speaks for a client
+            // identity this application no longer publishes. The saved session is checked against the current one below.
+            clients.TryRemove(did, out _);
+            cached.Client.Dispose();
+        }
+        var saved = await store.GetAsync(did, ct);
+        if (saved is null || !Current(saved, clientId)) throw new InvalidOperationException("AT authorization is required for this DID.");
         var identity = await Resolve(did, ct);
         ValidateSaved(saved, identity);
-        client = await OAuth(saved.Scope ?? Constants.BaseScope, did).RestoreSessionAsync(did, ct) ?? throw new InvalidOperationException("AT session restoration failed; reauthorize.");
-        clients[did] = client;
+        var client = await OAuth(clientId, saved.Scope ?? Constants.BaseScope, did).RestoreSessionAsync(did, ct) ?? throw new InvalidOperationException("AT session restoration failed; reauthorize.");
+        clients[did] = new CachedClient(clientId, client);
         return client;
     }
 
@@ -401,38 +434,86 @@ public sealed class AtprotoSessions
         finally { gate.Release(); }
     }
 
-    /// <summary>Revoke and remove the upstream grant; this is separate from local cookie logout.</summary>
+    /// <summary>
+    /// Revoke and remove the upstream grant; this is separate from local cookie logout. A session granted to a client
+    /// identity this application no longer publishes (WEB-0081) is removed here whether or not the provider accepts its
+    /// revocation.
+    /// </summary>
     public async Task Disconnect(string did, CancellationToken ct = default)
     {
         var gate = locks.GetOrAdd(did, _ => new SemaphoreSlim(1));
         await gate.WaitAsync(ct);
         try
         {
+            if (await store.GetAsync(did, ct) is { } stored && !Current(stored, ClientId))
+            {
+                await RevokeStale(did, stored, ct);
+                await store.DeleteAsync(did, ct);
+                if (clients.TryRemove(did, out var cached)) cached.Client.Dispose();
+                return;
+            }
+
             var client = await Client(did, ct);
             var provider = (DPoPTokenProvider)client.TokenProvider;
             var saved = await store.GetAsync(did, ct) ?? throw new InvalidOperationException("AT session unavailable.");
-            using var discovery = new AuthorizationServerDiscovery(network.Client, TimeSpan.Zero);
-            var metadata = await discovery.GetMetadataAsync(saved.TokenSet.Issuer, ct);
-            var endpoint = metadata.RevocationEndpoint ?? throw new InvalidOperationException("Provider does not advertise revocation; upstream disconnect cannot be confirmed.");
-            if (string.IsNullOrEmpty(saved.TokenSet.RefreshToken)) throw new InvalidOperationException("Session has no refresh token to revoke.");
-            for (var attempt = 0; attempt < 2; attempt++)
-            {
-                using var request = await provider.CreateDPoPRequestAsync(HttpMethod.Post, endpoint, includeAccessToken: false);
-                request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
-                { ["token"] = saved.TokenSet.RefreshToken, ["token_type_hint"] = "refresh_token", ["client_id"] = ClientId });
-                using var response = await network.Client.SendAsync(request, ct);
-                provider.UpdateNonceFromResponse(response, endpoint);
-                if (attempt == 0 && response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized && response.Headers.Contains("DPoP-Nonce")) continue;
-                if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Provider rejected AT revocation; the local session was retained for retry.");
-                await store.DeleteAsync(did, ct);
-                clients.TryRemove(did, out _);
-                client.Dispose();
-                return;
-            }
-            throw new InvalidOperationException("AT revocation nonce negotiation failed; the local session was retained for retry.");
+            await Revoke(provider, saved, ClientId, ct);
+            await store.DeleteAsync(did, ct);
+            clients.TryRemove(did, out _);
+            client.Dispose();
         }
         finally { gate.Release(); }
     }
 
+    // Revoke the session's refresh token at its issuer, in the name of the client identity it was granted to. Throws when
+    // the revocation cannot be confirmed, so the caller keeps the session for a retry.
+    private async Task Revoke(DPoPTokenProvider provider, OAuthSessionData saved, string clientId, CancellationToken ct)
+    {
+        using var discovery = new AuthorizationServerDiscovery(network.Client, TimeSpan.Zero);
+        var metadata = await discovery.GetMetadataAsync(saved.TokenSet.Issuer, ct);
+        var endpoint = metadata.RevocationEndpoint ?? throw new InvalidOperationException("Provider does not advertise revocation; upstream disconnect cannot be confirmed.");
+        if (string.IsNullOrEmpty(saved.TokenSet.RefreshToken)) throw new InvalidOperationException("Session has no refresh token to revoke.");
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var request = await provider.CreateDPoPRequestAsync(HttpMethod.Post, endpoint, includeAccessToken: false);
+            request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            { ["token"] = saved.TokenSet.RefreshToken, ["token_type_hint"] = "refresh_token", ["client_id"] = clientId });
+            using var response = await network.Client.SendAsync(request, ct);
+            provider.UpdateNonceFromResponse(response, endpoint);
+            if (attempt == 0 && response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized && response.Headers.Contains("DPoP-Nonce")) continue;
+            if (!response.IsSuccessStatusCode) throw new InvalidOperationException("Provider rejected AT revocation; the local session was retained for retry.");
+            return;
+        }
+        throw new InvalidOperationException("AT revocation nonce negotiation failed; the local session was retained for retry.");
+    }
+
+    // WEB-0081: best effort for a session granted to a previous client identity. A provider that authenticates a public
+    // client by the metadata at its client_id may refuse, since this application now publishes another identity there;
+    // the grant then lapses on the provider's terms, and the session is removed here regardless.
+    private async Task RevokeStale(string did, OAuthSessionData saved, CancellationToken ct)
+    {
+        if (saved.ClientId is not { } clientId) return;
+        try
+        {
+            var memory = new MemoryOAuthSessionStore();
+            await memory.StoreAsync(did, saved, ct);
+            using var provider = new DPoPTokenProvider(network.Client, memory, clientId: clientId,
+                redirectUri: saved.RedirectUri, scope: saved.Scope);
+            if (await provider.RestoreSessionAsync(did)) await Revoke(provider, saved, clientId, ct);
+        }
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            // Best effort by decision; see above.
+        }
+    }
+
+    // WEB-0081: whether a stored session was granted to the client identity this application publishes now. One granted to
+    // a previous identity — the base URL changed since — is gone: requests treat it as absent, sign-in authorizes afresh
+    // and replaces it, and Disconnect removes it. It is kept until then, so accepting the previous URL again restores it.
+    private static bool Current(OAuthSessionData saved, string clientId)
+        => string.Equals(saved.ClientId, clientId, StringComparison.Ordinal);
+
     private sealed record Binding(string? Did, string? Pds, string Issuer, string Scope, string Properties);
+
+    // A restored or signed-in client and the client identity it was built for (WEB-0081).
+    private sealed record CachedClient(string ClientId, ATProtoOAuthClient Client);
 }

@@ -15,19 +15,27 @@ public sealed class KoanWebOptions
     /// WEB-0078: the application's one public base URL - scheme, host and optional path, e.g.
     /// <c>https://www.example.com/app</c>. When set it is authoritative: the pipeline serves under its path and
     /// nothing outside it, and every absolute URL Koan writes (issuer, MCP resource, OpenGraph card, atproto client
-    /// metadata) derives from it. When unset, URLs derive from each request's scheme, host and path base.
+    /// metadata) derives from it. When unset, the URL the application accepted at runtime stands in for it (WEB-0081,
+    /// <see cref="Hosting.IApplicationUrlStore"/>), else URLs derive from each request's scheme, host and path base.
     /// Read it through <see cref="Hosting.KoanWebBaseUrl"/> or <see cref="KoanWeb.Urls"/>.
     /// Configure via: Koan:Web:ApplicationUrl (env: Koan__Web__ApplicationUrl).
     /// </summary>
     public string? ApplicationUrl { get; set; }
 
     /// <summary>
-    /// WEB-0078: the reverse proxies whose <c>X-Forwarded-Proto</c> and <c>X-Forwarded-For</c> are believed, as IP
-    /// addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header. The public host is
-    /// <see cref="ApplicationUrl"/>'s, so <c>X-Forwarded-Host</c> is not read.
+    /// WEB-0078: the reverse proxies whose <c>X-Forwarded-Proto</c>, <c>X-Forwarded-Host</c> and <c>X-Forwarded-For</c>
+    /// are believed, as IP addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header. A
+    /// configured or accepted base URL still decides every absolute URL Koan writes, whatever host a proxy forwards.
     /// Configure via: Koan:Web:TrustedProxies:0=10.0.0.5
     /// </summary>
     public IList<string> TrustedProxies { get; } = new List<string>();
+
+    /// <summary>
+    /// WEB-0081: how many distinct origins Koan holds while it observes where requests arrive
+    /// (<see cref="Hosting.KoanWebOrigins"/>); a new one beyond that evicts the one seen least recently. At least 1.
+    /// Configure via: Koan:Web:ObservedOriginLimit (env: Koan__Web__ObservedOriginLimit).
+    /// </summary>
+    public int ObservedOriginLimit { get; set; } = 32;
 
     /// <summary>
     /// WEB-0079: the folder the ASP.NET Data Protection key ring persists in, absolute or relative to the content

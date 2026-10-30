@@ -43,14 +43,21 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 rt?.Start();
 
                 // WEB-0078: the proxy and the base URL are decided before anything answers. Forwarded headers run first,
-                // because they rewrite the scheme and client address everything after them reads; the path base runs
-                // next, so static files, the health alias, every stage and every endpoint live under it, and a request
-                // outside it answers 404 here rather than reaching anything.
+                // because they rewrite the scheme, host and client address everything after them reads; WEB-0081: the
+                // origin each request arrived on is noted right after, as the proxy posture resolved it, before the
+                // path base turns anything away; the path base runs next, so static files, the health alias, every
+                // stage and every endpoint live under it, and a request outside it answers 404 here.
                 var baseUrl = app.ApplicationServices.GetRequiredService<KoanWebBaseUrl>();
                 if (opts.TrustedProxies.Count > 0)
                 {
                     app.UseForwardedHeaders(KoanWebTrustedProxies.ForwardedHeaders(opts.TrustedProxies));
                 }
+                var origins = app.ApplicationServices.GetRequiredService<KoanWebOrigins>();
+                app.Use((ctx, next) =>
+                {
+                    origins.Note(ctx.Request);
+                    return next(ctx);
+                });
                 if (baseUrl.PathBase.HasValue)
                 {
                     var pathBase = baseUrl.PathBase;

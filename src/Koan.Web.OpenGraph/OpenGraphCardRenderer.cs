@@ -172,7 +172,8 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
     }
 
     // WEB-0078: a root-relative path is rooted at the application's base URL (Koan:Web:ApplicationUrl when set,
-    // path included; else the request's scheme, host and path base), never at the bare request host.
+    // path included; else the URL the application accepted, WEB-0081; else the request's scheme, host and path base),
+    // read at render, never at the bare request host.
     private string? Absolutize(string? pathOrUrl, HttpRequest request)
     {
         if (string.IsNullOrEmpty(pathOrUrl))

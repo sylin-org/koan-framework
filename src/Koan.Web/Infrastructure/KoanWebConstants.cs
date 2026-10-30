@@ -83,6 +83,8 @@ public static class KoanWebConstants
         public const string FactCode = "koan.web.baseurl";
         public const string FactSubject = "web:baseurl";
         public const string ConfiguredFactReason = "base-url-configured";
+        // WEB-0081: the base URL is the one the application accepted and keeps in its IApplicationUrlStore.
+        public const string AcceptedFactReason = "base-url-accepted";
         public const string DerivedFactReason = "base-url-derived-from-request";
     }
 

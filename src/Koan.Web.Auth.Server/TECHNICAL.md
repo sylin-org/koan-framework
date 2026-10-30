@@ -79,7 +79,9 @@ derived from the authenticated session and approved scopes, not from caller-supp
 Tokens are bound to the requested resource. The MCP resource-server edge validates the signature, issuer, lifetime,
 and exact audience before the normal Koan access pipeline evaluates declarations. The origin used for advertised
 endpoints is `Issuer` when configured, else the application's canonical base URL (`Koan:Web:ApplicationUrl`,
-WEB-0078, path included); with neither, Development derives it from the request.
+WEB-0078, path included, else the URL the application accepted, WEB-0081, read per request); with neither,
+Development derives it from the request. A token minted under a previous accepted URL carries that issuer and
+audience, and is refused once another is accepted; its client re-authorizes.
 
 Every path the server writes for the browser follows one rule (SEC-0027, Web Auth's `ApplicationPaths`): it is
 application-relative and gets the application's path base — the configured base URL's, canonical as configured, else

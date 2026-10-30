@@ -8,10 +8,11 @@ namespace Koan.Web.Auth.Server.Protocol;
 
 /// <summary>
 /// SEC-0023 — the authorization server's one issuer identifier: <see cref="AuthServerOptions.Issuer"/> when set, else
-/// the application's named <c>Koan:Security:Trust:Issuer</c>, else the canonical base URL (WEB-0078; derived from the
-/// request where none is configured). The discovery metadata states it, and Trust stamps it on every token the
-/// application issues and accepts it at <c>Koan.bearer</c> through <see cref="IIssuerIdentifier"/>, so an outside
-/// verifier that reads the metadata and the JWKS accepts the tokens.
+/// the application's named <c>Koan:Security:Trust:Issuer</c>, else the canonical base URL (WEB-0078: configured, else
+/// the one the application accepted (WEB-0081), else derived from the request). The discovery metadata states it, and
+/// Trust stamps it on every token the application issues and accepts it at <c>Koan.bearer</c> through
+/// <see cref="IIssuerIdentifier"/>, so an outside verifier that reads the metadata and the JWKS accepts the tokens. It
+/// is read at use, so accepting a new URL changes the issuer from the next request on.
 /// </summary>
 internal sealed class AuthServerIssuer(
     IOptions<AuthServerOptions> server,
@@ -47,6 +48,6 @@ internal sealed class AuthServerIssuer(
     {
         var issuer = server.Value.Issuer;
         if (!string.IsNullOrWhiteSpace(issuer)) return issuer.TrimEnd('/');
-        return trust.Value.Issuer ?? baseUrl.Configured;
+        return trust.Value.Issuer ?? baseUrl.Current;
     }
 }

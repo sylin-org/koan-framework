@@ -22,7 +22,8 @@ public static class KoanWeb
         /// Otherwise it is a display value for logs and boot reports: the first <c>ASPNETCORE_URLS</c> entry with
         /// container-internal wildcards (0.0.0.0, +, *) replaced by localhost, or Koan's conventional default.
         /// Inside a request, prefer <see cref="Hosting.KoanWebBaseUrl.Resolve(Microsoft.AspNetCore.Http.HttpContext)"/>,
-        /// which also derives from the live request when nothing is configured.
+        /// which also knows the URL the application accepted (WEB-0081) and derives from the live request when there is
+        /// neither.
         /// </summary>
         /// <param name="cfg">Configuration instance (optional)</param>
         /// <param name="env">Host environment (optional)</param>

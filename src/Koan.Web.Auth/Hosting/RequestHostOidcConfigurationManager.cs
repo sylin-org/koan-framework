@@ -16,9 +16,9 @@ namespace Koan.Web.Auth.Hosting;
 /// bound server address owns discovery, token, userinfo, and JWKS traffic. Keeping those two addresses distinct is
 /// what makes the simulator work behind a proxy or in a container, where the browser's <c>localhost</c> or public DNS
 /// name is not necessarily reachable from the application process. The public issuer is the application's base
-/// URL (<see cref="KoanWebBaseUrl"/>, WEB-0078: <c>Koan:Web:ApplicationUrl</c> when set, else the request's scheme,
-/// host and path base), and the back-channel discovery request carries the request's path base so it reaches the
-/// provider under the path Koan serves.
+/// URL (<see cref="KoanWebBaseUrl"/>, WEB-0078: <c>Koan:Web:ApplicationUrl</c> when set, else the URL the application
+/// accepted (WEB-0081), else the request's scheme, host and path base), read per challenge, and the back-channel
+/// discovery request carries the request's path base so it reaches the provider under the path Koan serves.
 /// </summary>
 internal sealed class RequestHostOidcConfigurationManager : IConfigurationManager<OpenIdConnectConfiguration>
 {

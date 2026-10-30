@@ -10,8 +10,9 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// Resolves the Authorization Server's public origin, where its endpoints and the application's pages are reached.
 /// Prefers the configured <see cref="AuthServerOptions.Issuer"/> (an explicit override), then the application's
 /// canonical base URL (<c>Koan:Web:ApplicationUrl</c>, WEB-0078 — authoritative and host-spoof-proof behind a proxy,
-/// path included), and falls back to the live request host (the Development default) — so the endpoint URLs the AS
-/// advertises match the host the client actually reached. The issuer identifier is <see cref="AuthServerIssuer"/>'s.
+/// path included — else the URL the application accepted, WEB-0081), and falls back to the live request host (the
+/// Development default) — so the endpoint URLs the AS advertises match the host the client actually reached. The
+/// issuer identifier is <see cref="AuthServerIssuer"/>'s.
 /// </summary>
 internal static class RequestHost
 {

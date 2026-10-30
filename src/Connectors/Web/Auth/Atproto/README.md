@@ -45,9 +45,14 @@ With `ApplicationUrl` set to `https://your-app.example`, the connector serves an
 `https://your-app.example/auth/atproto/callback`; under `https://your-app.example/app` both sit under
 `/app`. A loopback `http://localhost:<port>` base URL derives the AT Protocol localhost development
 profile, in Development only. `Providers:atproto:ClientId` remains an explicit override of the metadata
-URL, which must still end in `/auth/atproto/client-metadata.json`. The connector derives everything from
-trusted configuration, never the incoming Host header. This first connector uses the public OAuth client
-profile, with no client secret or confidential-client key; provider session lifetime limits still apply.
+URL, which must still end in `/auth/atproto/client-metadata.json`. Without `ApplicationUrl`, the URL the
+application accepted at runtime stands in for it and is read at use, so accepting another moves the client identity
+on the next request (WEB-0081); with neither, the identity derives from the request where Koan derives the base URL
+(Development, and Staging, Test and CI with a notice), and in Production only under the application's
+`DerivesUntilAccepted` posture, until it accepts its URL. A sign-in in flight and a
+stored session were granted to the previous identity and end when it changes; the person signs in again. This first
+connector uses the public OAuth client profile, with no client secret or confidential-client key; provider session
+lifetime limits still apply.
 
 Send the browser to `/auth/atproto/challenge?return=<path>` for Bluesky account
 selection on its own authorization page. Keep

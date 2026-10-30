@@ -12,6 +12,7 @@ related:
   - WEB-0070
   - WEB-0071
   - ARCH-0128
+  - WEB-0081
 ---
 
 # WEB-0078: Koan.Web owns one canonical base URL, and serves under its path
@@ -48,6 +49,14 @@ outside it, and every pillar that writes an absolute URL derives from it.**
    absolute URL keeps booting without the key; a consumer that needs one — the issuer, the MCP audience and
    metadata, an OpenGraph card, the atproto identity, the Test IdP — cannot publish an origin a caller chose.
    `KoanWeb.Urls.Base()` reads the same normalisation.
+
+   > **Amended 2026-10-29 (WEB-0081).** With the key unset, an application that registers an `IApplicationUrlStore`
+   > gives the base URL a value at runtime, the *accepted* URL: `Resolve` answers the configured value, then the
+   > accepted one, then the request. An accepted URL passes the same `TryParse`, carries no path, and is read at use by
+   > every consumer below, so accepting one needs no restart. The rule stands: no consumer takes its origin from a
+   > `Host` header a caller chose, unless WEB-0078's own gate lets it derive one. That gate gains one consent in
+   > Production: an application's store may declare `DerivesUntilAccepted`, which allows deriving only until the
+   > application accepts a URL (WEB-0081, ARCH-0128).
 2. `KoanWebStartupFilter` applies the posture at the head of its pipeline, before the exception handler, the security
    headers, static files, the health alias and every stage: `UseForwardedHeaders` when `Koan:Web:TrustedProxies`
    declares a proxy, then `UsePathBase` with the base URL's path, then a guard that answers 404 to any request whose
@@ -56,6 +65,13 @@ outside it, and every pillar that writes an absolute URL derives from it.**
    believed, for one hop. Empty honours nothing, like `Koan:Web:Origin`. `X-Forwarded-Host` is not read: the host is
    the base URL's. The pillar owns this because only the pipeline owner can place it first (the WEB-0069 argument);
    the application keeps `ASP.NET`'s own `ForwardedHeadersOptions` for anything beyond one trusted hop.
+
+   > **Amended 2026-10-29 (WEB-0081), decided.** A declared proxy's `X-Forwarded-Host` is now read too, for the same
+   > one hop, and rewrites `Request.Host`. The proxy is already trusted for the scheme and client address of that hop;
+   > the origin a request arrived on is how an application learns its address; and the observed origin and a
+   > request-derived base URL must be spelled alike. The configured or accepted base URL still decides every absolute
+   > URL Koan writes; only a base URL derived from the request follows the forwarded host, as it already followed the
+   > forwarded scheme.
 4. Consumers derive from the base URL and keep their explicit overrides: `AuthServerOptions.Issuer` defaults to it;
    `McpServerOptions.ResourceUri` defaults to it plus the MCP route, and the authorization-server and metadata URLs
    derive from it; the dev token's default audience is that same MCP identity (read through the `Koan:Mcp` keys,

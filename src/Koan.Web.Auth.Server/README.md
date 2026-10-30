@@ -104,8 +104,9 @@ await new OAuthClient
 
 ## Production posture
 
-Set `Koan:Web:ApplicationUrl` to the application's public URL; the issuer and every advertised endpoint derive from it,
-path included (WEB-0078), and every access token carries that issuer as `iss`, so a verifier that reads the metadata
+Set `Koan:Web:ApplicationUrl` to the application's public URL, or have the application accept it at runtime
+(WEB-0081); the issuer and every advertised endpoint derive from it, path included (WEB-0078), and every access token
+carries that issuer as `iss`, so a verifier that reads the metadata
 and the JWKS accepts it (SEC-0023). `Koan:Web:Auth:Server:Issuer` remains an explicit override, and a named
 `Koan:Security:Trust:Issuer` is kept as the issuer when the server's own is unset. Outside Development, Koan persists and
 rotates encrypted-at-rest signing keys through the configured Data provider; startup fails closed if only an ephemeral

@@ -129,7 +129,7 @@ public sealed class ProtocolGuards
     {
         var baseUrl = new KoanWebBaseUrl("https://www.example.com/tangent");
 
-        var clientId = AtprotoClientIdentity.Derive(baseUrl, ["atproto"], development: false);
+        var clientId = AtprotoClientIdentity.Derive(baseUrl.Current, ["atproto"], development: false);
 
         Assert.Equal("https://www.example.com/tangent/auth/atproto/client-metadata.json", clientId);
         Assert.Equal("https://www.example.com/tangent/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(clientId!));
@@ -142,13 +142,13 @@ public sealed class ProtocolGuards
     {
         var baseUrl = new KoanWebBaseUrl("http://localhost:5220/tangent");
 
-        var clientId = AtprotoClientIdentity.Derive(baseUrl, ["atproto", "transition:generic"], development: true);
+        var clientId = AtprotoClientIdentity.Derive(baseUrl.Current, ["atproto", "transition:generic"], development: true);
 
         Assert.Equal("http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A5220%2Ftangent%2Fauth%2Fatproto%2Fcallback&scope=atproto%20transition%3Ageneric", clientId);
         Assert.Equal("http://127.0.0.1:5220/tangent/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(clientId!));
         var development = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Development"), baseUrl);
         Assert.Empty(development.Validate("atproto", new ProviderOptions { Scopes = ["atproto", "transition:generic"] }));
-        Assert.Null(AtprotoClientIdentity.Derive(baseUrl, ["atproto"], development: false));
+        Assert.Null(AtprotoClientIdentity.Derive(baseUrl.Current, ["atproto"], development: false));
         var production = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), baseUrl);
         Assert.Contains(production.Validate("atproto", new ProviderOptions { Scopes = ["atproto"] }), x => x.Contains("Koan:Web:ApplicationUrl"));
     }
@@ -156,7 +156,8 @@ public sealed class ProtocolGuards
     [Fact]
     public void Without_an_application_url_or_a_client_id_the_correction_names_both()
     {
-        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), new KoanWebBaseUrl(null));
+        var production = new EnvironmentStub("Production");
+        var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), production, new KoanWebBaseUrl(null, production));
         var errors = validator.Validate("atproto", new ProviderOptions { Scopes = ["atproto"] });
         Assert.Contains(errors, x => x.Contains("Koan:Web:ApplicationUrl") && x.Contains("ClientId"));
     }

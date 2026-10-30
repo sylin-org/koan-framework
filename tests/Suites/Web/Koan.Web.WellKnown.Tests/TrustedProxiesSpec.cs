@@ -14,21 +14,26 @@ using Xunit;
 namespace Koan.Web.WellKnown.Tests;
 
 /// <summary>
-/// WEB-0078: <c>Koan:Web:TrustedProxies</c> names the reverse proxies whose <c>X-Forwarded-Proto</c> and
-/// <c>X-Forwarded-For</c> Koan believes, for one hop, at the head of its pipeline. Nothing declared means no header
-/// is honoured (fail-closed, like <c>Koan:Web:Origin</c>). A real Kestrel loopback host, so the connection has the
-/// remote address the forwarded-headers middleware checks against the declared proxies.
+/// WEB-0078: <c>Koan:Web:TrustedProxies</c> names the reverse proxies whose <c>X-Forwarded-Proto</c>,
+/// <c>X-Forwarded-Host</c> (WEB-0081) and <c>X-Forwarded-For</c> Koan believes, for one hop, at the head of its
+/// pipeline. Nothing declared means no header is honoured (fail-closed, like <c>Koan:Web:Origin</c>). A real Kestrel
+/// loopback host, so the connection has the remote address the forwarded-headers middleware checks against the declared
+/// proxies.
 /// </summary>
 public sealed class TrustedProxiesSpec
 {
     [Fact]
-    public async Task A_declared_proxy_sets_the_scheme_and_the_client_address_for_one_hop()
+    public async Task A_declared_proxy_sets_the_scheme_the_host_and_the_client_address_for_one_hop()
     {
         await using var host = await ProxiedHost.Start(new Dictionary<string, string?> { ["Koan:Web:TrustedProxies:0"] = "127.0.0.1" });
 
         var oneHop = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-For", "203.0.113.9"));
         oneHop.Scheme.Should().Be("https");
         oneHop.Remote.Should().Be("203.0.113.9");
+        oneHop.Host.Should().Be(host.ListenUrl["http://".Length..], "without X-Forwarded-Host the host is the one the proxy sent");
+
+        var forwardedHost = await host.Probe(("X-Forwarded-Host", "tangent.example.org"), ("X-Forwarded-For", "203.0.113.9"));
+        forwardedHost.Host.Should().Be("tangent.example.org", "a declared proxy's forwarded host is the host the request arrived on");
 
         var twoHops = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-For", "203.0.113.9, 198.51.100.1"));
         twoHops.Remote.Should().Be("198.51.100.1", "only the hop the declared proxy appended is believed");
@@ -49,9 +54,10 @@ public sealed class TrustedProxiesSpec
     {
         await using var host = await ProxiedHost.Start(new Dictionary<string, string?>());
 
-        var probe = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-For", "203.0.113.9"));
+        var probe = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-Host", "tangent.example.org"), ("X-Forwarded-For", "203.0.113.9"));
         probe.Scheme.Should().Be("http");
         probe.Remote.Should().Be("127.0.0.1");
+        probe.Host.Should().Be(host.ListenUrl["http://".Length..]);
     }
 
     [Fact]
@@ -81,7 +87,7 @@ public sealed class TrustedProxiesSpec
         }
     }
 
-    internal sealed record Observed(string Scheme, string? Remote);
+    internal sealed record Observed(string Scheme, string? Remote, string Host);
 
     internal sealed class ProxiedHost : IAsyncDisposable
     {
@@ -94,13 +100,20 @@ public sealed class TrustedProxiesSpec
             _baseUrl = baseUrl;
         }
 
-        public static async Task<ProxiedHost> Start(IReadOnlyDictionary<string, string?> settings)
+        public IServiceProvider Services => _host.Services;
+
+        public string ListenUrl => _baseUrl;
+
+        public static async Task<ProxiedHost> Start(
+            IReadOnlyDictionary<string, string?> settings,
+            string environment = "Test",
+            Action<IServiceCollection>? configure = null)
         {
             var baseUrl = $"http://127.0.0.1:{FreePort()}";
             var host = Host.CreateDefaultBuilder()
                 .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Koan:Environment"] = "Test",
+                    ["Koan:Environment"] = environment,
                     ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                     ["Koan:BackgroundServices:Enabled"] = "false",
                     ["Logging:LogLevel:Default"] = "Warning",
@@ -108,12 +121,13 @@ public sealed class TrustedProxiesSpec
                 .ConfigureWebHostDefaults(web =>
                 {
                     web.UseUrls(baseUrl);
-                    web.UseEnvironment("Test");
+                    web.UseEnvironment(environment);
                     web.UseContentRoot(AppContext.BaseDirectory);
                     web.ConfigureServices(services =>
                     {
                         services.AddKoan();
                         services.AddKoanControllersFrom<RequestOriginProbeController>();
+                        configure?.Invoke(services);
                     });
                     web.Configure(_ => { });
                 })
@@ -124,10 +138,23 @@ public sealed class TrustedProxiesSpec
             }
             catch
             {
+                // A start that fails in module start runs after the host attached itself as AppHost.Current; stopping
+                // releases that lease, so a failed start does not leave the next spec on a disposed provider.
+                try { await host.StopAsync(CancellationToken.None); } catch { /* the start already failed */ }
                 host.Dispose();
                 throw;
             }
             return new ProxiedHost(host, baseUrl);
+        }
+
+        /// <summary>GET <paramref name="path"/> with <paramref name="headers"/>, answering the status and the body text.</summary>
+        public async Task<(HttpStatusCode Status, string Body)> Get(string path, params (string Name, string Value)[] headers)
+        {
+            using var client = new HttpClient { BaseAddress = new Uri(_baseUrl) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            foreach (var (name, value) in headers) request.Headers.TryAddWithoutValidation(name, value);
+            using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+            return (response.StatusCode, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         }
 
         public async Task<Observed> Probe(params (string Name, string Value)[] headers)
@@ -140,7 +167,8 @@ public sealed class TrustedProxiesSpec
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
             return new Observed(
                 document.RootElement.GetProperty("scheme").GetString()!,
-                document.RootElement.GetProperty("remote").GetString());
+                document.RootElement.GetProperty("remote").GetString(),
+                document.RootElement.GetProperty("host").GetString()!);
         }
 
         public async ValueTask DisposeAsync()
@@ -166,5 +194,5 @@ public sealed class RequestOriginProbeController : ControllerBase
     public const string Path = "/request-origin-probe";
 
     [HttpGet(Path)]
-    public IActionResult Get() => Ok(new { scheme = Request.Scheme, remote = HttpContext.Connection.RemoteIpAddress?.ToString() });
+    public IActionResult Get() => Ok(new { scheme = Request.Scheme, remote = HttpContext.Connection.RemoteIpAddress?.ToString(), host = Request.Host.Value });
 }

@@ -9,6 +9,7 @@ related:
   - SEC-0001
   - SEC-0006
   - WEB-0078
+  - WEB-0081
 ---
 
 # SEC-0023: A token carries the issuer its authorization server states
@@ -42,6 +43,10 @@ Measured by a consumer whose base URL carries a path.
    token minted there in the request-derived posture keeps the named-or-default name, which the bearer accepts. Where
    Production refuses to derive the base URL, the metadata refuses with WEB-0078's correction and tokens keep Trust's
    own name, as before.
+
+   > **Amended 2026-10-29 (WEB-0081).** A base URL the application accepted is stated like a configured one, inside a
+   > request and outside it, and from the request after it is accepted the metadata, new tokens and `Koan.bearer` all
+   > use it.
 4. The advertised endpoints still derive from `Koan:Web:Auth:Server:Issuer` or the base URL; only the `issuer` member
    can differ, and only when the application names `Koan:Security:Trust:Issuer` without naming the server's own.
 

@@ -488,6 +488,8 @@
       href: WEB-0079-the-key-ring-persists-where-the-application-says.md
     - name: WEB-0080 A failed sign-in returns to the application's own page with a sanitized code
       href: WEB-0080-a-failed-sign-in-returns-to-the-application.md
+    - name: WEB-0081 An application accepts its URL at runtime
+      href: WEB-0081-an-application-accepts-its-url-at-runtime.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

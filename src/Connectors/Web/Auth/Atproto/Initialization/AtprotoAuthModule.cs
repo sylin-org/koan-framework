@@ -1,6 +1,7 @@
 using Koan.Core;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
+using Koan.Core.Ordering;
 using Koan.Core.Provenance;
 using Koan.Web.Auth.Connector.Atproto.Controllers;
 using Koan.Web.Auth.Connector.Atproto.Hosting;
@@ -24,6 +25,9 @@ using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Auth.Connector.Atproto.Initialization;
 
+// WEB-0081: Start decides the client-identity check composition deferred, so it runs after Koan.Web has read the
+// application's accepted URL.
+[After(typeof(Koan.Web.Initialization.WebModule))]
 public sealed class AtprotoAuthModule : KoanModule
 {
     public override void Register(IServiceCollection services)
@@ -36,7 +40,8 @@ public sealed class AtprotoAuthModule : KoanModule
         services.AddSingleton<ProtectedAtprotoStore>();
         services.AddSingleton(sp => new AtprotoSessions(sp.GetRequiredService<ProtectedAtprotoStore>(), sp.GetRequiredService<AtprotoHttp>(),
             sp.GetRequiredService<IOptions<AtprotoOptions>>(), sp.GetRequiredService<IOptions<AuthOptions>>(),
-            sp.GetRequiredService<IAuthProviderCatalog>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<KoanWebBaseUrl>()));
+            sp.GetRequiredService<IAuthProviderCatalog>(), sp.GetRequiredService<IHostEnvironment>(), sp.GetRequiredService<KoanWebBaseUrl>(),
+            sp.GetService<IHttpContextAccessor>()));
         services.AddKoanControllersFrom<AtprotoMetadataController>();
         services.AddAuthentication().AddScheme<AtprotoAuthenticationOptions, AtprotoAuthenticationHandler>(Constants.Provider, options =>
         {
@@ -66,6 +71,20 @@ public sealed class AtprotoAuthModule : KoanModule
                 options.StateDataFormat = new PropertiesDataFormat(protection.CreateProtector(Constants.PropertiesPurpose));
                 options.CorrelationCookie.SecurePolicy = KoanEnv.Gate.DevelopmentOnly(environment) ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
             });
+    }
+
+    /// <summary>
+    /// WEB-0081: with nothing configured and an application store, composition cannot see the accepted URL the client
+    /// identity derives from. Once Koan.Web has read the store, an eligible provider without an identity it can publish
+    /// refuses the start with the correction composition would have given.
+    /// </summary>
+    public override Task Start(IServiceProvider services, CancellationToken ct)
+    {
+        var provider = services.GetRequiredService<IAuthProviderCatalog>().Find(Constants.Provider);
+        if (provider?.Eligible != true) return Task.CompletedTask;
+        var clientId = services.GetRequiredService<IOptions<AuthOptions>>().Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId;
+        services.GetServices<IAuthProtocol>().OfType<AtprotoProtocol>().Single().EnsureClientIdentity(clientId, provider.Scopes.ToArray());
+        return Task.CompletedTask;
     }
 
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

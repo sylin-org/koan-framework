@@ -61,10 +61,12 @@ this is configuration, not construction.
 
 - Secrets move to environment or a secret provider; literals and user-secrets do not ship.
 - The public URL is declared once: `Koan:Web:ApplicationUrl` (scheme, host, and the path when the
-  application lives under one). Koan then serves only under that path, and the issuer, MCP resource,
-  card URLs and atproto client metadata all derive from it instead of from the request `Host` header.
+  application lives under one), or accepted by the application through its `IApplicationUrlStore` (WEB-0081). Koan
+  then serves only under the configured path, and the issuer, MCP resource, card URLs and atproto client metadata all
+  derive from it instead of from the request `Host` header.
 - Behind a reverse proxy, name it: `Koan:Web:TrustedProxies` is the one proxy (IP or CIDR) whose
-  `X-Forwarded-Proto` and `X-Forwarded-For` are believed, one hop. Nothing declared, nothing believed.
+  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are believed, one hop. Nothing declared, nothing
+  believed.
 - The key ring persists: `Koan:Web:KeyRingDirectory` is a folder on the persistent volume, so sign-in cookies and
   protected sessions outlive a rebuilt container and every instance shares them. The folder remembers the application
   name its keys belong to, so a rename keeps them; `Koan:Web:KeyRingApplicationName` pins it when instances must agree

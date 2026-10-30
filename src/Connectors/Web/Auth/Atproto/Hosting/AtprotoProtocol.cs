@@ -44,29 +44,51 @@ internal sealed class AtprotoProtocol(IOptions<AtprotoOptions> settings, IHostEn
             errors.Add($"{Constants.Section}:DevelopmentPlcDirectory must use an exact allowed Development origin.");
         if (!scopes.Contains(Constants.BaseScope, StringComparer.Ordinal) || scopes.Any(x => string.IsNullOrWhiteSpace(x) || x.Any(char.IsWhiteSpace)))
             errors.Add($"{Constants.ProviderSection}:Scopes must include atproto and contain one scope token per array entry.");
-        // WEB-0078: ClientId is an explicit override; without it the client-metadata URL derives from the application's
-        // base URL (Koan:Web:ApplicationUrl), so an application under a public https URL configures nothing here.
-        var clientIdValue = options.ClientId ?? AtprotoClientIdentity.Derive(baseUrl, scopes, development);
-        if (!Uri.TryCreate(clientIdValue, UriKind.Absolute, out var clientId) || clientId.UserInfo.Length != 0 || clientId.Fragment.Length != 0)
-            errors.Add($"Set {AtprotoClientIdentity.BaseUrlKey} to this application's public URL, or {Constants.ProviderSection}:ClientId to its absolute client-metadata URL.");
-        else if (clientId.Scheme == "https")
-        {
-            if (!clientId.IsDefaultPort || clientId.Query.Length > 0 || !clientId.AbsolutePath.EndsWith(Constants.Metadata, StringComparison.Ordinal))
-                errors.Add($"{Constants.ProviderSection}:ClientId must be HTTPS on the default port at {Constants.Metadata} under the application's path, without a query.");
-        }
-        else
-        {
-            var query = HttpUtility.ParseQueryString(clientId.Query);
-            if (!development || clientId.Scheme != "http" || clientId.Host != "localhost" || !clientId.IsDefaultPort || clientId.AbsolutePath != "/" ||
-                query.GetValues("redirect_uri")?.Length != 1 || !Uri.TryCreate(query["redirect_uri"], UriKind.Absolute, out var redirect) ||
-                redirect.Scheme != "http" || !redirect.IsLoopback || redirect.Host == "localhost" || !redirect.AbsolutePath.EndsWith(Constants.Callback, StringComparison.Ordinal) ||
-                redirect.Query.Length > 0 || redirect.Fragment.Length > 0 || redirect.UserInfo.Length > 0 ||
-                query.GetValues("scope")?.Length != 1 || query["scope"] != string.Join(' ', scopes))
-                errors.Add($"{Constants.ProviderSection}:ClientId may use the special localhost profile only in Development, with one IP-loopback redirect_uri at {Constants.Callback} under the application's path and scope equal to the declared Scopes.");
-        }
+        if (ClientIdentityCorrection(options.ClientId, scopes, development, storeRead: false) is { } correction) errors.Add(correction);
         if (!Uri.TryCreate(configured.PlcDirectory, UriKind.Absolute, out var plc) || plc.UserInfo.Length > 0 || plc.Query.Length > 0 || plc.Fragment.Length > 0 ||
             (plc.Scheme != "https" && !(development && configured.DevelopmentAllowedOrigins.Contains(plc.GetLeftPart(UriPartial.Authority), StringComparer.Ordinal))))
             errors.Add($"{Constants.Section}:PlcDirectory must be HTTPS, or an explicitly allowed Development origin.");
         return errors;
+    }
+
+    /// <summary>
+    /// WEB-0081: the client-identity check again, once the application's store has been read at module start. Composition
+    /// cannot see an accepted URL, so the check it defers for a store is decided here, with the correction it would have
+    /// given.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The provider has no client identity it can publish.</exception>
+    internal void EnsureClientIdentity(string? clientId, IReadOnlyList<string> scopes)
+    {
+        if (ClientIdentityCorrection(clientId, scopes, KoanEnv.Gate.DevelopmentOnly(environment), storeRead: true) is not { } correction) return;
+        throw new InvalidOperationException(
+            $"Koan Web Auth provider '{Constants.Provider}' has incomplete or unsupported '{Constants.Protocol}' configuration. {correction}");
+    }
+
+    // WEB-0078: ClientId is an explicit override; without it the client-metadata URL derives from the application's base
+    // URL. A configured base URL is checked here as it always was. With nothing configured, the identity derives at use
+    // from the request where Koan derives the base URL; and where the application keeps an accepted URL in a store, which
+    // is read after the host composes, the check waits for the store (storeRead) and then runs on what it holds.
+    private string? ClientIdentityCorrection(string? configuredClientId, IReadOnlyList<string> scopes, bool development, bool storeRead)
+    {
+        var clientIdValue = configuredClientId ?? AtprotoClientIdentity.Derive(baseUrl.Current, scopes, development);
+        if (clientIdValue is null && !baseUrl.IsConfigured && (baseUrl.DerivesFromRequests || (baseUrl.CanAccept && !storeRead))) return null;
+
+        if (!Uri.TryCreate(clientIdValue, UriKind.Absolute, out var clientId) || clientId.UserInfo.Length != 0 || clientId.Fragment.Length != 0)
+            return AtprotoClientIdentity.Correction(baseUrl.Current, baseUrl.CanAccept && !baseUrl.IsConfigured);
+        if (clientId.Scheme == "https")
+        {
+            return !clientId.IsDefaultPort || clientId.Query.Length > 0 || !clientId.AbsolutePath.EndsWith(Constants.Metadata, StringComparison.Ordinal)
+                ? $"{Constants.ProviderSection}:ClientId must be HTTPS on the default port at {Constants.Metadata} under the application's path, without a query."
+                : null;
+        }
+
+        var query = HttpUtility.ParseQueryString(clientId.Query);
+        return !development || clientId.Scheme != "http" || clientId.Host != "localhost" || !clientId.IsDefaultPort || clientId.AbsolutePath != "/" ||
+               query.GetValues("redirect_uri")?.Length != 1 || !Uri.TryCreate(query["redirect_uri"], UriKind.Absolute, out var redirect) ||
+               redirect.Scheme != "http" || !redirect.IsLoopback || redirect.Host == "localhost" || !redirect.AbsolutePath.EndsWith(Constants.Callback, StringComparison.Ordinal) ||
+               redirect.Query.Length > 0 || redirect.Fragment.Length > 0 || redirect.UserInfo.Length > 0 ||
+               query.GetValues("scope")?.Length != 1 || query["scope"] != string.Join(' ', scopes)
+            ? $"{Constants.ProviderSection}:ClientId may use the special localhost profile only in Development, with one IP-loopback redirect_uri at {Constants.Callback} under the application's path and scope equal to the declared Scopes."
+            : null;
     }
 }

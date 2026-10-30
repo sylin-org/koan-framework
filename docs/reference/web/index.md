@@ -245,8 +245,13 @@ translation in Web.
 - `Koan:Web:ApplicationUrl` is the application's one public URL (scheme, host, optional path). When set, Koan serves
   only under its path — `/health`, the well-known documents and static files included — and every absolute URL it
   writes (issuer, MCP resource, OpenGraph card, atproto client metadata) derives from it; each keeps its own
-  override. `Koan:Web:TrustedProxies` names the proxies whose `X-Forwarded-Proto` and `X-Forwarded-For` are believed
-  for one hop; empty honours none. See WEB-0078 and the
+  override. Unset, the URL the application accepted at runtime through its `IApplicationUrlStore` stands in for it,
+  read at use so accepting one needs no restart (WEB-0081); a store that declares `DerivesUntilAccepted` lets
+  Production derive absolute URLs from requests until the first accept. `Koan:Web:TrustedProxies` names the proxies whose
+  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are believed for one hop; empty honours none.
+  `KoanWebOrigins` holds the origins requests arrive on other than the base URL, bounded by
+  `Koan:Web:ObservedOriginLimit`, and raises `Appeared` once per new one, so an application can offer an address it
+  learned (WEB-0081). See WEB-0078 and the
   [Koan.Web README](../../../src/Koan.Web/README.md#public-url-and-proxy).
 - `Koan:Web:KeyRingDirectory` names the folder the ASP.NET Data Protection key ring persists in, so cookies and
   protected sessions survive a rebuilt container and every instance over the folder shares them. The folder remembers

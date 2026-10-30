@@ -102,10 +102,52 @@ derive from each request's scheme, host and path base, which is the Development 
 so once, and Production refuses the first absolute URL anyone asks for, naming the key, while the host itself still
 boots. The startup facts state which applies (`koan.web.baseurl`).
 
-`Koan:Web:TrustedProxies` names the reverse proxies (IP addresses or CIDR networks) whose `X-Forwarded-Proto` and
-`X-Forwarded-For` Koan believes, for one hop, at the head of its pipeline. Nothing declared means no forwarded header
-is honoured. The public host is the base URL's, so `X-Forwarded-Host` is not read. `IsProxiedApi` is a separate,
-older switch: it only tells Koan that the proxy emits the security headers.
+An application that learns its address instead of asking for it up front accepts it at runtime (WEB-0081). It
+registers one `IApplicationUrlStore` — `Load` and `Save`, kept wherever the application keeps its settings — and calls
+`KoanWebBaseUrl.Accept(url)` on its operator's word:
+
+```csharp
+public sealed class PlaceAddress : IApplicationUrlStore
+{
+    public async Task<string?> Load(CancellationToken ct) => (await Settings.Get(Settings.Id, ct))?.Address;
+    public async Task Save(string applicationUrl, CancellationToken ct) { /* write it to the settings row */ }
+}
+
+await baseUrl.Accept("https://www.example.com", ct);
+```
+
+The precedence is configured, then accepted, then the request. Koan reads the store before the host serves, validates
+an accepted URL as it validates the key, keeps it through the store and holds it in memory; from the next request every
+absolute URL derives from it, whatever `Host` says, with no restart. An accepted URL is an origin: a path is mounted
+when the host starts, so it is configured. It is https, or http on a loopback host in Development, because an issuer
+must be https and an AT Protocol client is https or, in Development only, the localhost profile; `Accept` refuses any
+other origin before the store sees it. Tokens, atproto sign-ins and atproto sessions issued under the previous URL
+end as they would after a restart with the new one configured.
+
+An application set up on the address its first run is reached at declares that on its store:
+`public bool DerivesUntilAccepted => true;`. Then, while nothing is configured or accepted, Production derives absolute
+URLs from each request as the trusted proxies resolve it, instead of refusing; Koan says so once in the log, naming the
+posture and how it ends. The first accepted URL ends it for good, and a configured URL makes it moot. It is the
+application's consent in code, not `Koan:AllowMagicInProduction`.
+
+`Koan:Web:TrustedProxies` names the reverse proxies (IP addresses or CIDR networks) whose `X-Forwarded-Proto`,
+`X-Forwarded-Host` and `X-Forwarded-For` Koan believes, for one hop, at the head of its pipeline. Nothing declared
+means no forwarded header is honoured. A configured or accepted base URL still decides every absolute URL Koan
+writes, whatever host the proxy forwards. `IsProxiedApi` is a separate, older switch: it only tells Koan that the
+proxy emits the security headers.
+
+Koan notes the origins requests arrive on other than the base URL in force — scheme and host as that posture resolved
+them, with a count and when each was first and last seen — in memory, for at most `Koan:Web:ObservedOriginLimit`
+distinct origins (32), the least recent evicted. Inject `KoanWebOrigins` to read them or to hear of a new one:
+
+```csharp
+origins.Appeared += (_, seen) => { if (!seen.IsLocal) offers.Record(seen.Origin); };
+var recent = origins.Seen();   // most recent first, never the base URL in force
+```
+
+`Appeared` fires once per new origin, on the request that brought it, so an application offers an address without
+polling. `AddressClass` tells loopback and unspecified addresses (`IsLocal`) from private and public ones. An observed
+origin changes nothing until the application accepts it.
 
 ### Key ring
 

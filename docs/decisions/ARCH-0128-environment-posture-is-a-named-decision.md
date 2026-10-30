@@ -8,6 +8,7 @@ title: Environment posture is a named decision, not a boolean read
 related:
   - DATA-0046
   - SEC-0001
+  - WEB-0081
 ---
 
 # ARCH-0128: Environment posture is a named decision, not a boolean read
@@ -78,6 +79,13 @@ outage without a remedy. `KoanEnv.Gate` turns that description into a verdict:
 Consent is the capability's own option **or** `Koan:AllowMagicInProduction`. Either alone suffices:
 requiring both would make the framework-wide flag useless, and requiring neither would make Production
 indistinguishable from Development.
+
+> **Amended 2026-10-29 (WEB-0081).** A capability's own consent need not be a configuration key, and may be bounded
+> in time. An application that keeps its accepted base URL in an `IApplicationUrlStore` may declare
+> `DerivesUntilAccepted`, which is `KoanMagic.Consent` for request-derived absolute URLs: Production runs them,
+> `AllowedByConsent`, only while nothing is configured or accepted, and Koan announces the posture once with how it
+> ends. The bound is what makes the consent acceptable: the first accepted URL closes it, and nothing derived from a
+> request is kept. `Koan:AllowMagicInProduction` is unchanged and still consents on its own.
 
 `DevelopmentOnly` takes no consent parameter and reads no flag. The absence of an override is the
 feature; a surface that wants one belongs behind a `KoanMagic` instead, which is a design question to

@@ -38,15 +38,39 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
 - `Koan:Web:ApplicationUrl` is the one canonical base URL (WEB-0078). `KoanWebBaseUrl` parses it once — lowercase
   scheme and host, port only when not the default, the path percent-encoded as `Configured` and decoded as
   `PathBase`, no trailing slash; a query, fragment, `%2F` or an unspecified listen address stops boot — and
-  `KoanWebStartupFilter` applies it first: `UseForwardedHeaders` for `Koan:Web:TrustedProxies` (X-Forwarded-Proto and
-  X-Forwarded-For, one hop, only the declared proxies), then `UsePathBase` with the base URL's path and a guard that
-  answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
+  `KoanWebStartupFilter` applies it first: `UseForwardedHeaders` for `Koan:Web:TrustedProxies` (X-Forwarded-Proto,
+  X-Forwarded-Host and X-Forwarded-For, one hop, only the declared proxies), then the origin observation, then
+  `UsePathBase` with the base URL's path and a guard that answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
   and every contributor stage, so nothing is served at the root. `KoanWebBaseUrl.Resolve(HttpContext)` is what
   Auth.Server (`Issuer` default), MCP (`ResourceUri` default, authorization-server and metadata URLs), OpenGraph
   (`og:url`, `og:image`, canonical), the atproto connector (`ClientId` default), the dev token's audience and the
   Test IdP's issuer read; without a configured value it returns the request's scheme, host and path base, warns once
   in Staging, Test and CI, and refuses in Production with a correction (the host still boots; only the consumer that
   asked fails).
+- WEB-0081: with the key unset, the application's `IApplicationUrlStore` (one DI singleton) holds the URL it accepted.
+  `WebModule.Start` reads it inside `AppHost.PushScope`, before the host serves, after composition and after the data
+  pillar has started (`[After(KoanDataCoreModule)]`, so a store over an `Entity<T>` row works), and a stored
+  value that is not a public origin refuses the start naming the store. `KoanWebBaseUrl.Accept` validates with the same
+  `TryParse`, refuses a path and any origin that is not https or, under `KoanEnv.Gate.DevelopmentOnly`, http on a
+  loopback host (`Uri.IsLoopback`, the test the atproto client identity uses), saves through the store and then
+  publishes the value (`Volatile`), one accept at a time; `Load` applies the same rule;
+  `Resolve` answers configured, accepted, derived. `Current` is the configured-or-accepted value, `CanAccept` whether a
+  store is registered, `DerivesFromRequests` whether Koan derives one from the request here. The base URL states the
+  `koan.web.baseurl` fact again through `IKoanRuntimeFactRecorder` after the store is read and after every accept
+  (`base-url-accepted`).
+- WEB-0081: `KoanWebOrigins` (singleton) is the origins requests arrive on. The startup filter's middleware calls
+  `Note(request)` after the forwarded headers: a request whose scheme and `Host` match the base URL in force (`Current`,
+  split once per value) returns at once; any other has its origin normalised by `KoanWebBaseUrl.OriginOf` and recorded
+  in a `ConcurrentDictionary` (count by `Interlocked`, last-seen by compare-and-swap); a new origin takes a lock, evicts
+  the least recently seen beyond `Koan:Web:ObservedOriginLimit` (default 32, below 1 refuses the start) and raises
+  `Appeared` outside the lock, each handler isolated and logged on failure. `Seen()` projects the record without the
+  base URL in force, most recent first, enumerating the dictionary without a lock. `OriginAddressClass` comes from the
+  host without a trailing root dot: `localhost` names, loopback, unspecified, private ranges, else public.
+- WEB-0081 / ARCH-0128: `IApplicationUrlStore.DerivesUntilAccepted` (default false) is the request-derived
+  `KoanMagic`'s own consent, read once when `KoanWebBaseUrl` is built: in Production the verdict is `AllowedByConsent`
+  instead of `Refused`. `Resolve` answers `Current` before it derives, so the posture only acts while nothing is
+  configured or accepted; the one-time warning names the store, the posture and the accept or key that ends it, and the
+  derived fact summary says the derivation lasts until an accept.
 - `Koan:Web:KeyRingDirectory` names the folder the Data Protection key ring persists in (WEB-0079). `KoanWebKeyRing`
   resolves it once against the content root and supplies two defaults the application's own configuration overrides:
   as the `IConfigureOptions<KeyManagementOptions>` hook it sets `FileSystemXmlRepository` over the folder only when no

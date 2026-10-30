@@ -84,7 +84,7 @@ A request that carries a `Bearer` `Authorization` header is then authenticated b
 cookie it also carries. A header of another scheme — the `Basic` credentials a reverse proxy passes upstream — carries
 no token the edge could accept and is left to the session, so a signed-in person behind such a proxy still reads as
 themselves. The token is accepted only when its audience is the application's base URL (`Koan:Web:ApplicationUrl`,
-with or without a trailing slash), or `Koan:Web:Auth:ResourceServer:Resource` when set; its subject becomes the same
+or the URL the application accepted, WEB-0081, with or without a trailing slash), or `Koan:Web:Auth:ResourceServer:Resource` when set; its subject becomes the same
 `ClaimTypes.NameIdentifier` the person's session carries, so every page and gate answers for the agent as for the
 person. A token that is expired, tampered, foreign or issued for another resource answers 401 with
 `WWW-Authenticate: Bearer error="invalid_token"` wherever an endpoint requires an authenticated caller, and before any

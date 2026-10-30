@@ -24,6 +24,36 @@ An ordinary default challenge reuses an existing broader durable scope set only
 after the same DID/PDS/issuer/client and current declared ceiling validate;
 explicit scope challenges retain their exact requested set.
 
+The client identity is `Providers:atproto:ClientId` when configured, else it is
+derived at use from the application's base URL (WEB-0078, WEB-0081):
+`Koan:Web:ApplicationUrl` when set, else the URL the application accepted, else,
+where Koan derives the base URL from requests (Development, Staging/Test with a
+notice, Production under the application's `DerivesUntilAccepted`), the current
+request's. An https base yields `{base}/auth/atproto/client-metadata.json`; a
+loopback http base yields the localhost profile in Development only. A challenge,
+handle-first or server-first, reads the identity once and uses it for the pushed
+request, its `redirect_uri` and the authorization URL. The callback reads the
+identity current at the callback and uses it for the code exchange and the session
+it saves, so a sign-in in flight across an accept fails closed at its callback (the
+code was issued to the previous identity) and the person signs in again. Restored clients are cached per DID together with the identity they were
+built for; a cached client built for another identity is disposed and rebuilt.
+
+The identity is checked at composition. A configured base URL is checked there as
+it always was. With nothing configured, the check passes when Koan derives the base
+URL from requests, and, when the application registers an `IApplicationUrlStore`,
+it waits for the store: `AtprotoAuthModule.Start` (after `WebModule`) runs it on the
+URL the store held, and an eligible provider with no identity it can publish refuses
+the start with the same correction.
+
+A stored session saved under another client identity — the application accepted a
+new URL since — is gone. Requests and `GetSessionMetadata` treat it as absent; a
+default challenge does not reuse its scopes and a server-first callback does not
+preserve it, so the new grant replaces it; `Disconnect` revokes it in the old
+identity's name as a best effort (a provider that authenticates public clients by
+their metadata document may refuse, since the application no longer publishes that
+identity) and removes it either way. It stays stored until one of those happens, so
+accepting the previous URL again restores it.
+
 1. The standard challenge receives a handle/DID and AuthenticationProperties.
    The remote handler creates its browser correlation cookie and protects those
    properties separately from SDK state.
@@ -55,7 +85,7 @@ explicit scope challenges retain their exact requested set.
 
 The protected file store atomically consumes one-use state and replaces the
 encrypted document. Its process lock makes its single-host guarantee explicit.
-Restoration checks subject, PDS, issuer and configured client ID again. PDS origin
+Restoration checks subject, PDS, issuer and the current client identity again. PDS origin
 comparison permits the SDK's equivalent trailing slash after refresh; callback
 issuer comparison remains exact.
 

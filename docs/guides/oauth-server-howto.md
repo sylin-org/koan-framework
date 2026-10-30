@@ -197,7 +197,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Issuer` | _(`Koan:Security:Trust:Issuer`, else `Koan:Web:ApplicationUrl`, else the request host)_ | An explicit override of the AS's public origin for the discovery issuer + every advertised endpoint. Normally unset: the issuer is the application's canonical base URL, path included (WEB-0078), which is already host-spoof-proof behind a proxy. Every access token carries the issuer the metadata states as `iss` ([SEC-0023](../decisions/SEC-0023-a-token-carries-the-issuer-its-server-states.md)). |
+| `Issuer` | _(`Koan:Security:Trust:Issuer`, else `Koan:Web:ApplicationUrl`, else the URL the application accepted, else the request host)_ | An explicit override of the AS's public origin for the discovery issuer + every advertised endpoint. Normally unset: the issuer is the application's canonical base URL, path included (WEB-0078), which is already host-spoof-proof behind a proxy. Every access token carries the issuer the metadata states as `iss` ([SEC-0023](../decisions/SEC-0023-a-token-carries-the-issuer-its-server-states.md)). |
 | `ConsentPath` / `DonePath` | `/me/connect` · `/me/connect/done` | Your two app pages, application-relative: under a base URL with a path Koan adds the path once, in its redirects and absolute URLs alike ([SEC-0027](../decisions/SEC-0027-the-consent-flow-lives-under-the-base-path.md)). |
 | `AccessTokenLifetime` | `15 min` | Issued access-token lifetime. |
 | `RefreshTokenLifetime` | `30 days` | Refresh-token / backing-grant lifetime. |
