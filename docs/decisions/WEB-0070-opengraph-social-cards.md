@@ -8,6 +8,9 @@ date: 2026-06-13
 
 # ADR 0070: Koan.Web.OpenGraph, declarative social cards for SPA shells
 
+> **Amended by [WEB-0083](WEB-0083-the-web-fails-closed.md) (2026-10-30).** Section 2 no longer holds:
+> `SocialCardSnapshot` and its lifecycle hooks are gone, and each card is read for the request's reader.
+
 Date: 2026-06-13
 
 Status: Accepted

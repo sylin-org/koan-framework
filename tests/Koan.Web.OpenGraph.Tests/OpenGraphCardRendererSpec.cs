@@ -16,9 +16,9 @@ namespace Koan.Web.OpenGraph.Tests;
 /// <summary>
 /// ARCH-0079 integration spec: boots through real <c>AddKoan()</c> reflective discovery with the
 /// InMemory data connector, then exercises register -> request -> injected-and-encoded head end to
-/// end. No fakes: the snapshot is persisted and read back through the real data layer, which also
-/// proves the <c>[Cacheable]</c> entity degrades to a plain persisted read with no cache adapter.
+/// end. No fakes: the card is read through the real data layer for the request's reader.
 /// </summary>
+[Collection(AmbientHost.Name)]
 public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
 {
     private IntegrationHost _host = default!;
@@ -52,9 +52,9 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
 
     private IOpenGraphCardRenderer Renderer => _host.Services.GetRequiredService<IOpenGraphCardRenderer>();
 
-    private static HttpRequest Navigation(string path)
+    private HttpRequest Navigation(string path)
     {
-        var ctx = new DefaultHttpContext();
+        var ctx = new DefaultHttpContext { RequestServices = _host.Services.CreateScope().ServiceProvider };
         ctx.Request.Method = "GET";
         ctx.Request.Scheme = "https";
         ctx.Request.Host = new HostString("example.org");
@@ -159,42 +159,6 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Snapshot_is_warmed_on_upsert_and_removed_on_delete()
-    {
-        var work = new TestWork { Name = "First", Summary = "s", CoverMediaId = "c1" };
-        await work.Save();
-
-        var key = "TestWork:" + work.Id;
-        (await SocialCardSnapshot.Get(key)).Should().NotBeNull("upsert warms the snapshot");
-        (await SocialCardSnapshot.Get(key))!.Title.Should().Be("First");
-
-        work.Name = "Second";
-        await work.Save();
-        (await SocialCardSnapshot.Get(key))!.Title.Should().Be("Second", "re-upsert rebuilds the snapshot");
-
-        await TestWork.Remove(work.Id);
-        (await SocialCardSnapshot.Get(key)).Should().BeNull("delete evicts the snapshot");
-    }
-
-    [Fact]
-    public async Task Cold_snapshot_is_lazily_filled_on_first_request()
-    {
-        // Remove the eager snapshot to exercise the request-time lazy fill path.
-        var work = new TestWork { Name = "Cold Start", Summary = "s", CoverMediaId = "c1" };
-        await work.Save();
-
-        var key = "TestWork:" + work.Id;
-        await SocialCardSnapshot.Remove(key);
-        (await SocialCardSnapshot.Get(key)).Should().BeNull("not warmed");
-
-        var html = await Renderer.RenderShellAsync(Navigation($"/work/{work.Id}"));
-
-        html.Should().NotBeNull();
-        html!.Should().Contain("<meta property=\"og:title\" content=\"Cold Start\" />");
-        (await SocialCardSnapshot.Get(key)).Should().NotBeNull("the request lazily filled the snapshot");
-    }
-
-    [Fact]
     public async Task Toggles_off_suppress_their_tags()
     {
         // A fresh host with the head toggles disabled; operate entirely against its own store.
@@ -217,7 +181,9 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
             await work.Save();
 
             var renderer = host.Services.GetRequiredService<IOpenGraphCardRenderer>();
-            var html = await renderer.RenderShellAsync(Navigation($"/work/{work.Id}"));
+            var request = Navigation($"/work/{work.Id}");
+            request.HttpContext.RequestServices = host.Services.CreateScope().ServiceProvider;
+            var html = await renderer.RenderShellAsync(request);
 
             html.Should().NotBeNull();
             html!.Should().NotContain("<title>");

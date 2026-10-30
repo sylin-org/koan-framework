@@ -29,20 +29,6 @@ public sealed class ProjectionAndPassthroughTests
     }
 
     [Fact]
-    public void FromCard_hard_caps_stored_text()
-    {
-        var longTitle = new string('t', SocialCardSnapshot.MaxStoredTitleLength + 50);
-        var card = new SocialCard(longTitle, "desc", CardImage.Recipe("share-card", "abc"), "/work/1", "article");
-
-        var snapshot = SocialCardSnapshot.FromCard("TestWork:1", card);
-
-        snapshot.Title!.Length.Should().Be(SocialCardSnapshot.MaxStoredTitleLength);
-        snapshot.ImagePath.Should().Be("/media/abc/share-card");
-        snapshot.UrlPath.Should().Be("/work/1");
-        snapshot.OgType.Should().Be("article");
-    }
-
-    [Fact]
     public async Task Disabled_options_pass_through_as_null()
     {
         var options = new OpenGraphOptions { Enabled = false, ShellPath = "anything" };

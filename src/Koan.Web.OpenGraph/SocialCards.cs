@@ -1,9 +1,11 @@
-using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Koan.Core.Composition;
-using Koan.Core.Logging;
-using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Web.Endpoints;
+using Koan.Web.Hooks;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Web.OpenGraph;
 
@@ -14,12 +16,12 @@ namespace Koan.Web.OpenGraph;
 /// </summary>
 public static class SocialCards
 {
-    private static readonly KoanLog.KoanLogScope Log = KoanLog.For("Koan.Web.OpenGraph");
-
     /// <summary>
     /// Declare the card for <typeparamref name="T"/>. The route template's single non-catch-all token
     /// is matched against the request path (trailing slug segments are discarded); the resolver maps
-    /// that token to an entity; the returned builder's selectors project the card fields.
+    /// that token to an entity, or to null where the application shows no card for it; the Entity's read gate and
+    /// read constraint then decide for the request's reader (WEB-0083); the returned builder's selectors project the
+    /// card fields. A token the reader may not see receives the default card, as an unknown one does.
     /// </summary>
     public static SocialCardBuilder<T> For<T>(string routeTemplate, Func<string, Task<T?>> resolve)
         where T : Entity<T>
@@ -31,59 +33,30 @@ public static class SocialCards
         var registry = SocialCardRegistry.GetOrCreate(services);
 
         var builder = new SocialCardBuilder<T>();
-        var registration = new CardRegistration
+        registry.Register(typeof(T), new CardRegistration
         {
-            TypeDiscriminator = typeof(T).Name,
             Matcher = new RouteTokenMatcher(routeTemplate),
-            ResolveAndProject = async token =>
+            CardFor = async (token, http, ct) =>
             {
                 var entity = await resolve(token).ConfigureAwait(false);
-                return entity is null ? null : builder.Project(entity);
-            },
-            ProjectFromEntity = entity => builder.Project((T)entity),
-        };
+                if (entity is null) return null;
 
-        registry.Register(typeof(T), registration);
-        WireLifecycle<T>(registration);
+                var readable = await ReadFor<T>(entity.Id, http, ct).ConfigureAwait(false);
+                return readable is null ? null : builder.Project(readable);
+            },
+        });
         return builder;
     }
 
-    private static void WireLifecycle<T>(CardRegistration registration) where T : Entity<T>
+    // The one read every surface shares: the same gate, constraint and hooks GET {id} answers for this reader.
+    private static async Task<T?> ReadFor<T>(string id, HttpContext http, CancellationToken ct)
+        where T : Entity<T>
     {
-        // The lifecycle plan and registration belong to the same composing host. The entity is already in hand,
-        // so warming costs one write and no read.
-        Entity<T, string>.Lifecycle.AfterUpsert(ctx =>
-            WarmAsync(registration, ctx.Current, ctx.Current.Id));
-
-        // Evict on remove.
-        Entity<T, string>.Lifecycle.AfterRemove(ctx =>
-            EvictAsync(registration, ctx.Current.Id));
-    }
-
-    private static async ValueTask WarmAsync(CardRegistration registration, object entity, string id)
-    {
-        try
-        {
-            var card = registration.ProjectFromEntity(entity);
-            var snapshot = SocialCardSnapshot.FromCard(registration.KeyFor(id), card);
-            await snapshot.Save().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            // Warming is best-effort: the lazy request-time path rebuilds the snapshot on a miss.
-            Log.DataWarning("opengraph.warm", "failed", ("id", id), ("error", ex.Message));
-        }
-    }
-
-    private static async ValueTask EvictAsync(CardRegistration registration, string id)
-    {
-        try
-        {
-            await SocialCardSnapshot.Remove(registration.KeyFor(id)).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Log.DataWarning("opengraph.evict", "failed", ("id", id), ("error", ex.Message));
-        }
+        var services = http.RequestServices;
+        var context = services.GetRequiredService<EntityRequestContextBuilder>().Build(new QueryOptions(), ct, http);
+        var read = await services.GetRequiredService<IEntityEndpointService<T, string>>()
+            .GetById(new EntityGetByIdRequest<string> { Context = context, Id = id })
+            .ConfigureAwait(false);
+        return read.IsShortCircuited ? null : read.Model;
     }
 }

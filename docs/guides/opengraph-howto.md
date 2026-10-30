@@ -57,9 +57,8 @@ and discarded, so `/work/{id}/{slug}`, `/work/{id}`, and a request like
 `/work/{id}/anything` all resolve off the same id. The entity type must be a `Koan`
 entity (`T : Entity<T>`).
 
-Card registrations and lifecycle plans belong to the composing host. The registry retains the resolver and selectors
-for request-time cold fill and lifecycle warming, so they should not close over a service provider, scope, runtime
-service, options snapshot, adapter, or disposable. Use `id => T.Get(id)` so Entity resolution selects the active Koan
+Card registrations belong to the composing host. The registry retains the resolver and selectors for the request path,
+so they should not close over a service provider, scope, runtime service, options snapshot, adapter, or disposable. Use `id => T.Get(id)` so Entity resolution selects the active Koan
 runtime when the resolver executes, and keep selectors pure over the entity value. A second host receives a separate
 registry and may independently declare the same Entity type; no reset API is necessary.
 
@@ -137,29 +136,34 @@ errors, and 404s keep their status and body. Routing selects endpoints before th
 so injection applies only to navigations no controller route claimed. The fallback remains
 authoritative whenever OpenGraph passes through.
 
-Use automatic injection for content the application permits to be public. Card resolvers are
-application-supplied, and a cached card bypasses resolution without revalidating row or member Access.
-A controller rendering governed content checks current visibility before calling
-`IOpenGraphCardRenderer.RenderShellAsync(Request, ct)`; card fields must also suit that audience.
+A card shows what its reader may read. The resolver runs on every navigation, and returning null from it shows no card;
+the Entity's `[Access]` read gate and `EntityAccess<T>` read constraint then decide for the request's reader, as
+`GET {id}` does. A crawler is an anonymous reader, so a private row unfurls as the default card:
+
+```csharp
+SocialCards.For<Article>("/articles/{id}", async id =>
+        await Article.Get(id) is { Published: true } article ? article : null)
+    .Title(a => a.Title);
+```
+
+A selector still chooses what the card says, so keep its fields suited to everyone who may read the row.
 
 ## How it behaves
 
 - Matched route, known entity: the entity's `<title>`, canonical, og: and twitter:
   tags are injected.
-- Unknown id or slug: the default card (site name, default image, default
-  description) is injected. Never an error.
+- Unknown id or slug, or a row this reader may not read: the default card (site name,
+  default image, default description) is injected. Never an error.
 - Unmatched route: the default card.
 - Every emitted value is HTML-encoded; title and description are truncated to their
   configured maxima.
 
 ## Caching
 
-Each card is materialized as a `SocialCardSnapshot` entity marked `[Cacheable]`, so it
-reuses the cache pillar (L1/L2 plus coherence) when a cache adapter is referenced, and
-falls back to a plain persisted read otherwise. The snapshot is kept fresh by entity
-Lifecycle: it is rebuilt when the source entity is saved and removed when the
-source entity is deleted. The request path reads the snapshot and lazily fills it on a
-miss, so the common case is a cache read plus a string replace.
+A card is not stored. Each navigation reads the Entity for its reader, so a card follows
+its Entity at once, whichever token routes it, and goes when the Entity or its
+visibility does. Mark an Entity `[Cacheable]` to serve those reads from the cache pillar.
+A card rendered for a signed-in reader carries `Cache-Control: private`.
 
 ## What this is not
 

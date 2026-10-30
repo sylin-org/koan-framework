@@ -37,8 +37,13 @@ The package contributes its Web pipeline behavior automatically. A matching HTML
 canonical, OpenGraph, and Twitter metadata. Unknown entities and unmatched routes receive configured defaults; asset,
 API, non-HTML, disabled, and unavailable-shell requests pass through.
 
-Each declaration and its Entity lifecycle warming plan belong to the composing host. Resolvers should use Entity
-statics and selectors should remain pure over the Entity value; application services are not captured.
+Each declaration belongs to the composing host. Resolvers should use Entity statics and selectors should remain pure
+over the Entity value; application services are not captured.
+
+A link preview shows what its reader may read. The resolver runs on every navigation and may return null to show no
+card; the Entity's `[Access]` read gate and `EntityAccess<T>` read constraint then decide for the request's reader, as
+`GET {id}` does. A crawler is an anonymous reader. Nothing is stored, so a card follows its Entity at once, whichever
+token routes it. An Entity read often enough to matter is marked `[Cacheable]` as any other is.
 
 ## Image projection
 
@@ -50,7 +55,7 @@ original, and `CardImage.Url(...)` preserves an external URL. This package compo
 - The application owns its SPA fallback and shell file.
 - `SocialCards.For<T>` must run inside `AddKoan(() => ...)` or a `KoanModule.Register` method.
 - One host may declare one card per Entity type; separate hosts are isolated.
-- Snapshots use the Entity data path and optional Cache capability; no CDN purge or distributed shell cache is
+- A card rendered for a signed-in reader carries `Cache-Control: private`; no CDN purge or distributed shell cache is
   claimed.
 - No SSR, prerender, headless browser, oEmbed, JSON-LD, sitemap, or routing ownership is provided.
 
@@ -60,7 +65,7 @@ Automatic injection runs at the post-authorization Web pipeline boundary and onl
 controller route claimed. Controller endpoints retain their response and authorization semantics: a
 controller result, including its errors and 404s, passes through untouched. Controllers may call
 `IOpenGraphCardRenderer.RenderShellAsync(Request, ct)` after their business visibility checks; SPA
-fallback navigation remains automatic. Automatic injection is appropriate for content the application
-permits to be public. Card resolvers are application-supplied, and a cached card bypasses resolution;
-cards do not revalidate row or member Access. Check visibility before calling the renderer for governed
-content, and keep the card's fields appropriate for the audience receiving it.
+fallback navigation remains automatic. A card is read for the request's reader on every navigation: the resolver, then the Entity's read gate and
+read constraint, the read `GET {id}` answers. A token nothing resolves and a row the reader may not read both receive
+the default card. A selector still chooses what the card says, so keep its fields suited to everyone who may read the
+row; a property-level `[Access]` does not reach a selector.

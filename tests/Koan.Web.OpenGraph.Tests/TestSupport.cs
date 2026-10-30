@@ -29,3 +29,10 @@ internal sealed class TestOptionsMonitor<T> : IOptionsMonitor<T>
 
     public IDisposable? OnChange(Action<T, string?> listener) => null;
 }
+
+/// <summary>Specs that set the ambient <c>AppHost.Current</c> run one at a time: there is one per process.</summary>
+[Xunit.CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class AmbientHost
+{
+    public const string Name = "AmbientHost";
+}

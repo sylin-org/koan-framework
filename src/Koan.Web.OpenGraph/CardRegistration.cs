@@ -1,4 +1,6 @@
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 
 namespace Koan.Web.OpenGraph;
 
@@ -8,15 +10,11 @@ namespace Koan.Web.OpenGraph;
 /// </summary>
 internal sealed class CardRegistration
 {
-    public required string TypeDiscriminator { get; init; }
-
     public required RouteTokenMatcher Matcher { get; init; }
 
-    /// <summary>Lazy path: resolve the token to an entity, then project. Null when the entity is not found.</summary>
-    public required Func<string, Task<SocialCard?>> ResolveAndProject { get; init; }
-
-    /// <summary>Warm path: project an already-loaded entity (handed to us by Lifecycle).</summary>
-    public required Func<object, SocialCard> ProjectFromEntity { get; init; }
-
-    public string KeyFor(string token) => $"{TypeDiscriminator}:{token}";
+    /// <summary>
+    /// The card the request's reader may see for a route token: the application's resolver, then the Entity's own read
+    /// for that reader. Null when the resolver finds nothing or the reader may not read what it found.
+    /// </summary>
+    public required Func<string, HttpContext, CancellationToken, Task<SocialCard?>> CardFor { get; init; }
 }

@@ -56,16 +56,6 @@ public sealed class SocialCardRegistryTests
         second.Registrations[0].Matcher.TryExtractToken("/preview/two", out _).Should().BeTrue();
     }
 
-    [Fact]
-    public void KeyFor_composes_the_type_discriminator_and_token()
-    {
-        var registry = Compose(() => SocialCards.For<TestWork>("/work/{id}", id => TestWork.Get(id)));
-
-        var registration = registry.Registrations[0];
-
-        registration.KeyFor("abc").Should().Be("TestWork:abc");
-    }
-
     private static SocialCardRegistry Compose(Action declaration)
     {
         var services = new ServiceCollection();

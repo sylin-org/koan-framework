@@ -2,8 +2,6 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading;
 using System.Threading.Tasks;
-using Koan.Core.Logging;
-using Koan.Data.Core;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -12,7 +10,6 @@ namespace Koan.Web.OpenGraph;
 
 internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 {
-    private static readonly KoanLog.KoanLogScope Log = KoanLog.For<OpenGraphCardRenderer>();
     private static readonly HtmlEncoder Encoder = HtmlEncoder.Default;
 
     private readonly IOptionsMonitor<OpenGraphOptions> _options;
@@ -48,59 +45,34 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
             return null; // shell unavailable: let the app's own fallback serve it
         }
 
-        var snapshot = await ResolveSnapshotAsync(request.Path.Value ?? "/", ct).ConfigureAwait(false);
-        var head = BuildHead(snapshot, options, request);
+        var card = await ResolveCardAsync(request, ct).ConfigureAwait(false);
+        var head = BuildHead(card, options, request);
         return Inject(shell, head, options.PlaceholderMarker);
     }
 
-    private async Task<SocialCardSnapshot?> ResolveSnapshotAsync(string path, CancellationToken ct)
+    // WEB-0083: read for this request's reader, every time. A token nothing resolves and a row the reader may not read
+    // both fall through to the default card, so a card says nothing of what exists beyond the reader's sight.
+    private async Task<SocialCard?> ResolveCardAsync(HttpRequest request, CancellationToken ct)
     {
+        var path = request.Path.Value ?? "/";
         foreach (var registration in _cards.Registrations)
         {
-            if (!registration.Matcher.TryExtractToken(path, out var token))
+            if (registration.Matcher.TryExtractToken(path, out var token))
             {
-                continue;
+                return await registration.CardFor(token, request.HttpContext, ct).ConfigureAwait(false);
             }
-
-            var key = registration.KeyFor(token);
-            var snapshot = await SocialCardSnapshot.Get(key, ct).ConfigureAwait(false);
-            if (snapshot is not null)
-            {
-                return snapshot;
-            }
-
-            // Cache miss: resolve once, build, and save (lazy fill). A null result (unknown
-            // id/slug) falls through to the default card, never an error.
-            var card = await registration.ResolveAndProject(token).ConfigureAwait(false);
-            if (card is null)
-            {
-                return null;
-            }
-
-            snapshot = SocialCardSnapshot.FromCard(key, card);
-            try
-            {
-                await snapshot.Save(ct).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                // The card still renders this request; only the cache write failed.
-                Log.DataWarning("opengraph.fill", "failed", ("key", key), ("error", ex.Message));
-            }
-
-            return snapshot;
         }
 
         return null; // no matching route: default card
     }
 
-    private string BuildHead(SocialCardSnapshot? snapshot, OpenGraphOptions options, HttpRequest request)
+    private string BuildHead(SocialCard? card, OpenGraphOptions options, HttpRequest request)
     {
-        var title = Truncate(snapshot?.Title ?? options.SiteName, options.MaxTitleLength);
-        var description = Truncate(snapshot?.Description ?? options.DefaultDescription, options.MaxDescriptionLength);
-        var imageUrl = Absolutize(snapshot?.ImagePath ?? options.DefaultImage, request);
-        var url = Absolutize(snapshot?.UrlPath ?? request.Path.Value, request);
-        var ogType = snapshot?.OgType ?? options.DefaultType;
+        var title = Truncate(card?.Title ?? options.SiteName, options.MaxTitleLength);
+        var description = Truncate(card?.Description ?? options.DefaultDescription, options.MaxDescriptionLength);
+        var imageUrl = Absolutize(card?.Image.ToPath() ?? options.DefaultImage, request);
+        var url = Absolutize(card?.UrlPath ?? request.Path.Value, request);
+        var ogType = card?.OgType ?? options.DefaultType;
 
         var sb = new StringBuilder();
 
@@ -138,9 +110,6 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 
     private static void Name(StringBuilder sb, string name, string content)
         => sb.Append("<meta name=\"").Append(name).Append("\" content=\"").Append(Encode(content)).Append("\" />\n");
-
-    private static void Meta(StringBuilder sb, string tag, bool isLink, string rel, string href)
-        => sb.Append("<link rel=\"").Append(rel).Append("\" href=\"").Append(Encode(href)).Append("\" />\n");
 
     private static string Inject(string shell, string head, string marker)
     {

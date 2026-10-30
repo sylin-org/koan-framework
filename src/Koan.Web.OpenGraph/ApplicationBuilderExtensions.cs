@@ -27,6 +27,11 @@ internal static class ApplicationBuilderExtensions
                 if (html is not null)
                 {
                     context.Response.ContentType = "text/html; charset=utf-8";
+                    // WEB-0083: the card is this reader's, so a shared cache never answers another reader with it.
+                    if (context.User.Identity?.IsAuthenticated == true)
+                    {
+                        context.Response.Headers.CacheControl = "private";
+                    }
                     await context.Response.WriteAsync(html, context.RequestAborted).ConfigureAwait(false);
                     return; // short-circuit: this navigation is served
                 }
