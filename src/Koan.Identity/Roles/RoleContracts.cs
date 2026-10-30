@@ -28,7 +28,8 @@ public sealed class PermissionCriteria
 }
 
 /// <summary>
-/// What one person holds everywhere: the roles they are in and the <c>global:*</c> permissions those roles grant.
+/// What one person holds everywhere: the roles they are in, the <c>global:*</c> permissions those roles grant, and the
+/// position of the highest of them.
 /// Every bag is in the <see cref="RoleTokens.Everyone"/> role and an authenticated bag is also in the
 /// <see cref="RoleTokens.Authenticated"/> role, so the permissions of a role with either key reach the bag like a
 /// member role's. <see cref="RoleCollection.Bag"/> compiles and caches it; an application or a test builds one with
@@ -38,21 +39,27 @@ public sealed class RoleBag
 {
     private readonly HashSet<string> _tokens;
     private readonly HashSet<string> _roles;
+    private readonly HashSet<string> _permissions;
 
     /// <param name="personId">The person; required when <paramref name="authenticated"/>, ignored otherwise.</param>
     /// <param name="authenticated">Whether the bag is a signed-in person's.</param>
     /// <param name="roles">The role keys the person is a member of. The implicit roles are added.</param>
     /// <param name="permissions">The <c>global:*</c> permissions those roles grant; any other token is refused.</param>
-    public RoleBag(string? personId, bool authenticated, IEnumerable<string> roles, IEnumerable<string> permissions)
+    /// <param name="highest">The <see cref="Role.Position"/> of the highest of those roles; 0 when that is
+    /// <see cref="RoleTokens.Everyone"/>.</param>
+    public RoleBag(string? personId, bool authenticated, IEnumerable<string> roles, IEnumerable<string> permissions, int highest = 0)
     {
         ArgumentNullException.ThrowIfNull(roles);
         ArgumentNullException.ThrowIfNull(permissions);
+        ArgumentOutOfRangeException.ThrowIfNegative(highest);
+        Highest = highest;
         PersonId = authenticated ? RoleContract.Require(personId, nameof(personId)) : null;
         IsAuthenticated = authenticated;
         _roles = new(roles.Select(role => RoleContract.Require(role, nameof(roles))), StringComparer.Ordinal) { RoleTokens.Everyone };
         if (authenticated) _roles.Add(RoleTokens.Authenticated);
         var granted = permissions.Select(permission => RoleContract.RequirePermission(permission, nameof(permissions)))
             .ToHashSet(StringComparer.Ordinal);
+        _permissions = granted;
         Roles = _roles.Order(StringComparer.Ordinal).ToArray();
         Permissions = granted.Order(StringComparer.Ordinal).ToArray();
         _tokens = new(_roles.Concat(granted), StringComparer.Ordinal);
@@ -71,11 +78,36 @@ public sealed class RoleBag
     /// <summary>The roles and permissions together: what <see cref="Role.CanDo"/> intersects.</summary>
     public IReadOnlyList<string> Tokens { get; }
 
+    /// <summary>
+    /// The <see cref="Role.Position"/> of the highest role the bag is in: 0 when that is <see cref="RoleTokens.Everyone"/>.
+    /// Of two bags, the one with the higher <see cref="Highest"/> stands above the other.
+    /// </summary>
+    public int Highest { get; }
+
     public bool Contains(string token) => _tokens.Contains(RoleContract.Require(token, nameof(token)));
     public bool ContainsAny(IEnumerable<string> tokens) => tokens.Any(_tokens.Contains);
 
     /// <summary>Whether the bag is in the role <paramref name="roleKey"/>, trimmed; false for a key that cannot name a role.</summary>
     public bool InRole(string? roleKey) => RoleContract.TryRequire(roleKey, out var key) && _roles.Contains(key);
+
+    /// <summary>
+    /// Whether the bag manages <paramref name="role"/> — the role and its members — and, given <paramref name="to"/>,
+    /// may move it to that position: the role is below the bag's highest role (<see cref="Highest"/>), and so is
+    /// <paramref name="to"/>. A bag whose roles grant <see cref="RoleTokens.Administrator"/> manages every role and moves
+    /// it anywhere. Nobody manages their own highest role, and nobody moves <see cref="RoleTokens.Everyone"/>, which is
+    /// always at 0. Pure, over the row the caller has read; <see cref="RoleCollection.Manages"/> reads it by key.
+    /// </summary>
+    public bool Manages(Role role, int? to = null)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+        if (to is not null && role.Key == RoleTokens.Everyone) return false;
+        if (InRole(role.Key) && role.Position >= Highest) return false;
+        if (Administers) return true;
+        return role.Position < Highest && (to is null || to < Highest);
+    }
+
+    /// <summary>Whether the bag's roles grant <see cref="RoleTokens.Administrator"/>.</summary>
+    internal bool Administers => _permissions.Contains(RoleTokens.Administrator);
 
     /// <summary>
     /// The bag's permissions on one resource after the resource's overwrites, resolved in Discord's order, with no

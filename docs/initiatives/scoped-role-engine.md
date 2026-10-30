@@ -15,6 +15,9 @@ validation:
 > **Amended by [SEC-0030](../decisions/SEC-0030-bounds-belong-to-reads.md) (2026-10-30):** a role's members are
 > `RoleMember` rows read by person and by role then person, every listing is a page, and the compiled caches evict
 > instead of emptying. The card below records the model as it was first built.
+>
+> **Extended by [SEC-0031](../decisions/SEC-0031-roles-stand-in-one-order.md) (2026-10-30):** every role has a
+> position in one dense order, and an actor manages the roles below their highest.
 
 ## Outcome
 

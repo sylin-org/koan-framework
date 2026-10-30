@@ -75,9 +75,11 @@ public sealed class RoleBagCache
             ? await RoleReads.RolesOf(key.PersonId, _options.MaxRolesPerPerson, _options.MaxPageSize, ct).ConfigureAwait(false)
             : [];
 
-        var permissions = memberRoles.Concat(implicitRoles)
+        var held = memberRoles.Concat(implicitRoles).ToArray();
+        var permissions = held
             .SelectMany(role => role.Permissions.Where(permission => permission.StartsWith(RoleTokens.GlobalPrefix, StringComparison.Ordinal)));
-        return new RoleBag(key.Authenticated ? key.PersonId : null, key.Authenticated, memberRoles.Select(role => role.Key), permissions);
+        var highest = held.Select(role => role.Position).Append(0).Max();
+        return new RoleBag(key.Authenticated ? key.PersonId : null, key.Authenticated, memberRoles.Select(role => role.Key), permissions, highest);
     }
 
     /// <summary>

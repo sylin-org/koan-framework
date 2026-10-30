@@ -53,7 +53,7 @@ public sealed class RoleManagementController(RoleCollection roles, IOptions<Role
     [HttpPut("{key}")]
     [Authorize(Roles = IdentityRoles.Operator)]
     public async Task<ActionResult<Role>> Put(string key, [FromBody] SaveRoleRequest request, CancellationToken ct)
-        => Impersonating() ?? (ActionResult<Role>)Ok(await roles.Define(key, request.Name, request.Permissions, request.Metadata, ct));
+        => Impersonating() ?? (ActionResult<Role>)Ok(await roles.Define(key, request.Name, request.Permissions, request.Metadata, ct: ct));
 
     [HttpPatch("{key}")]
     [Authorize(Roles = IdentityRoles.Operator)]

@@ -12,7 +12,9 @@ Role routes are under `/api/identity/roles`:
 Role writes accept the stable key in the route and `{ name, permissions, metadata }` in the body. There is no ETag
 or version binding. Every mutation goes through `RoleCollection`, so lifecycle events and bag invalidation are the
 same for HTTP and headless callers. `metadata` is opaque presentation data, not authorization policy. The descriptor
-names the reserved tokens, `global:administrator` among them, and every bound.
+names the reserved tokens, `global:administrator` among them, and every bound. The role page is the order, the
+highest first; a role carries its `position` and a bag its `highest`. A role written here keeps its place, and a new
+one is placed at the top.
 
 A member page answers `{ items, next }`: pass `next` as `after` for the following page; the last page has no `next`.
 `take` is at most `MaxPageSize`. Adding a member answers the membership; removing one answers 204, or 404 when the

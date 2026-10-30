@@ -4,13 +4,24 @@
 rejects direct generic saves and removes of each. Per-role coordination serializes same-process changes to a role
 and its members; joins of one person are serialized by a striped person lock, taken after the role's lock, so the
 roles-per-person bound holds in-process; one lock serializes same-process overwrite edits, taken after the subject
-role's lock when the subject is a role. No path takes a role's lock after another lock, so none can deadlock. Mutations persist first, invalidate the compiled state they affect, then publish post-events. A
+role's lock when the subject is a role; one order lock serializes every write of a role's row, taken after any other
+lock. No path takes a role's lock after another lock, nor any lock while holding the order lock, so none can
+deadlock. Mutations persist first, invalidate the compiled state they affect, then publish post-events. A
 change is refused before any lock when a role lifecycle handler asks for it, and before anything happens inside a
 deferred `EntityContext.Transaction` scope (SEC-0021): the scope would hold the write until its commit while the
 events and the invalidation ran now.
 
 A role's row id is `Role.KeyFor(key)`, composed from its key; `Role.Key` is the token, and every read and write of a
 role by key goes through the composed id and requires the key read back to match exactly.
+
+Roles stand in one dense order (SEC-0031): `Role.Position`, indexed, is 0 for `everyone` and 1 to the number of the
+other roles. Every write of a role's row happens under the order lock: a role's own change reads it, places it and
+writes it there, so a rename never writes back a position a shift has since moved. Placing a new role at a position,
+moving one, or deleting one shifts the roles between by one, reading them a page at a time in position order from the
+end they move toward and writing each once; a new or moved role is written after its shift, and a deleted role is
+removed before. Until a moved role is written it can share its position with the role passing it, and the two stand
+as they stood or as they will. A placement reads the
+top position once; a position past either end is clamped to it. `Page` sorts by position, the highest first.
 
 What grows is rows, read a page at a time (SEC-0030). `RoleMember` is one row per role and person, its id composed
 from both, indexed by person and by role then person; adding or removing a member writes or deletes that row.
@@ -39,7 +50,9 @@ victim. A read that finds its entry takes no lock.
   (`everyone`, and `authenticated` for a person). It adds the member roles' keys plus the literal `global:*` grants of
   those roles and of the implicit roles. A membership change invalidates that person; defining a role or changing
   its permissions invalidates every bag rather than reading its members; deleting a role invalidates every bag when
-  it clears the role's permissions, and each member again as their membership row goes.
+  it clears the role's permissions, each member again as their membership row goes, and every bag once more when
+  the roles above it have moved down. The bag carries `Highest`, the position of its highest role, so placing or
+  moving a role invalidates every bag too.
 - Role overwrites, one set per resource, keyed by role: compilation reads the resource's role rows a page at a time.
   There is at most one per role, so the set is bounded by the roles the application defines.
 - A person's own overwrite on a resource, or its absence, read by key.
@@ -47,6 +60,11 @@ victim. A read that finds its entry takes no lock.
 `RoleCollection.OverwritesFor(bag, resource)` hands out copies of the role rows for the roles the bag is in and of
 the person's own row; an overwrite change invalidates the role set of its resource or the one person's entry, never a
 bag. `InvalidateOverwrites(resourceId)` invalidates both kinds on one resource.
+
+`RoleBag.Manages(role, to)` is pure over the role row and the bag's `Highest`: a role below it, and a `to` below it,
+or any role for a bag granted `global:administrator`; never a role the bag holds at or above its `Highest`, which also
+fails a tie closed, and never a move of `everyone`. `RoleCollection.Manages` reads the role by key first, and judges a
+key no role has where `Define` would place it.
 
 Authorization is pure: `Role.CanDo(PermissionCriteria, RoleBag)` intersects tokens, and
 `RoleBag.On(resourceId, overwrites, now)` resolves a resource in Discord's order — base, `everyone` overwrite, the

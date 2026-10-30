@@ -31,9 +31,32 @@ Every bag is in the `everyone` role; an authenticated bag is also in the `authen
 either key exists, its `global:*` permissions reach the bag like a member role's, so a permission given to everyone
 is one `Define("everyone", ...)`. `bag.Roles` and `bag.Permissions` separate the two halves of `bag.Tokens`. Warm bag
 reads are cache-only; a bag compiles from one read of the person's memberships and one read of those roles. Adding
-or removing a member compiles that person's bag again; defining a role or changing its permissions compiles every bag
-again, without reading the role's members; a rename or a metadata change alters no bag. A generation check prevents
+or removing a member compiles that person's bag again; defining, moving or deleting a role, or changing its
+permissions, compiles every bag again, without reading the role's members; a rename or a metadata change alters no
+bag. A generation check prevents
 an in-flight stale build from winning an invalidation race.
+
+### The order and who manages what
+
+Every role stands in one order, as in Discord: `Role.Position` 0 is `everyone`, and every other role holds one of 1
+to the number of them, a higher position above a lower. `Define` places a new role at the top, or at `position:` —
+the role there and those above it move up one — and `Move` moves one; deleting a role moves the roles above it down
+one. A position past either end lands on that end. A new `authenticated` role is placed at 1, since every signed-in
+person holds it. `Page` reads the order a page at a time, the highest first.
+
+```csharp
+var bag = await roles.Bag(actorId, authenticated: true, ct);   // bag.Highest: the position of their highest role
+await roles.Define("role:helper", "Helper", ["global:post_create"], position: bag.Highest, ct: ct); // directly below it
+if (await roles.Manages(bag, "role:helper", to: 2, ct)) await roles.Move("role:helper", 2, ct);
+var page = await roles.Page(pageSize: 50, ct: ct);
+var editable = page.Items.Where(role => bag.Manages(role));     // pure, over the rows read
+```
+
+An actor manages a role below their highest, and that role's members, and moves it only to a position below their
+highest; a bag whose roles grant `global:administrator` manages every role and moves it anywhere; nobody manages their
+own highest role, and nobody moves `everyone`. `Manages` answers the hierarchy; whether the actor may manage roles at
+all is the application's own permission, checked beside it. Of two people, the one whose bag has the higher `Highest`
+stands above the other.
 
 A person holds at most `MaxRolesPerPerson` roles: adding them to one more is refused with `RoleBoundException`,
 naming its configuration key. Nothing bounds how many members a role holds. A key — a role key, a person id, a
@@ -115,5 +138,6 @@ overwrite on a resource, or its absence). Past a capacity the cache evicts an en
 the rest warm.
 
 Reference `Sylin.Koan.Identity.Web` for management routes. See [TECHNICAL.md](TECHNICAL.md),
-[SEC-0021](../../docs/decisions/SEC-0021-resource-overwrites-resolve-in-discord-order.md) and
-[SEC-0030](../../docs/decisions/SEC-0030-bounds-belong-to-reads.md).
+[SEC-0021](../../docs/decisions/SEC-0021-resource-overwrites-resolve-in-discord-order.md),
+[SEC-0030](../../docs/decisions/SEC-0030-bounds-belong-to-reads.md) and
+[SEC-0031](../../docs/decisions/SEC-0031-roles-stand-in-one-order.md).

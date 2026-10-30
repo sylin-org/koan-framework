@@ -9,12 +9,21 @@ namespace Koan.Identity.Roles;
 /// <summary>
 /// A server-owned role or group. <see cref="Key"/> is its stable authorization token; its row id is composed from the
 /// key (<see cref="KeyFor"/>), so two keys that a store's collation would equate never share a row. Its members are
-/// <see cref="RoleMember"/> rows.
+/// <see cref="RoleMember"/> rows. Every role stands in one order (<see cref="Position"/>), and a bag manages the roles
+/// below its highest one (<see cref="RoleBag.Manages"/>).
 /// </summary>
 public sealed class Role : Entity<Role>, IAmbientExempt, IRequiresLifecycleEnforcement
 {
     /// <summary>The stable authorization token: <c>role:member</c>, <c>group:gardeners</c>, <c>everyone</c>.</summary>
     public string Key { get; set; } = "";
+
+    /// <summary>
+    /// The role's place in the order, a higher one above a lower: <see cref="RoleTokens.Everyone"/> at 0 and every
+    /// other role at one of 1 to the number of them. <see cref="RoleCollection"/> keeps the order dense: it places a
+    /// role when it is defined, moves it with <see cref="RoleCollection.Move"/>, and moves the roles above a deleted
+    /// role down one.
+    /// </summary>
+    [Index] public int Position { get; set; }
 
     public string Name { get; set; } = "";
     public List<string> Permissions { get; set; } = [];

@@ -251,6 +251,38 @@ public sealed class RoleSqliteSpec
         static string Visitor(int i) => $"person:crowded:{i:D3}";
     }
 
+    /// <summary>SEC-0031 on a real store: positions past 9 order, shift and page as numbers, never as text.</summary>
+    [Fact] public async Task Sqlite_orders_moves_and_closes_role_positions_as_numbers()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"koan-role-order-{Guid.CreateVersion7():n}.db");
+        try
+        {
+            await using var host = await Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await roles.Define(RoleTokens.Everyone, "Everyone");
+            for (var i = 1; i <= 12; i++) await roles.Define(Key(i), $"Role {i}");
+            (await Order(roles)).Should().Equal([.. Enumerable.Range(1, 12).Reverse().Select(Key), RoleTokens.Everyone]);
+
+            (await roles.Move(Key(2), 11)).Position.Should().Be(11);
+            (await roles.Define("role:sqlite:new", "New", position: 10)).Position.Should().Be(10);
+            (await roles.Delete(Key(5))).Should().BeTrue();
+
+            var order = await Order(roles);
+            order.Should().Equal(Key(12), Key(2), Key(11), "role:sqlite:new", Key(10), Key(9), Key(8), Key(7), Key(6), Key(4), Key(3), Key(1), RoleTokens.Everyone);
+            var positions = new List<int>();
+            foreach (var key in order) positions.Add((await roles.Get(key))!.Position);
+            positions.Should().Equal(Enumerable.Range(0, 13).Reverse(), "the order is dense, everyone at 0");
+            (await roles.Page(page: 2, pageSize: 5)).Items.Select(role => role.Key).Should().Equal(order.Skip(5).Take(5), "a page is the order's next part");
+        }
+        finally { Delete(path); }
+
+        static string Key(int i) => $"role:sqlite:{i:D2}";
+
+        static async Task<IReadOnlyList<string>> Order(RoleCollection roles)
+            => (await roles.Page(pageSize: 50)).Items.Select(role => role.Key).ToArray();
+    }
+
     private static async Task<object?> Scalar(SqliteConnection connection, string sql)
     {
         await using var command = connection.CreateCommand();
