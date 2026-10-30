@@ -9,6 +9,7 @@ using Koan.Core.Hosting.Bootstrap;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
 using Koan.Data.Core;
+using Koan.Data.Core.Model;
 using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Server.Hosting;
 using Koan.Web.Auth.Server.Controllers;
@@ -16,6 +17,7 @@ using Koan.Web.Auth.Server.Infrastructure;
 using Koan.Web.Auth.Server.Keys;
 using Koan.Web.Auth.Server.Options;
 using Koan.Web.Auth.Server.Protocol;
+using Koan.Web.Authorization;
 using Koan.Web.Extensions;
 using Koan.Web.Hosting;
 using Koan.Web.Infrastructure;
@@ -46,6 +48,8 @@ public sealed class AuthServerModule : KoanModule
         services.TryAddSingleton<AuthServerIssuer>();
         services.TryAddSingleton<IIssuerIdentifier>(sp => sp.GetRequiredService<AuthServerIssuer>());
         services.AddHostedService<Protocol.OAuthArtifactCleanupService>();
+        // SEC-0005 — removing a live grant this server issued, by any path, first forgets the person's remembered consent.
+        Entity<AgentGrant>.Lifecycle.BeforeRemove(OAuthGrants.ForgetConsent);
 
         // SEC-0006 D1 / SEC-0022 — the key lifecycle. The persisted, encrypted-at-rest, rotating ES256 store is the
         // active tier outside Development (so tokens survive restart and the JWKS is stable), and in Development too

@@ -20,7 +20,7 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 /// an in-memory data adapter so the OAuth entities (client, consent request, authorization code) persist. Drives
 /// the full Authorization Code + PKCE flow over real HTTP with cookies + redirects.
 /// </summary>
-public sealed class OAuthFlowFixture : IAsyncLifetime
+public class OAuthFlowFixture : IAsyncLifetime
 {
     private IHost? _host;
 
@@ -39,7 +39,7 @@ public sealed class OAuthFlowFixture : IAsyncLifetime
                 ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
                 ["Koan:Data:Sources:Default:ConnectionString"] = "memory://oauth-flow-tests",
                 ["Koan:BackgroundServices:Enabled"] = "false",
-            }))
+            }).AddInMemoryCollection(Settings))
             .ConfigureWebHostDefaults(web =>
             {
                 web.UseUrls(BaseUrl);
@@ -47,7 +47,7 @@ public sealed class OAuthFlowFixture : IAsyncLifetime
                 web.ConfigureServices(s =>
                 {
                     AppHost.Current = null;
-                    s.AddKoan();
+                    s.AddKoan(Declare);
                     s.AddKoanWeb();
                     s.AddKoanControllersFrom<TestSignInController>();
                 });
@@ -57,6 +57,12 @@ public sealed class OAuthFlowFixture : IAsyncLifetime
 
         await _host.StartAsync();
     }
+
+    /// <summary>Business declarations a derived fixture composes into the host, such as a lifecycle hook.</summary>
+    protected virtual void Declare() { }
+
+    /// <summary>Settings a derived fixture adds over the defaults.</summary>
+    protected virtual IEnumerable<KeyValuePair<string, string?>> Settings => [];
 
     /// <summary>A fresh cookie-aware, non-auto-redirecting client (so we can read Location/redirect ourselves).</summary>
     public HttpClient NewClient()

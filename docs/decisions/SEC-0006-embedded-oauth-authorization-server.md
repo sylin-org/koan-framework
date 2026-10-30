@@ -64,6 +64,12 @@ Effective authority = **(requested scope) ∩ (what the logged-in user actually 
 **D9 — Authorize once, stays working, revocable: refresh tokens ON + remembered consent (the delightful default).**
 A bare 15-minute access token with no refresh would force the client to re-pop the browser every 15 minutes — the feature would feel broken. So the default is short access tokens (~15 min) **plus** refresh tokens, made safe by rotation: every refresh **rotates** the token with reuse-detection that revokes the whole family on reuse (OAuth 2.1 §4.3.1), bound to `client_id`+scope+resource (no widening), stored hashed, supporting revocation (RFC 7009). Crucially, the refresh token is **backed by a SEC-0005 `AgentGrant`** — so "authorize once" creates a server-side, **revocable** grant the user (or an admin) can kill anytime, fleet-wide, and the next refresh fails closed. **Consent is remembered** (per user + client + scope set): a re-connect with an unchanged scope set and a live grant **skips the consent page entirely** — the user authorized once. New scopes or a revoked grant re-prompt. This is the standard "authorize once" OAuth UX, made revocable by reusing the grant machinery we already have.
 
+> **Amended 2026-10-30 ([SEC-0005](SEC-0005-governed-agent-access-grants-audit-door.md)).** Each approval is its own
+> grant, one per refresh family. Remembered consent is its own record, written when the person consents and forgotten
+> when any of their live grants for the same client, scope set and resource is removed, so a revoked approval
+> re-prompts while their other approvals keep refreshing. With refresh tokens off, no grant is issued and consent is
+> not remembered.
+
 ### Where it lives
 
 `Koan.Web.Auth.Server` → references `Koan.Web.Auth` (cookie session principal, `/.well-known/auth/providers` discovery, the `/auth/{provider}/challenge` round-trip, the chained `AddKoanBearer`) → transitively `Koan.Security.Trust` (the issuer). A clean downward edge, no cycle. It is **not** in `Koan.Mcp` (the AS is MCP-agnostic — it issues OAuth tokens to any bearer client) and **not** in `Koan.Web.Auth` core (it is a heavy opt-in capability; cf. the OTel leaf extraction in ARCH-0088). The **bearer-into-`/mcp` wiring (D3)** and the **protected-resource metadata + `WWW-Authenticate` (D2 discovery)** are `Koan.Mcp` concerns — the AS leaf only **mints**; the resource edge **validates**. The ES256 issuer tier (D1) lands in `Koan.Security.Trust`.

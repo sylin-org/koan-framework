@@ -48,7 +48,32 @@ names `OAuthGrantTypes.DeviceCode` (`unauthorized_client`; `ClientNotAllowed` fr
 accepted, since it grants nothing.
 
 Short-lived opaque protocol artifacts are single-use and cleaned in the background. Refresh rotates on every use;
-replay revokes the token family. Remembered consent depends on a live revocable grant and an unchanged scope set.
+replay revokes the token family. Remembered consent depends on an unrevoked approval and an unchanged scope set.
+
+Each approval is its own SEC-0005 `AgentGrant`: every authorization-code redemption and device-code exchange starts a
+refresh family and issues the grant that family's tokens name, so revoking one grant ends one connection, and refresh
+reuse revokes only its own family's grant. With refresh tokens off, nothing would name a grant, so none is issued. The
+grant carries the subject, an internal capability term naming the client and a hash of the scope set, and the
+resource. It records `IssuedAt` (the token endpoint's clock, the one its `ExpiresAt` is read from), `ClientId`, and
+`ClientName`, the name the client registered, read once from its `OAuthClient` and null when it registered none. A
+consumer reads those fields, or `AgentGrant.Approvals(subject, take)` for a person's live approvals newest first, and
+never parses the capability term.
+
+Remembered consent is a `RememberedConsent` row whose id hashes the subject, the capability term and the resource. A
+consent the person gives on the consent page, in either flow, writes it for the lifetime of the grant it issues; a
+re-connect it lets through issues its own grant but does not extend it. The module's `AgentGrant` before-remove hook
+deletes it whenever a live grant this server issued is removed, by `Remove()`, a removal by id, the access explainer,
+erasure or refresh reuse, so revoking any approval re-prompts while the others keep refreshing. The hook runs before the
+grant is deleted, on a ten-second token of its own rather than the caller's, so a revoke fails toward asking again: a
+cancelled or failed delete can leave the grant, never the consent; a failed forget stops the removal and leaves both
+for a retry. A grant from before these rows existed has none, so it never skips the consent page.
+
+`AgentGrant` declares a composite index on `(Subject, ExpiresAt)`. The gate's per-subject lookup and `Approvals` ask
+the store for the subject's unexpired rows; a connector that builds the index reads only those, while one that does
+not reads more to answer the same (the in-memory connector scans every row, and SQL Server declines an index keyed on
+a `string`). The cleanup service removes expired remembered consents and the expired grants that name a client, beside
+the other artifacts; removing an expired grant forgets no consent. A grant from before `ClientId` existed is not swept.
+With `Koan.Tenancy` referenced under a Closed posture the sweep has no tenant in scope, and Koan has no sanctioned scope for maintenance across tenants (`Tenant.None()` reaches only `[HostScoped]` entities), so it cannot run there; in that host the server already fails at start, because its signing-key store reads a tenant-scoped entity with no tenant.
 
 ## Consent page seam in process
 

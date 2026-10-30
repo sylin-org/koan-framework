@@ -24,6 +24,10 @@ public sealed class AuthorizationCode : Entity<AuthorizationCode>
     public List<string> Roles { get; set; } = new();
     public List<string> GrantedScopes { get; set; } = new();
 
+    /// <summary>True when remembered consent minted this code without the consent page, so its redemption is an approval
+    /// that does not itself remember consent (SEC-0005).</summary>
+    public bool Remembered { get; set; }
+
     public DateTimeOffset ExpiresUtc { get; set; }
 
     public bool IsExpired(DateTimeOffset now) => ExpiresUtc <= now;

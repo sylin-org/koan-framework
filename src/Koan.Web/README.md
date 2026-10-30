@@ -201,6 +201,12 @@ encryptor adds one through ASP.NET's `IDataProtectionBuilder`.
 - Runtime facts are redacted, not anonymous. Non-Development exposure remains an operator-owned security decision.
 - Authentication and richer authorization projections live in optional Web/Auth packages; referencing Web alone does
   not make an API secure.
+- An `AgentGrant` states when it was issued (`IssuedAt`) and, when Koan's authorization server issued it, to which
+  client (`ClientId`, `ClientName`); each approval is its own grant, and `AgentGrant.Approvals(subject, take)` reads a
+  person's live ones newest first. Koan's issuers set the fields; a grant an application saves carries what it sets,
+  and a grant saved before these fields existed answers null. None of them takes part in evaluation. `Remove()` is the
+  revoke; with the authorization server referenced, removing one of its live grants also makes that client ask the
+  person again.
 - Contributed predicates are request-lifetime read visibility. They do not authorize writes, secure raw storage/SQL,
   or travel into durable jobs; those boundaries must establish or re-resolve their own application authority.
 

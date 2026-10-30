@@ -79,12 +79,13 @@ internal static class OAuthProtocolEndpoints
 
         var scopeList = q["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-        // D9 — remembered consent: a person signed in by their session who already granted this (client, scope-set)
-        // and whose grant is still live skips the consent page; the code is minted directly. New scopes / a revoked
-        // grant re-prompt. SEC-0026: the session alone — a bearer for the person never stands in for the browser.
+        // D9 — remembered consent: a person signed in by their session whose consent to this (client, scope-set,
+        // resource) is remembered skips the consent page; the code is minted directly. New scopes, or revoking any of
+        // the person's live approvals for it (SEC-0005), re-prompt. SEC-0026: the session alone — a bearer for the
+        // person never stands in for the browser.
         var session = await Session(ctx);
         if (options.RememberConsent && session is not null && Subject(session) is { } rememberedSub
-            && await OAuthGrants.FindLiveAsync(rememberedSub, clientId, scopeList, resource, now, ctx.RequestAborted) is not null)
+            && await OAuthGrants.RemembersAsync(rememberedSub, clientId, scopeList, resource, now, ctx.RequestAborted))
         {
             var remembered = new AuthorizationCode
             {
@@ -98,6 +99,7 @@ internal static class OAuthProtocolEndpoints
                 SubjectEmail = session.FindFirst(ClaimTypes.Email)?.Value ?? session.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
                 Roles = session.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
                 GrantedScopes = scopeList,
+                Remembered = true,
                 ExpiresUtc = now + options.AuthorizationCodeLifetime,
             };
             await remembered.Save(ctx.RequestAborted);
@@ -305,8 +307,8 @@ internal static class OAuthProtocolEndpoints
         }
 
         var id = new GrantedIdentity(code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes);
-        var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, code.ClientId, id.Scopes, code.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
-        await IssueTokens(ctx, options, id, code.ClientId, code.Resource, OpaqueToken.New(), grant.Id, now);
+        var grantId = await IssueGrant(options, id, code.ClientId, code.Resource, consented: !code.Remembered, now, ctx.RequestAborted);
+        await IssueTokens(ctx, options, id, code.ClientId, code.Resource, OpaqueToken.New(), grantId, now);
     }
 
     private static async Task TokenDeviceCode(HttpContext ctx, IFormCollection form)
@@ -372,8 +374,8 @@ internal static class OAuthProtocolEndpoints
         }
 
         var id = new GrantedIdentity(device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes);
-        var grant = await OAuthGrants.FindOrCreateAsync(id.Subject, device.ClientId, id.Scopes, device.Resource, now, options.RefreshTokenLifetime, ctx.RequestAborted);
-        await IssueTokens(ctx, options, id, device.ClientId, device.Resource, OpaqueToken.New(), grant.Id, now);
+        var grantId = await IssueGrant(options, id, device.ClientId, device.Resource, consented: true, now, ctx.RequestAborted);
+        await IssueTokens(ctx, options, id, device.ClientId, device.Resource, OpaqueToken.New(), grantId, now);
     }
 
     // ---- refresh_token grant (D9: rotation + reuse-detection + revocation) ----------------------------
@@ -417,6 +419,20 @@ internal static class OAuthProtocolEndpoints
 
         var id = new GrantedIdentity(rt.Subject, rt.SubjectName, rt.SubjectEmail, rt.Roles, rt.GrantedScopes);
         await IssueTokens(ctx, options, id, rt.ClientId, rt.Resource, rt.FamilyId, rt.GrantId, now);
+    }
+
+    /// <summary>
+    /// SEC-0005 — the grant behind a new refresh family, one per approval, remembering the person's consent when they
+    /// gave it on the consent page. With refresh tokens off no token would name a grant, so none is issued and no
+    /// consent is remembered: answers the empty grant id.
+    /// </summary>
+    private static async Task<string> IssueGrant(AuthServerOptions options, GrantedIdentity id, string clientId,
+        string resource, bool consented, DateTimeOffset now, CancellationToken ct)
+    {
+        if (!options.EnableRefreshTokens) return "";
+        var grant = await OAuthGrants.IssueAsync(id.Subject, clientId, id.Scopes, resource, now,
+            options.RefreshTokenLifetime, remember: consented && options.RememberConsent, ct);
+        return grant.Id;
     }
 
     private sealed record GrantedIdentity(string Subject, string? Name, string? Email, List<string> Roles, List<string> Scopes);

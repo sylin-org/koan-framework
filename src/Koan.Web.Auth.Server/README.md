@@ -102,6 +102,32 @@ await new OAuthClient
 }.Save();
 ```
 
+## List and revoke the agents acting for a person
+
+Each approval — a person allowing a client on the consent page, or a re-connect their remembered consent lets through —
+issues its own SEC-0005 `AgentGrant`, which backs that connection's refresh tokens. The grant says when it was issued
+and to which client, so an application lists a person's live approvals and revokes one alone:
+
+```csharp
+using Koan.Web.Authorization;
+
+var approvals = await AgentGrant.Approvals(personId, take: 50); // live only, newest first
+// each: grant.ClientName ?? grant.ClientId, grant.IssuedAt, grant.ExpiresAt
+await approvals[0].Remove(); // that connection's next refresh fails; the others keep working
+```
+
+`Remove()` is the revoke. Removing a live grant this server issued, by any path, also forgets the person's remembered
+consent for that client, scope set and resource, so the client's next connection shows the consent page again; the
+person's other approvals keep refreshing until they expire or are removed. Two agents approved through the same client
+with the same scopes are two approvals. `ClientName` is the name the client registered, kept as it was at approval;
+the client chose it, so show it as unverified. A client that registered no name leaves it null.
+
+A grant issued before Koan recorded these answers null for `IssuedAt`, `ClientId` and `ClientName`, so `Approvals`
+leaves it out. It still refreshes and revokes, may back several connections, never keeps the person's consent
+remembered, and expires `RefreshTokenLifetime` (30 days by default) after it was issued. With
+`EnableRefreshTokens = false` a connection has no refresh token to back, so no grant is issued and every connection
+asks the person.
+
 ## Production posture
 
 Set `Koan:Web:ApplicationUrl` to the application's public URL, or have the application accept it at runtime

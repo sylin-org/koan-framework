@@ -1,4 +1,6 @@
+using Koan.Data.Core;
 using Koan.Web.Auth.Server.Options;
+using Koan.Web.Authorization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -6,7 +8,8 @@ namespace Koan.Web.Auth.Server.Protocol;
 
 /// <summary>
 /// SEC-0006 — periodically GCs expired OAuth protocol artifacts (consent requests, authorization codes, device
-/// codes, refresh tokens) so the data store does not grow without bound. The short-lived artifacts are deleted on
+/// codes, refresh tokens, remembered consents, and the expired grants this server issued — SEC-0005) so the data store
+/// does not grow without bound. The short-lived artifacts are deleted on
 /// success in the request path; this sweeps the ones that were abandoned (never redeemed, denied, or expired).
 /// Pairs with the IssuerKeyRotationService precedent.
 /// </summary>
@@ -30,7 +33,7 @@ internal sealed class OAuthArtifactCleanupService : BackgroundService
         {
             do
             {
-                try { await SweepAsync(stoppingToken); }
+                try { await Sweep(_time.GetUtcNow(), stoppingToken); }
                 catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
                 {
                     _logger.LogError(ex, "OAuth artifact cleanup failed; will retry on the next tick.");
@@ -41,12 +44,15 @@ internal sealed class OAuthArtifactCleanupService : BackgroundService
         catch (OperationCanceledException) { /* shutting down */ }
     }
 
-    private async Task SweepAsync(CancellationToken ct)
+    /// <summary>One sweep of everything expired at <paramref name="now"/>. A grant is this server's when it names a
+    /// client; removing an expired one revokes nothing, so it forgets no consent.</summary>
+    internal static async Task Sweep(DateTimeOffset now, CancellationToken ct)
     {
-        var now = _time.GetUtcNow();
         foreach (var c in await ConsentRequest.Query(x => x.ExpiresUtc <= now, ct)) await c.Remove(ct);
         foreach (var c in await AuthorizationCode.Query(x => x.ExpiresUtc <= now, ct)) await c.Remove(ct);
         foreach (var d in await DeviceCode.Query(x => x.ExpiresUtc <= now, ct)) await d.Remove(ct);
         foreach (var r in await RefreshToken.Query(x => x.ExpiresUtc <= now, ct)) await r.Remove(ct);
+        foreach (var c in await RememberedConsent.Query(x => x.ExpiresUtc <= now, ct)) await c.Remove(ct);
+        foreach (var g in await AgentGrant.Query(x => x.ClientId != null && x.ExpiresAt <= now, ct)) await g.Remove(ct);
     }
 }

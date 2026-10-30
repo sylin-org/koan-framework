@@ -14,12 +14,14 @@ public sealed class JitGrantService
 {
     public async Task<AgentGrant> GrantAsync(string subject, string capability, string resource, TimeSpan ttl, CancellationToken ct = default)
     {
+        var now = DateTimeOffset.UtcNow;
         var grant = new AgentGrant
         {
             Subject = subject,
             Capability = capability,
             Resource = resource,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(ttl),
+            IssuedAt = now,
+            ExpiresAt = now.Add(ttl),
         };
         return await grant.Save(ct).ConfigureAwait(false);
     }

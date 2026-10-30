@@ -245,6 +245,7 @@ await new AgentGrant
     Subject = "kitchen-agent",
     Capability = "has:scope:notes:write",   // an [Access] term: is:role / has:scope / has:claim
     Resource = "Note",
+    IssuedAt = DateTimeOffset.UtcNow,       // when it was lent; Koan's own issuers set it for you
     ExpiresAt = DateTimeOffset.UtcNow.AddHours(8),
 }.Save();
 

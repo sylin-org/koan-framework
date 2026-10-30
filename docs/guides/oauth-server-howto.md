@@ -137,7 +137,7 @@ the server matches exactly.
 Only a client allowed the grant may start it: pre-register it with `GrantTypes = [OAuthGrantTypes.DeviceCode]`. A client that names no grant is allowed the code grant only, and a dynamically registered client never gets the device grant; either is answered `unauthorized_client` ([SEC-0024](../decisions/SEC-0024-the-device-grant-is-a-clients-explicit-permission.md)). The permission is read again when the code is looked up, approved and exchanged, so a request made before an operator removed the grant is answered `unauthorized_client` there too, and `ConsentPage.Find` answers it `ClientNotAllowed` without the request.
 
 ### Refresh (stay connected)
-`POST /oauth/token` (grant `refresh_token`) rotates the token. Refresh tokens are **on by default** so a client is not forced to re-pop the browser every 15 minutes — made safe by rotation with reuse-detection (replaying a rotated token revokes the whole family) and backed by a **revocable grant** (see Security, below). **Consent is remembered** — a re-connect with a live grant skips the consent page.
+`POST /oauth/token` (grant `refresh_token`) rotates the token. Refresh tokens are **on by default** so a client is not forced to re-pop the browser every 15 minutes — made safe by rotation with reuse-detection (replaying a rotated token revokes the whole family) and backed by a **revocable grant** (see Security, below). **Consent is remembered** — once the person consents, a re-connect with the same scopes skips the consent page until that consent's grant expires or any of the person's approvals for that client and scope set is revoked.
 
 ## The `/mcp` resource-server edge
 
@@ -201,8 +201,8 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 | `ConsentPath` / `DonePath` | `/me/connect` · `/me/connect/done` | Your two app pages, application-relative: under a base URL with a path Koan adds the path once, in its redirects and absolute URLs alike ([SEC-0027](../decisions/SEC-0027-the-consent-flow-lives-under-the-base-path.md)). |
 | `AccessTokenLifetime` | `15 min` | Issued access-token lifetime. |
 | `RefreshTokenLifetime` | `30 days` | Refresh-token / backing-grant lifetime. |
-| `EnableRefreshTokens` | `true` | Rotating refresh tokens. |
-| `RememberConsent` | `true` | Skip the consent page on a re-connect with a live grant. |
+| `EnableRefreshTokens` | `true` | Rotating refresh tokens, each family backed by its own grant. Off, no grant is issued and no consent remembered. |
+| `RememberConsent` | `true` | Skip the consent page on a re-connect the person consented to, until that approval's grant expires or any of their approvals for it is revoked. Needs refresh tokens. |
 | `AllowDynamicRegistration` | `true` | Open RFC 7591 DCR (zero-trust). |
 | `DevTokenEnabled` | `true` | The `/oauth/dev-token` convenience (still hard dev-gated). |
 | `KeyRotationInterval` / `KeyOverlap` | `30 days` · `2 h` | ES256 signing-key rotation cadence + JWKS overlap. |
@@ -213,7 +213,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 - **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key unless the application names a key ring folder, `Koan:Web:KeyRingDirectory`, in which case the keys persist there too and a local install's tokens outlive a restart.)
 - **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are consented as-requested; the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate and custom `[McpTool(RequiredScopes)]` read (not the inert `Koan.permission`).
 - **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` at the edge.
-- **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed.
+- **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed. Each approval is its own grant, stating when it was issued (`IssuedAt`) and to which client (`ClientId`, and the `ClientName` the client registered, unverified), so a page lists a person's live approvals newest first with `AgentGrant.Approvals(personId, take)` and revokes one with `Remove()`: that connection stops refreshing, the client's next connection asks the person again, and the person's other approvals keep working. Grants issued before Koan recorded these answer null for them, are not listed, and never keep consent remembered.
 
 ## See also
 

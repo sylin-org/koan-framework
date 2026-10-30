@@ -95,11 +95,17 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         var jit = _fx.Services.GetRequiredService<JitGrantService>();
         using (Tenant.Use("studio-jit"))
         {
+            var before = DateTimeOffset.UtcNow;
             var grant = await jit.GrantSupportAccessAsync("support-agent", "Orders", TimeSpan.FromMinutes(-1)); // already past
             grant.IsActive(DateTimeOffset.UtcNow).Should().BeFalse("a past TTL is immediately inactive (no standing access)");
+            grant.IssuedAt.Should().NotBeNull("a JIT grant records when it was issued");
+            grant.IssuedAt!.Value.Should().BeOnOrAfter(before);
+            grant.ClientId.Should().BeNull("a JIT grant is issued to no OAuth client");
 
             await jit.ExtendAsync(grant.Id, TimeSpan.FromHours(1));
-            (await AgentGrant.Get(grant.Id))!.IsActive(DateTimeOffset.UtcNow).Should().BeTrue("one-click extend reactivates it");
+            var extended = await AgentGrant.Get(grant.Id);
+            extended!.IsActive(DateTimeOffset.UtcNow).Should().BeTrue("one-click extend reactivates it");
+            extended.IssuedAt.Should().BeCloseTo(grant.IssuedAt.Value, TimeSpan.FromMilliseconds(1), "extending keeps when it was issued");
 
             (await jit.RevokeAsync(grant.Id)).Should().BeTrue();
             (await AgentGrant.Get(grant.Id)).Should().BeNull("revoke removes the grant (fresh-per-request enforcement)");

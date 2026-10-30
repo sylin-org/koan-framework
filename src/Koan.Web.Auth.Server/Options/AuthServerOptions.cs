@@ -85,7 +85,7 @@ public sealed class AuthServerOptions
     /// <summary>
     /// SEC-0006 D9 — issue rotating refresh tokens (default on) so a client stays connected past the short
     /// access-token lifetime without re-popping the browser. Every refresh rotates with reuse-detection and is
-    /// backed by a revocable grant.
+    /// backed by a revocable grant, one per approval. Off, the server issues no grant and remembers no consent.
     /// </summary>
     public bool EnableRefreshTokens { get; set; } = true;
 
@@ -93,8 +93,9 @@ public sealed class AuthServerOptions
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
 
     /// <summary>
-    /// SEC-0006 D9 — remember consent (per user + client + scope set). A re-connect with an unchanged scope set
-    /// and a live grant skips the consent page; new scopes or a revoked grant re-prompt.
+    /// SEC-0006 D9 — remember consent (per user + client + scope set + resource) for as long as the grant the person's
+    /// approval issued. A re-connect with an unchanged scope set skips the consent page; new scopes, or revoking any of
+    /// the person's live approvals for it, re-prompt (SEC-0005). Needs refresh tokens, which back the grant.
     /// </summary>
     public bool RememberConsent { get; set; } = true;
 
