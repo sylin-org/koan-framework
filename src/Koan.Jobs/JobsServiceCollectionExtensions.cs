@@ -23,6 +23,7 @@ public static class JobsServiceCollectionExtensions
         if (configure is not null) services.Configure(configure);
 
         services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<JobCompletions>();
         // Capability election. No durable adapter → in-memory only (Local tier). Durable adapter present →
         // RoutingJobLedger so [JobPersistence(InMemory)] types stay volatile while Auto/DataStore types persist.
         services.TryAddSingleton<IJobLedger>(CreateLedger);
@@ -50,6 +51,7 @@ public static class JobsServiceCollectionExtensions
     {
         var options = services.GetRequiredService<IOptions<JobsOptions>>();
         var registry = services.GetRequiredService<JobTypeRegistry>();
+        var completions = services.GetRequiredService<JobCompletions>();
         if (!HasDurableDataAdapter(services))
         {
             var required = registry.All
@@ -65,12 +67,13 @@ public static class JobsServiceCollectionExtensions
                     "another durable Koan Data provider; otherwise use Auto or InMemory explicitly.");
             }
 
-            return new InMemoryJobLedger(options);
+            return new InMemoryJobLedger(options, completions);
         }
 
         return new RoutingJobLedger(
-            new InMemoryJobLedger(options),
-            new DataJobLedger(options, registry),
+            new InMemoryJobLedger(options, completions),
+            new DataJobLedger(options, registry, completions: completions,
+                logger: services.GetService<Microsoft.Extensions.Logging.ILogger<DataJobLedger>>()),
             registry);
     }
 

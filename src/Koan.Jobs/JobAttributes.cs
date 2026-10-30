@@ -49,8 +49,9 @@ public sealed class JobChainAttribute : Attribute
     public string[] Stages { get; }
 }
 
-/// <summary>Declares the idempotency/coalesce key — <c>(type, keys…, action)</c>. Re-delivery is deduped,
-/// concurrent duplicates coalesce. Keys are work-item property names (JOBS-0005 §5).</summary>
+/// <summary>Declares the idempotency/coalesce key — <c>(type, action, work item id, keys…)</c>, folded with the work
+/// item's data address. Re-delivery is deduped and concurrent duplicates coalesce, always within one work item: another
+/// item with the same keys gets its own job (JOBS-0010). Keys are work-item property names (JOBS-0005 §5).</summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
 public sealed class JobIdempotentAttribute : Attribute
 {

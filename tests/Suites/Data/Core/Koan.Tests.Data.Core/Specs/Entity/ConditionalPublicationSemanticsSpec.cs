@@ -85,14 +85,51 @@ public sealed class ConditionalPublicationSemanticsSpec
         native.Stored!.Revision.Should().Be("old");
     }
 
-    [Theory]
-    [InlineData("binary")]
-    [InlineData("date")]
-    public void Document_CAS_evaluator_refuses_unqualified_scalar_meaning(string kind)
+    [Fact]
+    public void Document_CAS_evaluator_compares_binary_by_its_bytes_and_DateTime_by_its_ticks_and_kind()
     {
-        var guard = kind == "binary" ? new Not(Filter.Eq("Bytes", new byte[] { 1, 2 })) : Filter.Eq("When", DateTime.UtcNow);
-        FluentActions.Invoking(() => InMemoryFilterEvaluator.CompileConditional<ConditionalAtoms>(guard))
-            .Should().Throw<NotSupportedException>();
+        var when = new DateTime(2026, 10, 30, 12, 0, 0, DateTimeKind.Utc);
+        var row = new ConditionalAtoms { Bytes = [1, 2], When = when };
+
+        Matches(Filter.Eq("Bytes", new byte[] { 1, 2 })).Should().BeTrue("equal bytes in another array are the same value");
+        Matches(Filter.Eq("Bytes", new byte[] { 1, 3 })).Should().BeFalse();
+        Matches(new Not(Filter.Eq("Bytes", new byte[] { 1, 2 }))).Should().BeFalse();
+        Matches(Filter.In("Bytes", new object?[] { new byte[] { 9 }, new byte[] { 1, 2 } })).Should().BeTrue();
+        Matches(Filter.Eq("When", when)).Should().BeTrue();
+        Matches(Filter.Eq("When", when.AddTicks(1))).Should().BeFalse();
+        Matches(Filter.Eq("When", DateTime.SpecifyKind(when, DateTimeKind.Unspecified)))
+            .Should().BeFalse("a value of another kind is not the instant the guard observed");
+        Matches(Filter.Eq("When", DateTime.SpecifyKind(when, DateTimeKind.Local))).Should().BeFalse();
+
+        bool Matches(Filter guard) => InMemoryFilterEvaluator.CompileConditional<ConditionalAtoms>(guard)(row);
+    }
+
+    [Fact]
+    public void Document_CAS_evaluator_tells_apart_two_offsets_of_one_instant_and_the_two_local_times_of_an_ambiguous_hour()
+    {
+        // The same instant at another offset is another stored value; so is the second 01:30 of a fall-back night, which
+        // carries the same ticks and kind as the first and differs only in the bit that says which side of the hour it is.
+        var at = new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero);
+        var first = new DateTime(2026, 11, 1, 1, 30, 0, DateTimeKind.Local);
+        var second = AmbiguousTwin(first);
+        second.Ticks.Should().Be(first.Ticks);
+        second.Kind.Should().Be(DateTimeKind.Local);
+        var row = new ConditionalAtoms { At = at.ToOffset(TimeSpan.FromHours(2)), When = second };
+
+        Matches(Filter.Eq("At", at)).Should().BeFalse("the same instant at another offset is another value");
+        Matches(Filter.Eq("At", at.ToOffset(TimeSpan.FromHours(2)))).Should().BeTrue();
+        Matches(Filter.Eq("When", first)).Should().BeFalse("the other side of the ambiguous hour is another instant");
+        Matches(Filter.Eq("When", second)).Should().BeTrue();
+        InMemoryFilterEvaluator.Compile<ConditionalAtoms>(Filter.Eq("At", at))(row)
+            .Should().BeTrue("a query still compares by instant");
+
+        bool Matches(Filter guard) => InMemoryFilterEvaluator.CompileConditional<ConditionalAtoms>(guard)(row);
+
+        static DateTime AmbiguousTwin(DateTime local)
+        {
+            var bits = System.Runtime.CompilerServices.Unsafe.As<DateTime, ulong>(ref local) | 0xC000_0000_0000_0000UL;
+            return System.Runtime.CompilerServices.Unsafe.As<ulong, DateTime>(ref bits);
+        }
     }
 
     [Fact]
@@ -250,6 +287,7 @@ public sealed class ConditionalPublicationSemanticsSpec
     {
         public byte[] Bytes { get; set; } = [];
         public DateTime When { get; set; }
+        public DateTimeOffset At { get; set; }
     }
 
     private sealed class ConditionalScope : IReadFilterContributor

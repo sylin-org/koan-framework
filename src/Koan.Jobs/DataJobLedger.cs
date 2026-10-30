@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Failures;
@@ -5,6 +6,7 @@ using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
 using Koan.Data.Core.Failures;
 using Koan.Data.Core.Sorting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Jobs;
@@ -29,17 +31,33 @@ internal sealed class DataJobLedger : IJobLedger
     private readonly Dictionary<string, double> _virtual = new(StringComparer.Ordinal);
     private readonly Func<string, double> _weight;
     private readonly IReadOnlyList<IDataFailureClassifier> _classifiers;
+    private readonly JobCompletions? _completions;
+    private readonly Microsoft.Extensions.Logging.ILogger? _logger;
 
     /// <summary>Attempts one claim gets when the store reports a transient conflict. Two is enough for a
     /// deadlock — the winner has committed by the time the victim rolls back — and the third is headroom for a
     /// second collision under contention rather than a policy of grinding.</summary>
     private const int ClaimAttempts = 3;
 
+    /// <summary>Reads a gate write makes against concurrent writers of the same key before it lets theirs stand.</summary>
+    private const int GateAttempts = 3;
+
+    /// <summary>Appends a coalescing submission makes against concurrent holders of its key's slot.</summary>
+    private const int CoalesceAttempts = 3;
+
+    /// <summary>Reads an owner's write (a settlement, a requeue, a lease renewal, a progress note) makes against concurrent
+    /// writes to its own running row — a lease renewal or a cancellation request landing between its read and its write.</summary>
+    private const int FenceAttempts = 8;
+
     public DataJobLedger(
         IOptions<JobsOptions> options,
         JobTypeRegistry registry,
-        IEnumerable<IDataFailureClassifier>? classifiers = null)
+        IEnumerable<IDataFailureClassifier>? classifiers = null,
+        JobCompletions? completions = null,
+        Microsoft.Extensions.Logging.ILogger<DataJobLedger>? logger = null)
     {
+        _completions = completions;
+        _logger = logger;
         _options = options.Value;
         _registry = registry;
         _weight = lane => _options.LaneWeights.GetValueOrDefault(lane, 1.0);
@@ -49,6 +67,7 @@ internal sealed class DataJobLedger : IJobLedger
     public async Task Append(JobRecord record, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
+        record.Revision = Guid.NewGuid();
         await JobRecord.Upsert(record, ct);
         await WakeStamp.TryBump(ct);   // JOBS-0009: same ambient transaction — rollback never moves the stamp
     }
@@ -56,6 +75,7 @@ internal sealed class DataJobLedger : IJobLedger
     public async Task AppendMany(IReadOnlyCollection<JobRecord> records, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
+        foreach (var record in records) record.Revision = Guid.NewGuid();
         await JobRecord.UpsertMany(records, ct);
         await WakeStamp.TryBump(ct);   // one bump per batch, not per row
     }
@@ -66,14 +86,318 @@ internal sealed class DataJobLedger : IJobLedger
         return await JobRecord.Get(jobId, ct);
     }
 
-    public async Task<JobRecord?> FindActiveByCoalesceKey(string workType, string coalesceKey, CancellationToken ct)
+    public async Task<JobRecord?> FindCoalescing(string workType, string coalesceKey, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        // Queued-only: a Running job does not block a new submit — the submit queues a trailing execution
-        // (at most 1 running + 1 queued per coalesce key, the debounce / trailing-edge pattern).
-        var hits = await JobRecord.Query(r => r.WorkType == workType && r.CoalesceKey == coalesceKey && r.Status == JobStatus.Queued, ct);
-        return hits.FirstOrDefault();
+        var group = JobRecord.SlotFor(coalesceKey);
+        // A claimed job gave its key back, so a submission arriving while it runs queues a trailing execution (JOBS-0006).
+        // Every queued job of the key counts, the slot holder or not; inside a transaction so do the submissions this
+        // transaction already made, which are not visible until it commits.
+        return (await QueuedOf(group, 1, ct)).FirstOrDefault() ?? PendingIn(EntityContext.CurrentTransaction, group);
     }
+
+    public async Task<JobRecord?> AppendCoalescing(JobRecord record, CancellationToken ct)
+    {
+        if (record.CoalesceKey is not { } key)
+        {
+            await Append(record, ct);
+            return null;
+        }
+
+        using var storageScope = JobsStorageScope.Enter();
+        var group = JobRecord.SlotFor(key);
+        if (EntityContext.CurrentTransaction is { IsCompleted: false } transaction)
+        {
+            // A deferred write cannot be conditional (DATA-0131), so the record takes no slot and the commit can never fail
+            // on one: it coalesces onto a committed job of its key or onto one this transaction already submitted. Two
+            // transactions that submit one key at once both commit a job; the first of them claimed serves the other.
+            if (((await QueuedOf(group, 1, ct)).FirstOrDefault() ?? PendingIn(transaction, group)) is { } queued) return queued;
+            await Append(record, ct);
+            Pending.GetOrCreateValue(transaction)[group] = record;
+            return null;
+        }
+
+        // The check and the append are one conditional insert: the record holds its key's unique slot, so a second
+        // unclaimed submission of the key cannot be appended beside it. A refused append whose holder has meanwhile been
+        // claimed or cancelled finds none and appends again; the outcome is always an append or a coalesce.
+        for (var attempt = 1; attempt <= CoalesceAttempts; attempt++)
+        {
+            if ((await QueuedOf(group, 1, ct)).FirstOrDefault() is { } queued) return queued;
+            record.CoalesceSlot = group;
+            try
+            {
+                await Append(record, ct);
+                return null;
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                record.ReleaseCoalesceSlot();
+            }
+        }
+
+        // The slot kept changing hands, or the store refuses the write for another reason, which this append surfaces:
+        // append without the slot; the next claim of the key serves whatever queued beside it.
+        if ((await QueuedOf(group, 1, ct)).FirstOrDefault() is { } holder) return holder;
+        await Append(record, ct);
+        return null;
+    }
+
+    /// <summary>One end-of-claim owner write (JOBS-0010); asked to cancel while it ran, the job settles Cancelled instead.
+    /// Nothing else is written: the next claim of the key serves whatever queued beside it.</summary>
+    public async Task<JobRecord?> TryRequeue(JobRecord record, string claimToken, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        var written = await EndClaim(record, claimToken, ct);
+        if (written is not null) Heard(written);
+        return written;
+    }
+
+    /// <summary>The write that ends a claim (JOBS-0010): read the row; when it no longer carries
+    /// <paramref name="claimToken"/>, the claim is lost — unless the row is one of this call's own writes whose answer was
+    /// lost, recognised by its revision or by the transition that carries it. Otherwise merge this execution's own
+    /// fields onto the row just read (<see cref="JobRecord.EndOfClaim"/>), write it as a compare on that read's revision,
+    /// and read again on a miss, a bounded number of times. Null when the claim was lost or kept losing.</summary>
+    private async Task<JobRecord?> EndClaim(JobRecord decided, string claimToken, CancellationToken ct)
+    {
+        var attempts = new List<(Guid Revision, JobRecord Row)>();
+        for (var attempt = 1; ; attempt++)
+        {
+            var latest = await JobRecord.Get(decided.Id, ct);
+            if (latest is null) return null;
+            if (!string.Equals(latest.ClaimToken, claimToken, StringComparison.Ordinal))
+                return Landed(latest, attempts);
+            if (attempt > FenceAttempts) return null;
+
+            var row = JobRecord.EndOfClaim(latest, decided, claimToken, _options.ArchiveAfter);
+            var revision = Guid.NewGuid();
+            if (row.Transitions.Count > 0) row.Transitions[^1].Revision = revision;
+            attempts.Add((revision, row));
+            try
+            {
+                if (await ReplaceAtRevision(row, latest.Revision, ct, revision))
+                {
+                    decided.Revision = revision;
+                    return row;
+                }
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                // The write may have landed with its answer lost: the next read tells.
+            }
+        }
+    }
+
+    /// <summary>The write of this call that <paramref name="latest"/> shows landed, or null.</summary>
+    private static JobRecord? Landed(JobRecord latest, List<(Guid Revision, JobRecord Row)> attempts)
+    {
+        foreach (var (revision, row) in attempts)
+            if (latest.Revision == revision || latest.Transitions.Any(t => t.Revision == revision))
+            {
+                row.Revision = revision;
+                return row;
+            }
+        return null;
+    }
+
+    /// <summary>Write <paramref name="record"/> over the stored row only while that row still carries <paramref name="read"/>,
+    /// the revision its writer read (JOBS-0010); the record takes a fresh revision. Where the store replaces conditionally
+    /// and no transaction defers the write, that is one conditional replace, so a stale copy never lands. Elsewhere the
+    /// stored revision is read and compared just before an ordinary save: the at-least-once floor, where a write landing
+    /// between that read and the save is overwritten.</summary>
+    private static async Task<bool> ReplaceAtRevision(JobRecord record, Guid read, CancellationToken ct, Guid? revision = null)
+    {
+        record.Revision = revision ?? Guid.NewGuid();
+        try
+        {
+            bool landed;
+            if (!EntityContext.InTransaction && ConditionalWriter() is { } cas)
+            {
+                landed = await cas.ConditionalReplaceAsync(record,
+                    Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Revision == read), ct);
+            }
+            else
+            {
+                var stored = await JobRecord.Get(record.Id, ct);
+                landed = stored is not null && stored.Revision == read;
+                if (landed) await JobRecord.Upsert(record, ct);
+            }
+            if (!landed) record.Revision = read;
+            return landed;
+        }
+        catch
+        {
+            record.Revision = read;
+            throw;
+        }
+    }
+
+    private static IConditionalWriteRepository<JobRecord, string>? ConditionalWriter()
+        => Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
+            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
+            : null;
+
+    /// <summary>The claimed job holds its key's run slot, so no other job of the key can be claimed — or deferred — while
+    /// it decides (JOBS-0010). A queued job of the key deferred past now means the key's work waits for that deferral: the
+    /// claim carries the later visible time back to the queue instead of running. That happens only when the deferral
+    /// landed between the claim's read and its write; a claim that reads one waits without writing. Otherwise this run
+    /// serves every other queued job of the key, which settles as coalesced into it. False when the claim went back.</summary>
+    private async Task<bool> ServeKey(JobRecord claimed, Guid group, DateTimeOffset now, CancellationToken ct)
+    {
+        var others = (await QueuedOf(group, Infrastructure.Constants.Retention.PageSize, ct))
+            .Where(other => other.Id != claimed.Id).ToList();
+        if (others.Where(other => other.VisibleAt > now).Select(other => (DateTimeOffset?)other.VisibleAt).Max() is { } deferredUntil)
+        {
+            var decided = claimed.Clone();
+            decided.Attempt = Math.Max(0, decided.Attempt - 1);
+            decided.Transitions.Add(new JobTransition
+            {
+                At = now, From = JobStatus.Running, To = JobStatus.Queued,
+                Note = $"waits for its key's deferral until {deferredUntil:O}",
+            });
+            decided.Status = JobStatus.Queued;
+            decided.Owner = null;
+            decided.LeaseUntil = null;
+            decided.VisibleAt = deferredUntil;
+            var written = await EndClaim(decided, claimed.ClaimToken!, ct);
+            if (written is not null)
+            {
+                Heard(written);   // asked to cancel meanwhile, it settled Cancelled
+                return false;
+            }
+            // Neither landed nor lost: the store kept refusing the write-back. The claim never runs ahead of the deferral;
+            // it is left to lapse with its lease, and the reaper requeues it.
+            _logger?.LogWarning(
+                "Koan.Jobs could not return job {JobId} to the queue to wait for its key's deferral; the claim is left to lapse with its lease ({LeaseUntil:O}), and the reaper requeues it.",
+                claimed.Id, claimed.LeaseUntil);
+            return false;
+        }
+
+        foreach (var other in others)
+        {
+            try
+            {
+                await Absorb(other, claimed.Id, now, ct);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested)
+            {
+                // It stays queued, and the key's run slot makes it run after this job, not beside it.
+            }
+        }
+        return true;
+    }
+
+    /// <summary>The queued, uncancelled jobs of a coalescing group that no predecessor holds: one indexed read, at most
+    /// <paramref name="limit"/>.</summary>
+    private static Task<IReadOnlyList<JobRecord>> QueuedOf(Guid group, int limit, CancellationToken ct)
+        => JobRecord.Query(
+            r => r.CoalesceGroup == group && r.Status == JobStatus.Queued && r.CancelRequestedAt == null && r.HeldBy == null,
+            QueryDefinition.All.WithPagination(1, limit), ct);
+
+    /// <summary>True when a job of the key other than <paramref name="jobId"/> runs, holding the key's run slot.</summary>
+    private static async Task<bool> KeyRuns(Guid group, string jobId, CancellationToken ct)
+        => (await JobRecord.Query(r => r.CoalesceGroup == group && r.Status == JobStatus.Running,
+                QueryDefinition.All.WithPagination(1, 2), ct))
+            .Any(row => !string.Equals(row.Id, jobId, StringComparison.Ordinal));
+
+    // --- chain successors (JOBS-0010) ---
+
+    public async Task<bool> ReleaseHeld(string successorId, string holderToken, bool cancel, DateTimeOffset now, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        var attempted = new List<(Guid Revision, JobRecord Row)>();
+        for (var attempt = 1; attempt <= FenceAttempts; attempt++)
+        {
+            var held = await JobRecord.Get(successorId, ct);
+            // A release whose answer was lost is recognised by the revision it wrote, as an owner's write is.
+            if (held is not null && attempted.FirstOrDefault(a => a.Revision == held.Revision) is { Row: not null } own)
+            {
+                if (cancel) Heard(own.Row);
+                else await WakeStamp.TryBump(ct);
+                return true;
+            }
+            if (held is not { Status: JobStatus.Queued } || !string.Equals(held.HeldBy, holderToken, StringComparison.Ordinal))
+                return false;
+            var row = held.Clone();
+            row.HeldBy = null;
+            if (cancel)
+            {
+                row.Transitions.Add(new JobTransition { At = now, From = JobStatus.Queued, To = JobStatus.Cancelled, Note = "cancelled with its predecessor" });
+                row.Status = JobStatus.Cancelled;
+                row.LastSettledAt = now;
+                row.ExpireAt = _options.ArchiveAfter > TimeSpan.Zero ? now + _options.ArchiveAfter : null;
+            }
+            var revision = Guid.NewGuid();
+            attempted.Add((revision, row));
+            bool landed;
+            try
+            {
+                landed = await ReplaceAtRevision(row, held.Revision, ct, revision);
+            }
+            catch (Exception) when (!ct.IsCancellationRequested && attempt < FenceAttempts)
+            {
+                continue;   // the next read tells whether it landed
+            }
+            if (!landed) continue;
+            if (cancel) Heard(row);
+            else await WakeStamp.TryBump(ct);   // released work moves the stamp, as an append does
+            return true;
+        }
+        return false;
+    }
+
+    public async Task<bool> DeleteHeld(string successorId, string holderToken, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        var held = await JobRecord.Get(successorId, ct);
+        if (held is null || !string.Equals(held.HeldBy, holderToken, StringComparison.Ordinal)) return false;
+        // The id derives from the holder's claim token, so no other run's successor can carry it: a read before an
+        // ordinary removal is safe where the store cannot delete conditionally.
+        var guarded = Data<JobRecord, string>.As<IConditionalDeleteRepository<JobRecord, string>>();
+        if (guarded is not null && !EntityContext.InTransaction)
+        {
+            var revision = held.Revision;
+            return await guarded.ConditionalDeleteAsync(successorId,
+                Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Revision == revision), ct);
+        }
+        return await JobRecord.Remove(successorId, ct);
+    }
+
+    public async Task<IReadOnlyList<JobRecord>> Held(int page, int limit, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        if (limit <= 0) return [];
+        var oldest = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.FirstSubmittedAt));
+        return await JobRecord.Query(r => r.Status == JobStatus.Queued && r.HeldBy != null,
+            QueryDefinition.All.WithSort(oldest).WithPagination(Math.Max(1, page), limit), ct);
+    }
+
+    /// <summary>Settle a queued job as coalesced into <paramref name="intoId"/>, which serves its submission — only while
+    /// it is as it was read. False when it changed first.</summary>
+    private async Task<bool> Absorb(JobRecord other, string intoId, DateTimeOffset now, CancellationToken ct)
+    {
+        var read = other.Revision;
+        other.ReleaseCoalesceSlot();
+        other.ServedBy = intoId;
+        other.LastError = $"Coalesced into job {intoId}, which serves this submission.";
+        other.LastSettledAt = now;
+        other.ExpireAt = _options.ArchiveAfter > TimeSpan.Zero ? now + _options.ArchiveAfter : null;
+        other.Transitions.Add(new JobTransition { At = now, From = other.Status, To = JobStatus.Cancelled, Note = $"coalesced into {intoId}" });
+        other.Status = JobStatus.Cancelled;
+
+        if (!await ReplaceAtRevision(other, read, ct)) return false;
+        Heard(other);   // the submission's waiters move on to the job that serves it
+        return true;
+    }
+
+    /// <summary>The submissions each open transaction has appended, by coalescing group — invisible to reads until it
+    /// commits, so a second submission of a key in the same transaction coalesces onto the first.</summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Koan.Data.Core.Transactions.ITransactionCoordinator, System.Collections.Concurrent.ConcurrentDictionary<Guid, JobRecord>> Pending = new();
+
+    private static JobRecord? PendingIn(Koan.Data.Core.Transactions.ITransactionCoordinator? transaction, Guid group)
+        => transaction is { IsCompleted: false } && Pending.TryGetValue(transaction, out var pending)
+           && pending.TryGetValue(group, out var record)
+            ? record
+            : null;
 
     /// <summary>
     /// Claims one job, retrying a claim the store refused for a transient conflict.
@@ -122,10 +446,17 @@ internal sealed class DataJobLedger : IJobLedger
         IReadOnlyCollection<string> saturatedLanes, CancellationToken ct,
         IReadOnlyDictionary<string, PoolDispatchContext>? pools = null)
     {
-        // One Running snapshot serves both the §17.2 exclusivity probe and the pool member-slot tally (JOBS-0007).
-        var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
-        var busy = running.Select(JobDataRoute.Identity).ToHashSet();
-        var memberSlots = pools is { Count: > 0 } ? BuildMemberSlots(pools, running) : null;
+        // JOBS-0010: the §17.2 exclusivity probe reads only the Running rows of the work items it is about to judge, and
+        // the JOBS-0007 member tally only the Running rows that hold a pool member — reads bounded by the candidate
+        // window and by pool capacity, never the whole Running set.
+        var busy = new RunningProbe(now);
+        Dictionary<string, int>? memberSlots = null;
+        if (pools is { Count: > 0 })
+        {
+            var members = pools.Values.SelectMany(p => p.Members).Distinct(StringComparer.Ordinal).ToList();
+            memberSlots = BuildMemberSlots(pools,
+                await JobRecord.Query(r => r.Status == JobStatus.Running && members.Contains(r.GateKey!), ct));
+        }
         var claimablePools = memberSlots is null ? null : ClaimablePools(pools!, memberSlots);
         var gatedKeys = (await ActiveGates(now, ct)).Select(g => g.GateKey).ToHashSet(StringComparer.Ordinal);
 
@@ -144,10 +475,11 @@ internal sealed class DataJobLedger : IJobLedger
         // PMC-056 in the pushed-down filter: a fresh reservation is visible only to its named hand; unreserved
         // or lapsed rows stay open to everyone. Kept textual so it translates through every provider's LINQ.
         var window = await JobRecord.Query(
-            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && r.HeldBy == null
                  && (r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now)),
             QueryDefinition.All.WithSort(sort).WithPagination(1, batchSize), ct);
 
+        await busy.Cover(window, ct);
         var heads = new Dictionary<string, JobRecord>(StringComparer.Ordinal);
         var windowLanes = new HashSet<string>(StringComparer.Ordinal);
         foreach (var r in window)
@@ -186,11 +518,10 @@ internal sealed class DataJobLedger : IJobLedger
 
         if (heads.Count == 0) return null;
 
-        // §20.3 capability-graded claim, tried in lane-fair order (WFQ over the per-node virtual time): a CAS-loss on
-        // the fairest lane's head falls through to the next-fairest lane rather than wasting the poll.
-        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
-            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
-            : null;
+        // §20.3, JOBS-0010: the claim is one write, a compare on the revision the candidate was read at, so a row that
+        // changed since — claimed, reserved, cancelled, absorbed — never lands; and it takes the candidate's run slot, so a
+        // second job of its key cannot be claimed while one runs. Tried in lane-fair order (WFQ over the per-node virtual
+        // time): a loss on the fairest lane's head falls through to the next-fairest lane rather than wasting the poll.
         foreach (var lane in LaneFairSelector.Order(heads.Keys, _virtual))
         {
             var candidate = heads[lane];
@@ -206,33 +537,43 @@ internal sealed class DataJobLedger : IJobLedger
                 candidate.GateKey = elected;
             }
 
-            JobRecord? claimed;
-            if (cas is null)
+            // Where the store cannot replace conditionally, the compare is a read just before an ordinary save: the
+            // documented at-least-once floor, which still honors a reservation stamped after the candidate was read.
+            var read = candidate.Revision;
+            Mark(candidate, owner, now, leaseUntil);
+            bool landed;
+            try
             {
-                // Optimistic floor (PMC-056): re-read immediately before the write and honor a reservation another
-                // coordinator stamped after our snapshot. The floor stays at-least-once for claim races — that window
-                // is the documented tier — but it must not knowingly violate an assignment.
-                var storedNow = await JobRecord.Get(candidate.Id!, ct);
-                if (storedNow is null || storedNow.Status != JobStatus.Queued
-                    || !(storedNow.ReservedFor == null || storedNow.ReservedFor == owner
-                         || (storedNow.ReservedUntil != null && storedNow.ReservedUntil < now)))
-                {
-                    continue;   // moved on / freshly reserved elsewhere → next-fairest lane
-                }
-                claimed = await ClaimOptimistic(candidate, owner, now, leaseUntil, ct);   // GateKey already stamped above
+                landed = await ReplaceAtRevision(candidate, read, ct);
             }
-            else
+            catch (Exception failure) when (!ct.IsCancellationRequested && candidate.CoalesceGroup is not null)
             {
-                Mark(candidate, owner, now, leaseUntil);
-                claimed = await cas.ConditionalReplaceAsync(
-                    candidate,
-                    Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Status == JobStatus.Queued && r.Owner == null
-                         && (r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now))),
-                    ct)
-                    ? candidate : null;
+                // Only the run slot's refusal is a lost claim: another job of the item took the slot first. A claim that
+                // landed with its answer lost is recognised by its token. Any other failure surfaces exactly as a plain
+                // claim's does.
+                var stored = await JobRecord.Get(candidate.Id, ct);
+                if (stored is not null && string.Equals(stored.ClaimToken, candidate.ClaimToken, StringComparison.Ordinal))
+                {
+                    landed = true;
+                    candidate.Revision = stored.Revision;
+                }
+                else if (failure is Koan.Data.Abstractions.Failures.UniqueValueConflictException
+                         || await KeyRuns(candidate.CoalesceGroup.Value, candidate.Id, ct))
+                {
+                    landed = false;
+                }
+                else
+                {
+                    throw;
+                }
             }
 
-            if (claimed is not null) { _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane)); return claimed; }
+            if (landed)
+            {
+                _virtual[lane] = LaneFairSelector.Charged(_virtual.GetValueOrDefault(lane), _weight(lane));
+                if (candidate.CoalesceGroup is not { } group || await ServeKey(candidate, group, now, ct)) return candidate;
+                return null;   // the key waits for a deferral that landed meanwhile: the claim went back to the queue
+            }
 
             // CAS loss on a pool job means our slot snapshot is stale — bail so the next drain iteration
             // re-elects with fresh counts; a non-pool loss just falls through to the next-fairest lane.
@@ -241,94 +582,67 @@ internal sealed class DataJobLedger : IJobLedger
         return null;
     }
 
-    public async Task Update(JobRecord record, CancellationToken ct)
+    public async Task<bool> Update(JobRecord record, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        await JobRecord.Upsert(record, ct);
-    }
-
-    /// <summary>Capability-graded like the claim: guarded CAS where <see cref="DataCaps.Write.ConditionalReplace"/>
-    /// exists, optimistic write-then-verify otherwise — a false return means another claimant owns the row.</summary>
-    public async Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct)
-    {
-        using var storageScope = JobsStorageScope.Enter();
-        var current = await JobRecord.Get(jobId, ct);
-        if (current is not { Status: JobStatus.Running } || !string.Equals(current.Owner, owner, StringComparison.Ordinal))
-            return false;
-
-        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
-            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
-            : null;
-        if (cas is not null)
-        {
-            current.LeaseUntil = leaseUntil;
-            return await cas.ConditionalReplaceAsync(current, Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Status == JobStatus.Running && r.Owner == owner), ct);
-        }
-
-        current.LeaseUntil = leaseUntil;
-        await JobRecord.Upsert(current, ct);
-        var verified = await JobRecord.Get(jobId, ct);
-        return verified is { Status: JobStatus.Running }
-            && string.Equals(verified.Owner, owner, StringComparison.Ordinal)
-            && verified.LeaseUntil == leaseUntil;
-    }
-
-    /// <summary>PMC-055 fencing at the settle point: the stored row must still be Running and owned by
-    /// <paramref name="expectedOwner"/>, or the settlement bounces — a revived zombie cannot clobber the
-    /// node that reclaimed the row.</summary>
-    public async Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct)
-    {
-        using var storageScope = JobsStorageScope.Enter();
-        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
-            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
-            : null;
-        if (cas is not null)
-        {
-            return await cas.ConditionalReplaceAsync(
-                record,
-                Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Status == JobStatus.Running && r.Owner == expectedOwner),
-                ct);
-        }
-
-        // Optimistic floor: verify ownership immediately before the write (the documented
-        // at-least-once tier — a race here is the same window the claim fallback already carries).
-        var stored = await JobRecord.Get(record.Id, ct);
-        if (stored is not { Status: JobStatus.Running } || !string.Equals(stored.Owner, expectedOwner, StringComparison.Ordinal))
-            return false;
-
-        await JobRecord.Upsert(record, ct);
+        if (!await ReplaceAtRevision(record, record.Revision, ct)) return false;
+        Heard(record);
         return true;
+    }
+
+    /// <summary>Tell the handles waiting in this process that <paramref name="record"/> settled, once its write has landed;
+    /// a write deferred to a transaction's commit is read from the ledger instead (JOBS-0010).</summary>
+    private void Heard(JobRecord record)
+    {
+        if (record.IsTerminal && !EntityContext.InTransaction) _completions?.Settled(record);
+    }
+
+    /// <summary>The lease merged onto the row as stored, while it carries <paramref name="claimToken"/>: a field another
+    /// writer set — a cancellation request — stands, and the owner reads it in the row returned.</summary>
+    public async Task<JobRecord?> RenewLease(string jobId, string claimToken, DateTimeOffset leaseUntil, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        JobRecord? latest = null;
+        for (var attempt = 1; attempt <= FenceAttempts; attempt++)
+        {
+            latest = await JobRecord.Get(jobId, ct);
+            if (latest is null || !string.Equals(latest.ClaimToken, claimToken, StringComparison.Ordinal)) return null;
+            var row = latest.Clone();
+            row.LeaseUntil = leaseUntil;
+            try
+            {
+                if (await ReplaceAtRevision(row, latest.Revision, ct)) return row;
+            }
+            catch (Exception) when (!ct.IsCancellationRequested && attempt < FenceAttempts)
+            {
+                // A renewal whose answer was lost still carries the token: the next read writes again.
+            }
+        }
+        return latest;
+    }
+
+    /// <summary>One end-of-claim owner write that settles the job (PMC-055, JOBS-0010): a zombie execution, on another node
+    /// or this one, carries a token the row no longer holds and writes nothing.</summary>
+    public async Task<JobRecord?> TrySettle(JobRecord record, string claimToken, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        var written = await EndClaim(record, claimToken, ct);
+        if (written is not null) Heard(written);
+        return written;
     }
 
     // --- reservation dispatch (PMC-056) ---
 
-    /// <summary>Capability-graded like <see cref="TrySettle"/>: guarded CAS where the provider offers it,
-    /// verify-then-write otherwise. Applies only while the row is Queued and unreserved.</summary>
+    /// <summary>A compare on the revision of the row read just before: applies only while that row is Queued and
+    /// unreserved, as it was read.</summary>
     public async Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        var cas = Data<JobRecord, string>.Capabilities.Has(DataCaps.Write.ConditionalReplace)
-            ? Data<JobRecord, string>.As<IConditionalWriteRepository<JobRecord, string>>()
-            : null;
-        if (cas is not null)
-        {
-            var candidate = await JobRecord.Get(jobId, ct);
-            if (candidate is not { Status: JobStatus.Queued } || candidate.ReservedFor != null) return false;
-            candidate.ReservedFor = hand;
-            candidate.ReservedUntil = reservedUntil;
-            return await cas.ConditionalReplaceAsync(
-                candidate,
-                Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobRecord>(r => r.Status == JobStatus.Queued && r.ReservedFor == null),
-                ct);
-        }
-
-        // Optimistic floor: verify unreserved immediately before the write.
-        var stored = await JobRecord.Get(jobId, ct);
-        if (stored is not { Status: JobStatus.Queued } || stored.ReservedFor != null) return false;
-        stored.ReservedFor = hand;
-        stored.ReservedUntil = reservedUntil;
-        await JobRecord.Upsert(stored, ct);
-        return true;
+        var candidate = await JobRecord.Get(jobId, ct);
+        if (candidate is not { Status: JobStatus.Queued } || candidate.ReservedFor != null || candidate.HeldBy != null) return false;
+        candidate.ReservedFor = hand;
+        candidate.ReservedUntil = reservedUntil;
+        return await ReplaceAtRevision(candidate, candidate.Revision, ct);
     }
 
     public async Task<IReadOnlyList<JobRecord>> ReservationCandidates(DateTimeOffset now, int limit, CancellationToken ct)
@@ -338,7 +652,8 @@ internal sealed class DataJobLedger : IJobLedger
         // Pushed down and ordered like the claim head — one bounded indexed seek per dispatch pass.
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
         return await JobRecord.Query(
-            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && r.ReservedFor == null,
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && r.ReservedFor == null
+                 && r.HeldBy == null,
             QueryDefinition.All.WithSort(sort).WithPagination(1, limit), ct);
     }
 
@@ -348,60 +663,119 @@ internal sealed class DataJobLedger : IJobLedger
         return await JobRecord.Query(r => r.Status == JobStatus.Queued && r.ReservedFor != null, ct);
     }
 
-    public async Task Progress(string jobId, double fraction, string? message, CancellationToken ct)
+    public async Task Progress(string jobId, string claimToken, double fraction, string? message, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        var r = await JobRecord.Get(jobId, ct);
-        if (r is null) return;
-        r.ProgressFraction = fraction;
-        r.ProgressMessage = message;
-        await JobRecord.Upsert(r, ct);
+        for (var attempt = 1; attempt <= FenceAttempts; attempt++)
+        {
+            var latest = await JobRecord.Get(jobId, ct);
+            if (latest is null || !string.Equals(latest.ClaimToken, claimToken, StringComparison.Ordinal)) return;
+            var row = latest.Clone();
+            row.ProgressFraction = fraction;
+            row.ProgressMessage = message;
+            try
+            {
+                if (await ReplaceAtRevision(row, latest.Revision, ct)) return;
+            }
+            catch (Exception) when (!ct.IsCancellationRequested && attempt < FenceAttempts)
+            {
+                // The next read tells whether it landed.
+            }
+        }
     }
 
-    public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
+    public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, int limit, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        var running = await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
-        return running.Where(r => r.LeaseUntil is { } l && l < now).ToList();
+        if (limit <= 0) return [];
+        return await JobRecord.Query(
+            r => r.Status == JobStatus.Running && r.LeaseUntil != null && r.LeaseUntil < now,
+            QueryDefinition.All.WithPagination(1, limit), ct);
     }
 
-    public async Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct)
+    public async Task<IReadOnlyList<JobRecord>> Orphaned(IReadOnlyCollection<string> liveOwners, int limit, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        return await JobRecord.Query(r => r.Status == JobStatus.Running, ct);
+        if (limit <= 0) return [];
+        var live = liveOwners.ToList();
+        return await JobRecord.Query(
+            r => r.Status == JobStatus.Running && r.Owner != null && !live.Contains(r.Owner),
+            QueryDefinition.All.WithPagination(1, limit), ct);
     }
 
-    public async Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
+    public async Task<IReadOnlyDictionary<string, int>> RunningLoad(IReadOnlyCollection<string> owners, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        return await JobRecord.Query(JobLedgerPredicates.NonTerminal(), ct);
-    }
-
-    public async Task<IReadOnlyList<JobRecord>> InStage(string workType, string action, CancellationToken ct)
-    {
-        using var storageScope = JobsStorageScope.Enter();
-        return await JobRecord.Query(r => r.WorkType == workType && r.Action == action && r.Status == JobStatus.Queued, ct);
+        var hands = owners.ToList();
+        var load = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var row in await JobRecord.Query(r => r.Status == JobStatus.Running && hands.Contains(r.Owner!), ct))
+            if (row.Owner is { } owner) load[owner] = load.GetValueOrDefault(owner) + 1;
+        return load;
     }
 
     public async Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        return await JobRecord.Query(JobLedgerPredicates.ForQuery(query), ct);
+        var newest = SortBuilder<JobRecord>.Build(s => s.OrderByDescending(r => r.FirstSubmittedAt));
+        return await JobRecord.Query(
+            JobLedgerPredicates.ForQuery(query),
+            QueryDefinition.All.WithSort(newest).WithPagination(query.Page, query.Size), ct);
     }
 
+    /// <summary>One row per gate key (JOBS-0010). The gate is created by an atomic insert and extended by a conditional
+    /// replace that applies only while the stored release is earlier, so concurrent backoffs on one key keep the latest
+    /// release in one row. Where the store lacks either primitive (SQL Server has no atomic insert today) the row is
+    /// written whole and read back, and a writer that reads an earlier release than its own extends again, up to
+    /// <see cref="GateAttempts"/> passes. That cannot close the race between two writers creating one gate: when the
+    /// earlier release's save lands after the later writer read its own back, the gate keeps the earlier release. Closing
+    /// it needs an atomic insert on the store.</summary>
     public async Task SetGate(string gateKey, DateTimeOffset releaseAt, string? reason, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        var existing = (await JobGateRecord.Query(g => g.GateKey == gateKey, ct)).FirstOrDefault();
-        if (existing is not null)
+        var gate = new JobGateRecord { Id = JobGateRecord.IdFor(gateKey), GateKey = gateKey, ReleaseAt = releaseAt, Reason = reason };
+        var capabilities = Data<JobGateRecord, string>.Capabilities;
+        var conditional = !EntityContext.InTransaction;
+        for (var attempt = 0; attempt < GateAttempts; attempt++)
         {
-            if (existing.ReleaseAt >= releaseAt) return;
-            existing.ReleaseAt = releaseAt;
-            existing.Reason = reason;
-            await JobGateRecord.Upsert(existing, ct);
-            return;
+            var existing = await JobGateRecord.Get(gate.Id, ct);
+            if (existing is not null && existing.ReleaseAt >= releaseAt) return;
+            if (conditional && existing is null && capabilities.Has(DataCaps.Write.InsertOnly))
+            {
+                if ((await JobGateRecord.Insert(gate, ct: ct)).Outcome != MutationOutcome.Conflict) return;
+                continue;   // another node created it first: compare against theirs
+            }
+            if (conditional && existing is not null && capabilities.Has(DataCaps.Write.ConditionalReplace))
+            {
+                if (await JobGateRecord.ReplaceIf(gate, g => g.ReleaseAt < releaseAt, ct: ct)) return;
+                continue;   // the stored release moved: compare again
+            }
+
+            await JobGateRecord.Upsert(gate, ct);
+            if (EntityContext.InTransaction) return;   // a deferred write cannot be read back before the commit
+            // Read back: a concurrent writer of an earlier release may have overwritten this one; extend again if so.
+            if ((await JobGateRecord.Get(gate.Id, ct))?.ReleaseAt >= releaseAt) return;
         }
-        await JobGateRecord.Upsert(new JobGateRecord { GateKey = gateKey, ReleaseAt = releaseAt, Reason = reason }, ct);
+    }
+
+    public async Task<int> PurgeReleasedGates(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        using var storageScope = JobsStorageScope.Enter();
+        if (limit <= 0) return 0;
+        var released = await JobGateRecord.Query(g => g.ReleaseAt <= now, QueryDefinition.All.WithPagination(1, limit), ct);
+        if (released.Count == 0) return 0;
+        var ids = released.Select(g => g.Id).ToList();
+        // A gate extended between the read and the delete is kept: the delete is guarded where the store can guard it.
+        var guarded = Data<JobGateRecord, string>.As<IConditionalDeleteRepository<JobGateRecord, string>>();
+        if (guarded is not null)
+            return await guarded.ConditionalDeleteMany(ids, Koan.Data.Abstractions.Filtering.LinqFilterCompiler.Compile<JobGateRecord>(g => g.ReleaseAt <= now), ct);
+
+        // No conditional delete (SQL Server today): re-read each gate just before its delete and keep one extended since
+        // the page was read. An extension landing between that read and the delete is removed with the gate.
+        var removed = 0;
+        foreach (var id in ids)
+            if ((await JobGateRecord.Get(id, ct)) is { } current && current.ReleaseAt <= now && await JobGateRecord.Remove(id, ct))
+                removed++;
+        return removed;
     }
 
     public async Task<IReadOnlyList<JobGateRecord>> ActiveGates(DateTimeOffset now, CancellationToken ct)
@@ -410,42 +784,42 @@ internal sealed class DataJobLedger : IJobLedger
         return await JobGateRecord.Query(g => g.ReleaseAt > now, ct);
     }
 
-    public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
+    public async Task<int> PurgeArchivable(DateTimeOffset olderThan, int limit, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        // Pushed down (§19.3): the LastSettledAt cutoff is in the predicate, so the store returns only the stale
-        // benign-terminal rows — not every Completed/Cancelled row to be filtered in memory.
-        var stale = await JobRecord.Query(
-            r => (r.Status == JobStatus.Completed || r.Status == JobStatus.Cancelled) && r.LastSettledAt < olderThan, ct);
-        foreach (var r in stale) await JobRecord.Remove(r.Id, ct);
-        return stale.Count;
+        // Pushed down (§19.3) and paged (JOBS-0010): the store returns at most one page of stale benign-terminal rows.
+        return await RemovePage(
+            r => (r.Status == JobStatus.Completed || r.Status == JobStatus.Cancelled) && r.LastSettledAt < olderThan, limit, ct);
     }
 
-    public async Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct)
+    public async Task<int> PurgeFailed(DateTimeOffset olderThan, int limit, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
         // §19.3 retention completion: Failed/Dead were retained forever; bound them by age (replayable until then).
-        var stale = await JobRecord.Query(
-            r => (r.Status == JobStatus.Failed || r.Status == JobStatus.Dead) && r.LastSettledAt < olderThan, ct);
-        foreach (var r in stale) await JobRecord.Remove(r.Id, ct);
-        return stale.Count;
+        return await RemovePage(
+            r => (r.Status == JobStatus.Failed || r.Status == JobStatus.Dead) && r.LastSettledAt < olderThan, limit, ct);
     }
 
-    public async Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
+    public async Task<int> TrimTerminal(string workType, int keep, int limit, CancellationToken ct)
     {
         using var storageScope = JobsStorageScope.Enter();
-        if (keep <= 0) return 0;
-        // The keep-th newest terminal row marks the cutoff; terminal rows settled before it are excess. Two pushed
-        // queries (a bounded page to find the cutoff, then a predicate delete) — no full materialize of the work-type.
-        var sort = SortBuilder<JobRecord>.Build(s => s.OrderByDescending(r => r.LastSettledAt));
-        var newestPage = QueryDefinition.All.WithSort(sort).WithPagination(1, keep);
-        var newest = await JobRecord.Query(JobLedgerPredicates.TerminalOf(workType), newestPage, ct);
-        if (newest.Count < keep) return 0;                         // under the cap — nothing to trim
-        if (newest[^1].LastSettledAt is not { } cutoff) return 0;
-        var excess = await JobRecord.Query(
-            JobLedgerPredicates.And(JobLedgerPredicates.TerminalOf(workType), r => r.LastSettledAt < cutoff), ct);
-        foreach (var r in excess) await JobRecord.Remove(r.Id, ct);
-        return excess.Count;
+        if (keep <= 0 || limit <= 0) return 0;
+        // The keep-th newest terminal row marks the cutoff — one row read — and terminal rows settled before it are
+        // excess, removed a page at a time.
+        var newestFirst = SortBuilder<JobRecord>.Build(s => s.OrderByDescending(r => r.LastSettledAt));
+        var boundary = await JobRecord.Query(
+            JobLedgerPredicates.TerminalOf(workType), QueryDefinition.All.WithSort(newestFirst).WithPagination(keep, 1), ct);
+        if (boundary.Count == 0 || boundary[0].LastSettledAt is not { } cutoff) return 0;   // under the cap
+        return await RemovePage(
+            JobLedgerPredicates.And(JobLedgerPredicates.TerminalOf(workType), r => r.LastSettledAt < cutoff), limit, ct);
+    }
+
+    /// <summary>Read at most <paramref name="limit"/> rows matching <paramref name="predicate"/> and remove them.</summary>
+    private static async Task<int> RemovePage(Expression<Func<JobRecord, bool>> predicate, int limit, CancellationToken ct)
+    {
+        if (limit <= 0) return 0;
+        var page = await JobRecord.Query(predicate, QueryDefinition.All.WithPagination(1, limit), ct);
+        return page.Count == 0 ? 0 : await JobRecord.Remove(page.Select(r => r.Id).ToList(), ct);
     }
 
     public async Task<long> CountActive(string workType, CancellationToken ct)
@@ -481,6 +855,39 @@ internal sealed class DataJobLedger : IJobLedger
 
     // --- claim internals ---
 
+    /// <summary>The rows that can hold a candidate back, read once per batch of candidates and only for what was not read
+    /// yet (JOBS-0010): the Running rows of the work items a claim is about to judge (§17.2), and, for a candidate with a
+    /// coalesce key, the key's running job — which holds its run slot — and its queued jobs deferred past now, whose
+    /// deferral the key's work waits for.</summary>
+    private sealed class RunningProbe(DateTimeOffset now)
+    {
+        private readonly HashSet<string> _read = new(StringComparer.Ordinal);
+        private readonly HashSet<Guid> _keysRead = new();
+
+        public HashSet<(string Type, string Id, JobDataRoute Route)> Busy { get; } = new();
+
+        /// <summary>The coalesce keys whose jobs cannot be claimed now.</summary>
+        public HashSet<Guid> HeldKeys { get; } = new();
+
+        public async Task Cover(IReadOnlyCollection<JobRecord> candidates, CancellationToken ct)
+        {
+            var workIds = candidates.Where(r => r.Exclusive).Select(r => r.WorkId).Where(_read.Add).ToList();
+            if (workIds.Count > 0)
+                foreach (var row in await JobRecord.Query(r => r.Status == JobStatus.Running && workIds.Contains(r.WorkId), ct))
+                    Busy.Add(JobDataRoute.Identity(row));
+
+            var groups = candidates.Select(r => r.CoalesceGroup).OfType<Guid>().Where(_keysRead.Add).Select(g => (Guid?)g).ToList();
+            if (groups.Count == 0) return;
+            var at = now;
+            foreach (var row in await JobRecord.Query(
+                         r => groups.Contains(r.CoalesceGroup)
+                              && (r.Status == JobStatus.Running
+                                  || (r.Status == JobStatus.Queued && r.VisibleAt > at && r.CancelRequestedAt == null
+                                      && r.HeldBy == null)), ct))
+                if (row.CoalesceGroup is { } held) HeldKeys.Add(held);
+        }
+    }
+
     private static Dictionary<string, int> BuildMemberSlots(
         IReadOnlyDictionary<string, PoolDispatchContext> pools, IReadOnlyList<JobRecord> running)
     {
@@ -512,7 +919,8 @@ internal sealed class DataJobLedger : IJobLedger
     /// single-lane backlog case). One LIMIT-1 read, not one-per-declared-lane.</summary>
     private static async Task<bool> BuriedWorkExists(HashSet<string> windowLanes, DateTimeOffset now, CancellationToken ct)
         => (await JobRecord.Query(
-            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && !windowLanes.Contains(r.Lane),
+            r => r.Status == JobStatus.Queued && r.VisibleAt <= now && r.CancelRequestedAt == null && r.HeldBy == null
+                 && !windowLanes.Contains(r.Lane),
             QueryDefinition.All.WithPagination(1, 1), ct)).Count > 0;
 
     /// <summary>The per-lane head seek (ix_jobs_lane_claim): the oldest claimable Queued+due row in <paramref name="lane"/>.
@@ -522,7 +930,7 @@ internal sealed class DataJobLedger : IJobLedger
     private async Task<JobRecord?> HydrateLaneHead(
         string lane, string owner, DateTimeOffset now, IReadOnlyCollection<string> saturatedLanes,
         HashSet<string>? claimablePools, HashSet<string> gatedKeys,
-        HashSet<(string Type, string Id, JobDataRoute Route)> busy, CancellationToken ct)
+        RunningProbe busy, CancellationToken ct)
     {
         var batchSize = Math.Max(1, _options.ClaimScanBatch);
         var sort = SortBuilder<JobRecord>.Build(s => s.OrderBy(r => r.VisibleAt).ThenBy(r => r.FirstSubmittedAt));
@@ -530,9 +938,11 @@ internal sealed class DataJobLedger : IJobLedger
         {
             var scan = QueryDefinition.All.WithSort(sort).WithPagination(page, batchSize);
             var window = await JobRecord.Query(
-                r => r.Status == JobStatus.Queued && r.Lane == lane && r.VisibleAt <= now && r.CancelRequestedAt == null,
+                r => r.Status == JobStatus.Queued && r.Lane == lane && r.VisibleAt <= now && r.CancelRequestedAt == null
+                     && r.HeldBy == null,
                 scan, ct);
             if (window.Count == 0) return null;
+            await busy.Cover(window, ct);
             foreach (var r in window)
                 if (IsClaimable(r, owner, now, saturatedLanes, claimablePools, gatedKeys, busy)) return r;
             if (window.Count < batchSize) return null;   // short page → this lane's ready set is exhausted
@@ -545,30 +955,28 @@ internal sealed class DataJobLedger : IJobLedger
     /// non-pool job's gate (if any) isn't active. <paramref name="claimablePools"/> null means no pool has capacity (or no
     /// resolver), so every pool job is currently unclaimable. The pool-XOR-gate split matches <see cref="InMemoryJobLedger"/>
     /// so the tiers converge (ARCH-0079): a pool job's admission is governed by member capacity, not by resource gates —
-    /// its <see cref="JobRecord.GateKey"/> is the elected member (null while queued), not a cooperative-backoff key.</summary>
+    /// its <see cref="JobRecord.GateKey"/> is the elected member (null while queued), not a cooperative-backoff key. A job
+    /// whose coalesce key runs, or waits for a deferral, is not claimable either (JOBS-0010).</summary>
     private static bool IsClaimable(JobRecord r, string owner, DateTimeOffset now,
         IReadOnlyCollection<string> saturatedLanes, HashSet<string>? claimablePools,
-        HashSet<string> gatedKeys, HashSet<(string Type, string Id, JobDataRoute Route)> busy)
+        HashSet<string> gatedKeys, RunningProbe probe)
     {
         if (!(r.ReservedFor == null || r.ReservedFor == owner || (r.ReservedUntil != null && r.ReservedUntil < now)))
             return false;
         if (saturatedLanes.Contains(r.Lane)) return false;
-        if (r.Exclusive && busy.Contains(JobDataRoute.Identity(r))) return false;
+        if (r.Exclusive && probe.Busy.Contains(JobDataRoute.Identity(r))) return false;
+        if (r.CoalesceGroup is { } key && probe.HeldKeys.Contains(key)) return false;
         if (r.PoolKey is not null)
             return claimablePools is not null && claimablePools.Contains(r.PoolKey);
         return r.GateKey is null || !gatedKeys.Contains(r.GateKey);
     }
 
-    private static async Task<JobRecord?> ClaimOptimistic(JobRecord candidate, string owner, DateTimeOffset now, DateTimeOffset leaseUntil, CancellationToken ct)
-    {
-        Mark(candidate, owner, now, leaseUntil);
-        await JobRecord.Upsert(candidate, ct);
-        return candidate;
-    }
-
     private static void Mark(JobRecord r, string owner, DateTimeOffset now, DateTimeOffset leaseUntil)
     {
         r.Attempt++;
+        r.ClaimToken = Guid.NewGuid().ToString("N");   // this claim's token: every write of its owner is fenced on it
+        r.ReleaseCoalesceSlot();   // a claimed job no longer absorbs submissions (JOBS-0006 trailing edge)
+        r.TakeRunSlot();           // and no other job of its key runs beside it (JOBS-0010)
         r.Transitions.Add(new JobTransition { At = now, From = r.Status, To = JobStatus.Running, Note = $"claimed by {owner}" });
         r.Status = JobStatus.Running;
         r.Owner = owner;

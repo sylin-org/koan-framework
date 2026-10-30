@@ -542,7 +542,7 @@ await mailbatch.Submit();                  // batch (IEnumerable<T>)
 
 Two defaults make *an entity a consistency unit*, so handlers don't lose writes:
 
-- **Mutate the entity passed to `Execute`** — the orchestrator auto-saves *that* reference, but **only if it changed**. An untouched reference is never written; a handler that reloads-and-saves its own copy is never clobbered (it left the passed one clean). Don't reload a second copy and save it yourself.
+- **Mutate the entity passed to `Execute`** — the orchestrator writes back **only the members you changed** on *that* reference (any member Koan persists, `private set` included), onto the entity as it is stored at settle. An untouched reference is never written; a handler that reloads-and-saves its own copy is never clobbered (it left the passed one clean); a change another writer made to another member while the job ran stands, and a change to the same member is a conflict that runs the job again on the stored entity without spending an attempt (JOBS-0010). Don't reload a second copy and save it yourself.
 - **One job per entity at a time** — a work-item id is its ordering key (Kafka-partition / SQS-FIFO model): jobs for the same `(WorkType, WorkId)` are serialized by default; different entities parallelize fully. Opt out per type with `[ParallelSafe]` when the actions are provably independent.
 
 #### Capability ladder

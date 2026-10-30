@@ -200,7 +200,12 @@ contract to deletion by immutable identity plus stored-row guard. The provider m
 conditional delete; a prior read followed by ordinary identity deletion is explicitly not a fallback.
 
 Document CAS implementations using the CLR evaluator call CompileConditional. That bounded
-entrypoint rejects managed, binary and DateTime fields rather than claiming unproved comparison
-semantics. The ordinary query evaluator accepts the same expressions it always accepts for queries
-and is not a conditional-write path. A bool cannot describe a postcommit
+entrypoint compares exactly: a DateTime matches only the same whole value — ticks, kind and, for a local time,
+the side of an ambiguous daylight-saving hour — a DateTimeOffset only the same instant at the same offset, and a
+binary value only the same bytes, so a guard never matches a row it did not observe. Managed fields refuse,
+because their values live in the persisted record rather than the entity the guard is evaluated over.
+The ordinary query evaluator compares a DateTime and a DateTimeOffset by their instant, as queries always
+have, and a binary value by its bytes; it is not a conditional-write path. `FilterSupport.OrdinalStrings` says
+whether a provider's string equality is ordinal; SQL Server and MySQL, whose default collations fold case,
+declare it false through `RelationalFilterSupport.CaseFolding`. A bool cannot describe a postcommit
 exception: native acknowledgement failure, cancellation and completion errors propagate.

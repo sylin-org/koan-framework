@@ -108,7 +108,7 @@ public sealed class FleetRosterSpec
         zombieRecord.Status = JobStatus.Completed;
         zombieRecord.Owner = null;
         zombieRecord.LastSettledAt = Now(host);
-        (await host.Ledger.TrySettle(zombieRecord, "node-a", default)).Should().BeFalse(
+        (await host.Ledger.TrySettle(zombieRecord, zombieRecord.ClaimToken!, default)).Should().BeNull(
             "the row was reclaimed; a revived zombie cannot clobber the new claimant");
 
         // The legitimate owner settles fine.
@@ -116,7 +116,7 @@ public sealed class FleetRosterSpec
         legitimate.Status = JobStatus.Completed;
         legitimate.Owner = null;
         legitimate.LastSettledAt = Now(host);
-        (await host.Ledger.TrySettle(legitimate, "node-b", default)).Should().BeTrue();
+        (await host.Ledger.TrySettle(legitimate, legitimate.ClaimToken!, default)).Should().NotBeNull();
     }
 
     [Fact]

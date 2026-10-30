@@ -41,8 +41,14 @@ internal sealed class RoutingJobLedger : IJobLedger
     public async Task<JobRecord?> Get(string jobId, CancellationToken ct)
         => await _durable.Get(jobId, ct) ?? await _inMemory.Get(jobId, ct);
 
-    public Task<JobRecord?> FindActiveByCoalesceKey(string workType, string coalesceKey, CancellationToken ct)
-        => For(workType).FindActiveByCoalesceKey(workType, coalesceKey, ct);
+    public Task<JobRecord?> FindCoalescing(string workType, string coalesceKey, CancellationToken ct)
+        => For(workType).FindCoalescing(workType, coalesceKey, ct);
+
+    public Task<JobRecord?> AppendCoalescing(JobRecord record, CancellationToken ct)
+        => For(record.WorkType).AppendCoalescing(record, ct);
+
+    public Task<JobRecord?> TryRequeue(JobRecord record, string claimToken, CancellationToken ct)
+        => For(record.WorkType).TryRequeue(record, claimToken, ct);
 
     // Disjoint job sets: claiming durable-then-volatile never double-claims; gates are mirrored so each honors all.
     public async Task<JobRecord?> ClaimNext(string owner, DateTimeOffset now, DateTimeOffset leaseUntil,
@@ -51,22 +57,33 @@ internal sealed class RoutingJobLedger : IJobLedger
         => await _durable.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools)
            ?? await _inMemory.ClaimNext(owner, now, leaseUntil, saturatedLanes, ct, pools);
 
-    public Task Update(JobRecord record, CancellationToken ct) => For(record.WorkType).Update(record, ct);
+    public Task<bool> Update(JobRecord record, CancellationToken ct) => For(record.WorkType).Update(record, ct);
 
-    public async Task Progress(string jobId, double fraction, string? message, CancellationToken ct)
+    public async Task Progress(string jobId, string claimToken, double fraction, string? message, CancellationToken ct)
     {
-        if (await _durable.Get(jobId, ct) is not null) await _durable.Progress(jobId, fraction, message, ct);
-        else await _inMemory.Progress(jobId, fraction, message, ct);
+        if (await _durable.Get(jobId, ct) is not null) await _durable.Progress(jobId, claimToken, fraction, message, ct);
+        else await _inMemory.Progress(jobId, claimToken, fraction, message, ct);
     }
 
     // A running job lives in exactly one ledger; probe durable then volatile like Get.
-    public async Task<bool> TryRenewLease(string jobId, string owner, DateTimeOffset leaseUntil, DateTimeOffset now, CancellationToken ct)
-        => await _durable.TryRenewLease(jobId, owner, leaseUntil, now, ct)
-           || await _inMemory.TryRenewLease(jobId, owner, leaseUntil, now, ct);
+    public async Task<JobRecord?> RenewLease(string jobId, string claimToken, DateTimeOffset leaseUntil, CancellationToken ct)
+        => await _durable.RenewLease(jobId, claimToken, leaseUntil, ct)
+           ?? await _inMemory.RenewLease(jobId, claimToken, leaseUntil, ct);
 
-    public async Task<bool> TrySettle(JobRecord record, string expectedOwner, CancellationToken ct)
-        => await _durable.TrySettle(record, expectedOwner, ct)
-           || await _inMemory.TrySettle(record, expectedOwner, ct);
+    public Task<JobRecord?> TrySettle(JobRecord record, string claimToken, CancellationToken ct)
+        => For(record.WorkType).TrySettle(record, claimToken, ct);
+
+    // A successor lives in its predecessor's ledger; probe durable then volatile like Get.
+    public async Task<bool> ReleaseHeld(string successorId, string holderToken, bool cancel, DateTimeOffset now, CancellationToken ct)
+        => await _durable.ReleaseHeld(successorId, holderToken, cancel, now, ct)
+           || await _inMemory.ReleaseHeld(successorId, holderToken, cancel, now, ct);
+
+    public async Task<bool> DeleteHeld(string successorId, string holderToken, CancellationToken ct)
+        => await _durable.DeleteHeld(successorId, holderToken, ct)
+           || await _inMemory.DeleteHeld(successorId, holderToken, ct);
+
+    public async Task<IReadOnlyList<JobRecord>> Held(int page, int limit, CancellationToken ct)
+        => Concat(await _durable.Held(page, limit, ct), await _inMemory.Held(page, limit, ct));
 
     // Reservations (PMC-056) live in exactly one tier's ledger, like the rows they point at.
     public async Task<bool> TryReserve(string jobId, string hand, DateTimeOffset reservedUntil, DateTimeOffset now, CancellationToken ct)
@@ -79,20 +96,40 @@ internal sealed class RoutingJobLedger : IJobLedger
     public async Task<IReadOnlyList<JobRecord>> Reservations(CancellationToken ct)
         => Concat(await _durable.Reservations(ct), await _inMemory.Reservations(ct));
 
-    public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, CancellationToken ct)
-        => Concat(await _durable.Stuck(now, ct), await _inMemory.Stuck(now, ct));
+    // Bounded sweeps take the durable page first and fill what is left of the limit from the volatile tier.
+    public async Task<IReadOnlyList<JobRecord>> Stuck(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        var durable = await _durable.Stuck(now, limit, ct);
+        return Concat(durable, await _inMemory.Stuck(now, limit - durable.Count, ct));
+    }
 
-    public async Task<IReadOnlyList<JobRecord>> Running(CancellationToken ct)
-        => Concat(await _durable.Running(ct), await _inMemory.Running(ct));
+    public async Task<IReadOnlyList<JobRecord>> Orphaned(IReadOnlyCollection<string> liveOwners, int limit, CancellationToken ct)
+    {
+        var durable = await _durable.Orphaned(liveOwners, limit, ct);
+        return Concat(durable, await _inMemory.Orphaned(liveOwners, limit - durable.Count, ct));
+    }
 
-    public async Task<IReadOnlyList<JobRecord>> NonTerminal(CancellationToken ct)
-        => Concat(await _durable.NonTerminal(ct), await _inMemory.NonTerminal(ct));
+    public async Task<IReadOnlyDictionary<string, int>> RunningLoad(IReadOnlyCollection<string> owners, CancellationToken ct)
+    {
+        var load = new Dictionary<string, int>(await _durable.RunningLoad(owners, ct), StringComparer.Ordinal);
+        foreach (var (owner, count) in await _inMemory.RunningLoad(owners, ct))
+            load[owner] = load.GetValueOrDefault(owner) + count;
+        return load;
+    }
 
-    public Task<IReadOnlyList<JobRecord>> InStage(string workType, string action, CancellationToken ct)
-        => For(workType).InStage(workType, action, ct);
-
+    // A work type's rows live in one ledger. A query across types reads the same newest-first window from both tiers
+    // and pages the merge — bounded by the page the caller asked for.
     public async Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct)
-        => Concat(await _durable.Query(query, ct), await _inMemory.Query(query, ct));
+    {
+        if (query.WorkType is { } workType) return await For(workType).Query(query, ct);
+        var window = query with { Page = 1, Size = query.Page * query.Size };
+        return Concat(await _durable.Query(window, ct), await _inMemory.Query(window, ct))
+            .OrderByDescending(r => r.FirstSubmittedAt)
+            .ThenByDescending(r => r.Id, StringComparer.Ordinal)
+            .Skip((query.Page - 1) * query.Size)
+            .Take(query.Size)
+            .ToList();
+    }
 
     // Mirror gates to both ledgers: a backoff must hold across persistence tiers sharing a resource.
     public async Task SetGate(string gateKey, DateTimeOffset releaseAt, string? reason, CancellationToken ct)
@@ -109,15 +146,28 @@ internal sealed class RoutingJobLedger : IJobLedger
         return gates.Values.ToList();
     }
 
-    public async Task<int> PurgeArchivable(DateTimeOffset olderThan, CancellationToken ct)
-        => await _durable.PurgeArchivable(olderThan, ct) + await _inMemory.PurgeArchivable(olderThan, ct);
+    // Gates are mirrored, so each ledger sweeps its own copy; the page bound holds across both.
+    public async Task<int> PurgeReleasedGates(DateTimeOffset now, int limit, CancellationToken ct)
+    {
+        var removed = await _durable.PurgeReleasedGates(now, limit, ct);
+        return removed + await _inMemory.PurgeReleasedGates(now, limit - removed, ct);
+    }
 
-    public async Task<int> PurgeFailed(DateTimeOffset olderThan, CancellationToken ct)
-        => await _durable.PurgeFailed(olderThan, ct) + await _inMemory.PurgeFailed(olderThan, ct);
+    public async Task<int> PurgeArchivable(DateTimeOffset olderThan, int limit, CancellationToken ct)
+    {
+        var removed = await _durable.PurgeArchivable(olderThan, limit, ct);
+        return removed + await _inMemory.PurgeArchivable(olderThan, limit - removed, ct);
+    }
+
+    public async Task<int> PurgeFailed(DateTimeOffset olderThan, int limit, CancellationToken ct)
+    {
+        var removed = await _durable.PurgeFailed(olderThan, limit, ct);
+        return removed + await _inMemory.PurgeFailed(olderThan, limit - removed, ct);
+    }
 
     // A work-type's rows live in exactly one ledger (persistence routing), so trim the owning one.
-    public Task<int> TrimTerminal(string workType, int keep, CancellationToken ct)
-        => For(workType).TrimTerminal(workType, keep, ct);
+    public Task<int> TrimTerminal(string workType, int keep, int limit, CancellationToken ct)
+        => For(workType).TrimTerminal(workType, keep, limit, ct);
 
     public Task<long> CountActive(string workType, CancellationToken ct)
         => For(workType).CountActive(workType, ct);

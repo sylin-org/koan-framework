@@ -1,6 +1,11 @@
 # JOBS-0006: Trailing-Edge Coalesce Semantics
 
-**Status**: Accepted
+**Status**: Accepted · amended by [JOBS-0010](JOBS-0010-jobs-never-starve-and-never-lose-an-update.md): coalescing
+is per work item — a key names the item itself, so another item with the same properties gets its own job; a submission
+coalesces onto any queued job of its key, and the queued job holds the key's unique slot, so the check and the append
+are one conditional insert; a claim gives that slot back and takes the key's run slot, so the key never runs twice at
+once, and the claimed job serves every other queued job of its key; a key's work waits for a deferral of any of its
+jobs — the trailing edge holds, and a requeue can leave two queued jobs of a key until the next run serves both
 **Date**: 2026-06-11
 **Deciders**: Enterprise Architect
 **Scope**: Koan.Jobs -- IJobLedger.FindActiveByCoalesceKey, InMemoryJobLedger, DataJobLedger

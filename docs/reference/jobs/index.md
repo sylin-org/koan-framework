@@ -45,9 +45,10 @@ handler stays the same across those tiers.
 
 ### Wake stamp and lease heartbeat
 
-The ledger decides; hints only hurry (JOBS-0009). With a durable ledger, submissions bump one
-framework-owned `WakeStamp` row inside the same transaction, and peers probe it at short cadence —
-cross-node discovery lands well under `PollInterval` with zero extra infrastructure. Referencing a
+The ledger decides; hints only hurry (JOBS-0009). With a durable ledger, a submission writes one of
+sixteen framework-owned `WakeStamp` rows inside the same transaction, chosen at random so submitting
+transactions do not queue on one row (JOBS-0010), and peers read them at short cadence — cross-node
+discovery lands well under `PollInterval` with zero extra infrastructure. Referencing a
 Communication connector adds instant signal-based wake on top. A missed hint costs one poll pass,
 never work: polling remains the complete correctness mechanism. A running handler renews its lease
 (`LeaseDuration`, renewal at ⅓ cadence); if another claimant takes the row mid-run, the loser
@@ -107,6 +108,11 @@ JobSubmission selected = await digests.Where(item => item.Ready).Submit();
 JobSubmission streamed = await SendDigest.QueryStream(item => item.Ready).Submit();
 ```
 
+Submit writes a new work item and never overwrites a stored one; when the handler returns, only the
+members it changed are written back, onto the item as it is stored then, so a write another writer made
+while the job ran survives. A member both changed is a conflict: the job runs again on the stored item
+without spending an attempt, up to `JobsOptions.MaxWriteConflicts` times (JOBS-0010).
+
 A collection submission reports confirmed ledger acceptance, not execution. It is ordered,
 sequentially backpressured, and not collection-atomic. Streaming bounds producer memory, not ledger
 growth; model an explicit work window for very large sources.
@@ -142,7 +148,8 @@ Full set: `OnClaimed`, `OnCompleted`, `OnFailed`, `OnDeadLettered`, `OnReschedul
 
 ## Inspect and correct
 
-- Query status/progress from the job accessor and ledger.
+- Query status/progress from the job accessor and ledger. `Jobs.Query` and `Jobs.WithStatus` read one bounded page,
+  newest first (`JobQuery.Page`, `JobQuery.Size`, 100 by default).
 - Read startup and runtime facts for persistence tier, dispatch regime, schedules, lanes, and connector participation.
 - Use `/health/ready` for selected durable dependencies.
 - Treat retries, timeouts, cancellation, and redelivery as observable outcomes, not hidden worker logs.

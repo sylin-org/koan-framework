@@ -12,7 +12,7 @@ public sealed class SentinelWakeSpec
         GreetJob.Reset();
         var g = new GreetJob { Name = "local" };
         await g.Job.Submit("");
-        (await WakeStamp.Get(WakeStamp.SingletonId)).Should().BeNull("a volatile tier never crosses nodes");
+        (await WakeStamp.All()).Should().BeEmpty("a volatile tier never crosses nodes");
 
         await host.Drain();
         GreetJob.Executions.Should().Be(1);

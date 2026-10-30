@@ -22,6 +22,9 @@ public enum DeadReason
     /// <summary>The durable record names a work type that is no longer registered by the running application.
     /// This is deterministic and cannot succeed on retry, so it is retired once instead of poisoning the worker loop.</summary>
     UnregisteredWorkType = 3,
+    /// <summary>The handler's changes conflicted with another writer's more than <c>JobsOptions.MaxWriteConflicts</c>
+    /// times (JOBS-0010); none of them was written.</summary>
+    Conflict = 4,
 }
 
 /// <summary>The control signal a handler raised via <see cref="JobContext"/> verbs, read by the orchestrator post-execute.

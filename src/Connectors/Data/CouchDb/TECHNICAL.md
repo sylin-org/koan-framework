@@ -60,5 +60,5 @@ Technical reference for maintainers. Status: **supported** (`couchdb-data-provid
 - Packaging: `dotnet pack` with the release-train version; package id `Sylin.Koan.Data.Connector.CouchDb`.
 
 Conditional replacement consumes the normalized Filter, qualifies it through CompileConditional, and
-retains the observed `_rev` fence. Managed, binary and DateTime guard fields refuse before document
-reads because the CLR evaluator does not establish the required comparison meaning for those shapes.
+retains the observed `_rev` fence. The CLR evaluator compares a DateTime by its ticks and kind and a
+binary value by its bytes; managed guard fields refuse before document reads.

@@ -95,12 +95,10 @@ public sealed class JobsTestDriver
         JobRecord? successor = null;
         if (settled.Status == JobStatus.Completed)
         {
-            var siblings = await _ledger.Query(
-                new JobQuery(WorkType: settled.WorkType, WorkId: settled.WorkId), ct);
-            successor = siblings
-                .Where(record => record.Id != settled.Id)
-                .OrderByDescending(record => record.FirstSubmittedAt)
-                .FirstOrDefault();
+            // The newest two jobs of the work item: the settled one and, when the stage advanced, its successor.
+            var newest = await _ledger.Query(
+                new JobQuery(WorkType: settled.WorkType, WorkId: settled.WorkId) { Size = 2 }, ct);
+            successor = newest.FirstOrDefault(record => record.Id != settled.Id);
         }
 
         return new JobStageRunResult(run, settled, successor);

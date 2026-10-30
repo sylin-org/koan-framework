@@ -89,5 +89,5 @@ finite host-state boundary.
 Conditional replacement compares the observed immutable stored record in ConcurrentDictionary.TryUpdate.
 An ordinary Save/Delete between observation and exchange therefore prevents a stale replacement. It
 never inserts a missing row. The old conditional-only RowGate has been removed. Guards use the existing
-normalized evaluator's CompileConditional admission, which rejects managed, binary and DateTime fields;
-ordinary query evaluation is unchanged. This is finite host-local storage, not durable coordination.
+normalized evaluator's CompileConditional admission, which compares a DateTime by its ticks and kind and a
+binary value by its bytes, and rejects managed fields. This is finite host-local storage, not durable coordination.

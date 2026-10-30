@@ -43,6 +43,9 @@ fallback. The connector does not currently expose provider-specific retry or com
 ## LINQ and pushdowns
 
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
+- The filter support declared is `RelationalFilterSupport.CaseFolding`: the database is created without a
+  `COLLATE`, so string equality follows the server's default collation, which folds case, and
+  `FilterSupport.OrdinalStrings` is false.
 - SqlClient sends at most 2,098 parameters in a statement (measured: 2,099 is refused). `GetMany` and `DeleteMany`
   name ids in slices of 2,000
   (deleting them in one transaction), and the store declares `MaximumSetMembers` 1,900, the slice the facade reads a

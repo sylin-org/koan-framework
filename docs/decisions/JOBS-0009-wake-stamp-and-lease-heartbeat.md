@@ -3,6 +3,10 @@
 > **Status: Accepted 2026-08-25** · Extends JOBS-0005 §6 (two trigger models) with two completions:
 > framework-owned cross-node wake carriage that requires no adapter code, and running jobs that hold
 > their lease alive instead of being reclaimable mid-flight.
+>
+> **Amended by [JOBS-0010](JOBS-0010-jobs-never-starve-and-never-lose-an-update.md) (2026-10-30):** Decision A's one
+> row is sixteen shard rows; a bump writes one at random with a fresh random version and no read, still inside the
+> submission transaction, and a probe reads all of them in one bounded read.
 
 ## 1. Problem
 

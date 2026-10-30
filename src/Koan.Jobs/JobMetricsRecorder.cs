@@ -55,13 +55,20 @@ internal sealed class JobMetricsRecorder
         }
     }
 
-    /// <summary>Drop rollup rows last flushed before the cutoff (bucket-age retention).</summary>
+    /// <summary>Drop rollup rows last flushed before the cutoff (bucket-age retention), a bounded page at a time.</summary>
     public async Task<int> PurgeAsync(DateTimeOffset olderThan, CancellationToken ct = default)
     {
         using var storageScope = JobsStorageScope.Enter();
         if (!_enabled) return 0;
-        var stale = await JobMetric.Query(m => m.LastFlushedAt < olderThan, ct);
-        foreach (var r in stale) await JobMetric.Remove(r.Id, ct);
-        return stale.Count;
+        var purged = 0;
+        while (true)
+        {
+            var page = await JobMetric.Query(m => m.LastFlushedAt < olderThan,
+                QueryDefinition.All.WithPagination(1, Infrastructure.Constants.Retention.PageSize), ct);
+            if (page.Count == 0) return purged;
+            var removed = await JobMetric.Remove(page.Select(r => r.Id).ToList(), ct);
+            purged += removed;
+            if (page.Count < Infrastructure.Constants.Retention.PageSize || removed == 0) return purged;
+        }
     }
 }

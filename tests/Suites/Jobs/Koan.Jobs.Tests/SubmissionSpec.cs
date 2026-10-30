@@ -46,12 +46,14 @@ public sealed class SubmissionSpec
     [Fact]
     public async Task Submission_reports_declared_coalescing_without_hiding_source_multiplicity()
     {
+        // The same work item twice coalesces; another item is never coalesced away, whatever its key (JOBS-0010).
         DedupeJob.Reset();
         await using var host = await JobsHarness.StartInMemoryAsync();
+        var same = new DedupeJob { Key = "same" };
         var source = new[]
         {
-            new DedupeJob { Key = "same" },
-            new DedupeJob { Key = "same" },
+            same,
+            new DedupeJob { Id = same.Id, Key = "same" },
             new DedupeJob { Key = "different" }
         };
 

@@ -34,7 +34,7 @@ translation and execution.
 | Route resolution, read lanes, naming capability | `FirebirdAdapterFactory` (+ `AdapterConnectionResolver`) |
 | Dialect (quote, parameters, LIKE escape, path reads) | `FirebirdDialect` |
 | Plan per entity (SELECT, hydration, shadow columns, encoded scalars) | `FirebirdEntityPlan` : `RelationalEntityPlan` |
-| Capability declaration | `FirebirdFeatures` (scalar-only `FilterSupport`) |
+| Capability declaration | `FirebirdFeatures` (scalar-only `FilterSupport`; string equality not declared ordinal, as the adapter pins no collation) |
 | Store features for the schema owner | `FirebirdStoreFeatures` (all optional features false) |
 | Schema DDL, catalog describe, database creation | `FirebirdDdlExecutor` (RDB$ system tables; DdlGate) |
 | Repository surface | `FirebirdRepository` (`AdoCommands`/`SqlParameters`) |

@@ -53,11 +53,13 @@ public readonly struct JobStatics<T> where T : Entity<T>, IKoanJob<T>
     public Task<JobStatus?> Status(string workId, CancellationToken ct = default)
         => JobAmbient.Coordinator.StatusAsync(typeof(T).FullName!, workId, ct);
 
-    /// <summary>Query this type's jobs (facade / dashboard).</summary>
+    /// <summary>Query this type's jobs (facade / dashboard), newest first: the <see cref="JobQuery.Page"/> of
+    /// <see cref="JobQuery.Size"/> matches the query names (JOBS-0010).</summary>
     public Task<IReadOnlyList<JobRecord>> Query(JobQuery query, CancellationToken ct = default)
         => JobAmbient.Coordinator.WhereAsync(query with { WorkType = typeof(T).FullName! }, ct);
 
-    /// <summary>Convenience: this type's jobs in a given status.</summary>
+    /// <summary>Convenience: this type's newest jobs in a given status — the first page of
+    /// <see cref="JobQuery.DefaultSize"/>. Page further with <see cref="Query"/>.</summary>
     public Task<IReadOnlyList<JobRecord>> WithStatus(JobStatus status, CancellationToken ct = default)
         => JobAmbient.Coordinator.WhereAsync(new JobQuery(WorkType: typeof(T).FullName!, Status: status), ct);
 

@@ -63,6 +63,7 @@ lane, dispatch with `FCALL_RO`, pass explicit keys through `KEYS`, pass paramete
 - [DATA-0110 compact data adapter language](../../../../docs/decisions/DATA-0110-compact-data-adapter-language.md)
 
 Conditional replacement consumes a normalized Filter and qualifies it with CompileConditional before
-reading the document. Managed, binary and DateTime guards refuse. Immediate-expiry payloads also refuse
+reading the document. A DateTime guard compares by ticks and kind, a binary one by its bytes, and a
+managed guard field refuses. Immediate-expiry payloads also refuse
 before reads; they cannot take an ordinary delete outside the observed-value transaction condition.
 Existing bounded provider transaction retries remain internal to one Entity dispatch.

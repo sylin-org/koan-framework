@@ -115,5 +115,5 @@ An explicit external mapping codec remains responsible for its declared physical
 Existing numeric rows or columns require a separate, explicit migration; upgrades do not rewrite them automatically.
 
 Conditional replacement consumes the normalized Filter, qualifies it through CompileConditional, and
-retains the observed native CAS fence. Managed, binary and DateTime guard fields refuse before document
-reads because the CLR evaluator does not establish the required comparison meaning for those shapes.
+retains the observed native CAS fence. The CLR evaluator compares a DateTime by its ticks and kind and a
+binary value by its bytes; managed guard fields refuse before document reads.

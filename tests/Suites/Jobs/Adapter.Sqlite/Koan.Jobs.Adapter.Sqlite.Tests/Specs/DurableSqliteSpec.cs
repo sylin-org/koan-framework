@@ -13,6 +13,82 @@ namespace Koan.Jobs.Adapter.Sqlite.Tests.Specs;
 public sealed class DurableSqliteSpec
 {
     [Fact]
+    public async Task transactional_duplicates_coalesce_like_any_other()
+    {
+        // JOBS-0010: a submission inside a transaction coalesces onto one the same transaction made, onto a committed
+        // job, and is coalesced onto by a later submission outside any transaction.
+        DedupeJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var item = new DedupeJob { Key = "tx" };
+        using (EntityContext.Transaction("submit-twice"))
+        {
+            await item.Job.Submit();
+            await item.Job.Submit();
+            await EntityContext.Commit();
+        }
+        using (EntityContext.Transaction("submit-again"))
+        {
+            await item.Job.Submit();
+            await EntityContext.Commit();
+        }
+        await item.Job.Submit();
+
+        (await JobRecord.Query(r => r.WorkType == typeof(DedupeJob).FullName!)).Should().ContainSingle();
+        await host.Drain();
+        DedupeJob.Executions.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task duplicates_from_concurrent_transactions_run_once()
+    {
+        // JOBS-0010: two transactions that submit one key at once cannot see each other before they commit, so both commit
+        // a job; the first claim absorbs the other, and the key runs once.
+        DedupeJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var id = new DedupeJob { Key = "concurrent" }.Id;
+        var bothSubmitted = new Barrier(2);
+        await Task.WhenAll(Enumerable.Range(0, 2).Select(i => Task.Run(async () =>
+        {
+            using (EntityContext.Transaction($"concurrent-{i}"))
+            {
+                await new DedupeJob { Id = id, Key = "concurrent" }.Job.Submit();
+                bothSubmitted.SignalAndWait(TimeSpan.FromSeconds(10));
+                await EntityContext.Commit();
+            }
+        })));
+
+        var rows = await JobRecord.Query(r => r.WorkType == typeof(DedupeJob).FullName!);
+        rows.Should().HaveCount(2);
+        await host.Drain();
+
+        DedupeJob.Executions.Should().Be(1);
+        var settled = await JobRecord.Query(r => r.WorkType == typeof(DedupeJob).FullName!);
+        settled.Should().ContainSingle(r => r.Status == JobStatus.Completed);
+        settled.Should().ContainSingle(r => r.Status == JobStatus.Cancelled)
+            .Which.LastError.Should().Contain("Coalesced into job");
+    }
+
+    [Fact]
+    public async Task cancelling_inside_a_transaction_pages_through_every_queued_job()
+    {
+        // JOBS-0010: cancellation reads a work item's queued jobs a page at a time. Inside a transaction the writes wait
+        // for the commit, so the first page never empties; the cancel still reaches every job and returns.
+        GreetJob.Reset();
+        await using var host = await JobsHarness.StartSqliteAsync();
+        var item = new GreetJob { Name = "busy" };
+        for (var i = 0; i < 230; i++) await item.Job.Submit();
+
+        using (EntityContext.Transaction("cancel-many"))
+        {
+            await item.Job.Cancel().WaitAsync(TimeSpan.FromSeconds(30));
+            await EntityContext.Commit();
+        }
+
+        (await JobRecord.Count.Where(r => r.WorkId == item.Id && r.Status == JobStatus.Cancelled, Koan.Data.Abstractions.CountStrategy.Exact))
+            .Should().Be(230);
+    }
+
+    [Fact]
     public async Task named_source_work_executes_from_central_ledger_and_survives_restart()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"koan-jobs-address-root-{Guid.NewGuid():N}.db");

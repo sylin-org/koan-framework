@@ -81,7 +81,7 @@ dashboard queries span addresses unless their `JobQuery` includes address filter
 |---|---|
 | No durable data adapter | In-memory ledger; work is lost on restart |
 | SQLite, Postgres, SQL Server, Mongo, or another durable adapter | Data-backed ledger; job state survives restart |
-| Shared durable store across nodes | Competing consumers share the ledger; a one-row wake stamp lets peers discover submissions at short-probe cadence (JOBS-0009) |
+| Shared durable store across nodes | Competing consumers share the ledger; a sharded wake stamp lets peers discover submissions at short-probe cadence (JOBS-0009, JOBS-0010) |
 | `JobsOptions.DispatchMode = JobDispatchMode.Reservation` (opt-in) | The senior live roster node actively hands due work to named fleet members ("a cookie to a named hand"); a fresh reservation binds its hand and every claim stays CAS-fenced. Default remains pull/CAS competition (PMC-056) |
 | Direct Communication connector that claims framework signals, such as RabbitMQ | Wake becomes instant; the ledger remains the source of truth |
 
@@ -91,7 +91,8 @@ and `communication:framework-signals:default` through
 `/.well-known/Koan/facts` or `koan://facts`.
 The standard `/health/ready` response includes queue depth, running depth, reclaim backlog, and oldest
 queued age in Development; production returns only aggregate readiness. Per-work-item status and history
-are available through `entity.Job` and `Entity.Jobs`.
+are available through `entity.Job` and `Entity.Jobs`; `Entity.Jobs.Query` and `WithStatus` read one bounded
+page, newest first (`JobQuery.Page`, `JobQuery.Size`).
 
 Optional retained throughput is one operation surface rather than a framework Entity. Enable
 `JobsOptions.MetricsEnabled`, then read outcome totals that survive ledger retention:
@@ -129,7 +130,26 @@ Inspect `jobs:dispatch` alongside `jobs:ledger` through `/.well-known/Koan/facts
 ## Boundaries
 
 - Execution is at-least-once; handlers must be idempotent.
-- The in-memory tier is development/test convenience, not durability.
+- The in-memory tier is development/test convenience, not durability. It keeps settled jobs only up to
+  `JobsOptions.InMemoryTerminalCapacity` (4096), evicting the one that settled first. A `JobHandle` waiting on a
+  job still hears its outcome when it settles; one that asks after the job was evicted gets `JobOutcome.Unknown`,
+  never a failure.
+- `JobHandle.Completion` returns `JobOutcome.Settled`, `JobOutcome.TimedOut` (with the status reached) or
+  `JobOutcome.Unknown`. A handle on a submission coalesced into another job reports that job's outcome and names it
+  in `ServedBy`.
+- Submit never overwrites a stored work item; save your changes before you submit them. Settle writes back
+  only the members the handler changed — every member Koan persists, non-public setters included — onto the
+  item as stored then, guarded by every member the store can compare exactly; one it cannot, such as a list of
+  two or more elements, is named in the log. A member another writer changed to a different value meanwhile is a
+  conflict: the job
+  runs again on the stored item without spending an attempt or advancing its chain, up to
+  `JobsOptions.MaxWriteConflicts` (5) times, and is then dead-lettered as `DeadReason.Conflict` (JOBS-0010).
+- A `[JobIdempotent]` key never runs twice at once, and coalescing never crosses work items: duplicate submissions
+  of one item coalesce onto its queued job, concurrent ones included, while another item with the same properties gets
+  its own job; a duplicate never runs ahead of a deferral, and the key's next run serves every job of the key queued
+  before it. A submission inside a transaction coalesces
+  onto a committed job or one the same transaction made. Two transactions that submit one key at once both commit
+  a job, and the first claim absorbs the other, so the key still runs once.
 - `[JobPersistence(JobPersistenceMode.DataStore)]` fails host composition when no durable Data adapter is available;
   Koan never silently weakens that declared requirement to in-memory execution.
 - Durable SQLite behavior does not prove every distributed provider or topology.

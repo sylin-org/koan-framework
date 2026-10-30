@@ -26,13 +26,22 @@ internal sealed class JobWakeCoordinator(
         }
     }
 
-    public async Task WaitForWork(TimeSpan timeout, CancellationToken ct)
+    /// <summary>Wait until work may be ready or <paramref name="timeout"/> elapses. True when a hint arrived.</summary>
+    public async Task<bool> WaitForWork(TimeSpan timeout, CancellationToken ct)
         => await _pending.WaitAsync(timeout, ct).ConfigureAwait(false);
 
-    public ValueTask Handle(JobReadySignal signal, CancellationToken ct)
+    /// <summary>Hurry this node's dispatcher without crossing Communication: an execution settled, so capacity is free
+    /// and a successor may be ready.</summary>
+    public void Nudge()
     {
         try { _pending.Release(); }
         catch (SemaphoreFullException) { /* a wake is already pending — level-triggered coalescing */ }
+        catch (ObjectDisposedException) { /* the host is stopping */ }
+    }
+
+    public ValueTask Handle(JobReadySignal signal, CancellationToken ct)
+    {
+        Nudge();
         return ValueTask.CompletedTask;
     }
 

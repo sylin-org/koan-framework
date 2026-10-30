@@ -31,6 +31,13 @@ public sealed record FilterSupport(
     /// </summary>
     public int? MaximumSetMembers { get; init; }
 
+    /// <summary>
+    /// Whether the provider's string equality is ordinal: exact, code unit by code unit. False where the store's default
+    /// collation folds case (SQL Server, MySQL), so an <see cref="FilterOperator.Eq"/> on a string there also matches a
+    /// value that differs only by case. A caller that needs exact equality treats such a comparison as inexact.
+    /// </summary>
+    public bool OrdinalStrings { get; init; } = true;
+
     /// <summary>Can the provider push the operator on a field of the given kind?</summary>
     public bool CanPush(FilterOperator op, bool collectionField)
         => (collectionField ? CollectionOperators : ScalarOperators).Contains(op);

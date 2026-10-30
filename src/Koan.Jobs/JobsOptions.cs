@@ -82,6 +82,11 @@ public sealed class JobsOptions
     /// <summary>Spread applied past a deferral's release time to avoid a thundering herd.</summary>
     public TimeSpan RescheduleJitter { get; set; } = TimeSpan.FromSeconds(2);
 
+    /// <summary>How many times a job runs again because the changes it made to its work item conflicted with another
+    /// writer's (JOBS-0010). A conflict is valid work made against a stale item: it never consumes an attempt and never
+    /// advances a chain. Past this bound the job is dead-lettered as <see cref="DeadReason.Conflict"/>.</summary>
+    public int MaxWriteConflicts { get; set; } = 5;
+
     /// <summary>Base delay for exponential retry backoff.</summary>
     public TimeSpan RetryBaseDelay { get; set; } = TimeSpan.FromSeconds(2);
 
@@ -120,6 +125,14 @@ public sealed class JobsOptions
     /// <summary>Hard cap on terminal rows kept per work-type: the newest N survive, older terminal rows are trimmed on
     /// the archival sweep. Bounds a high-throughput burst that age-based windows alone miss (JOBS-0005 §19.3). Zero = no cap.</summary>
     public int RetainPerWorkType { get; set; }
+
+    /// <summary>How many settled jobs the in-memory ledger keeps for status and history reads (JOBS-0010). When it holds
+    /// more, the job that settled first is evicted; queued and running jobs are never evicted. Sizes memory only — the
+    /// durable ledger is governed by <see cref="ArchiveAfter"/>, <see cref="FailedAfter"/> and
+    /// <see cref="RetainPerWorkType"/>. Zero keeps none. A <c>JobHandle</c> already waiting on a job hears its outcome when it
+    /// settles, because the ledger tells it before it evicts the job; a status read finds no job, and a handle that asks
+    /// after the job was evicted reads <see cref="JobOutcome.Unknown"/>, never a failure.</summary>
+    public int InMemoryTerminalCapacity { get; set; } = 4096;
 
     /// <summary>How often the worker runs the archival sweep.</summary>
     public TimeSpan ArchiveInterval { get; set; } = TimeSpan.FromHours(1);

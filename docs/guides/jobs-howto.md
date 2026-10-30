@@ -89,9 +89,11 @@ Kick it off from anywhere—a controller, a service, a startup task:
 await new ThumbnailJob { SourceUrl = url }.Job.Submit();
 ```
 
-The job runs in the background. Koan persists the entity, claims the job on a worker, runs `Execute`, and—if you changed it—saves the entity it handed you. When `Execute` returns, the job is **Completed**.
+The job runs in the background. Koan writes the entity if it is new, claims the job on a worker, runs `Execute`, and—if you changed it—writes your changes back. When `Execute` returns, the job is **Completed**.
 
-> **Mutate the entity you're given.** Koan loads the work-item fresh, passes it to `Execute`, and persists *that* reference if you changed it (untouched → nothing is written). So do your work on the `job` parameter—don't reload a second copy and save it yourself, or your write and Koan's will race. Need an escape hatch? A handler that genuinely owns its own persistence simply leaves the passed entity untouched; Koan then writes nothing.
+> **Submit never overwrites a stored entity.** A new entity is written with its job; an entity already stored stays exactly as it is, so a change another writer committed after you read your copy survives the submit. Save your own changes before you submit them (JOBS-0010).
+>
+> **Mutate the entity you're given.** Koan loads the work-item fresh, passes it to `Execute`, and remembers it as Koan stores it. When `Execute` returns it writes back **only the members you changed** — any member Koan persists, state behind a `private set` included — onto the entity as it is stored at that moment (untouched → nothing is written). A change another writer made to a different member while the job ran stands. If another writer changed the *same* member to a different value, Koan writes nothing and runs the job again on the stored entity: a conflict is stale work, not a failure, so it never spends an attempt or advances a chain, and only after `JobsOptions.MaxWriteConflicts` (5) conflicts is the job dead-lettered as `DeadReason.Conflict`. Need an escape hatch? A handler that genuinely owns its own persistence simply leaves the passed entity untouched; Koan then writes nothing.
 
 **Check on it later** by the entity's id:
 
@@ -230,7 +232,7 @@ public sealed class PresetPackage : Entity<PresetPackage>, IKoanJob<PresetPackag
 }
 ```
 
-Submit the same `(Source, Version, action)` twice and only one job runs—the second submit coalesces onto the first.
+Submit the same item with the same `(Source, Version, action)` twice and only one job runs—the second submit coalesces onto the first. Coalescing never crosses work items: another `PresetPackage` with the same `Source` and `Version` gets its own job, so cancelling one item never takes another item's work with it. That holds for duplicates submitted at the same moment from many requests or nodes too: the queued job holds a unique slot for its key, and a duplicate's append meets that slot and coalesces instead of queuing beside it (JOBS-0010). Once a worker claims the job the slot is free again, so a submit that arrives while it runs queues exactly one follow-up; and a job of the key never runs beside another: while one runs, or while one waits out a `Reschedule` or a `Backoff`, the others wait too, and the next run serves them all. A handle on a job served that way follows the job that served it and reports that job's outcome, naming it in `ServedBy`. Inside an `EntityContext.Transaction` a duplicate coalesces onto a committed job or onto one the same transaction submitted; two transactions submitting one key at the same moment both commit a job, and the first one claimed absorbs the other, so the work still runs once.
 
 **When to use it.** Any job that could be submitted more than once for the same logical unit (a webhook retried by the sender, a user double-clicking, a sweep re-enqueuing).
 
@@ -305,7 +307,7 @@ The resolved key is frozen onto the job exactly like a property gate, so dispatc
 [JobAction("Reconcile",   Schedule = "00:10:00")]   // every 10 minutes (a TimeSpan interval)
 [JobAction("NightlySweep", Schedule = "0 2 * * *")] // cron — daily at 02:00 UTC
 [JobAction("Warm",         Schedule = "@boot")]      // once at startup
-[JobAction("Pump",         Schedule = "@continuous")]// every scheduler tick
+[JobAction("Pump",         Schedule = "@continuous")]// again as soon as the last run settled
 public sealed class Maintenance : Entity<Maintenance>, IKoanJob<Maintenance> { … }
 ```
 
@@ -321,7 +323,7 @@ One cadence per action: re-registering the same action with the same expression 
 a *different* expression fails correctively naming both. `Maintenance.Jobs.ResetSchedules()` clears
 gateway registrations for the type (test isolation); attribute schedules are untouched.
 
-`Schedule` accepts a **TimeSpan interval** (`"00:10:00"`), a **cron** expression (`"0 2 * * *"`), or a **sentinel** (`@boot`, `@continuous`). A scheduled action runs on its own **singleton** work-item, so its handler typically does the bulk operation or fans out per-entity submits:
+`Schedule` accepts a **TimeSpan interval** (`"00:10:00"`), a **cron** expression (`"0 2 * * *"`), or a **sentinel** (`@boot`, `@continuous`). `@continuous` fires again only once its previous run has settled and at least one `PollInterval` has passed since that run fired, so a pump writes one ledger row per settled run, never one per scheduler tick. The scheduler runs on its own timer beside the worker's other duties, so a long job never stops it. A scheduled action runs on its own **singleton** work-item, so its handler typically does the bulk operation or fans out per-entity submits:
 
 ```csharp
 public static async Task Execute(Maintenance _, JobContext ctx, CancellationToken ct)
@@ -331,7 +333,7 @@ public static async Task Execute(Maintenance _, JobContext ctx, CancellationToke
 }
 ```
 
-Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping tick **coalesces** onto the one still in flight instead of piling up.
+Pair a scheduled action with `[JobIdempotent]` (a stable key) so an overlapping tick **coalesces** onto the one still queued instead of piling up.
 
 **When to use it.** Periodic reconciliation, retries of a whole class of work, "every night at…" maintenance. It also makes the system self-healing: edge submits give low latency, the schedule guarantees the work eventually happens. To run a scheduled action **on demand**, see `Trigger` in §8.
 
@@ -366,9 +368,12 @@ await PresetPackage.Jobs.Trigger(Stage.Discover);
 
 // the type's job subsystem
 await PresetPackage.Jobs.Cancel(id);
-var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);
-var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch));
+var running = await PresetPackage.Jobs.WithStatus(JobStatus.Running);             // the newest 100
+var mine    = await PresetPackage.Jobs.Query(new JobQuery(Action: Stage.Fetch) { Page = 2, Size = 50 });
 ```
+
+`Query` and `WithStatus` read one bounded page, newest first by submission: `JobQuery.Page` (from 1) of
+`JobQuery.Size` matches, 100 by default. Read the next page to see more.
 
 **What the result means.** Scalar `Submit` and type-level `Trigger` return a `JobHandle`, so you can
 `await (await …).Completion(timeout)` to run-and-wait. Source `Submit` returns a fixed-size
@@ -424,7 +429,7 @@ public sealed class ImportWindow : Entity<ImportWindow>, IKoanJob<ImportWindow>
 await new ImportWindow { Source = "vendor:catalog" }.Job.Submit(ImportWindow.Pull);   // ONE ledger row
 ```
 
-`ctx.ContinueWith(action)` re-queues the *same* work-item, and Koan persists your cursor automatically (it saw `Offset` change). Want parallelism without the explosion? Start a few conveyors over disjoint stripes (`Offset ≡ stripe (mod P)`) — `P` in flight, not a million.
+`ctx.ContinueWith(action)` re-queues the *same* work-item, and Koan writes your cursor back automatically (it saw `Offset` change, and writes only that). Want parallelism without the explosion? Start a few conveyors over disjoint stripes (`Offset ≡ stripe (mod P)`) — `P` in flight, not a million.
 
 **When to use it.** Any time the source is large or external (tens of thousands of items and up). If you do mint a job per row at scale, Koan won't stop you — but the worker will log a **job-per-row warning** (`JobPerRowWarnThreshold`) pointing right back here.
 
@@ -457,11 +462,19 @@ Honor it in long-running handlers by passing `ct` to the calls you `await`. A ca
 | a data adapter (SQLite/Postgres/Mongo/SQL Server) | **durable**—survive restarts |
 | several nodes on the same store | **distributed**—nodes share the work |
 
-**Cross-node wake cadence (numbers).** With a durable ledger, every submission bumps a one-row stamp in
-the same transaction and each node probes it every 250 ms (`JobsOptions.WakeProbeInterval`), so peers
-pick up new work well under one second; the full claim scan still runs at most every `PollInterval`
-(1 s default). A restarted host claims due work within roughly a second of boot — size kill/restart
-tests accordingly. Referencing a Communication connector makes wake signal-instant instead (JOBS-0009).
+**Cross-node wake cadence (numbers).** With a durable ledger, every submission writes one of sixteen
+wake-stamp rows, chosen at random, in the same transaction, and each node reads them every 250 ms
+(`JobsOptions.WakeProbeInterval`), so peers pick up new work well under one second; the full claim scan
+still runs at most every `PollInterval` (1 s default). Spreading the stamp keeps transactions that submit
+jobs from queuing on one row (JOBS-0010). A restarted host claims due work within roughly a second of boot
+— size kill/restart tests accordingly. Referencing a Communication connector makes wake signal-instant
+instead (JOBS-0009).
+
+**The worker never waits on its own work.** The roster heartbeat, the reaper, the scheduler, the archival
+sweep and the metrics flush each run on their own timer, and the dispatcher claims ready work up to
+`WorkerConcurrency` and runs each job in the background. A node running a job longer than the death
+timeout keeps heartbeating, so no peer declares it dead; a node working a backlog keeps scheduling,
+reaping and archiving (JOBS-0010).
 
 **Per-type control.** Override the tier for one model with `[JobPersistence]`:
 
@@ -470,7 +483,7 @@ tests accordingly. Referencing a Communication connector makes wake signal-insta
 public sealed class PingJob : Entity<PingJob>, IKoanJob<PingJob> { … }
 ```
 
-`Auto` (default) follows your adapters; `InMemory` keeps a job's queue state volatile even when a store is present (the orchestration is ephemeral—handy for a torrent of fire-and-forget work you don't want touching the database); `DataStore` insists on durability. Mixed tiers coexist in one app: durable and in-memory jobs run side by side, and a cooperative gate (§6) set by one is honored by the other—so a 429 backoff still protects a shared host across tiers.
+`Auto` (default) follows your adapters; `InMemory` keeps a job's queue state volatile even when a store is present (the orchestration is ephemeral—handy for a torrent of fire-and-forget work you don't want touching the database); `DataStore` insists on durability. The in-memory ledger keeps settled jobs for status and history reads only up to `JobsOptions.InMemoryTerminalCapacity` (4096 by default), evicting the one that settled first; queued and running jobs are never evicted. Mixed tiers coexist in one app: durable and in-memory jobs run side by side, and a cooperative gate (§6) set by one is honored by the other—so a 429 backoff still protects a shared host across tiers.
 
 `DataStore` is corrective rather than aspirational: when no durable Data adapter is available, host composition fails
 and names the affected work types. Koan never silently weakens that declaration to in-memory execution.
@@ -515,7 +528,7 @@ job, while the reverse order can leave a job without a later Entity write. A bus
 requires a durable outbox must model the intent in one atomic aggregate or add application-owned,
 idempotent recovery; the ambient coordinator alone does not provide that guarantee.
 
-**Retention.** A sweep keeps the active ledger lean three ways, all configurable in `JobsOptions` and all running every `ArchiveInterval` (default 1 h):
+**Retention.** A sweep keeps the active ledger lean three ways, all configurable in `JobsOptions` and all running every `ArchiveInterval` (default 1 h), each a page of rows at a time so a backlog never loads at once. The same sweep removes resource gates (§6) once they have released:
 
 - **Completed/Cancelled** older than `ArchiveAfter` (default **7 days**) are purged.
 - **Failed/Dead** older than `FailedAfter` (default **30 days**) are purged — queryable and replayable until then. Set `FailedAfter` to zero to retain failures indefinitely.
@@ -634,7 +647,7 @@ result.Settled.Status.Should().Be(JobStatus.Completed);
 result.Successor!.Action.Should().Be(Stage.Parse);
 result.Successor.Status.Should().Be(JobStatus.Queued);
 
-// Assert entity mutations (auto-save persisted the handler's writes)
+// Assert entity mutations (settle wrote back the properties the handler changed)
 var saved = await Pipeline.Get(pipeline.Id);
 saved!.Fetched.Should().Be("raw");
 saved.Trail.Should().Equal(Stage.Fetch);   // Parse has NOT run
@@ -721,9 +734,9 @@ await myJob.Job.Submit();                 await myJob.Job.Submit(action);
 await myJob.Job.Submit(action, TimeSpan.FromMinutes(5));   // `after` is a TimeSpan delay
 await myJob.Job.Submit("", TimeSpan.FromSeconds(10));      // single-action jobs: pass "" as the action to delay one
 var handle = await myJob.Job.Submit();
-var outcome = await handle.Completion(TimeSpan.FromSeconds(30));  // JobOutcome { Status, Error }; ledger-polled
+var outcome = await handle.Completion(TimeSpan.FromSeconds(30));  // Settled { Status, Error, ServedBy } | TimedOut { Status } | Unknown
 await myJob.Job.Cancel();                 await MyJob.Jobs.Cancel(id);
-await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);   // → IReadOnlyList<JobRecord>
+await myJob.Job.Status();                 await MyJob.Jobs.WithStatus(JobStatus.Running);   // → the newest page of JobRecord
 // All .Job / .Jobs surfaces are ambient: they require the Koan host to be STARTED (after app.StartAsync()).
 // Querying before startup throws KoanHostContextException naming the missing service.
 await MyJob.Jobs.Trigger(action);         // type-level action, no instance (schedule's on-demand twin)

@@ -71,7 +71,9 @@ public sealed class SnapVaultUploadProgressSpec
 
         // Stage flows from the ledger's ProgressMessage — the field the rebuilt pipeline sets via ctx.Progress.
         var rec0 = (await PhotoProcessingJob.Jobs.Query(new JobQuery(WorkId: jobs[0].Id))).Single();
-        await ledger.Progress(rec0.Id, 0.5, PhotoProcessingStage.Thumbnails, CancellationToken.None);
+        rec0.ProgressFraction = 0.5;
+        rec0.ProgressMessage = PhotoProcessingStage.Thumbnails;
+        (await ledger.Update(rec0, CancellationToken.None)).Should().BeTrue();
         using (Tenant.Use(studio)) snap = await UploadProgressProjection.SnapshotAsync(batch);
         snap.Photos.Single(p => p.FileName == "photo-0.jpg").Stage.Should().Be("thumbnails");
         snap.IsComplete.Should().BeFalse();

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Linq;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -6,9 +7,12 @@ using Microsoft.Extensions.Options;
 namespace Koan.Jobs;
 
 /// <summary>
-/// Drives the orchestrator in production (Normal mode): boot recovery, then a loop of reaper sweep → scheduled
-/// release → drain, paced by <c>PollInterval</c>. Disabled in <see cref="JobMode.Inline"/> and when
-/// <c>EnableWorker</c> is false (deterministic tests drive the orchestrator/scheduler directly).
+/// Drives the orchestrator in production (Normal mode). After boot recovery, every duty runs on its own timer — the
+/// roster heartbeat, the reaper, the scheduler, the archival sweep and the metrics flush — beside a dispatcher that
+/// claims ready work up to this node's capacity and starts each execution as a background task this service owns.
+/// No duty waits on another, so a node running a long job keeps heartbeating and a node working a backlog keeps
+/// scheduling, reaping and archiving. Disabled in <see cref="JobMode.Inline"/> and when <c>EnableWorker</c> is false
+/// (deterministic tests drive the orchestrator and scheduler directly).
 /// </summary>
 internal sealed class JobWorkerService : BackgroundService
 {
@@ -20,6 +24,7 @@ internal sealed class JobWorkerService : BackgroundService
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<JobWorkerService> _logger;
+    private readonly ConcurrentDictionary<Task, byte> _executions = new();
 
     public JobWorkerService(JobOrchestrator orchestrator, JobScheduler scheduler, IJobLedger ledger,
         JobTypeRegistry registry, JobWakeCoordinator wake, IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobWorkerService> logger)
@@ -48,105 +53,187 @@ internal sealed class JobWorkerService : BackgroundService
             await _scheduler.RecoverAsync(stoppingToken);          // reclaim anything left mid-flight by a crash
             await _scheduler.SubmitBootActionsAsync(stoppingToken); // fire @boot actions once
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
         catch (Exception ex) { _logger.LogError(ex, "Job boot sequence failed"); }
 
-        var lastReap = _clock.GetUtcNow();
-        var lastArchive = _clock.GetUtcNow();
-        var lastFlush = _clock.GetUtcNow();
-        var lastDrain = _clock.GetUtcNow();
-        var lastSeenStamp = -1L;
-        // JOBS-0009: with a durable ledger, the single-row WakeStamp probe lets peers notice submissions at
-        // WakeProbeInterval cadence while the expensive full claim scan still runs at most one PollInterval apart.
-        var probesWakeStamp = _ledger is RoutingJobLedger or DataJobLedger;
-        if (probesWakeStamp)
-            lastSeenStamp = await WakeStamp.ReadVersion(stoppingToken);
-        var iterationFailed = false;
+        try
+        {
+            await Task.WhenAll(
+                Duty("roster heartbeat", _options.WorkerHeartbeatInterval, _orchestrator.BeatAsync, runFirst: false, stoppingToken),
+                Duty("reaper", _options.ReaperInterval, _scheduler.ReapAsync, runFirst: false, stoppingToken),
+                Duty("scheduler", _options.PollInterval, _scheduler.TriggerDueAsync, runFirst: true, stoppingToken),
+                Duty("archival sweep", _options.ArchiveInterval, ct => _orchestrator.ArchiveAsync(ct), runFirst: false, stoppingToken),
+                _options.MetricsEnabled
+                    ? Duty("metrics flush", _options.MetricsFlushInterval, _orchestrator.FlushMetricsAsync, runFirst: false, stoppingToken)
+                    : Task.CompletedTask,
+                DispatchAsync(stoppingToken));
+        }
+        finally
+        {
+            // Every execution observes the stopping token: its handler is cancelled and its job re-queued for reclaim.
+            // The service waits for those settlements before it leaves the roster.
+            await Task.WhenAll(_executions.Keys);
+
+            // Graceful departure: resign from the fleet roster so peers see the planned shutdown
+            // immediately instead of waiting out the death timeout (PMC-055). Best-effort.
+            try { await _orchestrator.ResignAsync(CancellationToken.None); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Fleet-roster resignation failed on shutdown"); }
+
+            // Flush the last accumulated deltas on graceful stop (best-effort; metrics are lossy-tolerant).
+            if (_options.MetricsEnabled)
+                try { await _orchestrator.FlushMetricsAsync(CancellationToken.None); } catch (Exception ex) { _logger.LogDebug(ex, "Final metrics flush failed"); }
+        }
+    }
+
+    /// <summary>One duty on its own timer. The first failure is logged at Error, repeats at Debug, and recovery once at
+    /// Information; health is the persistent operator signal. A failing duty never pauses another.</summary>
+    private async Task Duty(string name, TimeSpan interval, Func<CancellationToken, Task> run, bool runFirst, CancellationToken stoppingToken)
+    {
+        var period = Period(interval);
+        if (!runFirst && !await Pause(period, stoppingToken)) return;
+        var failed = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var now = _clock.GetUtcNow();
-                if (now - lastReap >= _options.ReaperInterval)
+                await run(stoppingToken);
+                if (failed)
                 {
-                    await _scheduler.ReapAsync(stoppingToken);
-                    lastReap = now;
-                }
-                if (now - lastArchive >= _options.ArchiveInterval)
-                {
-                    await _orchestrator.ArchiveAsync(stoppingToken);
-                    lastArchive = now;
-                }
-                if (_options.MetricsEnabled && now - lastFlush >= _options.MetricsFlushInterval)
-                {
-                    await _orchestrator.FlushMetricsAsync(stoppingToken);   // §20.2 throughput rollup
-                    lastFlush = now;
-                }
-                await _scheduler.TriggerDueAsync(stoppingToken);   // recurring initiator: submit due scheduled actions
-                await _orchestrator.BeatAsync(stoppingToken);      // fleet-roster heartbeat (self-throttled, PMC-055)
-                await _orchestrator.AssignReservationsAsync(stoppingToken);   // dispatch duty when Reservation (PMC-056)
-
-                var due = now - lastDrain >= _options.PollInterval;
-                if (!probesWakeStamp)
-                {
-                    await _orchestrator.DrainAsync(stoppingToken);
-                    lastDrain = _clock.GetUtcNow();
-                }
-                else
-                {
-                    var stamp = await WakeStamp.ReadVersion(stoppingToken);
-                    var moved = stamp >= 0 && lastSeenStamp >= 0 && stamp != lastSeenStamp;
-                    if (moved || due)
-                    {
-                        await _orchestrator.DrainAsync(stoppingToken);
-                        lastDrain = _clock.GetUtcNow();
-                        lastSeenStamp = await WakeStamp.ReadVersion(stoppingToken);   // absorb bumps our drain just served
-                        if (lastSeenStamp < 0) lastSeenStamp = stamp;                  // keep the prior baseline on a failed read
-                    }
-                    else if (stamp >= 0)
-                    {
-                        lastSeenStamp = stamp;
-                    }
-                }
-
-                if (iterationFailed)
-                {
-                    _logger.LogInformation("Job worker recovered after a failed iteration");
-                    iterationFailed = false;
+                    _logger.LogInformation("Job worker {Duty} recovered after a failure", name);
+                    failed = false;
                 }
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
-                if (!iterationFailed)
-                    _logger.LogError(ex, "Job worker iteration failed; retrying at the configured poll interval");
-                else
-                    _logger.LogDebug(ex, "Job worker iteration remains unavailable");
-                iterationFailed = true;
+                if (!failed) _logger.LogError(ex, "Job worker {Duty} failed; retrying on its interval", name);
+                else _logger.LogDebug(ex, "Job worker {Duty} remains unavailable", name);
+                failed = true;
             }
 
-            // A healthy worker wakes immediately on a submit signal, and with a durable ledger re-probes the
-            // wake stamp at WakeProbeInterval. After a failure, bypass pending wake signals so an unavailable
-            // ledger cannot create a hot retry loop; the health contributor remains the durable signal.
+            if (!await Pause(period, stoppingToken)) return;
+        }
+    }
+
+    /// <summary>The dispatcher. It wakes on a submission hint, on a settled execution, on a moved wake stamp
+    /// (JOBS-0009) or at <c>PollInterval</c>, claims ready work up to this node's free capacity, starts each execution
+    /// in the background and returns to waiting. It never waits for an execution to finish.</summary>
+    private async Task DispatchAsync(CancellationToken stoppingToken)
+    {
+        // With a durable ledger, the wake stamp lets peers notice submissions at WakeProbeInterval cadence while the
+        // full claim scan still runs at most one PollInterval apart.
+        var probesWakeStamp = _ledger is RoutingJobLedger or DataJobLedger;
+        var lastSeenStamp = probesWakeStamp ? await WakeStamp.ReadVersion(stoppingToken) : -1L;
+        var lastPass = DateTimeOffset.MinValue;
+        var signaled = true;   // the first pass runs at once
+        var failed = false;
+        while (!stoppingToken.IsCancellationRequested)
+        {
             try
             {
-                var wait = probesWakeStamp && _options.WakeProbeInterval < _options.PollInterval
-                    ? _options.WakeProbeInterval
-                    : _options.PollInterval;
-                if (iterationFailed)
-                    await Task.Delay(_options.PollInterval, stoppingToken);
-                else
-                    await _wake.WaitForWork(wait, stoppingToken);
+                var pass = !probesWakeStamp || signaled || _clock.GetUtcNow() - lastPass >= _options.PollInterval;
+                if (!pass)
+                {
+                    var stamp = await WakeStamp.ReadVersion(stoppingToken);
+                    pass = stamp >= 0 && lastSeenStamp >= 0 && stamp != lastSeenStamp;
+                    if (!pass && stamp >= 0) lastSeenStamp = stamp;
+                }
+
+                if (pass)
+                {
+                    await DispatchPassAsync(stoppingToken);
+                    lastPass = _clock.GetUtcNow();
+                    if (probesWakeStamp)
+                    {
+                        var absorbed = await WakeStamp.ReadVersion(stoppingToken);   // absorb bumps this pass served
+                        if (absorbed >= 0) lastSeenStamp = absorbed;
+                    }
+                }
+
+                if (failed)
+                {
+                    _logger.LogInformation("Job worker dispatcher recovered after a failure");
+                    failed = false;
+                }
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception ex)
+            {
+                if (!failed) _logger.LogError(ex, "Job worker dispatch failed; retrying at the configured poll interval");
+                else _logger.LogDebug(ex, "Job worker dispatch remains unavailable");
+                failed = true;
+            }
+
+            // A healthy dispatcher wakes at once on a hint or a settled execution, and with a durable ledger re-probes
+            // the stamp at WakeProbeInterval. After a failure it bypasses pending hints so an unavailable ledger cannot
+            // create a hot retry loop.
+            if (failed)
+            {
+                signaled = false;
+                if (!await Pause(Period(_options.PollInterval), stoppingToken)) break;
+                continue;
+            }
+
+            var wait = probesWakeStamp && _options.WakeProbeInterval < _options.PollInterval
+                ? _options.WakeProbeInterval
+                : _options.PollInterval;
+            try { signaled = await _wake.WaitForWork(Chunk(Period(wait)), stoppingToken); }
             catch (OperationCanceledException) { break; }
         }
+    }
 
-        // Graceful departure: resign from the fleet roster so peers see the planned shutdown
-        // immediately instead of waiting out the death timeout (PMC-055). Best-effort.
-        try { await _orchestrator.ResignAsync(CancellationToken.None); }
-        catch (Exception ex) { _logger.LogDebug(ex, "Fleet-roster resignation failed on shutdown"); }
+    /// <summary>Claim ready work while this node has capacity, starting each execution without awaiting it.</summary>
+    private async Task DispatchPassAsync(CancellationToken stoppingToken)
+    {
+        await _orchestrator.AssignReservationsAsync(stoppingToken);   // dispatch duty when Reservation (PMC-056)
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            if (_options.WorkerConcurrency > 0 && _executions.Count >= _options.WorkerConcurrency) return;
+            var execution = await _orchestrator.TryStartNextAsync(stoppingToken, stoppingToken);
+            if (execution is null) return;
+            Track(execution);
+        }
+    }
 
-        // Flush the last accumulated deltas on graceful stop (best-effort; metrics are lossy-tolerant).
-        if (_options.MetricsEnabled)
-            try { await _orchestrator.FlushMetricsAsync(CancellationToken.None); } catch (Exception ex) { _logger.LogDebug(ex, "Final metrics flush failed"); }
+    /// <summary>Own an execution until it settles; its settlement frees capacity and may have appended a successor, so
+    /// it hurries the dispatcher.</summary>
+    private void Track(Task execution)
+    {
+        _executions.TryAdd(execution, 0);
+        _ = execution.ContinueWith(
+            static (settled, state) =>
+            {
+                var worker = (JobWorkerService)state!;
+                worker._executions.TryRemove(settled, out _);
+                worker._wake.Nudge();
+            },
+            this,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    /// <summary>Wait <paramref name="period"/> on the injected clock, in waits no longer than a timer accepts, so any
+    /// interval works — <see cref="TimeSpan.MaxValue"/> included, which never elapses. False when the worker stops.</summary>
+    private async Task<bool> Pause(TimeSpan period, CancellationToken stoppingToken)
+    {
+        try
+        {
+            for (var remaining = period; remaining > TimeSpan.Zero; remaining -= Chunk(remaining))
+                await Task.Delay(Chunk(remaining), _clock, stoppingToken);
+            return true;
+        }
+        catch (OperationCanceledException) { return false; }
+    }
+
+    /// <summary>The longest single wait a timer accepts is about 49.7 days; a longer interval is waited in parts.</summary>
+    private static TimeSpan Chunk(TimeSpan period)
+        => period > Infrastructure.Constants.Worker.LongestWait ? Infrastructure.Constants.Worker.LongestWait : period;
+
+    /// <summary>A non-positive interval runs the duty at the poll cadence rather than in a tight loop.</summary>
+    private TimeSpan Period(TimeSpan interval)
+    {
+        var period = interval > TimeSpan.Zero ? interval : _options.PollInterval;
+        return period > TimeSpan.Zero ? period : Infrastructure.Constants.Worker.MinimumPeriod;
     }
 }

@@ -32,6 +32,26 @@ internal static class JobLedgerPredicates
         return p ?? (static r => true);
     }
 
+    /// <summary>The same query as <see cref="ForQuery"/>, as a plain predicate for a ledger that holds its rows in memory:
+    /// the axes are normalized once and nothing is compiled per call.</summary>
+    public static Func<JobRecord, bool> Matcher(JobQuery q)
+    {
+        var source = q.WorkSource is { } s ? JobDataRoute.NormalizeSource(s) ?? "" : null;
+        var adapter = q.WorkAdapter is { } a ? JobDataRoute.NormalizeSelector(a) ?? "" : null;
+        var partition = q.WorkPartition;
+        return r => (q.WorkType is null || r.WorkType == q.WorkType)
+                    && (q.WorkId is null || r.WorkId == q.WorkId)
+                    && (q.Action is null || r.Action == q.Action)
+                    && (q.Status is null || r.Status == q.Status)
+                    && Axis(r.WorkSource, source)
+                    && Axis(r.WorkAdapter, adapter)
+                    && Axis(r.WorkPartition, partition);
+
+        // A null axis spans every value; an empty one selects the default, which a legacy row holds as null.
+        static bool Axis(string? value, string? wanted)
+            => wanted is null || (wanted.Length == 0 ? string.IsNullOrEmpty(value) : value == wanted);
+    }
+
     /// <summary>Non-terminal = Created/Queued/Running, as an **equality set**, not <c>Status &lt; Completed</c>:
     /// Mongo persists the enum by NAME, where ordering is lexicographic (not numeric), so an ordering comparison
     /// silently mismatches there. Equality translates on every store (JSON-number on relational, name on Mongo).</summary>

@@ -10,22 +10,26 @@ namespace Koan.Jobs;
 /// Recurrence comes from re-submitting; overlap is collapsed by coalescing (a stable <c>[JobIdempotent]</c> key).
 /// One engine subsumes the legacy reaper (<c>@continuous</c> reclaim), boot recovery (<c>@boot</c>), and recurring
 /// reconciles. Every submit is a type-level <see cref="IJobCoordinator.TriggerAsync"/> against the per-type singleton.
+/// The worker ticks it on its own timer (JOBS-0010), so a submission it makes never wakes it.
 /// </summary>
 internal sealed class JobScheduler
 {
     private readonly IJobCoordinator _coordinator;
+    private readonly IJobLedger _ledger;
     private readonly JobTypeRegistry _registry;
     private readonly JobOrchestrator _orchestrator;
     private readonly JobsOptions _options;
     private readonly TimeProvider _clock;
     private readonly ILogger<JobScheduler> _logger;
     private readonly Dictionary<(string Type, string Action), DateTimeOffset> _lastRun = new();
+    private readonly Dictionary<(string Type, string Action), string> _continuousRun = new();
     private readonly Dictionary<string, CronExpression?> _cronCache = new(StringComparer.Ordinal);
 
-    public JobScheduler(IJobCoordinator coordinator, JobTypeRegistry registry, JobOrchestrator orchestrator,
+    public JobScheduler(IJobCoordinator coordinator, IJobLedger ledger, JobTypeRegistry registry, JobOrchestrator orchestrator,
         IOptions<JobsOptions> options, TimeProvider clock, ILogger<JobScheduler> logger)
     {
         _coordinator = coordinator;
+        _ledger = ledger;
         _registry = registry;
         _orchestrator = orchestrator;
         _options = options.Value;
@@ -51,8 +55,9 @@ internal sealed class JobScheduler
     }
 
     /// <summary>Submit a fresh job for every scheduled action whose cadence is due. The worker calls this each tick;
-    /// tests call it explicitly. First fire is immediate; thereafter gated by the interval. <c>@continuous</c> fires
-    /// every tick.</summary>
+    /// tests call it explicitly. First fire is immediate; thereafter gated by the interval. <c>@continuous</c> re-arms
+    /// only after its previous run settled, and no sooner than one <c>PollInterval</c> after its previous fire — one
+    /// ledger row per settled run, never one per tick (JOBS-0010).</summary>
     public async Task TriggerDueAsync(CancellationToken ct = default)
     {
         var now = _clock.GetUtcNow();
@@ -96,7 +101,16 @@ internal sealed class JobScheduler
             return;
         }
 
-        // interval / @continuous
+        if (kind is ScheduleKind.Continuous)
+        {
+            if (_lastRun.TryGetValue(key, out var fired) && now - fired < _options.PollInterval) return;
+            if (_continuousRun.TryGetValue(key, out var previous) && await _ledger.Get(previous, ct) is { IsTerminal: false })
+                return;   // the previous run has not settled: a pump never queues behind itself
+            _lastRun[key] = now;
+            _continuousRun[key] = (await _coordinator.TriggerAsync(binding.WorkType, action, ct)).JobId;
+            return;
+        }
+
         if (_lastRun.TryGetValue(key, out var last) && now - last < interval) return;
         _lastRun[key] = now;
         await _coordinator.TriggerAsync(binding.WorkType, action, ct);

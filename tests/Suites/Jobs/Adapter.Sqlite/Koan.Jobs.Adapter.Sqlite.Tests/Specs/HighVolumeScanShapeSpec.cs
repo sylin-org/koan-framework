@@ -90,8 +90,8 @@ public sealed class HighVolumeScanShapeSpec(ITestOutputHelper output)
         for (var i = 0; i < BaselineRows; i++) await Make($"s{i}", JobStatus.Completed, now, now).Save();
         perRow.Stop();
 
-        (await h.Ledger.Query(new JobQuery(WorkType: WorkType, Status: JobStatus.Completed), default))
-            .Should().HaveCount(50_000 + BaselineRows);
+        (await JobRecord.Count.Where(r => r.WorkType == WorkType && r.Status == JobStatus.Completed, Koan.Data.Abstractions.CountStrategy.Exact))
+            .Should().Be(50_000 + BaselineRows);
 
         var batchedCost = batched.Elapsed.TotalMilliseconds / records.Count;
         var perRowCost = perRow.Elapsed.TotalMilliseconds / BaselineRows;
