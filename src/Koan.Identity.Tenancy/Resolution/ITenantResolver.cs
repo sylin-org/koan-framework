@@ -9,6 +9,9 @@ public interface ITenantResolver
     /// <summary>A short stable name used in runtime explanation.</summary>
     string Name { get; }
 
+    /// <summary>Where this carrier stands when a request's carriers disagree.</summary>
+    TenantCarrierRank Rank { get; }
+
     /// <summary>Return the candidate tenant id, or <c>null</c> when this carrier is absent.</summary>
     ValueTask<string?> ResolveAsync(TenantResolutionRequest request, CancellationToken ct = default)
         => new((string?)null);

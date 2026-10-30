@@ -14,6 +14,8 @@ internal sealed class HeaderTenantResolver(IOptions<TenancyResolutionOptions> op
 
     public string Name => "header";
 
+    public TenantCarrierRank Rank => TenantCarrierRank.Request;
+
     public async ValueTask<string?> ResolveAsync(TenantResolutionRequest request, CancellationToken ct = default)
         => await TenantCodeResolver.ResolveToTenantIdAsync(request.Header(_options.HeaderName), ct).ConfigureAwait(false);
 }

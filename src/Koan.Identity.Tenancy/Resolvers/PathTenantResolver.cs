@@ -14,6 +14,8 @@ internal sealed class PathTenantResolver(IOptions<TenancyResolutionOptions> opti
 
     public string Name => "path";
 
+    public TenantCarrierRank Rank => TenantCarrierRank.Address;
+
     public async ValueTask<string?> ResolveAsync(TenantResolutionRequest request, CancellationToken ct = default)
     {
         var code = ExtractCode(request.Path, _options.PathPrefix);

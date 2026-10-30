@@ -14,6 +14,8 @@ internal sealed class SubdomainTenantResolver(IOptions<TenancyResolutionOptions>
 
     public string Name => "subdomain";
 
+    public TenantCarrierRank Rank => TenantCarrierRank.Address;
+
     public async ValueTask<string?> ResolveAsync(TenantResolutionRequest request, CancellationToken ct = default)
     {
         var code = ExtractCode(request.Host, _options.BaseHosts);

@@ -13,6 +13,8 @@ internal sealed class TenantResolutionContributor(
     IEnumerable<ITenantResolver> resolvers,
     IOptions<TenancyResolutionOptions> options) : IWebContextContributor
 {
+    private readonly ILookup<TenantCarrierRank, ITenantResolver> _ranks = resolvers.ToLookup(static resolver => resolver.Rank);
+
     public int Order => 100;
 
     public async ValueTask ContributeAsync(WebContext webContext)
@@ -31,11 +33,13 @@ internal sealed class TenantResolutionContributor(
             Claim: type => context.User.FindFirst(type)?.Value,
             Header: name => context.Request.Headers.TryGetValue(name, out var value) ? value.ToString() : null);
 
-        string? candidate = null;
-        foreach (var resolver in resolvers)
+        var (candidate, disagreed) = await ResolveCandidate(request, context.RequestAborted).ConfigureAwait(false);
+        if (disagreed)
         {
-            candidate = await resolver.ResolveAsync(request, context.RequestAborted).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(candidate)) break;
+            // Two carriers of one rank name different tenants: nothing says which the person means. Existence-hiding
+            // like every other refusal of a tenant the person cannot reach.
+            webContext.Reject();
+            return;
         }
         if (string.IsNullOrEmpty(candidate)) return;
 
@@ -52,6 +56,29 @@ internal sealed class TenantResolutionContributor(
         if (ProjectRoles(context.User, memberships) is { } augmented)
             webContext.UsePrincipal(augmented);
         webContext.Use(() => Tenant.Use(candidate));
+    }
+
+    /// <summary>
+    /// The tenant the request names: the lowest rank that names one decides (<see cref="TenantCarrierRank"/>), and every
+    /// carrier of that rank must agree. Ranks below it are not read, so what the address decides costs no other carrier.
+    /// </summary>
+    private async ValueTask<(string? Candidate, bool Disagreed)> ResolveCandidate(TenantResolutionRequest request, CancellationToken ct)
+    {
+        foreach (var rank in Enum.GetValues<TenantCarrierRank>())
+        {
+            string? named = null;
+            foreach (var resolver in _ranks[rank])
+            {
+                var candidate = await resolver.ResolveAsync(request, ct).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(candidate)) continue;
+                if (named is not null && !StringComparer.Ordinal.Equals(named, candidate)) return (null, true);
+                named = candidate;
+            }
+
+            if (named is not null) return (named, false);
+        }
+
+        return (null, false);
     }
 
     /// <summary>Project tenant roles without ever conferring a reserved host role.</summary>

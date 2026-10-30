@@ -94,6 +94,139 @@ public sealed class TenantResolutionSpec : IdentityHostScopedSpec
         read.Should().Throw<OptionsValidationException>();
     }
 
+    /// <summary>
+    /// A member of two tenants whose session names one, or whose client sends a stray header naming it, is on the other
+    /// tenant's page: the request acts on the tenant the address shows.
+    /// </summary>
+    [Fact]
+    public async Task The_address_the_person_sees_wins_over_a_stray_header_and_a_session_claim()
+    {
+        await new Identity { Id = "address-alice" }.Save();
+        await new TenantRecord { Id = "tr-address-a", Name = "A", Code = "address-a" }.Save();
+        await new TenantRecord { Id = "tr-address-b", Name = "B", Code = "address-b" }.Save();
+        await new Membership { TenantId = "tr-address-a", IdentityId = "address-alice", Roles = { "koan:member" } }.Save();
+        await new Membership { TenantId = "tr-address-b", IdentityId = "address-alice", Roles = { "koan:member" } }.Save();
+
+        var scoped = await RunContextAsync(ctx =>
+        {
+            ctx.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "address-alice"), new Claim("tenant", "tr-address-a")], "test"));
+            ctx.Request.Headers["X-Koan-Tenant"] = "address-a";
+            ctx.Request.Path = "/t/address-b/orders";
+        });
+
+        scoped.Should().Be("tr-address-b", "the page shows B, so the request acts on B");
+    }
+
+    [Fact]
+    public async Task An_address_the_person_is_no_member_of_is_not_replaced_by_a_tenant_a_stray_header_names()
+    {
+        await new Identity { Id = "address-bob" }.Save();
+        await new TenantRecord { Id = "tr-own", Name = "Own", Code = "own" }.Save();
+        await new TenantRecord { Id = "tr-foreign", Name = "Foreign", Code = "foreign" }.Save();
+        await new Membership { TenantId = "tr-own", IdentityId = "address-bob", Roles = { "koan:member" } }.Save();
+
+        var scoped = await RunContextAsync(ctx =>
+        {
+            SignedIn(ctx, "address-bob");
+            ctx.Request.Headers["X-Koan-Tenant"] = "own";
+            ctx.Request.Path = "/t/foreign/orders";
+        });
+
+        scoped.Should().BeNull("the page shows a tenant the person may not enter; another tenant's data must not answer for it");
+    }
+
+    [Fact]
+    public async Task A_request_header_speaks_over_the_session_claim()
+    {
+        await new Identity { Id = "header-carol" }.Save();
+        await new TenantRecord { Id = "tr-header-a", Name = "A", Code = "header-a" }.Save();
+        await new TenantRecord { Id = "tr-header-b", Name = "B", Code = "header-b" }.Save();
+        await new Membership { TenantId = "tr-header-a", IdentityId = "header-carol", Roles = { "koan:member" } }.Save();
+        await new Membership { TenantId = "tr-header-b", IdentityId = "header-carol", Roles = { "koan:member" } }.Save();
+
+        var scoped = await RunContextAsync(ctx =>
+        {
+            ctx.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "header-carol"), new Claim("tenant", "tr-header-a")], "test"));
+            ctx.Request.Headers["X-Koan-Tenant"] = "header-b";
+        });
+
+        scoped.Should().Be("tr-header-b");
+    }
+
+    [Fact]
+    public async Task Two_addresses_that_name_different_tenants_are_refused_and_scope_nothing()
+    {
+        await new Identity { Id = "address-dana" }.Save();
+        await new TenantRecord { Id = "tr-two-a", Name = "A", Code = "two-a" }.Save();
+        await new TenantRecord { Id = "tr-two-b", Name = "B", Code = "two-b" }.Save();
+        await new Membership { TenantId = "tr-two-a", IdentityId = "address-dana", Roles = { "koan:member" } }.Save();
+        await new Membership { TenantId = "tr-two-b", IdentityId = "address-dana", Roles = { "koan:member" } }.Save();
+        var options = Options.Create(new TenancyResolutionOptions { BaseHosts = ["app.example.com"] });
+        var context = new DefaultHttpContext { RequestServices = _fx.Services };
+        SignedIn(context, "address-dana");
+        context.Request.Host = new HostString("two-a.app.example.com");
+        context.Request.Path = "/t/two-b/orders";
+        var webContext = new WebContext(context);
+
+        await new TenantResolutionContributor([new SubdomainTenantResolver(options), new PathTenantResolver(options)], options)
+            .ContributeAsync(webContext);
+
+        webContext.IsRejected.Should().BeTrue("nothing says which tenant the person means");
+        webContext.RejectionStatusCode.Should().Be(StatusCodes.Status404NotFound);
+        using var entered = webContext.EnterPending();
+        Tenant.Current.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Two_addresses_that_name_one_tenant_agree()
+    {
+        await new Identity { Id = "address-erin" }.Save();
+        await new TenantRecord { Id = "tr-same", Name = "Same", Code = "same" }.Save();
+        await new Membership { TenantId = "tr-same", IdentityId = "address-erin", Roles = { "koan:member" } }.Save();
+        var options = Options.Create(new TenancyResolutionOptions { BaseHosts = ["app.example.com"] });
+        var context = new DefaultHttpContext { RequestServices = _fx.Services };
+        SignedIn(context, "address-erin");
+        context.Request.Host = new HostString("same.app.example.com");
+        context.Request.Path = "/t/same/orders";
+        var webContext = new WebContext(context);
+
+        await new TenantResolutionContributor([new SubdomainTenantResolver(options), new PathTenantResolver(options)], options)
+            .ContributeAsync(webContext);
+
+        webContext.IsRejected.Should().BeFalse();
+        using var entered = webContext.EnterPending();
+        (Tenant.Current?.Id).Should().Be("tr-same");
+    }
+
+    /// <summary>The rule is the carriers' ranks, so the order they were registered in decides nothing.</summary>
+    [Fact]
+    public async Task Registration_order_decides_nothing()
+    {
+        await new Identity { Id = "order-frank" }.Save();
+        await new TenantRecord { Id = "tr-order-a", Name = "A", Code = "order-a" }.Save();
+        await new TenantRecord { Id = "tr-order-b", Name = "B", Code = "order-b" }.Save();
+        await new Membership { TenantId = "tr-order-a", IdentityId = "order-frank", Roles = { "koan:member" } }.Save();
+        await new Membership { TenantId = "tr-order-b", IdentityId = "order-frank", Roles = { "koan:member" } }.Save();
+        var options = _fx.Services.GetRequiredService<IOptions<TenancyResolutionOptions>>();
+        var registered = _fx.Services.GetServices<ITenantResolver>().ToArray();
+
+        foreach (var order in new[] { registered, registered.Reverse().ToArray() })
+        {
+            var context = new DefaultHttpContext { RequestServices = _fx.Services };
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                [new Claim(ClaimTypes.NameIdentifier, "order-frank"), new Claim("tenant", "tr-order-a")], "test"));
+            context.Request.Path = "/t/order-b/orders";
+            var webContext = new WebContext(context);
+
+            await new TenantResolutionContributor(order, options).ContributeAsync(webContext);
+
+            using var entered = webContext.EnterPending();
+            (Tenant.Current?.Id).Should().Be("tr-order-b");
+        }
+    }
+
     [Fact]
     public async Task Header_carrier_scopes_a_member_by_routing_code()
     {

@@ -39,9 +39,9 @@ public sealed class IdentityTenancyModule : KoanModule
                 static value => value.BaseHosts.All(host => !string.IsNullOrWhiteSpace(host)),
                 $"{nameof(TenancyResolutionOptions.BaseHosts)} cannot contain empty host names.");
 
-        // P4 — the four tenant-resolution carriers, registered in resolution order (claim → header → subdomain →
-        // path). The middleware tries them in registration order and the first non-null candidate wins. Their mere
-        // presence also satisfies the Tenancy prod-boot pre-flight (ARCH-0099 §1) — Reference = Intent.
+        // P4 — the four tenant-resolution carriers. Each declares its rank, so registration order decides nothing: the
+        // address (subdomain, path), then the request (header), then the session (claim). Their mere presence also
+        // satisfies the Tenancy prod-boot pre-flight (ARCH-0099 §1) — Reference = Intent.
         services.AddSingleton<ITenantResolver, ClaimTenantResolver>();
         services.AddSingleton<ITenantResolver, HeaderTenantResolver>();
         services.AddSingleton<ITenantResolver, SubdomainTenantResolver>();

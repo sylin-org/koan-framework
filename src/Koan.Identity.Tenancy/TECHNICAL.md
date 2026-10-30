@@ -17,7 +17,8 @@ another registry or activation ordering mechanism.
 `TenantResolutionContributor` executes automatically in Web's ordered context lifecycle after authentication:
 
 1. reject anonymous subjects before carrier/control-plane lookup;
-2. ask claim, header, subdomain, and path resolvers in that order for the first tenant candidate;
+2. read the resolvers by `TenantCarrierRank` for the tenant candidate: the lowest rank that names one decides, and two
+   carriers of that rank naming different tenants reject the request with 404;
 3. query one matching `Membership`, which both authorizes the candidate and supplies tenant roles;
 4. load the durable `Identity` and require `IsActive`;
 5. strip reserved Identity/Tenancy host roles, project the remaining standard role claims, and contribute
@@ -38,8 +39,13 @@ exact unique `TenantRecord.Code`; subdomain and path carriers resolve codes. Sub
 label before a configured base host. Empty `BaseHosts` leaves only that carrier inert. Empty names/prefixes and empty
 base-host entries fail startup.
 
-Carrier precedence is deterministic but not a policy override: every candidate passes the same active-membership
-check. There is deliberately no `RequireMembership` option.
+Every resolver declares its `TenantCarrierRank`, so registration order decides nothing: `Address` (subdomain, path), then
+`Request` (header), then `Session` (claim). The address wins rather than a disagreement being refused because the
+ordinary disagreement is legitimate: a member of two tenants, whose session names the first, opens a page of the
+second. Refusing would break moving between one's own tenants, and the page says what the person means. Only two
+addresses that contradict each other leave nothing to go by, so only they are refused. Precedence is not a policy
+override: every candidate passes the same active-membership check, and a candidate that fails it scopes nothing rather
+than falling through to a lower rank. There is deliberately no `RequireMembership` option.
 
 ## Effective access and role authority
 

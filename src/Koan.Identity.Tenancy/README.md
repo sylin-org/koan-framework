@@ -59,8 +59,11 @@ Subdomain routing is available but inert until the application's base hosts are 
 }
 ```
 
-Carrier order is claim, header, subdomain, then path; the first resolved candidate wins. Every carrier always requires
-an active durable member. Invalid empty carrier settings fail host startup through standard .NET options validation.
+The address the person sees decides which tenant a request acts on: a subdomain or a path speaks over a request's
+header, and a header over the session's claim, so a stray header or the tenant chosen at sign-in never scopes a page
+that shows another tenant. An address naming a tenant the person is no member of scopes nothing; it never falls back
+to a lower carrier. A subdomain and a path that name different tenants are refused with 404. Every carrier always
+requires an active durable member. Invalid empty carrier settings fail host startup through standard .NET options validation.
 Startup reporting lists the effective carriers and says whether subdomain routing is live.
 
 ## Lifecycle closure

@@ -3,8 +3,9 @@ namespace Koan.Identity.Tenancy;
 /// <summary>
 /// SEC-0007 P4 — app-level configuration for the tenant-resolution carriers (bound from
 /// <c>Koan:Tenancy:Resolution</c>). The per-tenant routing handle is <c>TenantRecord.Code</c>; this configures
-/// <i>how</i> each carrier reads the inbound signal. All four carriers run (in registration order: claim → header →
-/// subdomain → path) and the first to yield a candidate wins; the middleware then membership-authorizes it.
+/// <i>how</i> each carrier reads the inbound signal. The address the person sees (subdomain, path) decides, then a
+/// request's header, then the session's claim (<see cref="TenantCarrierRank"/>); the middleware then
+/// membership-authorizes the one named.
 /// </summary>
 public sealed class TenancyResolutionOptions
 {
