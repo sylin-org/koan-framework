@@ -148,6 +148,26 @@ SocialCards.For<Article>("/articles/{id}", async id =>
 
 A selector still chooses what the card says, so keep its fields suited to everyone who may read the row.
 
+## A server-rendered page
+
+A page a controller renders has no shell to inject into and needs no `ShellPath`. It has already read what its card says
+and decided who may read it, so it hands the card to `IOpenGraphCardRenderer` and places the block in its own head:
+
+```csharp
+var head = renderer.RenderHead(new SocialCard(
+    Title: topic.Title,
+    Description: firstWords,
+    Image: CardImage.Recipe("share-card", topic.CoverMediaId),
+    Url: address,
+    Type: "article",
+    SiteName: place.Name), Request);
+```
+
+Each value is optional and takes its configured default when left out; a card with no title takes its site name. The block
+is encoded, truncated and absolutized as a declared card's is. Nothing is read to render it, so nothing is checked either:
+hand a card only where everyone who follows the link may read what it says. A page that draws its own `<title>` sets
+`EmitTitleElement` to false. See [WEB-0085](../decisions/WEB-0085-a-server-rendered-page-hands-its-card.md).
+
 ## How it behaves
 
 - Matched route, known entity: the entity's `<title>`, canonical, og: and twitter:
@@ -167,6 +187,6 @@ A card rendered for a signed-in reader carries `Cache-Control: private`.
 
 ## What this is not
 
-No SSR or prerender, no headless browser, no user-agent sniffing, no routing
-ownership. It is string injection into one static shell. oEmbed, JSON-LD, and sitemap
+No prerender, no headless browser, no user-agent sniffing, no routing ownership. It
+injects into one static shell, or hands a server-rendered page its head block. oEmbed, JSON-LD, and sitemap
 generation are out of scope.

@@ -67,6 +67,6 @@ public sealed class SocialCardBuilder<T> where T : Entity<T>
         Title: _title?.Invoke(entity),
         Description: _description?.Invoke(entity),
         Image: _image?.Invoke(entity) ?? CardImage.Default,
-        UrlPath: _url?.Invoke(entity),
-        OgType: _ogType);
+        Url: _url?.Invoke(entity),
+        Type: _ogType);
 }

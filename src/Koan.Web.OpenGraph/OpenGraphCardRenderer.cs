@@ -50,6 +50,15 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         return Inject(shell, head, options.PlaceholderMarker);
     }
 
+    public string RenderHead(SocialCard card, HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var options = _options.CurrentValue;
+        return options.Enabled ? BuildHead(card, options, request) : string.Empty;
+    }
+
     // WEB-0083: read for this request's reader, every time. A token nothing resolves and a row the reader may not read
     // both fall through to the default card, so a card says nothing of what exists beyond the reader's sight.
     private async Task<SocialCard?> ResolveCardAsync(HttpRequest request, CancellationToken ct)
@@ -68,11 +77,12 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 
     private string BuildHead(SocialCard? card, OpenGraphOptions options, HttpRequest request)
     {
-        var title = Truncate(card?.Title ?? options.SiteName, options.MaxTitleLength);
+        var siteName = card?.SiteName ?? options.SiteName;
+        var title = Truncate(card?.Title ?? siteName, options.MaxTitleLength);
         var description = Truncate(card?.Description ?? options.DefaultDescription, options.MaxDescriptionLength);
         var imageUrl = Absolutize(card?.Image.ToPath() ?? options.DefaultImage, request);
-        var url = Absolutize(card?.UrlPath ?? request.Path.Value, request);
-        var ogType = card?.OgType ?? options.DefaultType;
+        var url = Absolutize(card?.Url ?? request.Path.Value, request);
+        var ogType = card?.Type ?? options.DefaultType;
 
         var sb = new StringBuilder();
 
@@ -91,7 +101,7 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         if (!string.IsNullOrEmpty(imageUrl)) Property(sb, "og:image", imageUrl);
         if (!string.IsNullOrEmpty(url)) Property(sb, "og:url", url);
         if (!string.IsNullOrEmpty(ogType)) Property(sb, "og:type", ogType);
-        if (!string.IsNullOrEmpty(options.SiteName)) Property(sb, "og:site_name", options.SiteName);
+        if (!string.IsNullOrEmpty(siteName)) Property(sb, "og:site_name", siteName);
         if (!string.IsNullOrEmpty(options.Locale)) Property(sb, "og:locale", options.Locale);
 
         if (options.EmitTwitterTags)

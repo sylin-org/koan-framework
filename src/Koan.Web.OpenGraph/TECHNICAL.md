@@ -30,6 +30,13 @@ visibility. A failure in the resolver, the read or a selector surfaces on the re
 The read runs outside any partition the resolver opened for itself: a resolver that reads a named partition finds its
 row absent from this read, and the reader receives the default card.
 
+## A handed card
+
+`IOpenGraphCardRenderer.RenderHead(SocialCard, HttpRequest)` serves a server-rendered page (WEB-0085). It takes the card's
+values, fills what is left out from the options, and returns the head block from the same rendering as step 6, for the page
+to place in its own head. It reads no shell, matches no route, reads no Entity and does no I/O; it returns an empty string
+when disabled. What the card says and who may see it are the caller's.
+
 ## Options
 
 `Koan:Web:OpenGraph` owns enablement, `ShellPath`, `PlaceholderMarker`, site/default metadata, Twitter/title/canonical
@@ -44,7 +51,7 @@ copy-on-write registration list, runs one resolver and one keyed Entity read, an
 
 ## Unsupported
 
-No routing/fallback ownership, SSR/prerender, user-agent policy, distributed shell cache, CDN invalidation, oEmbed,
+No routing/fallback ownership, rendering of the page itself, prerender, user-agent policy, distributed shell cache, CDN invalidation, oEmbed,
 JSON-LD, sitemap generation, or guarantee that external crawlers honor emitted metadata is claimed.
 
 Automatic injection runs at the post-authorization Web pipeline boundary and only for navigations no

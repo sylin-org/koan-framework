@@ -506,6 +506,8 @@
       href: WEB-0083-the-web-fails-closed.md
     - name: WEB-0084 A Server-Sent Events stream keeps itself alive, and a hub fans out to bounded queues
       href: WEB-0084-a-stream-keeps-itself-alive.md
+    - name: WEB-0085 A server-rendered page hands its card to the renderer and places the head block itself
+      href: WEB-0085-a-server-rendered-page-hands-its-card.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

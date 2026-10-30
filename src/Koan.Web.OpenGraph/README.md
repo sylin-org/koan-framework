@@ -50,6 +50,15 @@ token routes it. An Entity read often enough to matter is marked `[Cacheable]` a
 `CardImage.Recipe("share-card", mediaId)` projects `/media/{id}/share-card`, `CardImage.Raw(mediaId)` projects the
 original, and `CardImage.Url(...)` preserves an external URL. This package composes URLs only; Media owns rendering.
 
+## A server-rendered page
+
+A page drawn by a controller has no shell. It hands its card over and places the block in its own head; no `ShellPath` is
+needed, and what the card says and who may see it are the page's:
+
+```csharp
+var head = renderer.RenderHead(new SocialCard(topic.Title, firstWords, Url: address, Type: "article", SiteName: place.Name), Request);
+```
+
 ## Boundaries
 
 - The application owns its SPA fallback and shell file.
@@ -57,7 +66,7 @@ original, and `CardImage.Url(...)` preserves an external URL. This package compo
 - One host may declare one card per Entity type; separate hosts are isolated.
 - A card rendered for a signed-in reader carries `Cache-Control: private`; no CDN purge or distributed shell cache is
   claimed.
-- No SSR, prerender, headless browser, oEmbed, JSON-LD, sitemap, or routing ownership is provided.
+- No rendering of the page itself, prerender, headless browser, oEmbed, JSON-LD, sitemap, or routing ownership is provided.
 
 See the [OpenGraph guide](../../docs/guides/opengraph-howto.md) and [technical contract](TECHNICAL.md).
 

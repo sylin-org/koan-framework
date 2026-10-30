@@ -13,4 +13,12 @@ namespace Koan.Web.OpenGraph;
 public interface IOpenGraphCardRenderer
 {
     Task<string?> RenderShellAsync(HttpRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// The head block for a card a server-rendered page hands over, for the page to place in its own head: its title
+    /// element where configured, canonical link, OpenGraph and Twitter tags, encoded, truncated and absolutized. It reads
+    /// no shell, matches no route and reads no Entity, so what the card says and who may see it are the caller's. Empty
+    /// when OpenGraph is disabled.
+    /// </summary>
+    string RenderHead(SocialCard card, HttpRequest request);
 }
