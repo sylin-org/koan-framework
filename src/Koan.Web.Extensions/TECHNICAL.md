@@ -31,10 +31,14 @@ different route throws and directs the application to an explicit controller.
 `[RestEntity]` adds no access metadata. Base CRUD runs through `Sylin.Koan.Web`'s shared Entity endpoint service and
 gate/constrain/project model.
 
-Capability controller actions require ASP.NET authentication and carry a `RequireCapability` action. When the
-application calls `AddKoanAuthorization(...)` or `AddCapabilityAuthorization(...)`, `PolicyAuthorizationProvider`
-maps those actions through Entity-specific settings, defaults, and the declared default behavior. RBAC and other
-providers remain ordered participants in the same `IAuthorize` ladder.
+Capability controller actions require ASP.NET authentication and carry a `RequireCapability` action.
+`WebExtensionsModule` registers `PolicyAuthorizationProvider` with the reference, so every such action is decided by it:
+Entity-specific settings, then defaults, then `DefaultBehavior`, which is `Deny` until the application says otherwise.
+An action with no policy therefore never reaches the seam's allow-by-default (WEB-0083), and its 403 names the action,
+the Entity and what to map. `AddKoanAuthorization(...)` or `AddCapabilityAuthorization(...)` replaces the options
+whichever side of `AddKoan()` it stands. A controller's Entity is the first generic argument of its nearest closed base,
+so a concrete subclass maps by the Entity it governs. RBAC and other providers remain ordered participants in the same
+`IAuthorize` ladder, and an `EntityAccess<T>` custom gate named for the action decides ahead of policy.
 
 ## Data behavior
 

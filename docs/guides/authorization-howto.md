@@ -91,24 +91,27 @@ a bare entity and controller expose every verb, including `DELETE /all`. Close w
 `Koan:Web:Authorization:DefaultDecision=Forbid` (the whole host). The posture a host resolves to is the runtime fact
 `koan.web.authorization.default` at `/.well-known/Koan/facts`.
 
-Declaring capability policy is what adds the RBAC and named-policy rungs on top:
+Referencing `Koan.Web.Extensions` adds the RBAC and named-policy rungs on top. Call this where the application has
+policy to state:
 
 ```csharp
 services.AddKoanAuthorization(configureCapabilities: caps => { /* mapped below */ });
 ```
 
-Call it where the application has policy to state. `AddCapabilityAuthorization(...)` registers the same
-rungs, so the capability controllers enforce whichever of the two declared the policy.
+`AddCapabilityAuthorization(...)` states the same options, so the capability controllers enforce whichever of the two
+declared the policy.
 
 ## Capability gates (moderation / audit)
 
 The generic capability controllers are gated with `[RequireCapability]`, which routes through `IAuthorize`.
-Configure who may do what with the WEB-0047 resolution (Entity → Defaults → DefaultBehavior):
+Configure who may do what with the WEB-0047 resolution (Entity → Defaults → DefaultBehavior). `DefaultBehavior` is
+`Deny`: an action with no policy answers 403 and names what to map, from the moment the controller is declared
+(WEB-0083). `CapabilityDefaultBehavior.Allow` opens unmapped actions to any signed-in caller, and is the application's
+explicit choice.
 
 ```csharp
 services.AddKoanAuthorization(configureCapabilities: caps =>
 {
-    caps.DefaultBehavior = CapabilityDefaultBehavior.Deny;              // strict: only mapped actions allowed
     caps.Defaults.Audit.Snapshot = "can-snapshot";                    // map an action to an ASP.NET policy
     caps.Entities["Article"] = new CapabilityPolicy                     // per-entity override
     {

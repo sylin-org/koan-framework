@@ -14,9 +14,9 @@ using Xunit;
 namespace Koan.Web.Extensions.Tests;
 
 /// <summary>
-/// SEC-0002 step 3 — parity: the seam (RBAC floor + PolicyAuthorizationProvider) reproduces the characterized
-/// WEB-0047 behavior bit-for-bit (mirrors <see cref="CapabilityAuthorizationCharacterizationTests"/>), and a
-/// non-capability action correctly defers to the seam's general default instead of the capability DefaultBehavior.
+/// SEC-0002 step 3 — the seam (RBAC floor + PolicyAuthorizationProvider) resolves a capability action through
+/// Entity → Defaults → DefaultBehavior, and a non-capability action correctly defers to the seam's general default
+/// instead of the capability DefaultBehavior.
 /// </summary>
 public sealed class PolicyAuthorizationProviderTests
 {
@@ -49,12 +49,12 @@ public sealed class PolicyAuthorizationProviderTests
         => (await seam.AuthorizeAsync(new AuthorizeRequest { Subject = User, Action = action, Resource = typeof(Widget) })) is AuthorizeDecision.Allow;
 
     [Fact]
-    public async Task Unmapped_action_allow_by_default()
+    public async Task Unmapped_action_allowed_when_the_application_chose_to_allow()
         => (await Allowed(Seam(new CapabilityAuthorizationOptions { DefaultBehavior = CapabilityDefaultBehavior.Allow }), Action)).Should().BeTrue();
 
     [Fact]
-    public async Task Unmapped_action_deny_by_default()
-        => (await Allowed(Seam(new CapabilityAuthorizationOptions { DefaultBehavior = CapabilityDefaultBehavior.Deny }), Action)).Should().BeFalse();
+    public async Task Unmapped_action_denied_by_default()
+        => (await Allowed(Seam(new CapabilityAuthorizationOptions()), Action)).Should().BeFalse();
 
     [Fact]
     public async Task Mapped_default_policy_is_evaluated()

@@ -13,6 +13,9 @@ title: Capability authorization - global allow/deny fallback and per-entity defa
 > remain canon; they are now evaluated by `PolicyAuthorizationProvider` within the unified `IAuthorize` seam.
 > The standalone `ICapabilityAuthorizer` engine described here is retired (verified bit-for-bit against
 > characterization specs before removal).
+>
+> **Amended by [WEB-0083](WEB-0083-the-web-fails-closed.md) (2026-10-30).** The standard posture is deny-by-default,
+> and the provider is registered with the package reference rather than by an application's call.
 
 ## Context
 

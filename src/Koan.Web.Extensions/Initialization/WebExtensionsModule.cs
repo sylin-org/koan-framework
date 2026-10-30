@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Koan.Core;
+using Koan.Core.Hosting.Bootstrap;
+using Koan.Web.Extensions.Authorization;
 using Koan.Web.Extensions.GenericControllers;
 
 namespace Koan.Web.Extensions.Initialization;
@@ -16,6 +18,9 @@ public sealed class WebExtensionsModule : KoanModule
     public override void Register(IServiceCollection services)
     {
         var registry = GenericControllerRegistry.GetOrAdd(services);
+
+        // WEB-0083: a capability action with no policy is denied from the reference on, with nothing to call.
+        services.AddCapabilityDefaults();
 
         // Ensure MVC sees controllers from this assembly without requiring apps to call AddApplicationPart explicitly.
         var assembly = typeof(WebExtensionsModule).Assembly;
@@ -45,5 +50,6 @@ public sealed class WebExtensionsModule : KoanModule
     public override void Report(Koan.Core.Provenance.ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
+        module.AddNote("Capability actions with no mapped policy are denied unless the application sets DefaultBehavior to Allow.");
     }
 }

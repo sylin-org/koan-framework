@@ -36,7 +36,8 @@ public sealed class TodoModerationController : EntityModerationController<Todo>;
 ```
 
 An equivalent base exists for audit. The declaration is the opt-in; the package does not expose those
-surfaces for every Entity merely because it is referenced.
+surfaces for every Entity merely because it is referenced. The declaration opens no authority either: every action
+answers 403, naming what to map, until a policy is mapped for it (see below).
 
 ## Guarantees and boundaries
 
@@ -52,7 +53,18 @@ surfaces for every Entity merely because it is referenced.
 - Soft deletion is owned by `Sylin.Koan.Data.SoftDelete`. Referencing that package makes ordinary Entity controller
   deletion inherit its Data-axis semantics; recycle-bin HTTP workflows remain explicit application controllers.
 
-Use `AddKoanAuthorization(...)` only when the application needs named ASP.NET policies or capability-policy mappings.
-The ordinary `[RestEntity]` path requires no additional registration.
+Use `AddKoanAuthorization(...)` or `AddCapabilityAuthorization(...)` to map capability actions to named ASP.NET
+policies; a moderation or audit controller needs them, because an action with no policy is denied:
+
+```csharp
+builder.Services.AddCapabilityAuthorization(caps =>
+{
+    caps.Defaults.Audit.List = "can-audit";
+    caps.Entities["Todo"] = new CapabilityPolicy { Moderation = { Approve = "is-editor" } };
+});
+```
+
+`caps.DefaultBehavior = CapabilityDefaultBehavior.Allow` opens every unmapped action to any signed-in caller, and is
+the application's explicit choice. The ordinary `[RestEntity]` path requires no additional registration.
 
 See [TECHNICAL.md](TECHNICAL.md) for activation, routing, authorization, and persistence ownership.

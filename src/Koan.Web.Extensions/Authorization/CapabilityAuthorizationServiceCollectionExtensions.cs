@@ -25,10 +25,25 @@ public static class CapabilityAuthorizationServiceCollectionExtensions
         configure?.Invoke(opts);
         services.AddSingleton(opts);
 
-        // SEC-0002: ICapabilityAuthorizer is retired — capability gates route through the unified IAuthorize seam.
-        // The seam + capability-graded provider ladder register HERE (not only in AddKoanAuthorization) so the gates
-        // enforce whenever capability authz is configured. PolicyAuthorizationProvider absorbs the WEB-0047
-        // resolution over the options above; RbacAuthorizationProvider is the Tier-0 floor. TryAdd → idempotent.
+        return services.AddCapabilityLadder();
+    }
+
+    /// <summary>
+    /// WEB-0083: what every capability action is decided by, whether or not the application states any policy. The
+    /// module registers it with the reference, so an action with no policy is denied rather than falling through to the
+    /// seam's allow-by-default; an application's <see cref="AddCapabilityAuthorization(IServiceCollection, Action{CapabilityAuthorizationOptions})"/>
+    /// replaces the options whichever side of <c>AddKoan()</c> it stands.
+    /// </summary>
+    internal static IServiceCollection AddCapabilityDefaults(this IServiceCollection services)
+    {
+        services.TryAddSingleton(new CapabilityAuthorizationOptions());
+        return services.AddCapabilityLadder();
+    }
+
+    private static IServiceCollection AddCapabilityLadder(this IServiceCollection services)
+    {
+        // SEC-0002: capability gates route through the unified IAuthorize seam. PolicyAuthorizationProvider absorbs the
+        // WEB-0047 resolution over the options; RbacAuthorizationProvider is the Tier-0 floor. TryAdd → idempotent.
         services.AddKoanOptions<AuthorizeOptions>(AuthorizeOptions.SectionPath);
         services.TryAddScoped<IAuthorize, Authorizer>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, RbacAuthorizationProvider>());

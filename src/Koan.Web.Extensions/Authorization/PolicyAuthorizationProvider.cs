@@ -11,10 +11,9 @@ namespace Koan.Web.Extensions.Authorization;
 /// <summary>
 /// SEC-0002 §5/§7 — the named-policy provider (Order 100). Absorbs WEB-0047's capability resolution
 /// (Entity-mapping → Defaults → DefaultBehavior) and delegates mapped policies to ASP.NET
-/// <see cref="IAuthorizationService"/>. It is <b>definitive</b> for recognized capability actions (so the
-/// WEB-0047 default behavior is preserved bit-for-bit), and <b>defers</b> for any other action so the seam's
-/// general default or higher rungs decide. This is the unified-model home of the logic that used to live in
-/// <c>CapabilityAuthorizer</c>.
+/// <see cref="IAuthorizationService"/>. It is <b>definitive</b> for recognized capability actions, so an action with no
+/// policy never reaches the seam's allow-by-default (WEB-0083), and <b>defers</b> for any other action so the seam's
+/// general default or higher rungs decide.
 /// </summary>
 public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
 {
@@ -40,10 +39,12 @@ public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
 
         var policyName = ResolvePolicyName(request);
         if (policyName is null)
-            // recognized capability action, no policy mapped → WEB-0047 DefaultBehavior (definitive)
+            // recognized capability action, no policy mapped → DefaultBehavior (definitive)
             return _options.DefaultBehavior == CapabilityDefaultBehavior.Allow
                 ? AuthorizeDecision.Allowed()
-                : AuthorizeDecision.Forbidden("denied by default (no policy mapped)");
+                : AuthorizeDecision.Forbidden(
+                    $"Capability '{request.Action}' on '{EntityName(request)}' has no policy, so it is denied. Map one in " +
+                    $"AddCapabilityAuthorization: caps.Defaults.{request.Action} = \"a-policy\", or per entity through caps.Entities.");
 
         // Match CapabilityAuthorizer: evaluate the named policy with a null resource.
         var result = await _authz.AuthorizeAsync(request.Subject, resource: null, policyName).ConfigureAwait(false);
@@ -54,8 +55,7 @@ public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
 
     private string? ResolvePolicyName(AuthorizeRequest request)
     {
-        // The entity is conveyed as the request Resource (a Type, or an instance whose type names the entity).
-        var entityName = (request.Resource as Type)?.Name ?? request.Resource?.GetType().Name;
+        var entityName = EntityName(request);
 
         if (entityName is not null && _options.Entities.TryGetValue(entityName, out var entityPolicy))
         {
@@ -66,6 +66,10 @@ public sealed class PolicyAuthorizationProvider : IAuthorizationProvider
         var d = Pick(_options.Defaults, request.Action);
         return string.IsNullOrWhiteSpace(d) ? null : d;
     }
+
+    // The entity is conveyed as the request Resource (a Type, or an instance whose type names the entity).
+    private static string? EntityName(AuthorizeRequest request)
+        => (request.Resource as Type)?.Name ?? request.Resource?.GetType().Name;
 
     private static string? Pick(CapabilityPolicy policy, string action) => action switch
     {
