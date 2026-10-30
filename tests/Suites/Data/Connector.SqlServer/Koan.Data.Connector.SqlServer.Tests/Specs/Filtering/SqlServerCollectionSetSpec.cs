@@ -3,8 +3,7 @@ using System.Text.Json;
 namespace Koan.Data.Connector.SqlServer.Tests.Specs.Filtering;
 
 /// <summary>
-/// DATA-0162: a list against a JSON array column (HasAny, HasAll, HasNone) is a set that moves to one table-valued
-/// parameter when the statement passes SQL Server's parameters, so 2,050 or 70,000 values answer as two do.
+/// DATA-0162: a list against a JSON array column (HasAny, HasAll, HasNone) binds as one JSON text, so 2,050 or 70,000 values answer as two do.
 /// </summary>
 public sealed class SqlServerCollectionSetSpec(SqlServerFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<SqlServerFixture>(fixture, output)

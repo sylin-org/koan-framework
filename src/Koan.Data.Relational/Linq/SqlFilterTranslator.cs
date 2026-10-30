@@ -113,15 +113,14 @@ public sealed class SqlFilterTranslator
                     (stuck.Count == 0
                         ? "every list already does, and the rest are plain comparisons"
                         : string.Join("; ", stuck.Select(static set =>
-                            $"a list of {set.Members} {set.MemberTypes} members" +
-                            (set.Refusal is { } why ? $" ({why})" : " binds only one parameter per member here")))) +
+                            $"a list of {set.Members} {set.MemberTypes} members binds only one parameter per member here"))) +
                     ". Filter in smaller parts (DATA-0162).");
             }
             _forced.Add(movable.Ordinal);
         }
     }
 
-    private sealed record SetLowering(int Ordinal, int Members, bool PerMember, string MemberTypes, string? Refusal = null);
+    private sealed record SetLowering(int Ordinal, int Members, bool PerMember, string MemberTypes);
 
     private string Visit(Filter filter) => filter switch
     {
@@ -338,8 +337,7 @@ public sealed class SqlFilterTranslator
             }
             if (forced) _unmovable.Add(ordinal);
         }
-        _sets.Add(new SetLowering(ordinal, encoded.Count, PerMember: true, MemberTypes(encoded),
-            _unmovable.Contains(ordinal) ? _dialect.OneValueRefusal(encoded) : null));
+        _sets.Add(new SetLowering(ordinal, encoded.Count, PerMember: true, MemberTypes(encoded)));
         var keyword = negate ? "NOT IN" : "IN";
         var lists = encoded
             .Chunk(Math.Max(1, _dialect.MaximumInListMembers))
@@ -370,8 +368,7 @@ public sealed class SqlFilterTranslator
             }
             _unmovable.Add(ordinal);
         }
-        _sets.Add(new SetLowering(ordinal, encoded.Count, PerMember: true, MemberTypes(encoded),
-            _dialect.OneValueRefusal(encoded)));
+        _sets.Add(new SetLowering(ordinal, encoded.Count, PerMember: true, MemberTypes(encoded)));
         return perMember(encoded.Select(member => _dialect.JsonArrayContains(column, Bind(member), elementType)).ToList());
     }
 

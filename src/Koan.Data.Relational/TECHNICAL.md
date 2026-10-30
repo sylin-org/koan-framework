@@ -26,8 +26,8 @@ module-free Abstractions package. Application code should not consume these cont
   drops the least recently used plan and never refuses a container (DATA-0162). Every relational adapter keys its plans
   through it.
 - `In` and `Nin` lower through `ILinqSqlDialect.MemberOf` first: a dialect that binds the whole set as one value (a
-  PostgreSQL array through `SqlArrayParameter`, a JSON array read by SQLite's `json_each`, a SQL Server table-valued
-  parameter), each member encoded as the store binds it alone, carries a set of any size. Otherwise each member is its
+  PostgreSQL array through `SqlArrayParameter`, a JSON array read by SQLite's `json_each` or SQL Server's
+  `OPENJSON`), each member encoded as the store binds it alone, carries a set of any size. Otherwise each member is its
   own parameter, in IN lists of at most `MaximumInListMembers`. The parameter bound belongs to the statement
   (`MaximumParameters`, the store's measured limit, less the parameters the statement binds itself, which its caller
   passes to `Translate(filter, reservedParameters)`): while a statement is over it, the largest remaining per-member
@@ -35,12 +35,12 @@ module-free Abstractions package. Application code should not consume these cont
   through `MemberOf`, and `HasAny`/`HasAll`/`HasNone` through `CollectionMemberOf`, which binds wherever the dialect
   carries the set. A dialect that `PrefersSetParameters` keeps `In`/`Nin` as lists until the statement is over. A
   statement still over with nothing more that can move is refused with a `NotSupportedException` naming the lists that
-  could not and why (`OneValueRefusal`), or saying the rest are plain comparisons, never sent to a store that would
+  could not, or saying the rest are plain comparisons, never sent to a store that would
   reject it. `Has` and the list operators compare a JSON array element alike: the comparand in the canonical store
   form, then the dialect's `JsonArrayComparand`, against the element as `JsonArrayContains(column, parameter,
   elementType)` reads it. A `Not` over a field's `In` lowers as its `Nin`, and the reverse (DATA-0162).
 - A parameter value implementing `ISqlParameterValue` configures its own provider parameter (`SqlArrayParameter`, SQL
-  Server's table-valued sets); `SqlParameters` binds it as one value instead of expanding a sequence.
+  Server's JSON sets); `SqlParameters` binds it as one value instead of expanding a sequence.
 - `AdoCommands.QueryRowsAsync(…, maxRows, cancelAtBound)` reads at most `maxRows` rows. With `cancelAtBound`, which
   the adapters pass only for a declared Read (`BoundedReads.MayCancel`), it cancels the command at the bound before the
   reader closes, so a driver that drains on close does not read the rest; otherwise the reader drains to the end and

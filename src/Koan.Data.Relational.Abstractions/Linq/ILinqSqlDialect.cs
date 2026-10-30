@@ -51,13 +51,6 @@ public interface ILinqSqlDialect
         Func<object?, string> bind) => null;
 
     /// <summary>
-    /// Why <see cref="MemberOf"/> or <see cref="CollectionMemberOf"/> declined to bind <paramref name="members"/> as one
-    /// value, for the refusal of a statement that is still over <see cref="MaximumParameters"/> — a missing table type
-    /// and the DDL that creates it, say. Null when there is nothing to add to the member types.
-    /// </summary>
-    string? OneValueRefusal(IReadOnlyList<object?> members) => null;
-
-    /// <summary>
     /// The most members one IN list holds in this dialect. A longer set of per-member parameters is split into several
     /// IN lists, joined by OR (or by AND for NOT IN). The default sets no bound.
     /// </summary>

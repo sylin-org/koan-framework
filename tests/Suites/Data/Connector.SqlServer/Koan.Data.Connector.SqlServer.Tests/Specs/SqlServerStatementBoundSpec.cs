@@ -17,13 +17,6 @@ public sealed class SqlServerStatementBoundSpec(SqlServerFixture fixture)
     [Fact(DisplayName = "SQL Server: a conditional replace on a wide row works at every guard size around its exact bound")]
     public async Task A_conditional_replace_on_a_wide_row_works_at_its_exact_bound()
     {
-        // The set types live in dbo once a source that may create them has run there.
-        await using (var managed = await KoanIntegrationHost.Configure()
-                         .WithSettings(fixture.SettingsForBoot())
-                         .ConfigureServices(services => services.AddKoan())
-                         .StartAsync(TestContext.Current.CancellationToken))
-            await new BoundProbe { Name = "creates the set types in dbo" }.Save();
-
         await Execute("""
             DROP TABLE IF EXISTS [dbo].[WIDE_ROWS];
             CREATE TABLE [dbo].[WIDE_ROWS] ([ID] bigint PRIMARY KEY, [C01] nvarchar(40) NOT NULL, [C02] nvarchar(40) NOT NULL, [C03] nvarchar(40) NOT NULL, [C04] nvarchar(40) NOT NULL, [C05] nvarchar(40) NOT NULL, [C06] nvarchar(40) NOT NULL, [C07] nvarchar(40) NOT NULL, [C08] nvarchar(40) NOT NULL, [C09] nvarchar(40) NOT NULL, [C10] nvarchar(40) NOT NULL, [C11] nvarchar(40) NOT NULL, [C12] nvarchar(40) NOT NULL, [C13] nvarchar(40) NOT NULL, [C14] nvarchar(40) NOT NULL, [C15] nvarchar(40) NOT NULL, [C16] nvarchar(40) NOT NULL, [C17] nvarchar(40) NOT NULL, [C18] nvarchar(40) NOT NULL, [C19] nvarchar(40) NOT NULL);
@@ -118,6 +111,4 @@ public sealed class SqlServerStatementBoundSpec(SqlServerFixture fixture)
         public string C18 { get; set; } = "";
         public string C19 { get; set; } = "";
     }
-
-    public sealed class BoundProbe : Entity<BoundProbe> { public string Name { get; set; } = ""; }
 }

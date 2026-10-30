@@ -177,10 +177,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new Batch(this);
 
-    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default) =>
-        WithSetTypes(() => QueryCore(query, ct), ct);
-
-    private async Task<RepositoryQueryResult<TEntity>> QueryCore(QueryDefinition query, CancellationToken ct)
+    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
     {
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
@@ -210,10 +207,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         };
     }
 
-    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default) =>
-        WithSetTypes(() => CountCore(query, ct), ct);
-
-    private async Task<CountResult> CountCore(QueryDefinition query, CancellationToken ct)
+    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
     {
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
@@ -263,10 +257,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         return CountResult.Exact(count);
     }
 
-    public Task<bool> ConditionalReplaceAsync(TEntity model, Filter guard, CancellationToken ct = default) =>
-        WithSetTypes(() => ConditionalReplaceCore(model, guard, ct), ct);
-
-    private async Task<bool> ConditionalReplaceCore(TEntity model, Filter guard, CancellationToken ct)
+    public async Task<bool> ConditionalReplaceAsync(TEntity model, Filter guard, CancellationToken ct = default)
     {
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional replace");
@@ -342,48 +333,11 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             await _readiness.Provision(_options.SourcePlan, target,
                 token => Provision(plan, token),
                 token => Validate(plan, token), ct).ConfigureAwait(false);
-            await EnsureSetTypes(ct).ConfigureAwait(false);
             return;
         }
         await _readiness.ValidateShape(_options.SourcePlan, target, token => Validate(plan, token), ct)
             .ConfigureAwait(false);
-        await EnsureSetTypes(ct).ConfigureAwait(false);
     }
-
-    /// <summary>
-    /// Runs an operation whose filter may bind a set as a table-valued parameter. When the server says a set type is gone
-    /// (dropped after Koan found it), the catalog is read again — creating the type where this source may — and the
-    /// operation runs once more: it binds the type again, or is refused by name (DATA-0162).
-    /// </summary>
-    private async Task<T> WithSetTypes<T>(Func<Task<T>> operation, CancellationToken ct)
-    {
-        try
-        {
-            return await operation().ConfigureAwait(false);
-        }
-        catch (SqlException error) when (MissingSetType(error))
-        {
-            SetTypes.Invalidate();
-            await EnsureSetTypes(ct).ConfigureAwait(false);
-            return await operation().ConfigureAwait(false);
-        }
-    }
-
-    // "Cannot find data type …" naming one of Koan's set types: the type a parameter names is gone.
-    private static bool MissingSetType(SqlException error) =>
-        error.Errors.Cast<SqlError>().Any(static item =>
-            Infrastructure.Constants.SetTypes.MissingTypeErrors.Contains(item.Number) &&
-            item.Message.Contains(Infrastructure.Constants.SetTypes.Prefix, StringComparison.OrdinalIgnoreCase));
-
-    private SqlServerSetTypes SetTypes => SqlServerSetTypes.For(_options.SourcePlan.RouteIdentity, _options.Schema);
-
-    /// <summary>The table types a set binds through (DATA-0162): created when this source may create storage objects,
-    /// else read. Once per route and schema.</summary>
-    private Task EnsureSetTypes(CancellationToken ct) =>
-        SetTypes.Ensure(
-            Open,
-            RelationalDdlGate.MayCreate(_options.SourcePlan, _options.DdlPolicy, _options.AllowProductionDdl),
-            ct);
 
     private async Task Provision(SqlServerEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {

@@ -71,7 +71,7 @@ public sealed class SqlServerExactValueSpec(SqlServerFixture fixture, ITestOutpu
         foreach (var existing in await ExactClockRow.All()) await existing.Remove();
         await new ExactClockRow { Id = "a", At = SubMillisecond, Note = "a" }.Save();
 
-        // Past the parameters one statement binds, so the set travels as one table-valued parameter.
+        // Past the parameters one statement binds, so the set travels as one JSON text.
         var at = SubMillisecond;
         var set = Enumerable.Range(1, 3_000).Select(tick => at.AddTicks(tick)).Append(at).ToArray();
         (await ExactClockRow.Query(row => set.Contains(row.At))).Select(row => row.Id).Should().Equal("a");

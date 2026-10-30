@@ -13,15 +13,6 @@ public static class Constants
     // The collation of a text identity column: ids differing only by case are two rows, whatever the server folds (DATA-0164).
     public const string IdentityCollation = "Latin1_General_BIN2";
 
-    // The table types a set binds through as one table-valued parameter (DATA-0162): koan_set_<scalar>, one column.
-    public static class SetTypes
-    {
-        public const string Prefix = "koan_set_";
-        public const string Column = "koan_member";
-        // The server's "Cannot find data type": 351 for a table-valued parameter (measured), 2715 for a declaration.
-        public static readonly int[] MissingTypeErrors = [351, 2715];
-    }
-
     public static class Configuration
     {
         public const string Section = "Koan:Data:SqlServer";

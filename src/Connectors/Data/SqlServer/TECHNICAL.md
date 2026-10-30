@@ -56,34 +56,21 @@ fallback. The connector does not currently expose provider-specific retry or com
   scoped key set in, leaving room for the scope's own parameters.
 - A filter may bind 2,098 parameters less those its statement binds itself: a conditional replace's SET values and
   identity. An `In`/`Nin` binds a parameter per member while the statement fits; past that, the largest lists move, one
-  at a time, to one table-valued parameter. A `HasAny`/`HasAll`/`HasNone` list binds as one table-valued parameter
-  wherever its set type exists, because its per-member form reads the JSON array once per member, and per member
-  otherwise. A statement still over its bound with nothing more that can move is refused, naming each list that could
-  not and why (DATA-0162).
+  at a time, to one JSON text read through `OPENJSON`. A `HasAny`/`HasAll`/`HasNone` list always binds that way, because
+  its per-member form reads the JSON array once per member. A list of any size works, and the store holds nothing for it.
+  A list of mixed types, unsigned or signed-byte integers, byte arrays, or a raw TimeSpan, DateOnly or TimeOnly from a
+  typed column stays a parameter per member, and a statement still over its bound is refused, naming each such list
+  (DATA-0162).
+- A set member reads as the type a lone parameter of it binds as: nvarchar(4000) or nvarchar(max) (a char too),
+  uniqueidentifier, datetime2(7), datetimeoffset(7), bit, bigint, int, smallint, tinyint, a float or real rebuilt from
+  its exact mantissa and exponent, and for a decimal the decimal(p, s) of its own value, one `OPENJSON` per shape, compared
+  as sql_variants by value. A `Nin` reads as `NOT EXISTS`: members read as nullable, and `NOT IN` over a nullable set
+  rescans it per row. Text is read through
+  `CONVERT(nvarchar(...), CONVERT(varbinary(...), [koan_member]))`, whose coercible-default collation yields to the column's
+  as a lone parameter's does.
 - A JSON array element compares exactly as a document scalar does, so `Has` and the list operators answer what `Eq`
   answers: a Guid or a DateTime as document text, a decimal or a real number converted to decimal(38, 10) (it meets a
-  member by value to ten places; a decimal list binds through the sql_variant type), an integer as bigint, a boolean
-  as bit.
-- A set type is `[schema].[koan_set_<scalar>_<hash>]`, the hash the first eight hex digits of the SHA-256 of its one
-  column `[koan_member] <type> NOT NULL`; a changed shape is a new name. The column is exactly the SqlDbType a lone
-  parameter of the members binds as: nvarchar(4000) or nvarchar(max) (a char too), uniqueidentifier, datetime2(7),
-  datetimeoffset(7), float, real, bit, bigint, int, smallint, tinyint, and sql_variant for decimals, which bind with
-  their own precision and scale. Text is read through `CONVERT(nvarchar(…), CONVERT(varbinary(…), [koan_member]))`, whose
-  coercible-default collation yields to the column's as a lone parameter's does. A TimeSpan, DateOnly or TimeOnly on a
-  document field reaches a set already encoded (ticks, or text) and binds through the bigint or nvarchar type; read
-  from a typed column it has no set type (no typed column of them round-trips here), so such a list, or one of mixed
-  types, unsigned or signed-byte integers or byte arrays, stays a parameter per member.
-- The repository ensures the types at ready, once per route and schema: whenever it reads the catalog it creates every
-  missing type when the source may create storage objects, remembers a denied `CREATE TYPE` (permission 262 or any
-  refusal) as "may not create" without failing the operation, and reads each type's column to check it against the
-  definition. A list whose type is missing or of another shape stays a parameter per member; a statement still over
-  its bound is refused naming the type and why: the login was denied creating it, or the source may not create storage
-  objects, with the `CREATE TYPE` statement; or the type has another shape, with `DROP TYPE` where the source creates
-  types and `DROP TYPE …; CREATE TYPE …` where it does not. A refusal marks the catalog stale, and the next operation
-  reads it again (at most once a second), so a type created or dropped after a refusal is used without a restart. The
-  server's "Cannot find data type" for a set type (351, or 2715) marks the catalog stale at once, and the query, count
-  or conditional replace runs once more: a dropped type is created again, or the operation is refused by name
-  (DATA-0162).
+  member by value to ten places), an integer as bigint, a boolean as bit.
 - A Direct read that stops at its bound cancels its command only when its effect is a declared Read outside a caller's
   transaction. The effect is the caller's declaration, and Koan does not check it against the SQL. PostgreSQL enforces
   a declared Read only on the entity-routed query, which it runs in a read-only transaction, so a write labelled Read

@@ -41,30 +41,19 @@ crosses a number nobody chose, and some of them changed with the store or with w
      timestamps of one `DateTimeKind`;
    - SQLite binds one JSON array read by `json_each`, each member written as the value Microsoft.Data.Sqlite binds
      (INTEGER, REAL, or the driver's TEXT for strings, upper-case Guids, dates, decimals);
-   - SQL Server binds one table-valued parameter of a Koan set type, `[schema].[koan_set_<scalar>_<hash>]`, whose one
-     `koan_member` column is exactly the SqlDbType a lone parameter binds as: nvarchar(4000) or
-     nvarchar(max) (a char binds as text), uniqueidentifier, datetime2(7) for a DateTime (DATA-0164),
-     datetimeoffset(7), float for a double, real for a single, bit, bigint, int, smallint, tinyint, and sql_variant
-     for decimals, because a lone decimal takes its own value's precision and scale. Text is read through a conversion
-     from varbinary, whose coercible-default collation yields to the column's exactly as a parameter's does; read
-     straight from the table, a member would carry the database collation as an implicit label and conflict with a
-     column declared under another. The `<hash>` is the first eight hex digits of the SHA-256 of the column
-     definition, so a changed shape is a new name and no type is migrated. Whenever it reads the catalog, a source
-     that may create storage objects creates every type that is missing, idempotently, so a type dropped later, by an
-     operator or as a refusal said, is created again; Koan remembers a denied `CREATE TYPE` as "may not create" and
-     never fails an operation for it, and checks each type it finds against the definition. A list binds as one value
-     only where its type exists in its shape; otherwise it stays one parameter per member and works within the bound,
-     so a source without set types runs every list that fits. A statement still over the bound is refused naming the
-     type and the true reason: the source's login was denied creating it, or the source may not create storage objects
-     (its lifecycle, access or DDL policy), each with the `CREATE TYPE` statement; or the type is here under another
-     shape, with `DROP TYPE` where the source creates types and `DROP TYPE …; CREATE TYPE …` where it does not. A
-     refusal marks the catalog stale, and the next operation reads it again, at most once a second, so a type created
-     or dropped after a refusal is used without a restart. The server's "Cannot find data type" for a set type (351
-     for a table-valued parameter, as measured, or 2715) marks the catalog stale at once, and the query, count or
-     conditional replace runs once more after the catalog is read again: it binds the recreated type, or is refused by
-     name where the source may not create. A TimeSpan, DateOnly or TimeOnly on a document field reaches a set already
-     encoded, as ticks or as text, and binds through the bigint or nvarchar type; read raw from a typed column it has
-     no set type, because no typed column of them round-trips on SQL Server.
+   - SQL Server binds one JSON text read through `OPENJSON`, so the store holds nothing for a set and any login that can
+     read can use one. Each member reads as the type a lone parameter of it binds as: nvarchar(4000) or nvarchar(max)
+     (a char binds as text), uniqueidentifier, datetime2(7) for a DateTime (DATA-0164), datetimeoffset(7), bit, bigint,
+     int, smallint, tinyint. A double or a single travels as the integers that are its exact value, mantissa and
+     exponent, because the server's parser lands some decimal text a unit off. A decimal reads at the precision and
+     scale of its own value, one `OPENJSON` per shape, compared as sql_variants by value, because a lone decimal takes
+     its own value's precision and scale. Text is read through a conversion from varbinary, whose coercible-default
+     collation yields to the column's exactly as a parameter's does; read straight from the JSON, a member would carry
+     the database collation as an implicit label and conflict with a column declared under another. `Nin` reads as
+     `NOT EXISTS`, because members read as nullable and `NOT IN` over a nullable set rescans it per row (over 70,000 ids:
+     past 60 seconds against 0.2). A TimeSpan, DateOnly or TimeOnly on a document field reaches a set already encoded,
+     as ticks or as text, and binds through the bigint or nvarchar form; read raw from a typed column it stays one
+     parameter per member, because no typed column of them round-trips on SQL Server.
 
    The parameter bound belongs to the statement. `ILinqSqlDialect.MaximumParameters` is the store's measured limit
    (32,766 on SQLite, 65,535 on PostgreSQL, 2,098 on SQL Server, whose client refuses 2,099; none declared elsewhere),
@@ -76,12 +65,11 @@ crosses a number nobody chose, and some of them changed with the store or with w
    bind every list they can carry as one value; SQL Server keeps an `In`/`Nin` as a parameter list
    (`PrefersSetParameters`), which it plans best, while the statement fits. While a statement is over its bound the
    translator moves its largest remaining per-member list to one value and lowers the filter again; it refuses only
-   when nothing more can move and the statement is still over, naming each list that could not and why
-   (`ILinqSqlDialect.OneValueRefusal`), or saying the rest are plain comparisons. What still refuses, past that bound:
+   when nothing more can move and the statement is still over, naming each list that could not and why, or saying the rest are plain comparisons. What still refuses, past that bound:
    on SQLite a list of byte arrays, non-finite reals or unsigned 64-bit integers; on PostgreSQL a list of mixed types,
    of timestamps of mixed `DateTimeKind`, or of a type Npgsql builds no array of (chars, unsigned integers, bytes,
    byte arrays); on SQL Server a list of mixed types, of TimeSpan, DateOnly or TimeOnly read from a typed column, of
-   unsigned or signed-byte integers, or of byte arrays, and any list whose set type is missing or of another shape.
+   unsigned or signed-byte integers, or of byte arrays.
    MySQL, Firebird and DuckDB carry no set as one value and declare no bound: their per-statement limits were not
    measured here, a DuckDB query over 70,000 members ran, and a set past what the server accepts fails there. The
    translator also splits a per-member set into IN lists the dialect allows (1,500 on Firebird). `GetMany` and
@@ -148,8 +136,7 @@ crosses a number nobody chose, and some of them changed with the store or with w
   decimals and DateTimes, which failed with an arithmetic overflow or a date conversion; on SQLite they find the Guids,
   decimals and DateTimes a row holds, which they missed. On PostgreSQL a null list no longer fails a list filter.
   DuckDB, MySQL and Firebird compare elements as before.
-- Behavioural (SQL Server): a source that may create storage objects creates the `koan_set_*` table types in its
-  schema, and creates again any it finds missing; a document field holding a Guid or a DateTime compares as the
+- Behavioural (SQL Server): a document field holding a Guid or a DateTime compares as the
   document's text (DATA-0139), as on SQLite and PostgreSQL, where a DateTime used to fail converting the document's
   seven-digit fraction to `datetime`.
 - Behavioural: a SQLite or DuckDB batch of more than 4,096 operations commits instead of throwing
@@ -163,7 +150,7 @@ crosses a number nobody chose, and some of them changed with the store or with w
   compiles unchanged); `FilterSupport.MaximumSetMembers`, `ILinqSqlDialect.MemberOf` and `MaximumInListMembers`
   (default members, so a dialect outside this repository keeps compiling), `ILinqSqlDialect.PrefersSetParameters` and
   `MaximumParameters` (default members), `ILinqSqlDialect.CollectionMemberOf` (default member, taking the element
-  type) and `SetMatch`, `ILinqSqlDialect.OneValueRefusal`, `JsonArrayComparand` and the element-typed
+  type) and `SetMatch`, `JsonArrayComparand` and the element-typed
   `JsonArrayContains(string, string, Type)` (default members), `SqlFilterTranslator.Translate(Filter, int)`,
   `ISqlParameterValue` (a parameter value that configures its provider parameter; `SqlArrayParameter` is one),
   `BoundedReads` (`MayCancel`, `Close`) in `Koan.Data.Core.Direct`, an optional `cancelAtBound` on
@@ -194,7 +181,7 @@ crosses a number nobody chose, and some of them changed with the store or with w
   whole-domain byte lists answer as one list does; no query falls back to memory. The row values are a non-dyadic
   double, doubles of magnitude 1e14 to 1e19, a subnormal, singles, dates, offsets, times and spans with sub-millisecond
   ticks, a decimal with fourteen integral digits and one with scale 28, a long past 2^53, text past 4,000 characters,
-  and a quote and non-Latin chars. On SQL Server every set type is bound at least once (counted while the oracle ran).
+  and a quote and non-Latin chars.
   Typed offset columns are checked on SQLite and SQL Server, and typed TimeSpan, DateOnly and TimeOnly columns on
   SQLite and PostgreSQL: PostgreSQL's timestamptz neither writes a non-zero offset nor hydrates one, and SQL Server
   neither writes a TimeSpan column nor hydrates a date or time column — storage matters outside this record, and the
@@ -204,23 +191,8 @@ crosses a number nobody chose, and some of them changed with the store or with w
   2,502-char set on SQL Server and 70,000-member interval, date and time sets on PostgreSQL.
 - `SqlFilterSetMembershipSpec` (Relational): a statement past the dialect's bound with no set that can move is refused
   naming its sets; with two sets past the bound together, the larger moves to one value and the other stays a list.
-- `SqlServerSetTypeRefusalSpec` (Connector.SqlServer): on an External source in a schema without set types, a set
-  within the parameters works, a set of 2,502 is refused with its `CREATE TYPE`, and no type is created; a
-  2,502-member text set over a `Latin1_General_CS_AS` column answers what Eq answers (a probe showed the member read
-  straight from the table, or through `CAST`, fails with "Cannot resolve the collation conflict", and through
-  varbinary answers as Eq); a type named as Koan's float set but declared `real` is refused naming both shapes, and an
-  unhashed `koan_set_float` impostor is never used; a login without `CREATE TYPE` saves and queries, is refused a
-  large set naming the DDL and "was denied creating it", creates no type, and once an administrator runs that DDL the
-  same host binds the set. Each of the four failed when run against the round-three code. Round five: the denied
-  login's two-member `HasAny`, `HasAll` and `HasNone` over a text list answer, and a 2,502-member one is refused with
-  its DDL; the External impostor's refusal offers `DROP TYPE …; CREATE TYPE …`; on a Managed source an impostor of
-  another shape is refused with "Drop it (DROP TYPE …) and Koan creates it at this source's next operation", and after
-  the drop the next query creates the type as float and answers; a type dropped after a working 2,502-member query is
-  created again by the next query, which answers, and under an External source the next query is refused naming "may
-  not create storage objects" and the DDL. Run against the round-four code, the denied login refused even the
-  two-member list ("binds as one table-valued parameter here … was denied creating it"), both impostor refusals
-  offered only "Drop it so Koan creates it", and both dropped-type cases failed with the server's "Cannot find data
-  type" (error 351).
+- `SqlServerSetCollationSpec` (Connector.SqlServer): on an External source, a 2,502-member text set over a
+  `Latin1_General_CS_AS` column answers what Eq answers.
 - `SqlServerStatementBoundSpec` (Connector.SqlServer): a conditional replace on a row of nineteen SET columns, guarded
   by an `In` over its key of every size from 2,070 to 2,098 members and of 2,502, replaces the row each time. Run
   against the round-four code it failed with "The server supports a maximum of 2100 parameters".

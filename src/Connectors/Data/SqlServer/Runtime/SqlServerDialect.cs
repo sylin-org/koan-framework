@@ -39,12 +39,6 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
     public string EscapeLike(string fragment) => fragment.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
     public string Parameter(int index) => $"@p{index}";
 
-    private readonly SqlServerSetTypes? _sets;
-
-    /// <param name="sets">The set types of the source and schema this dialect's plan reads; null where no set binds as one
-    /// value (a plan built outside a repository).</param>
-    public SqlServerDialect(SqlServerSetTypes? sets = null) => _sets = sets;
-
     /// <summary>
     /// SQL Server plans a short IN list best, so a set binds a parameter per member while the statement stays within
     /// <see cref="MaximumParameters"/>, and the translator moves the largest set to <see cref="MemberOf"/> when it does
@@ -56,56 +50,39 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
     public int MaximumParameters => Infrastructure.Constants.StatementParameters;
 
     /// <summary>
-    /// A set binds as one table-valued parameter whose column is the type a lone parameter of its members binds as
-    /// (<see cref="SqlServerSetTypes"/>), read through an expression that compares as a lone parameter does, collation
-    /// included, so In answers what Eq answers. Members of mixed types, or of a type no set type holds, decline. A set
-    /// type that is missing, or here under another shape, is refused by name with the DDL that creates it.
+    /// A set binds as one JSON text whose members read as the type a lone parameter of them binds as
+    /// (<see cref="SqlServerJsonSet"/>), collation included, so In answers what Eq answers. Members of mixed types, or of a
+    /// type it does not read, decline.
     /// </summary>
     public string? MemberOf(string columnSql, IReadOnlyList<object?> members, bool negate, Func<object?, string> bind)
-        => Table(members, bind) is { } table
-            ? $"{columnSql} {(negate ? "NOT IN" : "IN")} (SELECT {table.Member} FROM {table.Source})"
-            : null;
+    {
+        if (SqlServerJsonSet.Select(members, bind) is not { } set) return null;
+        // The members read as nullable, and NOT IN over a nullable set rescans it per row. A null column is the caller's.
+        return negate
+            ? $"NOT EXISTS (SELECT 1 FROM ({set}) koan_set(koan_value) WHERE koan_set.koan_value = {columnSql})"
+            : $"{columnSql} IN ({set})";
+    }
 
     /// <summary>
-    /// A JSON array column against a set bound as one table-valued parameter: some element is a member
-    /// (<see cref="SetMatch.Any"/>), every member is an element (<see cref="SetMatch.All"/>), or no element is a member
-    /// (<see cref="SetMatch.None"/>). Elements are read and compared as <see cref="JsonArrayContains(string, string, Type)"/>
-    /// compares one.
+    /// A JSON array column against a set bound as one JSON text: some element is a member (<see cref="SetMatch.Any"/>),
+    /// every member is an element (<see cref="SetMatch.All"/>), or no element is a member (<see cref="SetMatch.None"/>).
+    /// Elements are read and compared as <see cref="JsonArrayContains(string, string, Type)"/> compares one.
     /// </summary>
     public string? CollectionMemberOf(string columnSql, IReadOnlyList<object?> members, SetMatch match, Type elementType,
         Func<object?, string> bind)
     {
-        if (Table(members, bind) is not { } table) return null;
+        if (SqlServerJsonSet.Select(members, bind) is not { } set) return null;
         var element = Element(elementType);
-        var any = $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE {element} IN (SELECT {table.Member} FROM {table.Source}))";
+        var any = $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE {element} IN ({set}))";
         return match switch
         {
             SetMatch.Any => any,
             SetMatch.None => $"(NOT {any})",
             // Every member is an element: no member is outside the array's non-null elements, an anti-join the server
             // hashes rather than rescanning the array per member.
-            _ => $"(NOT EXISTS (SELECT 1 FROM (SELECT {table.Member} AS koan_value FROM {table.Source}) koan_set " +
+            _ => $"(NOT EXISTS (SELECT 1 FROM ({set}) koan_set(koan_value) " +
                  $"WHERE koan_set.koan_value NOT IN (SELECT {element} FROM OPENJSON({columnSql}) item WHERE {element} IS NOT NULL)))"
         };
-    }
-
-    // A set binds as one table-valued parameter only where its set type exists in the right shape; otherwise it stays one
-    // parameter per member, and a statement still over the bound is refused naming the type (OneValueRefusal).
-    private (string Member, string Source)? Table(IReadOnlyList<object?> members, Func<object?, string> bind)
-    {
-        if (_sets is null || SqlServerSetTypes.KindOf(members) is not { } kind) return null;
-        if (_sets.Refusal(kind) is not null) return null;
-        return (kind.Member, bind(new SqlServerSetParameter(_sets.QualifiedName(kind), kind.Metadata, members)));
-    }
-
-    /// <summary>Why a set of <paramref name="members"/> cannot bind as one table-valued parameter here.</summary>
-    public string? OneValueRefusal(IReadOnlyList<object?> members)
-    {
-        if (_sets is null) return null;
-        if (SqlServerSetTypes.KindOf(members) is not { } kind)
-            return "no table type holds members of these types: mixed types, unsigned or signed-byte integers, byte " +
-                   "arrays, and TimeSpan, DateOnly or TimeOnly read from a typed column";
-        return _sets.Refusal(kind);
     }
 
     /// <summary>
