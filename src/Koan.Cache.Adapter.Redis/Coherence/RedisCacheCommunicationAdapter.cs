@@ -6,7 +6,6 @@ using Koan.Cache.Adapter.Redis.Stores;
 using Koan.Cache.Adapter.Redis.Infrastructure;
 using Koan.Cache.Options;
 using Koan.Cache.Topology;
-using Koan.Communication;
 using Koan.Communication.Adapters;
 using Koan.Core;
 using Koan.Core.Context;
@@ -27,7 +26,6 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
     private readonly RedisCacheBroadcastOptions _options;
     private readonly ILogger<RedisCacheCommunicationAdapter> _logger;
     private readonly ISubscriber _subscriber;
-    private readonly int _ingressCapacity;
     private readonly CancellationTokenSource _abort = new();
     private readonly List<ChannelMessageQueue> _subscriptions = [];
     private readonly List<Channel<RedisValue>> _inboxes = [];
@@ -40,7 +38,6 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
         IConnectionMultiplexer multiplexer,
         IOptions<RedisCacheBroadcastOptions> options,
         IOptions<CacheOptions> cacheOptions,
-        IOptions<CommunicationOptions> communicationOptions,
         ILogger<RedisCacheCommunicationAdapter> logger)
     {
         ArgumentNullException.ThrowIfNull(topology);
@@ -48,7 +45,6 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _subscriber = multiplexer.GetSubscriber();
-        _ingressCapacity = communicationOptions.Value.InProcessCapacity;
 
         var active = topology.Remote is RedisCacheStore
                      && cacheOptions.Value.CoherenceMode != Koan.Cache.Abstractions.Coherence.CoherenceMode.Disabled;
@@ -87,7 +83,7 @@ internal sealed class RedisCacheCommunicationAdapter : ICommunicationAdapter
             {
                 var queue = await _subscriber.SubscribeAsync(Channel(host.MeshId, route.Key)).ConfigureAwait(false);
                 _subscriptions.Add(queue);
-                var inbox = System.Threading.Channels.Channel.CreateBounded<RedisValue>(new BoundedChannelOptions(_ingressCapacity)
+                var inbox = System.Threading.Channels.Channel.CreateBounded<RedisValue>(new BoundedChannelOptions(Constants.BroadcastIngressCapacity)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleReader = true,

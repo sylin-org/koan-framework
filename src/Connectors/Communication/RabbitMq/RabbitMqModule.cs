@@ -23,6 +23,8 @@ public sealed class RabbitMqModule : KoanModule
             .Validate(static value => value.Prefetch > 0, "RabbitMQ Communication Prefetch must be greater than zero.")
             .Validate(static value => value.PublishTimeout > TimeSpan.Zero,
                 "RabbitMQ Communication PublishTimeout must be greater than zero.")
+            .Validate(static value => value.MaxMessageBytes > 0,
+                "RabbitMQ Communication MaxMessageBytes must be greater than zero.")
             .ValidateOnStart();
         services.TryAddEnumerable(
             ServiceDescriptor.Singleton<IServiceDiscoveryAdapter, RabbitMqDiscoveryAdapter>());
@@ -38,6 +40,10 @@ public sealed class RabbitMqModule : KoanModule
         module.AddSetting("Provider", Constants.ProviderId);
         module.AddSetting("Candidate lanes", "Transport, FrameworkSignals, FrameworkBroadcasts");
         module.AddSetting("Assurance", "durably-acknowledged publication");
+        module.AddSetting(
+            "Failed deliveries",
+            $"redelivered up to {Constants.Broker.DeliveryLimit} times, then dead-lettered to the receiver group's own queue");
+        module.AddSetting("Consumers", "one channel and sequential consumer per receiver group");
         module.AddNote("Candidacy is inert unless direct application intent or an explicit provider binding elects it.");
     }
 }

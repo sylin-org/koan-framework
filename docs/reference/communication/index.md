@@ -4,7 +4,7 @@ domain: communication
 title: "Raise occurrences and send Entity snapshots"
 audience: [developers, architects, operators, ai-agents]
 status: current
-last_updated: 2026-08-27
+last_updated: 2026-10-30
 framework_version: v1.0.0
 validation:
   date_last_tested: 2026-07-16
@@ -107,9 +107,11 @@ Console.WriteLine(
 
 Transport returns the parallel `TransportAcceptance` and `TransportSettlement` types. Awaiting
 `Raise` or `Send` means the elected provider accepted the enumerated items at its reported assurance
-boundary; it does not wait for handler completion. Receipts identify provider, channel, assurance,
-and whether settlement is observable. The local provider supports operation-scoped settlement;
-external providers may not.
+boundary; it does not wait for handler completion, and it never waits for a slow handler.
+Receipts identify provider, channel, assurance, and whether settlement is observable. The local
+provider supports operation-scoped settlement; external providers may not. `Overflowed` counts the
+deliveries that failed because their group's backlog was over its memory budget; they are also
+counted in `Failed`.
 
 ## Subscribe with the EventGateway
 
@@ -141,7 +143,8 @@ Note.EventGateway.Reset();
 
 Must be called **before the host starts** (composition time), so the binding pipeline sees the
 registration. Handlers receive the Entity snapshot, occurrence metadata, and the strongly-typed
-event details. A lambda that throws is treated as a handler failure — the engine retries it.
+event details. A lambda that throws is a handler failure: its delivery settles as failed, and the
+process-local runtime does not retry it.
 
 ## Guarantees
 
@@ -150,7 +153,8 @@ event details. A lambda that throws is treated as a handler failure — the engi
   identity for that occurrence.
 - Zero Event subscriptions is a valid zero-target occurrence. A known-local zero Transport receiver
   set fails before source enumeration; an external mandatory route may report it at publication.
-- Source order and multiplicity are retained by the built-in local runtime.
+- Source order and multiplicity are retained by the built-in local runtime: each handler group
+  receives its deliveries in publication order. There is no order across groups.
 - Each handler group gets freshly deserialized Entity state. Event groups also get separate details
   copies; handlers never share the publisher's mutable objects or another group's objects.
 - Handler `Where` runs at typed ingress; false records a filtered settlement.
@@ -158,28 +162,39 @@ event details. A lambda that throws is treated as a handler failure — the engi
   none of them, and suppresses an absent axis while a handler runs.
 - Publication failures and cancellation expose a bounded accepted prefix. Handler exceptions become
   failed settlement and payload-free operator logs.
-- Events, Transport, and framework signals use separate bounded local lanes, so a slow handler in one
-  lane does not block another.
-- Graceful host shutdown drains accepted local work when handlers honor cancellation.
+- Every local handler group has its own backlog and one sequential consumer, so a slow or hung
+  handler holds only its own group. Publishers never wait on a handler. A backlog is bounded by memory,
+  not by a count: a handler whose backlog stays within its budget never loses a delivery, and a group
+  whose waiting publications reach the budget fails further deliveries visibly, in settlement and the
+  log, while the publisher and every other group carry on.
+- Each handler invocation runs under `HandlerTimeout`; when it passes, the handler's token is
+  cancelled, and a handler that ends because of it is a failed delivery.
+- Graceful host shutdown drains accepted local work. Forced shutdown cancels running handlers, and a
+  handler that ignores cancellation or blocks its thread is abandoned with its delivery failed.
 
-## Configure local safety bounds
+## Configure local bounds
 
-Defaults are sufficient for normal first use. The capacity applies independently to each local lane;
-the payload limit covers an Entity snapshot plus Event details when present:
+Defaults are sufficient for normal first use. `InProcessBacklogBytes` (default 64 MiB) is memory: the
+encoded bytes the publications waiting for one local handler group may hold, with a publication shared
+by several groups counted once in each. A group exceeds it by at most one publication, plus
+per-delivery bookkeeping and the one delivery in flight. A publisher never waits on it, and a handler
+whose backlog stays within it never loses a delivery. `HandlerTimeout` bounds one handler invocation:
 
 ```json
 {
   "Koan": {
     "Communication": {
-      "InProcessCapacity": 512,
-      "MaxPayloadBytes": 8388608
+      "InProcessBacklogBytes": 268435456,
+      "HandlerTimeout": "00:05:00"
     }
   }
 }
 ```
 
-Invalid values fail during host startup. Oversized or unserializable values fail with a typed lane
-exception carrying the operation's partial acceptance.
+Invalid values fail during host startup. The process-local runtime has no payload limit. A provider
+whose transport has one declares it, and Koan rejects a larger publication with a typed
+`PayloadTooLarge` lane exception carrying the operation's partial acceptance; unserializable values
+fail the same way with `Serialization`.
 
 ## Choose a business channel
 
@@ -232,16 +247,20 @@ transitive connector remains inert. Standard Aspire, Compose, Docker/Podman, Kub
 application-owned topology supplies the broker; Koan consumes
 `ConnectionStrings:RabbitMq=amqp://user:password@host:5672`.
 
-The Entity and receiver code does not change. RabbitMQ creates a durable queue per stable receiver
-group, confirms mandatory persistent publications, restores authenticated context at ingress, and
-manually acknowledges handler outcomes. The sender knows broker acceptance, not remote handler
+The Entity and receiver code does not change. RabbitMQ creates a durable quorum queue per stable
+receiver group, confirms mandatory persistent publications, restores authenticated context at ingress,
+and manually acknowledges handler outcomes. Each receiver group consumes on its own channel, so a slow
+group never holds another. A failed delivery is redelivered up to five times and then dead-lettered to
+that group's own dead-letter queue. A publication larger than the broker's message limit
+(`Koan:Communication:RabbitMq:MaxMessageBytes`, RabbitMQ 4's 16 MiB by default) fails with
+`PayloadTooLarge` before it reaches RabbitMQ. The sender knows broker acceptance, not remote handler
 settlement, so `TransportAcceptance.SettlementObservable` is false and `WaitForSettlement()` fails
 with `SettlementUnavailable`.
 
 If the directly intended provider is unavailable, startup or publication fails. Koan does not fall
 back to local Transport because doing so would silently change reach. Current RabbitMQ limits include
-no Events, retry, dedupe, inbox/outbox, dead letters, replay, schema negotiation, or exactly-once
-side-effect claim.
+no Events, dedupe, inbox/outbox, replay, schema negotiation, or exactly-once side-effect claim;
+redelivery means a handler may run more than once for one snapshot.
 
 Framework signals are not an application bus. Koan modules use them for lossy internal hints; Jobs
 wake is the first consumer. Adding Jobs requires no messaging package or registration, and adding the

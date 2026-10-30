@@ -14,6 +14,9 @@ internal sealed record CommunicationRouteDecision(
     public string Reason => Receipt.Reason;
     public bool DirectIntent => Receipt.DirectIntent;
     public int Priority => Receipt.Priority;
+
+    /// <summary>The elected adapter's declared transport limit for one encoded publication, or null when it has none.</summary>
+    public int? MaxPayloadBytes => Adapter.Descriptor.MaxPayloadBytes;
     public string Assurance => Adapter.Descriptor.Assurance switch
     {
         CommunicationDeliveryAssurance.ProcessMemory => "process-memory",

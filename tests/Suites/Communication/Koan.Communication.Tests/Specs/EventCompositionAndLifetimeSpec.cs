@@ -31,7 +31,8 @@ public sealed class EventCompositionAndLifetimeSpec
             fact.Code == "koan.communication.events.bounds"
             && fact.Subject == "communication:events:bounds"
             && fact.Summary.Contains("process-memory", StringComparison.Ordinal)
-            && fact.Summary.Contains("256-occurrence", StringComparison.Ordinal));
+            && fact.Summary.Contains("67108864-byte backlog budget and one sequential consumer per subscription group", StringComparison.Ordinal)
+            && fact.Summary.Contains("handler timeout", StringComparison.Ordinal));
     }
 
     [Fact]

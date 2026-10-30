@@ -8,6 +8,38 @@
 
 ---
 
+> **Implementation update (2026-10-30):** Delivery has no head-of-line blocking, and publishers never
+> wait on handlers. The process-local provider gives every bound receiver, subscription, and framework
+> group its own backlog and one sequential consumer, and runs each handler off that consumer's thread.
+> A group's backlog is bounded by memory, never by a count: `CommunicationOptions.InProcessBacklogBytes`
+> (64 MiB by default) caps the encoded bytes of the publications waiting for one group, a publication
+> shared by several groups counting once in each; a group exceeds it by at most one publication, plus
+> per-delivery bookkeeping and the one delivery in flight. A handler whose backlog stays within the
+> budget never loses a delivery. A group whose waiting publications reach the budget, a stalled or
+> too-slow consumer, fails further deliveries at once and visibly; settlement counts each as failed
+> and as overflowed (`EventSettlement.Overflowed`, `TransportSettlement.Overflowed`), each episode logs
+> one warning when it begins and one note with its true count when the group admits again, and the
+> publisher and every other group are unaffected. Per-group order is publication order, which is the
+> source order and multiplicity the local runtime retains; there is no order across groups. This
+> replaces the bounded wait backpressure that R07-07 proved: process-local acceptance is admission to
+> each target group's backlog, enumeration stays one-pass, and memory stays bounded by each group's
+> budget. Every handler invocation, through any adapter, runs under
+> `CommunicationOptions.HandlerTimeout`; its token is cancelled at the deadline, and a handler that ends
+> because of it is a failed delivery. A handler that ignores its token holds only its own group, and
+> forced shutdown abandons it, even one that blocks its thread, with its delivery failed. A payload limit is a transport fact: an adapter declares
+> `CommunicationAdapterDescriptor.MaxPayloadBytes`, Koan rejects a larger encoded publication before
+> handing it over, and the process-local provider declares none; `CommunicationOptions.MaxPayloadBytes`
+> is deleted. RabbitMQ declares `MaxMessageBytes` (RabbitMQ 4's 16 MiB by default), consumes each
+> receiver group on its own channel, lets publications share one confirm-tracking channel with up to
+> 128 of them awaiting their confirms at once and no delay, held by an adapter-owned permit across each
+> awaited confirm (a further publication waits until one settles), instead of one round trip at a
+> time, and moves durable groups to quorum
+> queues of topology generation v4, which redeliver a failed delivery five times and then dead-letter
+> it, at least once, to the group's own dead-letter queue. Bounded redelivery and dead letters are now
+> RabbitMQ claims; deduplication, inbox/outbox, replay, and remote settlement remain non-claims, and
+> redelivery makes RabbitMQ handler execution at-least-once. Earlier topology generations are not
+> migrated; operators retire them.
+
 > **Implementation update (R10-01, 2026-07-17):** Lifecycle `Prior` is now the persisted value
 > captured before an operation begins and is exposed directly as `context.Prior`. The deferred
 > loader object was deleted because an `AfterUpsert` caller could otherwise execute its first read

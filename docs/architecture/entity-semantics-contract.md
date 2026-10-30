@@ -287,7 +287,9 @@ side effects. Local delivery serializes/deserializes so it cannot expose a share
 Standard Transport with no receiver group fails correctively instead of succeeding as a silent no-op.
 
 `Raise` and `Send` lift pointwise across one Entity, a finite sequence, and a genuine lazy async stream.
-They preserve source ordinal/multiplicity, capture context once, use bounded backpressure, and report an
+They preserve source ordinal/multiplicity, capture context once, never wait on a handler, bound each
+receiver group's waiting work by memory rather than by count (a group over its budget fails that
+delivery in settlement while every other group still receives it), and report an
 accepted prefix without claiming collection atomicity or handler execution order. A normal await ends
 at channel publication acceptance. The returned receipt is a bounded operation summary; per-item
 identity and receiver dedupe/completion/failure/retry/dead-letter transitions are incremental correlated

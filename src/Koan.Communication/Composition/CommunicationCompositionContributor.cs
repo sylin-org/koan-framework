@@ -84,8 +84,8 @@ internal static class CommunicationCompositionFacts
             builder.AddCapability(subject, eventCapabilities);
             AddContextGuarantees(builder, events, "events", source);
         }
-        builder.AddConfigKey(Constants.Configuration.InProcessCapacity);
-        builder.AddConfigKey(Constants.Configuration.MaxPayloadBytes);
+        builder.AddConfigKey(Constants.Configuration.InProcessBacklogBytes);
+        builder.AddConfigKey(Constants.Configuration.HandlerTimeout);
         builder.AddConfigKey(Constants.Configuration.TransportProvider);
         builder.AddConfigKey(Constants.Configuration.EventsProvider);
         builder.AddConfigKey(Constants.Configuration.FrameworkSignalsProvider);
@@ -151,9 +151,10 @@ internal static class CommunicationCompositionFacts
                         Constants.Diagnostics.Codes.TransportBounds,
                         subject,
                         $"Process-local Transport/{transport.Channel} uses " +
-                        $"{Constants.Transport.ProcessMemoryAssurance} acceptance, a " +
-                        $"{options.InProcessCapacity}-snapshot queue, and a " +
-                        $"{options.MaxPayloadBytes}-byte publication limit.",
+                        $"{Constants.Transport.ProcessMemoryAssurance} acceptance, " +
+                        $"{LocalGroupBounds(options, "receiver")}, a {options.HandlerTimeout} handler timeout, and " +
+                        $"{PayloadLimit(transport)}; only a group whose backlog reaches its budget fails further " +
+                        "deliveries, in settlement, and the sender never waits.",
                         Constants.Diagnostics.Reasons.BoundedProcessMemory,
                         source);
                 }
@@ -163,7 +164,8 @@ internal static class CommunicationCompositionFacts
                         Constants.Diagnostics.Codes.TransportBounds,
                         subject,
                         $"Transport/{transport.Channel} uses '{transport.AdapterId}' with " +
-                        $"{transport.Assurance} publisher acceptance; handler settlement is " +
+                        $"{transport.Assurance} publisher acceptance, a {options.HandlerTimeout} handler timeout, " +
+                        $"and {PayloadLimit(transport)}; handler settlement is " +
                         $"{(transport.Adapter.Descriptor.SettlementObservable ? "observable" : "not observable")} " +
                         "by the publisher.",
                         transport.Reason,
@@ -176,9 +178,9 @@ internal static class CommunicationCompositionFacts
                 builder.AddObservation(
                     Constants.Diagnostics.Codes.EventsBounds,
                     Constants.Diagnostics.Subjects.EventsBoundsFor(events.Channel),
-                    $"Events/{events.Channel} uses '{events.AdapterId}' with {events.Assurance} acceptance, a " +
-                    $"{options.InProcessCapacity}-occurrence queue when process-local, and a " +
-                    $"{options.MaxPayloadBytes}-byte publication limit; handler settlement is " +
+                    $"Events/{events.Channel} uses '{events.AdapterId}' with {events.Assurance} acceptance, " +
+                    (events.Adapter.Descriptor.IsBuiltIn ? LocalGroupBounds(options, "subscription") + ", " : "") +
+                    $"a {options.HandlerTimeout} handler timeout, and {PayloadLimit(events)}; handler settlement is " +
                     $"{(events.Adapter.Descriptor.SettlementObservable ? "observable" : "not observable")}.",
                     events.Adapter.Descriptor.IsBuiltIn
                         ? Constants.Diagnostics.Reasons.BoundedProcessMemory
@@ -247,6 +249,14 @@ internal static class CommunicationCompositionFacts
             Constants.Diagnostics.Reasons.HostContextCarriers,
             source);
     }
+
+    private static string LocalGroupBounds(CommunicationOptions options, string group)
+        => $"a {options.InProcessBacklogBytes}-byte backlog budget and one sequential consumer per {group} group";
+
+    private static string PayloadLimit(CommunicationRouteDecision route)
+        => route.MaxPayloadBytes is { } limit
+            ? $"a {limit}-byte transport payload limit"
+            : "no transport payload limit";
 
     private static void AddContextGuarantees(
         KoanCompositionBuilder builder,

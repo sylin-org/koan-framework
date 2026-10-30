@@ -80,18 +80,30 @@ handler failure are settlement outcomes. External providers may report that remo
 observable, in which case waiting fails correctively rather than pretending that broker acceptance
 means business completion.
 
+Publishers never wait on handlers. In the process-local provider every receiver and subscription
+group has its own backlog and one sequential consumer, so a slow or hung handler holds only its own
+group, and each group receives deliveries in publication order. A backlog is bounded by memory, not by
+a count: a handler whose backlog stays within `InProcessBacklogBytes` never loses a delivery. A group
+whose waiting publications reach the budget fails further deliveries at once and visibly; settlement
+counts each in both `Failed` and `Overflowed`, a warning names the group, and the publisher and every
+other group are unaffected. Each handler runs under `HandlerTimeout`: its cancellation token is cancelled when the
+timeout passes, and a handler that ends because of it is a failed delivery.
+
 Zero Event subscriptions is a valid occurrence. Transport with no receiver group fails before source
 enumeration. Each deliberate terminal call has a new operation identity; the built-in runtime does no
 retries.
 
 ## Provider election, local limits, and inspection
 
-With no connector, the default runtime has separate bounded, single-process, memory-only lanes for
-Events, Transport, competing-group framework signals, and every-node framework broadcasts. The internal
-lanes are not an application bus: Jobs uses the competing-group lane for wake hints, while Cache uses
-the every-node lane for peer L1 invalidation.
-Configure `CommunicationOptions.InProcessCapacity` and `MaxPayloadBytes` only when the defaults are
-inappropriate.
+With no connector, the default runtime carries Events, Transport, competing-group framework signals,
+and every-node framework broadcasts in a single process and in memory, with one backlog per bound
+group. The internal routes are not an application bus: Jobs uses the competing-group route for wake
+hints, while Cache uses the every-node route for peer L1 invalidation.
+`CommunicationOptions.InProcessBacklogBytes` (default 64 MiB) is the memory one group's waiting
+publications may hold, counted as their encoded bytes, with a publication shared by several groups
+counted once in each; a group exceeds it by at most one publication, plus per-delivery bookkeeping and
+the one delivery in flight; `HandlerTimeout` (default two minutes) bounds one handler invocation. The process-local provider has no payload limit; a provider whose transport has one
+declares it, and Koan rejects a larger publication with `PayloadTooLarge` before handing it over.
 
 A directly referenced connector may claim supported lanes. Election is per lane, so RabbitMQ can
 carry Transport and both internal routes while Events remain process-local. A transitive connector is inert unless
@@ -139,10 +151,11 @@ Startup reporting and shared facts show every lane/channel election, assurance, 
 typed handler binding, and context carriage. The same facts reach `/.well-known/Koan/facts` and
 `koan://facts` when those host surfaces are present.
 
-The local runtime is not durable and does not cross processes. The RabbitMQ connector currently
+The local runtime is not durable, does not cross processes, and does not retry. The RabbitMQ connector
 provides confirmed Transport, competing-group signals, and ephemeral per-node broadcast subscriptions with
-authenticated context, but
-not remote settlement, retries, deduplication, dead letters, replay, Events, or outbox coupling.
+authenticated context, and redelivers a failed durable-group delivery a bounded number of times before
+dead-lettering it, but
+not remote settlement, deduplication, replay, Events, or outbox coupling.
 Jobs wake and Cache peer invalidation both reuse Communication while retaining their different delivery topology.
 No arbitrary-object messaging surface is implemented underneath this API.
 

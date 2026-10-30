@@ -56,6 +56,8 @@ public enum CommunicationBindingScope
 /// <summary>
 /// An immutable, side-effect-free declaration of one Communication provider candidate. A layered candidate may
 /// replace the built-in floor when its owning engine activates it; declaring zero lanes keeps it dormant.
+/// <see cref="MaxPayloadBytes"/> is the largest encoded publication the adapter's transport accepts; Koan rejects
+/// a larger publication before handing it to the adapter. Null declares no transport limit, and Koan applies none.
 /// </summary>
 public sealed record CommunicationAdapterDescriptor(
     string Id,
@@ -67,7 +69,8 @@ public sealed record CommunicationAdapterDescriptor(
     bool IsLayered = false,
     bool SettlementObservable = false,
     IReadOnlyList<string>? Aliases = null,
-    ContextIngressTrust IngressTrust = ContextIngressTrust.Unverified);
+    ContextIngressTrust IngressTrust = ContextIngressTrust.Unverified,
+    int? MaxPayloadBytes = null);
 
 /// <summary>One stable local receiver/subscription group that an elected adapter must bind once.</summary>
 public sealed record CommunicationAdapterBinding(
@@ -118,7 +121,13 @@ public enum CommunicationDeliveryOutcome
     Failed
 }
 
-/// <summary>Host services made available to an elected adapter without exposing business handlers.</summary>
+/// <summary>
+/// Host services made available to an elected adapter without exposing business handlers. <see cref="Dispatch"/>
+/// runs one binding's handler under the host's handler timeout: the handler's token is cancelled when the timeout
+/// passes, and a handler that ends because of it is a <see cref="CommunicationDeliveryOutcome.Failed"/> delivery.
+/// The returned task completes when the handler returns, so an adapter that awaits it before taking that binding's
+/// next delivery bounds the binding's concurrency even for a handler that ignores cancellation.
+/// </summary>
 public sealed class CommunicationAdapterHost
 {
     private readonly Func<string, ReadOnlyMemory<byte>, CancellationToken,

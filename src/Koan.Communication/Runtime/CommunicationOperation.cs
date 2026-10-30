@@ -12,6 +12,7 @@ internal sealed class CommunicationOperation
     private long _delivered;
     private long _filtered;
     private long _failed;
+    private long _overflowed;
     private long _settled;
     private int _targetGroups;
     private int _targetGroupsInitialized;
@@ -92,6 +93,13 @@ internal sealed class CommunicationOperation
         MarkSettled();
     }
 
+    /// <summary>A target whose backlog was over its memory budget: its delivery failed without reaching the handler.</summary>
+    public void MarkOverflowed()
+    {
+        Interlocked.Increment(ref _overflowed);
+        MarkFailed();
+    }
+
     public void Seal(bool sourceCompleted)
     {
         if (sourceCompleted)
@@ -138,6 +146,7 @@ internal sealed class CommunicationOperation
             Volatile.Read(ref _expected),
             Volatile.Read(ref _delivered),
             Volatile.Read(ref _filtered),
-            Volatile.Read(ref _failed)));
+            Volatile.Read(ref _failed),
+            Volatile.Read(ref _overflowed)));
     }
 }

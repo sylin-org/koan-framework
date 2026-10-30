@@ -1,17 +1,13 @@
-using System.Text;
 using Koan.Communication.Adapters;
 using Koan.Communication.Semantics;
-using Koan.Core.Context;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Koan.Communication.Runtime;
 
 internal sealed class EventCoordinator(
     CommunicationContextPlan contextPlan,
-    CommunicationRouter router,
-    IOptions<CommunicationOptions> options)
+    CommunicationRouter router)
 {
     public async Task<EventAcceptance> Raise<TEntity, TEvent>(
         IAsyncEnumerable<TEntity> source,
@@ -38,13 +34,11 @@ internal sealed class EventCoordinator(
         }
 
         string? detailsPayload = null;
-        var detailsBytes = 0;
         if (hasDetails)
         {
             try
             {
                 detailsPayload = details!.ToJson();
-                detailsBytes = Encoding.UTF8.GetByteCount(detailsPayload);
             }
             catch (Exception error)
             {
@@ -82,20 +76,8 @@ internal sealed class EventCoordinator(
                         error);
                 }
 
-                if (Encoding.UTF8.GetByteCount(entityPayload) + detailsBytes > options.Value.MaxPayloadBytes)
-                {
-                    operation.MarkRejected();
-                    operation.Seal(false);
-                    throw new EventException(
-                        EventException.FailureKind.PayloadTooLarge,
-                        $"Entity Event rejected '{typeof(TEntity).Name}/{typeof(TEvent).Name}' at ordinal {ordinal} " +
-                        $"because its serialized snapshot and details exceed the configured " +
-                        $"{nameof(CommunicationOptions.MaxPayloadBytes)} limit.",
-                        new EventAcceptance(operation.Snapshot()));
-                }
-
                 var occurrenceId = Guid.CreateVersion7();
-                var wire = new CommunicationWireEnvelope(
+                var publication = CommunicationWireCodec.Encode(new CommunicationWireEnvelope(
                     CommunicationWireCodec.SchemaVersion,
                     router.MeshId,
                     CommunicationLane.Events,
@@ -108,14 +90,27 @@ internal sealed class EventCoordinator(
                     occurrenceId,
                     DateTimeOffset.UtcNow,
                     hasDetails,
-                    detailsPayload);
+                    detailsPayload));
+                if (route.MaxPayloadBytes is { } limit && publication.Length > limit)
+                {
+                    operation.MarkRejected();
+                    operation.Seal(false);
+                    throw new EventException(
+                        EventException.FailureKind.PayloadTooLarge,
+                        $"Entity Event rejected '{typeof(TEntity).Name}/{typeof(TEvent).Name}' at ordinal {ordinal} " +
+                        $"because its {publication.Length}-byte publication exceeds the {limit}-byte transport limit " +
+                        $"that provider '{route.AdapterId}' declares. Raise a smaller snapshot or details, or elect a " +
+                        "provider whose transport carries it.",
+                        new EventAcceptance(operation.Snapshot()));
+                }
+
                 try
                 {
                     var accepted = await router.Publish(
                             route,
                             contract,
                             $"{occurrenceId:N}",
-                            CommunicationWireCodec.Encode(wire),
+                            publication,
                             operation,
                             ct)
                         .ConfigureAwait(false);

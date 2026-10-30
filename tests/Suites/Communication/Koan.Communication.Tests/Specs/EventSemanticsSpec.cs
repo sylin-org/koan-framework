@@ -48,8 +48,8 @@ public sealed class EventSemanticsSpec
         var settlement = await acceptance.WaitForSettlement(ct);
 
         acceptance.SubscriptionGroups.Should().Be(2);
-        state.CopyEntityObservations.Should().Equal("A:original", "B:original");
-        state.CopyDetailsObservations.Should().Equal("A:original-details", "B:original-details");
+        state.CopyEntityObservations.Should().BeEquivalentTo(["A:original", "B:original"]);
+        state.CopyDetailsObservations.Should().BeEquivalentTo(["A:original-details", "B:original-details"]);
         state.CopyOccurrenceIds.Should().HaveCount(2);
         state.CopyOccurrenceIds.Distinct().Should().ContainSingle();
         settlement.Delivered.Should().Be(2);

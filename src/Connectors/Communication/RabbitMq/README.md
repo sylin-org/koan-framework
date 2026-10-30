@@ -80,12 +80,20 @@ least one receiver-group route existed. It does not mean a remote handler comple
 `SettlementObservable=false`; `WaitForSettlement()` fails correctively because remote settlement is
 not observable in this generation.
 
-Each stable receiver group has its own durable queue. Replicas of that group compete on the same
-queue, while different groups each receive a serialized copy. Node broadcasts instead use one
-non-durable, auto-delete queue per active host, so every live node receives a copy without leaving
-durable queues behind after it exits. Consumers use bounded prefetch and
-manual acknowledgement. Koan carries the host's opaque context envelope and authenticates it before
-restoring tenant or other registered axes around handler execution.
+Each stable receiver group has its own durable quorum queue, consumed on a channel of its own, so a
+slow or hung group never delays another. Replicas of that group compete on the same queue, while
+different groups each receive a serialized copy. Consumers use bounded prefetch and manual
+acknowledgement. A delivery whose handler fails or exceeds Koan's handler timeout is redelivered up to
+five times; after that RabbitMQ dead-letters it to the group's own dead-letter queue
+(`{group queue}.dead-letter`), where an operator can inspect, replay, or purge it. An envelope that
+fails authentication is dead-lettered at once. Node broadcasts instead use one non-durable, auto-delete
+queue per active host, so every live node receives a copy without leaving durable queues behind after
+it exits; a failed broadcast is dropped, because its owning module keeps a correctness fallback. Koan
+carries the host's opaque context envelope and authenticates it before restoring tenant or other
+registered axes around handler execution.
+
+Publications share one confirm-tracking channel and wait only for their own broker confirm, so
+concurrent senders do not queue behind one another's round trips.
 
 If the directly intended connector cannot start or publish, startup/send fails with provider-specific
 correction. Koan never silently falls back to process-local Transport, because that would change
@@ -98,8 +106,11 @@ All options live under `Koan:Communication:RabbitMq`:
 - `Username` / `Password` — credentials added to discovered endpoints without user information.
 - `MeshTrustKey` — optional explicit HMAC material; otherwise the authenticated broker credential is
   used. Applications on the same mesh must use the same material.
-- `Prefetch` — maximum unacknowledged consumer deliveries; default `32`.
+- `Prefetch` — maximum unacknowledged deliveries held by each receiver group; default `32`.
 - `PublishTimeout` — confirmed-publication timeout; default `00:00:15`.
+- `MaxMessageBytes` — the broker's `max_message_size`; default `16777216`, RabbitMQ 4's default. A
+  larger publication fails with `PayloadTooLarge` before it reaches the broker. Set it when the broker
+  is configured differently.
 
 Startup facts report each RabbitMQ-elected lane/channel, why it won, its assurance, its bound receiver
 groups, and the fact that remote settlement is unobservable. Health `communication.rabbitmq` becomes
@@ -107,14 +118,15 @@ critical only when RabbitMQ is elected.
 
 ## Deliberate limits
 
-This connector does not currently provide Entity Events, retries, inbox/outbox, deduplication,
-dead-letter policy, replay, ordering guarantees beyond RabbitMQ's queue behavior, remote handler
-settlement, transactional coupling to Data, schema aliases/migrations, or exactly-once side effects.
-The application mesh and CLR contract identities must match across participants.
+This connector does not currently provide Entity Events, inbox/outbox, deduplication, replay,
+ordering guarantees beyond RabbitMQ's queue behavior, remote handler settlement, transactional
+coupling to Data, schema aliases/migrations, or exactly-once side effects. Redelivery means a handler
+can run more than once for one snapshot, and a redelivered snapshot can arrive after later ones. The
+application mesh and CLR contract identities must match across participants.
 
-Named-channel support changes the exchange/topology suffix from `v2` to `v3`. Pre-release `v2`
-exchanges and durable queues are not consumed or removed automatically; operators upgrading a
-non-disposable broker must retire them explicitly after all participants move together.
+The topology generation is `v4`. Exchanges and durable queues of earlier generations are not consumed
+or removed automatically; operators retaining a broker retire them after all participants move
+together.
 
 Framework signals are reserved for Koan modules. Applications do not receive a generic publish or
 subscribe API. Jobs wake uses competing groups; Cache peer invalidation uses every-node delivery.

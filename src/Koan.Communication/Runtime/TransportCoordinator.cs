@@ -1,17 +1,13 @@
-using System.Text;
 using Koan.Communication.Adapters;
 using Koan.Communication.Semantics;
-using Koan.Core.Context;
 using Koan.Core.Json;
 using Koan.Data.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace Koan.Communication.Runtime;
 
 internal sealed class TransportCoordinator(
     CommunicationContextPlan contextPlan,
-    CommunicationRouter router,
-    IOptions<CommunicationOptions> options)
+    CommunicationRouter router)
 {
     public async Task<TransportAcceptance> Send<TEntity>(
         IAsyncEnumerable<TEntity> source,
@@ -54,18 +50,7 @@ internal sealed class TransportCoordinator(
                         error);
                 }
 
-                if (Encoding.UTF8.GetByteCount(entityPayload) > options.Value.MaxPayloadBytes)
-                {
-                    operation.MarkRejected();
-                    operation.Seal(false);
-                    throw new TransportException(
-                        TransportException.FailureKind.PayloadTooLarge,
-                        $"Entity Transport rejected '{typeof(TEntity).Name}' at ordinal {ordinal} because its " +
-                        $"snapshot exceeds the configured {nameof(CommunicationOptions.MaxPayloadBytes)} limit.",
-                        new TransportAcceptance(operation.Snapshot()));
-                }
-
-                var wire = new CommunicationWireEnvelope(
+                var publication = CommunicationWireCodec.Encode(new CommunicationWireEnvelope(
                     CommunicationWireCodec.SchemaVersion,
                     router.MeshId,
                     CommunicationLane.Transport,
@@ -74,14 +59,27 @@ internal sealed class TransportCoordinator(
                     operation.OperationId,
                     ordinal,
                     entityPayload,
-                    capturedContext);
+                    capturedContext));
+                if (route.MaxPayloadBytes is { } limit && publication.Length > limit)
+                {
+                    operation.MarkRejected();
+                    operation.Seal(false);
+                    throw new TransportException(
+                        TransportException.FailureKind.PayloadTooLarge,
+                        $"Entity Transport rejected '{typeof(TEntity).Name}' at ordinal {ordinal} because its " +
+                        $"{publication.Length}-byte publication exceeds the {limit}-byte transport limit that provider " +
+                        $"'{route.AdapterId}' declares. Send a smaller snapshot, or elect a provider whose transport " +
+                        "carries it.",
+                        new TransportAcceptance(operation.Snapshot()));
+                }
+
                 try
                 {
                     var accepted = await router.Publish(
                             route,
                             contract,
                             MessageId(operation.OperationId, ordinal),
-                            CommunicationWireCodec.Encode(wire),
+                            publication,
                             operation,
                             ct)
                         .ConfigureAwait(false);

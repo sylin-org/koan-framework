@@ -54,6 +54,7 @@ public sealed class TransportAcceptance
             counts.Expected,
             counts.Delivered,
             counts.Filtered,
-            counts.Failed);
+            counts.Failed,
+            counts.Overflowed);
     }
 }

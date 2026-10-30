@@ -1,10 +1,9 @@
-using System.Text;
 using System.Threading.Channels;
 using Koan.Communication.Adapters;
+using Koan.Communication.Infrastructure;
 using Koan.Communication.Runtime;
 using Koan.Core.Json;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace Koan.Communication.Signals;
 
@@ -17,7 +16,6 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
     private readonly CommunicationRouter _router;
     private readonly CommunicationRouteDecision _signalRoute;
     private readonly CommunicationRouteDecision _broadcastRoute;
-    private readonly CommunicationOptions _options;
     private readonly ILogger<FrameworkSignalRuntime> _logger;
     private readonly Channel<SignalPublication> _outbound;
     private readonly CancellationTokenSource _abort = new();
@@ -26,15 +24,13 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
 
     public FrameworkSignalRuntime(
         CommunicationRouter router,
-        IOptions<CommunicationOptions> options,
         ILogger<FrameworkSignalRuntime> logger)
     {
         _router = router;
         _signalRoute = router.For(CommunicationLane.FrameworkSignals);
         _broadcastRoute = router.For(CommunicationLane.FrameworkBroadcasts);
-        _options = options.Value;
         _logger = logger;
-        _outbound = Channel.CreateBounded<SignalPublication>(new BoundedChannelOptions(_options.InProcessCapacity)
+        _outbound = Channel.CreateBounded<SignalPublication>(new BoundedChannelOptions(Constants.FrameworkSignals.EgressCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = true,
@@ -69,14 +65,6 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
         try
         {
             var payload = signal.ToJson();
-            if (Encoding.UTF8.GetByteCount(payload) > _options.MaxPayloadBytes)
-            {
-                _logger.LogDebug(
-                    "Koan Communication dropped oversized framework signal {Contract}; the owning subsystem fallback remains active.",
-                    contractId);
-                return false;
-            }
-
             var operation = new CommunicationOperation(route);
             operation.MarkEnumerated();
             var wire = new CommunicationWireEnvelope(
@@ -89,11 +77,24 @@ internal sealed class FrameworkSignalRuntime : IFrameworkSignalPublisher, IAsync
                 Ordinal: 0,
                 payload,
                 Context: null);
+            var encoded = CommunicationWireCodec.Encode(wire);
+            if (route.MaxPayloadBytes is { } limit && encoded.Length > limit)
+            {
+                operation.MarkRejected();
+                operation.Seal(false);
+                _logger.LogDebug(
+                    "Koan Communication dropped framework signal {Contract} because it exceeds provider {Provider}'s " +
+                    "transport limit; the owning subsystem fallback remains active.",
+                    contractId,
+                    route.AdapterId);
+                return false;
+            }
+
             var publication = new SignalPublication(
                 contractId,
                 route,
                 operation.OperationId.ToString("N"),
-                CommunicationWireCodec.Encode(wire),
+                encoded,
                 operation);
             if (_outbound.Writer.TryWrite(publication)) return true;
 

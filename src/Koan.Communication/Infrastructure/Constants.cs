@@ -5,8 +5,8 @@ internal static class Constants
     internal static class Configuration
     {
         public const string Section = "Koan:Communication";
-        public const string InProcessCapacity = Section + ":InProcessCapacity";
-        public const string MaxPayloadBytes = Section + ":MaxPayloadBytes";
+        public const string InProcessBacklogBytes = Section + ":InProcessBacklogBytes";
+        public const string HandlerTimeout = Section + ":HandlerTimeout";
         public const string TransportProvider = Section + ":TransportProvider";
         public const string EventsProvider = Section + ":EventsProvider";
         public const string FrameworkSignalsProvider = Section + ":FrameworkSignalsProvider";
@@ -35,6 +35,15 @@ internal static class Constants
         public const string ProcessMemoryAssurance = "process-memory";
     }
 
+    internal static class FrameworkSignals
+    {
+        /// <summary>
+        /// Framework hints waiting for egress to the elected provider. Hints are small fixed-shape values and loss only
+        /// delays the owning module's fallback, so a full egress drops the newest hint.
+        /// </summary>
+        public const int EgressCapacity = 1024;
+    }
+
     internal static class Operations
     {
         public const string Raise = "Entity Event raise";
@@ -53,8 +62,6 @@ internal static class Constants
         public const string EventSubscriptions = "communication.events.subscription-groups";
         public const string FrameworkSignalsAdapter = "communication.framework-signals.adapter";
         public const string FrameworkBroadcastsAdapter = "communication.framework-broadcasts.adapter";
-        public const string Capacity = "communication.in-process-capacity";
-        public const string MaxPayloadBytes = "communication.max-payload-bytes";
     }
 
     internal static class Diagnostics

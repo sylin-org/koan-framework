@@ -44,7 +44,7 @@ public sealed class TransportSemanticsSpec
         var settlement = await acceptance.WaitForSettlement(ct);
 
         acceptance.ReceiverGroups.Should().Be(2);
-        state.CopyObservations.Should().Equal("A:original", "B:original");
+        state.CopyObservations.Should().BeEquivalentTo(["A:original", "B:original"]);
         settlement.Delivered.Should().Be(2);
     }
 

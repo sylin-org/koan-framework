@@ -46,11 +46,11 @@ Core-owned provider priority, and stable ID resolve eligible candidates.
 The adapter descriptor is also the startup source for settlement observability; each publication
 acceptance must match it, so receipts and composition facts cannot tell different stories.
 
-The local adapter owns one bounded queue and worker per semantic lane. Business channels that elect
-the local adapter share their lane's bound; distinct lanes cannot head-of-line block one another. The
-lanes share lifecycle and aggregate operation accounting. Generic
-dispatch is closed during catalog construction rather than reflected per item. A directly intended
-provider that cannot start fails the host; there is no local reach fallback.
+The local adapter owns one backlog and one sequential consumer per binding: every receiver,
+subscription, and framework group on every channel it carries. No binding can head-of-line block
+another, and none can block a publisher. Bindings share lifecycle and aggregate operation accounting.
+Generic dispatch is closed during catalog construction rather than reflected per item. A directly
+intended provider that cannot start fails the host; there is no local reach fallback.
 
 Named channels are declared at `Koan:Communication:Channels:{name}` and may pin Transport and Events
 independently. A missing pin follows normal direct-reference/built-in election. Every public typed
@@ -67,8 +67,10 @@ to one lazy async source. Each coordinator then:
 1. resolves the lane route, binds every hard segmentation obligation, and captures the composed context once;
 2. validates policy knowable at the selected boundary before enumeration;
 3. serializes each yielded Entity, plus Event details when present, with shared JSON settings;
-4. applies the configured combined UTF-8 payload bound;
-5. publishes an immutable host wire envelope through the elected adapter; and
+4. encodes the immutable host wire envelope and, when the elected adapter declares a transport limit
+   (`CommunicationAdapterDescriptor.MaxPayloadBytes`), rejects a larger encoded publication with
+   `PayloadTooLarge`; the process-local adapter declares none;
+5. publishes the envelope through the elected adapter; and
 6. seals a fixed-size acceptance when enumeration completes or fails.
 
 Every accepted envelope contains JSON rather than an object reference. Correlation includes the
@@ -77,13 +79,31 @@ Every Event subscription for that Entity sees the same occurrence identity.
 
 ## Ingress and dispatch
 
-The local lanes are multiple-writer/single-reader and use wait backpressure. Framework-signal callers
-use a separate bounded, non-blocking egress because loss only delays the owning subsystem's fallback.
-External adapters bind
-the same stable target declarations and return host-owned wire bytes to the same ingress. For every
-target group, ingress creates a scope, pushes it as the current `AppHost`, restores carriers using the
-adapter's declared trust provenance, deserializes fresh Entity state and Event details, evaluates
-`Where`, and invokes the typed handler.
+Local publication never waits. For each target binding the adapter offers the delivery to that
+binding's backlog, which is bounded by memory, never by a count. The backlog counts the encoded bytes
+of every publication waiting in it; one encoded publication is shared by every binding it targets and
+counts once in each. A delivery is admitted while the waiting bytes are below the budget, so a binding
+with nothing waiting always admits, and a binding's memory exceeds `InProcessBacklogBytes` by at most
+one publication, plus per-delivery bookkeeping and the one delivery in flight, which are not counted;
+shared publications make the process total usually less than the sum. A handler whose backlog stays
+within the budget never loses a delivery. A binding whose waiting publications reach it fails further
+deliveries immediately and visibly, settling each as failed and overflowed.
+Admission and the overflow episode are decided under one lock, so each episode logs one warning when
+it begins and one note, with its true count, when the binding admits again. The budget reaches only
+the binding that is over it. Each binding's consumer takes one delivery at a time, in the order it was
+offered, so per-binding order is publication order; there is no order across bindings. It runs each
+handler on the thread pool rather than its own thread and waits for it there, so a forced stop always
+reaches that wait. Framework-signal callers use a separate bounded, non-blocking egress
+because loss only delays the owning subsystem's fallback; that egress holds a fixed number of small
+fixed-shape hints and drops the newest when full.
+
+External adapters bind the same stable target declarations and return host-owned wire bytes to the
+same ingress. For every target group, ingress creates a scope, pushes it as the current `AppHost`,
+restores carriers using the adapter's declared trust provenance, deserializes fresh Entity state and
+Event details, evaluates `Where`, and invokes the typed handler under `HandlerTimeout`: the handler's
+token is cancelled when the timeout passes, and a handler that ends because of it is a failed delivery.
+Dispatch returns when the handler returns, so an adapter that awaits it before taking a binding's next
+delivery keeps a handler that ignores cancellation from holding anything but its own binding.
 
 `CommunicationContextPlan` is the pillar-owned wrapper over Core's memoized
 `SegmentationContextPlan`. It requires every applicable hard axis before restore and re-binds the
@@ -91,10 +111,11 @@ segmentation scope under the restored carrier before filters or handlers. A dete
 fallback is materialized into the outgoing opaque bag only for a hard typed operation; it is not ambient
 global state and cannot be re-resolved differently by a peer.
 
-Filtering, successful handling, and failure each settle one target counter. Handler exceptions are
-logged without payload contents and do not prevent later groups from receiving their copies. Graceful
-host stop closes publication, drains all lanes, and then stops. Forced shutdown depends on
-cooperative handler cancellation.
+Filtering, successful handling, failure, and overflow each settle one target counter; overflow also
+counts as failure. Handler exceptions are logged without payload contents and never reach another
+group. Graceful host stop closes publication, drains every binding, and then stops. Forced shutdown
+cancels running handlers and fails what remains queued; a handler that ignores cancellation, or blocks
+its thread, is abandoned with its delivery failed, so stop is not held by it.
 
 ## Lane policy
 
@@ -133,7 +154,7 @@ confidentiality; and remote settlement remains unavailable unless an adapter exp
 - provider-specific features outside an adapter's declared lane and assurance;
 - dynamic channel creation, automatic branching, mirroring, or failover;
 - channel-based authorization, confidentiality, or receiver selection;
-- retry, dedupe, dead-letter, replay, or outbox behavior;
+- process-local retry, dedupe, dead-letter, replay, or outbox behavior;
 - batch atomicity or transactional coupling to persistence;
 - application-authored non-Entity payloads (typed framework signals remain internal);
 - shared-reference semantics; or

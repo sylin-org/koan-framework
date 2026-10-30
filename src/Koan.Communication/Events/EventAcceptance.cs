@@ -53,6 +53,7 @@ public sealed class EventAcceptance
             counts.Expected,
             counts.Delivered,
             counts.Filtered,
-            counts.Failed);
+            counts.Failed,
+            counts.Overflowed);
     }
 }

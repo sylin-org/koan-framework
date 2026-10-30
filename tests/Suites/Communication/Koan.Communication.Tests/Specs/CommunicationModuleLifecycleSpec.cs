@@ -32,11 +32,11 @@ public sealed class CommunicationModuleLifecycleSpec
 
         services.Should().HaveCount(firstRegistrationCount);
 
-        services.AddKoanCommunication(options => options.InProcessCapacity = 731);
+        services.AddKoanCommunication(options => options.InProcessBacklogBytes = 731);
         using var provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<IOptions<CommunicationOptions>>()
-            .Value.InProcessCapacity.Should().Be(731);
+            .Value.InProcessBacklogBytes.Should().Be(731);
     }
 
     [Fact]

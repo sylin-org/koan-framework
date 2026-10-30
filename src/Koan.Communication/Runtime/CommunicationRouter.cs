@@ -51,6 +51,7 @@ internal sealed class CommunicationRouter
     private readonly ICommunicationAdapter[] _selectedAdapters;
     private readonly string _meshId;
     private readonly ProviderCatalog<ICommunicationAdapter> _providers;
+    private readonly TimeSpan _handlerTimeout;
     private int _state;
 
     public CommunicationRouter(
@@ -66,6 +67,7 @@ internal sealed class CommunicationRouter
     {
         _ingress = ingress;
         _logger = logger;
+        _handlerTimeout = options.Value.HandlerTimeout;
         _providers = ProviderCatalog<ICommunicationAdapter>.Compile(adapters, DescribeAdapter);
         var candidates = _providers.Candidates
             .Select(static candidate => candidate.Value)
@@ -288,6 +290,8 @@ internal sealed class CommunicationRouter
             return CommunicationDeliveryOutcome.Failed;
         }
 
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(_handlerTimeout);
         try
         {
             var wire = CommunicationWireCodec.Decode(payload);
@@ -319,13 +323,24 @@ internal sealed class CommunicationRouter
                 _ => throw new InvalidDataException("The Communication binding has an unsupported target type.")
             };
 
-            var outcome = await _ingress.Dispatch(binding.Target, envelope, ingressTrust, ct).ConfigureAwait(false);
+            var outcome = await _ingress.Dispatch(binding.Target, envelope, ingressTrust, deadline.Token)
+                .ConfigureAwait(false);
             return outcome == CommunicationTargetOutcome.Filtered
                 ? CommunicationDeliveryOutcome.Filtered
                 : CommunicationDeliveryOutcome.Delivered;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            return CommunicationDeliveryOutcome.Failed;
+        }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                "Communication handler for binding {BindingId} exceeded the {HandlerTimeout} handler timeout " +
+                "({Setting}); its delivery failed.",
+                bindingId,
+                _handlerTimeout,
+                Constants.Configuration.HandlerTimeout);
             return CommunicationDeliveryOutcome.Failed;
         }
         catch (Exception error)

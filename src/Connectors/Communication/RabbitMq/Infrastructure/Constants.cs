@@ -13,6 +13,7 @@ internal static class Constants
         internal const string MeshTrustKey = Section + ":MeshTrustKey";
         internal const string Prefetch = Section + ":Prefetch";
         internal const string PublishTimeout = Section + ":PublishTimeout";
+        internal const string MaxMessageBytes = Section + ":MaxMessageBytes";
         internal const string Username = Section + ":Username";
         internal const string Password = Section + ":Password";
     }
@@ -27,7 +28,20 @@ internal static class Constants
         internal const int ManagementPort = 15672;
         internal const int StartupPriority = 250;
         internal const string ExchangePrefix = "koan.communication";
-        internal const string ExchangeGeneration = "v3";
+        internal const string ExchangeGeneration = "v4";
+        internal const string DeadLetterSuffix = "dead-letter";
+
+        /// <summary>Failed deliveries a durable group's quorum queue redelivers before it dead-letters the message.</summary>
+        internal const int DeliveryLimit = 5;
+
+        /// <summary>
+        /// Publications that await their broker confirms at once, with no delay; a further one waits until a confirm
+        /// settles. The adapter's confirm window holds each permit until the confirm settles.
+        /// </summary>
+        internal const int OutstandingConfirms = 128;
+
+        /// <summary>RabbitMQ 4's default <c>max_message_size</c>.</summary>
+        internal const int DefaultMaxMessageBytes = 16 * 1024 * 1024;
         internal const string SignatureHeader = "x-koan-signature-v1";
         internal const string ContentType = "application/vnd.koan.communication+json;v=2";
         internal const string MessageTypePrefix = "koan.communication";
@@ -46,6 +60,19 @@ internal static class Constants
         internal static readonly TimeSpan DiscoveryHealthTimeout = TimeSpan.FromSeconds(5);
         internal static readonly TimeSpan NetworkRecoveryInterval = TimeSpan.FromSeconds(5);
         internal static readonly TimeSpan OrchestrationHealthTimeout = TimeSpan.FromSeconds(30);
+
+        internal static class QueueArguments
+        {
+            internal const string Type = "x-queue-type";
+            internal const string Quorum = "quorum";
+            internal const string DeliveryLimit = "x-delivery-limit";
+            internal const string DeadLetterExchange = "x-dead-letter-exchange";
+            internal const string DeadLetterRoutingKey = "x-dead-letter-routing-key";
+            internal const string DeadLetterStrategy = "x-dead-letter-strategy";
+            internal const string AtLeastOnce = "at-least-once";
+            internal const string Overflow = "x-overflow";
+            internal const string RejectPublish = "reject-publish";
+        }
     }
 
     internal static class Health

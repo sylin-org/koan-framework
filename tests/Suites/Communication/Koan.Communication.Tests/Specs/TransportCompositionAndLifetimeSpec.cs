@@ -41,7 +41,8 @@ public sealed class TransportCompositionAndLifetimeSpec
             fact.Code == "koan.communication.transport.bounds"
             && fact.Subject == "communication:transport:bounds"
             && fact.Summary.Contains("process-memory", StringComparison.Ordinal)
-            && fact.Summary.Contains("256-snapshot", StringComparison.Ordinal));
+            && fact.Summary.Contains("67108864-byte backlog budget and one sequential consumer per receiver group", StringComparison.Ordinal)
+            && fact.Summary.Contains("no transport payload limit", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -99,9 +100,9 @@ public sealed class TransportCompositionAndLifetimeSpec
         var action = () => CommunicationTestHost.Start(
             state,
             ct,
-            services => services.Configure<CommunicationOptions>(options => options.InProcessCapacity = 0));
+            services => services.Configure<CommunicationOptions>(options => options.InProcessBacklogBytes = 0));
 
         var error = (await action.Should().ThrowAsync<OptionsValidationException>()).Which;
-        error.Message.Should().Contain(nameof(CommunicationOptions.InProcessCapacity));
+        error.Message.Should().Contain(nameof(CommunicationOptions.InProcessBacklogBytes));
     }
 }

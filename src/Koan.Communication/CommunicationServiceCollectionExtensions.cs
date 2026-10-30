@@ -27,11 +27,13 @@ public static class CommunicationServiceCollectionExtensions
             services.AddOptions<CommunicationOptions>()
                 .BindConfiguration(Constants.Configuration.Section)
                 .Validate(
-                    static value => value.InProcessCapacity > 0,
-                    $"{nameof(CommunicationOptions.InProcessCapacity)} must be greater than zero.")
+                    static value => value.InProcessBacklogBytes > 0,
+                    $"{nameof(CommunicationOptions.InProcessBacklogBytes)} must be greater than zero.")
                 .Validate(
-                    static value => value.MaxPayloadBytes > 0,
-                    $"{nameof(CommunicationOptions.MaxPayloadBytes)} must be greater than zero.")
+                    static value => value.HandlerTimeout > TimeSpan.Zero
+                                    && value.HandlerTimeout.TotalMilliseconds <= int.MaxValue,
+                    $"{nameof(CommunicationOptions.HandlerTimeout)} must be greater than zero and at most " +
+                    $"{int.MaxValue} milliseconds.")
                 .ValidateOnStart();
 
             var handlers = CommunicationHandlerCatalog.FromDiscovery();
