@@ -181,9 +181,9 @@ public sealed class SessionRows
         var node = world.Node();
         await world.SignIn(node, did);
         var read = await node.Store.Read(did, Ct);
-        await using var claim = await node.Store.Claim(read!, Ct);
+        await using var claim = await node.Store.Claim(read!, TimeSpan.FromMinutes(1), Ct);
         Assert.NotNull(claim);
-        Assert.Null(await node.Store.Claim(read!, Ct));
+        Assert.Null(await node.Store.Claim(read!, TimeSpan.FromMinutes(1), Ct));
 
         await world.SignIn(world.Node(), did);
 

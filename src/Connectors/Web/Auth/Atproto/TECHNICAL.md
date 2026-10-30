@@ -105,63 +105,40 @@ are per process.
 - **`AtprotoSession`** — one row per DID, its id the SHA-256 of the DID and `Did` checked
   ordinally on read. `Grant` is the protected `OAuthSessionData`; `ExpiresAt`, indexed, is the
   last grant write plus 14 days, the longest a public client's refresh token lives;
-  `ClaimedUntil` and `ClaimId` mark a grant one process holds to refresh or revoke. `Version`
-  is a fresh random value on every write, never reused. A commit, a claim and the sweep are
-  conditional on the version read; a claim holder's renewals, release and end are conditional on
-  its `ClaimId` instead, and every other write leaves the row without it. A refresh's result is
-  conditional on the protected `Grant` it refreshed from, which only a sign-in, a result or an
-  end writes anew, and clears whatever claim holds the row. A store that cannot replace
-  conditionally is refused at start for an
-  eligible provider. Ending a session is a conditional delete where the store declares one, and
-  otherwise a conditional replace that empties the row to its DID and expires it at once. A
-  write under a claim runs until the store answers or its deadline passes, and is cancelled
-  then; past it, its outcome is unknown, and the fences settle whatever a store that ignores
-  cancellation lands late.
+  `ClaimedUntil` marks a grant one process holds to refresh or revoke. `Version` is a fresh random
+  value on every write, never reused. A commit, a claim, a release, an end and the sweep are
+  conditional on the version read or written. A refresh's result is conditional on the protected
+  `Grant` it refreshed from, which only a sign-in, a result or an end writes anew, and clears
+  whatever claim holds the row. A store that cannot replace conditionally is refused at start for
+  an eligible provider. Ending a session is a conditional delete where the store declares one, and
+  otherwise a conditional replace that empties the row to its DID and expires it at once.
 - **Reading.** `Read` is one keyed read. A grant that cannot be unprotected or deserialized, or
   that names another subject, is logged and read as no grant for that DID alone; the next
   sign-in commits over its version. A grant past `ExpiresAt` reads as none.
-- **Claims.** `SessionClaim` takes a new `ClaimId` and a lease of 15 seconds. A renewal falls
-  due 5 seconds after the lease last landed started, on its own task, and lands only while the
-  row carries the claim under an earlier `ClaimedUntil`, so a renewal only ever extends the
-  lease. While the latest has not answered, another starts every third of an interval
-  (`AttemptSpacing`, 1.67 s with the defaults); none is cut off before the end of the lease it
-  serves. A refused renewal is read: still under the claim, a newer renewal superseded it; without
-  it, the claim is lost. Renewals never wait behind the result write, go on while a provider
-  request is in flight, and stop once the claim is settled or lost, or once its lease ended with
-  none landed. A holder that stops keeps others waiting no longer than the lease. Disposing a
-  claim that is not settled releases it, clearing `ClaimId` and `ClaimedUntil`, within the lease
-  it starts in or an interval when less is left.
+- **Claims.** A claim is one conditional write on `Version` that sets `ClaimedUntil` to now plus
+  a fixed lease: two request timeouts, for a refresh or revocation and its nonce retry, and ten
+  seconds for the write that settles it, 70 s with the defaults. Nothing renews it. `SessionClaim`
+  keeps the row as it wrote it; a claim disposed unsettled is released, conditional on that
+  version, so a release never lands on a row anyone wrote since. An expired claim is simply taken.
 - **Refresh.** A request whose stored access token is due within 30 seconds claims the row and
-  starts its refresh only with half a lease left and the row, read again, still under its claim
-  with the grant it was taken on (`Begin`, `RequestRoom`); with less room, it waits an interval
-  for a renewal to give it, and otherwise releases the claim and reads the row again, until the
-  wait bound. The refresh, once sent, runs to its answer whatever the caller's cancellation, since
-  the provider rotates the refresh token as it answers. Its result is stored while the row holds
-  the grant it refreshed from, and clears the claim in the same write — a takeover's too — so no
-  renewal or release, the holder's or a taker's, can land after it. That write keeps one version
-  across its attempts, a third of an interval apart within a window of a lease; a refused attempt
-  reads the row, so one an earlier attempt landed is recognized. When none is known to have
-  landed, the claim is released and the row read once every attempt has answered, or an interval
-  on: a row holding this result means it was stored; one holding another grant is read again;
-  while an attempt is still pending in the store, or when the row cannot be read, the outcome is
-  unknown, logged at Warning, and the request fails with `TimeoutException`; otherwise the row id
-  is logged at Error and the request fails. Others wait, pausing from 50 ms up to 1 s, for the
-  stored grant or for the claim to lapse, for one request timeout at most; then the request
-  fails with `TimeoutException`, logged at Information, having written nothing. A waiter takes
-  over only once the lease lapses, which a working holder prevents for as long as it works: two
-  request timeouts and `ClaimHold` (an interval and three leases), 110 s with the defaults. A
-  provider that answers `invalid_grant` has ended the grant: the row ends and the person signs in
-  again. Any other failure releases the claim and keeps the session. A result refused means the
-  row is read again and the client retired. Retryable failures throw `TimeoutException`; a
-  session that must be signed in again throws `InvalidOperationException`.
+  makes its one refresh, which, once sent, runs to its answer whatever the caller's cancellation,
+  since the provider rotates the refresh token as it answers. Its result is stored while the row
+  holds the grant it refreshed from, and clears the claim in the same write. A result refused means
+  the row holds another grant: the row is read again and the client retired. A provider that answers
+  `invalid_grant` has ended the grant: the row ends and the person signs in again. Any other failure
+  releases the claim and keeps the session. A store that fails the result fails the request with
+  `TimeoutException`, logged at Warning with the row id; the client stays in the cache holding the
+  rotated tokens, and the next request in that process stores them. Others read the row again every
+  250 ms for the stored grant or for the lease to end, for one request timeout at most; then the
+  request fails with `TimeoutException`, having written nothing. A session that must be signed in
+  again throws `InvalidOperationException`.
 - **Disconnect.** The client and the issuer's revocation endpoint are read before the claim, so
-  the claim covers the revocation request and its nonce retry alone, started as a refresh is. The
-  row ends under the claim's fence only after revocation is confirmed, and a disconnect whose end
-  is refused throws rather than reporting success.
-- **Residuals.** WEB-0082 §3 names what the fences cannot close: a holder taken over while its
-  request is at the provider, whose late result clears a taker that already sent its own refresh,
-  a store whose writes take more than half a lease, which serves no refresh until it speeds up,
-  an answer lost after the provider rotated, and process clocks that differ.
+  the claim covers the revocation request and its nonce retry alone. The row ends, on the claim's
+  version, only after revocation is confirmed, and a disconnect whose end is refused throws rather
+  than reporting success.
+- **Accepted.** WEB-0082 §3 names what this design leaves open: a double refresh after a holder
+  stopped mid-request or outlasted its lease, a rotated token no process can store, and an answer
+  lost after the provider rotated.
 - **Sweep.** `AtprotoSessionSweep`, a hosted service, runs `Sweep` at start and every ten minutes
   while the provider is eligible: expired pending authorizations and expired session rows —
   ended or not refreshed in time — are deleted, 100 rows per read, each pass stopping at a short
@@ -229,12 +206,10 @@ Evidence boundaries:
   requested-grant completeness and mandatory PAR, and, over a SQLite store with a loopback
   provider that rotates refresh tokens and ends a grant whose rotated token is replayed, two
   connector instances standing for two processes: signing in at once and reading each other's
-  sessions, one refresh of a DID across both, a stopped holder's claim taken over within its
-  lease, the claim interleavings (a claim lost mid-refresh, a renewal unrecognized past its
-  bound, loss at the mark, a store cut with a second process sending, a stale renewal after an
-  unrecognized result, a result write stalled within and past its bound, a renewal hung through
-  a short outage, a result that outlasts an outage, a result stored though its release was
-  refused), a refreshed write that fails once still landing,
+  sessions, one refresh of a DID across both, a stopped holder's claim taken once its lease ended,
+  a waiter that fails after one request timeout while the holder's result lands, a result landing
+  over a taken claim, one result of two holders, a store that fails the refreshed write losing one
+  request and no session,
   a row this application cannot read failing only its DID, a sign-in replacing a claimed grant,
   a provider-ended grant, a checked disconnect and one that ended nothing, the paged sweep,
   pruning on DuckDB, which deletes nothing conditionally, the client cache's bound, eviction

@@ -401,25 +401,18 @@ public sealed class AtprotoSessions
 
     /// <summary>
     /// The DID's client with an access token that is not due. A grant that is due is claimed on its row first, so of every
-    /// process sharing the store one refreshes it at its provider; the others wait for the grant it stores, or for its
-    /// claim to lapse and claim it themselves. A holder renews its claim while it works, so a stopped one keeps others
-    /// waiting no longer than a claim's lifetime, and starts its refresh only with room on the lease to record it. A call
-    /// whose claim gave it no such room, was lost, or no longer holds the row, reads the row again and goes on as any
-    /// other. A call that has not claimed the row within <see cref="WaitBound"/> gives up with a
-    /// <see cref="TimeoutException"/>, to be tried again, having written nothing; a call that claimed it keeps the claim's
-    /// own bounds.
+    /// process sharing the store one refreshes it at its provider; the others read the row again until it holds the stored
+    /// grant or the claim's lease ended, and take the claim then. A call that gets neither within <see cref="WaitBound"/>
+    /// gives up with a <see cref="TimeoutException"/>, to be tried again, having written nothing.
     /// </summary>
     private async Task<ClientCache<AtprotoClient>.Lease> Ready(string did, string clientId, CancellationToken ct)
     {
         var deadline = DateTimeOffset.UtcNow + WaitBound;
-        var pause = Constants.ClaimPause;
-        var slow = false;
         while (true)
         {
             var stored = await store.Read(did, ct);
             if (stored?.Grant is not { } grant || !Current(grant, clientId)) throw AuthorizationRequired();
             var lease = await Rent(did, clientId, stored, null, ct);
-            var waiting = stored.Claimed;
             try
             {
                 if (!grant.TokenSet.IsExpired(Constants.RefreshAhead))
@@ -428,21 +421,29 @@ public sealed class AtprotoSessions
                     return lease;
                 }
 
-                if (!waiting)
+                if (!stored.Claimed)
                 {
-                    await using var claim = await store.Claim(stored, ct);
-                    if (claim is null) waiting = true;
-                    // No room on the lease to record a refresh: the claim is released and the row read again.
-                    else if (!await claim.Begin()) slow = true;
-                    else if (await Refresh(lease.Client, claim) is { } refreshed)
+                    await using var claim = await store.Claim(stored, ClaimLease, ct);
+                    if (claim is not null)
                     {
-                        RequireScopes(refreshed.TokenSet.Scope, AllowedScopes);
-                        return lease;
+                        if (await Refresh(lease.Client, claim) is { } refreshed)
+                        {
+                            RequireScopes(refreshed.TokenSet.Scope, AllowedScopes);
+                            return lease;
+                        }
+
+                        // A sign-in or a disconnect replaced the row during the refresh: this client's tokens are not
+                        // the stored ones.
+                        lease.Retire();
                     }
-                    // A sign-in or a disconnect replaced the row during the refresh: this client's tokens are not the
-                    // stored ones, and the row is read again.
-                    else lease.Retire();
                 }
+            }
+            catch (TimeoutException)
+            {
+                // The store did not take the result: this client alone holds the rotated tokens, and stays for the next
+                // call to store them.
+                lease.Dispose();
+                throw;
             }
             catch
             {
@@ -452,63 +453,51 @@ public sealed class AtprotoSessions
             }
 
             lease.Dispose();
-            var left = deadline - DateTimeOffset.UtcNow;
-            if (left <= TimeSpan.Zero) throw Unavailable(did, slow);
-            if (!waiting) continue;
-            await Task.Delay(pause < left ? pause : left, ct);
-            pause = pause * 2 < Constants.ClaimPauseCeiling ? pause * 2 : Constants.ClaimPauseCeiling;
+            await Pause(deadline, ct);
         }
     }
 
     /// <summary>
-    /// Refreshes a claimed grant at its provider, under a claim that has begun, and stores what it returns; null when the
-    /// claim no longer holds the row, so the caller reads the row again. Once sent, the request runs to its answer
-    /// whatever the caller's cancellation, since the provider rotates the refresh token as it answers, and its result is
-    /// written while the row still holds the grant it refreshed from. A provider that refuses the grant has ended the
-    /// session: its row ends too, and the person signs in again.
+    /// Refreshes a claimed grant at its provider and stores what it returns; null when the row holds another grant by then,
+    /// so the caller reads it again. Once sent, the request runs to its answer whatever the caller's cancellation, since
+    /// the provider rotates the refresh token as it answers. A provider that refuses the grant has ended the session: its
+    /// row ends too, and the person signs in again. A client still holding a grant the store did not take stores that one,
+    /// with no request.
     /// </summary>
     private async Task<OAuthSessionData?> Refresh(AtprotoClient client, SessionClaim claim)
     {
-        try { await client.Tokens.RefreshAsync(CancellationToken.None); }
-        catch (TokenRefreshException error) when (error.InnerException is OAuthException { ErrorCode: "invalid_grant" })
+        if (client.Capture.Written is null)
         {
-            await claim.End();
-            throw AuthorizationRequired(error);
+            try { await client.Tokens.RefreshAsync(CancellationToken.None); }
+            catch (TokenRefreshException error) when (error.InnerException is OAuthException { ErrorCode: "invalid_grant" })
+            {
+                await claim.End();
+                throw AuthorizationRequired(error);
+            }
         }
 
-        var refreshed = client.Capture.Take() ?? throw new InvalidOperationException("The AT session refresh returned no grant.");
+        var refreshed = client.Capture.Written ?? throw new InvalidOperationException("The AT session refresh returned no grant.");
         if (await claim.Refreshed(refreshed) is not { } stored) return null;
+        client.Capture.Take();
         client.Grant = stored.Row.Grant!;
         return refreshed;
     }
 
-    /// <summary>
-    /// The longest one request waits to claim a session: one request timeout, 30 s with the defaults. It is not when a
-    /// waiter may take over, which is when the holder's lease lapses: a holder renews it while it works, up to
-    /// <see cref="TakeoverHorizon"/>.
-    /// </summary>
+    /// <summary>The longest one request waits behind another's claim: one request timeout, 30 s with the defaults.</summary>
     private TimeSpan WaitBound => TimeSpan.FromSeconds(options.RequestTimeoutSeconds);
 
     /// <summary>
-    /// The longest a claim stands while its holder works: its provider requests, each within the request timeout, and the
-    /// longest its claim stands beyond them (<see cref="AtprotoSessionStore.ClaimHold"/>: an interval and three leases).
-    /// With the defaults, 2 × 30 s + 5 s + 3 × 15 s: 110 s. No waiter takes over from a holder within it.
+    /// How long a claim stands: the holder's provider requests, each within the request timeout, and the write that settles
+    /// them. With the defaults, 2 × 30 s + 10 s: 70 s, the longest a holder that stopped keeps others out.
     /// </summary>
-    private TimeSpan TakeoverHorizon => TimeSpan.FromSeconds(options.RequestTimeoutSeconds * Constants.ClaimedRequests) + store.ClaimHold;
+    private TimeSpan ClaimLease => WaitBound * Constants.ClaimedRequests + Constants.ClaimWriteBound;
 
-    // A call that waited its whole bound fails, to be tried again, having written nothing: another request is refreshing
-    // the session, or its own claims found no room on the lease to record a refresh.
-    private TimeoutException Unavailable(string did, bool slow)
+    // One pause behind another request's claim. Past the deadline the call fails, to be tried again, having written nothing.
+    private static async Task Pause(DateTimeOffset deadline, CancellationToken ct)
     {
-        var row = AtprotoSession.KeyFor(did);
-        if (slow)
-        {
-            store.LogTooSlow(row, WaitBound);
-            return new TimeoutException("The AT session's store answered too slowly to record a refresh; try again.");
-        }
-
-        store.LogWaited(row, WaitBound, TakeoverHorizon);
-        return new TimeoutException("Another request is refreshing this AT sign-in; try again.");
+        var left = deadline - DateTimeOffset.UtcNow;
+        if (left <= TimeSpan.Zero) throw new TimeoutException("Another request is refreshing this AT sign-in; try again.");
+        await Task.Delay(left < Constants.ClaimPause ? left : Constants.ClaimPause, ct);
     }
 
     private static InvalidOperationException AuthorizationRequired(Exception? cause = null)
@@ -569,20 +558,16 @@ public sealed class AtprotoSessions
     /// <summary>
     /// Revoke and remove the upstream grant; this is separate from local cookie logout. The client and the issuer's
     /// revocation endpoint are read first and the grant then claimed on its row, so no process refreshes it while it is
-    /// revoked, and the claim covers the revocation request and its nonce retry alone; a claim with no room on its lease
-    /// for them is released and the row read again. A call that has not claimed the row within the wait bound gives up,
-    /// to be tried again. A session granted to a client identity this
-    /// application no longer publishes (WEB-0081) is removed here whether or not the provider accepts its revocation; a
-    /// current one whose revocation cannot be confirmed is kept for a retry. The revocation, once sent, runs to its answer;
-    /// its end is written under the claim's identity. A session that changed while it was disconnected — signed in again,
-    /// or taken over by another process — is not ended, and the call says so.
+    /// revoked, and the claim covers the revocation request and its nonce retry alone. A call that has not claimed the row
+    /// within the wait bound gives up, to be tried again. A session granted to a client identity this application no longer
+    /// publishes (WEB-0081) is removed here whether or not the provider accepts its revocation; a current one whose
+    /// revocation cannot be confirmed is kept for a retry. A session that changed while it was disconnected — signed in
+    /// again, or claimed anew by another process — is not ended, and the call says so.
     /// </summary>
     public async Task Disconnect(string did, CancellationToken ct = default)
     {
         var clientId = ClientId;
         var deadline = DateTimeOffset.UtcNow + WaitBound;
-        var pause = Constants.ClaimPause;
-        var slow = false;
         while (true)
         {
             var stored = await store.Read(did, ct);
@@ -593,8 +578,8 @@ public sealed class AtprotoSessions
                 using var lease = current ? await Rent(did, clientId, stored, null, ct) : null;
                 var endpoint = current ? await RevocationEndpoint(saved, ct) : null;
                 using var stale = current ? null : await PrepareStale(did, saved, ct);
-                await using var claim = await store.Claim(stored, ct);
-                if (claim is not null && await claim.Begin())
+                await using var claim = await store.Claim(stored, ClaimLease, ct);
+                if (claim is not null)
                 {
                     if (current) await Revoke(lease!.Client.Tokens, endpoint!, saved, clientId, ct);
                     else if (stale is not null) await RevokeStale(stale, saved, ct);
@@ -602,14 +587,9 @@ public sealed class AtprotoSessions
                     clients.Remove(did);
                     return;
                 }
-
-                slow |= claim is not null;
             }
 
-            var left = deadline - DateTimeOffset.UtcNow;
-            if (left <= TimeSpan.Zero) throw Unavailable(did, slow);
-            await Task.Delay(pause < left ? pause : left, ct);
-            pause = pause * 2 < Constants.ClaimPauseCeiling ? pause * 2 : Constants.ClaimPauseCeiling;
+            await Pause(deadline, ct);
         }
     }
 

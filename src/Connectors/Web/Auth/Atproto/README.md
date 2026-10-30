@@ -157,12 +157,12 @@ added through ASP.NET's `IDataProtectionBuilder`).
 Nothing about a session is held in the process, so every process over the same store and
 key ring can sign people in and read every session; the connector's specs prove this with
 two connector instances over one store in one process, not with separate processes
-(WEB-0082). A grant due for refresh is claimed on its row with a short lease its holder
-renews while it works, fenced by a claim identity, and the refreshed tokens are stored only
-over the grant they replace, so one process refreshes it and the others use the tokens it
-stores; a holder that stops keeps them waiting no longer than the lease. WEB-0082 names what
-this cannot close: a holder cut off from the store for longer than the lease while its
-refresh is at the provider, and an answer lost after the provider rotated the token. A row this
+(WEB-0082). A grant due for refresh is claimed on its row with a fixed lease longer than its
+provider request can take, and the refreshed tokens are stored only over the grant they replace,
+so one process refreshes it and the others use the tokens it stores; a holder that stops keeps
+them out no longer than the lease, 70 s with the defaults, and a request that waits longer than
+one request timeout fails, to be tried again. WEB-0082 names what this accepts: a double refresh
+after a holder stopped mid-request, and an answer lost after the provider rotated the token. A row this
 application cannot read — its key was lost — is that one DID's session gone: the person
 signs in again, and the new grant replaces the row. Sessions not refreshed for 14 days,
 the longest a public client's refresh token lives, ended sessions and expired pending

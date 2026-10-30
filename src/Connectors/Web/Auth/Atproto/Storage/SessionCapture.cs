@@ -17,6 +17,12 @@ internal sealed class SessionCapture(OAuthSessionData? restored = null,
     private string? subject = restored?.TokenSet.Sub;
     private bool verified = verifyFirst is null;
 
+    /// <summary>The grant the SDK wrote last, if it wrote one since it was last taken.</summary>
+    public OAuthSessionData? Written
+    {
+        get { lock (gate) return written; }
+    }
+
     /// <summary>Takes the grant the SDK wrote last, if it wrote one since it was last taken.</summary>
     public OAuthSessionData? Take()
     {

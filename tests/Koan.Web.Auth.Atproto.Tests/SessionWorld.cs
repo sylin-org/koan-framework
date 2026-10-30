@@ -8,8 +8,6 @@ using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Koan.Web.Auth.Atproto.Tests;
@@ -43,12 +41,8 @@ internal sealed class SessionWorld : IAsyncDisposable
         return new SessionWorld(store, pds, dids);
     }
 
-    /// <summary>
-    /// A process of the application; <paramref name="claimLifetime"/> and <paramref name="claimRenewal"/> time its claims,
-    /// and <paramref name="log"/> hears its session store.
-    /// </summary>
-    public Node Node(Action<AtprotoOptions>? configure = null, TimeSpan? claimLifetime = null, TimeSpan? claimRenewal = null,
-        ILogger<AtprotoSessionStore>? log = null)
+    /// <summary>A process of the application.</summary>
+    public Node Node(Action<AtprotoOptions>? configure = null)
     {
         var options = new AtprotoOptions { DevelopmentAllowedOrigins = [Pds.Origin], DevelopmentPlcDirectory = Pds.Origin };
         foreach (var did in Dids) options.DevelopmentHandles[HandleOf(did)] = did;
@@ -57,7 +51,7 @@ internal sealed class SessionWorld : IAsyncDisposable
         var environment = new TestEnvironment();
         var auth = new AuthOptions();
         auth.Providers["atproto"] = new ProviderOptions { ClientId = ClientId };
-        var store = new AtprotoSessionStore(Store.Protection(), log ?? NullLogger<AtprotoSessionStore>.Instance, claimLifetime, claimRenewal);
+        var store = new AtprotoSessionStore(Store.Protection());
         var network = new AtprotoHttp(settings, environment);
         var node = new Node(store, network, new AtprotoSessions(store, network, settings,
             Microsoft.Extensions.Options.Options.Create(auth), new TestCatalog(), environment, new KoanWebBaseUrl(null)));

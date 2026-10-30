@@ -15,11 +15,10 @@ namespace Koan.Web.Auth.Connector.Atproto.Storage;
 /// AT sessions and pending authorizations as rows in the application's own store, each protected on its own with the
 /// Data Protection key ring. Every read is one keyed read or a bounded page, and nothing is held in the process: two
 /// processes over one store sign people in alike. A session row changes only by a conditional write: on the version it
-/// read, or, for a claim holder's own writes, on its claim identity. A row that cannot be unprotected reads as no session
+/// read, or, for a refresh's result, on the grant it refreshed from. A row that cannot be unprotected reads as no session
 /// for its own DID and nothing else.
 /// </summary>
-internal sealed class AtprotoSessionStore(IDataProtectionProvider protection, ILogger<AtprotoSessionStore>? logger = null,
-    TimeSpan? claimLifetime = null, TimeSpan? claimRenewal = null) : IOAuthStateStore
+internal sealed class AtprotoSessionStore(IDataProtectionProvider protection, ILogger<AtprotoSessionStore>? logger = null) : IOAuthStateStore
 {
     private readonly IDataProtector sessions = protection.CreateProtector(Constants.SessionProtectionPurpose);
     private readonly IDataProtector states = protection.CreateProtector(Constants.StateProtectionPurpose);
@@ -118,40 +117,15 @@ internal sealed class AtprotoSessionStore(IDataProtectionProvider protection, IL
     }
 
     /// <summary>
-    /// Claims <paramref name="read"/>'s grant for this process to refresh or revoke it, under a claim identity of its own:
-    /// a lease of <see cref="ClaimLifetime"/> that the claim renews while its holder works. Null when the row changed
-    /// since it was read, another claim included.
+    /// Claims <paramref name="read"/>'s grant for this process to refresh or revoke it, for <paramref name="lease"/>. Null
+    /// when the row changed since it was read, another claim included.
     /// </summary>
-    public async Task<SessionClaim?> Claim(StoredSession read, CancellationToken ct)
+    public async Task<SessionClaim?> Claim(StoredSession read, TimeSpan lease, CancellationToken ct)
     {
         var row = Copy(read.Row);
-        row.ClaimId = NewVersion();
-        row.ClaimedUntil = DateTimeOffset.UtcNow + ClaimLifetime;
-        return await Replace(row, read.Row.Version, ct) ? new SessionClaim(this, read with { Row = row }) : null;
+        row.ClaimedUntil = DateTimeOffset.UtcNow + lease;
+        return await Replace(row, read.Row.Version, ct) ? new SessionClaim(this, row) : null;
     }
-
-    /// <summary>How long a claim stands unless its holder renews it: the longest a stopped holder keeps others waiting.</summary>
-    public TimeSpan ClaimLifetime { get; } = claimLifetime ?? Constants.ClaimLifetime;
-
-    /// <summary>How long after the lease last landed started its holder renews it.</summary>
-    public TimeSpan ClaimRenewal { get; } = claimRenewal ?? Constants.ClaimRenewal;
-
-    /// <summary>
-    /// How far apart attempts at a write under a claim start while earlier ones have not answered: a third of a renewal
-    /// interval. No attempt is cut off on it; each runs until the store answers or its deadline passes.
-    /// </summary>
-    public TimeSpan AttemptSpacing => ClaimRenewal / Constants.ClaimAttemptsPerInterval;
-
-    /// <summary>The least lease a provider request starts under: half a lease, so the store records what it returns.</summary>
-    public TimeSpan RequestRoom => ClaimLifetime / 2;
-
-    /// <summary>
-    /// The longest a claim stands beyond its holder's provider requests: an interval waiting for a renewal to give a request
-    /// room, a lease for the result's attempts, at most a lease for the release, and the lease last renewed before the
-    /// holder settles. With the defaults, 5 s + 3 × 15 s: 50 s. With the requests, it is the horizon within which no waiter
-    /// takes over from a working holder, since the holder renews its lease until it settles.
-    /// </summary>
-    public TimeSpan ClaimHold => ClaimRenewal + ClaimLifetime * 3;
 
     /// <summary>
     /// Removes the pending authorizations and the session rows that expired by <paramref name="now"/> — sessions not
@@ -199,102 +173,36 @@ internal sealed class AtprotoSessionStore(IDataProtectionProvider protection, IL
             && await AtprotoSession.Remove(row.Id, ct);
     }
 
-    // ---- Writes under a claim ----
-
-    /// <summary>
-    /// <paramref name="next"/> in place of the row only while claim <paramref name="claimId"/> holds it: one attempt, until
-    /// the store answers or <paramref name="deadline"/> passes.
-    /// </summary>
-    internal Task<WriteOutcome> Write(AtprotoSession next, string claimId, DateTimeOffset deadline)
-        => Attempt(ct => AtprotoSession.ReplaceIf(next, stored => stored.ClaimId == claimId, ct: ct), deadline, CancellationToken.None);
+    // ---- Writes that settle a claim ----
 
     /// <summary>
     /// A refreshed grant: <paramref name="next"/>, held by no claim, in place of the row only while the row still holds
-    /// <paramref name="from"/>, the protected grant the refresh presented, whichever claim holds it then. One attempt, until
-    /// the store answers or <paramref name="deadline"/> passes. <paramref name="pending"/> receives the store call, which a
-    /// store that ignores cancellation may still complete after the attempt gave it up.
+    /// <paramref name="from"/>, the protected grant the refresh presented, whichever claim holds it then.
     /// </summary>
-    internal Task<WriteOutcome> WriteRefreshed(AtprotoSession next, string from, DateTimeOffset deadline, Action<Task> pending)
-        => Attempt(ct => AtprotoSession.ReplaceIf(next, stored => stored.Grant == from, ct: ct), deadline, CancellationToken.None, pending);
+    internal Task<bool> WriteRefreshed(AtprotoSession next, string from)
+        => Settling(ct => AtprotoSession.ReplaceIf(next, stored => stored.Grant == from, ct: ct));
+
+    /// <summary>The grant as it was, held by no claim, only while the row is as the claim wrote it.</summary>
+    internal Task<bool> Release(AtprotoSession claimed) => Settling(ct => Replace(Copy(claimed), claimed.Version, ct));
 
     /// <summary>
-    /// A renewal: <paramref name="next"/> in place of the row only while claim <paramref name="claimId"/> holds it under a
-    /// shorter lease, so a renewal only ever extends the lease, whatever order renewals land in. One attempt, until the
-    /// store answers, <paramref name="deadline"/> passes or <paramref name="stop"/> is cancelled.
+    /// Ends the claimed session, only while the row is as the claim wrote it: deleted where the store deletes conditionally,
+    /// and otherwise emptied in place to its DID, expiring now so the next sweep removes it.
     /// </summary>
-    internal Task<WriteOutcome> Renew(AtprotoSession next, string claimId, DateTimeOffset deadline, CancellationToken stop)
+    internal Task<bool> End(AtprotoSession claimed)
     {
-        var until = next.ClaimedUntil!.Value;
-        return Attempt(ct => AtprotoSession.ReplaceIf(next, stored => stored.ClaimId == claimId && stored.ClaimedUntil < until, ct: ct),
-            deadline, stop);
+        var version = claimed.Version;
+        if (Data<AtprotoSession, string>.Capabilities.Has(DataCaps.Write.ConditionalDelete))
+            return Settling(ct => Data<AtprotoSession, string>.DeleteIf(claimed.Id, stored => stored.Version == version, ct: ct));
+        return Settling(ct => Replace(new AtprotoSession { Id = claimed.Id, Did = claimed.Did, Version = NewVersion(), ExpiresAt = DateTimeOffset.UtcNow }, version, ct));
     }
 
-    /// <summary>
-    /// Ends the session claim <paramref name="claimId"/> holds: deleted where the store deletes conditionally, and
-    /// otherwise emptied in place to its DID, expiring now so the next sweep removes it. One attempt, as <see cref="Write"/>.
-    /// </summary>
-    internal Task<WriteOutcome> End(AtprotoSession row, string claimId, DateTimeOffset deadline)
+    // What settles a claim no longer answers to its caller's cancellation, since the provider has already acted; it has a
+    // bound of its own, which the claim's lease covers.
+    private static async Task<bool> Settling(Func<CancellationToken, Task<bool>> write)
     {
-        if (!Data<AtprotoSession, string>.Capabilities.Has(DataCaps.Write.ConditionalDelete))
-            return Write(new AtprotoSession { Id = row.Id, Did = row.Did, Version = NewVersion(), ExpiresAt = DateTimeOffset.UtcNow }, claimId, deadline);
-        return Attempt(ct => Data<AtprotoSession, string>.DeleteIf(row.Id, stored => stored.ClaimId == claimId, ct: ct),
-            deadline, CancellationToken.None);
-    }
-
-    /// <summary>The row as stored now, read once before <paramref name="deadline"/>; not answered when it cannot be.</summary>
-    internal async Task<(bool Answered, AtprotoSession? Row)> Peek(string id, DateTimeOffset deadline, CancellationToken stop = default)
-    {
-        var bound = deadline - DateTimeOffset.UtcNow;
-        if (bound <= TimeSpan.Zero || stop.IsCancellationRequested) return (false, null);
-        var limit = CancellationTokenSource.CreateLinkedTokenSource(stop);
-        limit.CancelAfter(bound);
-        Task<AtprotoSession?> read;
-        try { read = AtprotoSession.Get(id, limit.Token); }
-        catch (Exception) { limit.Dispose(); return (false, null); }
-        try { return (true, await read.WaitAsync(limit.Token)); }
-        catch (Exception) { return (false, null); }
-        finally { Leave(read, limit); }
-    }
-
-    // One attempt at a write under a claim: it runs until the store answers or the deadline passes, and is cancelled then,
-    // or when stop is. A store that ignores cancellation is left behind at the deadline; the fence settles whatever it lands.
-    private static async Task<WriteOutcome> Attempt(Func<CancellationToken, Task<bool>> call, DateTimeOffset deadline,
-        CancellationToken stop, Action<Task>? pending = null)
-    {
-        var bound = deadline - DateTimeOffset.UtcNow;
-        if (bound <= TimeSpan.Zero || stop.IsCancellationRequested) return WriteOutcome.Unknown(null);
-        var limit = CancellationTokenSource.CreateLinkedTokenSource(stop);
-        limit.CancelAfter(bound);
-        Task<bool> write;
-        try { write = call(limit.Token); }
-        catch (Exception error) { limit.Dispose(); return WriteOutcome.Unknown(error); }
-        pending?.Invoke(write);
-        try { return await write.WaitAsync(limit.Token) ? WriteOutcome.Landed : WriteOutcome.Refused; }
-        catch (Exception error) { return WriteOutcome.Unknown(error); }
-        finally { Leave(write, limit); }
-    }
-
-    // A store call given up while still running keeps its token until it ends, and its late failure is observed.
-    private static void Leave(Task call, CancellationTokenSource limit)
-    {
-        if (call.IsCompleted)
-        {
-            _ = call.Exception;
-            limit.Dispose();
-            return;
-        }
-
-        _ = call.ContinueWith(static (task, state) => { _ = task.Exception; ((CancellationTokenSource)state!).Dispose(); }, limit,
-            CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-    }
-
-    /// <summary>The row with the claim's lease extended to <paramref name="until"/>, still under claim <paramref name="claimId"/>.</summary>
-    internal static AtprotoSession Renewed(AtprotoSession row, string claimId, DateTimeOffset until)
-    {
-        var next = Copy(row);
-        next.ClaimId = claimId;
-        next.ClaimedUntil = until;
-        return next;
+        using var bound = new CancellationTokenSource(Constants.ClaimWriteBound);
+        return await write(bound.Token);
     }
 
     internal AtprotoSession Granted(string id, string did, OAuthSessionData grant) => new()
@@ -304,27 +212,14 @@ internal sealed class AtprotoSessionStore(IDataProtectionProvider protection, IL
         ExpiresAt = DateTimeOffset.UtcNow + Constants.RefreshTokenLifetime,
     };
 
-    /// <summary>The row's grant under a new version, held by no claim: every write that keeps a claim says so itself.</summary>
-    internal static AtprotoSession Copy(AtprotoSession row) => new()
+    // The row's grant under a new version, held by no claim.
+    private static AtprotoSession Copy(AtprotoSession row) => new()
     {
         Id = row.Id, Did = row.Did, Version = NewVersion(), Grant = row.Grant, ExpiresAt = row.ExpiresAt,
     };
 
-    internal void LogUnstored(AtprotoSession row, Exception? failure)
-        => log.LogError(failure, "The refreshed AT session of row {Row} was not stored, and no attempt at it is pending; the person " +
-            "signs in again at its next use.", row.Id);
-
-    internal void LogWaited(string row, TimeSpan waited, TimeSpan horizon)
-        => log.LogInformation("A request waited {Waited} for another request refreshing the AT session of row {Row}, and gives " +
-            "up to be tried again; that claim stands at most {Horizon} while its holder works.", waited, row, horizon);
-
-    internal void LogTooSlow(string row, TimeSpan waited)
-        => log.LogWarning("For {Waited}, every claim on the AT session of row {Row} landed with less than half a lease left, too " +
-            "late to record a refresh; the request gives up to be tried again, and the grant is untouched.", waited, row);
-
-    internal void LogUnknown(AtprotoSession row, Exception? failure)
-        => log.LogWarning(failure, "Whether the refreshed AT session of row {Row} was stored is not known: an attempt at it is still " +
-            "pending in the store, or the store could not be read. The request fails, to be tried again.", row.Id);
+    internal void LogUnstored(string row, Exception failure)
+        => log.LogWarning(failure, "The refreshed AT session of row {Row} could not be stored, and the request fails, to be tried again.", row);
 
     private static Task<bool> Replace(AtprotoSession row, string version, CancellationToken ct)
         => AtprotoSession.ReplaceIf(row, stored => stored.Version == version, ct: ct);
