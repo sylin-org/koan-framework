@@ -438,6 +438,8 @@
       href: DATA-0162-data-bounds-belong-to-reads.md
     - name: DATA-0163 A class-level index names its properties, or the mapping refuses it
       href: DATA-0163-a-class-level-index-names-its-properties.md
+    - name: DATA-0164 Numbers stay doubles at the codec, and each adapter handles the rest at its edge
+      href: DATA-0164-numbers-stay-doubles-at-the-codec.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -694,3 +696,5 @@
       href: SEC-0031-roles-stand-in-one-order.md
     - name: SEC-0032 Access opens on proof, and what is taken from a person reaches what they hold
       href: SEC-0032-access-opens-on-proof-and-revocation-reaches.md
+    - name: SEC-0033 The authorization server's protocol is the host's, and a person's rows stay in their tenant
+      href: SEC-0033-the-authorization-server-stands-under-closed-tenancy.md

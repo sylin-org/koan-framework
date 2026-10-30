@@ -10,6 +10,8 @@ public static class Constants
     public const string Service = "mssql";
     public const string DefaultSource = "Default";
     public const string DefaultSchema = "dbo";
+    // The collation of a text identity column: ids differing only by case are two rows, whatever the server folds (DATA-0164).
+    public const string IdentityCollation = "Latin1_General_BIN2";
 
     // The table types a set binds through as one table-valued parameter (DATA-0162): koan_set_<scalar>, one column.
     public static class SetTypes

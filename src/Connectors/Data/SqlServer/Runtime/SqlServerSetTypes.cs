@@ -51,14 +51,14 @@ internal sealed class SqlServerSetTypes
     // member as the decimal its value would bind as alone, and compares within the exact-numeric family by value.
     private static readonly SetKind Decimal = new("decimal", "sql_variant", new SqlMetaData(Column, SqlDbType.Variant), null);
 
-    // Each kind is the SqlDbType SqlClient infers for a lone parameter of that CLR type. A TimeSpan, DateOnly or TimeOnly
+    // Each kind is the SqlDbType a lone parameter of that type binds as. A TimeSpan, DateOnly or TimeOnly
     // on a document field reaches a set already encoded (ticks as bigint, the others as text) and binds through those
     // kinds; raw, from a typed column, it has no kind here — no typed column of them round-trips on SQL Server — so such
     // a list stays one parameter per member.
     private static readonly IReadOnlyDictionary<Type, SetKind> ByType = new Dictionary<Type, SetKind>
     {
         [typeof(Guid)] = new("uniqueidentifier", "uniqueidentifier", new SqlMetaData(Column, SqlDbType.UniqueIdentifier), null),
-        [typeof(DateTime)] = new("datetime", "datetime", new SqlMetaData(Column, SqlDbType.DateTime), null),
+        [typeof(SqlServerDateTime)] = new("datetime2", "datetime2(7)", new SqlMetaData(Column, SqlDbType.DateTime2, 0, 7), null),
         [typeof(DateTimeOffset)] = new("datetimeoffset", "datetimeoffset(7)", new SqlMetaData(Column, SqlDbType.DateTimeOffset, 0, 7), null),
         [typeof(double)] = new("float", "float", new SqlMetaData(Column, SqlDbType.Float), null),
         [typeof(float)] = new("real", "real", new SqlMetaData(Column, SqlDbType.Real), null),
@@ -303,7 +303,12 @@ internal sealed class SqlServerSetParameter(string typeName, SqlMetaData metadat
         foreach (var member in members)
         {
             var record = new SqlDataRecord(metadata);
-            record.SetValue(0, member is char character ? character.ToString() : member);
+            record.SetValue(0, member switch
+            {
+                char character => character.ToString(),
+                SqlServerDateTime dateTime => dateTime.Value,
+                _ => member
+            });
             yield return record;
         }
     }

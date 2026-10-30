@@ -244,7 +244,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (paged && !full)
             sql += $" OFFSET {shaping.EffectiveOffset()} ROWS FETCH NEXT {shaping.EffectivePageSize()} ROWS ONLY";
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, SqlParameters.FromObject(parameters), null, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, Exact(SqlParameters.FromObject(parameters)), null, ct).ConfigureAwait(false);
         return new RepositoryQueryResult<TEntity>
         {
             Items = rows.Select(row => Materialize(plan, row)).ToArray(),
@@ -258,7 +258,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         await using var connection = await Open(ct).ConfigureAwait(false);
         var count = await AdoCommands.ExecuteScalarInt64Async(
-            connection, $"SELECT COUNT_BIG(1) FROM {Plan.QualifiedTable} WHERE {query}", SqlParameters.FromObject(parameters), null, ct)
+            connection, $"SELECT COUNT_BIG(1) FROM {Plan.QualifiedTable} WHERE {query}", Exact(SqlParameters.FromObject(parameters)), null, ct)
             .ConfigureAwait(false);
         return CountResult.Exact(count);
     }
@@ -453,9 +453,16 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var identity = IdentityPredicate(command.Identity, "key_", parameters);
         var managed = ManagedGuard(plan, parameters);
         var updateWhere = identity + (managed.Length == 0 ? string.Empty : $" AND {managed}");
-        var sqlText = $"UPDATE {plan.QualifiedTable} SET {set} WHERE {updateWhere}; " +
-                      $"IF @@ROWCOUNT = 0 BEGIN IF EXISTS (SELECT 1 FROM {plan.QualifiedTable} WHERE {identity}) " +
-                      "THROW 50001, 'cross-scope write', 1; " + insert.Sql + "; END";
+        var update = $"UPDATE {plan.QualifiedTable} SET {set} WHERE {updateWhere}; ";
+        // No row to update, so this writer inserts. A primary-key violation (2627) means the row exists after all, either
+        // inserted since by another writer, whose row is committed by the time the insert fails, or held by another scope:
+        // the update runs again, and a row it still cannot touch is the other scope's. A row deleted again by then stays
+        // deleted, the delete having come after this write.
+        var sqlText = update + "IF @@ROWCOUNT = 0 BEGIN " +
+                      $"BEGIN TRY {insert.Sql}; END TRY " +
+                      "BEGIN CATCH IF ERROR_NUMBER() <> 2627 THROW; " + update +
+                      $"IF @@ROWCOUNT = 0 AND EXISTS (SELECT 1 FROM {plan.QualifiedTable} WHERE {identity}) " +
+                      "THROW 50001, 'cross-scope write', 1; END CATCH END";
         try
         {
             await AdoCommands.ExecuteAsync(
@@ -627,7 +634,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         foreach (var value in identity)
         {
             var name = $"{prefix}{index++}";
-            parameters.Add(name, value.Value);
+            parameters.Add(name, SqlServerDateTime.Exact(value.Value));
             clauses.Add($"{SqlServerDialect.Quote(value.Binding.PhysicalPath.Name)} = @{name}");
         }
         if (clauses.Count == 0) throw new InvalidOperationException("A relational identity predicate cannot be empty.");
@@ -636,6 +643,15 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 
     private static TEntity Materialize(
         SqlServerEntityPlan<TEntity, TKey> plan, IReadOnlyDictionary<string, object?> row) => plan.Hydrate(row);
+
+    // What a caller hands to a raw statement binds as Koan's own parameters do.
+    private static SqlParameters? Exact(SqlParameters? parameters)
+    {
+        if (parameters is null) return null;
+        var exact = new SqlParameters();
+        foreach (var (name, value) in parameters.Items) exact.Add(name, SqlServerDateTime.Exact(value));
+        return exact;
+    }
 
     private static SqlParameters Parameters(IReadOnlyList<object?> values)
     {
@@ -697,7 +713,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var sql = InstructionSql(instruction);
         var parameters = instruction.Parameters is null
             ? null
-            : SqlParameters.FromDictionary(instruction.Parameters);
+            : Exact(SqlParameters.FromDictionary(instruction.Parameters));
         await using var connection = await Open(ct).ConfigureAwait(false);
         if (instruction.Name == RelationalInstructions.SqlScalar)
         {

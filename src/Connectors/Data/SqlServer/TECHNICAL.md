@@ -45,7 +45,11 @@ fallback. The connector does not currently expose provider-specific retry or com
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
 - The filter support declared is `RelationalFilterSupport.CaseFolding`: the database is created without a
   `COLLATE`, so string equality follows the server's default collation, which folds case, and
-  `FilterSupport.OrdinalStrings` is false.
+  `FilterSupport.OrdinalStrings` is false. A text id column alone is `Latin1_General_BIN2`, so ids differing only by case
+  are two rows (DATA-0164).
+- A DateTime binds as `datetime2(7)`, exact to the tick (`SqlServerDateTime`).
+- `Upsert` updates, then inserts; a primary-key violation means another writer got there first, and the update runs again, so
+  concurrent upserts of a new id have one winner and no error.
 - SqlClient sends at most 2,098 parameters in a statement (measured: 2,099 is refused). `GetMany` and `DeleteMany`
   name ids in slices of 2,000
   (deleting them in one transaction), and the store declares `MaximumSetMembers` 1,900, the slice the facade reads a
@@ -61,8 +65,8 @@ fallback. The connector does not currently expose provider-specific retry or com
   member by value to ten places; a decimal list binds through the sql_variant type), an integer as bigint, a boolean
   as bit.
 - A set type is `[schema].[koan_set_<scalar>_<hash>]`, the hash the first eight hex digits of the SHA-256 of its one
-  column `[koan_member] <type> NOT NULL`; a changed shape is a new name. The column is exactly the SqlDbType SqlClient
-  infers for a lone parameter of the members: nvarchar(4000) or nvarchar(max) (a char too), uniqueidentifier, datetime,
+  column `[koan_member] <type> NOT NULL`; a changed shape is a new name. The column is exactly the SqlDbType a lone
+  parameter of the members binds as: nvarchar(4000) or nvarchar(max) (a char too), uniqueidentifier, datetime2(7),
   datetimeoffset(7), float, real, bit, bigint, int, smallint, tinyint, and sql_variant for decimals, which bind with
   their own precision and scale. Text is read through `CONVERT(nvarchar(…), CONVERT(varbinary(…), [koan_member]))`, whose
   coercible-default collation yields to the column's as a lone parameter's does. A TimeSpan, DateOnly or TimeOnly on a

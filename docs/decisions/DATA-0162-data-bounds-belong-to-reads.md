@@ -42,8 +42,8 @@ crosses a number nobody chose, and some of them changed with the store or with w
    - SQLite binds one JSON array read by `json_each`, each member written as the value Microsoft.Data.Sqlite binds
      (INTEGER, REAL, or the driver's TEXT for strings, upper-case Guids, dates, decimals);
    - SQL Server binds one table-valued parameter of a Koan set type, `[schema].[koan_set_<scalar>_<hash>]`, whose one
-     `koan_member` column is exactly the SqlDbType SqlClient infers for a lone parameter: nvarchar(4000) or
-     nvarchar(max) (a char binds as text), uniqueidentifier, the legacy datetime a DateTime binds as,
+     `koan_member` column is exactly the SqlDbType a lone parameter binds as: nvarchar(4000) or
+     nvarchar(max) (a char binds as text), uniqueidentifier, datetime2(7) for a DateTime (DATA-0164),
      datetimeoffset(7), float for a double, real for a single, bit, bigint, int, smallint, tinyint, and sql_variant
      for decimals, because a lone decimal takes its own value's precision and scale. Text is read through a conversion
      from varbinary, whose coercible-default collation yields to the column's exactly as a parameter's does; read

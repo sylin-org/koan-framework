@@ -161,7 +161,7 @@ internal sealed class SqlServerDdlExecutor(SqlConnection connection, SqlServerDi
         if (value == typeof(TimeOnly)) return "time";
         if (value == typeof(byte[])) return "varbinary(max)";
         // A key has to fit an index, which nvarchar(max) cannot.
-        return column.IsIdentity ? "nvarchar(450)" : "nvarchar(max)";
+        return column.IsIdentity ? $"nvarchar(450) COLLATE {Infrastructure.Constants.IdentityCollation}" : "nvarchar(max)";
     }
 
     private static bool IsNumeric(Type type)

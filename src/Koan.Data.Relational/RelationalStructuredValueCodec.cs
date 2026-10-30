@@ -1,3 +1,4 @@
+using System.Numerics;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core;
@@ -83,8 +84,10 @@ public sealed class RelationalStructuredValueCodec
     {
         JTokenType.Null or JTokenType.Undefined => null,
         JTokenType.Boolean => token.Value<bool>(),
-        JTokenType.Integer => token.Value<long>(),
-        JTokenType.Float => token.Value<decimal>(),
+        // A whole number past a long stays whole: a store may print a large double without its exponent.
+        JTokenType.Integer => token is JValue { Value: BigInteger big } ? big : token.Value<long>(),
+        // A real number stays a double, and a decimal member reads its digits where its type is known (DATA-0164).
+        JTokenType.Float => token.Value<double>(),
         JTokenType.String => token.Value<string>(),
         JTokenType.Bytes => token.Value<byte[]>(),
         JTokenType.Array => new DataArray(token.Children().Select(FromToken)),

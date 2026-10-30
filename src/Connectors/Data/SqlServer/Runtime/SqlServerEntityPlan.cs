@@ -6,8 +6,8 @@ using Koan.Data.Relational;
 namespace Koan.Data.Connector.SqlServer.Runtime;
 
 /// <summary>
-/// SQL Server qualifies a table with a schema and reads it exactly as the shared plan does, so it declares the
-/// qualifier and nothing else.
+/// SQL Server qualifies a table with a schema and reads it as the shared plan does; a DateTime on its way to a column
+/// binds to the tick (<see cref="SqlServerDateTime"/>).
 /// </summary>
 internal sealed class SqlServerEntityPlan<TEntity, TKey>(
     MappingPlan mapping,
@@ -19,4 +19,7 @@ internal sealed class SqlServerEntityPlan<TEntity, TKey>(
         new SqlServerDialect(SqlServerSetTypes.For(options.SourcePlan.RouteIdentity, options.Schema)),
         mapping.Container.Namespace.LastOrDefault() ?? options.Schema)
     where TEntity : class, IEntity<TKey>
-    where TKey : notnull;
+    where TKey : notnull
+{
+    protected override object? EncodeScalar(object? value) => SqlServerDateTime.Exact(value);
+}
