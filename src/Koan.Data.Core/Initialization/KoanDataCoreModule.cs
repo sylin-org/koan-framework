@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Koan.Data.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +25,7 @@ public sealed class KoanDataCoreModule : KoanModule
 {
     public override void Register(IServiceCollection services)
     {
+        services.TryAddSingleton<IMaintenanceScopes, AmbientMaintenanceScope>();
         DataPillarManifest.EnsureRegistered();
         ServiceCollectionExtensions.RegisterKoanDataCoreServices(services);
     }

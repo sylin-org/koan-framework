@@ -207,5 +207,6 @@ because their values live in the persisted record rather than the entity the gua
 The ordinary query evaluator compares a DateTime and a DateTimeOffset by their instant, as queries always
 have, and a binary value by its bytes; it is not a conditional-write path. `FilterSupport.OrdinalStrings` says
 whether a provider's string equality is ordinal; SQL Server and MySQL, whose default collations fold case,
-declare it false through `RelationalFilterSupport.CaseFolding`. A bool cannot describe a postcommit
+declare it false through `RelationalFilterSupport.CaseFolding`. `IMaintenanceScopes` runs background work once per
+ambient scope, one per tenant under `Koan.Tenancy` (SEC-0033). A bool cannot describe a postcommit
 exception: native acknowledgement failure, cancellation and completion errors propagate.

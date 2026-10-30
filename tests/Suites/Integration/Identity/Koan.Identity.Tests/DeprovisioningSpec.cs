@@ -68,10 +68,39 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
         (await AgentGrant.Approvals(person, 10)).Should().BeEmpty();
     }
 
-    /// <summary>A grant is tenant-scoped. With Tenancy closed and no tenant in scope, none is reachable to remove, and closing the person still completes.</summary>
+    /// <summary>A grant is tenant-scoped and a person is closed everywhere, so revoking reaches every tenant from none.</summary>
     [Fact]
-    public async Task With_no_tenant_in_scope_there_are_no_approvals_to_reach()
-        => (await ClientApprovals.Revoke("a-person")).Should().Be(0);
+    public async Task With_no_tenant_in_scope_revoking_reaches_the_approvals_in_every_tenant()
+    {
+        var person = $"everywhere-{Guid.CreateVersion7():N}";
+        var tenants = new[] { $"reach-{Guid.CreateVersion7():N}", $"reach-{Guid.CreateVersion7():N}" };
+        foreach (var id in tenants)
+        {
+            await new TenantRecord { Id = id, Name = id }.Save();
+            using (Tenant.Use(id)) await Approval(person, "client-a");
+        }
+
+        (await ClientApprovals.Revoke(person)).Should().Be(2);
+
+        foreach (var id in tenants)
+            using (Tenant.Use(id))
+                (await AgentGrant.Approvals(person, 10)).Should().BeEmpty();
+    }
+
+    /// <summary>The tenant in scope is reached too, and once, whether or not the registry names it.</summary>
+    [Fact]
+    public async Task The_tenant_in_scope_is_reached_once_whether_or_not_it_is_registered()
+    {
+        var person = $"in-scope-{Guid.CreateVersion7():N}";
+        var registered = $"reach-{Guid.CreateVersion7():N}";
+        await new TenantRecord { Id = registered, Name = registered }.Save();
+        using (Tenant.Use(registered)) await Approval(person, "client-a");
+        using var unregistered = Tenant.Use($"unregistered-{Guid.CreateVersion7():N}");
+        await Approval(person, "client-a");
+
+        (await ClientApprovals.Revoke(person)).Should().Be(2);
+        (await AgentGrant.Approvals(person, 10)).Should().BeEmpty();
+    }
 
     [Fact]
     public async Task A_store_that_cannot_answer_for_a_persons_approvals_surfaces()
@@ -81,7 +110,7 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
             using (EntityContext.Source("no-such-source")) await ClientApprovals.Revoke("a-person");
         };
 
-        await read.Should().ThrowAsync<InvalidOperationException>("only the segmentation guard reads as none");
+        await read.Should().ThrowAsync<InvalidOperationException>("a store that fails surfaces");
     }
 
     [Fact]

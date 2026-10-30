@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -8,7 +9,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// pre-registration can supply deliberate non-loopback redirects. <c>redirect_uri</c> is matched
 /// <b>exact-string</b> (D4). Confidential clients/client secrets are not supported.
 /// </summary>
-public sealed class OAuthClient : Entity<OAuthClient>
+public sealed class OAuthClient : Entity<OAuthClient>, IAmbientExempt
 {
     /// <summary>Untrusted display-only name (RFC 7591 <c>client_name</c>) — escape + label "unverified" on consent.</summary>
     public string ClientName { get; set; } = "";

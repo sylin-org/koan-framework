@@ -98,8 +98,8 @@ cache and locks do not claim distributed coherence.
 of the request's principal after the session and impersonation checks; sign-in and impersonation stamp none (SEC-0032).
 `IdentityStandingContributor` answers the standing seam from the person's row and `RoleCollection.ForPerson`, both read
 from the store, and calls a subject with no row inactive. `ClientApprovals.Revoke` removes a person's client grants for
-suspend, deactivation and erasure; with Koan.Tenancy closed and no tenant in scope it reaches none, and the standing
-still refuses every refresh.
+suspend, deactivation and erasure, in every scope `IMaintenanceScopes` names: under Koan.Tenancy, every tenant, with any
+tenant in scope or none (SEC-0033).
 
 What `/me` and a sign-in read is indexed: `IdentityId` on `Session`, `IdentityEmail` and `ExternalIdentityLink`, and
 `Actor`-then-`Target` and `Target` on `ImpersonationGrant`. A returning sign-in reads its email factor by

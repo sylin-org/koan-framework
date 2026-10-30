@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -10,7 +11,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// wins; the loser sees the row gone). It carries the consented subject identity, since <c>/oauth/token</c> has
 /// no browser session to read.
 /// </summary>
-public sealed class AuthorizationCode : Entity<AuthorizationCode>
+public sealed class AuthorizationCode : Entity<AuthorizationCode>, IAmbientExempt
 {
     public string ClientId { get; set; } = "";
     public string RedirectUri { get; set; } = "";

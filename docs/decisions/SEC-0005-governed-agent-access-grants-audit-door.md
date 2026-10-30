@@ -119,12 +119,8 @@ with the first agent's time, and revoking it cut off every agent behind it.
    connector scans, and SQL Server declines an index keyed on a `string`. The gate's lookup is not capped, since a cap
    would silently deny a live grant; it is bounded by the subject's live grants.
 6. **Sweep.** The authorization server's cleanup service removes expired `RememberedConsent` rows and expired grants
-   that carry a `ClientId`, beside the codes, requests and refresh tokens it already removes. It runs with no tenant in
-   scope. Under `Koan.Tenancy`'s Closed posture every one of those entities needs a tenant, and Koan has no sanctioned
-   scope for maintenance across tenants (`Tenant.None()` reaches only `[HostScoped]` entities), so the sweep cannot run
-   there. In such a host the authorization server does not start at all today: its signing-key store reads a
-   tenant-scoped entity with no tenant in scope. That gap is the authorization server's under tenancy, older than this
-   amendment, and is reported for its own decision; this amendment does not claim the sweep in that host.
+   that carry a `ClientId`, beside the codes, requests and refresh tokens it already removes. Under `Koan.Tenancy` the protocol's rows are the host's, and
+   remembered consents and grants are swept in each tenant (SEC-0033).
 7. **Refresh tokens off.** With `EnableRefreshTokens = false` no token names a grant, so the server issues none and
    remembers no consent: every connection asks the person, and nothing is listed that removing would not end.
 8. **The capability term is unchanged.** It still names the client and scope set inside the consent key; the new fields

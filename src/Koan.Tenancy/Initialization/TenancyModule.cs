@@ -5,6 +5,7 @@ using Koan.Core;
 using Koan.Core.Context;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
+using Koan.Data.Abstractions;
 using Koan.Core.Semantics;
 using Koan.Core.Semantics.Contributions;
 using Koan.Core.Semantics.Segmentation;
@@ -32,6 +33,7 @@ public sealed class TenancyModule : KoanModule, IContributeTo<SegmentationContri
         services.AddKoanOptions<TenancyOptions>(TenancyOptions.SectionPath);
         services.TryAddSingleton<TenancyRuntime>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IKoanContextCarrier, TenantContextCarrier>());
+        services.Replace(ServiceDescriptor.Singleton<IMaintenanceScopes, TenantMaintenanceScopes>());
 
         // Durable carriage is a separate Core concern. The segmentation contribution below declares tenant meaning
         // once; active pillars compile their own physical realization without Tenancy referencing them.

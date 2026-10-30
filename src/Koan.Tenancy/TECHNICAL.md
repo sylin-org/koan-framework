@@ -61,3 +61,7 @@ This package depends on Core, Data abstractions, and Data Core because its minim
 backed. It has no ASP.NET dependency. Request carriers, authentication, operator UI/API, invitation ceremony,
 tenant-status policy, cross-pillar data deletion, cryptographic erasure evidence, and verified domains are outside this
 package's current contract.
+
+## Maintenance across tenants
+
+The module replaces `IMaintenanceScopes`: background work runs in the tenant already in effect, if any, and once per other `TenantRecord`, read a page at a time, inside `Tenant.Use` (SEC-0033).

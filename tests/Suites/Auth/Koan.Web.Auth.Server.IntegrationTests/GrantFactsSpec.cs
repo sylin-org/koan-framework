@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -217,7 +218,7 @@ public sealed class GrantFactsSpec : IClassFixture<OAuthFlowFixture>
         (await new AgentGrantStore().ActiveCapabilities(person, "Notes", Ct)).Should().Equal(["has:scope:notes"]);
         (await AgentGrant.Approvals(person, 1, Ct)).Select(g => g.Id).Should().Equal([live.Id]);
 
-        await OAuthArtifactCleanupService.Sweep(now, Ct);
+        await OAuthArtifactCleanupService.Sweep(_fx.Services.GetRequiredService<Koan.Data.Abstractions.IMaintenanceScopes>(), now, Ct);
 
         (await AgentGrant.Query(g => g.Subject == person, Ct)).Select(g => g.Id).Should()
             .BeEquivalentTo([live.Id, lent.Id], "the sweep removes the expired grants a client was issued, and no other");

@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -8,7 +9,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// <see cref="BrowserBinding"/> secret, echoed in an httpOnly cookie) AND to the exact request tuple, and
 /// fast-expires — so approval can only come from the same browser for the same request.
 /// </summary>
-public sealed class ConsentRequest : Entity<ConsentRequest>
+public sealed class ConsentRequest : Entity<ConsentRequest>, IAmbientExempt
 {
     public string ClientId { get; set; } = "";
     public string RedirectUri { get; set; } = "";

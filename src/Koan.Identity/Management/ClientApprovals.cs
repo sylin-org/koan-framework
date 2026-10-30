@@ -1,4 +1,5 @@
-using Koan.Core.Semantics.Segmentation;
+using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions;
 using Koan.Web.Authorization;
 
 namespace Koan.Identity.Management;
@@ -12,19 +13,18 @@ namespace Koan.Identity.Management;
 public static class ClientApprovals
 {
     /// <summary>
-    /// Removes the client grants of <paramref name="identityId"/> a page at a time; answers how many. A
-    /// <see cref="AgentGrant"/> is tenant-scoped, so with Koan.Tenancy closed and no tenant in scope there are none to
-    /// reach from here. A store that fails surfaces.
+    /// Removes the client grants of <paramref name="identityId"/> a page at a time; answers how many. A person is closed
+    /// everywhere, and an <see cref="AgentGrant"/> belongs to a scope, so this runs in each of them
+    /// (<see cref="IMaintenanceScopes"/>): under Koan.Tenancy, every tenant, whichever is in scope or none. A store that
+    /// fails surfaces.
     /// </summary>
     public static async Task<int> Revoke(string identityId, CancellationToken ct = default)
     {
-        try
-        {
-            return await AgentGrant.RemoveApprovals(identityId, ct).ConfigureAwait(false);
-        }
-        catch (SegmentationRequiredException)
-        {
-            return 0;
-        }
+        var scopes = AppHost.GetRequiredService<IMaintenanceScopes>("ClientApprovals.Revoke");
+        var removed = 0;
+        await scopes.ForEach(
+            async token => removed += await AgentGrant.RemoveApprovals(identityId, token).ConfigureAwait(false),
+            ct).ConfigureAwait(false);
+        return removed;
     }
 }

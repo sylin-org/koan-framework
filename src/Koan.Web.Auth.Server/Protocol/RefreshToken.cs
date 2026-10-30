@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -10,7 +11,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// whole family is revoked (OAuth 2.1 §4.3.1). The token is backed by a revocable grant
 /// (<see cref="GrantId"/>): revoke the grant and the next refresh fails closed.
 /// </summary>
-public sealed class RefreshToken : Entity<RefreshToken>
+public sealed class RefreshToken : Entity<RefreshToken>, IAmbientExempt
 {
     /// <summary>The rotation family — every descendant of one authorization shares it (reuse-detection scope).</summary>
     [Index]

@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Model;
 
 namespace Koan.Web.Auth.Server.Keys;
@@ -9,7 +10,7 @@ namespace Koan.Web.Auth.Server.Keys;
 /// JWKS) until <see cref="RetireAfterUtc"/>, then are purged. Entities are the Koan move — <c>Save()</c> to
 /// persist, <c>Query(...)</c> to load, <c>Remove()</c> to purge.
 /// </summary>
-public sealed class IssuerSigningKeyRecord : Entity<IssuerSigningKeyRecord>
+public sealed class IssuerSigningKeyRecord : Entity<IssuerSigningKeyRecord>, IAmbientExempt
 {
     /// <summary>The <c>IDataProtector</c>-protected PKCS#8 private key, base64. Never stored in the clear.</summary>
     public string ProtectedPkcs8 { get; set; } = "";

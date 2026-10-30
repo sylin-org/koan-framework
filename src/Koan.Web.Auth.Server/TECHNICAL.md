@@ -79,7 +79,7 @@ the store for the subject's unexpired rows; a connector that builds the index re
 not reads more to answer the same (the in-memory connector scans every row, and SQL Server declines an index keyed on
 a `string`). The cleanup service removes expired remembered consents and the expired grants that name a client, beside
 the other artifacts; removing an expired grant forgets no consent. A grant from before `ClientId` existed is not swept.
-With `Koan.Tenancy` referenced under a Closed posture the sweep has no tenant in scope, and Koan has no sanctioned scope for maintenance across tenants (`Tenant.None()` reaches only `[HostScoped]` entities), so it cannot run there; in that host the server already fails at start, because its signing-key store reads a tenant-scoped entity with no tenant.
+With `Koan.Tenancy` referenced, the signing keys, clients, codes, consent requests, device codes and refresh tokens are the host's (`IAmbientExempt`), so the server starts under a Closed posture and its token endpoint needs no tenant to find them. A grant and a remembered consent stay in their tenant; the sweep reaches them through `IMaintenanceScopes`, once per tenant, and a refresh under Closed needs a tenant carrier that can name one (SEC-0033).
 
 ## Consent page seam in process
 

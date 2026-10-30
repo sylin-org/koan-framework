@@ -96,8 +96,7 @@ otherwise restore, so a person reactivated has no agents until they approve agai
 refuses: a time-out ends and the agent resumes. An application whose ban should outlast its lifting calls
 `RemoveApprovals` itself.
 
-Under Koan.Tenancy an `AgentGrant` is tenant-scoped, so with Tenancy closed and no tenant in scope `ClientApprovals`
-reaches none. The standing still refuses every refresh.
+Under Koan.Tenancy an `AgentGrant` is tenant-scoped, and `ClientApprovals` removes a person's in every tenant (SEC-0033).
 
 ### 5. The address the person sees decides
 

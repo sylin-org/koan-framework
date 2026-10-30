@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Model;
 
@@ -9,7 +10,7 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// human-typed code (stored normalized, rate-limited verification). On a separate device the user enters the
 /// code and approves, which captures the consented subject identity (the device-poll has no session to read).
 /// </summary>
-public sealed class DeviceCode : Entity<DeviceCode>
+public sealed class DeviceCode : Entity<DeviceCode>, IAmbientExempt
 {
     /// <summary>The normalized (dash-less, upper-case) user code — the verification lookup key.</summary>
     [Index]
