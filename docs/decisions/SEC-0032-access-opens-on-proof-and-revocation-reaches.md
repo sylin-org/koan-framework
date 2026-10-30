@@ -54,8 +54,9 @@ selectively would not be enough: an OIDC id_token's `roles` are role claims befo
 `SignInAsync` is the application's statement and passes untouched. The role-list file runs after the policy, so an
 operator's file may still grant a reserved role.
 
-An OAuth2 provider carries no email claim, so a verified-email entry cannot match one. Name it by provider-qualified
-subject.
+An OAuth2 provider carries no email claim, so a verified-email entry cannot match one. An OIDC provider that sends an
+email without `email_verified`, as Microsoft Entra does, cannot match one either, because that email is not proof. Name
+either by provider-qualified subject: `microsoft:{sub}`.
 
 ### 2. A request's roles are projected per request
 
@@ -125,9 +126,10 @@ factor by the id composed from person and address.
 
 - **An access token outlives what closed its person** by up to its 15-minute lifetime. Refresh is what this decision
   closes; an application that must close sooner evaluates its own standing per request.
-- **The compiled bag is per process.** A role change on another process reaches this process's cookies when its bag is
-  next compiled, as it reaches everything that reads the bag (SEC-0030). Standing reads the store, so tokens do not
-  share this. Cross-process invalidation is the bag's to solve.
+- **The compiled bag is per process, and has no time limit.** A role change on another process reaches this process's
+  cookies only when its bag is next compiled: on eviction or restart. On a host with several replicas, a removed role
+  can keep authorizing cookies on the other replicas until then, as it does everything that reads the bag (SEC-0030).
+  Standing reads the store, so tokens do not share this. Cross-process invalidation is the bag's to solve.
 - **Role-list and provider roles are as of sign-in.** Removing an address from the file reaches the next sign-in, and
   with a contributor reporting roles, an agent's tokens carry the standing's roles and not these.
 - **Refresh token rows keep the name, email and roles last written** until they expire, including for an erased person

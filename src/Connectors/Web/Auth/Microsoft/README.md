@@ -30,5 +30,7 @@ With `AddKoan()`, start at `GET /auth/microsoft/challenge?return=/`. Register
 - Default authority is multi-tenant `https://login.microsoftonline.com/common/v2.0`. Override `Authority` with a
   tenant-specific URL when the application requires tenant restriction.
 - Koan does not infer allowed tenants, app-registration policy, consent, redirect URIs, or secret rotation.
+- Entra sends an email without `email_verified`, so that email is not proof: an `Operators` or role-list entry naming
+  it does not match. Name the person by provider-qualified subject, `microsoft:{sub}` (SEC-0032).
 
 See [TECHNICAL.md](TECHNICAL.md).
