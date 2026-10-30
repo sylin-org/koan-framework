@@ -27,11 +27,10 @@ public enum TenantInviteStatus
 /// and the row is <c>[HostScoped]</c> control-plane state: acceptance runs before any tenant scope exists.
 /// </summary>
 [HostScoped]
-[Index(Name = "ix_tenantinvite_tokenhash")]
-[Index(Name = "ix_tenantinvite_tenant")]
 public sealed class TenantInvite : Entity<TenantInvite>
 {
     /// <summary>The tenant whose seat this invitation grants.</summary>
+    [Index(Name = "ix_tenantinvite_tenant")]
     public string TenantId { get; set; } = "";
 
     /// <summary>The normalized (<see cref="IdentityEmail.Normalize"/>) address the invitation was issued to.
@@ -41,7 +40,8 @@ public sealed class TenantInvite : Entity<TenantInvite>
     /// <summary>The single tenant role the seat will carry. Reserved host roles are refused at issue and at claim.</summary>
     public string Role { get; set; } = "";
 
-    /// <summary>SHA-256 of the raw token (hex). The raw token is returned exactly once at issue and never persisted.</summary>
+    /// <summary>SHA-256 of the raw token (hex). The raw token is returned exactly once at issue and never persisted. Acceptance reads the invitation by it.</summary>
+    [Index(Name = "ix_tenantinvite_tokenhash")]
     public string TokenHash { get; set; } = "";
 
     public TenantInviteStatus Status { get; set; } = TenantInviteStatus.Pending;

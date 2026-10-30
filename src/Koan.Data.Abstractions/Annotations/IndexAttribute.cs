@@ -4,7 +4,8 @@ namespace Koan.Data.Abstractions.Annotations;
 /// Declares a logical index.
 /// Recommended usage is property-anchored: place [Index] on each property that participates in the index.
 /// For composite indexes, give the same Name (or Group) to each participating property and set Order to control column order.
-/// If used at class-level, specify property names via Fields; adapters must resolve to storage names (respecting StorageName, naming strategies, etc.).
+/// If used at class-level, name the participating properties via Fields; adapters must resolve to storage names (respecting StorageName, naming strategies, etc.).
+/// A class-level index that names none builds nothing, so the mapping refuses it.
 /// </summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property, AllowMultiple = true, Inherited = true)]
 public sealed class IndexAttribute : Attribute
@@ -28,7 +29,7 @@ public sealed class IndexAttribute : Attribute
     public int Order { get; init; }
 
     /// <summary>
-    /// For class-level usage only: the set of property names participating in the index. Not used when the attribute is applied to a property.
+    /// For class-level usage only, and required there: the set of property names participating in the index. Not used when the attribute is applied to a property.
     /// </summary>
     public string[]? Fields { get; init; }
 
@@ -61,12 +62,14 @@ public sealed class IndexAttribute : Attribute
 
     /// <summary>
     /// Helper for adapters: when attached to a property, adapters can treat it as a single-field index on that property.
-    /// When class-level, returns provided Fields[] or throws if not provided.
+    /// When class-level, returns the provided Fields[], and refuses a declaration that names none.
     /// </summary>
     public static IReadOnlyList<string> ResolveFieldsFor(Type entityType, IndexAttribute index, string? anchoredPropertyName)
     {
         if (!string.IsNullOrWhiteSpace(anchoredPropertyName)) return new[] { anchoredPropertyName };
         if (index.Fields is { Length: > 0 }) return index.Fields;
-        throw new InvalidOperationException($"Index on {entityType.Name} requires either anchored property or Fields[]");
+        throw new InvalidOperationException(
+            $"Index '{index.Name ?? index.Group ?? "<unnamed>"}' on '{entityType.FullName}' is declared on the class and names no properties, so it would build nothing. " +
+            "Put [Index] on each property it covers, or name them with Fields.");
     }
 }

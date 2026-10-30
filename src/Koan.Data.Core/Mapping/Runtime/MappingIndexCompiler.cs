@@ -56,8 +56,7 @@ internal static class MappingIndexCompiler
 
         foreach (var attribute in plan.EntityType.GetCustomAttributes<IndexAttribute>(inherit: true))
         {
-            if (attribute.Fields is null || attribute.Fields.Length == 0) continue;
-            var paths = attribute.Fields.Select(field =>
+            var paths = IndexAttribute.ResolveFieldsFor(plan.EntityType, attribute, anchoredPropertyName: null).Select(field =>
             {
                 var property = properties.SingleOrDefault(candidate => string.Equals(candidate.Name, field, StringComparison.Ordinal))
                     ?? throw new InvalidOperationException(

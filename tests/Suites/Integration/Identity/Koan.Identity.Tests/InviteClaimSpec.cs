@@ -23,6 +23,17 @@ public sealed class InviteClaimSpec : IdentityHostScopedSpec
 
     private IServiceProvider Services => _fixture.Services;
 
+    [Fact]
+    public void An_invitation_is_read_by_its_token_hash_and_its_tenant_through_declared_indexes()
+    {
+        var indexes = Koan.Data.Core.IndexMetadata.GetIndexes(typeof(TenantInvite)).Where(index => !index.IsPrimaryKey).ToArray();
+
+        indexes.Should().ContainSingle(index => index.Name == "ix_tenantinvite_tokenhash"
+            && index.Properties.Single().Name == nameof(TenantInvite.TokenHash));
+        indexes.Should().ContainSingle(index => index.Name == "ix_tenantinvite_tenant"
+            && index.Properties.Single().Name == nameof(TenantInvite.TenantId));
+    }
+
     private static async Task<(string IdentityId, string Email)> NewVerifiedPersonAsync(
         IServiceProvider services, string email)
     {

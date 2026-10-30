@@ -460,6 +460,49 @@ public sealed class MappingConformanceSpec
         index.Should().Throw<MappingValueException>().WithMessage("*changed a compiled index*");
     }
 
+    /// <summary>
+    /// A class-level index that names no properties would build nothing, and the reads it was declared for would scan
+    /// with no word said. The mapping refuses it, naming the type and what to do instead.
+    /// </summary>
+    [Fact]
+    public void A_class_level_index_without_fields_is_refused_at_mapping_time_naming_the_type()
+    {
+        using var provider = Host(_ => { });
+        var compile = () => provider.GetRequiredService<IDataMappingPlans>().GetOrAdd<ClassIndexWithoutFields>(
+            "Legacy",
+            new MappingConvention(StorageAddress.From("dbo", "BAD_INDEX"), "Id", "Json"));
+
+        var refused = compile.Should().Throw<MappingCompilationException>().Which;
+        refused.EntityType.Should().Be(typeof(ClassIndexWithoutFields));
+        refused.Message.Should().Contain(typeof(ClassIndexWithoutFields).FullName!)
+            .And.Contain("ix_bad_index").And.Contain("Fields");
+    }
+
+    [Fact]
+    public void A_class_level_index_with_fields_still_maps()
+    {
+        using var provider = Host(_ => { });
+        var plan = provider.GetRequiredService<IDataMappingPlans>().GetOrAdd<ClassIndexWithFields>(
+            "Legacy",
+            new MappingConvention(StorageAddress.From("dbo", "GOOD_INDEX"), "Id", "Json"));
+
+        plan.Indexes.Should().ContainSingle(index => index.Name == "ix_good_index");
+    }
+
+    [Index(Name = "ix_bad_index")]
+    public sealed class ClassIndexWithoutFields
+    {
+        public string Id { get; set; } = "";
+        public string Code { get; set; } = "";
+    }
+
+    [Index(Name = "ix_good_index", Fields = [nameof(Code)])]
+    public sealed class ClassIndexWithFields
+    {
+        public string Id { get; set; } = "";
+        public string Code { get; set; } = "";
+    }
+
     private static ServiceProvider Host(
         Action<DataSourceBuilder> configure,
         Action<IServiceCollection>? servicesConfigure = null)

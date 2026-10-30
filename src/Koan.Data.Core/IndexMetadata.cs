@@ -73,14 +73,14 @@ public static class IndexMetadata
         var classIndexes = aggregateType.GetCustomAttributes<IndexAttribute>(inherit: true).ToArray();
         foreach (var idx in classIndexes)
         {
-            if (idx.Fields is null || idx.Fields.Length == 0) continue;
+            var declared = IndexAttribute.ResolveFieldsFor(aggregateType, idx, anchoredPropertyName: null);
             var fields = new List<PropertyInfo>();
-            foreach (var fieldName in idx.Fields)
+            foreach (var fieldName in declared)
             {
                 var p = props.FirstOrDefault(pp => string.Equals(pp.Name, fieldName, StringComparison.Ordinal));
                 if (p is null) continue; // ignore invalid
                 // Skip explicit Id-only index
-                if (p == idSpec?.Prop && idx.Fields.Length == 1) { fields.Clear(); break; }
+                if (p == idSpec?.Prop && declared.Count == 1) { fields.Clear(); break; }
                 fields.Add(p);
             }
             if (fields.Count == 0) continue;

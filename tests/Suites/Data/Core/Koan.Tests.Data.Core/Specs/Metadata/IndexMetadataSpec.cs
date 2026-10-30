@@ -38,6 +38,21 @@ public class IndexMetadataSpec
         public string Token { get; set; } = "";
     }
 
+    [Index(Name = "ix_declared_nothing")]
+    public class ClassIndexWithoutFields : Entity<ClassIndexWithoutFields>
+    {
+        public string Code { get; set; } = "";
+    }
+
+    [Fact]
+    public void A_class_level_index_without_fields_is_refused_naming_the_type()
+    {
+        var read = () => IndexMetadata.GetIndexes(typeof(ClassIndexWithoutFields));
+
+        read.Should().Throw<System.InvalidOperationException>()
+            .Which.Message.Should().Contain(typeof(ClassIndexWithoutFields).FullName!).And.Contain("ix_declared_nothing").And.Contain("Fields");
+    }
+
     [Fact]
     public void PkOnly_yields_a_single_primary_key_index()
     {
