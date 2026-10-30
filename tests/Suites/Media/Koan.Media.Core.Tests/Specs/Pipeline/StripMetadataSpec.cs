@@ -38,6 +38,37 @@ public sealed class StripMetadataSpec
     }
 
     [Fact]
+    public async Task Strip_All_leaves_no_iptc_byline_in_a_jpeg()
+    {
+        using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(8, 8);
+        image.Metadata.IptcProfile = new SixLabors.ImageSharp.Metadata.Profiles.Iptc.IptcProfile();
+        image.Metadata.IptcProfile.SetValue(SixLabors.ImageSharp.Metadata.Profiles.Iptc.IptcTag.Byline, "IPTC-Secret-Byline");
+        await using var src = new MemoryStream();
+        await image.SaveAsJpegAsync(src);
+        src.Position = 0;
+        System.Text.Encoding.Latin1.GetString(src.ToArray()).Should().Contain("IPTC-Secret-Byline", "the source carries it");
+
+        var output = await src.AsMedia().Strip().PreserveFormat().ToBytesAsync();
+
+        System.Text.Encoding.Latin1.GetString(output.Bytes).Should().NotContain("IPTC-Secret-Byline");
+    }
+
+    [Fact]
+    public async Task Strip_All_leaves_no_text_chunk_in_a_png()
+    {
+        using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(8, 8);
+        image.Metadata.GetPngMetadata().TextData.Add(new SixLabors.ImageSharp.Formats.Png.Chunks.PngTextData("Author", "PNG-Secret-Text", "", ""));
+        await using var src = new MemoryStream();
+        await image.SaveAsPngAsync(src);
+        src.Position = 0;
+        System.Text.Encoding.Latin1.GetString(src.ToArray()).Should().Contain("PNG-Secret-Text", "the source carries it");
+
+        var output = await src.AsMedia().Strip().PreserveFormat().ToBytesAsync();
+
+        System.Text.Encoding.Latin1.GetString(output.Bytes).Should().NotContain("PNG-Secret-Text");
+    }
+
+    [Fact]
     public async Task Strip_All_removes_exif_profile()
     {
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);

@@ -310,7 +310,11 @@ public enum MetadataKinds
     Exif = 1 << 0,
     Icc = 1 << 1,
     Xmp = 1 << 2,
-    All = Exif | Icc | Xmp,
+    /// <summary>IPTC: bylines, captions, places.</summary>
+    Iptc = 1 << 3,
+    /// <summary>Text a format carries of its own: PNG text chunks, GIF comments.</summary>
+    Text = 1 << 4,
+    All = Exif | Icc | Xmp | Iptc | Text,
 }
 
 /// <summary>

@@ -216,8 +216,10 @@ public static class ConfiguredRecipeBinder
                 "exif" => MetadataKinds.Exif,
                 "icc" => MetadataKinds.Icc,
                 "xmp" => MetadataKinds.Xmp,
+                "iptc" => MetadataKinds.Iptc,
+                "text" => MetadataKinds.Text,
                 "all" => MetadataKinds.All,
-                _ => throw new MediaRecipeBindingException($"Unknown strip kind '{part}'. Allowed: exif, icc, xmp, all."),
+                _ => throw new MediaRecipeBindingException($"Unknown strip kind '{part}'. Allowed: exif, icc, xmp, iptc, text, all."),
             };
         }
         return kinds;

@@ -219,10 +219,12 @@ public static class RecipeJsonSerializer
     private static string SerializeStripKinds(MetadataKinds kinds)
     {
         if (kinds == MetadataKinds.All) return "all";
-        var parts = new List<string>(3);
+        var parts = new List<string>(5);
         if (kinds.HasFlag(MetadataKinds.Exif)) parts.Add("exif");
         if (kinds.HasFlag(MetadataKinds.Icc)) parts.Add("icc");
         if (kinds.HasFlag(MetadataKinds.Xmp)) parts.Add("xmp");
+        if (kinds.HasFlag(MetadataKinds.Iptc)) parts.Add("iptc");
+        if (kinds.HasFlag(MetadataKinds.Text)) parts.Add("text");
         return string.Join(",", parts);
     }
 

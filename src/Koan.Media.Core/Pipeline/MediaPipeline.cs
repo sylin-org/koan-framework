@@ -1244,8 +1244,32 @@ public sealed class MediaPipeline : IMediaPipeline
     {
         var md = image.Metadata;
         if (kinds.HasFlag(MetadataKinds.Exif)) md.ExifProfile = null;
-        if (kinds.HasFlag(MetadataKinds.Icc)) md.IccProfile = null;
+        if (kinds.HasFlag(MetadataKinds.Icc))
+        {
+            md.IccProfile = null;
+            md.CicpProfile = null;
+        }
         if (kinds.HasFlag(MetadataKinds.Xmp)) md.XmpProfile = null;
+        if (kinds.HasFlag(MetadataKinds.Iptc)) md.IptcProfile = null;
+        if (kinds.HasFlag(MetadataKinds.Text))
+        {
+            md.GetPngMetadata().TextData.Clear();
+            md.GetGifMetadata().Comments.Clear();
+        }
+
+        // Each frame of an animation carries profiles of its own.
+        foreach (var frame in image.Frames)
+        {
+            var fm = frame.Metadata;
+            if (kinds.HasFlag(MetadataKinds.Exif)) fm.ExifProfile = null;
+            if (kinds.HasFlag(MetadataKinds.Icc))
+            {
+                fm.IccProfile = null;
+                fm.CicpProfile = null;
+            }
+            if (kinds.HasFlag(MetadataKinds.Xmp)) fm.XmpProfile = null;
+            if (kinds.HasFlag(MetadataKinds.Iptc)) fm.IptcProfile = null;
+        }
     }
 
     /// <summary>
