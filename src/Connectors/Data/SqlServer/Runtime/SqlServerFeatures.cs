@@ -26,7 +26,7 @@ internal static class SqlServerFeatures
     // A scoped In past the parameters one statement binds is sliced by Koan (DATA-0162).
     private static readonly FilterSupport SetBoundFilterSupport =
         // A scoped slice leaves room in the statement for the scope's own parameters, so it stays a parameter list.
-        RelationalFilterSupport.CaseFolding with { MaximumSetMembers = Infrastructure.Constants.MaximumParameters - 100 };
+        RelationalFilterSupport.Default with { MaximumSetMembers = Infrastructure.Constants.MaximumParameters - 100 };
 
     public static void Describe(ICapabilities capabilities)
     {

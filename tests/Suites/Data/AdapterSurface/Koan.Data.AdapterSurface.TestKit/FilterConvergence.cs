@@ -104,7 +104,7 @@ public static class FilterConvergence
     /// if any — establish a lease before calling for partitioned stores), then asserts every filter's
     /// adapter id-set equals the in-memory oracle. Throws listing all divergences.
     /// </summary>
-    /// <param name="foldsCase">The store declares <c>OrdinalStrings</c> false: a string match in the wrong case finds what
+    /// <param name="foldsCase">The store's default collation folds case: a string match in the wrong case finds what
     /// it would in the right one, and the three case-mismatch cases expect that.</param>
     public static async Task AssertConvergesAsync(bool foldsCase = false)
     {

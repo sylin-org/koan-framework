@@ -25,7 +25,7 @@ internal static class MySqlFeatures
 
     // A scoped In past the parameters one statement binds is sliced by Koan (DATA-0162).
     private static readonly FilterSupport SetBoundFilterSupport =
-        RelationalFilterSupport.CaseFolding with { MaximumSetMembers = Infrastructure.Constants.MaximumParameters };
+        RelationalFilterSupport.Default with { MaximumSetMembers = Infrastructure.Constants.MaximumParameters };
 
     public static void Describe(ICapabilities capabilities, bool conditionalReplace = true)
     {

@@ -25,7 +25,7 @@ of a second, ids differing only by case merged in an upsert, and two concurrent 
    deserializes into the Entity, so 19.99 and 0.1 stay exact and only code that needs a decimal pays. A whole number past a `long`
    reads as a double too, since PostgreSQL's `jsonb` prints a large double without an exponent.
 2. **SQL Server ids are exact.** A text id column is `Latin1_General_BIN2`. Every other text column keeps the server's default
-   collation and behaviour, and `FilterSupport.OrdinalStrings` stays false. MySQL's id column was already `utf8mb4_bin`.
+   collation and behaviour. MySQL's id column was already `utf8mb4_bin`.
 3. **SQL Server's upsert has one winner and no error.** An update that finds no row inserts; a primary-key violation (2627) means
    the row exists after all, and the update runs again. A row it still cannot touch is another scope's, and only then is the write
    refused as cross-scope. No lock hint is taken.
@@ -53,7 +53,6 @@ A typed `decimal` or `double` column holds its value exactly on every store.
 ## Consequences
 
 - Behavioural: on SQL Server `Get("ABC")` no longer finds `"abc"`. Text fields, their equality and their sort are unchanged.
-- A string match on SQL Server follows the collation the store declares through `FilterSupport.OrdinalStrings`, so its default
-  collation folds case in `StartsWith`, `EndsWith` and `Contains`. A literal backslash in a match is an ordinary character.
+- A string match on SQL Server follows the column's collation, so its default collation folds case in `StartsWith`, `EndsWith` and `Contains`. A literal backslash in a match is an ordinary character.
 - Evidence: `OrdinaryValueConvergence` on SQLite, PostgreSQL, SQL Server and MySQL; `SqlServerExactValueSpec` holds DateTime ticks,
   a DateTime set and concurrent upserts.

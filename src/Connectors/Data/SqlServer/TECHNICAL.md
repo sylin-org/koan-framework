@@ -43,9 +43,8 @@ fallback. The connector does not currently expose provider-specific retry or com
 ## LINQ and pushdowns
 
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
-- The filter support declared is `RelationalFilterSupport.CaseFolding`: the database is created without a
-  `COLLATE`, so string equality follows the server's default collation, which folds case, and
-  `FilterSupport.OrdinalStrings` is false. A text id column alone is `Latin1_General_BIN2`, so ids differing only by case
+- The database is created without a `COLLATE`, so string equality follows the server's default collation, which folds
+  case. A text id column alone is `Latin1_General_BIN2`, so ids differing only by case
   are two rows (DATA-0164).
 - A DateTime binds as `datetime2(7)`, exact to the tick (`SqlServerDateTime`).
 - `Upsert` updates, then inserts; a primary-key violation means another writer got there first, and the update runs again, so

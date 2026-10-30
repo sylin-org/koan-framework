@@ -41,7 +41,7 @@ Bulk upsert and batch operations share one MySQL transaction. Bulk delete uses o
 
 Registered SQL record/scalar operations require a configured read lane and begin a read-only transaction. The inspector lists, resolves, describes, and samples tables/views within the routed database through `information_schema` and the shared neutral reader. Health opens the resolved source and executes `SELECT 1`.
 
-The filter support it declares is `RelationalFilterSupport.CaseFolding`: string equality under a server's default collation folds case, so `FilterSupport.OrdinalStrings` is false and a caller needing exact string equality knows not to rely on it. Capability declarations cover native LINQ/filter execution, provider-bounded paging, bulk writes/deletes, atomic batches, fast removal, conditional replace, and row/container/database isolation. No vector capability is present. MySQL 8.4 and MariaDB 11.8 LTS share the query dialect and application surface; the only server-family branch normalizes schema metadata that the engines report differently.
+String equality under a server's default collation folds case. Capability declarations cover native LINQ/filter execution, provider-bounded paging, bulk writes/deletes, atomic batches, fast removal, conditional replace, and row/container/database isolation. No vector capability is present. MySQL 8.4 and MariaDB 11.8 LTS share the query dialect and application surface; the only server-family branch normalizes schema metadata that the engines report differently.
 
 ## Enum storage contract
 

@@ -38,8 +38,4 @@ public static class RelationalFilterSupport
         },
         NestedPaths: false,
         IgnoreCase: false);
-
-    /// <summary>The same surface on a store whose default collation folds case (SQL Server, MySQL): its string equality
-    /// is not ordinal (<see cref="FilterSupport.OrdinalStrings"/>).</summary>
-    public static FilterSupport CaseFolding { get; } = Default with { OrdinalStrings = false };
 }

@@ -205,8 +205,6 @@ the side of an ambiguous daylight-saving hour — a DateTimeOffset only the same
 binary value only the same bytes, so a guard never matches a row it did not observe. Managed fields refuse,
 because their values live in the persisted record rather than the entity the guard is evaluated over.
 The ordinary query evaluator compares a DateTime and a DateTimeOffset by their instant, as queries always
-have, and a binary value by its bytes; it is not a conditional-write path. `FilterSupport.OrdinalStrings` says
-whether a provider's string equality is ordinal; SQL Server and MySQL, whose default collations fold case,
-declare it false through `RelationalFilterSupport.CaseFolding`. `IMaintenanceScopes` runs background work once per
+have, and a binary value by its bytes; it is not a conditional-write path. `IMaintenanceScopes` runs background work once per
 ambient scope, one per tenant under `Koan.Tenancy` (SEC-0033). A bool cannot describe a postcommit
 exception: native acknowledgement failure, cancellation and completion errors propagate.

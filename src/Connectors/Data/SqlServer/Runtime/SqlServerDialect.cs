@@ -121,7 +121,7 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
     private string Element(Type elementType) => DocumentOperand(Cast("item.[value]", elementType), elementType);
     public string JsonArrayLength(string columnSql) => $"(SELECT COUNT(1) FROM OPENJSON({columnSql}))";
     /// <summary>
-    /// A scalar string match under the store's collation, which <see cref="FilterSupport.OrdinalStrings"/> declares.
+    /// A scalar string match under the column's collation.
     /// The bracket escapes of <see cref="EscapeLike"/> need no ESCAPE clause, and one would swallow a literal backslash.
     /// </summary>
     public string StringMatch(string columnSql, FilterOperator op, string value, Func<object?, string> bind)

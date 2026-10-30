@@ -44,9 +44,7 @@ internal static class FirebirdFeatures
         IgnoreCase: false)
     {
         // A scoped In past the parameters one statement binds is sliced by Koan (DATA-0162).
-        MaximumSetMembers = Infrastructure.Constants.MaximumParameters,
-        // String equality follows the column's collation, which this adapter does not pin, so it is not declared ordinal.
-        OrdinalStrings = false
+        MaximumSetMembers = Infrastructure.Constants.MaximumParameters
     };
 
     internal static void Declare(IDataClaims claims)
