@@ -10,9 +10,8 @@ namespace Koan.Web.Auth.Hosting;
 /// Fires <c>OnBootstrap</c> on every registered <see cref="IKoanAuthFlowHandler"/> once during
 /// host startup. The dispatcher is resolved
 /// from a fresh service scope (it and its handler dependencies are scoped) so the singleton
-/// hosted service never holds a captive scoped reference. Failures inside a single handler are
-/// logged by the dispatcher and do not prevent the host from coming up; a wholesale dispatch
-/// failure is logged here and also non-fatal.
+/// hosted service never holds a captive scoped reference. Bootstrap fails closed: a handler's failure is
+/// logged here and propagates, so the host does not start.
 /// </summary>
 internal sealed class AuthBootstrapHostedService : IHostedService
 {
@@ -32,23 +31,20 @@ internal sealed class AuthBootstrapHostedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await using var scope = _rootServices.CreateAsyncScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>();
+        _logger.LogDebug(
+            "Koan.Web.Auth: dispatching OnBootstrap to {Count} handlers",
+            dispatcher.Count);
+        var ctx = new AuthBootstrapContext(scope.ServiceProvider, _environment);
         try
         {
-            await using var scope = _rootServices.CreateAsyncScope();
-            var dispatcher = scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>();
-            _logger.LogDebug(
-                "Koan.Web.Auth: dispatching OnBootstrap to {Count} handlers",
-                dispatcher.Count);
-            var ctx = new AuthBootstrapContext(scope.ServiceProvider, _environment);
             await dispatcher.DispatchBootstrap(ctx, cancellationToken);
         }
-        catch (OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            _logger.LogCritical(ex, "Koan.Web.Auth: a flow handler's bootstrap failed; the host does not start");
             throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Koan.Web.Auth: auth bootstrap dispatch failed");
         }
     }
 

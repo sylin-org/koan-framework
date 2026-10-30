@@ -1,3 +1,4 @@
+using Koan.Core.Semantics.Segmentation;
 using Koan.Data.Core;
 using Koan.Web.Authorization;
 
@@ -13,12 +14,12 @@ internal sealed class AgentGrantAccessContributor : IEffectiveAccessContributor
         {
             grants = await AgentGrant.Query(g => g.Subject == identityId, ct).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (SegmentationRequiredException)
         {
             // AgentGrant is tenant-scoped (SEC-0005). In a no-tenant context (the GLOBAL operator/effective-access
             // view under a Closed posture) the fail-closed axis guard fires — there are simply no tenant grants to
             // contribute, so degrade to empty rather than fail the whole resolution. Inside a tenant scope the grants
-            // light up. The grants' Scope is the ambient tenant, not "global".
+            // light up. The grants' Scope is the ambient tenant, not "global". A store that fails surfaces.
             return Array.Empty<AccessFact>();
         }
 

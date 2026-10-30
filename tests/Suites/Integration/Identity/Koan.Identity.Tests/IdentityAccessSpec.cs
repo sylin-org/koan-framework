@@ -31,6 +31,18 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     private AccessExplainer NewExplainer(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<AccessExplainer>();
 
     [Fact]
+    public async Task A_data_failure_in_the_grant_contributor_surfaces_rather_than_reading_as_no_grants()
+    {
+        // A source nothing configured fails the read the way a store that cannot answer does: an
+        // InvalidOperationException that is not the segmentation guard.
+        using (EntityContext.Source("no-such-source"))
+        {
+            var read = () => new AgentGrantAccessContributor().ContributeAsync("a-person");
+            await read.Should().ThrowAsync<InvalidOperationException>();
+        }
+    }
+
+    [Fact]
     public async Task Global_role_grant_is_idempotent_and_listable()
     {
         const string id = "role-user";
