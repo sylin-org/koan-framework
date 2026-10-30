@@ -498,6 +498,10 @@
       href: WEB-0081-an-application-accepts-its-url-at-runtime.md
     - name: WEB-0082 AT sessions are rows in the application's store, refreshed by one process at a time
       href: WEB-0082-at-sessions-are-rows-in-the-applications-store.md
+    - name: WEB-0083 The web fails closed where it read as open, and believes each declared proxy
+      href: WEB-0083-the-web-fails-closed.md
+    - name: WEB-0084 A Server-Sent Events stream keeps itself alive, and a hub fans out to bounded queues
+      href: WEB-0084-a-stream-keeps-itself-alive.md
 - name: Flow (FLOW)
   items:
     - name: FLOW-0070 Flow commands bus

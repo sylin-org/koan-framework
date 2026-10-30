@@ -62,7 +62,7 @@ internal static class WebProvenanceItems
     internal static readonly ProvenanceItem TrustedProxies = new(
         ConfigurationConstants.Web.Section + ":" + ConfigurationConstants.Web.Keys.TrustedProxies,
         "Trusted Proxies",
-        "Reverse proxies (IP or CIDR) whose X-Forwarded-Proto, X-Forwarded-Host and X-Forwarded-For are honoured for one hop. Empty honours none.",
+        "Reverse proxies (IP or CIDR) whose X-Forwarded-Proto, X-Forwarded-Host and X-Forwarded-For are honoured, walking back to the first address nobody declared. Empty honours none.",
         DefaultValue: "(none)",
         DefaultConsumers: PipelineConsumers);
 }
