@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 
 namespace Koan.Identity.Reconciliation;
@@ -72,18 +73,20 @@ internal sealed class IdentityReconciler : IIdentityReconciler
     private static async Task ReconcileEmailAsync(string identityId, string address, bool verified, CancellationToken ct)
     {
         var normalized = NormalizeEmail(address);
-        var existing = await IdentityEmail.Query(e => e.IdentityId == identityId, ct).ConfigureAwait(false);
-        var match = existing.FirstOrDefault(e => string.Equals(e.Address, normalized, StringComparison.OrdinalIgnoreCase));
+        var key = IdentityEmail.KeyFor(identityId, normalized);
+        var match = await IdentityEmail.Get(key, ct).ConfigureAwait(false);
 
         if (match is null)
         {
+            // Only a factor not seen before asks whether the person holds another, which one row answers.
+            var another = await IdentityEmail.Query(e => e.IdentityId == identityId, new QueryDefinition().WithPagination(1, 1), ct).ConfigureAwait(false);
             await new IdentityEmail
             {
-                Id = IdentityEmail.KeyFor(identityId, normalized), // deterministic → concurrent first sign-ins converge to one row
+                Id = key, // deterministic → concurrent first sign-ins converge to one row
                 IdentityId = identityId,
                 Address = normalized,
                 Verified = verified,
-                Primary = existing.Count == 0, // the first factor becomes primary
+                Primary = another.Count == 0, // the first factor becomes primary
             }.Save(ct).ConfigureAwait(false);
         }
         else if (verified && !match.Verified)

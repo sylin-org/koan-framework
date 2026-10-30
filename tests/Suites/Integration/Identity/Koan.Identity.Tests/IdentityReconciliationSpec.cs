@@ -43,6 +43,19 @@ public sealed class IdentityReconciliationSpec : IdentityHostScopedSpec
     }
 
     [Theory]
+    [InlineData(typeof(Session), nameof(Session.IdentityId))]
+    [InlineData(typeof(IdentityEmail), nameof(IdentityEmail.IdentityId))]
+    [InlineData(typeof(ExternalIdentityLink), nameof(ExternalIdentityLink.IdentityId))]
+    [InlineData(typeof(Koan.Identity.Impersonation.ImpersonationGrant), nameof(Koan.Identity.Impersonation.ImpersonationGrant.Actor))]
+    [InlineData(typeof(Koan.Identity.Impersonation.ImpersonationGrant), nameof(Koan.Identity.Impersonation.ImpersonationGrant.Target))]
+    [InlineData(typeof(Membership), nameof(Membership.IdentityId))]
+    [InlineData(typeof(Membership), nameof(Membership.TenantId))]
+    public void A_lookup_by_person_or_tenant_leads_an_index(Type entity, string property)
+        => IndexMetadata.GetIndexes(entity).Should().Contain(
+            index => !index.IsPrimaryKey && index.Properties[0].Name == property,
+            "every /me and every sign-in reads these rows by this property");
+
+    [Theory]
     [InlineData(true, null, "Open")]
     [InlineData(false, null, "Closed")]
     [InlineData(false, IdentityPosture.Open, "Open")]

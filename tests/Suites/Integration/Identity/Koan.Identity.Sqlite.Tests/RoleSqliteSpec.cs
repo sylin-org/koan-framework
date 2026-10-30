@@ -283,14 +283,14 @@ public sealed class RoleSqliteSpec
             => (await roles.Page(pageSize: 50)).Items.Select(role => role.Key).ToArray();
     }
 
-    private static async Task<object?> Scalar(SqliteConnection connection, string sql)
+    internal static async Task<object?> Scalar(SqliteConnection connection, string sql)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = sql;
         return await command.ExecuteScalarAsync();
     }
 
-    private static async Task<IReadOnlyList<(string Name, string Sql)>> Indexes(SqliteConnection connection, string table)
+    internal static async Task<IReadOnlyList<(string Name, string Sql)>> Indexes(SqliteConnection connection, string table)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = @table AND sql IS NOT NULL";
@@ -301,7 +301,7 @@ public sealed class RoleSqliteSpec
         return indexes;
     }
 
-    private static async Task<IReadOnlyList<string>> Plan(SqliteConnection connection, string sql, params string[] values)
+    internal static async Task<IReadOnlyList<string>> Plan(SqliteConnection connection, string sql, params string[] values)
     {
         await using var command = connection.CreateCommand();
         command.CommandText = "EXPLAIN QUERY PLAN " + sql;
@@ -312,7 +312,7 @@ public sealed class RoleSqliteSpec
         return details;
     }
 
-    private static void Delete(string path)
+    internal static void Delete(string path)
     {
         SqliteConnection.ClearAllPools();
         foreach (var file in new[] { path, path + "-wal", path + "-shm" })
@@ -321,7 +321,7 @@ public sealed class RoleSqliteSpec
 
     /// <summary>A host on a SQLite file. <paramref name="fast"/> pools connections and syncs at checkpoints rather than
     /// every commit, for the specs that write thousands of rows; <see cref="Delete"/> clears the pool first.</summary>
-    private static Task<IntegrationHost> Start(string path, bool fast = false, Dictionary<string, string?>? settings = null)
+    internal static Task<IntegrationHost> Start(string path, bool fast = false, Dictionary<string, string?>? settings = null)
     {
         var all = new Dictionary<string, string?>
         {

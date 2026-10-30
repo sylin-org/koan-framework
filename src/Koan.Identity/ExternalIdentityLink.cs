@@ -17,6 +17,7 @@ public sealed class ExternalIdentityLink : Entity<ExternalIdentityLink>, IAmbien
 {
     /// <summary>The owning person (== the provider <c>sub</c>, which is the <see cref="Identity"/> id).</summary>
     [Parent(typeof(Identity))]
+    [Index]
     public string IdentityId { get; set; } = "";
 
     /// <summary>The auth provider (e.g. <c>google</c>, <c>discord</c>).</summary>

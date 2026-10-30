@@ -18,9 +18,11 @@ namespace Koan.Tenancy;
 public sealed class Membership : Entity<Membership>
 {
     /// <summary>The tenant this membership grants access to (a <see cref="TenantRecord"/> id).</summary>
+    [Index]
     public string TenantId { get; set; } = "";
 
     /// <summary>The global identity (id or email) this membership is for.</summary>
+    [Index]
     public string IdentityId { get; set; } = "";
 
     /// <summary>The roles granted within <see cref="TenantId"/> (e.g. <c>koan:owner</c>).</summary>

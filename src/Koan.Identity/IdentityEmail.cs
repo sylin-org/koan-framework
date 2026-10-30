@@ -15,6 +15,7 @@ public sealed class IdentityEmail : Entity<IdentityEmail>, IAmbientExempt
 {
     /// <summary>The owning person (<see cref="Identity"/> id).</summary>
     [Parent(typeof(Identity))]
+    [Index]
     public string IdentityId { get; set; } = "";
 
     /// <summary>The normalized (lower-cased, trimmed) email address.</summary>

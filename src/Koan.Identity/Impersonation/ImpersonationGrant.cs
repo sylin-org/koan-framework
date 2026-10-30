@@ -13,11 +13,16 @@ namespace Koan.Identity.Impersonation;
 /// </summary>
 public sealed class ImpersonationGrant : Entity<ImpersonationGrant>, IAmbientExempt
 {
+    private const string ActorTargetIndex = "ix_impersonation_grants_actor_target";
+
     /// <summary>The subject who may impersonate (the operator).</summary>
     [Parent(typeof(Identity))]
+    [Index(Group = ActorTargetIndex, Order = 0)]
     public string Actor { get; set; } = "";
 
     /// <summary>The subject being impersonated.</summary>
+    [Index]
+    [Index(Group = ActorTargetIndex, Order = 1)]
     public string Target { get; set; } = "";
 
     /// <summary>Mandatory justification (audited).</summary>

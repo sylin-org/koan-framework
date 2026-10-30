@@ -15,6 +15,7 @@ public sealed class Session : Entity<Session>, IAmbientExempt
 {
     /// <summary>The owning person.</summary>
     [Parent(typeof(Identity))]
+    [Index]
     public string IdentityId { get; set; } = "";
 
     /// <summary>Device label (e.g. "MacBook Pro", "iPhone").</summary>
