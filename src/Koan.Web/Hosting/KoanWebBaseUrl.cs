@@ -17,7 +17,8 @@ namespace Koan.Web.Hosting;
 /// <para>Precedence is configured, then accepted, then the request. A configured value is authoritative:
 /// <see cref="KoanWebStartupFilter"/> serves the application under its path and nothing outside it. An accepted value
 /// is an origin the application chose, kept in its own <see cref="IApplicationUrlStore"/>, loaded before the host
-/// serves and changed with <see cref="Accept"/>. Every pillar that writes an absolute URL — the authorization server's
+/// serves and changed with <see cref="Accept"/>; a stored value this host cannot use is not held, and the base URL
+/// behaves as if nothing were accepted until the next accept replaces it. Every pillar that writes an absolute URL — the authorization server's
 /// issuer, the MCP resource identity, OpenGraph cards, the atproto client identity — reads it here at use, so an
 /// accepted URL takes effect on the next request without a restart, and none of them takes its origin from the
 /// request <c>Host</c> header, which a caller controls.</para>
@@ -53,6 +54,7 @@ public sealed class KoanWebBaseUrl
     private readonly IKoanRuntimeFactRecorder? _facts;
     private readonly SemaphoreSlim _accepting = new(1, 1);
     private string? _accepted;
+    private (string Value, string Problem)? _unusable;
     private int _noticed;
 
     /// <summary>
@@ -195,6 +197,7 @@ public sealed class KoanWebBaseUrl
         {
             await _store.Save(normalized!, ct).ConfigureAwait(false);
             Volatile.Write(ref _accepted, normalized);
+            _unusable = null;
             Restate();
         }
         finally
@@ -217,24 +220,37 @@ public sealed class KoanWebBaseUrl
     }
 
     /// <summary>
-    /// Read the accepted URL from the application's store, once, before the host serves (<c>WebModule.Start</c>).
+    /// Read the accepted URL from the application's store, once, before the host serves (<c>WebModule.Start</c>). A
+    /// stored value this host cannot use — one that is not a public origin here, such as http on loopback outside
+    /// Development — is not held: the base URL behaves as if nothing were accepted, Koan says so once when nothing is
+    /// configured, and the store keeps the value until the application's next <see cref="Accept"/> replaces it.
     /// </summary>
-    /// <exception cref="InvalidOperationException">The store holds a value that is not a public origin.</exception>
     internal async Task Load(CancellationToken ct)
     {
         if (_store is null) return;
         var stored = await _store.Load(ct).ConfigureAwait(false);
         if (string.IsNullOrWhiteSpace(stored)) return;
 
-        if (!TryParseAccepted(stored, out var normalized, out var problem))
+        if (TryParseAccepted(stored, out var normalized, out var problem))
         {
-            throw new InvalidOperationException(
-                $"{_store.GetType().FullName} holds '{stored}' as the application's accepted URL, which must be its public " +
-                $"origin, validated as {Key} is: {problem}. Correct or clear the value it holds.");
+            Volatile.Write(ref _accepted, normalized);
+            Restate();
+            return;
         }
 
-        Volatile.Write(ref _accepted, normalized);
+        // WEB-0081: a place moved between environments carries a value that was valid where it was accepted; moving it
+        // must not need a database edit. A configured URL wins anyway, so there the value plays no part.
+        _unusable = (stored, problem);
+        if (Configured is not null) return;
         Restate();
+        _logger?.LogWarning(
+            "{Store} holds '{Stored}' as the application's accepted URL, and Koan does not use it here: {Problem}. Until " +
+            "the application accepts another (KoanWebBaseUrl.Accept), which replaces it, or {Key} is set, {Consequence}. " +
+            "Koan leaves the stored value as it is.",
+            _store.GetType().FullName, stored, problem, Key,
+            DerivesFromRequests
+                ? "absolute URLs derive from each request"
+                : "an absolute URL is refused where it is needed, as with nothing accepted");
     }
 
     /// <summary>
@@ -262,8 +278,11 @@ public sealed class KoanWebBaseUrl
         var window = _derivesUntilAccepted
             ? $" until the application accepts one ({UntilAccepted}), in Production too"
             : string.Empty;
+        var unusable = _unusable is { } held
+            ? $" The store holds '{held.Value}', which is not used: {held.Problem}; the next accepted URL replaces it."
+            : string.Empty;
         return ($"No base URL is configured ({Key}) or accepted{source}; absolute URLs derive from each request's scheme, " +
-                $"host and path base{window}.",
+                $"host and path base{window}.{unusable}",
             KoanWebConstants.BaseUrl.DerivedFactReason);
     }
 

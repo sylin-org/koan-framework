@@ -48,9 +48,9 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 // path base turns anything away; the path base runs next, so static files, the health alias, every
                 // stage and every endpoint live under it, and a request outside it answers 404 here.
                 var baseUrl = app.ApplicationServices.GetRequiredService<KoanWebBaseUrl>();
-                if (opts.TrustedProxies.Count > 0)
+                if (KoanWebTrustedProxies.ForwardedHeaders(opts.TrustedProxies) is { } forwarded)
                 {
-                    app.UseForwardedHeaders(KoanWebTrustedProxies.ForwardedHeaders(opts.TrustedProxies));
+                    app.UseForwardedHeaders(forwarded);
                 }
                 var origins = app.ApplicationServices.GetRequiredService<KoanWebOrigins>();
                 app.Use((ctx, next) =>

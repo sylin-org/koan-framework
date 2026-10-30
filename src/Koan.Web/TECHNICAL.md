@@ -39,7 +39,9 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   scheme and host, port only when not the default, the path percent-encoded as `Configured` and decoded as
   `PathBase`, no trailing slash; a query, fragment, `%2F` or an unspecified listen address stops boot — and
   `KoanWebStartupFilter` applies it first: `UseForwardedHeaders` for `Koan:Web:TrustedProxies` (X-Forwarded-Proto,
-  X-Forwarded-Host and X-Forwarded-For, one hop, only the declared proxies), then the origin observation, then
+  X-Forwarded-Host and X-Forwarded-For, one hop, only the declared proxies; blank entries declare nothing, and with no
+  proxy or network left the middleware is not added, since ASP.NET believes every peer when it knows none), then the
+  origin observation, then
   `UsePathBase` with the base URL's path and a guard that answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
   and every contributor stage, so nothing is served at the root. `KoanWebBaseUrl.Resolve(HttpContext)` is what
   Auth.Server (`Issuer` default), MCP (`ResourceUri` default, authorization-server and metadata URLs), OpenGraph
@@ -49,8 +51,11 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   asked fails).
 - WEB-0081: with the key unset, the application's `IApplicationUrlStore` (one DI singleton) holds the URL it accepted.
   `WebModule.Start` reads it inside `AppHost.PushScope`, before the host serves, after composition and after the data
-  pillar has started (`[After(KoanDataCoreModule)]`, so a store over an `Entity<T>` row works), and a stored
-  value that is not a public origin refuses the start naming the store. `KoanWebBaseUrl.Accept` validates with the same
+  pillar has started (`[After(KoanDataCoreModule)]`, so a store over an `Entity<T>` row works). A stored value this
+  host cannot use (it fails `TryParseAccepted` here, such as http loopback outside Development) is not held: the base
+  URL behaves as if nothing were accepted, one warning names the store, the value and the reason when nothing is
+  configured (none when a configured URL wins), the derived fact summary names it, and the store is never written; the
+  next `Accept` replaces it. `KoanWebBaseUrl.Accept` validates with the same
   `TryParse`, refuses a path and any origin that is not https or, under `KoanEnv.Gate.DevelopmentOnly`, http on a
   loopback host (`Uri.IsLoopback`, the test the atproto client identity uses), saves through the store and then
   publishes the value (`Volatile`), one accept at a time; `Load` applies the same rule;

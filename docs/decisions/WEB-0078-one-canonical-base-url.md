@@ -72,6 +72,13 @@ outside it, and every pillar that writes an absolute URL derives from it.**
    > request-derived base URL must be spelled alike. The configured or accepted base URL still decides every absolute
    > URL Koan writes; only a base URL derived from the request follows the forwarded host, as it already followed the
    > forwarded scheme.
+
+   > **Amended 2026-10-30.** A blank or whitespace entry declares nothing. ASP.NET's forwarded-headers middleware
+   > believes every peer when it knows no proxy and no network, so an empty entry — what a compose file passing
+   > `${PROXY:-}` produces — turned on trust in forwarded headers from every client. Koan ignores blank entries, and
+   > when no proxy remains it does not add the middleware, exactly as with an empty list; in no state does it run the
+   > middleware with no known proxy and no known network. `TrustedProxiesSpec` proves an empty entry and whitespace
+   > entries leave forwarded headers ignored, and that a declared proxy beside a blank entry is still believed.
 4. Consumers derive from the base URL and keep their explicit overrides: `AuthServerOptions.Issuer` defaults to it;
    `McpServerOptions.ResourceUri` defaults to it plus the MCP route, and the authorization-server and metadata URLs
    derive from it; the dev token's default audience is that same MCP identity (read through the `Koan:Mcp` keys,

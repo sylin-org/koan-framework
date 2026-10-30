@@ -10,11 +10,16 @@ namespace Koan.Web.Hosting;
 /// for one hop, for the scheme, the host and the client address. The host a proxy forwards is the origin the request
 /// arrived on (WEB-0081); the absolute URLs Koan writes still come from <see cref="KoanWebBaseUrl"/>, which derives
 /// from it only where nothing is configured or accepted. Fail-closed like <c>Koan:Web:Origin</c>: nothing declared
-/// means no forwarded header is honoured.
+/// means no forwarded header is honoured, and a blank entry declares nothing.
 /// </summary>
 internal static class KoanWebTrustedProxies
 {
-    public static ForwardedHeadersOptions ForwardedHeaders(IEnumerable<string> declared)
+    /// <summary>
+    /// The forwarded-headers options for the declared proxies, or null when no proxy is declared once blank entries are
+    /// ignored. ASP.NET believes forwarded headers from every peer when it knows no proxy and no network, so Koan never
+    /// runs the middleware in that state: null means the middleware is not added.
+    /// </summary>
+    public static ForwardedHeadersOptions? ForwardedHeaders(IEnumerable<string?> declared)
     {
         var options = new ForwardedHeadersOptions
         {
@@ -40,6 +45,6 @@ internal static class KoanWebTrustedProxies
             }
         }
 
-        return options;
+        return options.KnownProxies.Count == 0 && options.KnownIPNetworks.Count == 0 ? null : options;
     }
 }

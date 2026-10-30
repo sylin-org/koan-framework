@@ -122,7 +122,10 @@ absolute URL derives from it, whatever `Host` says, with no restart. An accepted
 when the host starts, so it is configured. It is https, or http on a loopback host in Development, because an issuer
 must be https and an AT Protocol client is https or, in Development only, the localhost profile; `Accept` refuses any
 other origin before the store sees it. Tokens, atproto sign-ins and atproto sessions issued under the previous URL
-end as they would after a restart with the new one configured.
+end as they would after a restart with the new one configured. A stored URL this host cannot use — set up in
+Development on `http://127.0.0.1:5220`, then started in Production — never stops the start: Koan says so once, treats
+it as nothing accepted and leaves the store alone, and the next accepted URL replaces it, so moving a place between
+environments needs no database edit.
 
 An application set up on the address its first run is reached at declares that on its store:
 `public bool DerivesUntilAccepted => true;`. Then, while nothing is configured or accepted, Production derives absolute
@@ -132,7 +135,8 @@ application's consent in code, not `Koan:AllowMagicInProduction`.
 
 `Koan:Web:TrustedProxies` names the reverse proxies (IP addresses or CIDR networks) whose `X-Forwarded-Proto`,
 `X-Forwarded-Host` and `X-Forwarded-For` Koan believes, for one hop, at the head of its pipeline. Nothing declared
-means no forwarded header is honoured. A configured or accepted base URL still decides every absolute URL Koan
+means no forwarded header is honoured, and a blank entry (`Koan__Web__TrustedProxies__0=` from `${PROXY:-}`) declares
+nothing. A configured or accepted base URL still decides every absolute URL Koan
 writes, whatever host the proxy forwards. `IsProxiedApi` is a separate, older switch: it only tells Koan that the
 proxy emits the security headers.
 

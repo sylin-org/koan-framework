@@ -24,7 +24,8 @@ public sealed class KoanWebOptions
 
     /// <summary>
     /// WEB-0078: the reverse proxies whose <c>X-Forwarded-Proto</c>, <c>X-Forwarded-Host</c> and <c>X-Forwarded-For</c>
-    /// are believed, as IP addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header. A
+    /// are believed, as IP addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header, and a
+    /// blank or whitespace entry declares nothing. A
     /// configured or accepted base URL still decides every absolute URL Koan writes, whatever host a proxy forwards.
     /// Configure via: Koan:Web:TrustedProxies:0=10.0.0.5
     /// </summary>

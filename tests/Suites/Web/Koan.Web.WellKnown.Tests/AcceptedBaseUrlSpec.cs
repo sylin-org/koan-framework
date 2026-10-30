@@ -172,19 +172,6 @@ public sealed class AcceptedBaseUrlSpec
     }
 
     [Fact]
-    public async Task A_stored_http_origin_outside_development_refuses_the_start()
-    {
-        var store = new MemoryApplicationUrlStore("http://localhost:5220");
-
-        var start = () => BaseUrlPathBaseSpec.BaseUrlHost.Start(new Dictionary<string, string?>(), Probe(store), environment: "Production");
-
-        var failure = await start.Should().ThrowAsync<Exception>();
-        Messages(failure.Which).Should().Contain(message =>
-            message.Contains(typeof(MemoryApplicationUrlStore).FullName!) && message.Contains("outside Development")
-            && message.Contains("Correct or clear"));
-    }
-
-    [Fact]
     public async Task Accepting_needs_the_application_store()
     {
         var baseUrl = new KoanWebBaseUrl(null);
@@ -193,18 +180,6 @@ public sealed class AcceptedBaseUrlSpec
 
         (await accept.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain(nameof(IApplicationUrlStore));
         baseUrl.Accepted.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task A_stored_value_that_is_not_a_public_origin_refuses_the_start()
-    {
-        var store = new MemoryApplicationUrlStore("https://place.example/tangent");
-
-        var start = () => BaseUrlPathBaseSpec.BaseUrlHost.Start(new Dictionary<string, string?>(), Probe(store));
-
-        var failure = await start.Should().ThrowAsync<Exception>();
-        Messages(failure.Which).Should().Contain(message =>
-            message.Contains(typeof(MemoryApplicationUrlStore).FullName!) && message.Contains("path") && message.Contains("Correct or clear"));
     }
 
     private sealed class EnvironmentStub(string name) : IHostEnvironment
@@ -220,29 +195,16 @@ public sealed class AcceptedBaseUrlSpec
         services.AddSingleton(store);
         services.AddKoanControllersFrom<BaseUrlProbeController>();
     };
-
-    private static IEnumerable<string> Messages(Exception exception)
-    {
-        for (Exception? current = exception; current is not null; current = current.InnerException)
-        {
-            yield return current.Message;
-            if (current is AggregateException aggregate)
-            {
-                foreach (var inner in aggregate.InnerExceptions)
-                {
-                    foreach (var message in Messages(inner)) yield return message;
-                }
-            }
-        }
-    }
 }
 
 /// <summary>An application's accepted-URL store kept in memory, counting what it was given.</summary>
-public sealed class MemoryApplicationUrlStore(string? value) : IApplicationUrlStore
+public sealed class MemoryApplicationUrlStore(string? value, bool derivesUntilAccepted = false) : IApplicationUrlStore
 {
     private int _saves;
 
     public string? Value { get; private set; } = value;
+
+    public bool DerivesUntilAccepted => derivesUntilAccepted;
 
     public int Saves => _saves;
 

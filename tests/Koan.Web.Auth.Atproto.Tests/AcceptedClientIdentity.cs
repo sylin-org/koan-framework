@@ -73,6 +73,34 @@ public sealed class AcceptedClientIdentity
     }
 
     [Fact]
+    public async Task In_production_a_stored_development_url_without_the_posture_is_nothing_accepted_and_refuses_the_start_as_that()
+    {
+        var start = () => AtprotoHost.Start(new MemoryApplicationUrlStore("http://127.0.0.1:5220"), "Production");
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(start);
+        Assert.Contains(Messages(failure), message =>
+            message.Contains("there is none") && message.Contains("accept it") && message.Contains("ClientId"));
+        Assert.DoesNotContain(Messages(failure), message => message.Contains("Correct or clear"));
+    }
+
+    [Fact]
+    public async Task In_production_a_stored_development_url_with_the_posture_starts_and_a_later_accept_names_the_client()
+    {
+        var store = new MemoryApplicationUrlStore("http://127.0.0.1:5220", derivesUntilAccepted: true);
+        await using var host = await AtprotoHost.Start(store, "Production");
+        var baseUrl = host.Services.GetRequiredService<KoanWebBaseUrl>();
+
+        Assert.Null(baseUrl.Accepted);
+        Assert.True(baseUrl.DerivesFromRequests);
+
+        await baseUrl.Accept("https://place.example", TestContext.Current.CancellationToken);
+
+        var (clientId, _) = await host.Metadata();
+        Assert.Equal("https://place.example/auth/atproto/client-metadata.json", clientId);
+        Assert.Equal("https://place.example", store.Value);
+    }
+
+    [Fact]
     public async Task In_production_the_posture_defers_the_identity_to_the_request()
     {
         await using var host = await AtprotoHost.Start(new MemoryApplicationUrlStore(null, derivesUntilAccepted: true), "Production");

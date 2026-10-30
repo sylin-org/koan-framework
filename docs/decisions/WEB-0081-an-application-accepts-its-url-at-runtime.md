@@ -119,6 +119,21 @@ accepted one is kept; Koan holds it, validates it and serves it.**
    (`http://localhost:5220` in Production or Test). `Accept` refuses such an origin with an `ArgumentException`
    naming why, before `Save`, so nothing that breaks the rule reaches a store; `Load` refuses a stored one at start as
    it refuses any stored value that fails validation, naming the store. A configured URL keeps WEB-0078's rule.
+
+   > **Amended 2026-10-30.** A stored value the host cannot use no longer refuses the start; moving a place between
+   > environments must not need a database edit. A place set up in Development keeps `http://127.0.0.1:5220`
+   > legitimately, and the same data started in Production held a value this rule refuses, so the start failed with
+   > "Correct or clear the value it holds" — even when a configured URL would have won. Now `Load` does not hold such a
+   > value (http loopback outside Development, http on any other host, a value that no longer parses or carries a
+   > path): the base URL behaves as if nothing were accepted, so it derives from requests where the environment or
+   > `DerivesUntilAccepted` allows it and is refused at the point of need otherwise. With nothing configured Koan logs
+   > one warning naming the store, the value and why it is not used, and the derived `koan.web.baseurl` fact names it
+   > too; with a configured URL the value plays no part and nothing is logged. Koan never writes to the store; the
+   > application's next valid `Accept` replaces the value as usual. `Accept` refuses exactly what it refused. The
+   > atproto start-time check keeps its rule and sees nothing accepted: in Production without the posture it refuses
+   > the start as for an empty store, naming the base URL and the accept; with the posture the identity derives from
+   > the request. The guarantee above, "a stored value that is not a public origin refuses the start", is replaced by
+   > this.
 4. **An origin, not a path.** An accepted URL carries no path. The path base is mounted when the host starts
    (`UsePathBase`, the 404 guard, the boot-time resolution of relative provider endpoints in `AuthSchemeSeeder`), and
    moving it live would move every route, cookie path and relative link a browser already holds. A path is
@@ -221,6 +236,10 @@ accepted one is kept; Koan holds it, validates it and serves it.**
   it keeps WEB-0078's refusal in Production.
 - `WebModule` now registers and starts after `KoanDataCoreModule`, an order the module ids already produced.
 - `AtprotoAuthModule` gains a `Start` and runs after `WebModule`.
+- Amended 2026-10-30: a host whose store holds a value it cannot use now starts where it refused, with one warning;
+  no signature changes. An application in Production without the posture and with nothing configured then refuses
+  absolute URLs at the point of need, and with an eligible atproto provider still refuses the start, as with an empty
+  store.
 
 ## Evidence
 
@@ -278,3 +297,14 @@ accepted one is kept; Koan holds it, validates it and serves it.**
   holds a URL, it answers that URL whatever the host; with a configured URL the posture changes nothing and logs
   nothing; the warning comes once and names the posture, the store, Production, the accept that ends it and the key.
   Dropping the consent fails four of the seven.
+- Amended 2026-10-30. `UnusableStoredUrlSpec` (Koan.Web.WellKnown.Tests): in Production with the posture, a stored
+  `http://127.0.0.1:5220` starts, logs the warning once, leaves `Current` null and `Resolve` derives from the request,
+  and the fact names the value; without the posture the same store starts and `Resolve` refuses naming the key; with a
+  configured URL it starts with no warning from the base URL and the configured URL answers; in Development the same
+  value is held; after the start an accept replaces it in the store and the fact; a stored URL with a path is set aside
+  too. The store is never written at start. Restoring the start-time refusal fails five of the six; the Development
+  case is the guard. `AcceptedClientIdentity` (Koan.Web.Auth.Atproto.Tests): in Production without the posture that
+  stored value refuses the start with the empty-store correction, not the store's; with the posture the host starts,
+  derives, and a later accept names the client. Restoring the refusal fails both. The two `AcceptedBaseUrlSpec` cases
+  above in which a stored `http://localhost:5220` and a stored URL with a path refused the start are retired with the
+  refusal.

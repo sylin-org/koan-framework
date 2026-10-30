@@ -43,7 +43,10 @@ it always was. With nothing configured, the check passes when Koan derives the b
 URL from requests, and, when the application registers an `IApplicationUrlStore`,
 it waits for the store: `AtprotoAuthModule.Start` (after `WebModule`) runs it on the
 URL the store held, and an eligible provider with no identity it can publish refuses
-the start with the same correction.
+the start with the same correction. A stored value Koan.Web does not use here (http
+loopback kept from Development, started in Production) is nothing held: without
+`DerivesUntilAccepted` the start is refused as for an empty store, with it the
+identity derives from the request until the application accepts a URL.
 
 A stored session saved under another client identity — the application accepted a
 new URL since — is gone. Requests and `GetSessionMetadata` treat it as absent; a

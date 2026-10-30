@@ -123,7 +123,8 @@ public sealed class WebModule : KoanModule
     // WEB-0079: the key ring's folder is created, proved writable and loaded before the host serves, so a folder this
     // process cannot use is a corrective start failure rather than a failed first sign-in. WEB-0081: the accepted base
     // URL is read from the application's store before the host serves, inside the host's ambient scope so a store over
-    // an Entity reads this host's data; a stored value that is not a public origin refuses the start.
+    // an Entity reads this host's data; a stored value this host cannot use is set aside with one warning, never a
+    // refused start, so a place moved between environments starts as if nothing were accepted.
     public override async Task Start(IServiceProvider services, CancellationToken ct)
     {
         services.GetRequiredService<Hosting.KoanWebKeyRing>().Prepare();

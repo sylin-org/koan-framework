@@ -60,6 +60,41 @@ public sealed class TrustedProxiesSpec
         probe.Host.Should().Be(host.ListenUrl["http://".Length..]);
     }
 
+    // A compose file that passes ${PROXY:-} declares an empty entry. ASP.NET believes every peer when it knows no proxy
+    // and no network, so a blank entry must leave the posture exactly as an empty list does.
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("\t ")]
+    public async Task A_blank_declaration_declares_nothing_and_forwarded_headers_are_ignored(string blank)
+    {
+        await using var host = await ProxiedHost.Start(new Dictionary<string, string?>
+        {
+            ["Koan:Web:TrustedProxies:0"] = blank,
+            ["Koan:Web:TrustedProxies:1"] = " ",
+        });
+
+        var probe = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-Host", "evil.example"), ("X-Forwarded-For", "203.0.113.9"));
+        probe.Scheme.Should().Be("http");
+        probe.Remote.Should().Be("127.0.0.1");
+        probe.Host.Should().Be(host.ListenUrl["http://".Length..]);
+    }
+
+    [Fact]
+    public async Task A_blank_entry_beside_a_declared_proxy_leaves_that_proxy_believed()
+    {
+        await using var host = await ProxiedHost.Start(new Dictionary<string, string?>
+        {
+            ["Koan:Web:TrustedProxies:0"] = "",
+            ["Koan:Web:TrustedProxies:1"] = "127.0.0.1",
+        });
+
+        var probe = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-Host", "tangent.example.org"), ("X-Forwarded-For", "203.0.113.9"));
+        probe.Scheme.Should().Be("https");
+        probe.Host.Should().Be("tangent.example.org");
+        probe.Remote.Should().Be("203.0.113.9");
+    }
+
     [Fact]
     public async Task A_declaration_that_does_not_cover_the_caller_is_not_believed()
     {
