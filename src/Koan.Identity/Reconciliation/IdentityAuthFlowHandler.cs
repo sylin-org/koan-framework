@@ -5,6 +5,7 @@ using Koan.Identity.Impersonation;
 using Koan.Identity.Management;
 using Koan.Identity.Roles;
 using Koan.Web.Auth.Contributors;
+using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Flow;
 
 namespace Koan.Identity.Reconciliation;
@@ -33,7 +34,7 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             var displayName = claims.FindFirst(ClaimTypes.Name)?.Value ?? claims.FindFirst("name")?.Value;
             var picture = claims.FindFirst("avatar")?.Value ?? claims.FindFirst("picture")?.Value;
             var email = claims.FindFirst(ClaimTypes.Email)?.Value ?? claims.FindFirst("email")?.Value;
-            var emailVerified = string.Equals(claims.FindFirst("email_verified")?.Value, "true", StringComparison.OrdinalIgnoreCase);
+            var emailVerified = string.Equals(claims.FindFirst(SignInProof.EmailVerifiedClaim)?.Value, "true", StringComparison.OrdinalIgnoreCase);
             var person = await reconciler.ReconcileAsync(
                 new IdentityClaims(subject, displayName, picture, email, emailVerified, ctx.Provider), ct).ConfigureAwait(false);
 

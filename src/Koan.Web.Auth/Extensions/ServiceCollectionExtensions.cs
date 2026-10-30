@@ -176,6 +176,7 @@ internal static class ServiceCollectionExtensions
                         if (dispatcher is null) return;
 
                         var provider = ResolveProviderFromPath(ctx.HttpContext.Request.Path.Value);
+                        ProviderClaimPolicy.Apply(identity, provider, ctx.HttpContext.RequestServices.GetService<AuthProviderPlan>());
                         var signInCtx = new AuthSignInContext
                         {
                             Provider = provider,

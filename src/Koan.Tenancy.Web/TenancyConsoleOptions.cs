@@ -52,8 +52,10 @@ public sealed class ConsoleExposureOptions
 /// break-glass) or a principal carrying <see cref="Role"/> is admitted. Empty list + no role claim = nobody (fail-closed).</summary>
 public sealed class ConsoleGrantOptions
 {
-    /// <summary>Break-glass operator identities (email / <c>sub</c> / name) admitted even in prod-closed posture. By
-    /// identity, NOT request-shape — a host config grant, never derived from a tenant membership ("no master backdoor").</summary>
+    /// <summary>Break-glass operator identities admitted even in prod-closed posture, each a provider-qualified subject
+    /// (<c>google:1234</c>, <c>atproto:did:plc:abc</c>) or an email the provider verified. A display name, an unverified
+    /// email and a bare subject never match. By identity, NOT request-shape — a host config grant, never derived from a
+    /// tenant membership ("no master backdoor").</summary>
     public string[] Operators { get; set; } = Array.Empty<string>();
 
     /// <summary>The role claim that admits (e.g. projected from a Koan.Identity server role, or any auth scheme).</summary>

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+using Koan.Web.Auth.Domain;
 
 namespace Koan.Tenancy.Web.Authorization;
 
@@ -18,7 +19,8 @@ namespace Koan.Tenancy.Web.Authorization;
 /// console.</item>
 /// <item><b>Closed (Production)</b> — admit an authenticated principal that either carries the grant
 /// <see cref="ConsoleGrantOptions.Role"/> (e.g. projected from a Koan.Identity server role) <b>or</b> whose
-/// identity is in the break-glass <see cref="ConsoleGrantOptions.Operators"/> allow-list. Both are keyed on
+/// provider-qualified subject or verified email is in the break-glass <see cref="ConsoleGrantOptions.Operators"/>
+/// allow-list. A display name, an unverified email and a bare subject prove nothing and open nothing. Both are keyed on
 /// identity/role, never on the forgeable request-shape (that's the exposure layer's job); neither is derived from a
 /// tenant membership ("no master backdoor").</item>
 /// </list>
@@ -66,23 +68,9 @@ public sealed class OperatorAuthorizationHandler : AuthorizationHandler<Operator
     private static bool IsAllowListed(ClaimsPrincipal user, ConsoleGrantOptions grant)
     {
         if (grant.Operators is null || grant.Operators.Length == 0) return false;
-        foreach (var candidate in Identities(user))
-            if (grant.Operators.Contains(candidate, StringComparer.OrdinalIgnoreCase))
-                return true;
-        return false;
-    }
-
-    private static System.Collections.Generic.IEnumerable<string> Identities(ClaimsPrincipal user)
-    {
-        string?[] raw =
-        {
-            user.Identity?.Name,
-            user.FindFirst("sub")?.Value,
-            user.FindFirst(ClaimTypes.NameIdentifier)?.Value,
-            user.FindFirst(ClaimTypes.Email)?.Value,
-            user.FindFirst("email")?.Value,
-        };
-        return raw.Where(v => !string.IsNullOrWhiteSpace(v))!.Cast<string>();
+        if (SignInProof.ProviderSubjectOf(user) is { } subject && grant.Operators.Contains(subject, StringComparer.Ordinal))
+            return true;
+        return SignInProof.VerifiedEmails(user).Any(email => grant.Operators.Contains(email, StringComparer.OrdinalIgnoreCase));
     }
 
     private bool IsLoopback()

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Data.Core;
 using Koan.Tenancy.Web.Authorization;
+using Koan.Web.Auth.Domain;
 using Koan.Tenancy.Web.Controllers;
 using Koan.Tenancy.Web.Services;
 using Koan.Tenancy.Web.Tests.Support;
@@ -151,14 +152,44 @@ public sealed class TenancyConsoleSpec
     }
 
     [Fact]
-    public async Task Operator_gate_accepts_a_configured_identity_only()
+    public async Task Operator_gate_accepts_a_provider_qualified_subject_only()
     {
-        var options = new TenancyConsoleOptions { Grant = { Operators = ["operator-1"] } };
-        var admitted = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "operator-1")], "test"));
-        var denied = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "other")], "test"));
+        var options = new TenancyConsoleOptions { Grant = { Operators = ["google:operator-1"] } };
+        var admitted = new ClaimsPrincipal(new ClaimsIdentity([new Claim(SignInProof.ProviderSubjectClaim, "google:operator-1")], "test"));
+        var otherProvider = new ClaimsPrincipal(new ClaimsIdentity([new Claim(SignInProof.ProviderSubjectClaim, "discord:operator-1")], "test"));
+        var bareSubject = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("sub", "google:operator-1"), new Claim(ClaimTypes.NameIdentifier, "google:operator-1")], "test"));
 
         (await Evaluate(TenancyPosture.Closed, admitted, options)).Should().BeTrue();
+        (await Evaluate(TenancyPosture.Closed, otherProvider, options)).Should().BeFalse();
+        (await Evaluate(TenancyPosture.Closed, bareSubject, options)).Should().BeFalse("a subject means nothing outside the provider that issued it");
+    }
+
+    /// <summary>Anyone can set their display name at Google or Discord to an operator's address.</summary>
+    [Fact]
+    public async Task A_display_name_equal_to_an_allow_listed_address_opens_nothing()
+    {
+        var options = new TenancyConsoleOptions { Grant = { Operators = ["ops@company.example"] } };
+        var named = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.NameIdentifier, "attacker"), new Claim(ClaimTypes.Name, "ops@company.example")], "test"));
+
+        named.Identity!.Name.Should().Be("ops@company.example");
+        (await Evaluate(TenancyPosture.Closed, named, options)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task An_allow_listed_email_opens_only_when_the_provider_verified_it()
+    {
+        var options = new TenancyConsoleOptions { Grant = { Operators = ["ops@company.example"] } };
+        var unverified = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Email, "ops@company.example")], "test"));
+        var denied = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim("email", "ops@company.example"), new Claim(SignInProof.EmailVerifiedClaim, "false")], "test"));
+        var verified = new ClaimsPrincipal(new ClaimsIdentity(
+            [new Claim(ClaimTypes.Email, "OPS@company.example"), new Claim(SignInProof.EmailVerifiedClaim, "true")], "test"));
+
+        (await Evaluate(TenancyPosture.Closed, unverified, options)).Should().BeFalse();
         (await Evaluate(TenancyPosture.Closed, denied, options)).Should().BeFalse();
+        (await Evaluate(TenancyPosture.Closed, verified, options)).Should().BeTrue();
     }
 
     [Fact]

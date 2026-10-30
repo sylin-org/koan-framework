@@ -10,13 +10,13 @@ public sealed class AuthLifecycleOptions
 
     /// <summary>
     /// Options for functional Web Auth's role-list lifecycle handler. The handler
-    /// reads an email-keyed JSON allow/revoke file at sign-in only. Empty
+    /// reads a verified-email-keyed JSON allow/revoke file at sign-in only. Empty
     /// <see cref="RoleListFileOptions.FilePath"/> disables the contributor (default).
     /// </summary>
     public RoleListFileOptions RoleListFile { get; set; } = new();
 
     /// <summary>
-    /// Email-keyed role list read from a JSON file at sign-in. Operations are explicit:
+    /// Verified-email-keyed role list read from a JSON file at sign-in. Operations are explicit:
     /// <c>allow</c> adds roles to the principal; <c>revoke</c> strips roles (runs after the rest
     /// of the contributor pipeline so it overrides upstream contributors). An email not present
     /// in either section is a no-op — removing from <c>allow</c> does not revoke.
@@ -29,7 +29,7 @@ public sealed class AuthLifecycleOptions
     ///   "revoke": { "ex-admin@example.com": ["admin"] }
     /// }
     /// </code>
-    /// Email lookup is case-insensitive against the principal's <see cref="System.Security.Claims.ClaimTypes.Email"/> claim.
+    /// Email lookup is case-insensitive against the emails the provider verified (<see cref="Domain.SignInProof.VerifiedEmails(System.Security.Claims.ClaimsIdentity)"/>).
     /// </remarks>
     public sealed class RoleListFileOptions
     {

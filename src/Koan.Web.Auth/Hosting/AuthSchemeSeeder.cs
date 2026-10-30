@@ -154,7 +154,7 @@ internal static class AuthSchemeSeeder
                     json = await resp.Content.ReadAsStringAsync(ctx.HttpContext.RequestAborted);
                     user = JObject.Parse(json);
                 }
-                ApplyClaims(ctx.Identity!, user);
+                ApplyClaims(ctx.Identity!, user, cfg);
                 await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
             },
             // WEB-0080: when the application names a failure landing, a sign-in that cannot complete lands there with a
@@ -244,7 +244,7 @@ internal static class AuthSchemeSeeder
                 if (ctx.Principal?.Identity is not ClaimsIdentity identity) return;
                 var json = ctx.User.RootElement.GetRawText();
                 var user = JObject.Parse(json);
-                ApplyClaims(identity, user);
+                ApplyClaims(identity, user, cfg);
                 await LinkExternalIdentityAsync(ctx.HttpContext, ctx.Scheme.Name, user, json);
             },
             // WEB-0080: the same failure landing as the OAuth2 handler.
@@ -263,10 +263,12 @@ internal static class AuthSchemeSeeder
     }
 
     /// <summary>
-    /// Port of <see cref="UserInfoMapper"/> + the sub/name/avatar mapping the hand-rolled callback did.
+    /// The sub/name/avatar mapping every provider gets, whether it verified its email, and, only where the provider opts
+    /// in, its roles, permissions and extra claims (<see cref="UserInfoMapper"/>). An extra claim never takes a type Koan
+    /// reads as its own (<c>koan*</c>); <see cref="ProviderClaimPolicy"/> then strips reserved roles at the cookie.
     /// Fail-closed: a missing identifier does NOT mint a synthetic "user" id (that collapsed anonymous logins).
     /// </summary>
-    private static void ApplyClaims(ClaimsIdentity identity, JObject user)
+    private static void ApplyClaims(ClaimsIdentity identity, JObject user, ProviderOptions cfg)
     {
         var sub = (string?)user["sub"] ?? (string?)user["id"];
         var name = (string?)user["name"] ?? (string?)user["username"];
@@ -285,13 +287,23 @@ internal static class AuthSchemeSeeder
         if (!string.IsNullOrWhiteSpace(avatar) && !identity.HasClaim(c => c.Type == "avatar"))
             identity.AddClaim(new Claim("avatar", avatar));
 
+        // Userinfo is the provider's latest word on its email, and id_token claims arrived before it.
+        if (user[SignInProof.EmailVerifiedClaim] is JValue verified)
+        {
+            foreach (var stale in identity.FindAll(SignInProof.EmailVerifiedClaim).ToArray()) identity.TryRemoveClaim(stale);
+            if (string.Equals(verified.ToString(), "true", StringComparison.OrdinalIgnoreCase))
+                identity.AddClaim(new Claim(SignInProof.EmailVerifiedClaim, "true"));
+        }
+
+        if (cfg.MapRolesAndClaims != true) return;
         var (roles, perms, extras) = UserInfoMapper.Map(user);
         foreach (var r in roles)
             if (!identity.HasClaim(ClaimTypes.Role, r)) identity.AddClaim(new Claim(ClaimTypes.Role, r));
         foreach (var p in perms)
             if (!identity.HasClaim(ExtraClaimPermission, p)) identity.AddClaim(new Claim(ExtraClaimPermission, p));
         foreach (var kv in extras)
-            if (!identity.HasClaim(kv.Key, kv.Value)) identity.AddClaim(new Claim(kv.Key, kv.Value));
+            if (!kv.Key.StartsWith("koan", StringComparison.OrdinalIgnoreCase) && !identity.HasClaim(kv.Key, kv.Value))
+                identity.AddClaim(new Claim(kv.Key, kv.Value));
     }
 
     /// <summary>Persist the external-identity link before sign-in completes; any failure rejects the authentication flow.</summary>

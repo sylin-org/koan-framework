@@ -3,16 +3,16 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Koan.Web.Auth.Domain;
 using Koan.Web.Auth.Flow;
 using Koan.Web.Auth.Options;
 
 namespace Koan.Web.Auth.Contributors.Builtin;
 
 /// <summary>
-/// Built-in <see cref="IKoanAuthFlowHandler"/> that applies an email-keyed allow/revoke role
-/// list (loaded from a JSON file on disk) to the principal during sign-in. Replaces the previous
-/// per-request <c>RoleListContributor</c> in the Roles module — semantics are unchanged for the
-/// file shape; what changed is the trigger (sign-in event rather than every claims transformation).
+/// Built-in <see cref="IKoanAuthFlowHandler"/> that applies an allow/revoke role list (loaded from a JSON
+/// file on disk) to the principal during sign-in, keyed on the email the provider verified: an address a
+/// person merely typed into their profile opens nothing.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,7 +22,7 @@ namespace Koan.Web.Auth.Contributors.Builtin;
 /// </para>
 /// <para>
 /// Empty <c>FilePath</c> disables the contributor (default). Missing file, parse errors, and
-/// missing email claims are soft failures — they log a warning and contribute nothing.
+/// a missing or unverified email are soft failures — they contribute nothing.
 /// </para>
 /// <para>
 /// Singleton-like caching: the parsed file is cached by mtime + size, re-stat'd at the configured
@@ -62,14 +62,10 @@ public sealed class RoleListFileContributor : IKoanAuthFlowHandler
             var file = GetFile(path, cfg!.PollInterval);
             if (file.Allow.Count == 0 && file.Revoke.Count == 0) return Task.CompletedTask;
 
-            // Email is the lookup key. We read it from the identity being signed in — this is the
-            // post-mapping identity, so it reflects whatever upstream contributors stamped, plus
-            // the email claim that the OAuth provider asserted.
-            foreach (var c in ctx.Identity.FindAll(ClaimTypes.Email))
+            // The verified email is the lookup key: without the provider's word that the address is the person's, the
+            // address is only what they typed.
+            foreach (var email in SignInProof.VerifiedEmails(ctx.Identity))
             {
-                var email = c.Value;
-                if (string.IsNullOrWhiteSpace(email)) continue;
-
                 if (file.Allow.TryGetValue(email, out var grants) && grants is not null)
                 {
                     foreach (var role in grants)

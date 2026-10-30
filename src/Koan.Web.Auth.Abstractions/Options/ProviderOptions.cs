@@ -9,6 +9,13 @@ public sealed class ProviderOptions
     public bool Enabled { get; init; } = true;
     public int? Priority { get; init; }
 
+    /// <summary>
+    /// Whether this provider's <c>roles</c>, <c>permissions</c> and <c>claims</c> become claims on the person's cookie.
+    /// Off unless opted in: at most providers a person controls their own profile, and only an operator knows that this
+    /// one's roles mean something here. Koan's reserved <c>koan:*</c> roles are stripped either way.
+    /// </summary>
+    public bool? MapRolesAndClaims { get; init; }
+
     // OIDC
     public string? Authority { get; init; }
     public string? ClientId { get; init; }
@@ -33,6 +40,7 @@ public sealed class ProviderOptions
         Icon = overlay.Icon ?? baseline.Icon,
         Enabled = overlay.Enabled && baseline.Enabled,
         Priority = overlay.Priority ?? baseline.Priority,
+        MapRolesAndClaims = overlay.MapRolesAndClaims ?? baseline.MapRolesAndClaims,
         Authority = overlay.Authority ?? baseline.Authority,
         ClientId = overlay.ClientId ?? baseline.ClientId,
         ClientSecret = overlay.ClientSecret ?? baseline.ClientSecret,

@@ -128,7 +128,9 @@ public sealed class TestAuthModule : KoanModule
                 ClientId = options.ClientId,
                 ClientSecret = options.ClientSecret,
                 Scopes = isOidc ? ["openid", "profile", "email"] : ["identify", "email"],
-                Priority = isOidc ? 26 : 25
+                Priority = isOidc ? 26 : 25,
+                // The simulator's roles are what a developer asked to sign in with.
+                MapRolesAndClaims = true,
             },
             Automatic: active,
             Available: active,
