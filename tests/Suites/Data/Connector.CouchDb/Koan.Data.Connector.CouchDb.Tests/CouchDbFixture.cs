@@ -35,7 +35,7 @@ public sealed class CouchDbFixture : KoanContainerFixture
 
         await _container.StartAsync().ConfigureAwait(false);
         var port = _container.GetMappedPublicPort(5984);
-        return $"http://localhost:{port}";
+        return $"http://127.0.0.1:{port}";
     }
 
     protected override ValueTask StopContainerAsync()

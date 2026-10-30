@@ -30,7 +30,8 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
         AllOf all => Join("AND", all.Operands, context),
         AnyOf any when any.Operands.Count == 0 => "FALSE",
         AnyOf any => Join("OR", any.Operands, context),
-        Not not => $"NOT ({Filter(not.Operand, context)})",
+        // N1QL's NOT over a null comparison stays null, and the oracle's Not is the plain complement.
+        Not not => $"NOT IFMISSINGORNULL({Filter(not.Operand, context)}, FALSE)",
         FieldFilter field => Field(field, context),
         ClrFilter => throw new NotSupportedException("Couchbase received a CLR-only residual filter for native execution."),
         _ => throw new NotSupportedException($"Couchbase does not support filter node '{filter.GetType().Name}'.")
@@ -45,6 +46,25 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
         for (var index = 0; index < values.Count; index++)
             translated[index] = Filter(values[index], context);
         return "(" + string.Join($" {operation} ", translated) + ")";
+    }
+
+    // A null member matches a null or missing value, and Nin is the complement of In. N1QL's IN never matches null, so null
+    // is split out.
+    private static string Membership(string path, object?[] values, bool negate, ParameterContext context)
+    {
+        var members = values.Where(static value => value is not null).ToArray();
+        var holdsNull = members.Length != values.Length;
+        if (members.Length == 0)
+            return values.Length == 0
+                ? negate ? "TRUE" : "FALSE"
+                : negate ? $"{path} IS VALUED" : $"{path} IS NOT VALUED";
+        if (!negate)
+            return holdsNull
+                ? $"({path} IS NOT VALUED OR {path} IN {context.Add(members)})"
+                : $"{path} IN {context.Add(members)}";
+        return holdsNull
+            ? $"({path} IS VALUED AND {path} NOT IN {context.Add(members)})"
+            : $"({path} IS NOT VALUED OR {path} NOT IN {context.Add(members)})";
     }
 
     private string Field(FieldFilter filter, ParameterContext context)
@@ -75,16 +95,15 @@ internal sealed class CouchbaseQueryCompiler<TEntity, TKey>(CouchbaseDocumentPla
         }
         return filter.Operator switch
         {
-            FilterOperator.Eq when values[0] is null => $"{path} IS NULL",
+            FilterOperator.Eq when values[0] is null => $"{path} IS NOT VALUED",
             FilterOperator.Eq => $"{path} = {context.Add(values[0])}",
-            FilterOperator.Ne when values[0] is null => $"{path} IS NOT NULL",
-            FilterOperator.Ne => $"({path} IS NULL OR {path} != {context.Add(values[0])})",
+            FilterOperator.Ne when values[0] is null => $"{path} IS VALUED",
+            FilterOperator.Ne => $"({path} IS NOT VALUED OR {path} != {context.Add(values[0])})",
             FilterOperator.Gt => $"{path} > {context.Add(values[0])}",
             FilterOperator.Gte => $"{path} >= {context.Add(values[0])}",
             FilterOperator.Lt => $"{path} < {context.Add(values[0])}",
             FilterOperator.Lte => $"{path} <= {context.Add(values[0])}",
-            FilterOperator.In => $"{path} IN {context.Add(values)}",
-            FilterOperator.Nin => $"({path} IS NULL OR {path} NOT IN {context.Add(values)})",
+            FilterOperator.In or FilterOperator.Nin => Membership(path, values, filter.Operator == FilterOperator.Nin, context),
             FilterOperator.StartsWith => $"{path} LIKE {context.Add(Escape(values[0]) + "%")}",
             FilterOperator.EndsWith => $"{path} LIKE {context.Add("%" + Escape(values[0]))}",
             FilterOperator.Contains => $"{path} LIKE {context.Add("%" + Escape(values[0]) + "%")}",

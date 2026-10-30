@@ -20,7 +20,7 @@ public sealed class CouchDbDiscoveryHealthSpec(CouchDbFixture fixture, ITestOutp
     {
         RequireBackingStore();
         var http = new Uri(Fixture.ConnectionString);
-        var uri = $"couchdb://koan:koan@localhost:{http.Port}";
+        var uri = $"couchdb://koan:koan@{http.Host}:{http.Port}";
 
         using var client = new CouchDbClient(uri, userId: null, password: null);
         var healthy = await client.PingAsync(CancellationToken.None);
@@ -33,7 +33,7 @@ public sealed class CouchDbDiscoveryHealthSpec(CouchDbFixture fixture, ITestOutp
     {
         RequireBackingStore();
         var http = new Uri(Fixture.ConnectionString);
-        var uri = $"couchdb://localhost:{http.Port}";
+        var uri = $"couchdb://{http.Host}:{http.Port}";
 
         using var client = new CouchDbClient(uri, userId: null, password: null);
         var healthy = await client.PingAsync(CancellationToken.None);

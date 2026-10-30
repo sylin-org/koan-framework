@@ -22,7 +22,7 @@ internal sealed class CouchDbQueryCompiler<TEntity, TKey>(string identityName)
     {
         null => JValue.CreateNull(),
         JToken token => token,
-        _ => JToken.FromObject(value, Newtonsoft.Json.JsonSerializer.Create(new Newtonsoft.Json.JsonSerializerSettings
+        _ => JToken.FromObject(ComparableScalarEncoding.EncodeComparand(value)!, Newtonsoft.Json.JsonSerializer.Create(new Newtonsoft.Json.JsonSerializerSettings
         {
             DateParseHandling = Newtonsoft.Json.DateParseHandling.None
         }))
