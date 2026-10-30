@@ -110,8 +110,8 @@ JobSubmission streamed = await SendDigest.QueryStream(item => item.Ready).Submit
 
 Submit writes a new work item and never overwrites a stored one; when the handler returns, only the
 members it changed are written back, onto the item as it is stored then, so a write another writer made
-while the job ran survives. A member both changed is a conflict: the job runs again on the stored item
-without spending an attempt, up to `JobsOptions.MaxWriteConflicts` times (JOBS-0010).
+while the job ran survives. A member both changed is a conflict: nothing is written, and the attempt fails, so
+the job retries on the stored item (JOBS-0010).
 
 A collection submission reports confirmed ledger acceptance, not execution. It is ordered,
 sequentially backpressured, and not collection-atomic. Streaming bounds producer memory, not ledger

@@ -6,7 +6,7 @@ amended_by: JOBS-0008, JOBS-0010
 > **Amended by [JOBS-0010](JOBS-0010-jobs-never-starve-and-never-lose-an-update.md) (2026-10-30):** the worker runs
 > each duty on its own timer and owns its executions as background tasks (§7); `@continuous` re-arms only after its
 > previous run settles (§6); submit never overwrites a stored work item and settle writes only the properties the
-> handler changed, onto the row as stored, by a guarded replace (§17.1); retention, claims and queries read bounded
+> handler changed, onto the row as stored (§17.1); retention, claims and queries read bounded
 > pages (§19.3); the in-memory tier keeps a bounded history of settled jobs (§8).
 **Date**: 2026-06-04
 **Deciders**: Enterprise Architect

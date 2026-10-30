@@ -132,24 +132,18 @@ Inspect `jobs:dispatch` alongside `jobs:ledger` through `/.well-known/Koan/facts
 - Execution is at-least-once; handlers must be idempotent.
 - The in-memory tier is development/test convenience, not durability. It keeps settled jobs only up to
   `JobsOptions.InMemoryTerminalCapacity` (4096), evicting the one that settled first. A `JobHandle` waiting on a
-  job still hears its outcome when it settles; one that asks after the job was evicted gets `JobOutcome.Unknown`,
+  job still hears its outcome when it settles; one that asks after the job was evicted gets an outcome with no status,
   never a failure.
-- `JobHandle.Completion` returns `JobOutcome.Settled`, `JobOutcome.TimedOut` (with the status reached) or
-  `JobOutcome.Unknown`. A handle on a submission coalesced into another job reports that job's outcome and names it
-  in `ServedBy`.
+- `JobHandle.Completion` returns a `JobOutcome`: the terminal status and last error when the job settled in time, the
+  status it reached when the wait ended first, and no status when nobody can read its outcome any more.
 - Submit never overwrites a stored work item; save your changes before you submit them. Settle writes back
   only the members the handler changed — every member Koan persists, non-public setters included — onto the
-  item as stored then, guarded by every member the store can compare exactly; one it cannot, such as a list of
-  two or more elements, is named in the log. A member another writer changed to a different value meanwhile is a
-  conflict: the job
-  runs again on the stored item without spending an attempt or advancing its chain, up to
-  `JobsOptions.MaxWriteConflicts` (5) times, and is then dead-lettered as `DeadReason.Conflict` (JOBS-0010).
-- A `[JobIdempotent]` key never runs twice at once, and coalescing never crosses work items: duplicate submissions
-  of one item coalesce onto its queued job, concurrent ones included, while another item with the same properties gets
-  its own job; a duplicate never runs ahead of a deferral, and the key's next run serves every job of the key queued
-  before it. A submission inside a transaction coalesces
-  onto a committed job or one the same transaction made. Two transactions that submit one key at once both commit
-  a job, and the first claim absorbs the other, so the key still runs once.
+  item as stored then. A member another writer changed to a different value meanwhile is a conflict: nothing is
+  written and the attempt fails, so the job retries on the stored item (JOBS-0010).
+- Coalescing never crosses work items: duplicate submissions of one item coalesce onto its queued job, concurrent ones
+  and one waiting out a retry or a deferral included, while another item with the same properties gets its own job. A
+  submission inside a transaction coalesces onto a committed job or one the same transaction made. It saves work
+  without promising a single run: two transactions that submit one key at once each commit a job.
 - `[JobPersistence(JobPersistenceMode.DataStore)]` fails host composition when no durable Data adapter is available;
   Koan never silently weakens that declared requirement to in-memory execution.
 - Durable SQLite behavior does not prove every distributed provider or topology.
