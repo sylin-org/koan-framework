@@ -15,7 +15,9 @@ namespace Koan.Identity.Reconciliation;
 /// discovered <see cref="IKoanAuthFlowHandler"/>; this one runs late (after identity-mapping) and (P0) upserts the
 /// durable <see cref="Identity"/> from the baked claims, then (P1) records a device <see cref="Session"/> and
 /// stamps its id on the cookie so revocation is enforceable. <c>OnValidatePrincipal</c> rejects a principal whose
-/// session was revoked or whose person is no longer active; <c>OnSignOut</c> revokes the session.
+/// session was revoked or whose person is no longer active, and projects the roles the person holds now from their
+/// compiled bag onto the request's principal. The cookie carries none of them, so a role removed stops authorizing
+/// the next request and a role granted starts. <c>OnSignOut</c> revokes the session.
 /// </summary>
 public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
 {
@@ -48,17 +50,6 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             }
         }
 
-        // Project role/group membership tokens from the compiled bag onto the standard role-claim surface.
-        if (ctx.Services.GetService<RoleCollection>() is { } roles)
-        {
-            var bag = await roles.Bag(subject, true, ct).ConfigureAwait(false);
-            foreach (var roleKey in bag.Tokens.Where(token => token != RoleTokens.Everyone
-                                                             && token != RoleTokens.Authenticated
-                                                             && !token.StartsWith(RoleTokens.GlobalPrefix, StringComparison.Ordinal)))
-                if (!ctx.Identity.HasClaim(ClaimTypes.Role, roleKey))
-                    ctx.Identity.AddClaim(new Claim(ClaimTypes.Role, roleKey));
-        }
-
         // Record a durable device session and stamp its id on the cookie so "sign out everywhere-else" can revoke
         // this specific session and OnValidatePrincipal can enforce it.
         var ua = ctx.HttpContext.Request.Headers.UserAgent.ToString();
@@ -86,8 +77,35 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             var impersonation = ctx.Services.GetService<ImpersonationService>();
             if (actor is not null && target is not null && impersonation is not null
                 && !await impersonation.IsActiveAsync(actor, target, ct).ConfigureAwait(false))
+            {
                 ctx.Inner.RejectPrincipal();
+                return;
+            }
         }
+
+        await ProjectRoles(ctx, principal, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The roles the person holds now, on a carrier identity of this request's principal. The cookie handler refreshes a
+    /// sliding cookie from the ticket it read, not from this principal, so nothing here reaches the cookie. A warm bag
+    /// is a cache read with no lock.
+    /// </summary>
+    private static async Task ProjectRoles(AuthValidatePrincipalContext ctx, ClaimsPrincipal principal, CancellationToken ct)
+    {
+        var subject = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? principal.FindFirst("sub")?.Value;
+        if (string.IsNullOrEmpty(subject) || ctx.Services.GetService<RoleCollection>() is not { } roles) return;
+
+        var bag = await roles.Bag(subject, true, ct).ConfigureAwait(false);
+        var held = bag.Roles
+            .Where(role => role != RoleTokens.Everyone && role != RoleTokens.Authenticated && !principal.IsInRole(role))
+            .Select(static role => new Claim(ClaimTypes.Role, role))
+            .ToArray();
+        if (held.Length == 0) return;
+
+        var current = new ClaimsPrincipal(principal.Identities);
+        current.AddIdentity(new ClaimsIdentity(held));
+        ctx.Inner.ReplacePrincipal(current);
     }
 
     public async Task OnSignOut(AuthSignOutContext ctx, CancellationToken ct)

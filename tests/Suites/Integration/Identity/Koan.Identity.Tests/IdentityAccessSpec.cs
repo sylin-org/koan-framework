@@ -8,6 +8,8 @@ using Koan.Tenancy;
 using Koan.Web.Auth.Contributors;
 using Koan.Web.Auth.Flow;
 using Koan.Web.Authorization;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -146,7 +148,7 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Global_role_is_stamped_onto_the_sign_in_principal_so_production_honors_it()
+    public async Task Global_role_is_projected_onto_each_request_so_production_honors_it_and_the_cookie_freezes_nothing()
     {
         const string id = "global-role-user";
         await new Identity { Id = id, DisplayName = "GR" }.Save();
@@ -164,8 +166,19 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
         };
         await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchSignIn(ctx, default);
 
-        ci.HasClaim(ClaimTypes.Role, "koan:admin").Should()
-            .BeTrue("a global IdentityRole must be stamped onto the cookie so the authorize floor actually honors it");
+        ci.HasClaim(ClaimTypes.Role, "koan:admin").Should().BeFalse("the cookie carries no role to go stale");
+
+        var request = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        var validated = new CookieValidatePrincipalContext(
+            request,
+            new AuthenticationScheme("test", null, typeof(CookieAuthenticationHandler)),
+            new CookieAuthenticationOptions(),
+            new AuthenticationTicket(new ClaimsPrincipal(ci), "test"));
+        await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchValidatePrincipal(
+            new AuthValidatePrincipalContext { Inner = validated, Services = scope.ServiceProvider }, default);
+
+        validated.Principal!.IsInRole("koan:admin").Should()
+            .BeTrue("a global role reaches each request's principal, so the authorize floor actually honors it");
     }
 
     [Fact]

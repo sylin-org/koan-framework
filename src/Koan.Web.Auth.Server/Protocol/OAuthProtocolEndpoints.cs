@@ -5,6 +5,7 @@ using Koan.Security.Trust.Issuer;
 using Koan.Web.Auth.Extensions;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Auth.Server.Options;
+using Koan.Web.Auth.Standing;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -298,6 +299,8 @@ internal static class OAuthProtocolEndpoints
             return;
         }
 
+        if (await Current(ctx, new GrantedIdentity(code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes)) is not { } id) return;
+
         // D4 single-use — atomic claim: delete-by-id is atomic on every adapter, so exactly one of any concurrent
         // redemptions wins (no read-check-write double-spend). The loser sees the row already gone.
         if (!await code.Remove(ctx.RequestAborted))
@@ -306,7 +309,6 @@ internal static class OAuthProtocolEndpoints
             return;
         }
 
-        var id = new GrantedIdentity(code.Subject, code.SubjectName, code.SubjectEmail, code.Roles, code.GrantedScopes);
         var grantId = await IssueGrant(options, id, code.ClientId, code.Resource, consented: !code.Remembered, now, ctx.RequestAborted);
         await IssueTokens(ctx, options, id, code.ClientId, code.Resource, OpaqueToken.New(), grantId, now);
     }
@@ -366,6 +368,8 @@ internal static class OAuthProtocolEndpoints
                 return;
         }
 
+        if (await Current(ctx, new GrantedIdentity(device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes)) is not { } id) return;
+
         // Single-use — atomic claim (delete-by-id), so concurrent polls of an approved device can't double-issue.
         if (!await device.Remove(ctx.RequestAborted))
         {
@@ -373,7 +377,6 @@ internal static class OAuthProtocolEndpoints
             return;
         }
 
-        var id = new GrantedIdentity(device.Subject ?? "", device.SubjectName, device.SubjectEmail, device.Roles, device.GrantedScopes);
         var grantId = await IssueGrant(options, id, device.ClientId, device.Resource, consented: true, now, ctx.RequestAborted);
         await IssueTokens(ctx, options, id, device.ClientId, device.Resource, OpaqueToken.New(), grantId, now);
     }
@@ -414,10 +417,13 @@ internal static class OAuthProtocolEndpoints
             return;
         }
 
+        // Before rotation: a refused token is not spent, so an agent refused while its person is timed out resumes when the
+        // time-out ends, and a store that cannot answer costs the client nothing.
+        if (await Current(ctx, new GrantedIdentity(rt.Subject, rt.SubjectName, rt.SubjectEmail, rt.Roles, rt.GrantedScopes)) is not { } id) return;
+
         rt.Rotated = true; // rotate — this token is now spent
         await rt.Save(ctx.RequestAborted);
 
-        var id = new GrantedIdentity(rt.Subject, rt.SubjectName, rt.SubjectEmail, rt.Roles, rt.GrantedScopes);
         await IssueTokens(ctx, options, id, rt.ClientId, rt.Resource, rt.FamilyId, rt.GrantId, now);
     }
 
@@ -436,6 +442,29 @@ internal static class OAuthProtocolEndpoints
     }
 
     private sealed record GrantedIdentity(string Subject, string? Name, string? Email, List<string> Roles, List<string> Scopes);
+
+    /// <summary>
+    /// Who a token is minted for now, not when they approved: the subject's standing replaces what was captured then, and
+    /// what no contributor speaks to stands as captured (a host with no owner of its people has only the approval). A
+    /// subject who may not act gets no token: writes <c>invalid_grant</c> and answers null. The reason stays the
+    /// application's; a client learns only that the grant no longer works.
+    /// </summary>
+    private static async Task<GrantedIdentity?> Current(HttpContext ctx, GrantedIdentity captured)
+    {
+        var standing = await ctx.RequestServices.GetRequiredService<SubjectStandings>().Of(captured.Subject, ctx.RequestAborted);
+        if (standing is null) return captured;
+        if (!standing.Active)
+        {
+            await JsonError(ctx, StatusCodes.Status400BadRequest, "invalid_grant", "The grant is no longer valid.");
+            return null;
+        }
+
+        return captured with
+        {
+            Name = standing.Name ?? captured.Name,
+            Roles = standing.Roles is { } roles ? [.. roles.Order(StringComparer.Ordinal)] : captured.Roles,
+        };
+    }
 
     private static async Task IssueTokens(HttpContext ctx, AuthServerOptions options, GrantedIdentity id,
         string clientId, string resource, string familyId, string grantId, DateTimeOffset now)

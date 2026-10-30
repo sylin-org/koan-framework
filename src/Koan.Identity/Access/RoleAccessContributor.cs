@@ -6,8 +6,8 @@ namespace Koan.Identity.Access;
 /// Contributes the person's server roles and their global permissions to the administrative access view: the roles
 /// they are members of, as role facts whose row is the <see cref="RoleMember"/> a revoke removes, and the permissions of
 /// the implicit <c>everyone</c> and <c>authenticated</c> roles, which reach every person's bag without a membership. The
-/// implicit roles are never role facts: a sign-in stamps no role claim for them, so a principal simulated from these
-/// facts carries the role claims a real sign-in carries.
+/// implicit roles are never role facts: a request projects no role claim for them, so a principal simulated from these
+/// facts carries the role claims a real request carries.
 /// </summary>
 internal sealed class RoleAccessContributor(RoleCollection roles) : IEffectiveAccessContributor
 {

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Koan.Identity.Revocation.Tests</AssemblyName>
+    <RootNamespace>Koan.Identity.Revocation.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../src/Koan.Core/Koan.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Data.Core/Koan.Data.Core.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Identity/Koan.Identity.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Web/Koan.Web.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Web.Auth/Koan.Web.Auth.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Web.Auth.Server/Koan.Web.Auth.Server.csproj" />
+    <ProjectReference Include="../../../../../src/Koan.Security.Trust/Koan.Security.Trust.csproj" />
+    <ProjectReference Include="../../../../../src/Connectors/Data/InMemory/Koan.Data.Connector.InMemory.csproj" />
+  </ItemGroup>
+</Project>

@@ -11,7 +11,9 @@ namespace Koan.Identity.Management;
 /// <summary>
 /// SEC-0007 Layer 1 — operator lifecycle ops: bulk suspend / reactivate (suspend ≠ delete; partial-failure
 /// tolerant; one audit batch row records the operation intent) and lifecycle-aware delete (detect dependents →
-/// cascade, so a dependent never raises a raw FK error).
+/// cascade, so a dependent never raises a raw FK error). Suspending also removes the person's client grants, after
+/// the status that already refuses their refresh; a person whose grants could not all be removed reads as failed, and
+/// suspending them again finishes it.
 /// </summary>
 public sealed class IdentityLifecycleService
 {
@@ -66,6 +68,7 @@ public sealed class IdentityLifecycleService
                 if (person is null) { failed.Add(id); continue; }
                 person.Status = status;
                 await person.Save(ct).ConfigureAwait(false);
+                if (status != IdentityStatus.Active) await ClientApprovals.Revoke(id, ct).ConfigureAwait(false);
                 succeeded.Add(id);
             }
             catch

@@ -7,12 +7,13 @@ namespace Koan.Identity.Tenancy.Deprovisioning;
 
 /// <summary>
 /// One lifecycle chokepoint for closing a person's tenant access. A full <see cref="DeactivateAsync"/> first sets
-/// <c>Identity.Status = Deactivated</c>, then revokes Koan cookie sessions and removes every tenant membership. The
+/// <c>Identity.Status = Deactivated</c>, then revokes Koan cookie sessions, removes their client grants and removes
+/// every tenant membership. The
 /// request-path bridge independently requires an active durable person and a current membership, so deactivation
 /// fails closed even if a later cleanup write fails. <see cref="RemoveFromTenantAsync"/> removes only one seat.
 /// <para>These are ordered, idempotent Entity writes, not a database transaction. A receipt is written only after the
-/// requested workflow completes and proves only the integrity of its recorded fields. Already-issued bearer tokens
-/// and non-tenant authorization remain owned by their issuer.</para>
+/// requested workflow completes and proves only the integrity of its recorded fields. An access token already issued
+/// lasts out its short lifetime, and non-tenant authorization remains owned by its issuer.</para>
 /// </summary>
 public sealed class DeprovisioningService
 {
@@ -20,7 +21,7 @@ public sealed class DeprovisioningService
 
     public DeprovisioningService(SessionService sessions) => _sessions = sessions;
 
-    /// <summary>Deactivate the person, revoke Koan cookie sessions, and remove all tenant seats. Idempotent.</summary>
+    /// <summary>Deactivate the person, revoke Koan cookie sessions and client grants, and remove all tenant seats. Idempotent.</summary>
     public async Task<DeprovisioningReceipt> DeactivateAsync(string identityId, CancellationToken ct = default)
     {
         var person = await Identity.Get(identityId, ct).ConfigureAwait(false);
@@ -33,6 +34,7 @@ public sealed class DeprovisioningService
         }
 
         var revoked = await _sessions.RevokeAllAsync(identityId, ct).ConfigureAwait(false);
+        await ClientApprovals.Revoke(identityId, ct).ConfigureAwait(false);
         var membershipsRemoved = await RemoveMembershipsAsync(identityId, tenantId: null, ct).ConfigureAwait(false);
 
         return await WriteReceiptAsync(new DeprovisioningReceipt
@@ -49,6 +51,7 @@ public sealed class DeprovisioningService
                 DeprovisioningSurfaces.TenantStorage,
                 DeprovisioningSurfaces.TenantCache,
                 DeprovisioningSurfaces.CookieSessions,
+                DeprovisioningSurfaces.ClientGrants,
             },
         }, ct).ConfigureAwait(false);
     }

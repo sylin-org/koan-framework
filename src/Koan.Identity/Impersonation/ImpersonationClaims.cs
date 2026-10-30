@@ -23,17 +23,14 @@ public static class ImpersonationClaims
 
     /// <summary>
     /// Build the impersonated identity: subject = <paramref name="targetSubject"/> (so the session acts as them),
-    /// plus an <see cref="ActorClaim"/> = <paramref name="actorSubject"/> and the target's effective roles. The
-    /// sub is the target's; the actor claim preserves attribution (never a God-mode sub-swap).
+    /// plus an <see cref="ActorClaim"/> = <paramref name="actorSubject"/>. The sub is the target's; the actor claim
+    /// preserves attribution (never a God-mode sub-swap). The target's roles are projected per request like anyone's.
     /// </summary>
-    public static ClaimsIdentity BuildImpersonatedIdentity(string targetSubject, string actorSubject, IEnumerable<string> targetRoles)
+    public static ClaimsIdentity BuildImpersonatedIdentity(string targetSubject, string actorSubject)
     {
         var identity = new ClaimsIdentity("impersonation");
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, targetSubject));
         identity.AddClaim(new Claim(ActorClaim, actorSubject));
-        foreach (var role in targetRoles)
-            if (!identity.HasClaim(ClaimTypes.Role, role))
-                identity.AddClaim(new Claim(ClaimTypes.Role, role));
         return identity;
     }
 }

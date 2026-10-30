@@ -19,6 +19,7 @@ internal static class IdentityErasureConstants
         public const string GlobalRoles = "global-roles";
         public const string PermissionOverwrites = "permission-overwrites";
         public const string ImpersonationGrants = "impersonation-grants";
+        public const string ClientGrants = "client-grants";
         public const string AuditEventsSanitized = "audit-events-sanitized";
         public const string ChainedEventsRehashed = "chained-events-rehashed";
     }

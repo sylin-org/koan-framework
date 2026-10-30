@@ -3,8 +3,10 @@ using AwesomeAssertions;
 using Koan.Data.Core;
 using Koan.Identity;
 using Koan.Identity.Tenancy;
+using Koan.Identity.Management;
 using Koan.Identity.Tenancy.Deprovisioning;
 using Koan.Tenancy;
+using Koan.Web.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -24,6 +26,63 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
 
     private static ClaimsPrincipal PrincipalFor(string subject)
         => new(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, subject) }, "test"));
+
+    private static Task<AgentGrant> Approval(string person, string client)
+        => new AgentGrant
+        {
+            Subject = person,
+            Capability = $"mcp:grant:{client}:scope",
+            Resource = "https://app.example/mcp",
+            ClientId = client,
+            IssuedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = DateTimeOffset.UtcNow.AddDays(30),
+        }.Save();
+
+    /// <summary>More approvals than one page, and a grant no client holds, which is not an approval.</summary>
+    [Fact]
+    public async Task Removing_a_persons_approvals_walks_every_page_and_leaves_what_is_not_an_approval()
+    {
+        using var tenant = Tenant.Use("approvals-tenant");
+        var person = $"approvals-{Guid.CreateVersion7():N}";
+        for (var i = 0; i < 230; i++) await Approval(person, $"client-{i}");
+        await Approval("someone-else-" + person, "client-0");
+        var jit = await new AgentGrant { Subject = person, Capability = "support:read", Resource = "*" }.Save();
+
+        (await AgentGrant.RemoveApprovals(person)).Should().Be(230);
+
+        (await AgentGrant.Query(g => g.Subject == person)).Should().ContainSingle().Which.Id.Should().Be(jit.Id);
+        (await AgentGrant.Approvals("someone-else-" + person, 10)).Should().ContainSingle();
+        (await AgentGrant.RemoveApprovals(person)).Should().Be(0, "removing again finds nothing");
+    }
+
+    [Fact]
+    public async Task Deactivating_a_person_removes_their_approvals()
+    {
+        var person = $"deactivated-{Guid.CreateVersion7():N}";
+        await new Identity { Id = person }.Save();
+        using var tenant = Tenant.Use("deactivated-tenant");
+        await Approval(person, "client-a");
+
+        await _fx.Services.GetRequiredService<DeprovisioningService>().DeactivateAsync(person);
+
+        (await AgentGrant.Approvals(person, 10)).Should().BeEmpty();
+    }
+
+    /// <summary>A grant is tenant-scoped. With Tenancy closed and no tenant in scope, none is reachable to remove, and closing the person still completes.</summary>
+    [Fact]
+    public async Task With_no_tenant_in_scope_there_are_no_approvals_to_reach()
+        => (await ClientApprovals.Revoke("a-person")).Should().Be(0);
+
+    [Fact]
+    public async Task A_store_that_cannot_answer_for_a_persons_approvals_surfaces()
+    {
+        var read = async () =>
+        {
+            using (EntityContext.Source("no-such-source")) await ClientApprovals.Revoke("a-person");
+        };
+
+        await read.Should().ThrowAsync<InvalidOperationException>("only the segmentation guard reads as none");
+    }
 
     [Fact]
     public async Task Deactivation_sets_status_revokes_sessions_and_makes_SessionGuard_reject()
@@ -47,6 +106,7 @@ public sealed class DeprovisioningSpec : IdentityHostScopedSpec
             DeprovisioningSurfaces.TenantStorage,
             DeprovisioningSurfaces.TenantCache,
             DeprovisioningSurfaces.CookieSessions,
+            DeprovisioningSurfaces.ClientGrants,
         });
         (await Membership.Query(m => m.IdentityId == "dp-user")).Should().BeEmpty();
 

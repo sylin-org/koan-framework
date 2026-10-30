@@ -21,6 +21,7 @@ namespace Koan.Web.Authorization;
 public sealed class AgentGrant : Entity<AgentGrant>
 {
     private const string SubjectExpiryIndex = "ix_agent_grants_subject_expiry";
+    private const int ApprovalRemovalPageSize = 100;
 
     /// <summary>The agent's subject id — the principal's <c>sub</c> (bearer) or <c>NameIdentifier</c> (cookie).</summary>
     [Index(Group = SubjectExpiryIndex, Order = 0)]
@@ -70,6 +71,31 @@ public sealed class AgentGrant : Entity<AgentGrant>
             .WithSort<AgentGrant>(sort => sort.OrderByDescending(g => g.IssuedAt))
             .WithPagination(1, take);
         return Query(g => g.Subject == subject && g.ExpiresAt > now && g.ClientId != null, newestFirst, ct);
+    }
+
+    /// <summary>
+    /// Removes every grant Koan's authorization server issued to a client for <paramref name="subject"/>, live or expired,
+    /// a page at a time; answers how many this call removed. Each removal runs as <c>Remove()</c> does, so each client asks
+    /// the person again before it is remembered. A grant issued any other way is left. Removing the grants is what ends
+    /// an agent's renewals for good; access it already holds lasts out its short lifetime.
+    /// </summary>
+    public static async Task<int> RemoveApprovals(string subject, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(subject);
+        var page = new QueryDefinition().WithPagination(1, ApprovalRemovalPageSize);
+        var removed = 0;
+        while (true)
+        {
+            var rows = await Query(g => g.Subject == subject && g.ClientId != null, page, ct);
+            var progress = 0;
+            foreach (var row in rows)
+                if (await row.Remove(ct)) progress++;
+            removed += progress;
+
+            // Removing shrinks the set, so the next read is the next page. A page that removed nothing ends the walk:
+            // it was empty, or another revocation of this person took those rows and is walking the rest.
+            if (progress == 0) return removed;
+        }
     }
 
     /// <summary>True when the grant has not expired as of <paramref name="now"/>.</summary>

@@ -14,4 +14,7 @@ public static class DeprovisioningSurfaces
 
     /// <summary>Durable Koan cookie sessions revoked and rechecked by Identity's request-path session guard.</summary>
     public const string CookieSessions = "cookie-sessions";
+
+    /// <summary>The person's client grants, whose refresh tokens stop minting access. Access a client already holds lasts out its short lifetime.</summary>
+    public const string ClientGrants = "client-grants";
 }

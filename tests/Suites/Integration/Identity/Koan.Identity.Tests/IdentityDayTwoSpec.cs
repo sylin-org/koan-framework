@@ -12,6 +12,7 @@ using Koan.Web.Auth.Flow;
 using Koan.Web.Authorization;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
@@ -58,7 +59,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
     [Fact]
     public void Impersonated_principal_carries_actor_not_a_sub_swap()
     {
-        var principal = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("the-target", "the-actor", new[] { "koan:reader" }));
+        var principal = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("the-target", "the-actor"));
 
         principal.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be("the-target", "the session acts as the target");
         ImpersonationClaims.IsImpersonating(principal).Should().BeTrue();
@@ -68,7 +69,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
     [Fact]
     public void Dangerous_verbs_are_blocked_while_impersonating_only()
     {
-        var impersonating = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("t", "a", Array.Empty<string>()));
+        var impersonating = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("t", "a"));
         var normal = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.NameIdentifier, "t") }, "x"));
 
         ImpersonationGuard.IsBlocked(impersonating, "identity.delete").Should().BeTrue();
@@ -79,7 +80,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
     [Fact]
     public void Banner_filter_advertises_active_impersonation()
     {
-        var http = new DefaultHttpContext { User = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("t", "the-actor", Array.Empty<string>())) };
+        var http = new DefaultHttpContext { User = new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity("t", "the-actor")) };
         var ctx = new ActionExecutingContext(
             new ActionContext(http, new RouteData(), new ActionDescriptor()),
             new List<IFilterMetadata>(), new Dictionary<string, object?>(), controller: new object());
@@ -157,17 +158,17 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         await new Identity { Id = "bs-actor", DisplayName = "A" }.Save();
         await new Identity { Id = "bs-target", DisplayName = "T" }.Save();
 
-        (await svc.BuildSessionAsync("bs-actor", "bs-target", Array.Empty<string>()))
+        (await svc.BuildSessionAsync("bs-actor", "bs-target"))
             .Should().BeNull("no active grant → no impersonated principal (the session bridge fail-closes)");
 
         var grant = await svc.RequestAsync("bs-actor", "bs-target", "reason", null);
         await svc.ApproveAsync(grant.Id, "bs-approver", TimeSpan.FromMinutes(10));
 
-        var principal = await svc.BuildSessionAsync("bs-actor", "bs-target", new[] { "koan:reader" });
+        var principal = await svc.BuildSessionAsync("bs-actor", "bs-target");
         principal.Should().NotBeNull();
         principal!.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be("bs-target");
         ImpersonationClaims.ActorOf(principal).Should().Be("bs-actor");
-        principal.IsInRole("koan:reader").Should().BeTrue("the impersonated session carries the target's roles");
+        principal.FindAll(ClaimTypes.Role).Should().BeEmpty("the target's roles are projected per request, like anyone's");
     }
 
     [Fact]
@@ -175,8 +176,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
     {
         // Worst case: impersonating a TARGET who holds the operator role — [Authorize(Roles=Operator)] would pass,
         // so the guard (not the role gate) must be what blocks the destructive verb.
-        var impersonatingOperator = new ClaimsPrincipal(
-            ImpersonationClaims.BuildImpersonatedIdentity("imp-t3", "imp-op3", new[] { IdentityRoles.Operator }));
+        var impersonatingOperator = WithRole(ImpersonationClaims.BuildImpersonatedIdentity("imp-t3", "imp-op3"), IdentityRoles.Operator);
 
         var admin = new IdentityAdminController(_fx.Services.GetRequiredService<IdentityLifecycleService>());
         admin.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = impersonatingOperator } };
@@ -192,7 +192,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Simulated_principals_carry_exactly_the_role_claims_a_real_sign_in_carries()
+    public async Task Simulated_principals_carry_exactly_the_role_claims_a_real_request_carries()
     {
         var roles = _fx.Services.GetRequiredService<RoleCollection>();
         var suffix = Guid.NewGuid().ToString("N");
@@ -209,9 +209,9 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
             // The implicit roles exist with permissions: their permissions reach the bag, never a role claim.
             await roles.Define(RoleTokens.Everyone, "Everyone", ["global:everyone_parity"]);
             await roles.Define(RoleTokens.Authenticated, "Authenticated", ["global:authenticated_parity"]);
-            var targetSignIn = await SignInRoles(target);
-            var actorSignIn = await SignInRoles(actor);
-            targetSignIn.Should().Equal($"role:parity-reader:{suffix}");
+            var targetRequest = await RequestRoles(target);
+            var actorRequest = await RequestRoles(actor);
+            targetRequest.Should().Equal($"role:parity-reader:{suffix}");
             (await roles.Bag(target, true)).Permissions.Should().Contain(["global:everyone_parity", "global:authenticated_parity"]);
 
             using var scope = _fx.Services.CreateScope();
@@ -220,20 +220,21 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
                 "the implicit roles' permissions stay in the effective view");
             var authorize = new CapturingAuthorize();
             await new AccessExplainer(resolver, authorize, roles).CanAsync(target, "read", "Orders");
-            RoleClaims(authorize.Principal!).Should().Equal(targetSignIn, "the forward explainer simulates what a sign-in would carry");
+            RoleClaims(authorize.Principal!).Should().Equal(targetRequest, "the forward explainer simulates what a request would carry");
 
             var impersonation = _fx.Services.GetRequiredService<ImpersonationService>();
             var grant = await impersonation.RequestAsync(actor, target, "parity", null);
             await impersonation.ApproveAsync(grant.Id, $"parity-approver:{suffix}", TimeSpan.FromMinutes(10));
             var signIns = new CapturingAuthentication();
-            var controller = WithServices(new ImpersonationController(impersonation, resolver), signIns,
+            var controller = WithServices(new ImpersonationController(impersonation), signIns,
                 new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, actor)], "test")));
             (await controller.Start(grant.Id, default)).Should().BeOfType<OkObjectResult>();
-            RoleClaims(signIns.Principal!).Should().Equal(targetSignIn, "an impersonation session carries the target's sign-in roles");
+            RoleClaims(signIns.Principal!).Should().BeEmpty("no session's cookie carries a role");
+            RoleClaims(await Validated(signIns.Principal!)).Should().Equal(targetRequest, "an impersonation session's requests carry the target's roles");
 
-            controller = WithServices(new ImpersonationController(impersonation, resolver), signIns, signIns.Principal!);
-            (await controller.Stop(default)).Should().BeOfType<OkObjectResult>();
-            RoleClaims(signIns.Principal!).Should().Equal(actorSignIn, "stopping restores the actor's sign-in roles");
+            controller = WithServices(new ImpersonationController(impersonation), signIns, signIns.Principal!);
+            (await controller.Stop()).Should().BeOfType<OkObjectResult>();
+            RoleClaims(await Validated(signIns.Principal!)).Should().Equal(actorRequest, "stopping restores the actor's requests' roles");
         }
         finally
         {
@@ -250,8 +251,7 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         var suffix = Guid.NewGuid().ToString("N");
         var key = $"role:guarded:{suffix}";
         var resource = $"resource:guarded:{suffix}";
-        var impersonating = new ClaimsPrincipal(
-            ImpersonationClaims.BuildImpersonatedIdentity($"guard-target:{suffix}", $"guard-op:{suffix}", [IdentityRoles.Operator]));
+        var impersonating = WithRole(ImpersonationClaims.BuildImpersonatedIdentity($"guard-target:{suffix}", $"guard-op:{suffix}"), IdentityRoles.Operator);
         var operatorPrincipal = new ClaimsPrincipal(new ClaimsIdentity(
             [new Claim(ClaimTypes.NameIdentifier, $"guard-op:{suffix}"), new Claim(ClaimTypes.Role, IdentityRoles.Operator)], "test"));
         RoleManagementController RoleRoutes(ClaimsPrincipal user) => WithUser(new RoleManagementController(roles, options), user);
@@ -308,7 +308,14 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         return controller;
     }
 
-    private async Task<IReadOnlyList<string>> SignInRoles(string subject)
+    private static ClaimsPrincipal WithRole(ClaimsIdentity identity, string role)
+    {
+        identity.AddClaim(new Claim(ClaimTypes.Role, role));
+        return new ClaimsPrincipal(identity);
+    }
+
+    /// <summary>The roles a signed-in person's requests carry: nothing from the sign-in, the bag's on each validation.</summary>
+    private async Task<IReadOnlyList<string>> RequestRoles(string subject)
     {
         using var scope = _fx.Services.CreateScope();
         var identity = new ClaimsIdentity("test");
@@ -320,7 +327,20 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
             Services = scope.ServiceProvider,
             HttpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider },
         }, default);
-        return RoleClaims(new ClaimsPrincipal(identity));
+        identity.FindAll(ClaimTypes.Role).Should().BeEmpty("the cookie carries no role");
+        return RoleClaims(await Validated(new ClaimsPrincipal(identity)));
+    }
+
+    /// <summary>The principal a request authorizes on, after the cookie pipeline validates <paramref name="cookie"/>.</summary>
+    private async Task<ClaimsPrincipal> Validated(ClaimsPrincipal cookie)
+    {
+        using var scope = _fx.Services.CreateScope();
+        var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        var scheme = new AuthenticationScheme("test", null, typeof(CookieAuthenticationHandler));
+        var inner = new CookieValidatePrincipalContext(http, scheme, new CookieAuthenticationOptions(), new AuthenticationTicket(cookie, "test"));
+        await scope.ServiceProvider.GetRequiredService<AuthFlowDispatcher>().DispatchValidatePrincipal(
+            new AuthValidatePrincipalContext { Inner = inner, Services = scope.ServiceProvider }, default);
+        return inner.Principal.Should().NotBeNull("the principal stays valid").And.Subject.As<ClaimsPrincipal>();
     }
 
     private static IReadOnlyList<string> RoleClaims(ClaimsPrincipal principal)

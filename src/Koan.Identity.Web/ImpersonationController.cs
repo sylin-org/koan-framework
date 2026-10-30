@@ -2,7 +2,6 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Koan.Identity.Access;
 using Koan.Identity.Impersonation;
 
 namespace Koan.Identity.Web;
@@ -18,13 +17,8 @@ namespace Koan.Identity.Web;
 public sealed class ImpersonationController : ControllerBase
 {
     private readonly ImpersonationService _impersonation;
-    private readonly EffectiveAccessResolver _resolver;
 
-    public ImpersonationController(ImpersonationService impersonation, EffectiveAccessResolver resolver)
-    {
-        _impersonation = impersonation;
-        _resolver = resolver;
-    }
+    public ImpersonationController(ImpersonationService impersonation) => _impersonation = impersonation;
 
     private string? Actor => User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? User.FindFirst("sub")?.Value;
 
@@ -70,8 +64,7 @@ public sealed class ImpersonationController : ControllerBase
         var grant = await ImpersonationGrant.Get(grantId, ct);
         if (grant is null || grant.Actor != Actor) return NotFound();
 
-        var access = await _resolver.ResolveAsync(grant.Target, ct);
-        var principal = await _impersonation.BuildSessionAsync(Actor, grant.Target, access.Roles, ct);
+        var principal = await _impersonation.BuildSessionAsync(Actor, grant.Target, ct);
         if (principal is null) return StatusCode(403, new { error = "no active approved grant to impersonate this target" });
 
         await HttpContext.SignInAsync(principal); // the impersonated cookie carries sub=target + koan_actor=operator
@@ -80,15 +73,13 @@ public sealed class ImpersonationController : ControllerBase
 
     /// <summary>Stop impersonating — restores the operator's own session.</summary>
     [HttpPost("stop")]
-    public async Task<IActionResult> Stop(CancellationToken ct)
+    public async Task<IActionResult> Stop()
     {
         var actor = ImpersonationClaims.ActorOf(User);
         if (actor is null) return Ok(new { impersonating = (string?)null });
 
-        var access = await _resolver.ResolveAsync(actor, ct);
         var identity = new ClaimsIdentity("cookie");
         identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, actor));
-        foreach (var role in access.Roles) identity.AddClaim(new Claim(ClaimTypes.Role, role));
         await HttpContext.SignInAsync(new ClaimsPrincipal(identity));
         return Ok(new { stopped = true });
     }

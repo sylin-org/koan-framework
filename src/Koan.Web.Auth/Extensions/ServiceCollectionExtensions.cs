@@ -21,6 +21,7 @@ using Koan.Web.Auth.Hosting;
 using Koan.Web.Auth.Infrastructure;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Providers;
+using Koan.Web.Auth.Standing;
 
 namespace Koan.Web.Auth.Extensions;
 
@@ -75,6 +76,11 @@ internal static class ServiceCollectionExtensions
         DiscoverAndRegisterAuthFlowHandlers(services);
         services.AddScoped<IKoanAuthFlowHandler, JsonChallengeHandler>();
         services.TryAddScoped<AuthFlowDispatcher>();
+
+        // A subject's standing composes every [KoanDiscoverable] contributor, scoped like the flow handlers.
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(ISubjectStandingContributor)))
+            services.TryAddEnumerable(ServiceDescriptor.Scoped(typeof(ISubjectStandingContributor), type));
+        services.TryAddScoped<SubjectStandings>();
 
         services.AddHostedService<AuthBootstrapHostedService>();
 

@@ -69,9 +69,9 @@ public sealed class ImpersonationService
     /// approved, unexpired grant for <paramref name="target"/>. Fail-closed: returns <see langword="null"/> when
     /// there is no active grant, so the session bridge cannot mint a principal without authorization.
     /// </summary>
-    public async Task<ClaimsPrincipal?> BuildSessionAsync(string actor, string target, IEnumerable<string> targetRoles, CancellationToken ct = default)
+    public async Task<ClaimsPrincipal?> BuildSessionAsync(string actor, string target, CancellationToken ct = default)
     {
         if (!await IsActiveAsync(actor, target, ct).ConfigureAwait(false)) return null;
-        return new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity(target, actor, targetRoles));
+        return new ClaimsPrincipal(ImpersonationClaims.BuildImpersonatedIdentity(target, actor));
     }
 }

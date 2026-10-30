@@ -3,6 +3,7 @@ using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Infrastructure;
+using Koan.Identity.Management;
 using Koan.Identity.Roles;
 using Microsoft.Extensions.Options;
 
@@ -27,7 +28,7 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles, IOpti
             Order,
             Ready: true,
             EstimatedItems: (int)Math.Min(count, int.MaxValue),
-            Summary: "Deactivate the person, close cookie access, and remove core identity dependents.");
+            Summary: "Deactivate the person, close cookie access, remove their client grants, and remove core identity dependents.");
     }
 
     public async Task<IdentityErasureOwnerResult> EraseAsync(string identityId, CancellationToken ct = default)
@@ -42,6 +43,7 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles, IOpti
             await owned.Person.Save(ct).ConfigureAwait(false);
         }
 
+        var clientGrantCount = await ClientApprovals.Revoke(identityId, ct).ConfigureAwait(false);
         var emailCount = await RemoveAll(owned.Emails, ct).ConfigureAwait(false);
         var sessionCount = await RemoveAll(owned.Sessions, ct).ConfigureAwait(false);
         var linkCount = await RemoveAll(owned.ExternalLinks, ct).ConfigureAwait(false);
@@ -89,6 +91,7 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles, IOpti
                 [IdentityErasureConstants.Counts.GlobalRoles] = roleCount,
                 [IdentityErasureConstants.Counts.PermissionOverwrites] = overwriteCount,
                 [IdentityErasureConstants.Counts.ImpersonationGrants] = impersonationCount,
+                [IdentityErasureConstants.Counts.ClientGrants] = clientGrantCount,
             },
         };
     }

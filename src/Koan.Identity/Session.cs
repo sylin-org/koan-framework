@@ -8,8 +8,8 @@ namespace Koan.Identity;
 /// <summary>
 /// SEC-0007 Layer 1 — the durable twin of a sign-in session (the cookie stays the transport; this is the device-list
 /// + revocation record). One per device/browser. Revoking a session is immediate and observable; "sign out
-/// everywhere-else" revokes every cookie session for a person except the current one. Client-token revocation is a
-/// separate concern owned by the issuing capability.
+/// everywhere-else" revokes every cookie session for a person except the current one. A person's connected agents are
+/// closed through their client grants (<see cref="Management.ClientApprovals"/>), not here.
 /// </summary>
 public sealed class Session : Entity<Session>, IAmbientExempt
 {
