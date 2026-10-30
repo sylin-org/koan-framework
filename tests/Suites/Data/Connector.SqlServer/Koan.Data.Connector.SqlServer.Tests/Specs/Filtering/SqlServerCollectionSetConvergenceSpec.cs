@@ -15,6 +15,6 @@ public sealed class SqlServerCollectionSetConvergenceSpec(SqlServerFixture fixtu
         RequireBackingStore();
         await using var host = await BootAsync();
         using var _ = Lease(NewPartition("lists"));
-        foreach (var note in await CollectionSetConvergence.AssertConvergesAsync(host.Services)) Output.WriteLine(note);
+        foreach (var note in await CollectionSetConvergence.AssertConvergesAsync(host.Services, doublesCompareExactly: false)) Output.WriteLine(note);
     }
 }

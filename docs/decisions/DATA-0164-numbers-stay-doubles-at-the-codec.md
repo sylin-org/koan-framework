@@ -23,7 +23,7 @@ of a second, ids differing only by case merged in an upsert, and two concurrent 
 
 1. **The codec leaves a real number a double.** A `decimal` member reads its digits where its type is known, when the document
    deserializes into the Entity, so 19.99 and 0.1 stay exact and only code that needs a decimal pays. A whole number past a `long`
-   stays whole, since PostgreSQL's `jsonb` prints a large double without an exponent.
+   reads as a double too, since PostgreSQL's `jsonb` prints a large double without an exponent.
 2. **SQL Server ids are exact.** A text id column is `Latin1_General_BIN2`. Every other text column keeps the server's default
    collation and behaviour, and `FilterSupport.OrdinalStrings` stays false. MySQL's id column was already `utf8mb4_bin`.
 3. **SQL Server's upsert has one winner and no error.** An update that finds no row inserts; a primary-key violation (2627) means
@@ -39,7 +39,9 @@ A number in a document is ordinary when a double holds it: a decimal of up to fi
 Past that, what a store and its comparison type hold decides, and Koan does not build for it:
 
 - a decimal past seventeen significant digits rounds, and one at the very top of its range saves and then refuses to read;
-- on SQL Server a document double compares as `decimal(38, 10)`, so `Eq` on 1/3 misses and a value past 1e28 compares as NULL;
+- on SQL Server a document double compares as `decimal(38, 10)`, so `Eq` on 1/3 misses and a value past 1e28 compares as NULL; one
+  held in exponent form (below 1e-4, from 1e15) reaches it through `float`, whose conversion from text can land values of 1e16 and
+  above a unit off;
 - on MySQL the `JSON` type lands some doubles a unit off (7.9e28), a document double past 1e35 fails the save in its generated
   column, and `Eq` compares through `DECIMAL(65, 30)`;
 - on SQL Server and MySQL a trailing blank does not count in `=`, so ids `'a'` and `'a '` are one key.

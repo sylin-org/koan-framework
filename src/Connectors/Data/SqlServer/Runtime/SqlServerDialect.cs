@@ -162,8 +162,10 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
         if (value == typeof(byte) || value == typeof(sbyte) || value == typeof(short) || value == typeof(ushort) ||
             value == typeof(int) || value == typeof(uint) || value == typeof(long) || value == typeof(ulong) ||
             value == typeof(TimeSpan)) return $"TRY_CONVERT(bigint, {expression})";
+        // A document holds a double's small or large values in exponent form, which text converts to float but not to
+        // decimal (DATA-0164).
         if (value == typeof(float) || value == typeof(double) || value == typeof(decimal))
-            return $"TRY_CONVERT(decimal(38, 10), {expression})";
+            return $"COALESCE(TRY_CONVERT(decimal(38, 10), {expression}), TRY_CONVERT(decimal(38, 10), TRY_CONVERT(float, {expression})))";
         return expression;
     }
 

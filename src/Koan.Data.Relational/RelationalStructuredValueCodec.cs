@@ -84,8 +84,8 @@ public sealed class RelationalStructuredValueCodec
     {
         JTokenType.Null or JTokenType.Undefined => null,
         JTokenType.Boolean => token.Value<bool>(),
-        // A whole number past a long stays whole: a store may print a large double without its exponent.
-        JTokenType.Integer => token is JValue { Value: BigInteger big } ? big : token.Value<long>(),
+        // A whole number past a long is a large double a store printed without its exponent (PostgreSQL's jsonb).
+        JTokenType.Integer => token is JValue { Value: BigInteger } ? (object)token.Value<double>() : token.Value<long>(),
         // A real number stays a double, and a decimal member reads its digits where its type is known (DATA-0164).
         JTokenType.Float => token.Value<double>(),
         JTokenType.String => token.Value<string>(),

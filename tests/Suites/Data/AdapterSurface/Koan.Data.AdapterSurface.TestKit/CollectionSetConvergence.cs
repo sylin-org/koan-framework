@@ -27,8 +27,8 @@ public sealed class ListMemberDoc : Entity<ListMemberDoc>
 /// query is executed by the store, and a query that fails is a failure.
 ///
 /// <para>The per-member form must find every value a row holds as read back: one it misses is a failure. A value no
-/// row holds once read back — a double the relational write path keeps to fifteen significant digits, such as one
-/// third — is returned as a note, and the list is held to what the per-member form answers. The doubles include
+/// row holds once read back, or a double on a store that compares one at a fixed scale (SQL Server, DATA-0164), is returned
+/// as a note, and the list is held to what the per-member form answers. The doubles include
 /// exponent forms and a negative zero against a stored zero, which print differently as text and as numbers. A
 /// DateTimeOffset list is not covered: the JSON filter language reads an offset string as a DateTime first and cannot
 /// express one.</para>
@@ -67,7 +67,7 @@ public static class CollectionSetConvergence
 
     /// <summary>Seeds the rows and asserts every case, listing every divergence; returns a note for each value the
     /// per-member form finds in no row although a row holds it.</summary>
-    public static async Task<IReadOnlyList<string>> AssertConvergesAsync(IServiceProvider services)
+    public static async Task<IReadOnlyList<string>> AssertConvergesAsync(IServiceProvider services, bool doublesCompareExactly = true)
     {
         foreach (var existing in await ListMemberDoc.All()) await existing.Remove();
         foreach (var row in Corpus()) await row.Save();
@@ -75,7 +75,7 @@ public static class CollectionSetConvergence
         var failures = new List<string>();
         var all = Corpus().Select(static row => row.Id).ToHashSet();
         var notes = new List<string>();
-        var context = new Context(services, failures, notes, all);
+        var context = new Context(services, failures, notes, all, doublesCompareExactly);
         await context.Field("Names", ["alpha", "Bravo", "çé"], static i => $"pad-{i}", [1, 2, Medium, Large]);
         await context.Field("Refs", [G1, G2, G3], static _ => Guid.NewGuid(), [1, 2, Medium]);
         await context.Field("Amounts", [1.5m, 2m, 12345678901234.123456m], static i => 1_000_000.25m + i, [1, 2, Medium]);
@@ -90,7 +90,7 @@ public static class CollectionSetConvergence
         return notes;
     }
 
-    private sealed class Context(IServiceProvider services, List<string> failures, List<string> notes, HashSet<string> all)
+    private sealed class Context(IServiceProvider services, List<string> failures, List<string> notes, HashSet<string> all, bool doublesCompareExactly)
     {
         public async Task Field<V>(string field, IReadOnlyList<V> values, Func<int, V> pad, int[] sizes) where V : notnull
         {
@@ -116,7 +116,7 @@ public static class CollectionSetConvergence
                 var holders = stored
                     .Where(row => property.GetValue(row) is System.Collections.IEnumerable list && list.Cast<object>().Any(item => Equals(item, value)))
                     .Select(static row => row.Id).ToList();
-                if (holders.Count > 0)
+                if (holders.Count > 0 && (doublesCompareExactly || value is not double))
                     failures.Add($"  [{field} has {value}] finds no row, though {string.Join(",", holders)} holds it as read back");
                 else
                     notes.Add($"{field}: no row holds {value} as read back (the write path did not keep it); the list is held to what the per-member form answers");
