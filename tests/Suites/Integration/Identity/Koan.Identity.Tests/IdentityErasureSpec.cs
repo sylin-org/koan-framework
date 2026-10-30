@@ -150,7 +150,7 @@ public sealed class IdentityErasureSpec : IdentityHostScopedSpec
         JsonConvert.SerializeObject(complete).Should().NotContain(identityId).And.NotContain(marker);
         (await TestIdentityErasureRow.Query(row => row.IdentityId == identityId)).Should().BeEmpty();
         (await Membership.Query(row => row.IdentityId == identityId)).Should().BeEmpty();
-        (await roles.Overwrites("erase-delight-resource")).Should().BeEmpty("a person's overwrites are core-owned person rows");
+        (await roles.Overwrites("erase-delight-resource")).Items.Should().BeEmpty("a person's overwrites are core-owned person rows");
         using (Tenant.Use(tenantId))
             (await AgentGrant.Query(row => row.Subject == identityId)).Should().BeEmpty();
 

@@ -12,8 +12,9 @@ public sealed record EffectiveAccess(
 
     /// <summary>
     /// The distinct things the identity can do somewhere: agent-grant capability terms and role permissions, each
-    /// fact naming the resource it holds on. A deny is not subtracted here; ask a resource with
-    /// <see cref="AccessExplainer.Explain"/> or <see cref="Roles.RoleBag.On"/>.
+    /// fact naming the resource it holds on. A per-resource overwrite is not among them: what holds on one resource is
+    /// asked of that resource, with <see cref="AccessExplainer.WhyAsync"/>, <see cref="AccessExplainer.Explain"/> or
+    /// <see cref="Roles.RoleBag.On"/>.
     /// </summary>
     public IReadOnlyList<string> Capabilities =>
         Facts.Where(f => f.Kind is AccessFactKind.Capability or AccessFactKind.Permission).Select(f => f.Value).Distinct().ToList();

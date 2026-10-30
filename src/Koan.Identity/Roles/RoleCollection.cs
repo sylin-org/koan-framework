@@ -7,9 +7,11 @@ using Microsoft.Extensions.Options;
 namespace Koan.Identity.Roles;
 
 /// <summary>
-/// The only supported mutation and compilation surface for server roles and their per-resource overwrites. Every
-/// change commits immediately: a change asked for inside a deferred <see cref="EntityContext.Transaction(string)"/>
-/// scope is refused before any write.
+/// The only supported mutation and compilation surface for server roles, their members and their per-resource
+/// overwrites. Every change commits immediately: a change asked for inside a deferred
+/// <see cref="EntityContext.Transaction(string)"/> scope is refused before any write. What grows — a role's members, a
+/// resource's or a subject's overwrites — is read a page at a time; evaluating a bag on a resource reads only the rows
+/// that bag can meet there.
 /// </summary>
 public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> options, IIdentityActorAccessor? actor = null)
 {
@@ -17,56 +19,129 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _overwriteLock = new(1, 1);
 
+    // Joins of one person are serialized, so the roles-per-person bound holds within this process. A lock per person
+    // would grow with every person ever added; a fixed set of stripes bounds the memory, and people who share a stripe
+    // only wait on each other. Taken after the role's lock, and never while waiting for another lock.
+    private const int PersonLockStripes = 64;
+    private readonly SemaphoreSlim[] _personLocks = [.. Enumerable.Range(0, PersonLockStripes).Select(_ => new SemaphoreSlim(1, 1))];
+
     public Task<RoleBag> Bag(string? personId, bool authenticated, CancellationToken ct = default)
         => authenticated ? bags.Get(RoleContract.Require(personId, nameof(personId)), ct) : bags.Anonymous(ct);
-    public Task<Role?> Get(string roleKey, CancellationToken ct = default) => Role.Get(RoleContract.Require(roleKey, nameof(roleKey)), ct);
-    public async Task<IReadOnlyList<Role>> ForPerson(string personId, CancellationToken ct = default)
+    public Task<Role?> Get(string roleKey, CancellationToken ct = default) => RoleReads.ExactRole(RoleContract.Require(roleKey, nameof(roleKey)), ct);
+
+    /// <summary>The roles <paramref name="personId"/> holds, in key order: their memberships read by person.</summary>
+    public Task<IReadOnlyList<Role>> ForPerson(string personId, CancellationToken ct = default)
+        => RoleReads.RolesOf(RoleContract.Require(personId, nameof(personId)), _options.MaxRolesPerPerson, _options.MaxPageSize, ct);
+
+    /// <summary>
+    /// A page of <paramref name="roleKey"/>'s members in person order, at most <paramref name="take"/> (no more than
+    /// <see cref="RoleOptions.MaxPageSize"/>). Pass a page's <see cref="RoleMemberPage.Next"/> as <paramref name="after"/>
+    /// to read the next; a page can hold fewer rows than <paramref name="take"/> while a next page follows. Whether one
+    /// person is a member is their bag's <see cref="RoleBag.InRole"/>, or one read of <see cref="RoleMember.KeyFor"/>.
+    /// </summary>
+    public async Task<RoleMemberPage> Members(string roleKey, string? after = null, int take = 50, CancellationToken ct = default)
     {
-        personId = RoleContract.Require(personId, nameof(personId));
-        var result = await Role.Query(role => role.Members.Contains(personId), new QueryDefinition { Page = 1, PageSize = _options.MaxRolesPerPerson + 1 }, ct);
-        if (result.Count > _options.MaxRolesPerPerson) throw new InvalidOperationException($"Person role count exceeds the configured bound of {_options.MaxRolesPerPerson}.");
-        return result;
+        roleKey = RoleContract.Require(roleKey, nameof(roleKey));
+        RequireTake(take);
+        var (rows, next) = await RoleReads.Page<RoleMember>(member => member.RoleKey == roleKey,
+            member => StringComparer.Ordinal.Equals(member.RoleKey, roleKey), member => member.PersonId, member => member.PersonId,
+            after, take, ct);
+        return new RoleMemberPage(rows, next);
     }
 
     public Task<Role> Define(string roleKey, string name, IEnumerable<string>? permissions = null,
         IReadOnlyDictionary<string, string>? metadata = null, CancellationToken ct = default)
-        => Mutate(roleKey, null, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current =>
+        => Mutate(roleKey, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current =>
         {
             var nextPermissions = permissions is null ? current?.Permissions.ToArray() ?? [] : NormalizePermissions(permissions);
-            return Task.FromResult(new Role { Id = roleKey, Name = RoleContract.Require(name, nameof(name), 160), Permissions = [.. nextPermissions], Members = current?.Members.ToList() ?? [], Metadata = metadata is null ? current?.Metadata.ToDictionary() ?? [] : NormalizeMetadata(metadata), UpdatedBy = actor?.CurrentActorSubject });
+            return new Role { Id = Role.KeyFor(roleKey), Key = roleKey, Name = RoleContract.RequireText(name, nameof(name), 160), Permissions = [.. nextPermissions], Metadata = metadata is null ? current?.Metadata.ToDictionary() ?? [] : NormalizeMetadata(metadata), UpdatedBy = actor?.CurrentActorSubject };
         }, ct);
 
     public Task<Role> Update(string roleKey, string name, IEnumerable<string> permissions,
         IReadOnlyDictionary<string, string>? metadata = null, CancellationToken ct = default)
-        => Mutate(roleKey, null, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current =>
-            Task.FromResult(Copy(Require(current, roleKey), name: RoleContract.Require(name, nameof(name), 160),
-                permissions: NormalizePermissions(permissions), metadata: NormalizeMetadata(metadata))), ct);
+        => Mutate(roleKey, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current =>
+            Copy(Require(current, roleKey), name: RoleContract.RequireText(name, nameof(name), 160),
+                permissions: NormalizePermissions(permissions), metadata: NormalizeMetadata(metadata)), ct);
 
     public Task<Role> Rename(string roleKey, string name, CancellationToken ct = default)
-        => Mutate(roleKey, null, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current => Task.FromResult(Copy(Require(current, roleKey), name: RoleContract.Require(name, nameof(name), 160))), ct);
+        => Mutate(roleKey, RoleEventKind.RoleChanging, RoleEventKind.RoleChanged, current => Copy(Require(current, roleKey), name: RoleContract.RequireText(name, nameof(name), 160)), ct);
 
     public Task<Role> SetPermissions(string roleKey, IEnumerable<string> permissions, CancellationToken ct = default)
-        => Mutate(roleKey, null, RoleEventKind.PermissionsChanging, RoleEventKind.PermissionsChanged, current => Task.FromResult(Copy(Require(current, roleKey), permissions: NormalizePermissions(permissions))), ct);
+        => Mutate(roleKey, RoleEventKind.PermissionsChanging, RoleEventKind.PermissionsChanged, current => Copy(Require(current, roleKey), permissions: NormalizePermissions(permissions)), ct);
 
-    public Task<Role> Add(string roleKey, string personId, CancellationToken ct = default)
-        => ChangeMember(roleKey, personId, true, ct);
-    public Task<Role> Remove(string roleKey, string personId, CancellationToken ct = default)
-        => ChangeMember(roleKey, personId, false, ct);
+    /// <summary>
+    /// Adds <paramref name="personId"/> to <paramref name="roleKey"/>, which must exist: one membership row, and the
+    /// person's bag compiles again. Adding a member again returns their membership and publishes nothing. A person
+    /// already holding <see cref="RoleOptions.MaxRolesPerPerson"/> roles is refused with <see cref="RoleBoundException"/>;
+    /// joins of one person are serialized in this process, so the bound holds here. Processes that share a store do
+    /// not coordinate, so two of them can each admit the last role, and the bag of a person left over the bound then
+    /// fails closed.
+    /// </summary>
+    public async Task<RoleMember> Add(string roleKey, string personId, CancellationToken ct = default)
+    {
+        DemandImmediate();
+        roleKey = RoleContract.Require(roleKey, nameof(roleKey));
+        personId = RoleContract.Require(personId, nameof(personId));
+        await using var gate = await Enter(roleKey, ct);
+        await using var personGate = await EnterPerson(personId, ct);
+        var role = Require(await RoleReads.ExactRole(roleKey, ct), roleKey);
+        var id = RoleMember.KeyFor(roleKey, personId);
+        if (Exact(await RoleMember.Get(id, ct), roleKey, personId) is { } existing) return existing;
+        if ((await RoleReads.MembershipsOf(personId, _options.MaxRolesPerPerson, _options.MaxPageSize, ct)).Count >= _options.MaxRolesPerPerson)
+            throw new RoleBoundException(Key(nameof(RoleOptions.MaxRolesPerPerson)),
+                $"Person '{personId}' already holds the configured maximum of {_options.MaxRolesPerPerson} roles " +
+                $"({RoleOptions.SectionPath}:{nameof(RoleOptions.MaxRolesPerPerson)}). Remove one of their roles, or raise the bound.");
+
+        var context = Context(role, role, personId, RoleChangePhase.Before, ct);
+        await RoleEventRegistry.Before(RoleEventKind.MemberAdding, context);
+        var member = new RoleMember { Id = id, RoleKey = roleKey, PersonId = personId, AddedAt = DateTimeOffset.UtcNow, AddedBy = actor?.CurrentActorSubject };
+        using (RoleMutationGuard.Allow<RoleMember>(id, EntityLifecycleOperation.Upsert)) member = await member.Save(ct);
+        bags.Invalidate(personId);
+        await RoleEventRegistry.After(RoleEventKind.MemberAdded, context with { Phase = RoleChangePhase.After });
+        return member;
+    }
+
+    /// <summary>
+    /// Removes <paramref name="personId"/> from <paramref name="roleKey"/>: one membership row, and the person's bag
+    /// compiles again. False when they are not a member. A membership whose role no longer exists is removed without
+    /// events, since there is no role to name.
+    /// </summary>
+    public async Task<bool> Remove(string roleKey, string personId, CancellationToken ct = default)
+    {
+        DemandImmediate();
+        roleKey = RoleContract.Require(roleKey, nameof(roleKey));
+        personId = RoleContract.Require(personId, nameof(personId));
+        await using var gate = await Enter(roleKey, ct);
+        var member = Exact(await RoleMember.Get(RoleMember.KeyFor(roleKey, personId), ct), roleKey, personId);
+        if (member is null) return false;
+        var context = await RoleReads.ExactRole(roleKey, ct) is { } role ? Context(role, role, personId, RoleChangePhase.Before, ct) : null;
+        if (context is not null) await RoleEventRegistry.Before(RoleEventKind.MemberRemoving, context);
+        using (RoleMutationGuard.Allow<RoleMember>(member.Id, EntityLifecycleOperation.Remove)) await member.Remove(ct);
+        bags.Invalidate(personId);
+        if (context is not null) await RoleEventRegistry.After(RoleEventKind.MemberRemoved, context with { Phase = RoleChangePhase.After });
+        return true;
+    }
 
     public async Task<RolePage> Page(string? search = null, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         if (page < 1 || pageSize < 1 || pageSize > _options.MaxPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize));
-        search = string.IsNullOrWhiteSpace(search) ? null : RoleContract.Require(search, nameof(search), 160);
+        search = string.IsNullOrWhiteSpace(search) ? null : RoleContract.RequireText(search, nameof(search), 160);
         var query = new QueryDefinition { Page = page, PageSize = pageSize };
-        var result = search is null ? await Role.AllWithCount(query, ct) : await Role.QueryWithCount(role => role.Id.Contains(search) || role.Name.Contains(search), query, ct);
+        var result = search is null ? await Role.AllWithCount(query, ct) : await Role.QueryWithCount(role => role.Key.Contains(search) || role.Name.Contains(search), query, ct);
         return new RolePage(result.Items, result.TotalCount, page, pageSize);
     }
 
     /// <summary>
-    /// Deletes a role and, with it, the overwrites that name it, so a role defined later under the same key starts
-    /// with none. Every before-event — the role's and each overwrite's — runs before any write. The overwrites of
-    /// <see cref="RoleTokens.Everyone"/> and <see cref="RoleTokens.Authenticated"/> stay: those roles hold every bag
-    /// whether or not a row defines their permissions.
+    /// Deletes a role and, with it, its members and the overwrites that name it, so a role defined later under the same
+    /// key starts with neither. The role's before-event and every overwrite's before-event run before any write. Then
+    /// the role is neutralized: its permissions are cleared, the allows of its overwrites are taken out — an overwrite
+    /// that allowed only is removed, one that also denies keeps its denies — and every bag compiles again. Then each
+    /// membership is removed and its person's bag compiles again, then the overwrites that remain, which only deny, and
+    /// the role last. Each is read a page at a time, and each overwrite's after-event is published as it is removed.
+    /// No write takes away a deny while the role still grants anything, so no state between them grants more than the
+    /// role did; once it is neutralized, a deletion that stops leaves members holding only the role's denies, and a
+    /// retry finishes it. The overwrites of <see cref="RoleTokens.Everyone"/> and <see cref="RoleTokens.Authenticated"/>
+    /// stay: those roles hold every bag whether or not a row defines their permissions.
     /// </summary>
     public async Task<bool> Delete(string roleKey, CancellationToken ct = default)
     {
@@ -74,36 +149,131 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
         await using var gate = await Enter(roleKey, ct);
         await using var overwriteGate = await EnterOverwrites(ct);
-        var current = await Role.Get(roleKey, ct); if (current is null) return false;
-        IReadOnlyList<PermissionOverwrite> overwrites = RoleContract.IsImplicitRole(roleKey) ? [] : await OverwritesOf(OverwriteSubjectKind.Role, roleKey, ct);
+        var current = await RoleReads.ExactRole(roleKey, ct); if (current is null) return false;
         var before = Context(current, current, null, RoleChangePhase.Before, ct);
         await RoleEventRegistry.Before(RoleEventKind.RoleDeleting, before);
-        var removals = overwrites.Select(row => new OverwriteChangeContext(row, row, actor?.CurrentActorSubject, RoleChangePhase.Before, ct)).ToList();
-        foreach (var removal in removals) await RoleEventRegistry.Before(RoleEventKind.OverwriteRemoving, removal);
-        foreach (var row in overwrites)
+        var implicitRole = RoleContract.IsImplicitRole(roleKey);
+        if (!implicitRole)
+            await EachOverwriteOf(roleKey, row => RoleEventRegistry.Before(RoleEventKind.OverwriteRemoving, Removal(row, ct)), ct);
+
+        if (current.Permissions.Count > 0)
         {
-            using (RoleMutationGuard.Allow<PermissionOverwrite>(row.Id, EntityLifecycleOperation.Remove)) await row.Remove(ct);
-            bags.InvalidateOverwrites(row.ResourceId);
+            var granting = current;
+            using (RoleMutationGuard.Allow<Role>(granting.Id, EntityLifecycleOperation.Upsert))
+                current = await Copy(granting, permissions: []).Save(ct);
         }
-        using (RoleMutationGuard.Allow<Role>(roleKey, EntityLifecycleOperation.Remove)) await current.Remove(ct);
-        InvalidateBags(roleKey, current.Members);
-        foreach (var removal in removals) await RoleEventRegistry.After(RoleEventKind.OverwriteRemoved, removal with { Phase = RoleChangePhase.After });
+
+        if (!implicitRole)
+        {
+            await EachOverwriteOf(roleKey, async row =>
+            {
+                if (row.Allow.Count == 0) return;
+                if (row.Deny.Count == 0)
+                {
+                    await RemoveWithRole(row, ct);
+                    return;
+                }
+
+                var denying = row.Duplicate();
+                denying.Allow = [];
+                denying.UpdatedBy = actor?.CurrentActorSubject;
+                using (RoleMutationGuard.Allow<PermissionOverwrite>(denying.Id, EntityLifecycleOperation.Upsert)) await denying.Save(ct);
+                bags.InvalidateOverwrite(denying);
+            }, ct);
+        }
+
+        bags.InvalidateAll();
+        for (string? after = null; ;)
+        {
+            var page = await Members(roleKey, after, _options.MaxPageSize, ct);
+            foreach (var member in page.Items)
+            {
+                using (RoleMutationGuard.Allow<RoleMember>(member.Id, EntityLifecycleOperation.Remove)) await member.Remove(ct);
+                bags.Invalidate(member.PersonId);
+            }
+
+            if ((after = page.Next) is null) break;
+        }
+
+        if (!implicitRole) await EachOverwriteOf(roleKey, row => RemoveWithRole(row, ct), ct);
+        using (RoleMutationGuard.Allow<Role>(current.Id, EntityLifecycleOperation.Remove)) await current.Remove(ct);
         await RoleEventRegistry.After(RoleEventKind.RoleDeleted, before with { Phase = RoleChangePhase.After });
         return true;
     }
 
-    /// <summary>The overwrites on one resource, for every subject, from the compiled cache. Each call returns its own
-    /// copies; pass them to <see cref="RoleBag.On"/>.</summary>
-    public async Task<IReadOnlyList<PermissionOverwrite>> Overwrites(string resourceId, CancellationToken ct = default)
-        => (await bags.Overwrites(resourceId, ct)).Select(row => row.Duplicate()).ToArray();
+    /// <summary>
+    /// The overwrites that evaluate <paramref name="bag"/> on <paramref name="resourceId"/>: the resource's overwrites
+    /// for the roles the bag is in, <see cref="RoleTokens.Everyone"/> included, and the bag's person's own, from the
+    /// compiled cache. Each call returns its own copies; pass them to <see cref="RoleBag.On"/>, which gives the same
+    /// answer it gives over every overwrite on the resource.
+    /// </summary>
+    public async Task<IReadOnlyList<PermissionOverwrite>> OverwritesFor(RoleBag bag, string resourceId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(bag);
+        resourceId = RoleContract.Require(resourceId, nameof(resourceId));
+        var roleOverwrites = await bags.RoleOverwrites(resourceId, ct).ConfigureAwait(false);
+        var rows = new List<PermissionOverwrite>();
+        foreach (var role in bag.Roles)
+        {
+            if (roleOverwrites.TryGetValue(role, out var row)) rows.Add(row.Duplicate());
+        }
+
+        if (bag.PersonId is { } person && await bags.PersonOverwrite(resourceId, person, ct).ConfigureAwait(false) is { } own)
+            rows.Add(own.Duplicate());
+        return rows;
+    }
+
+    /// <summary>
+    /// A page of the overwrites on <paramref name="resourceId"/>, for every subject: its role overwrites by role key, then
+    /// its people's by person id; at most <paramref name="take"/> (no more than <see cref="RoleOptions.MaxPageSize"/>).
+    /// Pass a page's <see cref="OverwritePage.Next"/> as <paramref name="after"/> to read the next; a page can hold fewer
+    /// rows than <paramref name="take"/> while a next page follows. To evaluate a person there, read
+    /// <see cref="OverwritesFor"/>.
+    /// </summary>
+    public async Task<OverwritePage> Overwrites(string resourceId, string? after = null, int take = 50, CancellationToken ct = default)
+    {
+        resourceId = RoleContract.Require(resourceId, nameof(resourceId));
+        RequireTake(take);
+        var (fromKind, fromCursor) = ResourceCursor(after);
+        var items = new List<PermissionOverwrite>(take);
+        foreach (var kind in (OverwriteSubjectKind[])[OverwriteSubjectKind.Role, OverwriteSubjectKind.Person])
+        {
+            if (kind < fromKind) continue;
+            if (items.Count == take) return new OverwritePage(items, ResourceCursor(kind, null));
+            var (rows, next) = await RoleReads.Page<PermissionOverwrite>(
+                row => row.ResourceId == resourceId && row.SubjectKind == kind,
+                row => row.SubjectKind == kind && StringComparer.Ordinal.Equals(row.ResourceId, resourceId),
+                row => row.SubjectId, row => row.SubjectId, kind == fromKind ? fromCursor : null, take - items.Count, ct);
+            items.AddRange(rows);
+            if (next is not null) return new OverwritePage(items, ResourceCursor(kind, next));
+        }
+
+        return new OverwritePage(items, null);
+    }
+
+    /// <summary>
+    /// A page of the overwrites <paramref name="subjectId"/> holds across resources, in resource order; at most
+    /// <paramref name="take"/> (no more than <see cref="RoleOptions.MaxPageSize"/>). Pass a page's
+    /// <see cref="OverwritePage.Next"/> as <paramref name="after"/> to read the next.
+    /// </summary>
+    public async Task<OverwritePage> OverwritesOf(OverwriteSubjectKind subjectKind, string subjectId, string? after = null,
+        int take = 50, CancellationToken ct = default)
+    {
+        subjectId = RequireSubject(subjectKind, subjectId);
+        RequireTake(take);
+        var (rows, next) = await RoleReads.Page<PermissionOverwrite>(
+            row => row.SubjectKind == subjectKind && row.SubjectId == subjectId,
+            row => row.SubjectKind == subjectKind && StringComparer.Ordinal.Equals(row.SubjectId, subjectId),
+            row => row.ResourceId, row => row.ResourceId, after, take, ct);
+        return new OverwritePage(rows, next);
+    }
 
     /// <summary>
     /// Sets what <paramref name="subjectId"/> may and may not do on <paramref name="resourceId"/>, replacing its
     /// overwrite there. The subject is a role key — <see cref="RoleTokens.Everyone"/> for everyone — or a person id;
     /// a role other than the implicit ones must exist. <paramref name="allow"/> and <paramref name="deny"/> are
     /// <c>global:*</c> permissions, never <see cref="RoleTokens.Administrator"/>; a permission in both is allowed, as
-    /// within one Discord step. A new overwrite is refused when its resource or its subject already holds the
-    /// configured maximum. <paramref name="expiresAt"/>, when set, is when it stops applying.
+    /// within one Discord step. <paramref name="expiresAt"/>, when set, is when it stops applying.
     /// </summary>
     public async Task<PermissionOverwrite> Overwrite(string resourceId, OverwriteSubjectKind subjectKind, string subjectId,
         IEnumerable<string> allow, IEnumerable<string> deny, DateTimeOffset? expiresAt = null, CancellationToken ct = default)
@@ -120,7 +290,7 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
 
         await using var roleGate = subjectKind == OverwriteSubjectKind.Role ? await Enter(subjectId, ct) : null;
         await using var gate = await EnterOverwrites(ct);
-        if (subjectKind == OverwriteSubjectKind.Role && !RoleContract.IsImplicitRole(subjectId) && await Role.Get(subjectId, ct) is null)
+        if (subjectKind == OverwriteSubjectKind.Role && !RoleContract.IsImplicitRole(subjectId) && await RoleReads.ExactRole(subjectId, ct) is null)
             throw new KeyNotFoundException($"Role '{subjectId}' does not exist.");
         var id = PermissionOverwrite.KeyFor(resourceId, subjectKind, subjectId);
         var previous = await PermissionOverwrite.Get(id, ct);
@@ -130,7 +300,6 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
             Deny = [.. denied], ExpiresAt = expiresAt, UpdatedBy = actor?.CurrentActorSubject,
         };
         if (previous is not null && Equivalent(previous, next)) return previous;
-        if (previous is null) await DemandRoom(resourceId, subjectKind, subjectId, ct);
         return await SaveOverwrite(previous, next, ct);
     }
 
@@ -174,7 +343,7 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         var context = new OverwriteChangeContext(previous, next, actor?.CurrentActorSubject, RoleChangePhase.Before, ct);
         await RoleEventRegistry.Before(RoleEventKind.OverwriteChanging, context);
         using (RoleMutationGuard.Allow<PermissionOverwrite>(next.Id, EntityLifecycleOperation.Upsert)) next = await next.Save(ct);
-        bags.InvalidateOverwrites(next.ResourceId);
+        bags.InvalidateOverwrite(next);
         await RoleEventRegistry.After(RoleEventKind.OverwriteChanged, context with { Current = next, Phase = RoleChangePhase.After });
         return next;
     }
@@ -182,65 +351,55 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     /// <summary>Removes an overwrite; the overwrite lock is held.</summary>
     private async Task RemoveOverwrite(PermissionOverwrite current, CancellationToken ct)
     {
-        var context = new OverwriteChangeContext(current, current, actor?.CurrentActorSubject, RoleChangePhase.Before, ct);
+        var context = Removal(current, ct);
         await RoleEventRegistry.Before(RoleEventKind.OverwriteRemoving, context);
         using (RoleMutationGuard.Allow<PermissionOverwrite>(current.Id, EntityLifecycleOperation.Remove)) await current.Remove(ct);
-        bags.InvalidateOverwrites(current.ResourceId);
+        bags.InvalidateOverwrite(current);
         await RoleEventRegistry.After(RoleEventKind.OverwriteRemoved, context with { Phase = RoleChangePhase.After });
     }
 
-    /// <summary>The overwrites one subject holds across resources, bounded by the per-subject maximum.</summary>
-    internal async Task<IReadOnlyList<PermissionOverwrite>> OverwritesOf(OverwriteSubjectKind subjectKind, string subjectId, CancellationToken ct)
+    /// <summary>Removes one of a deleted role's overwrites, whose before-event already ran; the overwrite lock is held.</summary>
+    private async ValueTask RemoveWithRole(PermissionOverwrite row, CancellationToken ct)
     {
-        var query = new QueryDefinition { Page = 1, PageSize = _options.MaxOverwritesPerSubject + 1 };
-        var rows = await PermissionOverwrite.Query(row => row.SubjectKind == subjectKind && row.SubjectId == subjectId, query, ct);
-        if (rows.Count > _options.MaxOverwritesPerSubject) throw SubjectBound(subjectKind, subjectId);
-        return rows;
+        using (RoleMutationGuard.Allow<PermissionOverwrite>(row.Id, EntityLifecycleOperation.Remove)) await row.Remove(ct);
+        bags.InvalidateOverwrite(row);
+        await RoleEventRegistry.After(RoleEventKind.OverwriteRemoved, Removal(row, ct) with { Phase = RoleChangePhase.After });
     }
 
-    /// <summary>The overwrites, across resources, that apply to a bag: on everyone, on its other roles, on its person.</summary>
-    internal async Task<IReadOnlyList<PermissionOverwrite>> OverwritesFor(RoleBag bag, CancellationToken ct)
+    /// <summary>Visits every overwrite of a role, a page at a time; changing or removing the one visited does not move the cursor.</summary>
+    private async Task EachOverwriteOf(string roleKey, Func<PermissionOverwrite, ValueTask> visit, CancellationToken ct)
     {
-        var subjects = bag.Roles.ToList();
-        if (bag.PersonId is { } person && !subjects.Contains(person, StringComparer.Ordinal)) subjects.Add(person);
-        var bound = (int)Math.Min(int.MaxValue - 1, 2L * subjects.Count * _options.MaxOverwritesPerSubject);
-        var rows = await PermissionOverwrite.Query(row => subjects.Contains(row.SubjectId), new QueryDefinition { Page = 1, PageSize = bound + 1 }, ct);
-        if (rows.Count > bound) throw new InvalidOperationException($"The overwrites of person '{bag.PersonId}' and their roles exceed the configured bound of {_options.MaxOverwritesPerSubject} per subject.");
-        return rows.Where(row => row.SubjectKind == OverwriteSubjectKind.Role ? bag.InRole(row.SubjectId) : row.SubjectId == bag.PersonId).ToList();
+        for (string? after = null; ;)
+        {
+            var page = await OverwritesOf(OverwriteSubjectKind.Role, roleKey, after, _options.MaxPageSize, ct);
+            foreach (var row in page.Items) await visit(row);
+            if ((after = page.Next) is null) return;
+        }
     }
 
-    private Task<Role> ChangeMember(string roleKey, string personId, bool add, CancellationToken ct)
-    {
-        personId = RoleContract.Require(personId, nameof(personId));
-        return Mutate(roleKey, personId, add ? RoleEventKind.MemberAdding : RoleEventKind.MemberRemoving,
-            add ? RoleEventKind.MemberAdded : RoleEventKind.MemberRemoved, current =>
-            {
-                current = Require(current, roleKey); var members = current.Members.ToHashSet(StringComparer.Ordinal);
-                var changed = add ? members.Add(personId) : members.Remove(personId);
-                if (!changed) return Task.FromResult(current);
-                if (members.Count > _options.MaxMembersPerRole)
-                    throw new RoleBoundException(Key(nameof(RoleOptions.MaxMembersPerRole)),
-                        $"Role '{roleKey}' already holds the configured maximum of {_options.MaxMembersPerRole} members " +
-                        $"({RoleOptions.SectionPath}:{nameof(RoleOptions.MaxMembersPerRole)}). Remove a member, or raise the bound.");
-                return Task.FromResult(Copy(current, members: members.Order(StringComparer.Ordinal).ToArray()));
-            }, ct);
-    }
+    private OverwriteChangeContext Removal(PermissionOverwrite row, CancellationToken ct)
+        => new(row, row, actor?.CurrentActorSubject, RoleChangePhase.Before, ct);
 
-    private async Task<Role> Mutate(string roleKey, string? subject, RoleEventKind beforeKind, RoleEventKind afterKind,
-        Func<Role?, Task<Role>> change, CancellationToken ct)
+    /// <summary>
+    /// Changes the role document. A change that can alter a bag — a role defined, or its permissions changed —
+    /// compiles every bag again rather than reading the role's members: such changes are rare, and a bag compiles from
+    /// two bounded reads. A rename or a metadata change alters no bag.
+    /// </summary>
+    private async Task<Role> Mutate(string roleKey, RoleEventKind beforeKind, RoleEventKind afterKind,
+        Func<Role?, Role> change, CancellationToken ct)
     {
         DemandImmediate();
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
         await using var gate = await Enter(roleKey, ct);
-        var previous = await Role.Get(roleKey, ct); var next = await change(previous);
+        var previous = await RoleReads.ExactRole(roleKey, ct); var next = change(previous);
         if (ReferenceEquals(previous, next) || (previous is not null && Equivalent(previous, next))) return previous ?? next;
-        var context = Context(previous ?? next, next, subject, RoleChangePhase.Before, ct);
+        var context = Context(previous ?? next, next, null, RoleChangePhase.Before, ct);
         await RoleEventRegistry.Before(beforeKind, context);
-        var alsoPermissions = previous is not null && beforeKind == RoleEventKind.RoleChanging &&
-                              !previous.Permissions.SequenceEqual(next.Permissions, StringComparer.Ordinal);
+        var permissionsChanged = previous is not null && !previous.Permissions.SequenceEqual(next.Permissions, StringComparer.Ordinal);
+        var alsoPermissions = permissionsChanged && beforeKind == RoleEventKind.RoleChanging;
         if (alsoPermissions) await RoleEventRegistry.Before(RoleEventKind.PermissionsChanging, context);
-        using (RoleMutationGuard.Allow<Role>(roleKey, EntityLifecycleOperation.Upsert)) next = await next.Save(ct);
-        InvalidateBags(roleKey, (previous?.Members ?? []).Concat(next.Members));
+        using (RoleMutationGuard.Allow<Role>(next.Id, EntityLifecycleOperation.Upsert)) next = await next.Save(ct);
+        if (previous is null || permissionsChanged) bags.InvalidateAll();
         if (alsoPermissions) await RoleEventRegistry.After(RoleEventKind.PermissionsChanged, context with { Current = next, Phase = RoleChangePhase.After });
         await RoleEventRegistry.After(afterKind, context with { Current = next, Phase = RoleChangePhase.After });
         return next;
@@ -248,8 +407,8 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
 
     /// <summary>
     /// Refuses, before any lock is taken, a change asked for by a role lifecycle handler, and a change asked for inside
-    /// a deferred scope. A role or overwrite change is a read-modify-write under this collection's lock, with
-    /// before-events, cache invalidation and after-events around one write; a deferred scope would hold the write
+    /// a deferred scope. A role, member or overwrite change is a read-modify-write under this collection's lock, with
+    /// before-events, cache invalidation and after-events around its write; a deferred scope would hold the write
     /// until its commit while the rest ran now.
     /// </summary>
     private static void DemandImmediate()
@@ -262,28 +421,35 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
                 "Make the change after EntityContext.Commit(), outside the scope.");
     }
 
-    private void InvalidateBags(string roleKey, IEnumerable<string> members)
+    private void RequireTake(int take)
     {
-        if (RoleContract.IsImplicitRole(roleKey)) bags.InvalidateAll();
-        else bags.Invalidate(members);
+        if (take < 1 || take > _options.MaxPageSize)
+            throw new ArgumentOutOfRangeException(nameof(take), take, $"take must be between 1 and {_options.MaxPageSize}.");
     }
 
-    private async Task DemandRoom(string resourceId, OverwriteSubjectKind subjectKind, string subjectId, CancellationToken ct)
+    private const char CursorSeparator = ':';
+
+    /// <summary>A resource listing's cursor: the subject kind it is reading, and the cursor within that kind, if any.</summary>
+    private static string ResourceCursor(OverwriteSubjectKind kind, string? within) => $"{kind}{CursorSeparator}{within}";
+
+    private static (OverwriteSubjectKind Kind, string? Within) ResourceCursor(string? after)
     {
-        var onResource = await PermissionOverwrite.Count.Where(row => row.ResourceId == resourceId, CountStrategy.Exact, ct);
-        if (onResource >= _options.MaxOverwritesPerResource)
-            throw new RoleBoundException(Key(nameof(RoleOptions.MaxOverwritesPerResource)),
-                $"Resource '{resourceId}' already holds the configured maximum of {_options.MaxOverwritesPerResource} overwrites " +
-                $"({RoleOptions.SectionPath}:{nameof(RoleOptions.MaxOverwritesPerResource)}). Remove an overwrite on it, or raise the bound.");
-        var ofSubject = await PermissionOverwrite.Count.Where(row => row.SubjectKind == subjectKind && row.SubjectId == subjectId, CountStrategy.Exact, ct);
-        if (ofSubject >= _options.MaxOverwritesPerSubject) throw SubjectBound(subjectKind, subjectId);
+        if (string.IsNullOrWhiteSpace(after)) return (OverwriteSubjectKind.Role, null);
+        var at = after.IndexOf(CursorSeparator, StringComparison.Ordinal);
+        if (at < 1 || !Enum.TryParse<OverwriteSubjectKind>(after[..at], ignoreCase: false, out var kind) || !Enum.IsDefined(kind))
+            throw new ArgumentException($"'{after}' is not a cursor this listing handed back.", nameof(after));
+        var within = after[(at + 1)..];
+        _ = RoleReads.ParseCursor(within);
+        return (kind, within.Length == 0 ? null : within);
     }
+
+    /// <summary>The membership a read by key returned, when it names exactly this role and person.</summary>
+    private static RoleMember? Exact(RoleMember? member, string roleKey, string personId)
+        => member is not null && StringComparer.Ordinal.Equals(member.RoleKey, roleKey) && StringComparer.Ordinal.Equals(member.PersonId, personId)
+            ? member
+            : null;
 
     private static string Key(string bound) => $"{RoleOptions.SectionPath}:{bound}";
-
-    private RoleBoundException SubjectBound(OverwriteSubjectKind subjectKind, string subjectId) => new(Key(nameof(RoleOptions.MaxOverwritesPerSubject)),
-        $"{subjectKind} '{subjectId}' already holds the configured maximum of {_options.MaxOverwritesPerSubject} overwrites " +
-        $"({RoleOptions.SectionPath}:{nameof(RoleOptions.MaxOverwritesPerSubject)}). Remove one of its overwrites, or raise the bound.");
 
     private static string RequireSubject(OverwriteSubjectKind subjectKind, string subjectId)
     {
@@ -306,6 +472,12 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
 
     private async Task<IAsyncDisposable> Enter(string key, CancellationToken ct) { var s = _locks.GetOrAdd(key, _ => new(1, 1)); await s.WaitAsync(ct); return new Releaser(s); }
     private async Task<IAsyncDisposable> EnterOverwrites(CancellationToken ct) { await _overwriteLock.WaitAsync(ct); return new Releaser(_overwriteLock); }
+    private async Task<IAsyncDisposable> EnterPerson(string personId, CancellationToken ct)
+    {
+        var stripe = _personLocks[(int)((uint)StringComparer.Ordinal.GetHashCode(personId) % PersonLockStripes)];
+        await stripe.WaitAsync(ct);
+        return new Releaser(stripe);
+    }
     private RoleChangeContext Context(Role previous, Role current, string? subject, RoleChangePhase phase, CancellationToken ct) => new(previous, current, subject, actor?.CurrentActorSubject, phase, ct);
     private string[] NormalizePermissions(IEnumerable<string> p) => RoleContract.Normalize(p, _options.MaxPermissionsPerRole, nameof(p), allowEmpty: true);
     private static Role Require(Role? role, string key) => role ?? throw new KeyNotFoundException($"Role '{key}' does not exist.");
@@ -313,12 +485,11 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     {
         if (metadata is null) return [];
         if (metadata.Count > _options.MaxMetadataEntries) throw new ArgumentException($"Metadata exceeds the configured bound of {_options.MaxMetadataEntries} entries.", nameof(metadata));
-        return metadata.ToDictionary(entry => RoleContract.Require(entry.Key, "metadata key", 64), entry => RoleContract.Require(entry.Value, "metadata value", 512), StringComparer.Ordinal);
+        return metadata.ToDictionary(entry => RoleContract.Require(entry.Key, "metadata key", 64), entry => RoleContract.RequireText(entry.Value, "metadata value", 512), StringComparer.Ordinal);
     }
-    private Role Copy(Role r, string? name = null, IEnumerable<string>? permissions = null, IEnumerable<string>? members = null, IReadOnlyDictionary<string, string>? metadata = null) => new() { Id = r.Id, Name = name ?? r.Name, Permissions = [.. permissions ?? r.Permissions], Members = [.. members ?? r.Members], Metadata = metadata?.ToDictionary() ?? r.Metadata.ToDictionary(), UpdatedBy = actor?.CurrentActorSubject };
-    private static bool Equivalent(Role left, Role right) => left.Id == right.Id && left.Name == right.Name &&
+    private Role Copy(Role r, string? name = null, IEnumerable<string>? permissions = null, IReadOnlyDictionary<string, string>? metadata = null) => new() { Id = r.Id, Key = r.Key, Name = name ?? r.Name, Permissions = [.. permissions ?? r.Permissions], Metadata = metadata?.ToDictionary() ?? r.Metadata.ToDictionary(), UpdatedBy = actor?.CurrentActorSubject };
+    private static bool Equivalent(Role left, Role right) => left.Id == right.Id && left.Key == right.Key && left.Name == right.Name &&
         left.Permissions.SequenceEqual(right.Permissions, StringComparer.Ordinal) &&
-        left.Members.SequenceEqual(right.Members, StringComparer.Ordinal) &&
         left.Metadata.Count == right.Metadata.Count && left.Metadata.All(entry => right.Metadata.TryGetValue(entry.Key, out var value) && value == entry.Value);
     private static bool Equivalent(PermissionOverwrite left, PermissionOverwrite right) => left.ResourceId == right.ResourceId &&
         left.SubjectKind == right.SubjectKind && left.SubjectId == right.SubjectId && left.ExpiresAt == right.ExpiresAt &&

@@ -42,8 +42,16 @@ public sealed class RoleWebSpec
             (await saved.Content.ReadAsStringAsync()).Should().Contain("#45a67f").And.Contain("global:topic_read");
 
             (await client.PutAsync($"/api/identity/roles/{key}/members/person:web", null)).StatusCode.Should().Be(HttpStatusCode.OK);
-            var members = await client.GetStringAsync($"/api/identity/roles/{key}/members?page=1&pageSize=10");
-            members.Should().Contain("person:web");
+            (await client.PutAsync($"/api/identity/roles/{key}/members/person:web-two", null)).StatusCode.Should().Be(HttpStatusCode.OK);
+            var first = await client.GetStringAsync($"/api/identity/roles/{key}/members?take=1");
+            first.Should().Contain("person:web");
+            var next = Next(first);
+            next.Should().EndWith(":person:web", "the cursor names the last row returned");
+            var second = await client.GetStringAsync($"/api/identity/roles/{key}/members?after={Uri.EscapeDataString(next!)}&take=1");
+            second.Should().Contain("person:web-two").And.NotContain("\"next\"", "the last page has no next");
+            (await client.GetAsync($"/api/identity/roles/{key}/members?take=101")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await client.DeleteAsync($"/api/identity/roles/{key}/members/person:web-two")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+            (await client.DeleteAsync($"/api/identity/roles/{key}/members/person:web-two")).StatusCode.Should().Be(HttpStatusCode.NotFound);
             (await client.GetStringAsync("/api/identity/roles?search=Member&page=1&pageSize=10")).Should().Contain(key);
             (await client.GetAsync("/api/identity/roles?pageSize=101")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
             var tooMuchMetadata = Enumerable.Range(0, 33).ToDictionary(index => $"key:{index}", _ => "value");
@@ -66,17 +74,18 @@ public sealed class RoleWebSpec
         var database = Path.Combine(Path.GetTempPath(), $"koan-role-bound-web-{Guid.CreateVersion7():n}.db");
         try
         {
-            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxMembersPerRole"] = "1" });
+            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxRolesPerPerson"] = "1" });
             using var client = host.GetTestClient();
             client.BaseAddress = new Uri("http://localhost");
             Authorize(client, "operator:web", true);
-            (await client.PutAsJsonAsync("/api/identity/roles/role:small", new { name = "Small", permissions = new[] { "global:post" } }))
-                .StatusCode.Should().Be(HttpStatusCode.OK);
+            foreach (var key in new[] { "role:small", "role:other" })
+                (await client.PutAsJsonAsync($"/api/identity/roles/{key}", new { name = key, permissions = new[] { "global:post" } }))
+                    .StatusCode.Should().Be(HttpStatusCode.OK);
             (await client.PutAsync("/api/identity/roles/role:small/members/person:one", null)).StatusCode.Should().Be(HttpStatusCode.OK);
 
-            var full = await client.PutAsync("/api/identity/roles/role:small/members/person:two", null);
+            var full = await client.PutAsync("/api/identity/roles/role:other/members/person:one", null);
             full.StatusCode.Should().Be(HttpStatusCode.Conflict);
-            (await full.Content.ReadAsStringAsync()).Should().Contain("MaxMembersPerRole").And.Contain("Remove a member, or raise the bound");
+            (await full.Content.ReadAsStringAsync()).Should().Contain("MaxRolesPerPerson").And.Contain("Remove one of their roles, or raise the bound");
         }
         finally { if (File.Exists(database)) File.Delete(database); }
     }
@@ -87,7 +96,8 @@ public sealed class RoleWebSpec
         var database = Path.Combine(Path.GetTempPath(), $"koan-overwrite-web-{Guid.CreateVersion7():n}.db");
         try
         {
-            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxOverwritesPerResource"] = "2" });
+            // A configuration still naming a removed bound starts and bounds nothing.
+            using var host = await Start(database, new() { ["Koan:Identity:Roles:MaxOverwritesPerSubject"] = "1" });
             using var client = host.GetTestClient();
             client.BaseAddress = new Uri("http://localhost");
             const string resource = "tangent/the workshop";
@@ -97,21 +107,28 @@ public sealed class RoleWebSpec
             (await client.GetAsync($"/api/identity/overwrites{query}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
             Authorize(client, "operator:web", true);
-            (await client.GetStringAsync("/api/identity/roles/descriptor")).Should().Contain(RoleTokens.Administrator).And.Contain("maxOverwritesPerResource");
+            (await client.GetStringAsync("/api/identity/roles/descriptor")).Should().Contain(RoleTokens.Administrator).And.Contain("maxRolesPerPerson").And.NotContain("maxOverwritesPerResource");
             (await client.PutAsJsonAsync("/api/identity/roles/role:guests", new { name = "Guests", permissions = new[] { "global:post" } }))
                 .StatusCode.Should().Be(HttpStatusCode.OK);
 
             var saved = await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:guests{query}", new { deny = new[] { "global:post" } });
             saved.StatusCode.Should().Be(HttpStatusCode.OK);
             (await saved.Content.ReadAsStringAsync()).Should().Contain(resource).And.Contain("global:post");
+            (await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:guests?resource=tangent%2Felsewhere", new { deny = new[] { "global:post" } }))
+                .StatusCode.Should().Be(HttpStatusCode.OK, "a subject holds any number of overwrites");
             (await client.PutAsJsonAsync($"/api/identity/overwrites/person/person:web{query}", new { allow = new[] { "global:post" } }))
                 .StatusCode.Should().Be(HttpStatusCode.OK);
+            (await client.PutAsJsonAsync($"/api/identity/overwrites/role/everyone{query}", new { allow = new[] { "global:view" } }))
+                .StatusCode.Should().Be(HttpStatusCode.OK, "a resource holds any number of overwrites");
             var listed = await client.GetStringAsync($"/api/identity/overwrites{query}");
-            listed.Should().Contain("role:guests").And.Contain("person:web");
-
-            var full = await client.PutAsJsonAsync($"/api/identity/overwrites/role/everyone{query}", new { allow = new[] { "global:view" } });
-            full.StatusCode.Should().Be(HttpStatusCode.Conflict);
-            (await full.Content.ReadAsStringAsync()).Should().Contain("MaxOverwritesPerResource");
+            listed.Should().Contain("role:guests").And.Contain("person:web").And.Contain("everyone").And.NotContain("\"next\"", "the last page has no next");
+            var paged = await client.GetStringAsync($"/api/identity/overwrites{query}&take=2");
+            paged.Should().Contain("everyone").And.Contain("role:guests").And.NotContain("person:web");
+            var after = Next(paged);
+            after.Should().Be("Person:", "the resource's roles filled the page, so the next one starts with its people");
+            (await client.GetStringAsync($"/api/identity/overwrites{query}&after={Uri.EscapeDataString(after!)}&take=2"))
+                .Should().Contain("person:web").And.NotContain("\"next\"", "the last page has no next");
+            (await client.GetAsync($"/api/identity/overwrites{query}&after=nonsense")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
             (await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:missing{query}", new { allow = new[] { "global:post" } }))
                 .StatusCode.Should().Be(HttpStatusCode.NotFound);
             (await client.PutAsJsonAsync($"/api/identity/overwrites/role/role:guests{query}", new { allow = new[] { RoleTokens.Administrator } }))
@@ -145,6 +162,9 @@ public sealed class RoleWebSpec
         });
         return await builder.StartAsync(TestContext.Current.CancellationToken);
     }
+
+    private static string? Next(string page)
+        => System.Text.Json.JsonDocument.Parse(page).RootElement.TryGetProperty("next", out var next) ? next.GetString() : null;
 
     private static void Authorize(HttpClient client, string subject, bool op)
     {

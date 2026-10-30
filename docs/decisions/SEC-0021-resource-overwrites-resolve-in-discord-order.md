@@ -9,9 +9,20 @@ related:
   - SEC-0007
   - SEC-0009
   - DATA-0131
+amended_by: SEC-0030
 ---
 
 # SEC-0021: A resource allows and denies beyond what roles grant, through overwrites resolved in Discord's order
+
+> **Amended by [SEC-0030](SEC-0030-bounds-belong-to-reads.md) (2026-10-30): the role model's bounds belong to its
+> reads.** Resolution, its order, the deciding fact, revoke, events, the guard and the deferred-scope refusal stand.
+> These parts are replaced: `MaxOverwritesPerResource` and `MaxOverwritesPerSubject` are removed, and no overwrite
+> write is refused for a count; a bag is evaluated over `RoleCollection.OverwritesFor(bag, resource)` — the resource's
+> role overwrites, compiled per resource, and the person's own, read by key — while `Overwrites(resource, after, take)`
+> and `OverwritesOf(...)` are paged listings; `PermissionOverwriteAccessContributor` is removed, so the identity-wide
+> effective-access view carries no overwrite facts and `AccessExplainer.WhyAsync` reads them for the resource asked;
+> the caches evict instead of emptying; and a role's members are `RoleMember` rows, so `MaxMembersPerRole` and its
+> 409 are gone. The text below records the decision as it was made.
 
 ## Context
 

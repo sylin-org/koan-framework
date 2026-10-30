@@ -155,14 +155,14 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
     [Fact]
     public async Task Only_a_bound_answers_409_and_a_handler_failure_keeps_its_own_exception()
     {
-        var options = Options.Create(new RoleOptions { MaxMembersPerRole = 1, MaxOverwritesPerResource = 1 });
+        var options = Options.Create(new RoleOptions { MaxRolesPerPerson = 1 });
         var bounded = new RoleCollection(new RoleBagCache(options), options);
         var suffix = Guid.NewGuid().ToString("N");
         var key = $"role:small:{suffix}";
-        var resource = $"resource:small:{suffix}";
+        var other = $"role:other:{suffix}";
         await bounded.Define(key, "Small", [P]);
+        await bounded.Define(other, "Other", [P]);
         var roleRoutes = Operator(new Koan.Identity.Web.RoleManagementController(bounded, options));
-        var overwriteRoutes = Operator(new Koan.Identity.Web.PermissionOverwriteController(bounded));
         var deny = new Koan.Identity.Web.PermissionOverwriteController.SaveOverwriteRequest(null, [P]);
 
         Koan.Data.Core.Model.Entity.Role.Reset()
@@ -181,14 +181,11 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
 
         (await roleRoutes.AddMember(key, $"person:one:{suffix}", default)).Result.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>();
-        var memberBound = (await roleRoutes.AddMember(key, $"person:two:{suffix}", default)).Result
+        var roleBound = (await roleRoutes.AddMember(other, $"person:one:{suffix}", default)).Result
             .Should().BeOfType<Microsoft.AspNetCore.Mvc.ConflictObjectResult>().Subject;
-        memberBound.Value!.ToString().Should().Contain("MaxMembersPerRole");
-        (await overwriteRoutes.Put(OverwriteSubjectKind.Role, key, resource, deny, default)).Result.Should().BeOfType<Microsoft.AspNetCore.Mvc.OkObjectResult>();
-        (await overwriteRoutes.Put(OverwriteSubjectKind.Role, RoleTokens.Everyone, resource, deny, default)).Result
-            .Should().BeOfType<Microsoft.AspNetCore.Mvc.ConflictObjectResult>().Which.Value!.ToString().Should().Contain("MaxOverwritesPerResource");
-        var bound = () => bounded.Add(key, $"person:three:{suffix}");
-        (await bound.Should().ThrowAsync<RoleBoundException>()).Which.ConfigurationKey.Should().Be("Koan:Identity:Roles:MaxMembersPerRole");
+        roleBound.Value!.ToString().Should().Contain("MaxRolesPerPerson").And.Contain("Remove one of their roles, or raise the bound");
+        var bound = () => bounded.Add(other, $"person:one:{suffix}");
+        (await bound.Should().ThrowAsync<RoleBoundException>()).Which.ConfigurationKey.Should().Be("Koan:Identity:Roles:MaxRolesPerPerson");
     }
 
     private static T Operator<T>(T controller) where T : Microsoft.AspNetCore.Mvc.ControllerBase
@@ -230,7 +227,7 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         (await explainer.RevokeAsync(new AccessFactRef(fact.RowType, fact.RowId, fact.Subject))).Should().BeFalse(
             "a handle that does not name the permission revokes nothing");
         (await explainer.RevokeAsync(fact.Ref)).Should().BeTrue();
-        (await Roles.Overwrites(resource)).Should().BeEmpty("the overwrite named nothing else, so revoking its one deny removed it");
+        (await Roles.Overwrites(resource)).Items.Should().BeEmpty("the overwrite named nothing else, so revoking its one deny removed it");
         (await explainer.Explain(person, resource, P)).Allowed.Should().BeTrue();
         (await explainer.RevokeAsync(fact.Ref)).Should().BeFalse("nothing is left to revoke");
     }
@@ -257,7 +254,7 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         (await explainer.Explain(person, board, P)).Allowed.Should().BeFalse("revoking the allow of global:pin must not lift the row's denies");
         (await explainer.Explain(person, board, topic)).Allowed.Should().BeFalse();
         (await explainer.Explain(person, board, pin)).Allowed.Should().BeFalse("the revoked allow is gone");
-        var row = (await Roles.Overwrites(board)).Should().ContainSingle().Subject;
+        var row = (await Roles.Overwrites(board)).Items.Should().ContainSingle().Subject;
         row.Allow.Should().BeEmpty();
         row.Deny.Should().Equal(P, topic);
 
@@ -265,17 +262,17 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         (await explainer.RevokeAsync(denyPost.Ref)).Should().BeTrue();
         (await explainer.Explain(person, board, P)).Allowed.Should().BeTrue("the revoked deny is lifted");
         (await explainer.Explain(person, board, topic)).Allowed.Should().BeFalse("only that deny was removed");
-        (await Roles.Overwrites(board)).Single().Deny.Should().Equal(topic);
+        (await Roles.Overwrites(board)).Items.Single().Deny.Should().Equal(topic);
 
         var notPermission = new AccessFactRef(nameof(PermissionOverwrite), denyPost.RowId, null, AccessFactKind.Deny, "topic");
         (await explainer.RevokeAsync(notPermission)).Should().BeFalse("a value that is not a permission revokes nothing");
         (await explainer.RevokeAsync(new AccessFactRef(nameof(PermissionOverwrite), new string('x', 300), null, AccessFactKind.Deny, topic)))
             .Should().BeFalse("an id that cannot name a row revokes nothing");
-        (await Roles.Overwrites(board)).Single().Deny.Should().Equal([topic], "the row is unchanged");
+        (await Roles.Overwrites(board)).Items.Single().Deny.Should().Equal([topic], "the row is unchanged");
 
         var denyTopic = (await explainer.Explain(person, board, topic)).ContributingFacts.Single();
         (await explainer.RevokeAsync(denyTopic.Ref)).Should().BeTrue();
-        (await Roles.Overwrites(board)).Should().BeEmpty("the row is removed once both lists are empty");
+        (await Roles.Overwrites(board)).Items.Should().BeEmpty("the row is removed once both lists are empty");
     }
 
     [Fact]
@@ -327,7 +324,7 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
     }
 
     [Fact]
-    public async Task Contributor_emits_allows_and_denies_on_their_resource_and_skips_an_expired_overwrite()
+    public async Task Why_names_the_overwrites_on_the_resource_asked_about_and_skips_an_expired_one()
     {
         var suffix = Guid.NewGuid().ToString("N");
         var person = $"person:contributor:{suffix}";
@@ -343,41 +340,115 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         await Task.Delay(400, TestContext.Current.CancellationToken);
 
         using var scope = _fixture.Services.CreateScope();
-        var access = await scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>().ResolveAsync(person);
-        // Everyone's overwrites apply to every person, so only this spec's resources are asserted.
-        var overwriteFacts = access.Facts.Where(f => f.Source == nameof(PermissionOverwrite) && f.Resource.EndsWith(suffix, StringComparison.Ordinal)).ToList();
-
-        overwriteFacts.Should().BeEquivalentTo(new[]
+        var explainer = scope.ServiceProvider.GetRequiredService<AccessExplainer>();
+        OverwriteFacts(await explainer.WhyAsync(person, $"resource:a:{suffix}")).Should().BeEquivalentTo(new[]
         {
             new { Kind = AccessFactKind.Permission, Value = P, Resource = $"resource:a:{suffix}", Subject = member },
             new { Kind = AccessFactKind.Deny, Value = View, Resource = $"resource:a:{suffix}", Subject = member },
+        });
+        OverwriteFacts(await explainer.WhyAsync(person, $"resource:b:{suffix}")).Should().BeEquivalentTo(new[]
+        {
             new { Kind = AccessFactKind.Permission, Value = "global:pin", Resource = $"resource:b:{suffix}", Subject = person },
         });
-        overwriteFacts.Should().OnlyContain(f => f.RowType == nameof(PermissionOverwrite));
-        access.Capabilities.Should().Contain([View, P, "global:pin"]).And.NotContain("global:short_lived");
+        OverwriteFacts(await explainer.WhyAsync(person, $"resource:c:{suffix}")).Should().BeEmpty("the person does not hold that role");
+        OverwriteFacts(await explainer.WhyAsync(person, $"resource:d:{suffix}")).Should().BeEmpty("the overwrite expired");
+        OverwriteFacts(await explainer.WhyAsync(person, $"resource:a:{suffix}")).Should().OnlyContain(f => f.RowType == nameof(PermissionOverwrite));
+
+        var access = await scope.ServiceProvider.GetRequiredService<EffectiveAccessResolver>().ResolveAsync(person);
+        access.Facts.Should().NotContain(f => f.Source == nameof(PermissionOverwrite),
+            "an overwrite holds on one resource, so it is asked of that resource, never listed for every resource");
+        access.Capabilities.Should().Contain(View).And.NotContain("global:pin");
+
+        static IEnumerable<AccessFact> OverwriteFacts(IReadOnlyList<AccessFact> facts) => facts.Where(f => f.Source == nameof(PermissionOverwrite));
     }
 
+    /// <summary>
+    /// Reading only the rows a bag can meet gives the answer every overwrite on the resource gives: the same
+    /// permissions and the same deciding fact, for a person in several roles, a person in none, and a visitor.
+    /// </summary>
     [Fact]
-    public async Task Bounds_refuse_a_new_overwrite_with_a_corrective_explanation_and_a_replacement_still_lands()
+    public async Task OverwritesFor_resolves_as_every_overwrite_on_the_resource_does()
     {
-        var options = Options.Create(new RoleOptions { MaxOverwritesPerResource = 2, MaxOverwritesPerSubject = 2 });
-        var roles = new RoleCollection(new RoleBagCache(options), options);
         var suffix = Guid.NewGuid().ToString("N");
-        var resource = $"resource:bounded:{suffix}";
-        await roles.Overwrite(resource, OverwriteSubjectKind.Person, $"person:a:{suffix}", [], [P]);
-        await roles.Overwrite(resource, OverwriteSubjectKind.Person, $"person:b:{suffix}", [], [P]);
+        var resource = $"resource:equivalent:{suffix}";
+        string Role(string name) => $"role:{name}:{suffix}";
+        string Person(string name) => $"person:{name}:{suffix}";
+        foreach (var name in new[] { "a", "b", "c" }) await Roles.Define(Role(name), name, [View]);
+        await Roles.Add(Role("a"), Person("one"));
+        await Roles.Add(Role("a"), Person("two"));
+        await Roles.Add(Role("b"), Person("two"));
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [View], [P]);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, Role("a"), [P], []);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, Role("b"), [], [View, "global:pin"]);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, Role("c"), ["global:pin"], [P]);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Person, Person("one"), [], [P]);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Person, Person("three"), ["global:pin"], []);
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Person, Person("elsewhere"), [], [View]);
 
-        var third = () => roles.Overwrite(resource, OverwriteSubjectKind.Person, $"person:c:{suffix}", [], [P]);
-        (await third.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should()
-            .Contain("MaxOverwritesPerResource").And.Contain("Remove an overwrite on it, or raise the bound");
-        (await roles.Overwrite(resource, OverwriteSubjectKind.Person, $"person:a:{suffix}", [P], [])).Allow.Should().Equal(P);
+        var every = new List<PermissionOverwrite>();
+        for (string? after = null; ;)
+        {
+            var page = await Roles.Overwrites(resource, after, take: 2);
+            every.AddRange(page.Items);
+            if ((after = page.Next) is null) break;
+        }
 
-        var subject = $"person:busy:{suffix}";
-        await roles.Overwrite($"resource:one:{suffix}", OverwriteSubjectKind.Person, subject, [], [P]);
-        await roles.Overwrite($"resource:two:{suffix}", OverwriteSubjectKind.Person, subject, [], [P]);
-        var another = () => roles.Overwrite($"resource:three:{suffix}", OverwriteSubjectKind.Person, subject, [], [P]);
-        (await another.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should()
-            .Contain("MaxOverwritesPerSubject").And.Contain("Remove one of its overwrites, or raise the bound");
+        every.Should().HaveCount(7);
+        var now = DateTimeOffset.UtcNow;
+        foreach (var bag in new[] { await Roles.Bag(Person("one"), true), await Roles.Bag(Person("two"), true), await Roles.Bag(Person("three"), true), await Roles.Bag(null, false) })
+        {
+            var full = bag.On(resource, every, now);
+            var lean = bag.On(resource, await Roles.OverwritesFor(bag, resource), now);
+            lean.Permissions.Should().Equal(full.Permissions, bag.PersonId ?? "visitor");
+            foreach (var permission in new[] { P, View, "global:pin", "global:unknown" })
+                lean.Explain(permission).Should().BeEquivalentTo(full.Explain(permission), $"{bag.PersonId ?? "visitor"} {permission}");
+        }
+    }
+
+    /// <summary>The administration listings read a page at a time: a resource's overwrites, roles first by key and then
+    /// people by id, and a subject's across resources in resource order.</summary>
+    [Fact]
+    public async Task A_resources_and_a_subjects_overwrites_page_with_a_cursor()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        var resource = $"resource:listed:{suffix}";
+        var roleKeys = new[] { $"role:x:{suffix}", $"role:y:{suffix}" };
+        foreach (var key in roleKeys) await Roles.Define(key, key, []);
+        var people = Enumerable.Range(0, 5).Select(i => $"person:listed:{suffix}:{i}").ToArray();
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [View], []);
+        foreach (var key in roleKeys.Reverse()) await Roles.Overwrite(resource, OverwriteSubjectKind.Role, key, [P], []);
+        foreach (var person in people.Reverse()) await Roles.Overwrite(resource, OverwriteSubjectKind.Person, person, [], [P]);
+
+        var listed = new List<string>();
+        for (string? after = null; ;)
+        {
+            var page = await Roles.Overwrites(resource, after, take: 3);
+            listed.AddRange(page.Items.Select(row => $"{row.SubjectKind}/{row.SubjectId}"));
+            if ((after = page.Next) is null) break;
+        }
+
+        string[] roleSubjects = [RoleTokens.Everyone, .. roleKeys];
+        listed.Should().Equal([.. roleSubjects.Order(StringComparer.Ordinal).Select(key => $"Role/{key}"), .. people.Select(person => $"Person/{person}")],
+            "roles first by key, then people by id, each once");
+
+        var subject = $"person:many-resources:{suffix}";
+        var places = Enumerable.Range(0, 7).Select(i => $"resource:place:{suffix}:{i}").ToArray();
+        foreach (var place in places.Reverse()) await Roles.Overwrite(place, OverwriteSubjectKind.Person, subject, [View], []);
+        var pages = new List<IReadOnlyList<string>>();
+        for (string? after = null; ;)
+        {
+            var page = await Roles.OverwritesOf(OverwriteSubjectKind.Person, subject, after, take: 3);
+            pages.Add(page.Items.Select(row => row.ResourceId).ToArray());
+            if ((after = page.Next) is null) break;
+        }
+
+        pages.SelectMany(page => page).Should().Equal(places);
+        pages.Select(page => page.Count).Should().Equal(3, 3, 1);
+
+        var unknownCursor = () => Roles.Overwrites(resource, "Group:anything");
+        await unknownCursor.Should().ThrowAsync<ArgumentException>();
+        var tooMany = () => Roles.OverwritesOf(OverwriteSubjectKind.Person, subject, take: 101);
+        await tooMany.Should().ThrowAsync<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -397,13 +468,14 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         await past.Should().ThrowAsync<ArgumentException>();
         await unknownKind.Should().ThrowAsync<ArgumentException>();
         await unknownRole.Should().ThrowAsync<KeyNotFoundException>();
-        (await Roles.Overwrites(resource)).Should().BeEmpty();
+        (await Roles.Overwrites(resource)).Items.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task An_overwrite_change_invalidates_its_resource_and_leaves_bags_valid()
+    public async Task An_overwrite_change_invalidates_what_it_affects_and_leaves_bags_valid()
     {
         var cache = _fixture.Services.GetRequiredService<RoleBagCache>();
+        var ct = TestContext.Current.CancellationToken;
         var suffix = Guid.NewGuid().ToString("N");
         var person = $"person:cache:{suffix}";
         var resource = $"resource:cache:{suffix}";
@@ -412,19 +484,28 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         await Roles.Add(member, person);
         await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [], [P]);
 
-        var compiled = await cache.Overwrites(resource, TestContext.Current.CancellationToken);
-        (await cache.Overwrites(resource, TestContext.Current.CancellationToken)).Should().BeSameAs(compiled, "a warm read is cache-only");
+        var compiled = await cache.RoleOverwrites(resource, ct);
+        (await cache.RoleOverwrites(resource, ct)).Should().BeSameAs(compiled, "a warm read is cache-only");
         var bag = await Roles.Bag(person, true);
-        bag.On(resource, await Roles.Overwrites(resource), DateTimeOffset.UtcNow).Holds(P).Should().BeFalse();
+        bag.On(resource, await Roles.OverwritesFor(bag, resource), DateTimeOffset.UtcNow).Holds(P).Should().BeFalse();
 
         await Roles.Overwrite(resource, OverwriteSubjectKind.Person, person, [P], []);
 
-        (await cache.Overwrites(resource, TestContext.Current.CancellationToken)).Should().NotBeSameAs(compiled).And.HaveCount(2);
+        (await cache.RoleOverwrites(resource, ct)).Should().BeSameAs(compiled, "a person's own overwrite leaves the resource's role overwrites compiled");
         (await Roles.Bag(person, true)).Should().BeSameAs(bag, "a bag holds no overwrite, so an overwrite change leaves it valid");
-        bag.On(resource, await Roles.Overwrites(resource), DateTimeOffset.UtcNow).Holds(P).Should().BeTrue();
+        (await Roles.OverwritesFor(bag, resource)).Should().HaveCount(2);
+        bag.On(resource, await Roles.OverwritesFor(bag, resource), DateTimeOffset.UtcNow).Holds(P).Should().BeTrue();
+
+        await Roles.Overwrite(resource, OverwriteSubjectKind.Role, member, ["global:pin"], []);
+        (await cache.RoleOverwrites(resource, ct)).Should().NotBeSameAs(compiled, "a role overwrite change compiles the resource's role overwrites again")
+            .And.HaveCount(2);
 
         await Roles.RemoveOverwrite(resource, OverwriteSubjectKind.Person, person);
-        bag.On(resource, await Roles.Overwrites(resource), DateTimeOffset.UtcNow).Holds(P).Should().BeFalse("a removal reaches the next read");
+        bag.On(resource, await Roles.OverwritesFor(bag, resource), DateTimeOffset.UtcNow).Holds(P).Should().BeFalse("a removal reaches the next read");
+
+        var warm = await cache.RoleOverwrites(resource, ct);
+        cache.InvalidateOverwrites(resource);
+        (await cache.RoleOverwrites(resource, ct)).Should().NotBeSameAs(warm, "a host propagating a change elsewhere invalidates the resource");
     }
 
     [Fact]
@@ -442,7 +523,7 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         {
             var vetoed = () => Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [], ["global:vetoed"]);
             await vetoed.Should().ThrowAsync<UnauthorizedAccessException>();
-            (await Roles.Overwrites(resource)).Should().BeEmpty();
+            (await Roles.Overwrites(resource)).Items.Should().BeEmpty();
 
             await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [], [P]);
             await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [], [P]);
@@ -472,7 +553,7 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
             await change.Should().ThrowAsync<InvalidOperationException>().WithMessage("Recursive role mutation*");
         }
         finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
-        (await Roles.Overwrites(resource)).Should().BeEmpty();
+        (await Roles.Overwrites(resource)).Items.Should().BeEmpty();
     }
 
     [Fact]
@@ -486,9 +567,9 @@ public sealed class PermissionOverwriteSpec : IdentityHostScopedSpec
         await Roles.Overwrite(resource, OverwriteSubjectKind.Role, RoleTokens.Everyone, [View], []);
 
         (await Roles.Delete(doomed)).Should().BeTrue();
-        (await Roles.Overwrites(resource)).Should().ContainSingle().Which.SubjectId.Should().Be(RoleTokens.Everyone);
+        (await Roles.Overwrites(resource)).Items.Should().ContainSingle().Which.SubjectId.Should().Be(RoleTokens.Everyone);
         await Roles.Define(doomed, "Doomed again", [P]);
-        (await Roles.Overwrites(resource)).Should().ContainSingle("a role defined again under the key starts with no overwrite");
+        (await Roles.Overwrites(resource)).Items.Should().ContainSingle("a role defined again under the key starts with no overwrite");
     }
 
     private static RoleBag Bag(string[] permissions) => new(Person, true, [HeldRole], permissions);

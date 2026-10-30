@@ -47,7 +47,12 @@ internal static class IdentityAuditSnapshot
         }),
         Role role => JsonConvert.SerializeObject(new
         {
-            role.Id, role.Name, Permissions = role.Permissions.Count, Members = role.Members.Count, Metadata = role.Metadata.Keys.Order(), role.UpdatedAt,
+            role.Key, role.Name, Permissions = role.Permissions.Count, Metadata = role.Metadata.Keys.Order(), role.UpdatedAt,
+        }),
+        RoleMember member => JsonConvert.SerializeObject(new
+        {
+            member.RoleKey,
+            member.AddedAt,
         }),
         PermissionOverwrite overwrite => JsonConvert.SerializeObject(new
         {

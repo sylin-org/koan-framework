@@ -43,18 +43,18 @@ public sealed class IdentityAccessController : ControllerBase
     public sealed record GrantRequest(string RoleKey);
 
     [HttpPost("roles")]
-    public async Task<ActionResult<Role>> Grant([FromRoute] string id, [FromBody] GrantRequest req, CancellationToken ct)
+    public async Task<ActionResult<RoleMember>> Grant([FromRoute] string id, [FromBody] GrantRequest req, CancellationToken ct)
     {
         if (ImpersonationGuard.IsBlocked(User, "role.grant")) return StatusCode(403, new { error = "granting roles is blocked while impersonating" });
         try { return Ok(await _roles.Add(req.RoleKey, id, ct)); }
         catch (KeyNotFoundException) { return NotFound(); }
+        catch (RoleBoundException bound) { return Conflict(new { error = bound.Message }); }
     }
 
     [HttpDelete("roles/{roleKey}")]
     public async Task<IActionResult> Revoke([FromRoute] string id, [FromRoute] string roleKey, CancellationToken ct)
     {
         if (ImpersonationGuard.IsBlocked(User, ImpersonationGuard.RoleManage)) return StatusCode(403, new { error = "changing roles is blocked while impersonating" });
-        try { await _roles.Remove(roleKey, id, ct); return NoContent(); }
-        catch (KeyNotFoundException) { return NotFound(); }
+        return await _roles.Remove(roleKey, id, ct) ? NoContent() : NotFound();
     }
 }

@@ -270,11 +270,11 @@ public sealed class IdentityDayTwoSpec : IdentityHostScopedSpec
         (await RoleRoutes(operatorPrincipal).Patch(key, save with { Name = "Renamed" }, default)).Result.Should().BeOfType<OkObjectResult>();
         Refused((await RoleRoutes(impersonating).AddMember(key, $"guard-member:{suffix}", default)).Result, "roles");
         (await RoleRoutes(operatorPrincipal).AddMember(key, $"guard-member:{suffix}", default)).Result.Should().BeOfType<OkObjectResult>();
-        Refused((await RoleRoutes(impersonating).RemoveMember(key, $"guard-member:{suffix}", default)).Result, "roles");
-        (await RoleRoutes(operatorPrincipal).RemoveMember(key, $"guard-member:{suffix}", default)).Result.Should().BeOfType<OkObjectResult>();
+        Refused(await RoleRoutes(impersonating).RemoveMember(key, $"guard-member:{suffix}", default), "roles");
+        (await RoleRoutes(operatorPrincipal).RemoveMember(key, $"guard-member:{suffix}", default)).Should().BeOfType<NoContentResult>();
 
         Refused((await OverwriteRoutes(impersonating).Put(OverwriteSubjectKind.Role, key, resource, deny, default)).Result, "overwrites");
-        (await roles.Overwrites(resource)).Should().BeEmpty();
+        (await roles.Overwrites(resource)).Items.Should().BeEmpty();
         (await OverwriteRoutes(operatorPrincipal).Put(OverwriteSubjectKind.Role, key, resource, deny, default)).Result.Should().BeOfType<OkObjectResult>();
         Refused(await OverwriteRoutes(impersonating).Delete(OverwriteSubjectKind.Role, key, resource, default), "overwrites");
         (await OverwriteRoutes(operatorPrincipal).Delete(OverwriteSubjectKind.Role, key, resource, default)).Should().BeOfType<NoContentResult>();

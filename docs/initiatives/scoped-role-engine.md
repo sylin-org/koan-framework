@@ -12,6 +12,10 @@ validation:
 
 # Server role collections and compiled person bags
 
+> **Amended by [SEC-0030](../decisions/SEC-0030-bounds-belong-to-reads.md) (2026-10-30):** a role's members are
+> `RoleMember` rows read by person and by role then person, every listing is a page, and the compiled caches evict
+> instead of emptying. The card below records the model as it was first built.
+
 ## Outcome
 
 The earlier scoped-role prototype was superseded by one semantically minimal model: one server `Role` collection,

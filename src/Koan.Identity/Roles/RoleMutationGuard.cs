@@ -3,8 +3,8 @@ using Koan.Data.Core.Model;
 
 namespace Koan.Identity.Roles;
 
-/// <summary>Refuses every write to a <see cref="Role"/> or a <see cref="PermissionOverwrite"/> that
-/// <see cref="RoleCollection"/> did not permit for that row and operation.</summary>
+/// <summary>Refuses every write to a <see cref="Role"/>, a <see cref="RoleMember"/> or a <see cref="PermissionOverwrite"/>
+/// that <see cref="RoleCollection"/> did not permit for that row and operation.</summary>
 internal static class RoleMutationGuard
 {
     private static readonly AsyncLocal<Permit?> Current = new();
@@ -17,6 +17,8 @@ internal static class RoleMutationGuard
     {
         Entity<Role>.Lifecycle.BeforeUpsert(context => Demand(context));
         Entity<Role>.Lifecycle.BeforeRemove(context => Demand(context));
+        Entity<RoleMember>.Lifecycle.BeforeUpsert(context => Demand(context));
+        Entity<RoleMember>.Lifecycle.BeforeRemove(context => Demand(context));
         Entity<PermissionOverwrite>.Lifecycle.BeforeUpsert(context => Demand(context));
         Entity<PermissionOverwrite>.Lifecycle.BeforeRemove(context => Demand(context));
     }

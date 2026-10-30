@@ -1,13 +1,15 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Identity.Impersonation;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Roles;
+using Microsoft.Extensions.Options;
 
 namespace Koan.Identity.Erasure;
 
 /// <summary>Closes access first, then removes every core-owned durable-person row.</summary>
-internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IIdentityErasureContributor
+internal sealed class IdentityCoreErasureContributor(RoleCollection roles, IOptions<RoleOptions> roleOptions) : IIdentityErasureContributor
 {
     public string Owner => IdentityErasureConstants.CoreOwner;
     public int Order => 100;
@@ -15,13 +17,16 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
     public async Task<IdentityErasureOwnerPlan> PreviewAsync(string identityId, CancellationToken ct = default)
     {
         var owned = await LoadAsync(identityId, ct).ConfigureAwait(false);
-        var count = (owned.Person is null ? 0 : 1) + owned.Emails.Count + owned.Sessions.Count +
-                    owned.ExternalLinks.Count + owned.Roles.Count + owned.Overwrites.Count + owned.ImpersonationGrants.Count;
+        var memberships = await RoleMember.Count.Where(member => member.PersonId == identityId, CountStrategy.Exact, ct).ConfigureAwait(false);
+        var overwrites = await PermissionOverwrite.Count.Where(
+            row => row.SubjectKind == OverwriteSubjectKind.Person && row.SubjectId == identityId, CountStrategy.Exact, ct).ConfigureAwait(false);
+        var count = (owned.Person is null ? 0L : 1L) + owned.Emails.Count + owned.Sessions.Count +
+                    owned.ExternalLinks.Count + memberships + overwrites + owned.ImpersonationGrants.Count;
         return new IdentityErasureOwnerPlan(
             Owner,
             Order,
             Ready: true,
-            EstimatedItems: count,
+            EstimatedItems: (int)Math.Min(count, int.MaxValue),
             Summary: "Deactivate the person, close cookie access, and remove core identity dependents.");
     }
 
@@ -40,13 +45,31 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         var emailCount = await RemoveAll(owned.Emails, ct).ConfigureAwait(false);
         var sessionCount = await RemoveAll(owned.Sessions, ct).ConfigureAwait(false);
         var linkCount = await RemoveAll(owned.ExternalLinks, ct).ConfigureAwait(false);
+        // Every membership row is removed, a page at a time, however many there are: never through the read that
+        // refuses a person holding more roles than the bound, so erasure always finishes.
         var roleCount = 0;
-        foreach (var role in owned.Roles) { await roles.Remove(role.Id, identityId, ct); roleCount++; }
-        var overwriteCount = 0;
-        foreach (var overwrite in owned.Overwrites)
+        for (string? after = null; ;)
         {
-            if (await roles.RemoveOverwrite(overwrite.ResourceId, OverwriteSubjectKind.Person, identityId, ct).ConfigureAwait(false))
-                overwriteCount++;
+            var (memberships, next) = await RoleReads.MembershipPage(identityId, after, roleOptions.Value.MaxPageSize, ct).ConfigureAwait(false);
+            foreach (var membership in memberships)
+            {
+                if (await roles.Remove(membership.RoleKey, identityId, ct).ConfigureAwait(false)) roleCount++;
+            }
+
+            if ((after = next) is null) break;
+        }
+
+        var overwriteCount = 0;
+        for (string? after = null; ;)
+        {
+            var page = await roles.OverwritesOf(OverwriteSubjectKind.Person, identityId, after, roleOptions.Value.MaxPageSize, ct).ConfigureAwait(false);
+            foreach (var overwrite in page.Items)
+            {
+                if (await roles.RemoveOverwrite(overwrite.ResourceId, OverwriteSubjectKind.Person, identityId, ct).ConfigureAwait(false))
+                    overwriteCount++;
+            }
+
+            if ((after = page.Next) is null) break;
         }
         var impersonationCount = await RemoveAll(owned.ImpersonationGrants, ct).ConfigureAwait(false);
         var identityCount = owned.Person is not null && await owned.Person.Remove(ct).ConfigureAwait(false) ? 1 : 0;
@@ -76,12 +99,10 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         var emails = await IdentityEmail.Query(email => email.IdentityId == identityId, ct).ConfigureAwait(false);
         var sessions = await Session.Query(session => session.IdentityId == identityId, ct).ConfigureAwait(false);
         var links = await ExternalIdentityLink.Query(link => link.IdentityId == identityId, ct).ConfigureAwait(false);
-        var roleRows = await roles.ForPerson(identityId, ct).ConfigureAwait(false);
-        var overwrites = await roles.OverwritesOf(OverwriteSubjectKind.Person, identityId, ct).ConfigureAwait(false);
         var impersonation = await ImpersonationGrant.Query(
             grant => grant.Actor == identityId || grant.Target == identityId,
             ct).ConfigureAwait(false);
-        return new OwnedRows(person, emails, sessions, links, roleRows, overwrites, impersonation);
+        return new OwnedRows(person, emails, sessions, links, impersonation);
     }
 
     private static async Task<int> RemoveAll<TEntity>(IReadOnlyList<TEntity> rows, CancellationToken ct)
@@ -105,7 +126,5 @@ internal sealed class IdentityCoreErasureContributor(RoleCollection roles) : IId
         IReadOnlyList<IdentityEmail> Emails,
         IReadOnlyList<Session> Sessions,
         IReadOnlyList<ExternalIdentityLink> ExternalLinks,
-        IReadOnlyList<Role> Roles,
-        IReadOnlyList<PermissionOverwrite> Overwrites,
         IReadOnlyList<ImpersonationGrant> ImpersonationGrants);
 }

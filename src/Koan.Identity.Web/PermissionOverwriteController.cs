@@ -16,15 +16,17 @@ namespace Koan.Identity.Web;
 [Route("api/identity/overwrites")]
 public sealed class PermissionOverwriteController(RoleCollection roles) : ControllerBase
 {
-    /// <summary>The overwrites on one resource, for every subject.</summary>
+    /// <summary>A page of the overwrites on one resource, for every subject: roles first, then people. Pass the page's
+    /// <c>next</c> as <c>after</c> for the next.</summary>
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<PermissionOverwrite>>> List([FromQuery] string resource, CancellationToken ct)
-        => Ok(await roles.Overwrites(resource, ct));
+    public async Task<ActionResult<OverwritePage>> List([FromQuery] string resource, [FromQuery] string? after = null,
+        [FromQuery] int take = 50, CancellationToken ct = default)
+        => Ok(await roles.Overwrites(resource, after, take, ct));
 
     public sealed record SaveOverwriteRequest(IReadOnlyList<string>? Allow, IReadOnlyList<string>? Deny, DateTimeOffset? ExpiresAt = null);
 
-    /// <summary>Sets the subject's overwrite on the resource. A bound the change would exceed answers 409 with the
-    /// correction; an unknown role answers 404; an impersonating caller is refused.</summary>
+    /// <summary>Sets the subject's overwrite on the resource. An unknown role answers 404; an impersonating caller is
+    /// refused.</summary>
     [HttpPut("{subjectKind}/{subjectId}")]
     public async Task<ActionResult<PermissionOverwrite>> Put(OverwriteSubjectKind subjectKind, string subjectId,
         [FromQuery] string resource, [FromBody] SaveOverwriteRequest request, CancellationToken ct)
@@ -32,7 +34,6 @@ public sealed class PermissionOverwriteController(RoleCollection roles) : Contro
         if (Impersonating() is { } refused) return refused;
         try { return Ok(await roles.Overwrite(resource, subjectKind, subjectId, request.Allow ?? [], request.Deny ?? [], request.ExpiresAt, ct)); }
         catch (KeyNotFoundException) { return NotFound(); }
-        catch (RoleBoundException bound) { return Conflict(new { error = bound.Message }); }
     }
 
     [HttpDelete("{subjectKind}/{subjectId}")]

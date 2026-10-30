@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace Koan.Identity.Roles;
 
 public static class RoleTokens
@@ -76,7 +79,7 @@ public sealed class RoleBag
 
     /// <summary>
     /// The bag's permissions on one resource after the resource's overwrites, resolved in Discord's order, with no
-    /// I/O. <paramref name="overwrites"/> are rows the caller has loaded, usually <see cref="RoleCollection.Overwrites"/>;
+    /// I/O. <paramref name="overwrites"/> are rows the caller has loaded, usually <see cref="RoleCollection.OverwritesFor"/>;
     /// a row for another resource, for a role the bag is not in or for another person contributes nothing, and a row
     /// whose <see cref="PermissionOverwrite.ExpiresAt"/> is not after <paramref name="now"/> contributes nothing.
     /// </summary>
@@ -96,29 +99,42 @@ public static class RoleResourceAuthorization
     }
 }
 
+/// <summary>
+/// The role model's configuration. The bounds a person can meet are properties of the model — the roles one person
+/// holds, the permissions a role or an overwrite list names, a role's metadata — and a read is bounded by its page.
+/// The cache capacities size memory: past one, an entry nothing has read lately is evicted, and nothing is refused.
+/// </summary>
 public sealed class RoleOptions
 {
     public const string SectionPath = "Koan:Identity:Roles";
+
+    /// <summary>The people whose compiled bags stay in memory.</summary>
     public int MaxCachedBags { get; set; } = 1024;
+
+    /// <summary>The roles one person holds; adding a person to one more is refused.</summary>
     public int MaxRolesPerPerson { get; set; } = 256;
-    public int MaxMembersPerRole { get; set; } = 4096;
 
     /// <summary>The bound on a role's permissions, and on each of an overwrite's allow and deny lists.</summary>
     public int MaxPermissionsPerRole { get; set; } = 256;
     public int MaxMetadataEntries { get; set; } = 32;
+
+    /// <summary>The most rows one page of a role, member or overwrite listing returns.</summary>
     public int MaxPageSize { get; set; } = 100;
 
-    /// <summary>The most overwrites one resource holds, across its subjects.</summary>
-    public int MaxOverwritesPerResource { get; set; } = 256;
-
-    /// <summary>The most overwrites one subject — a role or a person — holds, across resources.</summary>
-    public int MaxOverwritesPerSubject { get; set; } = 4096;
-
-    /// <summary>The most resources whose compiled overwrites are cached.</summary>
+    /// <summary>The resources whose role overwrites stay compiled in memory.</summary>
     public int MaxCachedResources { get; set; } = 1024;
+
+    /// <summary>The (resource, person) pairs whose own overwrite, or its absence, stays in memory.</summary>
+    public int MaxCachedPersonOverwrites { get; set; } = 16_384;
 }
 
 public sealed record RolePage(IReadOnlyList<Role> Items, long TotalCount, int Page, int PageSize);
+
+/// <summary>A page of a role's members in person order; <see cref="Next"/> continues it, and is null after the last.</summary>
+public sealed record RoleMemberPage(IReadOnlyList<RoleMember> Items, string? Next);
+
+/// <summary>A page of overwrites; <see cref="Next"/> continues it, and is null after the last.</summary>
+public sealed record OverwritePage(IReadOnlyList<PermissionOverwrite> Items, string? Next);
 
 internal static class RoleContract
 {
@@ -126,15 +142,28 @@ internal static class RoleContract
     {
         ArgumentNullException.ThrowIfNull(options);
         if (options.MaxCachedBags is < 1 or > 100_000 || options.MaxRolesPerPerson is < 1 or > 10_000 ||
-            options.MaxMembersPerRole is < 1 or > 1_000_000 || options.MaxPermissionsPerRole is < 1 or > 10_000 ||
-            options.MaxMetadataEntries is < 0 or > 1_000 || options.MaxPageSize is < 1 or > 1_000 ||
-            options.MaxOverwritesPerResource is < 1 or > 10_000 || options.MaxOverwritesPerSubject is < 1 or > 1_000_000 ||
-            options.MaxCachedResources is < 1 or > 100_000)
+            options.MaxPermissionsPerRole is < 1 or > 10_000 || options.MaxMetadataEntries is < 0 or > 1_000 ||
+            options.MaxPageSize is < 1 or > 1_000 || options.MaxCachedResources is < 1 or > 100_000 ||
+            options.MaxCachedPersonOverwrites is < 1 or > 1_000_000)
             throw new InvalidOperationException("Koan:Identity:Roles contains an invalid or unsafe bound.");
         return options;
     }
 
+    /// <summary>
+    /// A key — a role key, a person id, a resource id, a subject, a permission, a metadata key, a cursor's key: trimmed,
+    /// present, at most <paramref name="max"/> characters, well-formed UTF-16 and free of control characters, so no two
+    /// keys composed into one id or one stored value can be confused.
+    /// </summary>
     public static string Require(string? value, string name, int max = 256)
+    {
+        var result = RequireText(value, name, max);
+        if (!IsKey(result))
+            throw new ArgumentException($"{name} must not contain a control character or an unpaired surrogate.", name);
+        return result;
+    }
+
+    /// <summary>Display text — a role's name, a metadata value, a search: trimmed, present, at most <paramref name="max"/> characters.</summary>
+    public static string RequireText(string? value, string name, int max = 256)
     {
         var result = value?.Trim();
         if (string.IsNullOrEmpty(result) || result.Length > max)
@@ -142,11 +171,43 @@ internal static class RoleContract
         return result;
     }
 
-    /// <summary>The trimmed value when it is present and at most <paramref name="max"/> characters.</summary>
+    /// <summary>The trimmed value when it is a key: present, at most <paramref name="max"/> characters, no control character.</summary>
     public static bool TryRequire(string? value, out string result, int max = 256)
     {
         result = value?.Trim() ?? "";
-        return result.Length > 0 && result.Length <= max;
+        return result.Length > 0 && result.Length <= max && IsKey(result);
+    }
+
+    /// <summary>Whether <paramref name="value"/> holds no control character and no surrogate without its pair.</summary>
+    private static bool IsKey(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (char.IsControl(c) || char.IsLowSurrogate(c)) return false;
+            if (!char.IsHighSurrogate(c)) continue;
+            if (i + 1 >= value.Length || !char.IsLowSurrogate(value[i + 1])) return false;
+            i++;
+        }
+
+        return true;
+    }
+
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    /// <summary>
+    /// The id of the row <paramref name="kind"/> names by <paramref name="parts"/>: the SHA-256 of the parts, each prefixed
+    /// with its length, so parts that hold any text compose one id only from the same parts. The text is encoded strictly,
+    /// so a part that is not well-formed UTF-16 is refused rather than hashed as the replacement character.
+    /// </summary>
+    public static string ComposeId(string kind, params string[] parts)
+    {
+        var text = string.Join('\u001f', [kind, .. parts.Select(part => $"{part.Length}:{part}")]);
+        try { return Convert.ToHexString(SHA256.HashData(StrictUtf8.GetBytes(text))); }
+        catch (EncoderFallbackException invalid)
+        {
+            throw new ArgumentException("A key composed into an id is not well-formed UTF-16.", nameof(parts), invalid);
+        }
     }
 
     /// <summary>The trimmed permission token when the value is one.</summary>

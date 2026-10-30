@@ -24,12 +24,27 @@ public sealed class AccessExplainer
         _roles = roles;
     }
 
-    /// <summary>Reverse: the facts contributing to <paramref name="identityId"/>'s access on <paramref name="resourceName"/>.</summary>
+    /// <summary>
+    /// Reverse: the facts contributing to <paramref name="identityId"/>'s access on <paramref name="resourceName"/> — the
+    /// identity-wide facts that hold there, and the overwrites that apply to the person on that resource, each allowed
+    /// permission a <see cref="AccessFactKind.Permission"/> fact and each withheld one a <see cref="AccessFactKind.Deny"/>
+    /// fact naming its row. An overwrite holds on one resource, so it is read for the resource asked about, never
+    /// across every resource the person can reach.
+    /// </summary>
     public async Task<IReadOnlyList<AccessFact>> WhyAsync(string identityId, string resourceName, CancellationToken ct = default)
     {
         resourceName = RoleContract.Require(resourceName, nameof(resourceName));
         var access = await _resolver.ResolveAsync(identityId, ct).ConfigureAwait(false);
-        return access.Facts.Where(f => AppliesTo(f, resourceName)).ToList();
+        var facts = access.Facts.Where(f => AppliesTo(f, resourceName)).ToList();
+        if (_roles is null) return facts;
+
+        var bag = await _roles.Bag(identityId, authenticated: true, ct).ConfigureAwait(false);
+        var now = DateTimeOffset.UtcNow;
+        facts.AddRange((await _roles.OverwritesFor(bag, resourceName, ct).ConfigureAwait(false))
+            .Where(row => row.AppliesAt(now))
+            .SelectMany(row => row.Allow.Select(permission => row.Fact(AccessFactKind.Permission, permission))
+                .Concat(row.Deny.Select(permission => row.Fact(AccessFactKind.Deny, permission)))));
+        return facts;
     }
 
     /// <summary>
@@ -71,15 +86,15 @@ public sealed class AccessExplainer
 
     /// <summary>
     /// "Can X use <paramref name="permission"/> on <paramref name="resourceId"/>, and if not, why?" Resolves X's cached
-    /// bag against the resource's cached overwrites (<see cref="RoleBag.On"/>) and returns the deciding fact: the
-    /// overwrite whose deny withheld the permission, revocable through its <see cref="AccessFactRef"/>, or the fact that
-    /// no role X holds grants it.
+    /// bag against the overwrites that apply to it there (<see cref="RoleCollection.OverwritesFor"/>, cached) with
+    /// <see cref="RoleBag.On"/> and returns the deciding fact: the overwrite whose deny withheld the permission,
+    /// revocable through its <see cref="AccessFactRef"/>, or the fact that no role X holds grants it.
     /// </summary>
     public async Task<AccessDecision> Explain(string identityId, string resourceId, string permission, CancellationToken ct = default)
     {
         if (_roles is null) return new AccessDecision(false, "no role collection is registered", []);
         var bag = await _roles.Bag(identityId, authenticated: true, ct).ConfigureAwait(false);
-        var overwrites = await _roles.Overwrites(resourceId, ct).ConfigureAwait(false);
+        var overwrites = await _roles.OverwritesFor(bag, resourceId, ct).ConfigureAwait(false);
         return bag.On(resourceId, overwrites, DateTimeOffset.UtcNow).Explain(permission);
     }
 
@@ -91,10 +106,10 @@ public sealed class AccessExplainer
     {
         switch (fact.RowType)
         {
-            case "RoleMember":
-                if (_roles is null || string.IsNullOrWhiteSpace(fact.Subject)) return false;
-                try { await _roles.Remove(fact.RowId, fact.Subject, ct).ConfigureAwait(false); return true; }
-                catch (KeyNotFoundException) { return false; }
+            case nameof(RoleMember):
+                if (_roles is null || !RoleContract.TryRequire(fact.RowId, out var membershipId)) return false;
+                return await RoleMember.Get(membershipId, ct).ConfigureAwait(false) is { } member &&
+                       await _roles.Remove(member.RoleKey, member.PersonId, ct).ConfigureAwait(false);
             case nameof(PermissionOverwrite):
                 // One row holds several facts: removing the row for one of them would also lift its denies. Only the
                 // named permission leaves the named list; a handle that names no valid permission revokes nothing.

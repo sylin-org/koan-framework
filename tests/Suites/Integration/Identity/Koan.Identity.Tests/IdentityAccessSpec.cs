@@ -180,15 +180,21 @@ public sealed class IdentityAccessSpec : IdentityHostScopedSpec
     {
         const string id = "role-audit-user";
         await new Identity { Id = id, DisplayName = "Role Audit" }.Save();
-        var role = await Roles.GrantAsync(id, "koan:admin");
+        var member = await Roles.GrantAsync(id, "koan:admin");
 
-        (await AuditEvent.Query(a => a.Subject == role.Id)).Should().Contain(
-            a => a.Action == "role.created" && a.Target == $"Role/{role.Id}",
+        (await AuditEvent.Query(a => a.Subject == member.RoleKey)).Should().Contain(
+            a => a.Action == "role.created" && a.Target == $"Role/{Role.KeyFor(member.RoleKey)}",
             "defining the server role self-audits against its stable key");
+        (await AuditEvent.Query(a => a.Subject == id)).Should().Contain(
+            a => a.Action == "rolemember.created" && a.Target == $"RoleMember/{member.Id}",
+            "adding the member self-audits its membership row against the person");
 
         (await Roles.RevokeAsync(id, "koan:admin")).Should().BeTrue();
-        (await AuditEvent.Query(a => a.Subject == role.Id)).Should().Contain(
-            a => a.Action == "role.updated", "membership removal self-audits the role collection mutation");
+        (await AuditEvent.Query(a => a.Subject == id)).Should().Contain(
+            a => a.Action == "rolemember.deleted" && a.Target == $"RoleMember/{member.Id}",
+            "removing the member self-audits its membership row");
+        (await AuditEvent.Query(a => a.Subject == id && a.Action == "rolemember.created")).Should().OnlyContain(
+            a => a.After != null && !a.After.Contains(id), "the privacy-safe snapshot names the role, never the person");
     }
 
     [Fact]

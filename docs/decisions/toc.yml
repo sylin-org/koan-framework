@@ -674,3 +674,5 @@
       href: SEC-0028-a-consent-page-reads-koans-answer.md
     - name: SEC-0029 A sign-in or logout return is a local path of the application
       href: SEC-0029-a-return-is-a-local-path-of-the-application.md
+    - name: SEC-0030 The role model's bounds belong to its reads, never to what an application may hold
+      href: SEC-0030-bounds-belong-to-reads.md

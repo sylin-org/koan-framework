@@ -26,17 +26,13 @@ public sealed class IdentityHostFixture : IAsyncLifetime
 
 internal sealed class IdentityRoleTestClient(RoleCollection roles)
 {
-    public async Task<Role> GrantAsync(string person, string key)
+    public async Task<RoleMember> GrantAsync(string person, string key)
     {
         if (await roles.Get(key) is null) await roles.Define(key, key, ["global:test"]);
         return await roles.Add(key, person);
     }
-    public async Task<bool> RevokeAsync(string person, string key)
-    {
-        if (await roles.Get(key) is null) return false;
-        await roles.Remove(key, person); return true;
-    }
+    public Task<bool> RevokeAsync(string person, string key) => roles.Remove(key, person);
     public async Task<IReadOnlyList<TestRoleGrant>> ListAsync(string person)
-        => (await roles.ForPerson(person)).Select(role => new TestRoleGrant(role.Id)).ToArray();
+        => (await roles.ForPerson(person)).Select(role => new TestRoleGrant(role.Key)).ToArray();
 }
 internal sealed record TestRoleGrant(string RoleKey);
