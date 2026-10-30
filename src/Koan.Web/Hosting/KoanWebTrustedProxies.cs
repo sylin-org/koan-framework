@@ -7,7 +7,10 @@ namespace Koan.Web.Hosting;
 
 /// <summary>
 /// WEB-0078: the forwarded-header posture for <c>Koan:Web:TrustedProxies</c>. Only the declared proxies are believed,
-/// for one hop, for the scheme, the host and the client address. The host a proxy forwards is the origin the request
+/// for the scheme, the host and the client address. The walk starts at the connection and steps back one forwarded entry
+/// for each declared proxy it passes, so a CDN and a reverse proxy in a row reach the client, and it stops at the first
+/// address nobody declared, so what a client writes to the left of its own address is never read (WEB-0083). The host a
+/// proxy forwards is the origin the request
 /// arrived on (WEB-0081); the absolute URLs Koan writes still come from <see cref="KoanWebBaseUrl"/>, which derives
 /// from it only where nothing is configured or accepted. Fail-closed like <c>Koan:Web:Origin</c>: nothing declared
 /// means no forwarded header is honoured, and a blank entry declares nothing.
@@ -26,7 +29,8 @@ internal static class KoanWebTrustedProxies
             ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                 | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
                 | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost,
-            ForwardLimit = 1,
+            // Every declared proxy is walked and nothing else is: the header's own length is the only bound the walk needs.
+            ForwardLimit = null,
         };
         options.KnownProxies.Clear();
         options.KnownIPNetworks.Clear();

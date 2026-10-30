@@ -8,7 +8,7 @@ namespace Koan.Web.WellKnown.Tests;
 
 /// <summary>
 /// WEB-0081: Koan notes the origins requests arrive on other than the base URL in force — counted, with when each was
-/// first and last seen — in memory, bounded, the least recent evicted, each told apart by address class, and says once
+/// first and last seen — in memory, bounded, the least seen evicted, each told apart by address class, and says once
 /// when a new one appears. On a real Kestrel host, a declared proxy's forwarded scheme and host count and an
 /// undeclared one's do not.
 /// </summary>
@@ -69,7 +69,7 @@ public sealed class ObservedOriginsSpec
     }
 
     [Fact]
-    public void The_record_is_bounded_and_evicts_the_least_recent_origin()
+    public void The_record_is_bounded_and_evicts_the_least_seen_origin()
     {
         var time = new SteppedTime(Start);
         var origins = new KoanWebOrigins(new KoanWebBaseUrl("https://place.example"), 2, time);
@@ -83,6 +83,44 @@ public sealed class ObservedOriginsSpec
         origins.Note(Request("https", "c.example"));
 
         origins.Seen().Select(origin => origin.Origin).Should().Equal("https://c.example", "https://a.example");
+    }
+
+    [Fact]
+    public void Among_origins_seen_as_often_the_least_recent_goes()
+    {
+        var time = new SteppedTime(Start);
+        var origins = new KoanWebOrigins(new KoanWebBaseUrl("https://place.example"), 2, time);
+
+        origins.Note(Request("https", "a.example"));
+        time.Advance(TimeSpan.FromSeconds(1));
+        origins.Note(Request("https", "b.example"));
+        time.Advance(TimeSpan.FromSeconds(1));
+        origins.Note(Request("https", "c.example"));
+
+        origins.Seen().Select(origin => origin.Origin).Should().Equal("https://c.example", "https://b.example");
+    }
+
+    // Host is the caller's to write, so a scanner with random hosts must not push out the address the place is reached
+    // at, nor reset the count an offer of it reads.
+    [Fact]
+    public void A_scan_of_random_hosts_does_not_evict_the_origin_people_arrive_on()
+    {
+        var time = new SteppedTime(Start);
+        var origins = new KoanWebOrigins(new KoanWebBaseUrl(null), 32, time);
+        var appeared = new List<string>();
+        origins.Appeared += (_, origin) => appeared.Add(origin.Origin);
+
+        for (var i = 0; i < 5; i++) origins.Note(Request("https", "tangent.example.org"));
+        for (var i = 0; i < 1000; i++)
+        {
+            time.Advance(TimeSpan.FromSeconds(1));
+            origins.Note(Request("http", $"scan-{i}.example"));
+        }
+        origins.Note(Request("https", "tangent.example.org"));
+
+        origins.Seen().Should().HaveCount(32);
+        origins.Seen().Single(origin => origin.Origin == "https://tangent.example.org").Count.Should().Be(6);
+        appeared.Count(origin => origin == "https://tangent.example.org").Should().Be(1, "it never left the record");
     }
 
     [Theory]

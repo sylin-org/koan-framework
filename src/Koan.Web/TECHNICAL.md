@@ -39,7 +39,7 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   scheme and host, port only when not the default, the path percent-encoded as `Configured` and decoded as
   `PathBase`, no trailing slash; a query, fragment, `%2F` or an unspecified listen address stops boot — and
   `KoanWebStartupFilter` applies it first: `UseForwardedHeaders` for `Koan:Web:TrustedProxies` (X-Forwarded-Proto,
-  X-Forwarded-Host and X-Forwarded-For, one hop, only the declared proxies; blank entries declare nothing, and with no
+  X-Forwarded-Host and X-Forwarded-For, walking back through the declared proxies to the first address nobody declared; blank entries declare nothing, and with no
   proxy or network left the middleware is not added, since ASP.NET believes every peer when it knows none), then the
   origin observation, then
   `UsePathBase` with the base URL's path and a guard that answers 404 outside it. That runs before the exception handler, security headers, static files, the health alias
@@ -67,7 +67,7 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   `Note(request)` after the forwarded headers: a request whose scheme and `Host` match the base URL in force (`Current`,
   split once per value) returns at once; any other has its origin normalised by `KoanWebBaseUrl.OriginOf` and recorded
   in a `ConcurrentDictionary` (count by `Interlocked`, last-seen by compare-and-swap); a new origin takes a lock, evicts
-  the least recently seen beyond `Koan:Web:ObservedOriginLimit` (default 32, below 1 refuses the start) and raises
+  the least often seen, the least recent among equals, beyond `Koan:Web:ObservedOriginLimit` (default 32, below 1 refuses the start) and raises
   `Appeared` outside the lock, each handler isolated and logged on failure. `Seen()` projects the record without the
   base URL in force, most recent first, enumerating the dictionary without a lock. `OriginAddressClass` comes from the
   host without a trailing root dot: `localhost` names, loopback, unspecified, private ranges, else public.

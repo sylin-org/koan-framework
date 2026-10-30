@@ -15,7 +15,9 @@ namespace Koan.Web.Hosting;
 /// </summary>
 /// <remarks>
 /// The record is held in memory and never persisted. It holds at most <c>Koan:Web:ObservedOriginLimit</c> distinct
-/// origins; a new one beyond that evicts the one seen least recently. A request on the base URL in force costs a
+/// origins; a new one beyond that evicts the one seen least often, the least recent among equals, because a request's
+/// Host is the caller's to write: a scan of random hosts churns only itself, and the origin people arrive on keeps its
+/// place and its count (WEB-0083). A request on the base URL in force costs a
 /// comparison. Any other request — every request, while nothing is configured or accepted — costs a lookup and two
 /// interlocked writes, and a lock only when its origin is new.
 /// </remarks>
@@ -62,7 +64,7 @@ public sealed class KoanWebOrigins
     /// <summary>
     /// Raised once when an origin enters the record: on the request that first arrived on it, before that request goes
     /// on. Keep a handler short and hand longer work off; one that throws is logged and does not fail the request. An
-    /// origin evicted as least recent and seen again enters again.
+    /// origin evicted and seen again enters again.
     /// </summary>
     public event EventHandler<ObservedOrigin>? Appeared;
 
@@ -150,7 +152,7 @@ public sealed class KoanWebOrigins
             }
             else
             {
-                while (_entries.Count >= _limit) EvictLeastRecent();
+                while (_entries.Count >= _limit) EvictLeastSeen();
                 entry = new Entry(origin, Classify(origin), now);
                 _entries[origin] = entry;
                 appeared = entry.Snapshot();
@@ -160,14 +162,19 @@ public sealed class KoanWebOrigins
         if (appeared is not null) Raise(appeared);
     }
 
-    private void EvictLeastRecent()
+    private void EvictLeastSeen()
     {
-        Entry? oldest = null;
+        Entry? least = null;
         foreach (var (_, entry) in _entries)
         {
-            if (oldest is null || entry.LastTicks < oldest.LastTicks) oldest = entry;
+            if (least is null
+                || entry.Count < least.Count
+                || (entry.Count == least.Count && entry.LastTicks < least.LastTicks))
+            {
+                least = entry;
+            }
         }
-        if (oldest is not null) _entries.TryRemove(oldest.Origin, out _);
+        if (least is not null) _entries.TryRemove(least.Origin, out _);
     }
 
     private void Raise(ObservedOrigin origin)
@@ -211,6 +218,8 @@ public sealed class KoanWebOrigins
 
         public string Origin { get; } = origin;
 
+        public long Count => Volatile.Read(ref _count);
+
         public long LastTicks => Volatile.Read(ref _lastTicks);
 
         public void Hit(DateTimeOffset now)
@@ -227,6 +236,6 @@ public sealed class KoanWebOrigins
         }
 
         public ObservedOrigin Snapshot()
-            => new(Origin, addressClass, Volatile.Read(ref _count), first, new DateTimeOffset(LastTicks, TimeSpan.Zero));
+            => new(Origin, addressClass, Count, first, new DateTimeOffset(LastTicks, TimeSpan.Zero));
     }
 }

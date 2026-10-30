@@ -11,6 +11,8 @@ related:
   - ARCH-0128
 ---
 
+> **Amended by [WEB-0083](WEB-0083-the-web-fails-closed.md) (2026-10-30).** The observed-origins record evicts the origin seen least often, the least recent among equals, and the proxy posture walks every declared proxy.
+
 # WEB-0081: An application accepts its URL at runtime, and sees the origins requests arrive on
 
 ## Context

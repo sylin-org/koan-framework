@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Koan.Core;
 using Koan.Web.Infrastructure;
@@ -33,11 +35,11 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
             if (!app.Properties.ContainsKey(appliedKey))
             {
                 app.Properties[appliedKey] = true;
-                // Greenfield boot: initialize env and run the runtime against the scoped web provider.
-                // KoanEnv.TryInitialize is itself best-effort and swallows its own failures (KoanEnv.cs),
-                // so this guard is belt-and-suspenders against an unexpected throw during env snapshot init;
-                // env not being initialized here is non-fatal — downstream callers re-try TryInitialize.
-                try { Koan.Core.KoanEnv.TryInitialize(app.ApplicationServices); } catch { }
+                // Initialize env and run the runtime against the scoped web provider. Every gate reads this snapshot, so
+                // a failure here stops the boot rather than leaving the posture unknown.
+                Koan.Core.KoanEnv.Initialize(
+                    app.ApplicationServices.GetService<IConfiguration>(),
+                    app.ApplicationServices.GetService<IHostEnvironment>());
                 var rt = app.ApplicationServices.GetService(typeof(Koan.Core.Hosting.Runtime.IAppRuntime)) as Koan.Core.Hosting.Runtime.IAppRuntime;
                 rt?.Discover();
                 rt?.Start();
@@ -125,29 +127,16 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     RunStage(app, KoanWebPipelineStage.BeforeRouting);
                     app.UseRouting();
                     // Ensure auth middleware is in the correct position (after routing, before endpoints)
-                    // Safe even if no authentication schemes are registered.
-                    try
-                    {
-                        app.UseAuthentication();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // No authentication services registered; ignore.
-                    }
+                    // Safe even if no authentication schemes are registered. AddControllers registers the services both
+                    // need, so a host without them stops here with ASP.NET's correction naming AddAuthorization.
+                    app.UseAuthentication();
                     // Preserve AuthenticateResult.Fail separately from NoResult. ASP.NET leaves both callers
                     // anonymous, but a rejected credential must not inherit an Entity's anonymous authority.
                     app.UseMiddleware<EntityAuthenticationResultMiddleware>();
                     // WEB-0069: modules contribute middleware between authentication and authorization here
                     // (e.g. the zero-config dev identity), via the supported stage seam — no startup-filter ordering.
                     RunStage(app, KoanWebPipelineStage.AfterAuthentication);
-                    try
-                    {
-                        app.UseAuthorization();
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        // No authorization services registered; ignore.
-                    }
+                    app.UseAuthorization();
                     RunStage(app, KoanWebPipelineStage.AfterAuthorization);
                     // WEB-0075: the limiter runs after routing (so endpoint [EnableRateLimiting] metadata applies) and
                     // before the endpoints, which terminate the pipeline: placed after them it saw only unmatched requests.

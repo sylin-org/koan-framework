@@ -248,9 +248,9 @@ translation in Web.
   override. Unset, the URL the application accepted at runtime through its `IApplicationUrlStore` stands in for it,
   read at use so accepting one needs no restart (WEB-0081); a store that declares `DerivesUntilAccepted` lets
   Production derive absolute URLs from requests until the first accept. `Koan:Web:TrustedProxies` names the proxies whose
-  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are believed for one hop; empty honours none.
+  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are believed, walking back to the first address nobody declared; empty honours none.
   `KoanWebOrigins` holds the origins requests arrive on other than the base URL, bounded by
-  `Koan:Web:ObservedOriginLimit`, and raises `Appeared` once per new one, so an application can offer an address it
+  `Koan:Web:ObservedOriginLimit`, the least seen evicted, and raises `Appeared` once per new one, so an application can offer an address it
   learned (WEB-0081). See WEB-0078 and the
   [Koan.Web README](../../../src/Koan.Web/README.md#public-url-and-proxy).
 - `Koan:Web:KeyRingDirectory` names the folder the ASP.NET Data Protection key ring persists in, so cookies and

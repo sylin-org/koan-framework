@@ -134,7 +134,9 @@ posture and how it ends. The first accepted URL ends it for good, and a configur
 application's consent in code, not `Koan:AllowMagicInProduction`.
 
 `Koan:Web:TrustedProxies` names the reverse proxies (IP addresses or CIDR networks) whose `X-Forwarded-Proto`,
-`X-Forwarded-Host` and `X-Forwarded-For` Koan believes, for one hop, at the head of its pipeline. Nothing declared
+`X-Forwarded-Host` and `X-Forwarded-For` Koan believes, at the head of its pipeline. Behind a CDN and then a reverse
+proxy, declare both, by network where the CDN publishes its ranges: the walk steps back through every declared proxy and
+stops at the first address nobody declared, which is the client. Nothing declared
 means no forwarded header is honoured, and a blank entry (`Koan__Web__TrustedProxies__0=` from `${PROXY:-}`) declares
 nothing. A configured or accepted base URL still decides every absolute URL Koan
 writes, whatever host the proxy forwards. `IsProxiedApi` is a separate, older switch: it only tells Koan that the
@@ -142,7 +144,7 @@ proxy emits the security headers.
 
 Koan notes the origins requests arrive on other than the base URL in force — scheme and host as that posture resolved
 them, with a count and when each was first and last seen — in memory, for at most `Koan:Web:ObservedOriginLimit`
-distinct origins (32), the least recent evicted. Inject `KoanWebOrigins` to read them or to hear of a new one:
+distinct origins (32), the least seen evicted, so a scan of random hosts cannot push out the address people use. Inject `KoanWebOrigins` to read them or to hear of a new one:
 
 ```csharp
 origins.Appeared += (_, seen) => { if (!seen.IsLocal) offers.Record(seen.Origin); };

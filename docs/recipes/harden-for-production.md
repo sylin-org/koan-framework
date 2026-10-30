@@ -64,8 +64,9 @@ this is configuration, not construction.
   application lives under one), or accepted by the application through its `IApplicationUrlStore` (WEB-0081). Koan
   then serves only under the configured path, and the issuer, MCP resource, card URLs and atproto client metadata all
   derive from it instead of from the request `Host` header.
-- Behind a reverse proxy, name it: `Koan:Web:TrustedProxies` is the one proxy (IP or CIDR) whose
-  `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are believed, one hop. Nothing declared, nothing
+- Behind a reverse proxy, name it: `Koan:Web:TrustedProxies` lists every proxy in front of the application (IP or
+  CIDR, a CDN's published ranges included) whose `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For` are
+  believed. Nothing declared, nothing
   believed.
 - The key ring persists: `Koan:Web:KeyRingDirectory` is a folder on the persistent volume, so sign-in cookies and
   protected sessions outlive a rebuilt container and every instance shares them. The folder remembers the application

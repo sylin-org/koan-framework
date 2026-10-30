@@ -15,6 +15,8 @@ related:
   - WEB-0081
 ---
 
+> **Amended by [WEB-0083](WEB-0083-the-web-fails-closed.md) (2026-10-30).** `Koan:Web:TrustedProxies` is believed through every declared proxy in a row, not for one hop.
+
 # WEB-0078: Koan.Web owns one canonical base URL, and serves under its path
 
 ## Context

@@ -24,8 +24,9 @@ public sealed class KoanWebOptions
 
     /// <summary>
     /// WEB-0078: the reverse proxies whose <c>X-Forwarded-Proto</c>, <c>X-Forwarded-Host</c> and <c>X-Forwarded-For</c>
-    /// are believed, as IP addresses or CIDR networks, one hop. Empty (the default) honours no forwarded header, and a
-    /// blank or whitespace entry declares nothing. A
+    /// are believed, as IP addresses or CIDR networks, however many stand in a row: declare each one, or its network. The
+    /// first address nobody declared is the client. Empty (the default) honours no forwarded header, and a blank or
+    /// whitespace entry declares nothing. A
     /// configured or accepted base URL still decides every absolute URL Koan writes, whatever host a proxy forwards.
     /// Configure via: Koan:Web:TrustedProxies:0=10.0.0.5
     /// </summary>
@@ -33,7 +34,8 @@ public sealed class KoanWebOptions
 
     /// <summary>
     /// WEB-0081: how many distinct origins Koan holds while it observes where requests arrive
-    /// (<see cref="Hosting.KoanWebOrigins"/>); a new one beyond that evicts the one seen least recently. At least 1.
+    /// (<see cref="Hosting.KoanWebOrigins"/>); a new one beyond that evicts the one seen least often, the least recent
+    /// among equals. At least 1.
     /// Configure via: Koan:Web:ObservedOriginLimit (env: Koan__Web__ObservedOriginLimit).
     /// </summary>
     public int ObservedOriginLimit { get; set; } = 32;

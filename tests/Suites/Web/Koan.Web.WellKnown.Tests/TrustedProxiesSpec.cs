@@ -15,15 +15,15 @@ namespace Koan.Web.WellKnown.Tests;
 
 /// <summary>
 /// WEB-0078: <c>Koan:Web:TrustedProxies</c> names the reverse proxies whose <c>X-Forwarded-Proto</c>,
-/// <c>X-Forwarded-Host</c> (WEB-0081) and <c>X-Forwarded-For</c> Koan believes, for one hop, at the head of its
-/// pipeline. Nothing declared means no header is honoured (fail-closed, like <c>Koan:Web:Origin</c>). A real Kestrel
+/// <c>X-Forwarded-Host</c> (WEB-0081) and <c>X-Forwarded-For</c> Koan believes, however many stand in a row, at the head
+/// of its pipeline. Nothing declared means no header is honoured (fail-closed, like <c>Koan:Web:Origin</c>). A real Kestrel
 /// loopback host, so the connection has the remote address the forwarded-headers middleware checks against the declared
 /// proxies.
 /// </summary>
 public sealed class TrustedProxiesSpec
 {
     [Fact]
-    public async Task A_declared_proxy_sets_the_scheme_the_host_and_the_client_address_for_one_hop()
+    public async Task A_declared_proxy_sets_the_scheme_the_host_and_the_client_address()
     {
         await using var host = await ProxiedHost.Start(new Dictionary<string, string?> { ["Koan:Web:TrustedProxies:0"] = "127.0.0.1" });
 
@@ -37,6 +37,41 @@ public sealed class TrustedProxiesSpec
 
         var twoHops = await host.Probe(("X-Forwarded-Proto", "https"), ("X-Forwarded-For", "203.0.113.9, 198.51.100.1"));
         twoHops.Remote.Should().Be("198.51.100.1", "only the hop the declared proxy appended is believed");
+    }
+
+    // A CDN in front of a reverse proxy: every visitor must not read as the CDN's edge.
+    [Fact]
+    public async Task Declared_proxies_in_a_row_are_walked_back_to_the_client()
+    {
+        await using var host = await ProxiedHost.Start(new Dictionary<string, string?>
+        {
+            ["Koan:Web:TrustedProxies:0"] = "127.0.0.1",
+            ["Koan:Web:TrustedProxies:1"] = "198.51.100.0/24",
+        });
+
+        var probe = await host.Probe(
+            ("X-Forwarded-Proto", "https, http"),
+            ("X-Forwarded-Host", "tangent.example.org, internal.example"),
+            ("X-Forwarded-For", "203.0.113.9, 198.51.100.1"));
+
+        probe.Remote.Should().Be("203.0.113.9");
+        probe.Scheme.Should().Be("https");
+        probe.Host.Should().Be("tangent.example.org");
+    }
+
+    [Fact]
+    public async Task The_walk_stops_at_the_first_address_nobody_declared()
+    {
+        await using var host = await ProxiedHost.Start(new Dictionary<string, string?>
+        {
+            ["Koan:Web:TrustedProxies:0"] = "127.0.0.1",
+            ["Koan:Web:TrustedProxies:1"] = "198.51.100.0/24",
+        });
+
+        // A client writes what it likes to the left of its own address; nothing past that address is believed.
+        var probe = await host.Probe(("X-Forwarded-For", "6.6.6.6, 198.51.100.7, 203.0.113.9, 198.51.100.1"));
+
+        probe.Remote.Should().Be("203.0.113.9");
     }
 
     [Fact]
@@ -112,6 +147,22 @@ public sealed class TrustedProxiesSpec
 
         var failure = await start.Should().ThrowAsync<Exception>();
         Messages(failure.Which).Should().Contain(message => message.Contains("Koan:Web:TrustedProxies") && message.Contains("the-proxy"));
+    }
+
+    // A host whose services lost AddAuthorization stops at boot with the correction, not a 500 on each request.
+    [Fact]
+    public async Task A_host_without_authorization_services_stops_boot_naming_the_registration()
+    {
+        var start = () => ProxiedHost.Start(new Dictionary<string, string?>(), configure: services =>
+        {
+            foreach (var marker in services.Where(service => service.ServiceType.Name == "AuthorizationPolicyMarkerService").ToArray())
+            {
+                services.Remove(marker);
+            }
+        });
+
+        var failure = await start.Should().ThrowAsync<Exception>();
+        Messages(failure.Which).Should().Contain(message => message.Contains("AddAuthorization"));
     }
 
     private static IEnumerable<string> Messages(Exception exception)
