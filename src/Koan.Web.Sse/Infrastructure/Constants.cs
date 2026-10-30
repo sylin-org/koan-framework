@@ -9,6 +9,7 @@ internal static class Constants
         public static class Keys
         {
             public const string DefaultEvent = "DefaultEvent";
+            public const string Heartbeat = "Heartbeat";
         }
     }
 }

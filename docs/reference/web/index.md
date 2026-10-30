@@ -64,7 +64,8 @@ application only owns explicit pipeline mapping when it disables that default.
   defaults to `/swagger` in Development only and fails closed for unauthenticated callers when explicitly enabled in
   another environment.
 - `Sylin.Koan.Web.Sse` lets a controller return `Sse.Stream(asyncValues)`. One `SseResult` handles typed JSON, raw text,
-  and explicit envelopes for both MVC and framework transports; replay and heartbeat are not implied.
+  and explicit envelopes for both MVC and framework transports. A stream writes a heartbeat while its source is quiet, and
+  `SseHub<T>` fans values out to bounded per-stream queues within one process; replay stays the application's.
 
 See the package-owned contracts for [Web Extensions](../../../src/Koan.Web.Extensions/README.md),
 [OpenAPI](../../../src/Koan.Web.OpenApi/README.md), and [SSE](../../../src/Koan.Web.Sse/README.md). Each composes

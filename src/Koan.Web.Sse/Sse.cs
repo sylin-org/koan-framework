@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json;
 
 namespace Koan.Web.Sse;
@@ -15,12 +16,17 @@ public static class Sse
 
     /// <summary>
     /// Streams typed values as compact JSON frames, text values without quoting, and explicit
-    /// <see cref="SseEnvelope"/> values without losing their wire fields.
+    /// <see cref="SseEnvelope"/> values without losing their wire fields. The stream writes a comment whenever it has
+    /// written nothing for <paramref name="heartbeat"/> (<c>Koan:Web:Sse:Heartbeat</c> when null, none when zero or less)
+    /// and ends cleanly after <paramref name="lifetime"/> (until the reader leaves or the source ends when null), for the
+    /// reader to reconnect.
     /// </summary>
     public static SseResult Stream<T>(
         IAsyncEnumerable<T> source,
         string? eventName = null,
-        JsonSerializerSettings? serializer = null)
+        JsonSerializerSettings? serializer = null,
+        TimeSpan? heartbeat = null,
+        TimeSpan? lifetime = null)
     {
         ArgumentNullException.ThrowIfNull(source);
         serializer ??= DefaultSerializer;
@@ -29,7 +35,19 @@ public static class Sse
         return new SseResult(
             Project(source, eventName, serializer),
             eventName,
-            useConfiguredDefault: !isEnvelopeStream);
+            useConfiguredDefault: !isEnvelopeStream,
+            heartbeat,
+            lifetime);
+    }
+
+    /// <summary>
+    /// The id a reconnecting reader last received, for the application to resume after: a browser's EventSource sends it by
+    /// itself, carrying the <see cref="SseEnvelope.Id"/> of the last frame that had one. Null on a first connection.
+    /// </summary>
+    public static string? LastEventId(HttpRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return request.Headers["Last-Event-ID"].FirstOrDefault() is { Length: > 0 } id ? id : null;
     }
 
     private static async IAsyncEnumerable<SseEnvelope> Project<T>(

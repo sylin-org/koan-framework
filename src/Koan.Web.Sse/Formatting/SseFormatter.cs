@@ -16,6 +16,10 @@ public static class SseFormatter
             throw new ArgumentNullException(nameof(envelope), "SSE data payload cannot be null.");
         }
 
+        RefuseLineBreak(envelope.Comment, "comment");
+        RefuseLineBreak(envelope.EventName, "event name");
+        RefuseLineBreak(envelope.Id, "id");
+
         var builder = new StringBuilder();
 
         if (envelope.HasComment)
@@ -49,22 +53,29 @@ public static class SseFormatter
         return builder.ToString();
     }
 
+    // A line break in a single-line field ends it and begins whatever follows as another field, so text that reached one
+    // from a person could forge a frame. Refused; data is the one field that may span lines.
+    private static void RefuseLineBreak(string? value, string field)
+    {
+        if (value is not null && value.AsSpan().IndexOfAny('\r', '\n') >= 0)
+        {
+            throw new ArgumentException(
+                $"An SSE {field} cannot hold a line break, which would end the field and begin another: '{value.ReplaceLineEndings(" ")}'.",
+                nameof(value));
+        }
+    }
+
+    // A reader's parser ends a line at CR, LF or CRLF, so each of them begins a new data line here.
     private static void AppendDataLines(StringBuilder builder, string data)
     {
-        var span = data.AsSpan();
-        var start = 0;
-        for (var i = 0; i < span.Length; i++)
+        var rest = data.AsSpan();
+        while (rest.IndexOfAny('\r', '\n') is var at and >= 0)
         {
-            if (span[i] == '\n')
-            {
-                builder.Append("data: ").Append(span.Slice(start, i - start)).Append('\n');
-                start = i + 1;
-            }
+            builder.Append("data: ").Append(rest[..at]).Append('\n');
+            var isCrLf = rest[at] == '\r' && at + 1 < rest.Length && rest[at + 1] == '\n';
+            rest = rest[(at + (isCrLf ? 2 : 1))..];
         }
 
-        if (start <= span.Length)
-        {
-            builder.Append("data: ").Append(span[start..]).Append('\n');
-        }
+        builder.Append("data: ").Append(rest).Append('\n');
     }
 }
