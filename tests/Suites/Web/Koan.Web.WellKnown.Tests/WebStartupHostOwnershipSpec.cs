@@ -57,6 +57,26 @@ public sealed class WebStartupHostOwnershipSpec
         AppHost.Current.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Disposing_a_started_host_without_stopping_it_releases_the_ambient_host()
+    {
+        using (var host = Host.CreateDefaultBuilder()
+            .ConfigureWebHost(web =>
+            {
+                web.UseTestServer();
+                web.UseEnvironment("Test");
+                web.ConfigureServices(services => services.AddKoan());
+                web.Configure(_ => { });
+            })
+            .Build())
+        {
+            await host.StartAsync(TestContext.Current.CancellationToken);
+            AppHost.Current.Should().NotBeNull();
+        }
+
+        AppHost.Current.Should().BeNull();
+    }
+
     private sealed class NewerOwnerStartupFilter(IServiceProvider services) : IStartupFilter, IDisposable
     {
         private IDisposable? _lease;

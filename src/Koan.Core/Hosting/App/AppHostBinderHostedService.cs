@@ -9,11 +9,12 @@ namespace Koan.Core.Hosting.App;
 /// Generic-host binder: attaches <see cref="AppHost.Current"/> and initializes <c>KoanEnv</c> in
 /// <see cref="StartingAsync"/>, which the host runs before any hosted service's <c>StartAsync</c>, so an application
 /// hosted service registered before <c>AddKoan()</c> still starts with the host attached (ARCH-0140). The host is
-/// released in <see cref="StoppedAsync"/>, after every hosted service has stopped.
+/// released in <see cref="StoppedAsync"/>, after every hosted service has stopped, or when the host is disposed without
+/// stopping, whose provider is gone with it.
 /// </summary>
 internal sealed class AppHostBinderHostedService(
     System.IServiceProvider sp,
-    KoanContextCarrierRegistry? contextCarriers = null) : IHostedLifecycleService
+    KoanContextCarrierRegistry? contextCarriers = null) : IHostedLifecycleService, IDisposable
 {
     private IDisposable? _hostLease;
 
@@ -38,7 +39,9 @@ internal sealed class AppHostBinderHostedService(
 
     public Task StoppedAsync(CancellationToken cancellationToken)
     {
-        Interlocked.Exchange(ref _hostLease, null)?.Dispose();
+        Dispose();
         return Task.CompletedTask;
     }
+
+    public void Dispose() => Interlocked.Exchange(ref _hostLease, null)?.Dispose();
 }

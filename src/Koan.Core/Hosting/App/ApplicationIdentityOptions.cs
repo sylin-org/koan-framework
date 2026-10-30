@@ -81,7 +81,7 @@ internal static class ApplicationIdentityDefaults
         var description = assembly?.GetCustomAttribute<AssemblyDescriptionAttribute>()?.Description;
 
         options.Name = Coalesce(options.Name, koanApp?.Name, title, product, env?.ApplicationName, assemblyName, "Koan Application");
-        options.Code = NormalizeCode(options.Code, options.Name, koanApp?.Code);
+        options.Code = NormalizeCode(options.Code, koanApp?.Code, options.Name);
         options.Description = Coalesce(options.Description, koanApp?.Description, description, "");
 
         if (string.IsNullOrWhiteSpace(options.ContactEmail))
@@ -143,19 +143,11 @@ internal static class ApplicationIdentityDefaults
         return "";
     }
 
-    private static string NormalizeCode(string? existingCode, string? resolvedName, string? attributeCode)
+    // Configuration names the code first, as it does the name; then the assembly's attribute; then the name.
+    private static string NormalizeCode(string? configuredCode, string? attributeCode, string? resolvedName)
     {
-        if (!string.IsNullOrWhiteSpace(attributeCode))
-        {
-            return Slugify(attributeCode);
-        }
-
-        if (!string.IsNullOrWhiteSpace(resolvedName))
-        {
-            return Slugify(resolvedName);
-        }
-
-        return "koan-app";
+        var code = Coalesce(configuredCode, attributeCode, resolvedName);
+        return string.IsNullOrWhiteSpace(code) ? "koan-app" : Slugify(code);
     }
 
     private static string Slugify(string value)

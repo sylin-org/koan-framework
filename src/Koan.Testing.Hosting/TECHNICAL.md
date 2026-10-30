@@ -58,8 +58,11 @@ service registration.
 
 Koan's generic-host binder owns process-default host selection. Its compare-and-release lease makes
 overlapping teardown owner-safe, but it does not give simultaneous static Entity operations separate
-process defaults. Test projects that boot real Koan hosts therefore disable parallelization unless
-their operations are explicitly flow-scoped.
+process defaults: this is the design, not a gap. The terse `Entity<T>` surface resolves through
+`AppHost`, and a process serves one host unless a flow says otherwise. Hosts that overlap, in one spec or
+in parallel specs, each call `IntegrationHost.Enter()`, which selects that host for the calling async flow
+through `AppHost.PushScope`; then a save runs that host's `Lifecycle` hooks and repositories and no other's.
+A test project that boots real Koan hosts and does not enter them disables parallelization.
 
 ## Evidence
 

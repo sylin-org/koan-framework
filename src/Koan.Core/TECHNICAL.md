@@ -13,7 +13,10 @@ source: src/Koan.Core/
 - Options: follow ADR ARCH-0040 for constants/options.
 - Error modes: required terse host-backed surfaces use `KoanHostContextException`; avoid magic values.
 - Runtime ownership: the generic-host binder owns the process-default `AppHost` provider from host
-  start through stop. Explicit flow scopes override that default without mutating its lease.
+  start through stop, or until the host is disposed without stopping. Explicit flow scopes override that default
+  without mutating its lease. One default per process is the design: Entity statics and `Lifecycle` hooks resolve through
+  it, so hosts that overlap in one process share it unless each flow enters its own with `AppHost.PushScope`
+  (`IntegrationHost.Enter()` in the test kit).
 - Startup order is Koan's, not the application's: the binder attaches the host, runtime discovery runs and every
   module's `Start` runs in `IHostedLifecycleService.StartingAsync`, which the host completes before any hosted
   service's `StartAsync`. An application hosted service registered before `AddKoan()` starts with the host attached

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Core.Hosting.App;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -170,6 +171,13 @@ public sealed class IntegrationHost : IAsyncDisposable
 
     /// <summary>The underlying <see cref="IHost"/> for tests that need direct lifecycle control.</summary>
     public IHost Host => _host;
+
+    /// <summary>
+    /// Selects this host for the calling async flow until disposed: Entity statics and every other ambient surface resolve
+    /// here, whichever host started last. A spec holding hosts that overlap, or running in parallel with others, enters the
+    /// one it means.
+    /// </summary>
+    public IDisposable Enter() => AppHost.PushScope(Services);
 
     /// <summary>Start the host's hosted services. Most tests should use <c>StartAsync</c> on the builder instead.</summary>
     public Task StartAsync(CancellationToken ct = default) => _host.StartAsync(ct);

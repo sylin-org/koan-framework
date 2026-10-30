@@ -128,7 +128,10 @@ public sealed class AggregateConfigHostOwnershipSpec
         await using var host = await StartHost(factory);
         var diagnostics = host.Services.GetRequiredService<IDataDiagnostics>();
 
-        diagnostics.GetEntityConfigsSnapshot().Should().BeEmpty();
+        // Only this entity's rows are this spec's: whatever else the process's Entity statics touched through this host
+        // while it was the ambient one is not.
+        diagnostics.GetEntityConfigsSnapshot().Should().NotContain(info =>
+            info.EntityType == typeof(AggregateOwnershipEntity).FullName);
 
         _ = AggregateConfigs.Get<AggregateOwnershipEntity, string>(host.Services);
 
@@ -138,7 +141,8 @@ public sealed class AggregateConfigHostOwnershipSpec
             && info.Provider == RecordingAdapterFactory.ProviderId
             && info.IdProperty == nameof(AggregateOwnershipEntity.Id));
 
-        diagnostics.GetAdapterParticipationsSnapshot().Should().BeEmpty(
+        diagnostics.GetAdapterParticipationsSnapshot().Should().NotContain(
+            info => info.Provider == RecordingAdapterFactory.ProviderId,
             "describing aggregate configuration must not activate a backing adapter");
 
         _ = AggregateConfigs.Get<AggregateOwnershipEntity, string>(host.Services).Repository;
