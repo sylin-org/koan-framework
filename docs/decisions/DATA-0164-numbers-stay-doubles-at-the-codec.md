@@ -44,6 +44,8 @@ Past that, what a store and its comparison type hold decides, and Koan does not 
   above a unit off;
 - on MySQL the `JSON` type lands some doubles a unit off (7.9e28), a document double past 1e35 fails the save in its generated
   column, and `Eq` compares through `DECIMAL(65, 30)`;
+- on PostgreSQL a very large double (`double.MaxValue`), which `jsonb` prints whole, can read back a unit off, and an unsigned
+  `long` past the signed range reads as a double on every store;
 - on SQL Server and MySQL a trailing blank does not count in `=`, so ids `'a'` and `'a '` are one key.
 
 A typed `decimal` or `double` column holds its value exactly on every store.

@@ -11,7 +11,7 @@ public sealed class PostgresOrdinaryValueSpec(PostgresFixture fixture, ITestOutp
     {
         RequireBackingStore();
         await using var host = await BootAsync();
-        await OrdinaryValueConvergence.AssertNumbersRoundTripAsync(7.9e28, double.MaxValue);
+        await OrdinaryValueConvergence.AssertNumbersRoundTripAsync(7.9e28);
     }
 
     [Fact(DisplayName = "Postgres: ids differing only by case or accent stay separate rows")]
