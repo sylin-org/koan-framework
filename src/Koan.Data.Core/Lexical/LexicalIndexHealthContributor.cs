@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Koan.Core;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Observability.Health;
+using Koan.Core.Semantics.Segmentation;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Lexical;
 using Microsoft.Extensions.Options;
@@ -18,6 +19,11 @@ namespace Koan.Data.Core.Lexical;
 /// the contributor measures each entity at most once per <see cref="DataRuntimeOptions.LexicalReadinessInterval"/>
 /// and answers the last measurement in between; the interval and the time of the measurement are in the report.
 /// <c>Entity.Lexical.Status()</c> called by an application is always exact.</para>
+///
+/// <para>An entity whose reads require a segment (a tenant-scoped entity) has no index a host-wide probe may read: the
+/// probe holds no tenant, and each tenant's rows are that tenant's to count. Its currency is reported as unmeasured, and
+/// the report is Unknown rather than Degraded while every index the probe can read is current; the application measures
+/// it on demand with <c>Entity.Lexical.Status()</c> inside the segment (DATA-0162).</para>
 /// </summary>
 internal sealed class LexicalIndexHealthContributor(
     IServiceProvider services,
@@ -51,10 +57,17 @@ internal sealed class LexicalIndexHealthContributor(
         var data = new Dictionary<string, object?>(StringComparer.Ordinal);
         var stale = new List<string>();
         var unkept = new List<string>();
+        var segmented = new List<string>();
         foreach (var type in entities)
         {
             var name = type.Name;
             var observation = await Observe(type, now, interval, ct).ConfigureAwait(false);
+            if (observation.Segmented)
+            {
+                data[name] = "unmeasured:segmented";
+                segmented.Add(name);
+                continue;
+            }
             if (observation.Error is { } error)
             {
                 data[name] = $"error:{error}";
@@ -75,12 +88,19 @@ internal sealed class LexicalIndexHealthContributor(
         data["entities"] = string.Join(",", entities.Select(static type => type.Name));
         data["interval"] = interval.ToString();
         data["observedAt"] = _observations.Values.Select(static observation => observation.At).DefaultIfEmpty(now).Min().ToString("O");
-        var state = stale.Count == 0 && unkept.Count == 0 ? HealthState.Healthy : HealthState.Degraded;
-        var description = state == HealthState.Healthy
-            ? "Every declared lexical index is current"
-            : unkept.Count != 0
+        var state = stale.Count != 0 || unkept.Count != 0
+            ? HealthState.Degraded
+            : segmented.Count != 0 ? HealthState.Unknown : HealthState.Healthy;
+        var description = state switch
+        {
+            HealthState.Healthy => "Every declared lexical index is current",
+            HealthState.Unknown =>
+                $"The lexical index of {string.Join(", ", segmented)} is measured on demand inside a segment " +
+                "(Entity.Lexical.Status()); every other declared index is current",
+            _ => unkept.Count != 0
                 ? $"A route cannot keep the lexical index of {string.Join(", ", unkept)}"
-                : $"The lexical index of {string.Join(", ", stale)} is not current; run Rebuild";
+                : $"The lexical index of {string.Join(", ", stale)} is not current; run Rebuild"
+        };
         return new HealthReport(Name, state, description, null, data);
     }
 
@@ -92,6 +112,10 @@ internal sealed class LexicalIndexHealthContributor(
         try
         {
             fresh = new Observation(now, await LexicalRoutes.Status(type, services, ct).ConfigureAwait(false), null);
+        }
+        catch (SegmentationRequiredException)
+        {
+            fresh = new Observation(now, null, null, Segmented: true);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -106,5 +130,5 @@ internal sealed class LexicalIndexHealthContributor(
         return fresh;
     }
 
-    private sealed record Observation(DateTimeOffset At, LexicalIndexStatus? Status, string? Error);
+    private sealed record Observation(DateTimeOffset At, LexicalIndexStatus? Status, string? Error, bool Segmented = false);
 }

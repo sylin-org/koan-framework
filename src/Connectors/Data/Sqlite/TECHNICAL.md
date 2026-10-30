@@ -182,7 +182,17 @@ Connection and provenance output are redacted.
 - Explicit mapped containers do not combine with ambient partitions or managed row fields.
 - SQLite attached databases are not inferred from mapping namespaces.
 - Provider exceptions surface directly; commands are not replayed after failure.
-- Native bulk accepts at most 4,096 items and 30,000 parameters per dispatch.
+- A filter's `In`/`Nin`, and the ids of a one-column identity, bind as one JSON array matched through `json_each`, so
+  the set meets no parameter limit. Each member is written as the value Microsoft.Data.Sqlite binds for it: integers
+  and booleans as INTEGER, reals as REAL, and strings, Guids (upper-case), dates, `DateOnly`, decimals and chars as the
+  TEXT the driver writes. A member JSON cannot carry (a byte array, a non-finite real, an unsigned 64-bit integer)
+  binds one parameter per member: a filter whose statement then passes 32,766 parameters, less those the statement
+  binds itself, is refused, naming its sets, and
+  `GetMany`/`DeleteMany` over such keys, or over a composite identity, run in slices of 30,000 parameters and 500
+  identity predicates (SQLite allows 32,766 variables and an expression depth of 1,000). The store declares
+  `MaximumSetMembers` 30,000, the slice the facade reads a scoped key set in (DATA-0162).
+- A batch has no size bound of its own: each queued operation is its own statement inside the batch's one
+  transaction. `UpsertMany` writes at most 4,096 rows per multi-row statement, all inside its one transaction (DATA-0162).
 - A lexical index is keyed by the row's rowid. A `VACUUM` of a table with a text primary key may renumber rows; run
   `Rebuild` after one. `Inspect()` lists the index's view and shadow tables beside the application's containers, and a
   `DELETE FROM` of a declaring table deletes row by row because the delete trigger runs.

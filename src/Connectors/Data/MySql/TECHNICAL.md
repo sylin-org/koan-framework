@@ -27,6 +27,8 @@ The database must exist before the connector opens it. With managed storage, rea
 
 The shared filter AST lowers through `SqlFilterTranslator` and `MySqlDialect`. Scalar comparisons, set operators, string predicates, collection membership/size, managed fields, and composed boolean filters remain parameterized and execute in MySQL. The connector rewrites the translator's backslash `LIKE` escape literal into MySQL's default SQL-mode representation; it does not mutate the session SQL mode or raw-SQL semantics.
 
+`GetMany` and `DeleteMany` name ids in slices of 10,000 parameters (deleting them in one transaction), and the store declares `MaximumSetMembers` 10,000, so a scoped key set of any size reads in slices (DATA-0162).
+
 Provider-bounded paging uses `LIMIT` / `OFFSET`. Natural order is the full identity; explicit sorts append identity columns not already requested, giving stable ordering across equal values and page boundaries. Counts are exact.
 
 ## Writes and isolation

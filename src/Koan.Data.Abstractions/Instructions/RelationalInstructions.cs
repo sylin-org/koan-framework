@@ -14,4 +14,10 @@ public static class RelationalInstructions
     public const string SqlScalar = "relational.sql.scalar";
     public const string SqlNonQuery = "relational.sql.nonquery";
     public const string SqlQuery = "relational.sql.query";
+
+    /// <summary>
+    /// <see cref="SqlQuery"/> option: the most rows the adapter reads from the command, as an <see cref="int"/>. Rows past
+    /// it are never materialized (DATA-0162).
+    /// </summary>
+    public const string MaxRows = "relational.sql.maxRows";
 }

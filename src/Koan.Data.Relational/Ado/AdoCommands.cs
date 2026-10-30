@@ -63,22 +63,45 @@ public static class AdoCommands
         return value is null ? 0L : Convert.ToInt64(value);
     }
 
-    /// <summary>Reads arbitrary rows as case-insensitive column→value dictionaries (the raw-SQL escape hatch).</summary>
+    /// <summary>
+    /// Reads arbitrary rows as case-insensitive column→value dictionaries (the raw-SQL escape hatch): every row, or at most
+    /// <paramref name="maxRows"/>. Rows past the bound are never materialized. With <paramref name="cancelAtBound"/> —
+    /// which only a declared Read outside a caller's transaction may ask for — the command is also cancelled at the bound,
+    /// so a driver that drains on close (Npgsql, SqlClient) does not read the rest; otherwise the reader drains to the end
+    /// and every statement the command holds completes (DATA-0162, <see cref="Koan.Data.Core.Direct.BoundedReads"/>).
+    /// </summary>
     public static async Task<List<IReadOnlyDictionary<string, object?>>> QueryRowsAsync(
-        IDbConnection conn, string sql, SqlParameters? parameters, IDbTransaction? tx, CancellationToken ct)
+        IDbConnection conn, string sql, SqlParameters? parameters, IDbTransaction? tx, CancellationToken ct,
+        int? maxRows = null, bool cancelAtBound = false)
     {
         using var cmd = CreateCommand(conn, sql, parameters, tx);
-        await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+        var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         var rows = new List<IReadOnlyDictionary<string, object?>>();
-        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        var bounded = false;
+        try
         {
-            var dict = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
-            for (var i = 0; i < reader.FieldCount; i++)
+            while (true)
             {
-                dict[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                if (maxRows is { } limit && rows.Count >= limit)
+                {
+                    bounded = true;
+                    break;
+                }
+                if (!await reader.ReadAsync(ct).ConfigureAwait(false)) break;
+                var dict = new Dictionary<string, object?>(reader.FieldCount, StringComparer.OrdinalIgnoreCase);
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    dict[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                }
+                rows.Add(dict);
             }
-            rows.Add(dict);
         }
+        catch
+        {
+            await reader.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+        await Koan.Data.Core.Direct.BoundedReads.Close(cmd, reader, bounded && cancelAtBound, ct).ConfigureAwait(false);
         return rows;
     }
 

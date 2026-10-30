@@ -20,6 +20,10 @@ internal sealed class FirebirdDialect : IRelationalMappingDialect
     public string QuoteIdent(string ident) => Quote(ident);
     public string Parameter(int index) => $"@p{index}";
 
+    /// <summary>Firebird before 5.0 refuses an IN list longer than 1,500 members, so a longer set of parameters is
+    /// split into several lists (DATA-0162).</summary>
+    public int MaximumInListMembers => 1_500;
+
     public string EscapeLike(string fragment) => fragment.Replace("\\", "\\\\", StringComparison.Ordinal)
         .Replace("%", "\\%", StringComparison.Ordinal)
         .Replace("_", "\\_", StringComparison.Ordinal);

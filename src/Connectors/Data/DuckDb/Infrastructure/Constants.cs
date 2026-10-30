@@ -7,7 +7,8 @@ public static class Constants
     public const string DefaultConnection = "Data Source=.koan/data/Koan.duckdb";
     public const int MaximumMemorySources = 256;
     public const int MaximumPlans = 512;
-    public const int MaximumBatchItems = 4_096;
+    // The most rows one multi-row statement writes or deletes; a larger set is sliced inside its one transaction.
+    public const int MaximumRowsPerStatement = 4_096;
     public const int MaximumParameters = 30_000;
 
     /// <summary>

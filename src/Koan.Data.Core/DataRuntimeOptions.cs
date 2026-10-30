@@ -2,9 +2,6 @@ namespace Koan.Data.Core;
 
 public sealed class DataRuntimeOptions
 {
-    // If true, the runtime will attempt to ensure schemas exist for known entities on start.
-    public bool EnsureSchemaOnStart { get; set; } = true;
-
     /// <summary>Maximum memoized healthy targets per source-readiness stage and host.</summary>
     public int ReadinessCacheEntries { get; set; } = 4096;
 

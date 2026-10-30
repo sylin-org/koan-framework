@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions;
+using Koan.Data.Relational.Linq;
 using Koan.Data.Relational.Mapping;
 
 namespace Koan.Data.Connector.SqlServer.Runtime;
@@ -36,8 +37,111 @@ internal sealed class SqlServerDialect : IRelationalMappingDialect
     public string QuoteIdent(string ident) => Quote(ident);
     public string EscapeLike(string fragment) => fragment.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]");
     public string Parameter(int index) => $"@p{index}";
-    public string JsonArrayContains(string columnSql, string parameter) =>
-        $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE item.[value] = {parameter})";
+
+    private readonly SqlServerSetTypes? _sets;
+
+    /// <param name="sets">The set types of the source and schema this dialect's plan reads; null where no set binds as one
+    /// value (a plan built outside a repository).</param>
+    public SqlServerDialect(SqlServerSetTypes? sets = null) => _sets = sets;
+
+    /// <summary>
+    /// SQL Server plans a short IN list best, so a set binds a parameter per member while the statement stays within
+    /// <see cref="MaximumParameters"/>, and the translator moves the largest set to <see cref="MemberOf"/> when it does
+    /// not (DATA-0162).
+    /// </summary>
+    public bool PrefersSetParameters => true;
+
+    /// <summary>SqlClient sends at most 2,098 parameters in a statement (measured: 2,099 is refused).</summary>
+    public int MaximumParameters => Infrastructure.Constants.StatementParameters;
+
+    /// <summary>
+    /// A set binds as one table-valued parameter whose column is the type a lone parameter of its members binds as
+    /// (<see cref="SqlServerSetTypes"/>), read through an expression that compares as a lone parameter does, collation
+    /// included, so In answers what Eq answers. Members of mixed types, or of a type no set type holds, decline. A set
+    /// type that is missing, or here under another shape, is refused by name with the DDL that creates it.
+    /// </summary>
+    public string? MemberOf(string columnSql, IReadOnlyList<object?> members, bool negate, Func<object?, string> bind)
+        => Table(members, bind) is { } table
+            ? $"{columnSql} {(negate ? "NOT IN" : "IN")} (SELECT {table.Member} FROM {table.Source})"
+            : null;
+
+    /// <summary>
+    /// A JSON array column against a set bound as one table-valued parameter: some element is a member
+    /// (<see cref="SetMatch.Any"/>), every member is an element (<see cref="SetMatch.All"/>), or no element is a member
+    /// (<see cref="SetMatch.None"/>). Elements are read and compared as <see cref="JsonArrayContains(string, string, Type)"/>
+    /// compares one.
+    /// </summary>
+    public string? CollectionMemberOf(string columnSql, IReadOnlyList<object?> members, SetMatch match, Type elementType,
+        Func<object?, string> bind)
+    {
+        if (Table(members, bind) is not { } table) return null;
+        var element = Element(elementType);
+        var any = $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE {element} IN (SELECT {table.Member} FROM {table.Source}))";
+        return match switch
+        {
+            SetMatch.Any => any,
+            SetMatch.None => $"(NOT {any})",
+            // Every member is an element: no member is outside the array's non-null elements, an anti-join the server
+            // hashes rather than rescanning the array per member.
+            _ => $"(NOT EXISTS (SELECT 1 FROM (SELECT {table.Member} AS koan_value FROM {table.Source}) koan_set " +
+                 $"WHERE koan_set.koan_value NOT IN (SELECT {element} FROM OPENJSON({columnSql}) item WHERE {element} IS NOT NULL)))"
+        };
+    }
+
+    // A set binds as one table-valued parameter only where its set type exists in the right shape; otherwise it stays one
+    // parameter per member, and a statement still over the bound is refused naming the type (OneValueRefusal).
+    private (string Member, string Source)? Table(IReadOnlyList<object?> members, Func<object?, string> bind)
+    {
+        if (_sets is null || SqlServerSetTypes.KindOf(members) is not { } kind) return null;
+        if (_sets.Refusal(kind) is not null) return null;
+        return (kind.Member, bind(new SqlServerSetParameter(_sets.QualifiedName(kind), kind.Metadata, members)));
+    }
+
+    /// <summary>Why a set of <paramref name="members"/> cannot bind as one table-valued parameter here.</summary>
+    public string? OneValueRefusal(IReadOnlyList<object?> members)
+    {
+        if (_sets is null) return null;
+        if (SqlServerSetTypes.KindOf(members) is not { } kind)
+            return "no table type holds members of these types: mixed types, unsigned or signed-byte integers, byte " +
+                   "arrays, and TimeSpan, DateOnly or TimeOnly read from a typed column";
+        return _sets.Refusal(kind);
+    }
+
+    /// <summary>
+    /// JSON holds a Guid as lower-case D text and a DateTime as round-trip ISO text, so both sides compare as that text: a
+    /// DateTime operand is rewritten to fixed-width wall-clock text, and the comparand is encoded to match (DATA-0139).
+    /// Converting the document's seven-digit fraction to the legacy <c>datetime</c> a DateTime parameter binds as fails.
+    /// </summary>
+    public string DocumentOperand(string readSql, Type physicalType) =>
+        RelationalDocumentText.IsDateTime(physicalType) ? DateTimeOperand(readSql) : readSql;
+
+    public object? DocumentComparand(object? value, Type physicalType) => RelationalDocumentText.Comparand(value);
+
+    // RelationalDocumentText.DateTimeOperand in T-SQL: the first nineteen characters, then the fraction padded to seven
+    // digits, dropping a Z or ±hh:mm suffix. NULL stays NULL.
+    private static string DateTimeOperand(string text)
+    {
+        var zone = $"(CASE WHEN RIGHT({text}, 1) = 'Z' THEN 1 " +
+                   $"WHEN SUBSTRING({text}, LEN({text}) - 5, 1) IN ('+', '-') THEN 6 ELSE 0 END)";
+        var fraction = $"(CASE WHEN SUBSTRING({text}, 20, 1) = '.' " +
+                       $"THEN SUBSTRING({text}, 21, LEN({text}) - 20 - {zone}) ELSE '' END)";
+        return $"(LEFT({text}, 19) + '.' + LEFT({fraction} + '0000000', 7))";
+    }
+
+    public string JsonArrayContains(string columnSql, string parameter) => JsonArrayContains(columnSql, parameter, typeof(string));
+
+    /// <summary>
+    /// Each element is read exactly as a scalar read out of a document is — converted to its type, a DateTime rewritten
+    /// to wall-clock text — and compared with a comparand encoded to match (DATA-0139), so <c>Has</c> answers what
+    /// <c>Eq</c> answers. A decimal or a real number converts to decimal(38, 10), as the scalar comparison does: it
+    /// meets a member by value to ten places.
+    /// </summary>
+    public string JsonArrayContains(string columnSql, string parameter, Type elementType) =>
+        $"EXISTS (SELECT 1 FROM OPENJSON({columnSql}) item WHERE {Element(elementType)} = {parameter})";
+
+    public object? JsonArrayComparand(object? value, Type elementType) => RelationalDocumentText.Comparand(value);
+
+    private string Element(Type elementType) => DocumentOperand(Cast("item.[value]", elementType), elementType);
     public string JsonArrayLength(string columnSql) => $"(SELECT COUNT(1) FROM OPENJSON({columnSql}))";
     public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
         // This dialect escapes LIKE metacharacters by bracket-quoting ([%], [_], [[]), which needs no

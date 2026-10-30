@@ -9,7 +9,11 @@ internal static class Constants
         internal const string ConfigurationName = "Mongo";
         internal const int Priority = 20;
         internal const int MaximumRoutes = 128;
-        internal const int MaximumCollectionsPerRepository = 1024;
+        // How many collections one repository's schema memo remembers as ensured; past it the least recently used is
+        // forgotten and re-ensured on its next use.
+        internal const int RememberedCollectionsPerRepository = 1024;
+        // How many collections one container listing reads before it reports the provider limit.
+        internal const int InspectedCollections = 1024;
         internal const int DuplicateKeyError = 11000;
         // The _id of the one document in the store marker collection (DATA-0148).
         internal const string StoreMarkerSlot = "store";

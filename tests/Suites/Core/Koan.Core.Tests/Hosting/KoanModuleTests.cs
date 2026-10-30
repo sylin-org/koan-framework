@@ -44,7 +44,7 @@ public class KoanModuleTests
         var services = new ServiceCollection().BuildServiceProvider();
         var host = new KoanModuleHost(services, runtime);
 
-        await host.StartAsync(CancellationToken.None);
+        await host.StartingAsync(CancellationToken.None);
 
         starts.Should().Equal("semantic");
     }

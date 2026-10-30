@@ -14,6 +14,12 @@ source: src/Koan.Core/
 - Error modes: required terse host-backed surfaces use `KoanHostContextException`; avoid magic values.
 - Runtime ownership: the generic-host binder owns the process-default `AppHost` provider from host
   start through stop. Explicit flow scopes override that default without mutating its lease.
+- Startup order is Koan's, not the application's: the binder attaches the host, runtime discovery runs and every
+  module's `Start` runs in `IHostedLifecycleService.StartingAsync`, which the host completes before any hosted
+  service's `StartAsync`. An application hosted service registered before `AddKoan()` starts with the host attached
+  and Data's routes hydrated. The binder releases the host in `StoppedAsync`, after every hosted service stopped
+  (ARCH-0140). A host configured to start services concurrently (`HostOptions.ServicesStartConcurrently`) runs the
+  starting phase concurrently too, and loses this order.
 
 ## Key types
 
@@ -54,6 +60,10 @@ source: src/Koan.Core/
   `ILoggerFactory` from the current `AppHost` provider, so host leases and flow scopes also govern
   logging without a second ambient owner.
 - `IKoanRuntimeFacts`: read-only access to the current host's schema-versioned runtime fact envelope.
+  Recording a fact the store already holds unchanged (all but its observation time) takes no lock and writes
+  nothing, so a hot path that records the same decision on every call costs one dictionary read. A changed fact is
+  written under the store's gate and marks the envelope stale; the ordered envelope is built once per change, when it
+  is next read, and its `Sequence` counts the changes (ARCH-0140).
 - `KoanFactKind.Guarantee`: schema-2 meaning for a value-free guarantee projected from a canonical
   concern plan or realization receipt. Startup selects by kind; Web and MCP serialize the same envelope.
 - `KoanApplicationReferenceManifest`: immutable host-owned direct `PackageReference`/

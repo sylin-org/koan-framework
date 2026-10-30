@@ -97,17 +97,12 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         var plan = Plan();
         await Ready(plan, ct).ConfigureAwait(false);
         var found = new Dictionary<TKey, TEntity>();
-        var width = Math.Max(1, plan.IdentityRoots.Count);
-        var chunk = Math.Max(1, Infrastructure.Constants.MaximumParameters / width);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        for (var offset = 0; offset < requested.Count; offset += chunk)
+        foreach (var slice in IdentitySlices(plan, requested, reservedParameters: 0))
         {
             await using var command = connection.CreateCommand();
-            var predicates = new List<string>();
-            foreach (var (id, index) in requested.Skip(offset).Take(chunk).Select((value, index) => (value, index)))
-                predicates.Add(IdentityPredicate(command, plan, plan.Commands.Get(id).Identity, $"k{index}_"));
-            command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row " +
-                                  $"WHERE {string.Join(" OR ", predicates)}";
+            var identities = IdentitySet(command, plan, slice, "k");
+            command.CommandText = $"SELECT {plan.Select} FROM {plan.QualifiedTable} AS koan_row WHERE {identities}";
             await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
             while (await reader.ReadAsync(ct).ConfigureAwait(false))
             {
@@ -194,7 +189,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
             .Count();
         var parametersPerItem = Math.Max(1, writeRoots + (ManagedFieldWriteScope.Current?.Count ?? 0));
         var dispatchSize = Math.Max(1, Math.Min(
-            Infrastructure.Constants.MaximumBatchItems,
+            Infrastructure.Constants.MaximumRowsPerStatement,
             Infrastructure.Constants.MaximumParameters / parametersPerItem));
         for (var offset = 0; offset < values.Count; offset += dispatchSize)
         {
@@ -216,18 +211,9 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
         var work = connection.In(transaction);
-        var width = Math.Max(1, plan.IdentityRoots.Count);
-        var dispatchSize = Math.Max(1, Math.Min(
-            Infrastructure.Constants.MaximumBatchItems,
-            Infrastructure.Constants.MaximumParameters / width));
         var deleted = 0;
-        for (var offset = 0; offset < values.Count; offset += dispatchSize)
-            deleted += await Delete(
-                work,
-                plan,
-                values.Skip(offset).Take(dispatchSize).ToArray(),
-                guard: null,
-                ct).ConfigureAwait(false);
+        foreach (var slice in IdentitySlices(plan, values, reservedParameters: 0))
+            deleted += await Delete(work, plan, slice, guard: null, ct).ConfigureAwait(false);
         await transaction.Commit(ct).ConfigureAwait(false);
         return deleted;
     }
@@ -357,7 +343,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         await using var command = connection.CreateCommand();
         var set = UpdateSet(command, plan, write.Values, "set_");
         var identity = IdentityPredicate(command, plan, write.Identity, "key_");
-        var (condition, values) = Where(plan, guard);
+        var (condition, values) = Where(plan, guard, reservedParameters: command.Parameters.Count);
         AddParameters(command, values, "p");
         command.CommandText = $"UPDATE {plan.QualifiedTable} AS koan_row SET {set} WHERE {identity} AND ({condition})";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
@@ -375,7 +361,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         var identity = IdentityPredicate(command, plan, plan.Commands.Delete(id).Identity, "key_");
-        var (condition, values) = Where(plan, guard);
+        var (condition, values) = Where(plan, guard, reservedParameters: command.Parameters.Count);
         AddParameters(command, values, "p");
         command.CommandText = $"DELETE FROM {plan.QualifiedTable} AS koan_row WHERE {identity} AND ({condition})";
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false) == 1;
@@ -396,19 +382,9 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         await using var connection = await Open(ct).ConfigureAwait(false);
         await using var transaction = await connection.Begin(ct).ConfigureAwait(false);
         var work = connection.In(transaction);
-        var width = Math.Max(1, plan.IdentityRoots.Count);
-        var guardParameters = Where(plan, guard).Values.Count;
-        var dispatchSize = Math.Max(1, Math.Min(
-            Infrastructure.Constants.MaximumBatchItems,
-            (Infrastructure.Constants.MaximumParameters - guardParameters) / width));
         var deleted = 0;
-        for (var offset = 0; offset < ids.Count; offset += dispatchSize)
-            deleted += await Delete(
-                work,
-                plan,
-                ids.Skip(offset).Take(dispatchSize).ToArray(),
-                guard,
-                ct).ConfigureAwait(false);
+        foreach (var slice in IdentitySlices(plan, ids, reservedParameters: Where(plan, guard).Values.Count))
+            deleted += await Delete(work, plan, slice, guard, ct).ConfigureAwait(false);
         await transaction.Commit(ct).ConfigureAwait(false);
         return deleted;
     }
@@ -820,26 +796,26 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         CancellationToken ct)
     {
         await using var command = session.CreateCommand();
-        var predicates = ids.Select((id, index) =>
-            IdentityPredicate(command, plan, plan.Commands.Delete(id).Identity, $"d{index}_")).ToArray();
-        var identities = string.Join(" OR ", predicates);
+        var identities = IdentitySet(command, plan, ids, "d");
         if (guard is null)
             command.CommandText = $"DELETE FROM {plan.QualifiedTable} WHERE {identities}";
         else
         {
-            var (condition, values) = Where(plan, guard);
+            var (condition, values) = Where(plan, guard, reservedParameters: command.Parameters.Count);
             AddParameters(command, values, "p");
             command.CommandText = $"DELETE FROM {plan.QualifiedTable} AS koan_row WHERE ({identities}) AND ({condition})";
         }
         return await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
     }
 
+    // reservedParameters: what the statement binds besides the filter, so the whole stays within SQLite's limit.
     private static (string? Sql, IReadOnlyList<object?> Values) Where(
         SqliteEntityPlan<TEntity, TKey> plan,
-        Filter? filter)
+        Filter? filter,
+        int reservedParameters = 0)
     {
         if (filter is null) return (null, []);
-        var translated = plan.Filter().Translate(filter);
+        var translated = plan.Filter().Translate(filter, reservedParameters);
         return (translated.whereSql, translated.parameters);
     }
 
@@ -942,6 +918,59 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         return string.Join(", ", assignments);
     }
 
+    /// <summary>
+    /// The slices of <paramref name="ids"/> one statement each carries. A one-column identity whose keys have a JSON form
+    /// (text, integers, Guids, dates; see <see cref="SqliteDialect.JsonSet"/>) is one slice, matched by <c>json_each</c> over a single parameter (<see cref="IdentitySet"/>), however
+    /// many ids there are. Any other identity is an OR of per-key predicates, so its slices stay inside SQLite's
+    /// parameter limit (less <paramref name="reservedParameters"/> the statement binds besides) and its expression
+    /// depth (DATA-0162).
+    /// </summary>
+    private static IEnumerable<IReadOnlyList<TKey>> IdentitySlices(
+        SqliteEntityPlan<TEntity, TKey> plan,
+        IReadOnlyList<TKey> ids,
+        int reservedParameters)
+    {
+        if (JsonIdentities(plan, ids) is not null)
+        {
+            yield return ids;
+            yield break;
+        }
+        var width = Math.Max(1, plan.IdentityRoots.Count);
+        var size = Math.Max(1, Math.Min(
+            Infrastructure.Constants.MaximumIdentityTerms,
+            (Infrastructure.Constants.MaximumParameters - reservedParameters) / width));
+        foreach (var slice in ids.Chunk(size)) yield return slice;
+    }
+
+    /// <summary>The predicate matching any of <paramref name="ids"/>, its values bound on <paramref name="command"/>.</summary>
+    private static string IdentitySet(
+        SqliteCommand command,
+        SqliteEntityPlan<TEntity, TKey> plan,
+        IReadOnlyList<TKey> ids,
+        string prefix)
+    {
+        if (JsonIdentities(plan, ids) is { } json)
+        {
+            var name = $"@{prefix}ids";
+            command.Parameters.AddWithValue(name, json);
+            return $"({SqliteDialect.Quote(plan.IdentityRoots[0])} IN (SELECT value FROM json_each({name})))";
+        }
+        var predicates = ids.Select((id, index) =>
+            IdentityPredicate(command, plan, plan.Commands.Get(id).Identity, $"{prefix}{index}_"));
+        return "(" + string.Join(" OR ", predicates) + ")";
+    }
+
+    /// <summary>The keys of <paramref name="ids"/> as one JSON array when the identity is one column and every key has a
+    /// JSON form <c>json_each</c> yields as the same value a bound parameter would; else null.</summary>
+    private static string? JsonIdentities(SqliteEntityPlan<TEntity, TKey> plan, IReadOnlyList<TKey> ids)
+    {
+        if (plan.IdentityRoots.Count != 1) return null;
+        var keys = new object?[ids.Count];
+        for (var index = 0; index < ids.Count; index++)
+            keys[index] = plan.Parameter(plan.Commands.Get(ids[index]).Identity.Single());
+        return SqliteDialect.JsonSet(keys);
+    }
+
     private static string IdentityPredicate(
         SqliteCommand command,
         SqliteEntityPlan<TEntity, TKey> plan,
@@ -1008,8 +1037,9 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
             return (TResult)(object)await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         var rows = new List<Dictionary<string, object?>>();
+        var limit = Koan.Data.Abstractions.Instructions.InstructionSql.MaxRows(instruction) ?? int.MaxValue;
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
-        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        while (rows.Count < limit && await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < reader.FieldCount; index++)
@@ -1030,13 +1060,6 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
     }
 
     private static string ParameterName(string name) => name.StartsWith('@') ? name : "@" + name;
-
-    private static void DemandBatch(int count)
-    {
-        if (count > Infrastructure.Constants.MaximumBatchItems)
-            throw new ArgumentOutOfRangeException(nameof(count), count,
-                $"SQLite accepts at most {Infrastructure.Constants.MaximumBatchItems} items per bounded batch.");
-    }
 
     private sealed class Batch(SqliteRepository<TEntity, TKey> repository) :
         IBatchSet<TEntity, TKey>,
@@ -1086,7 +1109,6 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
 
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
-            DemandBatch(_operations.Count);
             if (options?.MaxItems is { } maximum && _operations.Count > maximum)
                 throw new InvalidOperationException(
                     $"The queued SQLite batch has {_operations.Count} items, exceeding its declared bound of {maximum}.");

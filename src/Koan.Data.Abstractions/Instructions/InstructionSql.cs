@@ -31,6 +31,29 @@ public static class InstructionSql
         object? parameters = null)
         => Create(RelationalInstructions.SqlQuery, sql, effect, parameters);
 
+    /// <summary>A query whose adapter reads at most <paramref name="maxRows"/> rows (DATA-0162).</summary>
+    public static Instruction Query(
+        string sql,
+        DataOperationEffect effect,
+        object? parameters,
+        int maxRows)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRows);
+        return Create(RelationalInstructions.SqlQuery, sql, effect, parameters) with
+        {
+            Options = new Dictionary<string, object?>(StringComparer.Ordinal) { [RelationalInstructions.MaxRows] = maxRows }
+        };
+    }
+
+    /// <summary>The most rows <paramref name="instruction"/> asks its adapter to read, or null for every row.</summary>
+    public static int? MaxRows(Instruction instruction)
+    {
+        ArgumentNullException.ThrowIfNull(instruction);
+        return instruction.Options?.TryGetValue(RelationalInstructions.MaxRows, out var value) == true && value is int rows
+            ? rows
+            : null;
+    }
+
     private static Instruction Create(
         string name,
         string sql,

@@ -47,8 +47,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
     private readonly RelationalSchemaPolicy _schemaPolicy;
     private readonly DataSegmentationPlan _segmentation;
     private readonly MappingPlan? _declaredMapping;
-    private readonly object _planGate = new();
-    private readonly Dictionary<string, DuckDbEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
+    private readonly RelationalPlanCache<DuckDbEntityPlan<TEntity, TKey>> _plans = new(Infrastructure.Constants.MaximumPlans);
 
     internal DuckDbRepository(IServiceProvider services, DuckDbRoute route, DuckDbAdapterFactory factory)
     {
@@ -145,7 +144,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
             .Count();
         var parametersPerItem = Math.Max(1, writeRoots + (ManagedFieldWriteScope.Current?.Count ?? 0));
         var dispatchSize = Math.Max(1, Math.Min(
-            Infrastructure.Constants.MaximumBatchItems,
+            Infrastructure.Constants.MaximumRowsPerStatement,
             Infrastructure.Constants.MaximumParameters / parametersPerItem));
         for (var offset = 0; offset < values.Count; offset += dispatchSize)
         {
@@ -167,7 +166,7 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         await using var transaction = (DuckDBTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
         var width = Math.Max(1, plan.IdentityRoots.Count);
         var dispatchSize = Math.Max(1, Math.Min(
-            Infrastructure.Constants.MaximumBatchItems,
+            Infrastructure.Constants.MaximumRowsPerStatement,
             Infrastructure.Constants.MaximumParameters / width));
         var deleted = 0;
         for (var offset = 0; offset < values.Count; offset += dispatchSize)
@@ -435,12 +434,8 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
                         EntityContext.Current?.Partition,
                         _services);
         var key = _declaredMapping?.Id ?? table;
-        lock (_planGate)
+        return _plans.GetOrAdd(key, _ =>
         {
-            if (_plans.TryGetValue(key, out var existing)) return existing;
-            if (_plans.Count >= Infrastructure.Constants.MaximumPlans)
-                throw new InvalidOperationException(
-                    $"DuckDB reached the repository plan bound of {Infrastructure.Constants.MaximumPlans}.");
             if (_declaredMapping is not null)
             {
                 var segmentation = _segmentation.For(typeof(TEntity));
@@ -451,10 +446,8 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
             var mapping = _declaredMapping ?? RelationalManagedMapping.Compile<TEntity>(
                 _route.Source,
                 StorageAddress.From(table));
-            var created = new DuckDbEntityPlan<TEntity, TKey>(mapping, _segmentation);
-            _plans.Add(key, created);
-            return created;
-        }
+            return new DuckDbEntityPlan<TEntity, TKey>(mapping, _segmentation);
+        });
     }
 
     private async Task<DuckDBConnection> Open(CancellationToken ct)
@@ -879,8 +872,9 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
             return (TResult)(object)await command.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         var rows = new List<Dictionary<string, object?>>();
+        var limit = Koan.Data.Abstractions.Instructions.InstructionSql.MaxRows(instruction) ?? int.MaxValue;
         await using var reader = await command.ExecuteReaderAsync(ct).ConfigureAwait(false);
-        while (await reader.ReadAsync(ct).ConfigureAwait(false))
+        while (rows.Count < limit && await reader.ReadAsync(ct).ConfigureAwait(false))
         {
             var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < reader.FieldCount; index++)
@@ -902,13 +896,6 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
 
     /// <summary>DuckDB binds <c>$name</c> placeholders to parameters named without any prefix character.</summary>
     private static string ParameterName(string name) => name.TrimStart('@', '$');
-
-    private static void DemandBatch(int count)
-    {
-        if (count > Infrastructure.Constants.MaximumBatchItems)
-            throw new ArgumentOutOfRangeException(nameof(count), count,
-                $"DuckDB accepts at most {Infrastructure.Constants.MaximumBatchItems} items per bounded batch.");
-    }
 
     private sealed class Batch(DuckDbRepository<TEntity, TKey> repository) : IBatchSet<TEntity, TKey>
     {
@@ -949,7 +936,6 @@ internal sealed class DuckDbRepository<TEntity, TKey> :
 
         public async Task<BatchResult> Save(BatchOptions? options = null, CancellationToken ct = default)
         {
-            DemandBatch(_operations.Count);
             if (options?.MaxItems is { } maximum && _operations.Count > maximum)
                 throw new InvalidOperationException(
                     $"The queued DuckDB batch has {_operations.Count} items, exceeding its declared bound of {maximum}.");

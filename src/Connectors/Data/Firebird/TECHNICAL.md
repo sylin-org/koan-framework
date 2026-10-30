@@ -53,6 +53,9 @@ with the quoted column. Consequences:
 
 - scalar filters, sorts, declared indexes and managed-isolation predicates are store-enforced;
 - deeper paths refuse (`NestedPaths=false` declared; the coordinator routes them to the floor);
+- `GetMany` and `DeleteMany` name ids in slices of 1,000 parameters (deleting them in one transaction), the store
+  declares `MaximumSetMembers` 1,000 for scoped key sets, and a filter's IN list holds at most 1,500 members, the bound
+  Firebird before 5.0 enforces (DATA-0162);
 - collection-shaped bindings (e.g. `List<string>`) stay document-only; their operators are absent
   from `FilterSupport.CollectionOperators`, and running them records a `koan.data.query.fallback`
   fact — the residual is declared, visible, and convergent;

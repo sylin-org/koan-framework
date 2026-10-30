@@ -100,6 +100,54 @@ public sealed class KoanRuntimeFactsSpec
     }
 
     [Fact]
+    public async Task An_unchanged_fact_takes_no_lock_and_writes_nothing()
+    {
+        var store = new KoanRuntimeFactStore();
+        store.Record(Descriptor(KoanFactState.Selected, "held"));
+        var before = store.Current;
+
+        // Hold the store's one write gate on another thread: recording the same decision again must not need it.
+        var gate = typeof(KoanRuntimeFactStore)
+            .GetField("_gate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(store)!;
+        using var held = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var holder = Task.Run(() =>
+        {
+            lock (gate)
+            {
+                held.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        });
+        held.Wait(TimeSpan.FromSeconds(10)).Should().BeTrue();
+
+        var unchanged = Task.Run(() => store.Record(Descriptor(KoanFactState.Selected, "held")));
+        (await Task.WhenAny(unchanged, Task.Delay(TimeSpan.FromSeconds(5)))).Should().BeSameAs(unchanged,
+            "an unchanged fact is not written, so it never waits for the gate");
+
+        var changed = Task.Run(() => store.Record(Descriptor(KoanFactState.Rejected, "moved")));
+        (await Task.WhenAny(changed, Task.Delay(TimeSpan.FromMilliseconds(200)))).Should().NotBeSameAs(changed,
+            "a changed fact is written under the gate");
+        release.Set();
+        await holder;
+        await changed;
+
+        store.Current.Sequence.Should().Be(before.Sequence + 1, "only the changed fact was a write");
+        store.Current.Facts.Should().ContainSingle().Which.Summary.Should().Be("moved");
+    }
+
+    [Fact]
+    public void Reading_the_envelope_twice_without_a_change_returns_the_same_envelope()
+    {
+        var store = new KoanRuntimeFactStore();
+        store.Record(Descriptor(KoanFactState.Selected, "one"));
+        store.Current.Should().BeSameAs(store.Current);
+        store.Record(Descriptor(KoanFactState.Selected, "one"));
+        store.Current.Should().BeSameAs(store.Current);
+    }
+
+    [Fact]
     public void Recollection_replaces_collected_facts_without_discarding_operation_facts()
     {
         var store = new KoanRuntimeFactStore();

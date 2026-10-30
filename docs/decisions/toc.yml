@@ -222,6 +222,8 @@
       href: ARCH-0138-module-discovery-failures-are-boot-failures.md
     - name: ARCH-0139 Registry-driven services register after discovery, whatever code ran first
       href: ARCH-0139-registry-driven-services-register-after-discovery.md
+    - name: ARCH-0140 Recording an unchanged fact takes no lock, and Koan starts before any hosted service whatever the registration order
+      href: ARCH-0140-core-hot-paths-take-no-lock-and-start-in-any-order.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries
@@ -432,6 +434,8 @@
       href: DATA-0160-sqlite-qualifies-declared-index-names-per-partition-table.md
     - name: DATA-0161 A deferred commit that fails before it dispatches anything reports NotCommitted
       href: DATA-0161-a-commit-that-fails-before-dispatch-reports-not-committed.md
+    - name: DATA-0162 A data bound sizes memory or a read, never what an application may hold
+      href: DATA-0162-data-bounds-belong-to-reads.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

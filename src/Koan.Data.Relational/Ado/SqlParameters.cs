@@ -84,6 +84,14 @@ public sealed class SqlParameters
     {
         foreach (var (name, value) in _items)
         {
+            if (value is ISqlParameterValue bound)
+            {
+                var parameter = cmd.CreateParameter();
+                parameter.ParameterName = "@" + name;
+                bound.ApplyTo(parameter);
+                cmd.Parameters.Add(parameter);
+                continue;
+            }
             if (value is not (null or string or byte[]) && value is IEnumerable seq)
             {
                 sql = ExpandInClause(cmd, sql, name, seq);

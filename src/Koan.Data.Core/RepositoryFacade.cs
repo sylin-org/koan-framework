@@ -70,6 +70,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private readonly bool _scopeAdapterOk;
     private readonly string? _scopeAdapterError;
     private readonly FilterSupport _filterCaps;
+    // The most identities one scoped read names in a single In: the store's declared set bound (DATA-0162), read once.
+    private readonly Lazy<int> _identitySlice;
     private readonly bool _skipReadPushabilityCheck;
     private readonly OperationOverrideDescriptor? _deleteOverride;
     private readonly Filter? _notYetDeleted;
@@ -117,6 +119,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         _routeBinding = routeBinding;
         _resolveRoute = resolveRoute;
         _idField = AggregateMetadata.GetIdSpec(typeof(TEntity))?.Prop.Name ?? "Id";
+        _identitySlice = new Lazy<int>(() => Math.Max(1,
+            DataCaps.Describe(_inner, _inner.GetType().Name).Detail<FilterSupport>(DataCaps.Query.Filter)?.MaximumSetMembers
+            ?? int.MaxValue));
         // The adapter is inspected once iff this entity could ever be scoped: it has a managed descriptor (write-stamp
         // + equality read) OR a NON-default read-filter contributor (a predicate axis). The built-in equality
         // contributor alone is not a trigger — with no managed descriptor it yields no filter, so a non-tenant app is
@@ -495,6 +500,18 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     private QueryDefinition ScopedByIds(IReadOnlyList<TKey> ids, Filter managed)
         => QueryDefinition.All.Where(Filter.All(Filter.In(_idField, ids.Cast<object?>().ToList()), managed));
 
+    /// <summary>The rows among <paramref name="ids"/> that match <paramref name="scope"/>, read in slices no larger than
+    /// the store binds in one statement, so a scoped key set of any size reads as the unscoped one does (DATA-0162).</summary>
+    private async Task<IReadOnlyList<TEntity>> ScopedRows(IReadOnlyList<TKey> ids, Filter scope, CancellationToken ct)
+    {
+        var slice = _identitySlice.Value;
+        if (ids.Count <= slice) return (await RequireQuery().Query(ScopedByIds(ids, scope), ct)).Items;
+        var rows = new List<TEntity>(ids.Count);
+        foreach (var part in ids.Chunk(slice))
+            rows.AddRange((await RequireQuery().Query(ScopedByIds(part, scope), ct)).Items);
+        return rows;
+    }
+
     // ARCH-0084: forward the inner provider's unified capabilities (native IDescribesCapabilities,
     // else the legacy-marker bridge) — so the facade is correct regardless of how inner declares.
     public void Describe(ICapabilities caps)
@@ -662,8 +679,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         }
         else
         {
-            var result = await RequireQuery().Query(ScopedByIds(ids, managed), ct);
-            raw = result.Items.Cast<TEntity?>().ToArray();
+            raw = (await ScopedRows(ids, managed, ct)).Cast<TEntity?>().ToArray();
         }
         return Reverse(NormalizeGetMany(ids, raw));
     }
@@ -1245,9 +1261,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         var ov = _deleteOverride;   // mass delete: no batch hard-delete exists, so the override always applies
         if (ov is not null)
         {
-            var scoped = ScopedByIds(idList, Filter.And(managed, _notYetDeleted)!);
-            var soft = await RequireQuery().Query(scoped, ct);
-            return await OverrideUpsertMany(soft.Items, ov, segmentation, ct);
+            var soft = await ScopedRows(idList, Filter.And(managed, _notYetDeleted)!, ct);
+            return await OverrideUpsertMany(soft, ov, segmentation, ct);
         }
         return await PhysicalDeleteMany(idList, managed, ct);
     }
@@ -1268,8 +1283,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     /// check-then-delete, lowered once for the set (DATA-0124).</summary>
     private async Task<IReadOnlyList<TKey>> VisibleIds(IReadOnlyList<TKey> ids, Filter managed, CancellationToken ct)
     {
-        var res = await RequireQuery().Query(ScopedByIds(ids, managed), ct);
-        return res.Items.Select(e => e.Id).ToList();
+        var rows = await ScopedRows(ids, managed, ct);
+        return rows.Select(e => e.Id).ToList();
     }
 
     private async Task<long> DeleteVisibleInBoundedPages(

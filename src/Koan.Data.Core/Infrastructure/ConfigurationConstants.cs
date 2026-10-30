@@ -55,10 +55,4 @@ internal static class ConfigurationConstants
         public static string TimeoutForProvider(string provider) => $"{Section}:{provider}:Readiness:Timeout";
         public static string GatingForProvider(string provider) => $"{Section}:{provider}:Readiness:EnableReadinessGating";
     }
-
-    public static class Runtime
-    {
-        public const string Section = ConfigurationConstants.Section + ":Runtime";
-        public const string EnsureSchemaOnStart = Runtime.Section + ":EnsureSchemaOnStart";
-    }
 }

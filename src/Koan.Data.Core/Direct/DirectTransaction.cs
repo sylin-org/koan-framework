@@ -63,7 +63,7 @@ internal sealed class DirectTransaction(
         if (res is null || res is DBNull) return default; return (T)Convert.ChangeType(res, typeof(T));
     }
 
-    public async Task<IReadOnlyList<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
+    public async Task<DirectRows<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
     {
         sourcePlan.Demand(effect, "direct transaction query");
         await using var cmd = conn.CreateCommand();
@@ -81,11 +81,12 @@ internal sealed class DirectTransaction(
                 cmd.Parameters.Add(p);
             }
         }
-        using var reader = await cmd.ExecuteReaderAsync(ct);
-        return await DirectSession.MaterializeAsObjects(reader, maxRows, ct);
+        // Inside the caller's transaction: a bounded read drains to the end and never cancels (BoundedReads).
+        var reader = await cmd.ExecuteReaderAsync(ct);
+        return await DirectSession.MaterializeAsObjects(cmd, reader, maxRows, cancelAtBound: false, ct);
     }
 
-    public async Task<IReadOnlyList<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
+    public async Task<DirectRows<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
         sourcePlan.Demand(effect, "direct transaction typed query");
         await using var cmd = conn.CreateCommand();
@@ -106,12 +107,12 @@ internal sealed class DirectTransaction(
         var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         var limits = new RecordSetLimits(maxRows, long.MaxValue, long.MaxValue, timeout);
         var records = await materializer.Materialize(
-                new DirectSession.AdoNeutralRecordReader(reader),
+                new DirectSession.AdoNeutralRecordReader(cmd, reader, cancelWhenAbandoned: false),
                 limits,
                 "direct transaction typed query",
                 ct)
             .ConfigureAwait(false);
-        return records.Project<T>();
+        return new DirectRows<T>(records.Project<T>(), records.Completion);
     }
 
     public async Task Commit(CancellationToken ct = default)

@@ -173,6 +173,25 @@ public sealed class SourceReadinessCoordinatorSpec
     }
 
     [Fact]
+    public async Task A_full_stage_cache_keeps_the_targets_in_use_and_forgets_the_least_recently_used()
+    {
+        var coordinator = new DataSourceReadinessCoordinator(
+            options: Options.Create(new DataRuntimeOptions { ReadinessCacheEntries = 4 }));
+        var proven = new List<string>();
+        Func<CancellationToken, Task> Work(string target) => _ => { proven.Add(target); return Task.CompletedTask; };
+
+        foreach (var target in new[] { "hot", "b", "c", "d" })
+            await coordinator.EnsureReachable(Plan(), target, Work(target));
+        await coordinator.EnsureReachable(Plan(), "hot", Work("hot"));   // the first one proven is in use
+        await coordinator.EnsureReachable(Plan(), "e", Work("e"));       // admitting past the bound evicts one
+
+        proven.Clear();
+        await coordinator.EnsureReachable(Plan(), "hot", Work("hot"));
+        await coordinator.EnsureReachable(Plan(), "b", Work("b"));
+        proven.Should().Equal(["b"], "the target in use stays proven; the least recently used one is proven again");
+    }
+
+    [Fact]
     public async Task Host_shutdown_owns_shared_work_cancellation()
     {
         using var lifetime = new TestLifetime();

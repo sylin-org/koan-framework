@@ -64,7 +64,9 @@ commit.
 
 ## Collection and index realization
 
-`MongoSchema` is a retryable, host-bounded gate per physical collection. `Managed` creates a missing collection and
+`MongoSchema` is a retryable gate per physical collection. It remembers up to 1,024 ensured collections per repository
+and forgets the least recently used one when a new collection is admitted; ensuring is idempotent, so a forgotten
+collection is ensured again on its next use and a partition past the bound keeps working (DATA-0162). `Managed` creates a missing collection and
 realizes declared indexes. `External` verifies existence and performs no DDL. Managed conventions and explicit mapping
 plans both lower their index paths through the same physical decisions used by reads and writes. TTL declarations use
 MongoDB's native zero-second expiry index.
@@ -123,7 +125,7 @@ fail-closed. Concurrent callers share one resolution, while cancellation abandon
 native endpoints bypass discovery. Health probes use the same route and client owner as data operations. Referencing
 the package alone does not create a MongoDB client or start discovery.
 
-Route clients and per-repository collection gates are bounded. Driver clients are reused for the host lifetime and
+Route clients are bounded; the per-repository collection memo evicts its least recently used entry. Driver clients are reused for the host lifetime and
 disposed with the host. Collection enumeration, identity batches, pipeline results, and inspection samples all have
 explicit bounds.
 

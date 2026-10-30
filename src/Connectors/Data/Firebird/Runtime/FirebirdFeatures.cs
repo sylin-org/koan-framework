@@ -41,7 +41,11 @@ internal static class FirebirdFeatures
         },
         CollectionOperators: new HashSet<FilterOperator>(),
         NestedPaths: false,
-        IgnoreCase: false);
+        IgnoreCase: false)
+    {
+        // A scoped In past the parameters one statement binds is sliced by Koan (DATA-0162).
+        MaximumSetMembers = Infrastructure.Constants.MaximumParameters
+    };
 
     internal static void Declare(IDataClaims claims)
     {

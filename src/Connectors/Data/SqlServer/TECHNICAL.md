@@ -43,6 +43,49 @@ fallback. The connector does not currently expose provider-specific retry or com
 ## LINQ and pushdowns
 
 - Supported expressions follow `Koan.Data.Relational` translator. See: `xref:reference.modules.Koan.data.relational#supported-linq-subset`.
+- SqlClient sends at most 2,098 parameters in a statement (measured: 2,099 is refused). `GetMany` and `DeleteMany`
+  name ids in slices of 2,000
+  (deleting them in one transaction), and the store declares `MaximumSetMembers` 1,900, the slice the facade reads a
+  scoped key set in, leaving room for the scope's own parameters.
+- A filter may bind 2,098 parameters less those its statement binds itself: a conditional replace's SET values and
+  identity. An `In`/`Nin` binds a parameter per member while the statement fits; past that, the largest lists move, one
+  at a time, to one table-valued parameter. A `HasAny`/`HasAll`/`HasNone` list binds as one table-valued parameter
+  wherever its set type exists, because its per-member form reads the JSON array once per member, and per member
+  otherwise. A statement still over its bound with nothing more that can move is refused, naming each list that could
+  not and why (DATA-0162).
+- A JSON array element compares exactly as a document scalar does, so `Has` and the list operators answer what `Eq`
+  answers: a Guid or a DateTime as document text, a decimal or a real number converted to decimal(38, 10) (it meets a
+  member by value to ten places; a decimal list binds through the sql_variant type), an integer as bigint, a boolean
+  as bit.
+- A set type is `[schema].[koan_set_<scalar>_<hash>]`, the hash the first eight hex digits of the SHA-256 of its one
+  column `[koan_member] <type> NOT NULL`; a changed shape is a new name. The column is exactly the SqlDbType SqlClient
+  infers for a lone parameter of the members: nvarchar(4000) or nvarchar(max) (a char too), uniqueidentifier, datetime,
+  datetimeoffset(7), float, real, bit, bigint, int, smallint, tinyint, and sql_variant for decimals, which bind with
+  their own precision and scale. Text is read through `CONVERT(nvarchar(…), CONVERT(varbinary(…), [koan_member]))`, whose
+  coercible-default collation yields to the column's as a lone parameter's does. A TimeSpan, DateOnly or TimeOnly on a
+  document field reaches a set already encoded (ticks, or text) and binds through the bigint or nvarchar type; read
+  from a typed column it has no set type (no typed column of them round-trips here), so such a list, or one of mixed
+  types, unsigned or signed-byte integers or byte arrays, stays a parameter per member.
+- The repository ensures the types at ready, once per route and schema: whenever it reads the catalog it creates every
+  missing type when the source may create storage objects, remembers a denied `CREATE TYPE` (permission 262 or any
+  refusal) as "may not create" without failing the operation, and reads each type's column to check it against the
+  definition. A list whose type is missing or of another shape stays a parameter per member; a statement still over
+  its bound is refused naming the type and why: the login was denied creating it, or the source may not create storage
+  objects, with the `CREATE TYPE` statement; or the type has another shape, with `DROP TYPE` where the source creates
+  types and `DROP TYPE …; CREATE TYPE …` where it does not. A refusal marks the catalog stale, and the next operation
+  reads it again (at most once a second), so a type created or dropped after a refusal is used without a restart. The
+  server's "Cannot find data type" for a set type (351, or 2715) marks the catalog stale at once, and the query, count
+  or conditional replace runs once more: a dropped type is created again, or the operation is refused by name
+  (DATA-0162).
+- A Direct read that stops at its bound cancels its command only when its effect is a declared Read outside a caller's
+  transaction. The effect is the caller's declaration, and Koan does not check it against the SQL. PostgreSQL enforces
+  a declared Read only on the entity-routed query, which it runs in a read-only transaction, so a write labelled Read
+  fails there. On the untyped and typed Direct reads, and on every SQL Server path (SQL Server has no read-only
+  statement), a write labelled Read is cancelled at the bound like any read, and the server rolls back the statement
+  the cancel interrupts. A write a Read-labelled command carries past the bound may therefore be rolled back here
+  (DATA-0162).
+- A document field holding a Guid or a DateTime compares as the document's text, both sides rewritten to the
+  fixed-width forms of `RelationalDocumentText` (DATA-0139), as on SQLite and PostgreSQL.
 - Paging uses `OFFSET`/`FETCH`. Every caller-requested provider-bounded stream sort component must be a
   portable scalar -- an enum, or an integral, decimal, floating, or temporal type -- for its comparison
   to hold on every qualified adapter. Any other key still streams here; Data.Core records a fact naming

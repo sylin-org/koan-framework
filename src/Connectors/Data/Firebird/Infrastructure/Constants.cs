@@ -2,6 +2,8 @@ namespace Koan.Data.Connector.Firebird.Infrastructure;
 
 public static class Constants
 {
+    // The most parameters Koan binds in one Firebird statement; an identity set or scoped In past it is sliced.
+    public const int MaximumParameters = 1_000;
     public const string Provider = "firebird";
     public const string Service = "firebird";
     public const string DefaultSource = "Default";

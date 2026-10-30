@@ -117,7 +117,8 @@ declaration names `Top(size)` or `Page(page, size)`, a page holds at most 1,000 
 most 64 words. Rows written before the declaration are indexed by `Post.Lexical.Rebuild(ct)`; `Post.Lexical.Status(ct)`
 says exactly whether the index covers every row, and the `data:lexical` readiness report says what it last measured,
 at most once per `DataRuntimeOptions.LexicalReadinessInterval` (five minutes) per entity, so a probe never counts a
-whole table. A store that cannot keep the index refuses the entity's first write, naming `query.lexical` and the
+whole table. A tenant-scoped entity's index is the tenant's to measure, so the report names it unmeasured and reads
+Unknown rather than Degraded; `Status` inside the tenant measures it. A store that cannot keep the index refuses the entity's first write, naming `query.lexical` and the
 correction; a route whose DDL policy did not build it refuses the search, naming the missing structure and the policy. This is search by the words a row holds;
 [semantic search](../../capabilities/ai/semantic-search.md) is search by meaning. See
 [DATA-0159](../../decisions/DATA-0159-lexical-search-over-declared-entity-text.md).

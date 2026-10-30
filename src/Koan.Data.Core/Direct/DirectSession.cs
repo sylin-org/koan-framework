@@ -140,7 +140,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         return (T)Convert.ChangeType(res, typeof(T));
     }
 
-    public async Task<IReadOnlyList<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
+    public async Task<DirectRows<object>> Query(string sql, object? parameters = null, CancellationToken ct = default)
     {
         var ceiling = DemandBeforeRoute(_effect, "direct query");
         GuardDirect();
@@ -149,8 +149,9 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             var data = _sp.GetService(typeof(IDataService)) as IDataService;
             if (data is not null)
             {
-                // Execute instruction-backed query and normalize to List<object>
-                var instruction = InstructionSql.Query(sql, _effect, parameters);
+                // The adapter reads one row past MaxRows, so a cut answer is told from one of exactly MaxRows and no row
+                // beyond it is materialized.
+                var instruction = InstructionSql.Query(sql, _effect, parameters, _maxRows == int.MaxValue ? _maxRows : _maxRows + 1);
                 var method = typeof(DataServiceExecuteExtensions).GetMethods().FirstOrDefault(m => m.Name == "Execute" && m.IsGenericMethodDefinition && m.GetGenericArguments().Length == 2);
                 if (method is not null)
                 {
@@ -159,13 +160,22 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                     if (taskObj is not null)
                     {
                         var result = await taskObj;
+                        var list = new List<object>();
+                        var completion = RecordSetCompletion.Complete;
                         if (result is System.Collections.IEnumerable seq && result is not string)
                         {
-                            var list = new List<object>();
-                            foreach (var item in seq) list.Add(item!);
-                            return list;
+                            foreach (var item in seq)
+                            {
+                                if (list.Count == _maxRows)
+                                {
+                                    completion = RecordSetCompletion.RecordLimit;
+                                    break;
+                                }
+                                list.Add(item!);
+                            }
                         }
-                        return new List<object> { result! };
+                        else list.Add(result!);
+                        return new DirectRows<object>(list, completion);
                     }
                 }
             }
@@ -173,11 +183,12 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         await using var ctx = await Open(_effect, "direct query", ceiling, ct);
         await using var cmd = CreateCommand(ctx.Connection, sql, ToDictionary(parameters), ctx.Transaction);
         cmd.CommandTimeout = (int)_timeout.TotalSeconds;
-        using var reader = await cmd.ExecuteReaderAsync(ct);
-        return await MaterializeAsObjects(reader, _maxRows, ct);
+        var reader = await cmd.ExecuteReaderAsync(ct);
+        return await MaterializeAsObjects(
+            cmd, reader, _maxRows, BoundedReads.MayCancel(_effect, ctx.Transaction is not null), ct);
     }
 
-    public async Task<IReadOnlyList<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
+    public async Task<DirectRows<T>> Query<T>(string sql, object? parameters = null, CancellationToken ct = default)
     {
         var ceiling = DemandBeforeRoute(_effect, "direct typed query");
         GuardDirect();
@@ -193,7 +204,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
                         $"Entity-backed Direct returned '{entityRows[index]?.GetType().FullName ?? "null"}', not the requested target. Use the matching Entity type.");
                 typed[index] = item;
             }
-            return typed;
+            return new DirectRows<T>(typed, entityRows.Completion);
         }
 
         await using var ctx = await Open(_effect, "direct typed query", ceiling, ct);
@@ -206,9 +217,13 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             long.MaxValue,
             _timeout);
         var records = await _sp.GetRequiredService<RecordSetMaterializer>()
-            .Materialize(new AdoNeutralRecordReader(reader), limits, "direct typed query", ct)
+            .Materialize(
+                new AdoNeutralRecordReader(cmd, reader, BoundedReads.MayCancel(_effect, ctx.Transaction is not null)),
+                limits,
+                "direct typed query",
+                ct)
             .ConfigureAwait(false);
-        return records.Project<T>();
+        return new DirectRows<T>(records.Project<T>(), records.Completion);
     }
 
     private bool TryGetEntityType(out Type? entityType)
@@ -545,13 +560,21 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
 
     internal sealed class AdoNeutralRecordReader : INeutralRecordReader
     {
+        private readonly DbCommand _command;
         private readonly DbDataReader _reader;
+        private readonly bool _cancelWhenAbandoned;
         private bool _ended;
         private bool _additional;
 
-        public AdoNeutralRecordReader(DbDataReader reader)
+        /// <param name="command">The command <paramref name="reader"/> reads.</param>
+        /// <param name="reader">The open reader, closed when this is disposed.</param>
+        /// <param name="cancelWhenAbandoned">Whether a read that stops before the end of the result cancels the command
+        /// (<see cref="BoundedReads.MayCancel"/>).</param>
+        public AdoNeutralRecordReader(DbCommand command, DbDataReader reader, bool cancelWhenAbandoned)
         {
+            _command = command ?? throw new ArgumentNullException(nameof(command));
             _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+            _cancelWhenAbandoned = cancelWhenAbandoned;
             var fields = new DataField[reader.FieldCount];
             for (var ordinal = 0; ordinal < fields.Length; ordinal++)
             {
@@ -584,7 +607,8 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             return new DataRecord(Fields, values);
         }
 
-        public ValueTask DisposeAsync() => _reader.DisposeAsync();
+        public ValueTask DisposeAsync() =>
+            BoundedReads.Close(_command, _reader, cancel: !_ended && _cancelWhenAbandoned, CancellationToken.None);
 
         private static object? Normalize(object? value) => value switch
         {
@@ -606,23 +630,41 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         }
     }
 
-    internal static async Task<IReadOnlyList<object>> MaterializeAsObjects(DbDataReader reader, int maxRows, CancellationToken ct)
+    /// <summary>At most <paramref name="maxRows"/> rows as column-name dictionaries; a row past them is read only to say
+    /// the answer was cut (<see cref="RecordSetCompletion.RecordLimit"/>). Closes <paramref name="reader"/>, cancelling
+    /// <paramref name="command"/> at the bound when <paramref name="cancelAtBound"/> (<see cref="BoundedReads"/>).</summary>
+    internal static async Task<DirectRows<object>> MaterializeAsObjects(
+        DbCommand command, DbDataReader reader, int maxRows, bool cancelAtBound, CancellationToken ct)
     {
         var list = new List<object>();
-        var cols = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray();
-        int count = 0;
-        while (await reader.ReadAsync(ct))
+        var completion = RecordSetCompletion.Complete;
+        try
         {
-            var obj = new Dictionary<string, object?>();
-            for (int i = 0; i < cols.Length; i++)
+            var cols = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToArray();
+            while (await reader.ReadAsync(ct))
             {
-                var val = reader.IsDBNull(i) ? null : reader.GetValue(i);
-                obj[cols[i]] = val;
+                if (list.Count == maxRows)
+                {
+                    completion = RecordSetCompletion.RecordLimit;
+                    break;
+                }
+                var obj = new Dictionary<string, object?>();
+                for (int i = 0; i < cols.Length; i++)
+                {
+                    var val = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                    obj[cols[i]] = val;
+                }
+                list.Add(obj);
             }
-            list.Add(obj);
-            if (++count >= maxRows) break;
         }
-        return list;
+        catch
+        {
+            await reader.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+        await BoundedReads.Close(command, reader, completion == RecordSetCompletion.RecordLimit && cancelAtBound, ct)
+            .ConfigureAwait(false);
+        return new DirectRows<object>(list, completion);
     }
 
     // NK-009: an unqualified session follows the active logical default, so it binds the authority's current plan,

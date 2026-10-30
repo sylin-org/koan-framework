@@ -7,8 +7,11 @@ public static class Constants
     public const string DefaultConnection = "Data Source=.koan/data/Koan.sqlite";
     public const int MaximumMemorySources = 256;
     public const int MaximumPlans = 512;
-    public const int MaximumBatchItems = 4_096;
+    // The most rows one multi-row statement writes; a larger UpsertMany is sliced inside its one transaction.
+    public const int MaximumRowsPerStatement = 4_096;
     public const int MaximumParameters = 30_000;
+    // An OR of per-key identity predicates nests one level per key; SQLite refuses an expression deeper than 1,000.
+    public const int MaximumIdentityTerms = 500;
     internal const int PrimaryKeyConstraint = 1555;
     internal const int UniqueConstraint = 2067;
     internal const int BusyCode = 5;

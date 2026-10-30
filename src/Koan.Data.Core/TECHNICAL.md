@@ -157,7 +157,10 @@ validation:
 - Generic readiness state, initialization order, and monitoring ship in `Sylin.Koan.Core` under the
   `Koan.Core.Adapters` namespace. Data Core adds source semantics: provider option binding, default paging,
   and distinct host-owned single-flight stages for non-creating reachability, declared-shape validation,
-  and explicitly authorized provisioning.
+  and explicitly authorized provisioning. Each stage remembers the targets it proved, up to
+  `DataRuntimeOptions.ReadinessCacheEntries` (4,096), as a least-recently-used set: a hit marks the target used without
+  a lock, and admitting past the bound forgets the least recently used eighth under one small gate, so a hot table
+  stays proven and a forgotten one is proven again on its next use (DATA-0162).
 - `AdapterOptionsConfigurator<TOptions>` and `IAdapterOptions` live in
   `Koan.Data.Adapters.Configuration`; AI and other concerns do not implement a Data paging contract.
 - `AdapterBootReporting` lives in `Koan.Data.Adapters.Reporting` and reports Data settings through
@@ -188,6 +191,20 @@ validation:
 - A Direct session refuses, like segmentation, while a Shared-mode isolation axis value is bound (a row-scoped,
   ambient-stamped managed field). It is untyped, so per-entity read predicates (soft delete, Web row filters) are
   not evaluated for it; those paths are covered on the Entity surface (DATA-0129).
+- A Direct query returns `DirectRows<T>`: at most the session's `MaxRows` (`Koan:Data:Direct:MaxRows`, 10,000 by
+  default), with a `Completion` of `RecordLimit` when the command had more, so a cut answer always says so. The
+  untyped, typed, transaction and entity-routed queries obey the same rule and read at most one row past `MaxRows`:
+  the entity-routed one asks its adapter for that many through the `relational.sql.maxRows` instruction option
+  (`InstructionSql.Query(sql, effect, parameters, maxRows)`), and every relational adapter stops reading there.
+  `BoundedReads` decides what happens to the rest: a declared Read outside a caller's transaction cancels its command
+  at the bound, on the untyped, typed and entity-routed paths, so Npgsql and SqlClient do not drain the rest of the
+  result, and a failure the abandoned rest raises does not fail the read. A command with any other effect, and every
+  read in a `DirectTransaction`, is never cancelled: it drains to its end, so a write it carries completes, and a
+  failure there is raised. The effect is the caller's declaration, and Koan does not check it against the SQL.
+  PostgreSQL enforces a declared Read only on the entity-routed query, which it runs in a read-only transaction, so a
+  write labelled Read fails there. On the untyped and typed Direct reads, and on every SQL Server path (SQL Server has
+  no read-only statement), a write labelled Read is cancelled at the bound like any read, and the server rolls back
+  the statement the cancel interrupts. (DATA-0162).
 
 ## Source Integration ownership
 
@@ -263,6 +280,10 @@ validation:
   `IConditionalBatchDelete.DeleteIf(id, scope)` inside a native batch, which then needs no visibility read. A row that
   leaves the scope after any check is not removed. Other adapters, and scopes holding a counterpart predicate, keep the
   check-then-delete; `IAxisScopeDiagnostics.ScopedDeletesAtStore` reports which path an entity takes.
+- A `Get` or `Remove` of many ids under a read scope reads the scope as `In(ids) AND scope`, in slices of the store's
+  declared `FilterSupport.MaximumSetMembers` when it declares one, so the scope never turns a working key set into one
+  past the store's parameter limit (DATA-0162). A store that binds a set as one value declares no bound and reads the
+  set in one statement.
 - `ConditionalDeleteAsync` (and `Data<T,K>.DeleteIf`) under an active read scope ANDs that scope into the caller's
   guard instead of refusing (DATA-0157). A scope holding a counterpart predicate still refuses.
 - A transfer resolves each endpoint, under its applied context, to a `TransferPlace`: elected provider, the factory's

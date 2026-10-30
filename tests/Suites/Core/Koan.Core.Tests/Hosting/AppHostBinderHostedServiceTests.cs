@@ -24,17 +24,17 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Start_replaces_stale_provider_andStop_releases_its_lease()
+    public async Task Starting_replaces_stale_provider_and_stopped_releases_its_lease()
     {
         var stale = new FakeServiceProvider("stale");
         var current = new FakeServiceProvider("current");
         AppHost.Current = stale;
         var binder = new AppHostBinderHostedService(current);
 
-        await binder.StartAsync(TestContext.Current.CancellationToken);
+        await binder.StartingAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeSameAs(current);
 
-        await binder.StopAsync(TestContext.Current.CancellationToken);
+        await binder.StoppedAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeNull();
     }
 
@@ -46,14 +46,14 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         var binderA = new AppHostBinderHostedService(providerA);
         var binderB = new AppHostBinderHostedService(providerB);
 
-        await binderA.StartAsync(TestContext.Current.CancellationToken);
-        await binderB.StartAsync(TestContext.Current.CancellationToken);
+        await binderA.StartingAsync(TestContext.Current.CancellationToken);
+        await binderB.StartingAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeSameAs(providerB);
 
-        await binderA.StopAsync(TestContext.Current.CancellationToken);
+        await binderA.StoppedAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeSameAs(providerB);
 
-        await binderB.StopAsync(TestContext.Current.CancellationToken);
+        await binderB.StoppedAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeNull();
     }
 
@@ -63,7 +63,7 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         var attached = new FakeServiceProvider("attached");
         var scoped = new FakeServiceProvider("scoped");
         var binder = new AppHostBinderHostedService(attached);
-        await binder.StartAsync(TestContext.Current.CancellationToken);
+        await binder.StartingAsync(TestContext.Current.CancellationToken);
 
         using (AppHost.PushScope(scoped))
         {
@@ -71,7 +71,7 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         }
 
         AppHost.Current.Should().BeSameAs(attached);
-        await binder.StopAsync(TestContext.Current.CancellationToken);
+        await binder.StoppedAsync(TestContext.Current.CancellationToken);
         AppHost.Current.Should().BeNull();
     }
 
@@ -83,13 +83,13 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         var binderA = new AppHostBinderHostedService(providerA);
         var binderB = new AppHostBinderHostedService(providerB);
 
-        await binderA.StartAsync(TestContext.Current.CancellationToken);
+        await binderA.StartingAsync(TestContext.Current.CancellationToken);
         AppHost.Identity.Code.Should().Be("app-a");
-        await binderA.StopAsync(TestContext.Current.CancellationToken);
+        await binderA.StoppedAsync(TestContext.Current.CancellationToken);
 
-        await binderB.StartAsync(TestContext.Current.CancellationToken);
+        await binderB.StartingAsync(TestContext.Current.CancellationToken);
         AppHost.Identity.Code.Should().Be("app-b");
-        await binderB.StopAsync(TestContext.Current.CancellationToken);
+        await binderB.StoppedAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         var providerA = new FakeServiceProvider("A", Identity("app-a"));
         var providerB = new FakeServiceProvider("B", Identity("app-b"));
         var binder = new AppHostBinderHostedService(attached);
-        await binder.StartAsync(TestContext.Current.CancellationToken);
+        await binder.StartingAsync(TestContext.Current.CancellationToken);
 
         async Task<string> ResolveInScope(FakeServiceProvider provider)
         {
@@ -114,7 +114,7 @@ public sealed class AppHostBinderHostedServiceTests : IDisposable
         resolved.Should().Equal("app-a", "app-b");
 
         AppHost.Identity.Code.Should().Be("attached");
-        await binder.StopAsync(TestContext.Current.CancellationToken);
+        await binder.StoppedAsync(TestContext.Current.CancellationToken);
     }
 
     private static ApplicationIdentitySnapshot Identity(string code) => new(

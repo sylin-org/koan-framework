@@ -140,8 +140,9 @@ supplies discovery/facts metadata; model the field set after the exemplar adapte
 
 Immutable plans keyed by stable structure (provider, source, entity/key type, partition); warm path
 consumes the plan. The warm operation excludes reflection over entity members, DI enumeration, policy
-recomputation, capability discovery, and dictionary-to-JSON-to-object materialization. Plans are
-bounded (`MaximumPlans`); a declared map under an ambient partition rejects (pinned container cannot
+recomputation, capability discovery, and dictionary-to-JSON-to-object materialization. Plans live
+in a `RelationalPlanCache`, an LRU bounded by `MaximumPlans`: a full cache evicts the least recently used plan
+and never refuses a new container; a declared map under an ambient partition rejects (pinned container cannot
 honor a different one).
 
 ### Step 7 — Implement the mandatory surface (Entity Persistence)

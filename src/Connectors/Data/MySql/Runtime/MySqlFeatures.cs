@@ -23,12 +23,16 @@ internal static class MySqlFeatures
         foreach (var capability in All) claims.Capability(capability);
     }
 
+    // A scoped In past the parameters one statement binds is sliced by Koan (DATA-0162).
+    private static readonly FilterSupport SetBoundFilterSupport =
+        RelationalFilterSupport.Default with { MaximumSetMembers = Infrastructure.Constants.MaximumParameters };
+
     public static void Describe(ICapabilities capabilities, bool conditionalReplace = true)
     {
         foreach (var capability in All)
             if (conditionalReplace || capability != DataCaps.Write.ConditionalReplace) capabilities.Add(capability);
         capabilities
-            .Add(DataCaps.Query.Filter, RelationalFilterSupport.Default)
+            .Add(DataCaps.Query.Filter, SetBoundFilterSupport)
             .Add(DataCaps.Query.FilterExecution, new FilterExecutionProfile(FilterExecutionKind.Native));
     }
 }

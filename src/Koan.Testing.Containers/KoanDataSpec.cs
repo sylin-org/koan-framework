@@ -68,6 +68,28 @@ public abstract class KoanDataSpec<TFixture> where TFixture : KoanContainerFixtu
     protected Task<BoundHost> BootAsync(Action<IServiceCollection>? configure) =>
         BootCoreAsync(Fixture.SettingsForBoot(), null, configure);
 
+    /// <summary>
+    /// Boot a real Koan host whose composition runs <paramref name="declare"/> through the typed application builder, so
+    /// a spec can declare what <c>AddKoan(koan => ...)</c> declares (an explicit Data map, for example).
+    /// </summary>
+    protected Task<BoundHost> BootAsync(Action<KoanApplicationBuilder> declare)
+    {
+        ArgumentNullException.ThrowIfNull(declare);
+        return BootTypedAsync(Fixture.SettingsForBoot(), declare);
+    }
+
+    private async Task<BoundHost> BootTypedAsync(
+        IEnumerable<System.Collections.Generic.KeyValuePair<string, string?>> settings,
+        Action<KoanApplicationBuilder> declare)
+    {
+        var host = await KoanIntegrationHost.Configure()
+            .WithSettings(settings)
+            .ConfigureServices(services => services.AddKoan(declare))
+            .StartAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(false);
+        return new BoundHost(host);
+    }
+
     /// <summary>Boots with both composition-owned declarations and ordinary post-composition services.</summary>
     protected Task<BoundHost> BootAsync(Action declare, Action<IServiceCollection> configure)
     {

@@ -46,9 +46,9 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
     private readonly MappingPlan? _declaredMapping;
     private readonly DataSegmentationPlan _segmentation;
     private readonly INamingProvider? _namingProvider;
-    private readonly object _plansGate = new();
-    private readonly Dictionary<string, NpgsqlEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
-    private readonly int _planLimit;
+    private readonly RelationalPlanCache<NpgsqlEntityPlan<TEntity, TKey>> _plans;
+    // The most parameters an OR of per-key identity predicates binds in one statement, inside PostgreSQL's 65,535.
+    private const int MaximumIdentityParameters = 30_000;
     private readonly DataSourceReadinessCoordinator _readiness;
     private readonly IRelationalSchemaOrchestrator _schema;
     private readonly IRelationalStoreFeatures _features;
@@ -82,7 +82,7 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
             Access = options.SourcePlan.Access
         };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
-        _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
+        _plans = new RelationalPlanCache<NpgsqlEntityPlan<TEntity, TKey>>(services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries);
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(options.Source);
         _namingProvider = namingProvider;
@@ -100,19 +100,13 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
                 $"Explicit PostgreSQL map '{_declaredMapping.Id}' pins one physical container and cannot accept an ambient partition.");
         var table = _declaredMapping?.Container.Name ?? ResolveStorageName();
         var key = _declaredMapping?.Id ?? $"{_options.SearchPath}/{table}";
-        lock (_plansGate)
+        return _plans.GetOrAdd(key, _ =>
         {
-            if (_plans.TryGetValue(key, out var existing)) return existing;
-            if (_plans.Count >= _planLimit)
-                throw new InvalidOperationException(
-                    $"The PostgreSQL repository reached its configured mapping-plan limit of {_planLimit}.");
             var mapping = _declaredMapping ?? RelationalManagedMapping.Compile<TEntity>(
                 _options.Source,
                 StorageAddress.From(_options.SearchPath, table));
-            var created = new NpgsqlEntityPlan<TEntity, TKey>(mapping, _options, _segmentation);
-            _plans.Add(key, created);
-            return created;
-        }
+            return new NpgsqlEntityPlan<TEntity, TKey>(mapping, _options, _segmentation);
+        });
     }
 
     private string ResolveStorageName() => _namingProvider is null
@@ -137,14 +131,18 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         var requested = ids as IReadOnlyList<TKey> ?? ids.ToArray();
         if (requested.Count == 0) return [];
         await Ready(ct).ConfigureAwait(false);
-        var parameters = new SqlParameters();
-        var predicates = new string[requested.Count];
-        for (var index = 0; index < requested.Count; index++)
-            predicates[index] = IdentityPredicate(_plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
-        var sql = $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}";
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
-        var entities = rows.Select(Materialize).ToDictionary(static entity => entity.Id);
+        var entities = new Dictionary<TKey, TEntity>();
+        foreach (var slice in IdentitySlices(requested))
+        {
+            var parameters = new SqlParameters();
+            var sql = $"SELECT {_plan.Select} FROM {_plan.QualifiedTable} WHERE {IdentitySet(slice, "k", parameters)}";
+            foreach (var row in await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false))
+            {
+                var entity = Materialize(row);
+                entities[entity.Id] = entity;
+            }
+        }
         return requested.Select(id => entities.TryGetValue(id, out var entity) ? entity : null).ToArray();
     }
 
@@ -310,7 +308,7 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         var parameters = new SqlParameters();
         var set = UpdateSet(command.Values, parameters, "set_");
         var identity = IdentityPredicate(command.Identity, "key_", parameters);
-        var (condition, conditionValues) = Where(guard);
+        var (condition, conditionValues) = Where(guard, reservedParameters: parameters.Count);
         Add(parameters, conditionValues, "p");
         var sql = $"UPDATE {_plan.QualifiedTable} SET {set} WHERE {identity}" +
                   (condition is null ? string.Empty : $" AND ({condition})");
@@ -382,7 +380,7 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional delete");
         var parameters = new SqlParameters();
         var identity = IdentityPredicate(_plan.Commands.Delete(id).Identity, "key_", parameters);
-        var (condition, conditionValues) = Where(guard);
+        var (condition, conditionValues) = Where(guard, reservedParameters: parameters.Count);
         Add(parameters, conditionValues, "p");
         var sql = $"DELETE FROM {_plan.QualifiedTable} WHERE {identity}" +
                   (condition is null ? string.Empty : $" AND ({condition})");
@@ -589,7 +587,8 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         return string.Join(", ", assignments);
     }
 
-    /// <summary>Deletes <paramref name="ids"/>; with a <paramref name="guard"/>, only the rows that still match it.</summary>
+    /// <summary>Deletes <paramref name="ids"/>; with a <paramref name="guard"/>, only the rows that still match it. A set
+    /// that takes more than one statement is deleted inside one transaction, so it stays atomic.</summary>
     private async Task<int> Delete(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
@@ -597,12 +596,32 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         Filter? guard,
         CancellationToken ct)
     {
+        var slices = IdentitySlices(ids).ToList();
+        if (slices.Count == 1 || transaction is not null)
+        {
+            var deleted = 0;
+            foreach (var slice in slices)
+                deleted += await DeleteSlice(connection, transaction, slice, guard, ct).ConfigureAwait(false);
+            return deleted;
+        }
+        await using var own = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var total = 0;
+        foreach (var slice in slices)
+            total += await DeleteSlice(connection, own, slice, guard, ct).ConfigureAwait(false);
+        await own.CommitAsync(ct).ConfigureAwait(false);
+        return total;
+    }
+
+    private async Task<int> DeleteSlice(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        IReadOnlyList<TKey> ids,
+        Filter? guard,
+        CancellationToken ct)
+    {
         var parameters = new SqlParameters();
-        var predicates = new string[ids.Count];
-        for (var index = 0; index < ids.Count; index++)
-            predicates[index] = IdentityPredicate(_plan.Commands.Delete(ids[index]).Identity, $"d{index}_", parameters);
-        var sql = $"DELETE FROM {_plan.QualifiedTable} WHERE ({string.Join(" OR ", predicates)})";
-        if (guard is not null && Where(guard) is ({ } condition, var conditionValues))
+        var sql = $"DELETE FROM {_plan.QualifiedTable} WHERE {IdentitySet(ids, "d", parameters)}";
+        if (guard is not null && Where(guard, reservedParameters: parameters.Count) is ({ } condition, var conditionValues))
         {
             Add(parameters, conditionValues, "p");
             sql += $" AND ({condition})";
@@ -610,11 +629,48 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         return await AdoCommands.ExecuteAsync(connection, sql, parameters, transaction, ct).ConfigureAwait(false);
     }
 
-    private (string? Sql, IReadOnlyList<object?> Parameters) Where(Filter? filter)
+    /// <summary>
+    /// The slices of <paramref name="ids"/> one statement each names. A one-column identity whose keys bind as a
+    /// PostgreSQL array is one slice, matched with <c>= ANY</c> over that one array however many ids there are; any other
+    /// identity is an OR of per-key predicates, sliced inside PostgreSQL's 65,535 parameters per statement (DATA-0162).
+    /// </summary>
+    private IEnumerable<IReadOnlyList<TKey>> IdentitySlices(IReadOnlyList<TKey> ids)
+    {
+        if (IdentityArray(ids) is not null) return [ids];
+        var size = Math.Max(1, MaximumIdentityParameters / Math.Max(1, _plan.IdentityRoots.Count));
+        return ids.Chunk(size);
+    }
+
+    /// <summary>The predicate matching any of <paramref name="ids"/>, its values added to <paramref name="parameters"/>.</summary>
+    private string IdentitySet(IReadOnlyList<TKey> ids, string prefix, SqlParameters parameters)
+    {
+        if (IdentityArray(ids) is { } array)
+        {
+            parameters.Add($"{prefix}ids", new SqlArrayParameter(array));
+            return $"({NpgsqlDialect.Quote(_plan.IdentityRoots[0])} = ANY(@{prefix}ids))";
+        }
+        var predicates = new string[ids.Count];
+        for (var index = 0; index < ids.Count; index++)
+            predicates[index] = IdentityPredicate(_plan.Commands.Get(ids[index]).Identity, $"{prefix}{index}_", parameters);
+        return "(" + string.Join(" OR ", predicates) + ")";
+    }
+
+    /// <summary>The keys of <paramref name="ids"/> as one typed array when the identity is one column; else null.</summary>
+    private Array? IdentityArray(IReadOnlyList<TKey> ids)
+    {
+        if (_plan.IdentityRoots.Count != 1) return null;
+        var keys = new object?[ids.Count];
+        for (var index = 0; index < ids.Count; index++)
+            keys[index] = _plan.Commands.Get(ids[index]).Identity.Single().Value;
+        return NpgsqlDialect.TypedArray(keys);
+    }
+
+    // reservedParameters: what the statement binds besides the filter, so the whole stays within PostgreSQL's limit.
+    private (string? Sql, IReadOnlyList<object?> Parameters) Where(Filter? filter, int reservedParameters = 0)
     {
         if (filter is null) return (null, []);
         var translator = _plan.Filter();
-        var translated = translator.Translate(filter);
+        var translated = translator.Translate(filter, reservedParameters);
         return (translated.whereSql, translated.parameters);
     }
 
@@ -781,7 +837,10 @@ public sealed partial class NpgsqlRepository<TEntity, TKey> :
         }
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
             return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, fence, ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, fence, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, fence, ct,
+            Koan.Data.Abstractions.Instructions.InstructionSql.MaxRows(instruction),
+            Koan.Data.Core.Direct.BoundedReads.MayCancel(instruction.EffectiveEffect(), inCallerTransaction: false))
+            .ConfigureAwait(false);
         return (TResult)(object)rows.Select(row => new Dictionary<string, object?>((IDictionary<string, object?>)row,
             StringComparer.OrdinalIgnoreCase)).ToArray();
     }

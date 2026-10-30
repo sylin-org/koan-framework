@@ -41,9 +41,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
     private readonly DataSourceReadinessCoordinator _readiness;
     private readonly IRelationalSchemaOrchestrator _schema;
     private readonly RelationalSchemaPolicy _schemaPolicy;
-    private readonly object _plansGate = new();
-    private readonly Dictionary<string, FirebirdEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
-    private readonly int _planLimit;
+    private readonly RelationalPlanCache<FirebirdEntityPlan<TEntity, TKey>> _plans;
 
     private FirebirdEntityPlan<TEntity, TKey> Plan => ResolvePlan();
 
@@ -63,7 +61,7 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
             Access = options.SourcePlan.Access
         };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
-        _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
+        _plans = new RelationalPlanCache<FirebirdEntityPlan<TEntity, TKey>>(services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries);
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(options.Source);
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
     }
@@ -85,13 +83,21 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         if (requested.Count == 0) return [];
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
-        var parameters = new SqlParameters();
-        var predicates = new string[requested.Count];
-        for (var index = 0; index < requested.Count; index++)
-            predicates[index] = IdentityPredicate(plan, plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}", parameters, null, ct).ConfigureAwait(false);
-        var entities = rows.Select(row => Materialize(plan, row)).ToDictionary(static entity => entity.Id);
+        var entities = new Dictionary<TKey, TEntity>();
+        foreach (var slice in requested.Chunk(IdentitySlice(plan)))
+        {
+            var parameters = new SqlParameters();
+            var predicates = new string[slice.Length];
+            for (var index = 0; index < slice.Length; index++)
+                predicates[index] = IdentityPredicate(plan, plan.Commands.Get(slice[index]).Identity, $"k{index}_", parameters);
+            var rows = await AdoCommands.QueryRowsAsync(connection, $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}", parameters, null, ct).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                var entity = Materialize(plan, row);
+                entities[entity.Id] = entity;
+            }
+        }
         return requested.Select(id => entities.TryGetValue(id, out var entity) ? entity : null).ToArray();
     }
 
@@ -127,8 +133,21 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await Delete(connection, null, values, ct).ConfigureAwait(false);
+        var slice = IdentitySlice(Plan);
+        if (values.Count <= slice) return await Delete(connection, null, values, ct).ConfigureAwait(false);
+        // More ids than one statement binds: every slice is deleted inside one transaction, so the set stays atomic.
+        await using var transaction = (FbTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var deleted = 0;
+        foreach (var part in values.Chunk(slice))
+            deleted += await Delete(connection, transaction, part, ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return deleted;
     }
+
+    /// <summary>The most ids one statement names: each binds a parameter per identity column, and Firebird binds at
+    /// most <see cref="Infrastructure.Constants.MaximumParameters"/> in one statement (DATA-0162).</summary>
+    private static int IdentitySlice(FirebirdEntityPlan<TEntity, TKey> plan) =>
+        Math.Max(1, Infrastructure.Constants.MaximumParameters / Math.Max(1, plan.IdentityRoots.Count));
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
@@ -279,17 +298,12 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
                 $"Explicit Firebird map '{_declaredMapping.Id}' pins one physical container and cannot accept an ambient partition.");
         var table = _declaredMapping?.Container.Name ?? AdapterNaming.GetOrCompute<TEntity, TKey>(_services);
         var key = _declaredMapping?.Id ?? table;
-        lock (_plansGate)
+        return _plans.GetOrAdd(key, _ =>
         {
-            if (_plans.TryGetValue(key, out var existing)) return existing;
-            if (_plans.Count >= _planLimit)
-                throw new InvalidOperationException($"The Firebird repository reached its configured mapping-plan limit of {_planLimit}.");
             var mapping = _declaredMapping ?? RelationalManagedMapping.Compile<TEntity>(
                 _options.Source, StorageAddress.From(table));
-            var created = new FirebirdEntityPlan<TEntity, TKey>(mapping, _segmentation);
-            _plans.Add(key, created);
-            return created;
-        }
+            return new FirebirdEntityPlan<TEntity, TKey>(mapping, _segmentation);
+        });
     }
 
     private async Task Ready(CancellationToken ct)
@@ -668,7 +682,10 @@ internal sealed class FirebirdRepository<TEntity, TKey> :
         }
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
             return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct,
+            Koan.Data.Abstractions.Instructions.InstructionSql.MaxRows(instruction),
+            Koan.Data.Core.Direct.BoundedReads.MayCancel(instruction.EffectiveEffect(), inCallerTransaction: false))
+            .ConfigureAwait(false);
         return (TResult)(object)rows.Select(row =>
             ((IDictionary<string, object>)row).ToDictionary(
                 static pair => pair.Key, static pair => (object?)pair.Value, StringComparer.OrdinalIgnoreCase)).ToArray();

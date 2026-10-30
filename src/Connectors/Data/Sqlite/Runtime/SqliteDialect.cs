@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Relational.Linq;
@@ -12,9 +14,102 @@ internal sealed class SqliteDialect : IRelationalMappingDialect
         .Replace("%", "\\%", StringComparison.Ordinal)
         .Replace("_", "\\_", StringComparison.Ordinal);
     public string Parameter(int index) => $"@p{index}";
-    public string JsonArrayContains(string columnSql, string parameter) =>
-        $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE value = {parameter})";
+    public string JsonArrayContains(string columnSql, string parameter) => JsonArrayContains(columnSql, parameter, typeof(string));
+
+    /// <summary>
+    /// Each element is read as a scalar read out of a document is — a DateTime rewritten to wall-clock text — and compared
+    /// with a comparand encoded to match (DATA-0139): a Guid as its text, and a decimal as the real number json_each reads
+    /// a JSON number as.
+    /// </summary>
+    public string JsonArrayContains(string columnSql, string parameter, Type elementType) =>
+        $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE {DocumentOperand("value", elementType)} = {parameter})";
+
+    public object? JsonArrayComparand(object? value, Type elementType) => RelationalDocumentText.Comparand(value) switch
+    {
+        decimal number => (double)number,
+        var other => other
+    };
     public string JsonArrayLength(string columnSql) => $"json_array_length({columnSql})";
+
+    /// <summary>
+    /// A set binds as one JSON array matched through <c>json_each</c>, so its size meets no parameter limit
+    /// (DATA-0162). Each member is written as the value Microsoft.Data.Sqlite binds for it, so <c>json_each</c> yields
+    /// the same storage class and the same value a list of parameters would: an integer or a boolean as INTEGER, a real
+    /// as REAL, and a string, Guid, date, decimal or char as the TEXT the driver writes. A member JSON cannot carry (a
+    /// byte array, a non-finite real, an unsigned 64-bit integer) leaves the set on one parameter per member.
+    /// </summary>
+    public string? MemberOf(string columnSql, IReadOnlyList<object?> members, bool negate, Func<object?, string> bind)
+        => JsonSet(members) is { } json
+            ? $"{columnSql} {(negate ? "NOT IN" : "IN")} (SELECT value FROM json_each({bind(json)}))"
+            : null;
+
+    /// <summary>SQLite accepts 32,766 variables in a statement.</summary>
+    public int MaximumParameters => 32_766;
+
+    /// <summary>A JSON array column against a set bound as one JSON array, each element read and compared as
+    /// <see cref="JsonArrayContains(string, string, Type)"/> compares one (DATA-0162).</summary>
+    public string? CollectionMemberOf(string columnSql, IReadOnlyList<object?> members, SetMatch match, Type elementType,
+        Func<object?, string> bind)
+    {
+        if (JsonSet(members) is not { } json) return null;
+        var set = bind(json);
+        var element = DocumentOperand("value", elementType);
+        var any = $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE {element} IN (SELECT value FROM json_each({set})))";
+        return match switch
+        {
+            SetMatch.Any => any,
+            SetMatch.None => $"(NOT {any})",
+            _ => $"(NOT EXISTS (SELECT 1 FROM json_each({set}) AS koan_set " +
+                 $"WHERE koan_set.value NOT IN (SELECT {element} FROM json_each({columnSql}) WHERE value IS NOT NULL)))"
+        };
+    }
+
+    /// <summary>
+    /// The members as one JSON array, each written as the value the driver binds for it, or null when one has no JSON
+    /// form that <c>json_each</c> turns back into that value.
+    /// </summary>
+    internal static string? JsonSet(IReadOnlyList<object?> members)
+    {
+        if (members.Count == 0) return null;
+        var json = new System.Text.StringBuilder(members.Count * 16).Append('[');
+        for (var index = 0; index < members.Count; index++)
+        {
+            if (index > 0) json.Append(',');
+            switch (members[index])
+            {
+                case string text: AppendString(json, text); break;
+                case char character: AppendString(json, character.ToString()); break;
+                case bool flag: json.Append(flag ? '1' : '0'); break;
+                case long value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case int value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case short value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case byte value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case sbyte value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case ushort value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case uint value: json.Append(value.ToString(CultureInfo.InvariantCulture)); break;
+                case double value when double.IsFinite(value): AppendReal(json, value); break;
+                case float value when float.IsFinite(value): AppendReal(json, value); break;
+                // The driver binds these as TEXT in these exact forms.
+                case Guid value: AppendString(json, value.ToString().ToUpperInvariant()); break;
+                case decimal value: AppendString(json, value.ToString("0.0###########################", CultureInfo.InvariantCulture)); break;
+                case DateTime value: AppendString(json, value.ToString(@"yyyy\-MM\-dd HH\:mm\:ss.FFFFFFF", CultureInfo.InvariantCulture).TrimEnd('.')); break;
+                case DateOnly value: AppendString(json, value.ToString(@"yyyy\-MM\-dd", CultureInfo.InvariantCulture)); break;
+                default: return null;
+            }
+        }
+        return json.Append(']').ToString();
+    }
+
+    // A whole real keeps its decimal point, so json_each reads it back as REAL, as the bound parameter is.
+    private static void AppendReal(System.Text.StringBuilder json, double value)
+    {
+        var text = value.ToString("R", CultureInfo.InvariantCulture);
+        json.Append(text);
+        if (text.IndexOfAny(['.', 'E', 'e']) < 0) json.Append(".0");
+    }
+
+    private static void AppendString(System.Text.StringBuilder json, string value) =>
+        json.Append(JsonSerializer.Serialize(value));
     public string JsonArrayElementLike(string columnSql, string patternParameter, string literalParameter) =>
         // SQLite's LIKE folds ASCII case, which the case-sensitive floor does not; instr() is exact.
         $"EXISTS (SELECT 1 FROM json_each({columnSql}) WHERE instr(value, {literalParameter}) > 0)";

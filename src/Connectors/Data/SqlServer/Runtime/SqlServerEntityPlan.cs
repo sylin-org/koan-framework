@@ -16,7 +16,7 @@ internal sealed class SqlServerEntityPlan<TEntity, TKey>(
     : RelationalEntityPlan<TEntity, TKey, SqlServerDialect>(
         mapping,
         segmentation,
-        new SqlServerDialect(),
+        new SqlServerDialect(SqlServerSetTypes.For(options.SourcePlan.RouteIdentity, options.Schema)),
         mapping.Container.Namespace.LastOrDefault() ?? options.Schema)
     where TEntity : class, IEntity<TKey>
     where TKey : notnull;

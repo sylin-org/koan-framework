@@ -9,8 +9,6 @@ using Koan.Data.Core.Pillars;
 using Koan.Data.Core.Composition;
 using Koan.Core.Composition;
 using Koan.Core.Semantics;
-using DataCoreItems = Koan.Data.Core.Infrastructure.DataCoreProvenanceItems;
-using ProvenanceModes = Koan.Core.Hosting.Bootstrap.ProvenancePublicationModeExtensions;
 
 namespace Koan.Data.Core.Initialization;
 
@@ -18,7 +16,7 @@ namespace Koan.Data.Core.Initialization;
 /// Koan.Data.Core boot module (ARCH-0086). Folds the former split between <c>KoanDataCoreInitializer</c>
 /// service registration, pillar manifest, and provenance into one
 /// <see cref="KoanModule"/>: <see cref="Register"/> wires the data-core services and ensures the data
-/// pillar manifest; <see cref="Report"/> publishes the EnsureSchemaOnStart provenance. Id preserves the
+/// pillar manifest; <see cref="Report"/> publishes the active data-axis planes. Id preserves the
 /// prior ModuleName so boot reports are unchanged.
 /// </summary>
 public sealed class KoanDataCoreModule : KoanModule
@@ -62,17 +60,6 @@ public sealed class KoanDataCoreModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)
     {
         module.Describe(Version);
-        var ensureSetting = Koan.Core.Configuration.ReadWithSource(
-            cfg,
-            DataCoreItems.EnsureSchemaOnStart.Key,
-            true);
-
-        module.AddSetting(
-            DataCoreItems.EnsureSchemaOnStart,
-            ProvenanceModes.FromConfigurationValue(ensureSetting),
-            ensureSetting.Value,
-            sourceKey: ensureSetting.ResolvedKey,
-            usedDefault: ensureSetting.UsedDefault);
 
         // ARCH-0101 §9: list the active data-axis planes (managed isolation fields, operation overrides, container
         // particles) in the boot report. Omitted entirely when no axis is registered (off = structurally absent).

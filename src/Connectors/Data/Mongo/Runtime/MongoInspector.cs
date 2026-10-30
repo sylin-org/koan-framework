@@ -60,7 +60,7 @@ internal sealed class MongoInspector(MongoRoute route, MongoClientManager client
         {
             foreach (var value in cursor.Current)
             {
-                if (all.Count == Constants.Provider.MaximumCollectionsPerRepository)
+                if (all.Count == Constants.Provider.InspectedCollections)
                 {
                     providerBound = true;
                     break;

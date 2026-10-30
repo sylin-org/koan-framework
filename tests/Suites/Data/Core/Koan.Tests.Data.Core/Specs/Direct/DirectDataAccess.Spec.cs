@@ -1,3 +1,4 @@
+using Koan.Data.Abstractions;
 using Koan.Data.Core.Direct;
 using Koan.Data.Abstractions.Sources;
 using Koan.Tests.Data.Core.Support;
@@ -53,6 +54,41 @@ public sealed class DirectDataAccessSpec
         var rows = await reads.Query<ProbeRow>("SELECT id, name FROM direct_probe");
         rows.Should().ContainSingle();
         rows[0].Name.Should().Be("folded");
+    }
+
+    [Fact]
+    public async Task A_direct_query_past_its_max_rows_says_it_was_cut()
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync(includeSqlite: true);
+        var data = runtime.Services.GetRequiredService<IDataService>();
+        var connection = $"Data Source={runtime.SqlitePath}";
+        await data.Direct(adapter: "sqlite").WithConnectionString(connection).Effect(DataOperationEffect.SchemaOrAdmin)
+            .Execute("CREATE TABLE IF NOT EXISTS direct_cut (id INTEGER PRIMARY KEY, name TEXT)");
+        await data.Direct(adapter: "sqlite").WithConnectionString(connection).Effect(DataOperationEffect.Write)
+            .Execute("INSERT INTO direct_cut (name) VALUES ('a'), ('b'), ('c'), ('d'), ('e')");
+
+        IDirectSession Reads(int maxRows) => data.Direct(adapter: "sqlite")
+            .WithConnectionString(connection).Effect(DataOperationEffect.Read).WithMaxRows(maxRows);
+
+        var cut = await Reads(3).Query("SELECT id, name FROM direct_cut ORDER BY id");
+        cut.Should().HaveCount(3);
+        cut.Completion.Should().Be(RecordSetCompletion.RecordLimit);
+        cut.IsComplete.Should().BeFalse();
+
+        var typedCut = await Reads(3).Query<ProbeRow>("SELECT id, name FROM direct_cut ORDER BY id");
+        typedCut.Should().HaveCount(3);
+        typedCut.Completion.Should().Be(RecordSetCompletion.RecordLimit);
+
+        var whole = await Reads(5).Query("SELECT id, name FROM direct_cut ORDER BY id");
+        whole.Should().HaveCount(5);
+        whole.IsComplete.Should().BeTrue("exactly MaxRows rows is the whole answer");
+        (await Reads(5).Query<ProbeRow>("SELECT id, name FROM direct_cut")).IsComplete.Should().BeTrue();
+
+        await using var tx = Reads(2).Begin();
+        var inTransaction = await tx.Query("SELECT id FROM direct_cut");
+        inTransaction.Should().HaveCount(2);
+        inTransaction.Completion.Should().Be(RecordSetCompletion.RecordLimit);
+        (await tx.Query<ProbeRow>("SELECT id, name FROM direct_cut")).Completion.Should().Be(RecordSetCompletion.RecordLimit);
     }
 
     [Fact]

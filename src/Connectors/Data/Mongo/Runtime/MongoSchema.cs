@@ -20,7 +20,12 @@ internal sealed class MongoSchema<TEntity, TKey>(
     private readonly object _gate = new();
     // The repository fixes source/database/entity; the remaining physical identity is the collection.
     // Successful initialization retains resolved names. Normal operations perform no further index I/O.
-    private readonly Dictionary<string, Lazy<Task<string[]>>> _entries = new(StringComparer.Ordinal);
+    // The memo holds the most recently used collections up to a bound and forgets the least recently used one when a
+    // new collection is admitted: ensuring a collection is idempotent, so a forgotten one costs a re-ensure on its next
+    // use, never a failure, and a partition or tenant container past the bound keeps working.
+    private readonly Dictionary<string, LinkedListNode<(string Collection, Lazy<Task<string[]>> Entry)>> _entries =
+        new(StringComparer.Ordinal);
+    private readonly LinkedList<(string Collection, Lazy<Task<string[]>> Entry)> _recency = new();
 
     public Task Ensure(string collection, CancellationToken ct)
     {
@@ -28,14 +33,24 @@ internal sealed class MongoSchema<TEntity, TKey>(
         Lazy<Task<string[]>> entry;
         lock (_gate)
         {
-            if (!_entries.TryGetValue(collection, out entry!))
+            if (_entries.TryGetValue(collection, out var held))
             {
-                if (_entries.Count >= Constants.Provider.MaximumCollectionsPerRepository)
-                    throw new InvalidOperationException(
-                        $"MongoDB reached the bounded collection-plan limit of " +
-                        $"{Constants.Provider.MaximumCollectionsPerRepository} for '{typeof(TEntity).FullName}'.");
+                if (!ReferenceEquals(_recency.First, held))
+                {
+                    _recency.Remove(held);
+                    _recency.AddFirst(held);
+                }
+                entry = held.Value.Entry;
+            }
+            else
+            {
+                if (_entries.Count >= Constants.Provider.RememberedCollectionsPerRepository && _recency.Last is { } oldest)
+                {
+                    _recency.RemoveLast();
+                    _entries.Remove(oldest.Value.Collection);
+                }
                 entry = new Lazy<Task<string[]>>(() => EnsureCore(collection, ct), LazyThreadSafetyMode.ExecutionAndPublication);
-                _entries.Add(collection, entry);
+                _entries.Add(collection, _recency.AddFirst((collection, entry)));
             }
         }
         return Observe(collection, entry);
@@ -47,8 +62,11 @@ internal sealed class MongoSchema<TEntity, TKey>(
         catch
         {
             lock (_gate)
-                if (_entries.TryGetValue(collection, out var current) && ReferenceEquals(current, entry))
+                if (_entries.TryGetValue(collection, out var current) && ReferenceEquals(current.Value.Entry, entry))
+                {
+                    _recency.Remove(current);
                     _entries.Remove(collection);
+                }
             throw;
         }
     }

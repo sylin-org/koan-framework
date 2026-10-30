@@ -23,6 +23,14 @@ public sealed record FilterSupport(
     /// </summary>
     public bool SupportsNegation { get; init; } = true;
 
+    /// <summary>
+    /// The most members one <c>In</c> or <c>Nin</c> binds in a single statement, or <see langword="null"/> when the store
+    /// binds a set as one value and so carries a set of any size. Koan reads its own scoped key sets (a scoped
+    /// <c>Get</c> or <c>Remove</c> of many ids) in slices of this size, so a read scope never turns a working call into
+    /// one past the store's parameter limit (DATA-0162).
+    /// </summary>
+    public int? MaximumSetMembers { get; init; }
+
     /// <summary>Can the provider push the operator on a field of the given kind?</summary>
     public bool CanPush(FilterOperator op, bool collectionField)
         => (collectionField ? CollectionOperators : ScalarOperators).Contains(op);

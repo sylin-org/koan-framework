@@ -39,9 +39,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     private readonly DataSourceReadinessCoordinator _readiness;
     private readonly IRelationalSchemaOrchestrator _schema;
     private readonly RelationalSchemaPolicy _schemaPolicy;
-    private readonly object _plansGate = new();
-    private readonly Dictionary<string, SqlServerEntityPlan<TEntity, TKey>> _plans = new(StringComparer.Ordinal);
-    private readonly int _planLimit;
+    private readonly RelationalPlanCache<SqlServerEntityPlan<TEntity, TKey>> _plans;
 
     private SqlServerEntityPlan<TEntity, TKey> Plan => ResolvePlan();
 
@@ -61,7 +59,7 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             Access = options.SourcePlan.Access
         };
         _segmentation = services.GetRequiredService<DataSegmentationPlan>();
-        _planLimit = services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries;
+        _plans = new RelationalPlanCache<SqlServerEntityPlan<TEntity, TKey>>(services.GetRequiredService<IOptions<MappingOptions>>().Value.PlanEntries);
         _declaredMapping = services.GetRequiredService<IDataMappingPlans>().Find<TEntity>(options.Source);
         OptimizationInfo = services.GetStorageOptimization<TEntity, TKey>();
     }
@@ -83,16 +81,24 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (requested.Count == 0) return [];
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
-        var parameters = new SqlParameters();
-        var predicates = new string[requested.Count];
-        for (var index = 0; index < requested.Count; index++)
-            predicates[index] = IdentityPredicate(plan.Commands.Get(requested[index]).Identity, $"k{index}_", parameters);
         await using var connection = await Open(ct).ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(
-            connection,
-            $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}",
-            parameters, null, ct).ConfigureAwait(false);
-        var entities = rows.Select(row => Materialize(plan, row)).ToDictionary(static entity => entity.Id);
+        var entities = new Dictionary<TKey, TEntity>();
+        foreach (var slice in requested.Chunk(IdentitySlice(plan)))
+        {
+            var parameters = new SqlParameters();
+            var predicates = new string[slice.Length];
+            for (var index = 0; index < slice.Length; index++)
+                predicates[index] = IdentityPredicate(plan.Commands.Get(slice[index]).Identity, $"k{index}_", parameters);
+            var rows = await AdoCommands.QueryRowsAsync(
+                connection,
+                $"SELECT {plan.Select} FROM {plan.QualifiedTable} WHERE {string.Join(" OR ", predicates)}",
+                parameters, null, ct).ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                var entity = Materialize(plan, row);
+                entities[entity.Id] = entity;
+            }
+        }
         return requested.Select(id => entities.TryGetValue(id, out var entity) ? entity : null).ToArray();
     }
 
@@ -128,8 +134,21 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "bulk delete");
         await using var connection = await Open(ct).ConfigureAwait(false);
-        return await Delete(connection, null, values, ct).ConfigureAwait(false);
+        var slice = IdentitySlice(Plan);
+        if (values.Count <= slice) return await Delete(connection, null, values, ct).ConfigureAwait(false);
+        // More ids than one statement binds: every slice is deleted inside one transaction, so the set stays atomic.
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        var deleted = 0;
+        foreach (var part in values.Chunk(slice))
+            deleted += await Delete(connection, transaction, part, ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return deleted;
     }
+
+    /// <summary>The most ids one statement names: each binds a parameter per identity column, and SQL Server binds at
+    /// most <see cref="Infrastructure.Constants.MaximumParameters"/> in one statement (DATA-0162).</summary>
+    private static int IdentitySlice(SqlServerEntityPlan<TEntity, TKey> plan) =>
+        Math.Max(1, Infrastructure.Constants.MaximumParameters / Math.Max(1, plan.IdentityRoots.Count));
 
     public async Task<int> DeleteAll(CancellationToken ct = default)
     {
@@ -158,7 +177,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
 
     public IBatchSet<TEntity, TKey> CreateBatch() => new Batch(this);
 
-    public async Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default)
+    public Task<RepositoryQueryResult<TEntity>> Query(QueryDefinition query, CancellationToken ct = default) =>
+        WithSetTypes(() => QueryCore(query, ct), ct);
+
+    private async Task<RepositoryQueryResult<TEntity>> QueryCore(QueryDefinition query, CancellationToken ct)
     {
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
@@ -188,7 +210,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         };
     }
 
-    public async Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default)
+    public Task<CountResult> Count(QueryDefinition query, CancellationToken ct = default) =>
+        WithSetTypes(() => CountCore(query, ct), ct);
+
+    private async Task<CountResult> CountCore(QueryDefinition query, CancellationToken ct)
     {
         await Ready(ct).ConfigureAwait(false);
         var plan = Plan;
@@ -238,8 +263,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         return CountResult.Exact(count);
     }
 
-    public async Task<bool> ConditionalReplaceAsync(
-        TEntity model, Filter guard, CancellationToken ct = default)
+    public Task<bool> ConditionalReplaceAsync(TEntity model, Filter guard, CancellationToken ct = default) =>
+        WithSetTypes(() => ConditionalReplaceCore(model, guard, ct), ct);
+
+    private async Task<bool> ConditionalReplaceCore(TEntity model, Filter guard, CancellationToken ct)
     {
         await Ready(ct).ConfigureAwait(false);
         _options.SourcePlan.Demand(DataOperationEffect.Write, "conditional replace");
@@ -248,7 +275,8 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         var parameters = new SqlParameters();
         var set = UpdateSet(plan, command.Values, parameters, "set_");
         var identity = IdentityPredicate(command.Identity, "key_", parameters);
-        var (condition, conditionValues) = Where(plan, guard);
+        // The guard is translated against what the statement leaves: its SET values and identity are parameters too.
+        var (condition, conditionValues) = Where(plan, guard, reservedParameters: parameters.Count);
         Add(parameters, conditionValues, "p");
         await using var connection = await Open(ct).ConfigureAwait(false);
         return await AdoCommands.ExecuteAsync(
@@ -297,17 +325,12 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
                 $"Explicit SQL Server map '{_declaredMapping.Id}' pins one physical container and cannot accept an ambient partition.");
         var table = _declaredMapping?.Container.Name ?? Core.Configuration.AdapterNaming.GetOrCompute<TEntity, TKey>(_services);
         var key = _declaredMapping?.Id ?? $"{_options.Schema}/{table}";
-        lock (_plansGate)
+        return _plans.GetOrAdd(key, _ =>
         {
-            if (_plans.TryGetValue(key, out var existing)) return existing;
-            if (_plans.Count >= _planLimit)
-                throw new InvalidOperationException($"The SQL Server repository reached its configured mapping-plan limit of {_planLimit}.");
             var mapping = _declaredMapping ?? RelationalManagedMapping.Compile<TEntity>(
                 _options.Source, StorageAddress.From(_options.Schema, table));
-            var created = new SqlServerEntityPlan<TEntity, TKey>(mapping, _options, _segmentation);
-            _plans.Add(key, created);
-            return created;
-        }
+            return new SqlServerEntityPlan<TEntity, TKey>(mapping, _options, _segmentation);
+        });
     }
 
     private async Task Ready(CancellationToken ct)
@@ -319,11 +342,48 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
             await _readiness.Provision(_options.SourcePlan, target,
                 token => Provision(plan, token),
                 token => Validate(plan, token), ct).ConfigureAwait(false);
+            await EnsureSetTypes(ct).ConfigureAwait(false);
             return;
         }
         await _readiness.ValidateShape(_options.SourcePlan, target, token => Validate(plan, token), ct)
             .ConfigureAwait(false);
+        await EnsureSetTypes(ct).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Runs an operation whose filter may bind a set as a table-valued parameter. When the server says a set type is gone
+    /// (dropped after Koan found it), the catalog is read again — creating the type where this source may — and the
+    /// operation runs once more: it binds the type again, or is refused by name (DATA-0162).
+    /// </summary>
+    private async Task<T> WithSetTypes<T>(Func<Task<T>> operation, CancellationToken ct)
+    {
+        try
+        {
+            return await operation().ConfigureAwait(false);
+        }
+        catch (SqlException error) when (MissingSetType(error))
+        {
+            SetTypes.Invalidate();
+            await EnsureSetTypes(ct).ConfigureAwait(false);
+            return await operation().ConfigureAwait(false);
+        }
+    }
+
+    // "Cannot find data type …" naming one of Koan's set types: the type a parameter names is gone.
+    private static bool MissingSetType(SqlException error) =>
+        error.Errors.Cast<SqlError>().Any(static item =>
+            Infrastructure.Constants.SetTypes.MissingTypeErrors.Contains(item.Number) &&
+            item.Message.Contains(Infrastructure.Constants.SetTypes.Prefix, StringComparison.OrdinalIgnoreCase));
+
+    private SqlServerSetTypes SetTypes => SqlServerSetTypes.For(_options.SourcePlan.RouteIdentity, _options.Schema);
+
+    /// <summary>The table types a set binds through (DATA-0162): created when this source may create storage objects,
+    /// else read. Once per route and schema.</summary>
+    private Task EnsureSetTypes(CancellationToken ct) =>
+        SetTypes.Ensure(
+            Open,
+            RelationalDdlGate.MayCreate(_options.SourcePlan, _options.DdlPolicy, _options.AllowProductionDdl),
+            ct);
 
     private async Task Provision(SqlServerEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
@@ -494,10 +554,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
     }
 
     private static (string? Sql, IReadOnlyList<object?> Parameters) Where(
-        SqlServerEntityPlan<TEntity, TKey> plan, Filter? filter)
+        SqlServerEntityPlan<TEntity, TKey> plan, Filter? filter, int reservedParameters = 0)
     {
         if (filter is null) return (null, []);
-        var translated = plan.Filter().Translate(filter);
+        var translated = plan.Filter().Translate(filter, reservedParameters);
         return (translated.whereSql, translated.parameters);
     }
 
@@ -648,7 +708,10 @@ internal sealed class SqlServerRepository<TEntity, TKey> :
         if (instruction.Name == RelationalInstructions.SqlNonQuery)
             return (TResult)(object)await AdoCommands.ExecuteAsync(connection, sql, parameters, null, ct)
                 .ConfigureAwait(false);
-        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct).ConfigureAwait(false);
+        var rows = await AdoCommands.QueryRowsAsync(connection, sql, parameters, null, ct,
+            Koan.Data.Abstractions.Instructions.InstructionSql.MaxRows(instruction),
+            Koan.Data.Core.Direct.BoundedReads.MayCancel(instruction.EffectiveEffect(), inCallerTransaction: false))
+            .ConfigureAwait(false);
         return (TResult)(object)rows.ToArray();
     }
 

@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Koan.Data.Abstractions.Sources;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -122,22 +124,44 @@ public sealed class DataSourceReadinessCoordinator
         return $"{plan.RouteIdentity}:{targetIdentity}";
     }
 
+    /// <summary>
+    /// One stage's in-flight work and its memo of proven targets. The memo is a least-recently-used set: a hit stamps
+    /// the entry with the time it was used (no lock, no shared counter), and admitting past the bound evicts the least
+    /// recently used entries under one small gate, an eighth of the bound at a time so the ordering is paid once per
+    /// many admissions rather than on every one. A target in use stays proven; one nobody touches is proven again on
+    /// its next use (DATA-0162).
+    /// </summary>
     private sealed class StageState(int capacity)
     {
-        private long _stamp;
+        private readonly object _evictionGate = new();
+        private readonly int _evictionBatch = Math.Max(1, capacity / 8);
         public ConcurrentDictionary<string, Lazy<Task>> Inflight { get; } = new(StringComparer.Ordinal);
-        public ConcurrentDictionary<string, long> Completed { get; } = new(StringComparer.Ordinal);
+        public ConcurrentDictionary<string, StrongBox<long>> Completed { get; } = new(StringComparer.Ordinal);
 
-        public bool IsComplete(string key) => Completed.ContainsKey(key);
+        public bool IsComplete(string key)
+        {
+            if (!Completed.TryGetValue(key, out var lastUsed)) return false;
+            Volatile.Write(ref lastUsed.Value, Stopwatch.GetTimestamp());
+            return true;
+        }
 
         public void RememberComplete(string key)
         {
-            Completed[key] = Interlocked.Increment(ref _stamp);
-            var overflow = Completed.Count - capacity;
-            if (overflow <= 0) return;
+            Completed[key] = new StrongBox<long>(Stopwatch.GetTimestamp());
+            if (Completed.Count <= capacity) return;
 
-            foreach (var oldest in Completed.OrderBy(static pair => pair.Value).Take(overflow))
-                ((ICollection<KeyValuePair<string, long>>)Completed).Remove(oldest);
+            lock (_evictionGate)
+            {
+                var overflow = Completed.Count - capacity;
+                if (overflow <= 0) return;
+                var evict = Math.Min(Completed.Count - 1, overflow - 1 + _evictionBatch);
+                foreach (var stale in Completed
+                             .Where(pair => !string.Equals(pair.Key, key, StringComparison.Ordinal))
+                             .OrderBy(static pair => Volatile.Read(ref pair.Value.Value))
+                             .Take(evict)
+                             .ToArray())
+                    ((ICollection<KeyValuePair<string, StrongBox<long>>>)Completed).Remove(stale);
+            }
         }
     }
 }

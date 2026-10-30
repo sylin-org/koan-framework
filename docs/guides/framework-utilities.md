@@ -159,8 +159,9 @@ An implementation assembly contains at most one concrete `KoanModule`.
 - `string? Version` (virtual) — defaults to the declaring assembly version.
 - `void Register(IServiceCollection services)` (virtual) — register DI services. Replaces `Initialize`.
 - `Task Start(IServiceProvider sp, CancellationToken ct)` (virtual) — one-time startup work, DI available,
-  ordered against other modules by `[Before]`/`[After]`, run by `KoanModuleHost`. Folds the "register a
-  bootstrap `IHostedService` for startup" idiom into one verb.
+  ordered against other modules by `[Before]`/`[After]`, run by `KoanModuleHost` in the host's starting phase,
+  before any hosted service's `StartAsync` (ARCH-0140). Folds the "register a bootstrap `IHostedService` for
+  startup" idiom into one verb.
 - `void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)` (virtual) — publish
   provenance. Named `Report` (not `Describe`) to disambiguate from per-provider capabilities
   (`IDescribesCapabilities.Describe`, ARCH-0084).
