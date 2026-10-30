@@ -290,7 +290,8 @@ API for the supported control plane. It administers tenant registry rows and det
 not imply invitation, suspension, erasure, or act-as.
 
 **Recipe.** Add the package and keep the ordinary `AddKoan()` bootstrap. Open `/tenancy`. In Closed posture, grant
-the `koan:tenancy-operator` host role or configure an operator subject under `Koan:Tenancy:Console:Grant`.
+the `koan:tenancy-operator` host role or configure a provider-qualified subject or a verified email under
+`Koan:Tenancy:Console:Grant:Operators`.
 
 **When to use it.** Use the projection for internal tenant/seat administration and review of its mutation audit. Use
 business-named application workflows when membership grants require additional domain checks.

@@ -93,3 +93,14 @@ This model deliberately has no binding entity, scope tree, policy replacement, t
 membership query. Multi-process hosts must propagate invalidation through their deployment integration —
 `Invalidate(person)`, `InvalidateAll()` and `InvalidateOverwrites(resourceId)` are public for that; the in-process
 cache and locks do not claim distributed coherence.
+
+`IdentityAuthFlowHandler.OnValidatePrincipal` projects `RoleBag.Roles`, less the implicit roles, onto a carrier identity
+of the request's principal after the session and impersonation checks; sign-in and impersonation stamp none (SEC-0032).
+`IdentityStandingContributor` answers the standing seam from the person's row and `RoleCollection.ForPerson`, both read
+from the store, and calls a subject with no row inactive. `ClientApprovals.Revoke` removes a person's client grants for
+suspend, deactivation and erasure; with Koan.Tenancy closed and no tenant in scope it reaches none, and the standing
+still refuses every refresh.
+
+What `/me` and a sign-in read is indexed: `IdentityId` on `Session`, `IdentityEmail` and `ExternalIdentityLink`, and
+`Actor`-then-`Target` and `Target` on `ImpersonationGrant`. A returning sign-in reads its email factor by
+`IdentityEmail.KeyFor`, and only a factor not seen before asks whether the person holds another, one row at most.

@@ -15,6 +15,8 @@ package implements or consumes these contracts and owns its own ordinary module 
 
 - Auth lifecycle contexts carry one request/host operation; implementations are discovered and registered by Web Auth.
 - Identity-store contracts let a durable identity module replace Web Auth's host-local defaults.
+- `ISubjectStandingContributor` is one owner's word on a subject's standing; discovered implementations compose in Web
+  Auth's `SubjectStandings`. `SignInProof` names what a sign-in proved and the claims that carry it.
 - Provider definitions describe availability; Web Auth alone compiles eligibility and election.
 - `IAuthProtocol` lets a connector validate its protocol's effective merged `ProviderOptions` once during host
   composition. It returns secret-free corrective messages with complete configuration paths; an empty list means

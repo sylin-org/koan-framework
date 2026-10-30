@@ -436,6 +436,8 @@
       href: DATA-0161-a-commit-that-fails-before-dispatch-reports-not-committed.md
     - name: DATA-0162 A data bound sizes memory or a read, never what an application may hold
       href: DATA-0162-data-bounds-belong-to-reads.md
+    - name: DATA-0163 A class-level index names its properties, or the mapping refuses it
+      href: DATA-0163-a-class-level-index-names-its-properties.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface
@@ -686,3 +688,5 @@
       href: SEC-0030-bounds-belong-to-reads.md
     - name: SEC-0031 Roles stand in one order, and an actor manages the roles below their highest
       href: SEC-0031-roles-stand-in-one-order.md
+    - name: SEC-0032 Access opens on proof, and what is taken from a person reaches what they hold
+      href: SEC-0032-access-opens-on-proof-and-revocation-reaches.md

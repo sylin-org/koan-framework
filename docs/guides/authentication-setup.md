@@ -189,10 +189,11 @@ public sealed class ArticlesController : EntityController<Article>;
 ASP.NET authentication handler returns a failed result for a supplied credential, Koan Entity endpoints return 401
 before reading or mutating data. A request for the same public read with no credential remains anonymous and allowed.
 
-External roles map to `ClaimTypes.Role`; permissions from the local simulator map to `Koan.permission`. Koan maps
-these claims but does not define or normalize a role vocabulary: a role means what the application's authorization
-declares, and refreshing application-owned roles happens in an `IKoanAuthFlowHandler` at sign-in and
-cookie-principal validation. Bearer tokens use their separate validation scheme. Row-level ownership
+A provider's roles map to `ClaimTypes.Role` and its permissions to `Koan.permission` only where it sets
+`MapRolesAndClaims`, which the local simulator does; Koan's reserved `koan:*` roles never map. Koan does not define or
+normalize a role vocabulary: a role means what the application's authorization declares, and refreshing
+application-owned roles happens in an `IKoanAuthFlowHandler` at cookie-principal validation. Bearer tokens use their
+separate validation scheme. Row-level ownership
 and agent grants are authorization concerns, introduced by
 [Identity and isolation](../reference/identity/index.md).
 

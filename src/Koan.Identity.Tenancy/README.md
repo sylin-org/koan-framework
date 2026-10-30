@@ -69,7 +69,7 @@ Startup reporting lists the effective carriers and says whether subdomain routin
 ## Lifecycle closure
 
 `DeprovisioningService.RemoveFromTenantAsync(personId, tenantId)` removes one seat. `DeactivateAsync(personId)` marks
-the person deactivated first, revokes all Koan cookie sessions, then removes every tenant seat. Both return a
+the person deactivated first, revokes all Koan cookie sessions and their client grants, then removes every tenant seat. Both return a
 `DeprovisioningReceipt` whose content hash can detect later changes with `HasValidHash()`.
 
 These operations are ordered, idempotent Entity writes—not a cross-provider transaction. A receipt is emitted only
@@ -110,8 +110,8 @@ Over HTTP, `Koan.Tenancy.Web` exposes the ceremony: `POST /api/tenancy/invitatio
 - The bridge scopes inbound ASP.NET Core requests. Background work must establish its tenant through the normal
   captured/explicit Koan context rather than copying a raw header or path value.
 - Membership roles cannot project Koan host-operator roles, and invitations cannot grant them either.
-- Already-issued bearer tokens remain governed by their issuer outside tenant scope; this package does not revoke
-  OAuth tokens or claim global authorization closure.
+- An access token already issued lasts out its short lifetime outside tenant scope; this package removes client grants,
+  so no refresh mints another, and does not claim global authorization closure.
 - Public/anonymous tenant routing is not a switch on this security boundary and is not currently provided.
 - Tenant suspension and custom-domain ownership verification are not enforced here.
 - Invitation delivery (email send) is the application's job; this package owns the token, the claim, and the seat.

@@ -50,6 +50,12 @@ accepted, since it grants nothing.
 Short-lived opaque protocol artifacts are single-use and cleaned in the background. Refresh rotates on every use;
 replay revokes the token family. Remembered consent depends on an unrevoked approval and an unchanged scope set.
 
+`/oauth/token` asks `SubjectStandings` before every mint and before spending the code or the refresh token. A subject
+who may not act gets `invalid_grant` and the code or token stays unspent, so an agent refused during a time-out resumes
+with the same token, which is not reuse, and a store that cannot answer costs the client nothing. A live subject's
+reported name and roles replace those captured at approval; what no contributor speaks to stands as captured. The rows
+keep what was last written, for the host with no owner of its people.
+
 Each approval is its own SEC-0005 `AgentGrant`: every authorization-code redemption and device-code exchange starts a
 refresh family and issues the grant that family's tokens name, so revoking one grant ends one connection, and refresh
 reuse revokes only its own family's grant. With refresh tokens off, nothing would name a grant, so none is issued. The

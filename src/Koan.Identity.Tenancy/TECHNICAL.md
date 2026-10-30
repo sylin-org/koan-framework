@@ -58,7 +58,8 @@ or direct write placed such a value on a membership. Ordinary tenant roles use s
 
 ## Deprovisioning semantics
 
-Full deactivation writes `Identity.Status` first, then revokes Koan cookie sessions and removes all memberships. The
+Full deactivation writes `Identity.Status` first, then revokes Koan cookie sessions, removes the person's client grants
+and removes all memberships. A client grant is tenant-scoped, so it removes those the ambient tenant reaches. The
 status check keeps tenant entry fail-closed if a later cleanup write throws. Seat removal deletes matching membership
 rows for only one tenant and does not revoke sessions or affect other seats.
 

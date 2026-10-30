@@ -44,7 +44,7 @@ Exposure answers where the surface exists; authority answers who can operate it.
           "RequireHeader": "X-Koan-Console"
         },
         "Grant": {
-          "Operators": [ "operator-subject-id" ],
+          "Operators": [ "google:1234567890", "ops@company.example" ],
           "Role": "koan:tenancy-operator"
         }
       }
@@ -53,8 +53,9 @@ Exposure answers where the surface exists; authority answers who can operate it.
 }
 ```
 
-A failed exposure condition returns 404 before routing. It is never authority. Closed posture requires the configured
-operator identity or host role and returns 403 otherwise. Development is open by default; set
+A failed exposure condition returns 404 before routing. It is never authority. Closed posture requires the host role,
+or an `Operators` entry matching a subject qualified by its provider (`google:1234567890`) or an email the provider
+verified, and returns 403 otherwise. A display name, an unverified email and a bare subject never match. Development is open by default; set
 `RequireLoopbackForOpenPosture` when a development host can receive remote traffic.
 
 Startup reporting shows the routes, resolved posture, exposure conditions, configured operator count, and audit page

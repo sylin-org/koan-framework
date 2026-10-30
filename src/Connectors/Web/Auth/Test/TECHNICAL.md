@@ -25,8 +25,10 @@ port publishing and reverse proxies without an application-owned back-channel op
 Discovery and authorization canonicalize the local URI authority, including default ports, before constructing
 the issuer. The consuming handler keeps exact issuer, audience, signature and nonce validation enabled.
 
-Userinfo emits `sub`, `id`, username, email, roles, permissions, and custom claims. Web Auth maps roles to
-`ClaimTypes.Role`, permissions to `Koan.permission`, and extra claims one-for-one.
+Userinfo emits `sub`, `id`, username, email, `email_verified`, roles, permissions, and custom claims. The simulator
+says every address is verified and opts in to `MapRolesAndClaims`, since its roles are what a developer asked to sign in
+with: Web Auth maps roles to `ClaimTypes.Role`, permissions to `Koan.permission`, and extra claims one-for-one, and
+strips `koan:*` roles as for any provider.
 
 The authorize, token, userinfo and discovery controllers carry `[ResourceServerExempt]` (SEC-0025): they check the
 provider's own token, not the application's, so with `Koan:Web:Auth:ResourceServer:Enabled` the edge leaves them alone

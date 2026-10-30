@@ -3,6 +3,17 @@
 Koan's durable person, session, audit, erasure, and server-role core. Reference the package beside Web Auth and keep
 `AddKoan()` as the only bootstrap.
 
+## What is taken from a person reaches what they hold
+
+A request's roles are the person's now. The cookie carries none: each request projects them from the person's compiled
+bag, so a role removed stops authorizing their next request, a role granted starts, and nobody signs in again.
+`IdentityLifecycleService.SuspendAsync`, deactivation and erasure close the person's agents too: their refresh is
+refused at once, and their client grants are removed, so reactivating them brings no agent back.
+
+Koan.Identity reports each person's standing to the authorization server: a live person's next refresh carries their
+current roles and name, and a suspended, deactivated or erased person's mints nothing. An application adds what it knows
+of a person by implementing `ISubjectStandingContributor`; see Web Auth's README.
+
 ## Server roles
 
 Identity owns one `Role` collection. The role `Key` is its stable token (for example `role:member` or

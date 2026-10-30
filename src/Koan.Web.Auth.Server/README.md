@@ -33,6 +33,8 @@ sends the person to `/notes/me/connect` and scopes its browser-binding cookie to
 - `/oauth/request/{rid}` and its approve/deny actions form the small consent-page seam owned by the application.
 - `/oauth/dev-token` provides a real audience-bound token for the current cookie user in Development only.
 - Refresh tokens rotate with reuse detection and remain backed by a revocable grant.
+- Every token is minted for who the person is now: an inactive subject gets `invalid_grant`, and a live one's token
+  carries their current roles and name (`SubjectStandings`), whatever they were at approval.
 
 The consent page reads `rid` or `user_code`, renders the framework's request projection, and posts Allow or Deny. The
 framework owns every protocol decision and response around that page. Only the person's session decides: the server
@@ -121,6 +123,17 @@ consent for that client, scope set and resource, so the client's next connection
 person's other approvals keep refreshing until they expire or are removed. Two agents approved through the same client
 with the same scopes are two approvals. `ClientName` is the name the client registered, kept as it was at approval;
 the client chose it, so show it as unverified. A client that registered no name leaves it null.
+
+Removing a person's every approval is one call, a page at a time, which is what Koan.Identity's suspend, deactivate and
+erase make:
+
+```csharp
+await AgentGrant.RemoveApprovals(personId);
+```
+
+To refuse an agent while a person cannot act, without ending its approval, report it through the standing seam
+(`ISubjectStandingContributor`): its refresh is refused and its token is not spent, so it resumes when the report ends.
+Access it already holds lasts out `AccessTokenLifetime`.
 
 A grant issued before Koan recorded these answers null for `IssuedAt`, `ClientId` and `ClientName`, so `Approvals`
 leaves it out. It still refreshes and revokes, may back several connections, never keeps the person's consent

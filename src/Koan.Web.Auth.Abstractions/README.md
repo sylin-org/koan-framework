@@ -12,8 +12,8 @@ dotnet add package Sylin.Koan.Web.Auth.Abstractions
 ## Meaningful use
 
 Reference this package when authoring a reusable module that implements an auth lifecycle handler, identity store,
-current-user projector, authentication provider definition, or `IAuthProtocol` configuration validator without
-activating Koan's Web Auth runtime. A protocol validator does not register or implement an authentication handler.
+current-user projector, authentication provider definition, subject-standing contributor, or `IAuthProtocol`
+configuration validator without activating Koan's Web Auth runtime. A protocol validator does not register or implement an authentication handler.
 
 ## Boundaries
 

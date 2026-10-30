@@ -127,14 +127,31 @@ URL that already carries the base, remains only for the self-hosted development 
 - sign-out handler failures are logged and local sign-out continues.
 
 Handlers are scoped, auto-discovered implementations of `IKoanAuthFlowHandler`, ordered by `Priority` and then full
-type name. Framework-contributed and application handlers share one pipeline. Provider-owned claims are mapped once
-from the provider's assertions; refreshing application-owned role claims is a flow-handler decision (stamping the
-mutable sign-in identity and re-validating the cookie principal), never a Web Auth normalization. These
-cookie events do not validate bearer tokens. The built-in
-role-list handler applies an email-keyed allow/revoke JSON file at sign-in when
+type name. Framework-contributed and application handlers share one pipeline. Refreshing application-owned role claims
+is a flow-handler decision (projecting them onto the request's principal during cookie-principal validation), never a
+Web Auth normalization. A cookie is reissued from the ticket the handler read, so what a handler projects onto a request
+does not reach the cookie unless it asks to renew. These cookie events do not validate bearer tokens. The built-in
+role-list handler applies an allow/revoke JSON file keyed on verified emails at sign-in when
 `Koan:Web:Auth:Lifecycle:RoleListFile:FilePath` is configured. At priority 50 it applies revocations after
 lower-priority handlers; a later handler can add roles again. Choose ordering deliberately for
 application-owned role authority. Implement only the events the module owns; no DI registration is required.
+
+## Provider assertions
+
+`AuthSchemeSeeder` maps sub, name and avatar for every provider, and whether it verified its email; userinfo's
+`email_verified` replaces what the id_token said. Roles, permissions and extra claims map only under
+`ProviderOptions.MapRolesAndClaims`, and an extra claim never takes a `koan*` type. `ProviderClaimPolicy` then runs once
+when a provider's sign-in reaches the cookie, before any flow handler and for every protocol: it stamps
+`SignInProof.ProviderSubjectClaim`, replacing anything a provider asserted under that type, removes every role claim
+of a provider that has not opted in, and removes `koan:*` roles always. An OIDC id_token's `roles` are role claims
+before Koan sees them, which is why this sits at the cookie and not in the userinfo mapping. A sign-in on a path the
+provider plan does not know is the application's own and passes untouched.
+
+## Subject standing
+
+`SubjectStandings` is scoped and composes every discovered `ISubjectStandingContributor`, ordered by type name so a
+result never rests on registration order: the first inactive answer ends the walk, roles are the union of those
+reported, and the first name stands. No contributor knowing the subject answers null. A contributor's failure propagates.
 
 ## Inspectability
 

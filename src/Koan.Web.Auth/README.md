@@ -100,13 +100,43 @@ Under a base URL with a path, the login redirect and the discovery document's `c
 
 ## Claims and role refresh
 
-Provider-owned claims and application-owned role decisions stay distinct. Web Auth maps the provider's
-roles to `ClaimTypes.Role` and its extra claims one-for-one; it does not define, normalize, or rank a
-role vocabulary, so a role means exactly what the application's authorization declares. Refreshing
-application-owned role claims belongs to the shared sign-in flow: an `IKoanAuthFlowHandler` may stamp or
-strip role claims on the mutable sign-in identity and re-check them during cookie-principal validation. An
-optional built-in handler applies an email-keyed allow/revoke file at sign-in
-(`Koan:Web:Auth:Lifecycle:RoleListFile`); an empty file path, the default, disables it.
+Provider-owned claims and application-owned role decisions stay distinct. A provider's roles, permissions and extra
+claims become claims only where it opts in:
+
+```json
+{ "Koan": { "Web": { "Auth": { "Providers": { "corporate": { "MapRolesAndClaims": true } } } } } }
+```
+
+Off by default, because at most providers a person controls their own profile. Koan's reserved `koan:*` roles are
+stripped either way, and Web Auth does not define, normalize, or rank a role vocabulary, so a role means exactly what
+the application's authorization declares. Refreshing application-owned role claims belongs to the shared flow: an
+`IKoanAuthFlowHandler` may project role claims onto the request's principal during cookie-principal validation, which is
+how Koan.Identity makes a role removed stop authorizing the next request. An optional built-in handler applies an
+allow/revoke file keyed on the email the provider verified at sign-in (`Koan:Web:Auth:Lifecycle:RoleListFile`); an
+empty file path, the default, disables it.
+
+## What a sign-in proves
+
+`SignInProof` names it. A provider's sign-in stamps the subject qualified by that provider
+(`SignInProof.ProviderSubjectOf(user)`, such as `google:1234`), and `SignInProof.VerifiedEmails(user)` answers only what
+the provider said it verified. A display name, an unverified email and a bare `sub` prove nothing: key access on these
+two, as the tenancy console's allow-list does.
+
+## Ask a subject's standing
+
+`SubjectStandings.Of(subject)` says whether a subject may act now, with their current name and roles. Anything that
+mints access long after a person approved it asks this; the embedded authorization server does at every token. An
+application contributes by implementing one interface, discovered with no registration:
+
+```csharp
+public sealed class PlaceStanding : ISubjectStandingContributor
+{
+    public async Task<SubjectStanding?> Read(string subject, CancellationToken ct)
+        => await Participant.Get(subject, ct) is { IsBanned: true } ? new SubjectStanding(Active: false) : null;
+}
+```
+
+Any contributor saying inactive decides, whatever others say; null means it knows nothing of the subject.
 
 ## Guarantees and failure posture
 
@@ -117,6 +147,7 @@ optional built-in handler applies an email-keyed allow/revoke file at sign-in
 - Unknown or ineligible `PreferredProviderId` values fail startup instead of silently selecting something else.
 - Missing external subject identifiers, identity-link persistence failures, and security-bearing lifecycle-handler
   failures reject the sign-in flow.
+- A flow handler's bootstrap failure is logged and stops the host.
 - Cookie validation failures reject the principal. Sign-out cleanup alone is best-effort.
 - A failure landing that could leave the application or its base path, could not be a `Location` header, or already
   names `error` is refused: at the challenge with 400, in configuration at startup naming the key. The landing
