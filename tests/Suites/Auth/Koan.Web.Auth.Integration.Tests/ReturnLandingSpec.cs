@@ -39,7 +39,7 @@ public sealed class ReturnLandingSpec : IClassFixture<BaseUrlAuthSwapFixture>
         using var client = _fx.NewClient();
         (await SignInLanding(client, $"{Base}/auth/test/challenge?return={Uri.EscapeDataString(value)}")).Should().Be(Base + "/");
 
-        using var logout = await client.GetAsync($"{Base}/auth/logout?return={Uri.EscapeDataString(value)}", TestContext.Current.CancellationToken);
+        using var logout = await client.PostAsync($"{Base}/auth/logout?return={Uri.EscapeDataString(value)}", null, TestContext.Current.CancellationToken);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);
         logout.Headers.Location!.OriginalString.Should().Be(Base + "/");
     }
@@ -50,7 +50,7 @@ public sealed class ReturnLandingSpec : IClassFixture<BaseUrlAuthSwapFixture>
         using var client = _fx.NewClient();
         (await SignInLanding(client, $"{Base}/auth/test/challenge?return={Base}/e2e/whoami")).Should().Be(Base + "/e2e/whoami");
 
-        using var logout = await client.GetAsync($"{Base}/auth/logout?return={Base}/e2e/whoami", TestContext.Current.CancellationToken);
+        using var logout = await client.PostAsync($"{Base}/auth/logout?return={Base}/e2e/whoami", null, TestContext.Current.CancellationToken);
         logout.Headers.Location!.OriginalString.Should().Be(Base + "/e2e/whoami");
     }
 
@@ -60,7 +60,10 @@ public sealed class ReturnLandingSpec : IClassFixture<BaseUrlAuthSwapFixture>
         using var client = _fx.NewClient();
         (await SignInLanding(client, $"{Base}/auth/test/challenge")).Should().Be(Base + "/");
 
-        using var logout = await client.GetAsync($"{Base}/auth/logout", TestContext.Current.CancellationToken);
+        using var image = await client.GetAsync($"{Base}/auth/logout", TestContext.Current.CancellationToken);
+        image.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed, "an image in anything a person reads must not end their session");
+
+        using var logout = await client.PostAsync($"{Base}/auth/logout", null, TestContext.Current.CancellationToken);
         logout.Headers.Location!.OriginalString.Should().Be(Base + "/");
     }
 

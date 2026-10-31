@@ -53,8 +53,8 @@ public sealed class AuthController(IAuthProviderCatalog providers, IOptions<Auth
         return Challenge(props, provider);
     }
 
+    // POST only (SEC-0035): on a GET, an image in anything a person reads would end their session.
     [HttpPost(AuthConstants.Routes.Logout)]
-    [HttpGet(AuthConstants.Routes.Logout)]
     public async Task<IActionResult> Logout([FromQuery(Name = AuthConstants.Query.Return)] string? returnUrl)
     {
         await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);

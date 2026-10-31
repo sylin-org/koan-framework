@@ -205,7 +205,8 @@ and agent grants are authorization concerns, introduced by
   (`Koan:Web:Auth:ReturnUrl:FailurePath` names one for every provider);
 - `/auth/{provider}/callback` — handler-owned callback registered with the provider;
 - `GET /me` — current-user projection, or 401;
-- `GET|POST /auth/logout?return=/path` — local sign-out.
+- `POST /auth/logout?return=/path` — local sign-out, from a form: a `GET` is refused, so an image in anything a person reads
+  never ends their session.
 
 Return URLs are checked against Web Auth's return-url policy before redirect. Do not create a second callback controller
 or manually parse provider tokens.

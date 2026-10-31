@@ -704,3 +704,5 @@
       href: SEC-0033-the-authorization-server-stands-under-closed-tenancy.md
     - name: SEC-0034 An inbound atproto service-auth token proves its issuer, in the connector that resolves DIDs
       href: SEC-0034-a-service-auth-token-proves-its-issuer.md
+    - name: SEC-0035 Signing out takes a POST
+      href: SEC-0035-signing-out-takes-a-post.md

@@ -62,7 +62,7 @@ failure answer.
 - `GET /.well-known/auth/providers` returns eligible providers only.
 - `GET /auth/{provider}/challenge` invokes the provider's ASP.NET handler. Built-in OAuth2/OIDC flows use PKCE.
 - `/auth/{provider}/callback` is consumed by the corresponding ASP.NET authentication handler.
-- `GET /me` projects the current cookie principal; `GET|POST /auth/logout` removes the local session.
+- `GET /me` projects the current cookie principal; `POST /auth/logout` removes the local session; a page signs out with a form.
 - Explicitly configured providers outrank automatic local defaults. `PreferredProviderId` selects among eligible
   providers.
 - Startup logs and Koan composition facts report provider state, eligibility, default election, reason, and correction

@@ -57,7 +57,7 @@ public sealed class ReturnUrlConfigurationSpec
 
         (await app.SignInLanding(client, "/notes/auth/test/challenge")).Should().Be("/notes/home");
 
-        using var logout = await client.GetAsync("/notes/auth/logout", TestContext.Current.CancellationToken);
+        using var logout = await client.PostAsync("/notes/auth/logout", null, TestContext.Current.CancellationToken);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);
         logout.Headers.Location!.OriginalString.Should().Be("/notes/home");
     }
@@ -82,7 +82,7 @@ public sealed class ReturnUrlConfigurationSpec
             .Should().Be("https://app.example/x");
         (await app.SignInLanding(client, "/auth/test/challenge")).Should().Be("https://app.example/home");
 
-        using var logout = await client.GetAsync($"/auth/logout?return={Uri.EscapeDataString(unicode + "/")}", TestContext.Current.CancellationToken);
+        using var logout = await client.PostAsync($"/auth/logout?return={Uri.EscapeDataString(unicode + "/")}", null, TestContext.Current.CancellationToken);
         logout.StatusCode.Should().Be(HttpStatusCode.Redirect);
         logout.Headers.Location!.OriginalString.Should().Be("https://app.example/");
     }
