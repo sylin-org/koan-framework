@@ -136,6 +136,19 @@ accepted one is kept; Koan holds it, validates it and serves it.**
    > the start as for an empty store, naming the base URL and the accept; with the posture the identity derives from
    > the request. The guarantee above, "a stored value that is not a public origin refuses the start", is replaced by
    > this.
+
+   > **Amended 2026-10-31.** "An origin a sign-in can be published under" checked only the scheme, so
+   > `https://place.example:8443` was accepted. The AT Protocol's `client_id` carries no port and a provider's fetch of
+   > one refuses it, so sign-in broke at once and, with nothing configured, the next start was refused by the atproto
+   > check on the URL the store held. The rule cannot move into Koan.Web whole, because an application without that
+   > provider may live on any port. `IApplicationUrlRule` lets an active capability say what it cannot use: `Accept`
+   > refuses such an origin with its reason before `Save`, `Load` does not hold a stored one, as above, and
+   > `WouldAccept` answers without accepting, so an application offers only what it can keep. The atproto connector
+   > contributes the rule while its provider is eligible and its identity derives from the base URL. Its
+   > `AtprotoClientIdentity.Derive` yields no identity for https on another port, so a configured one gets the correction
+   > naming the base URL and a derived one is refused at use instead of being refused by the provider: a challenge logs
+   > the correction, and a stored session reads as not current. A stored one still refuses the start in Production
+   > without the posture, as the empty store it now reads as does.
 4. **An origin, not a path.** An accepted URL carries no path. The path base is mounted when the host starts
    (`UsePathBase`, the 404 guard, the boot-time resolution of relative provider endpoints in `AuthSchemeSeeder`), and
    moving it live would move every route, cookie path and relative link a browser already holds. A path is
@@ -242,6 +255,10 @@ accepted one is kept; Koan holds it, validates it and serves it.**
   no signature changes. An application in Production without the posture and with nothing configured then refuses
   absolute URLs at the point of need, and with an eligible atproto provider still refuses the start, as with an empty
   store.
+- Amended 2026-10-31: `IApplicationUrlRule` and `KoanWebBaseUrl.WouldAccept` are added, with one optional constructor
+  parameter. With an eligible atproto provider and no `ClientId`, `Accept` refuses https on a port of its own and a
+  stored one is set aside. A configured one still refuses the start, now with the correction naming the base URL.
+  An application that offers observed origins asks `WouldAccept` first, or `Accept` refuses what it offered.
 
 ## Evidence
 
@@ -310,3 +327,13 @@ accepted one is kept; Koan holds it, validates it and serves it.**
   derives, and a later accept names the client. Restoring the refusal fails both. The two `AcceptedBaseUrlSpec` cases
   above in which a stored `http://localhost:5220` and a stored URL with a path refused the start are retired with the
   refusal.
+- Amended 2026-10-31. `ApplicationUrlRuleSpec` (Koan.Web.WellKnown.Tests): with no rule an https origin on another port
+  is accepted; with one, it is refused before the store with the rule's reason, `WouldAccept` answers the same without
+  accepting, and a stored one is set aside with one warning and the store left alone. `AcceptedClientIdentity`
+  (Koan.Web.Auth.Atproto.Tests): with the provider eligible, accepting `https://place.example:8443` is refused and the
+  client stays; stored in Production it is nothing accepted, refusing the start as for an empty store without the posture
+  and deriving with it; configured, the correction names the URL; with an explicit `ClientId` it is accepted and the
+  published identity stays that `ClientId`; with the provider disabled it is accepted and held; a challenge on a derived
+  origin with a port answers the failure and logs the correction. `StaleClientIdentity`: under a base URL that names no
+  client, `GetSessionMetadata` answers null and `Disconnect` removes the stored session. `ProtocolGuards`: `Derive` yields
+  no identity for https on another port.

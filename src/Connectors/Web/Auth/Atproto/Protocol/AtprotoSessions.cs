@@ -52,16 +52,14 @@ public sealed class AtprotoSessions
     /// configured or accepted one (WEB-0081), else the current request's where Koan derives it. Read at use, so a URL
     /// the application accepts changes the identity from the next request on.
     /// </summary>
-    internal string ClientId
-    {
-        get
-        {
-            if (auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId is { } configured) return configured;
-            var root = BaseUrl();
-            return AtprotoClientIdentity.Derive(root, AllowedScopes, development)
-                ?? throw new InvalidOperationException(AtprotoClientIdentity.Correction(root, baseUrl.CanAccept && !baseUrl.IsConfigured));
-        }
-    }
+    internal string ClientId => PublishedClientId
+        ?? throw new AtprotoClientIdentityException(AtprotoClientIdentity.Correction(BaseUrl(), baseUrl.CanAccept && !baseUrl.IsConfigured));
+
+    /// <summary>The client identity this application publishes now, or null when its base URL names no client: a step that
+    /// only asks about a stored session then finds it is not current, as it finds one granted to a previous identity.</summary>
+    private string? PublishedClientId
+        => auth.Value.Providers.GetValueOrDefault(Constants.Provider)?.ClientId
+           ?? AtprotoClientIdentity.Derive(BaseUrl(), AllowedScopes, development);
 
     private string? BaseUrl()
         => baseUrl.Current ?? (baseUrl.DerivesFromRequests && http?.HttpContext is { } context ? baseUrl.Resolve(context) : null);
@@ -305,7 +303,7 @@ public sealed class AtprotoSessions
     public async Task<SessionMetadata?> GetSessionMetadata(string did, CancellationToken ct = default)
     {
         if (!IdentityResolver.IsValidDid(did)) throw new ArgumentException("A valid DID is required.", nameof(did));
-        var clientId = ClientId;
+        if (PublishedClientId is not { } clientId) return null;
         var stored = await store.Read(did, ct);
         if (stored?.Grant is not { } saved || !Current(saved, clientId)) return null;
         var identity = await Resolve(did, ct);
@@ -588,7 +586,7 @@ public sealed class AtprotoSessions
     /// </summary>
     public async Task Disconnect(string did, CancellationToken ct = default)
     {
-        var clientId = ClientId;
+        var clientId = PublishedClientId;
         var deadline = DateTimeOffset.UtcNow + WaitBound;
         while (true)
         {
@@ -596,14 +594,14 @@ public sealed class AtprotoSessions
             if (stored?.Grant is not { } saved) throw AuthorizationRequired();
             if (!stored.Claimed)
             {
-                var current = Current(saved, clientId);
-                using var lease = current ? await Rent(did, clientId, stored, null, ct) : null;
+                var current = clientId is not null && Current(saved, clientId);
+                using var lease = current ? await Rent(did, clientId!, stored, null, ct) : null;
                 var endpoint = current ? await RevocationEndpoint(saved, ct) : null;
                 using var stale = current ? null : await PrepareStale(did, saved, ct);
                 await using var claim = await store.Claim(stored, ClaimLease, ct);
                 if (claim is not null)
                 {
-                    if (current) await Revoke(lease!.Client.Tokens, endpoint!, saved, clientId, ct);
+                    if (current) await Revoke(lease!.Client.Tokens, endpoint!, saved, clientId!, ct);
                     else if (stale is not null) await RevokeStale(stale, saved, ct);
                     if (!await claim.End()) throw ChangedWhileDisconnected();
                     clients.Remove(did);

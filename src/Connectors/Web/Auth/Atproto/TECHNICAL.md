@@ -29,7 +29,9 @@ derived at use from the application's base URL (WEB-0078, WEB-0081):
 `Koan:Web:ApplicationUrl` when set, else the URL the application accepted, else,
 where Koan derives the base URL from requests (Development, Staging/Test with a
 notice, Production under the application's `DerivesUntilAccepted`), the current
-request's. An https base yields `{base}/auth/atproto/client-metadata.json`; a
+request's. An https base on the default port yields
+`{base}/auth/atproto/client-metadata.json`; on another port it yields no identity, because
+the AT Protocol's `client_id` carries no port and a provider's fetch of it refuses one. A
 loopback http base yields the localhost profile in Development only. A challenge,
 handle-first or server-first, reads the identity once and uses it for the pushed
 request, its `redirect_uri` and the authorization URL. The callback reads the
@@ -47,6 +49,18 @@ the start with the same correction. A stored value Koan.Web does not use here (h
 loopback kept from Development, started in Production) is nothing held: without
 `DerivesUntilAccepted` the start is refused as for an empty store, with it the
 identity derives from the request until the application accepts a URL.
+
+`AtprotoApplicationUrlRule` (`IApplicationUrlRule`) tells Koan.Web what the eligible
+provider cannot use when the identity derives from the base URL: an origin that names no
+client. `Accept` refuses one before the store and a stored one is the same nothing held, so
+it stops a later start only as an empty store does, in Production without
+`DerivesUntilAccepted`. A configured `ClientId` does not derive from the base URL, so the
+rule passes; its redirect takes the client id's authority, so whatever answers that host on
+the default port must also answer the callback. With the base URL derived from a request on
+another port, a step that publishes the identity is refused with the correction
+(`AtprotoClientIdentityException`): a challenge answers `SignInFailure.Failed` and logs the
+correction. `GetSessionMetadata` and `Disconnect` publish nothing, so there a stored session
+is simply not current: the first answers null and the second removes it.
 
 A stored session saved under another client identity — the application accepted a
 new URL since — is gone. Requests and `GetSessionMetadata` treat it as absent; a

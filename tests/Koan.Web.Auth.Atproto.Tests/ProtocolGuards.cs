@@ -130,6 +130,7 @@ public sealed class ProtocolGuards
 
         var clientId = AtprotoClientIdentity.Derive(baseUrl.Current, ["atproto"], development: false);
 
+        Assert.Null(AtprotoClientIdentity.Derive("https://www.example.com:8443", ["atproto"], development: true));
         Assert.Equal("https://www.example.com/tangent/auth/atproto/client-metadata.json", clientId);
         Assert.Equal("https://www.example.com/tangent/auth/atproto/callback", AtprotoClientIdentity.RedirectUri(clientId!));
         var validator = new AtprotoProtocol(Microsoft.Extensions.Options.Options.Create(new AtprotoOptions()), new EnvironmentStub("Production"), baseUrl);

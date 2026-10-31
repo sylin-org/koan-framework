@@ -38,6 +38,7 @@ public sealed class AtprotoAuthModule : KoanModule
     {
         services.AddKoanOptions<AtprotoOptions>(Constants.Section);
         services.AddSingleton<IAuthProtocol, AtprotoProtocol>();
+        services.AddSingleton<IApplicationUrlRule, AtprotoApplicationUrlRule>();
         services.AddSingleton(new AuthProviderDefinition(Constants.Provider, new ProviderOptions
         { Type = Constants.Protocol, DisplayName = "AT Protocol", Scopes = [Constants.BaseScope], Priority = 200 }));
         services.AddSingleton<AtprotoHttp>();

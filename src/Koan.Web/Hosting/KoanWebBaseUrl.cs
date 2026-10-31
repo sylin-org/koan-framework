@@ -56,11 +56,14 @@ public sealed class KoanWebBaseUrl
     private string? _accepted;
     private (string Value, string Problem)? _unusable;
     private int _noticed;
+    private readonly Lazy<IReadOnlyList<IApplicationUrlRule>> _rules;
 
     /// <summary>
     /// Create the base URL from the configured value. A null or empty value means "accepted, else derived from each
     /// request". <paramref name="store"/> is the application's <see cref="IApplicationUrlStore"/>, when it supplies one;
-    /// <paramref name="facts"/> receives the base URL fact again whenever the accepted URL changes.
+    /// <paramref name="facts"/> receives the base URL fact again whenever the accepted URL changes;
+    /// <paramref name="rules"/> answers what the capabilities active in this host require of an accepted URL, asked at
+    /// first use because a rule may depend on what depends on this.
     /// </summary>
     /// <exception cref="InvalidOperationException">The value is not the application's public URL.</exception>
     public KoanWebBaseUrl(
@@ -68,8 +71,10 @@ public sealed class KoanWebBaseUrl
         IHostEnvironment? environment = null,
         ILogger<KoanWebBaseUrl>? logger = null,
         IApplicationUrlStore? store = null,
-        IKoanRuntimeFactRecorder? facts = null)
+        IKoanRuntimeFactRecorder? facts = null,
+        Func<IEnumerable<IApplicationUrlRule>>? rules = null)
     {
+        _rules = new Lazy<IReadOnlyList<IApplicationUrlRule>>(() => rules?.Invoke().ToList() ?? []);
         _logger = logger;
         _environment = environment?.EnvironmentName;
         _store = store;
@@ -171,7 +176,8 @@ public sealed class KoanWebBaseUrl
     /// accepted URL is an origin — scheme, host and port — because the path base is mounted when the host starts. It is
     /// https, or http on a loopback host in Development: an issuer must be https (OAuth 2.1) and an AT Protocol client
     /// is https, or the localhost profile in Development only, so any other origin would break sign-in at once or refuse
-    /// the next start. A configured value still wins over it.
+    /// the next start. A capability active in this host may refuse one too (<see cref="IApplicationUrlRule"/>). A
+    /// configured value still wins over it.
     /// </summary>
     /// <exception cref="InvalidOperationException">The application supplies no <see cref="IApplicationUrlStore"/>.</exception>
     /// <exception cref="ArgumentException"><paramref name="applicationUrl"/> is not a public origin.</exception>
@@ -217,6 +223,17 @@ public sealed class KoanWebBaseUrl
                 "The application accepted {ApplicationUrl} as its base URL; {Key} is configured as {Configured} and still wins.",
                 normalized, Key, Configured);
         }
+    }
+
+    /// <summary>
+    /// Whether <see cref="Accept"/> would take <paramref name="applicationUrl"/>, and why not when it would not, so an
+    /// application offers its operator only what it can keep.
+    /// </summary>
+    public bool WouldAccept(string? applicationUrl, out string problem)
+    {
+        if (_store is not null) return TryParseAccepted(applicationUrl, out _, out problem);
+        problem = $"the application supplies no {nameof(IApplicationUrlStore)} to keep it";
+        return false;
     }
 
     /// <summary>
@@ -362,7 +379,8 @@ public sealed class KoanWebBaseUrl
     // An accepted URL is validated as a configured one is, and is an origin: the path base is mounted when the host
     // starts (KoanWebStartupFilter), so a path can only be configured. It is https, or http on a loopback host in
     // Development: OAuth 2.1 requires an https issuer, and the AT Protocol accepts an http client only as its localhost
-    // profile, in Development. Any other origin would break sign-in once accepted and refuse the next start.
+    // profile, in Development. Any other origin would break sign-in once accepted and refuse the next start, and so would
+    // one a capability active in this host cannot use, which that capability says (IApplicationUrlRule).
     private bool TryParseAccepted(string? value, out string? normalized, out string problem)
     {
         if (!TryParse(value, out normalized, out var pathBase, out problem)) return false;
@@ -375,20 +393,30 @@ public sealed class KoanWebBaseUrl
         }
 
         var origin = new Uri(normalized!);
-        if (origin.Scheme == Uri.UriSchemeHttps) return true;
-        if (!origin.IsLoopback)
+        if (origin.Scheme != Uri.UriSchemeHttps)
         {
-            normalized = null;
-            problem = "it is http on a host other than loopback; an accepted URL is https, as OAuth 2.1 requires of an issuer " +
-                      "and the AT Protocol of a client, or http on a loopback host in Development";
-            return false;
+            if (!origin.IsLoopback)
+            {
+                normalized = null;
+                problem = "it is http on a host other than loopback; an accepted URL is https, as OAuth 2.1 requires of an issuer " +
+                          "and the AT Protocol of a client, or http on a loopback host in Development";
+                return false;
+            }
+            if (!_loopbackHttp)
+            {
+                normalized = null;
+                problem = $"it is http on a loopback host outside Development, in environment '{_environment ?? KoanEnv.EnvironmentName}'; " +
+                          "an http origin is accepted only on a loopback host in Development, where the AT Protocol's localhost " +
+                          "client profile exists, so here it must be https";
+                return false;
+            }
         }
-        if (!_loopbackHttp)
+
+        foreach (var rule in _rules.Value)
         {
+            if (rule.Refuses(normalized!) is not { } refused) continue;
             normalized = null;
-            problem = $"it is http on a loopback host outside Development, in environment '{_environment ?? KoanEnv.EnvironmentName}'; " +
-                      "an http origin is accepted only on a loopback host in Development, where the AT Protocol's localhost " +
-                      "client profile exists, so here it must be https";
+            problem = refused;
             return false;
         }
         return true;

@@ -121,7 +121,9 @@ an accepted URL as it validates the key, keeps it through the store and holds it
 absolute URL derives from it, whatever `Host` says, with no restart. An accepted URL is an origin: a path is mounted
 when the host starts, so it is configured. It is https, or http on a loopback host in Development, because an issuer
 must be https and an AT Protocol client is https or, in Development only, the localhost profile; `Accept` refuses any
-other origin before the store sees it. Tokens, atproto sign-ins and atproto sessions issued under the previous URL
+other origin before the store sees it, and any origin a capability active in the host cannot use
+(`IApplicationUrlRule`), such as an atproto client's on a port of its own. `WouldAccept` asks without accepting, so an
+application offers only what it can keep. Tokens, atproto sign-ins and atproto sessions issued under the previous URL
 end as they would after a restart with the new one configured. A stored URL this host cannot use — set up in
 Development on `http://127.0.0.1:5220`, then started in Production — never stops the start: Koan says so once, treats
 it as nothing accepted and leaves the store alone, and the next accepted URL replaces it, so moving a place between

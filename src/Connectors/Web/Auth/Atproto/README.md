@@ -45,9 +45,12 @@ Declare the application's public URL once; the client-metadata URL and the callb
 With `ApplicationUrl` set to `https://your-app.example`, the connector serves and advertises
 `https://your-app.example/auth/atproto/client-metadata.json` and uses the callback
 `https://your-app.example/auth/atproto/callback`; under `https://your-app.example/app` both sit under
-`/app`. A loopback `http://localhost:<port>` base URL derives the AT Protocol localhost development
+`/app`. The AT Protocol's client id carries no port, so without an explicit `ClientId` an https base URL on
+another port names no client: a configured one refuses the start, and an application cannot accept one. A loopback
+`http://localhost:<port>` base URL derives the AT Protocol localhost development
 profile, in Development only. `Providers:atproto:ClientId` remains an explicit override of the metadata
-URL, which must still end in `/auth/atproto/client-metadata.json`. Without `ApplicationUrl`, the URL the
+URL, which must still end in `/auth/atproto/client-metadata.json`, on the default port; the provider
+returns each sign-in to the callback on that same host and port. Without `ApplicationUrl`, the URL the
 application accepted at runtime stands in for it and is read at use, so accepting another moves the client identity
 on the next request (WEB-0081); with neither, the identity derives from the request where Koan derives the base URL
 (Development, and Staging, Test and CI with a notice), and in Production only under the application's

@@ -57,7 +57,9 @@ expansion no adapter can serve fails closed with `422`; a response past the safe
   configured (none when a configured URL wins), the derived fact summary names it, and the store is never written; the
   next `Accept` replaces it. `KoanWebBaseUrl.Accept` validates with the same
   `TryParse`, refuses a path and any origin that is not https or, under `KoanEnv.Gate.DevelopmentOnly`, http on a
-  loopback host (`Uri.IsLoopback`, the test the atproto client identity uses), saves through the store and then
+  loopback host (`Uri.IsLoopback`, the test the atproto client identity uses), then asks every `IApplicationUrlRule` in
+  DI, resolved at first use because a rule may depend on what depends on the base URL; `WouldAccept` answers the same
+  check without accepting. It saves through the store and then
   publishes the value (`Volatile`), one accept at a time; `Load` applies the same rule;
   `Resolve` answers configured, accepted, derived. `Current` is the configured-or-accepted value, `CanAccept` whether a
   store is registered, `DerivesFromRequests` whether Koan derives one from the request here. The base URL states the

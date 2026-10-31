@@ -97,9 +97,29 @@ public sealed class StaleClientIdentity
         Assert.Null((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
     }
 
+    [Fact]
+    public async Task Under_a_base_url_that_names_no_client_the_stored_session_reads_as_absent()
+    {
+        await using var world = await World.Start(current: "https://second.example:8443");
+
+        Assert.Null(await world.Sessions.GetSessionMetadata(Did, TestContext.Current.CancellationToken));
+        Assert.NotNull((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
+    }
+
+    [Fact]
+    public async Task Under_a_base_url_that_names_no_client_disconnect_removes_the_stored_session()
+    {
+        await using var world = await World.Start(current: "https://second.example:8443");
+
+        await world.Sessions.Disconnect(Did, TestContext.Current.CancellationToken);
+
+        Assert.Null((await world.Store.Read(Did, TestContext.Current.CancellationToken))?.Grant);
+        Assert.Equal(World.ClientOf(FirstUrl), world.Provider.Revoked!["client_id"].ToString());
+    }
+
     /// <summary>
     /// Sessions in Development whose base URL was <see cref="FirstUrl"/> when <see cref="Did"/> signed in with broader
-    /// scopes, and is now <see cref="SecondUrl"/>.
+    /// scopes, and is now <see cref="SecondUrl"/> or the URL a test names.
     /// </summary>
     private sealed class World : IAsyncDisposable
     {
@@ -117,7 +137,7 @@ public sealed class StaleClientIdentity
 
         public static string ClientOf(string baseUrl) => baseUrl + Constants.Metadata;
 
-        public static async Task<World> Start(bool revocation = true)
+        public static async Task<World> Start(bool revocation = true, string current = SecondUrl)
         {
             var provider = await Provider.Start(revocation);
             var application = await TestStore.Start();
@@ -148,7 +168,7 @@ public sealed class StaleClientIdentity
                     AccessToken = "stale-access", RefreshToken = "stale-refresh", ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
                 },
             }, null, TestContext.Current.CancellationToken);
-            await baseUrl.Accept(SecondUrl, TestContext.Current.CancellationToken);
+            await baseUrl.Accept(current, TestContext.Current.CancellationToken);
 
             return new World(provider, store, network, sessions, application);
         }

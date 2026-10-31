@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Net;
 using System.Text.Json;
 using Koan.Core;
 using Koan.Core.Diagnostics;
@@ -7,6 +9,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace Koan.Web.Auth.Atproto.Tests;
@@ -101,6 +104,104 @@ public sealed class AcceptedClientIdentity
     }
 
     [Fact]
+    public async Task An_address_on_a_port_of_its_own_is_refused_before_the_store_and_the_client_stays()
+    {
+        var store = new MemoryApplicationUrlStore("https://place.example");
+        await using var host = await AtprotoHost.Start(store, "Production");
+        var baseUrl = host.Services.GetRequiredService<KoanWebBaseUrl>();
+
+        Assert.False(baseUrl.WouldAccept("https://place.example:8443", out var problem));
+        Assert.Contains("port", problem);
+        var failure = await Assert.ThrowsAsync<ArgumentException>(() => baseUrl.Accept("https://place.example:8443", TestContext.Current.CancellationToken));
+
+        Assert.Contains("https://place.example:8443", failure.Message);
+        Assert.Contains("ClientId", failure.Message);
+        Assert.Equal("https://place.example", store.Value);
+        var (clientId, _) = await host.Metadata();
+        Assert.Equal("https://place.example/auth/atproto/client-metadata.json", clientId);
+    }
+
+    [Fact]
+    public async Task In_production_a_stored_address_on_a_port_of_its_own_without_the_posture_refuses_the_start_as_nothing_accepted()
+    {
+        var start = () => AtprotoHost.Start(new MemoryApplicationUrlStore("https://place.example:8443"), "Production");
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(start);
+        Assert.Contains(Messages(failure), message => message.Contains("there is none") && message.Contains("accept it"));
+    }
+
+    [Fact]
+    public async Task In_production_a_stored_address_on_a_port_of_its_own_with_the_posture_starts_and_a_later_accept_names_the_client()
+    {
+        var store = new MemoryApplicationUrlStore("https://place.example:8443", derivesUntilAccepted: true);
+        await using var host = await AtprotoHost.Start(store, "Production");
+        var baseUrl = host.Services.GetRequiredService<KoanWebBaseUrl>();
+
+        Assert.Null(baseUrl.Accepted);
+        Assert.Equal("https://place.example:8443", store.Value);
+
+        await baseUrl.Accept("https://place.example", TestContext.Current.CancellationToken);
+
+        var (clientId, _) = await host.Metadata();
+        Assert.Equal("https://place.example/auth/atproto/client-metadata.json", clientId);
+    }
+
+    [Fact]
+    public async Task A_configured_url_on_a_port_of_its_own_refuses_the_start_naming_the_url_and_the_rule()
+    {
+        var start = () => AtprotoHost.Start(new MemoryApplicationUrlStore(null), "Production",
+            new() { ["Koan:Web:ApplicationUrl"] = "https://place.example:8443" });
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(start);
+        Assert.Contains(Messages(failure), message =>
+            message.Contains("https://place.example:8443") && message.Contains("no port") && message.Contains("Koan:Web:ApplicationUrl"));
+    }
+
+    [Fact]
+    public async Task With_an_explicit_client_id_an_address_on_a_port_of_its_own_is_accepted_and_the_client_stays()
+    {
+        const string configured = "https://place.example/auth/atproto/client-metadata.json";
+        var store = new MemoryApplicationUrlStore(null);
+        await using var host = await AtprotoHost.Start(store, "Production",
+            new() { ["Koan:Web:Auth:Providers:atproto:ClientId"] = configured });
+
+        await host.Services.GetRequiredService<KoanWebBaseUrl>().Accept("https://place.example:8443", TestContext.Current.CancellationToken);
+
+        Assert.Equal("https://place.example:8443", store.Value);
+        var (clientId, redirect) = await host.Metadata();
+        Assert.Equal(configured, clientId);
+        Assert.Equal("https://place.example/auth/atproto/callback", redirect);
+    }
+
+    [Fact]
+    public async Task With_the_provider_disabled_an_address_on_a_port_of_its_own_is_accepted_and_held()
+    {
+        var disabled = new Dictionary<string, string?> { ["Koan:Web:Auth:Providers:atproto:Enabled"] = "false" };
+        var store = new MemoryApplicationUrlStore("https://place.example:8443");
+        await using var host = await AtprotoHost.Start(store, "Production", disabled);
+        var baseUrl = host.Services.GetRequiredService<KoanWebBaseUrl>();
+
+        Assert.Equal("https://place.example:8443", baseUrl.Accepted);
+
+        await baseUrl.Accept("https://place.example:9443", TestContext.Current.CancellationToken);
+
+        Assert.Equal("https://place.example:9443", store.Value);
+    }
+
+    [Fact]
+    public async Task A_sign_in_on_a_derived_origin_with_a_port_answers_the_failure_and_logs_the_correction()
+    {
+        var log = new WarningLog();
+        await using var host = await AtprotoHost.Start(new MemoryApplicationUrlStore(null), logging: log);
+        using var client = host.Client(new Uri("https://place.example:8443"));
+
+        using var response = await client.GetAsync("/auth/atproto/challenge?identifier=alice.test&return=/", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(log.Messages, message => message.Contains("https://place.example:8443") && message.Contains("no port"));
+    }
+
+    [Fact]
     public async Task In_production_the_posture_defers_the_identity_to_the_request()
     {
         await using var host = await AtprotoHost.Start(new MemoryApplicationUrlStore(null, derivesUntilAccepted: true), "Production");
@@ -131,8 +232,7 @@ public sealed class AcceptedClientIdentity
 
         public async Task<(string ClientId, string Redirect)> Metadata()
         {
-            using var client = _host.GetTestClient();
-            client.BaseAddress = new Uri("http://localhost");
+            using var client = Client(new Uri("http://localhost"));
             using var response = await client.GetAsync("/auth/atproto/client-metadata.json", TestContext.Current.CancellationToken);
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -140,8 +240,15 @@ public sealed class AcceptedClientIdentity
                 document.RootElement.GetProperty("redirect_uris").EnumerateArray().Single().GetString()!);
         }
 
+        public HttpClient Client(Uri origin)
+        {
+            var client = _host.GetTestClient();
+            client.BaseAddress = origin;
+            return client;
+        }
+
         public static async Task<AtprotoHost> Start(
-            IApplicationUrlStore store, string environment = "Development", Dictionary<string, string?>? extra = null)
+            IApplicationUrlStore store, string environment = "Development", Dictionary<string, string?>? extra = null, ILoggerProvider? logging = null)
         {
             // The application's store, where the connector keeps its sessions and pending authorizations.
             var folder = Path.Combine(Path.GetTempPath(), "koan-atproto-" + Guid.NewGuid().ToString("N"));
@@ -167,6 +274,7 @@ public sealed class AcceptedClientIdentity
                     web.ConfigureServices(services =>
                     {
                         services.AddSingleton(store);
+                        if (logging is not null) services.AddSingleton(logging);
                         services.AddKoan();
                     });
                     web.Configure(_ => { });
@@ -200,6 +308,29 @@ public sealed class AcceptedClientIdentity
             if (current is AggregateException aggregate)
                 foreach (var inner in aggregate.InnerExceptions)
                     foreach (var message in Messages(inner)) yield return message;
+        }
+    }
+
+    private sealed class WarningLog : ILoggerProvider
+    {
+        private readonly ConcurrentQueue<string> _messages = new();
+
+        public IEnumerable<string> Messages => _messages;
+
+        public ILogger CreateLogger(string categoryName) => new Logger(_messages);
+
+        public void Dispose() { }
+
+        private sealed class Logger(ConcurrentQueue<string> messages) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Warning;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            {
+                if (logLevel >= LogLevel.Warning) messages.Enqueue(formatter(state, exception));
+            }
         }
     }
 

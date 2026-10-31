@@ -35,8 +35,11 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
         // Expected discovery/PAR failures must not disclose provider bodies or escape as HTTP 500. The person goes to
         // the application's failure landing with a sanitized code when one is named (WEB-0080), else to this page.
         var failure = exception is AtprotoSignInException known ? known.Failure : SignInFailure.Failed;
-        Logger.LogWarning("AT sign-in could not start ({Failure}; {FailureType}).",
-            SignInFailureReturn.Code(failure), (exception.InnerException ?? exception).GetType().Name);
+        if (exception is AtprotoClientIdentityException)
+            Logger.LogWarning("AT sign-in could not start ({Failure}): {Correction}", SignInFailureReturn.Code(failure), exception.Message);
+        else
+            Logger.LogWarning("AT sign-in could not start ({Failure}; {FailureType}).",
+                SignInFailureReturn.Code(failure), (exception.InnerException ?? exception).GetType().Name);
         if (SignInFailureReturn.Redirect(Context, properties, failure)) return;
         Response.StatusCode = StatusCodes.Status400BadRequest;
         Response.Headers.CacheControl = "no-store";

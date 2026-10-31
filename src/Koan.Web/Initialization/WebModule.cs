@@ -39,7 +39,8 @@ public sealed class WebModule : KoanModule
             sp.GetService<IHostEnvironment>(),
             sp.GetService<ILogger<Hosting.KoanWebBaseUrl>>(),
             sp.GetService<Hosting.IApplicationUrlStore>(),
-            sp.GetService<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>()));
+            sp.GetService<Koan.Core.Diagnostics.IKoanRuntimeFactRecorder>(),
+            () => sp.GetServices<Hosting.IApplicationUrlRule>()));
         // WEB-0081: the origins requests arrive on, noted at the head of the pipeline and held in memory, bounded.
         services.TryAddSingleton(sp => new Hosting.KoanWebOrigins(
             sp.GetRequiredService<Hosting.KoanWebBaseUrl>(),

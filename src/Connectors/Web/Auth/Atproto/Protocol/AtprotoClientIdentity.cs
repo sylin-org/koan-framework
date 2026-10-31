@@ -13,11 +13,17 @@ internal static class AtprotoClientIdentity
 {
     internal const string BaseUrlKey = "Koan:Web:ApplicationUrl";
 
+    /// <summary>Why an origin on a port of its own names no client, worded to follow "It is 'origin':".</summary>
+    internal const string OriginRefused =
+        "it is on a port of its own, and the AT Protocol names a client by a metadata URL with no port. " +
+        "Use this application's address on the default port, or set " + Constants.ProviderSection + ":ClientId to a client-metadata URL there";
+
     /// <summary>
-    /// The client-metadata URL for <paramref name="baseUrl"/>, or null when there is no base URL. An https base
-    /// yields <c>{base}/auth/atproto/client-metadata.json</c>. A loopback http base yields the AT Protocol
-    /// localhost development profile, whose <c>redirect_uri</c> is the IP-loopback callback under the base path;
-    /// that profile exists only in Development, so outside it an http base yields null.
+    /// The client-metadata URL for <paramref name="baseUrl"/>, or null when there is no base URL. An https base on the
+    /// default port yields <c>{base}/auth/atproto/client-metadata.json</c>; on another port it yields null, because the
+    /// AT Protocol's <c>client_id</c> carries no port. A loopback http base yields the AT Protocol localhost development
+    /// profile, whose <c>redirect_uri</c> is the IP-loopback callback under the base path; that profile exists only in
+    /// Development, so outside it an http base yields null.
     /// </summary>
     public static string? Derive(string? baseUrl, IReadOnlyList<string> scopes, bool development)
     {
@@ -26,7 +32,7 @@ internal static class AtprotoClientIdentity
         var path = configured.AbsolutePath.TrimEnd('/');
 
         if (configured.Scheme == Uri.UriSchemeHttps)
-            return configured.GetLeftPart(UriPartial.Authority) + path + Constants.Metadata;
+            return configured.IsDefaultPort ? configured.GetLeftPart(UriPartial.Authority) + path + Constants.Metadata : null;
 
         if (!development || configured.Scheme != Uri.UriSchemeHttp || !configured.IsLoopback) return null;
 
@@ -37,16 +43,17 @@ internal static class AtprotoClientIdentity
 
     /// <summary>
     /// The correction when no client identity can be derived: from no base URL at all, or from one that cannot name an AT
-    /// Protocol client (an http URL outside Development's loopback profile). <paramref name="acceptable"/> says whether the
+    /// Protocol client (an http URL outside Development's loopback profile, or https on a port of its own). <paramref name="acceptable"/> says whether the
     /// application could accept a URL instead (it keeps an accepted URL and nothing is configured).
     /// </summary>
     public static string Correction(string? baseUrl, bool acceptable)
         => (baseUrl is null
                ? "The AT Protocol client identity derives from the application's base URL, and there is none. "
-               : $"The application's base URL {baseUrl} cannot name an AT Protocol client: its client-metadata URL must be https, or loopback http in Development. ") +
-           $"Set {BaseUrlKey} to this application's public https URL" +
+               : $"The application's base URL {baseUrl} cannot name an AT Protocol client: its client-metadata URL must be https with no port, or loopback http in Development. ") +
+           $"Set {BaseUrlKey} to this application's public https URL on the default port" +
            (acceptable ? ", have the application accept it," : "") +
-           $" or set {Constants.ProviderSection}:ClientId to its absolute client-metadata URL.";
+           $" or set {Constants.ProviderSection}:ClientId to its absolute client-metadata URL on the default port; " +
+           $"the provider returns each sign-in to {Constants.Callback} on that same host and port.";
 
     /// <summary>
     /// The redirect URI the client identity implies: for an https metadata URL, the callback under the same
