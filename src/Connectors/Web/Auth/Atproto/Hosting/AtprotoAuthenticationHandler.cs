@@ -1,7 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Encodings.Web;
-using System.Text.Json;
 using Koan.Web.Auth.Connector.Atproto.Infrastructure;
 using Koan.Web.Auth.Connector.Atproto.Options;
 using Koan.Web.Auth.Connector.Atproto.Protocol;
@@ -59,12 +56,7 @@ internal sealed class AtprotoAuthenticationHandler(IOptionsMonitor<AtprotoAuthen
             var principal = await sessions.Complete(Request.QueryString.ToString(), Context.RequestAborted);
             var did = principal.FindFirst(AtprotoClaimTypes.Did)!.Value;
             if (identities is not null)
-                await identities.Link(new ExternalIdentity
-                {
-                    UserId = did, Provider = Constants.Provider,
-                    ProviderKeyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(did))),
-                    ClaimsJson = JsonSerializer.Serialize(new { did, handle = principal.FindFirst(AtprotoClaimTypes.Handle)?.Value })
-                }, Context.RequestAborted);
+                await identities.Link(AtprotoSessions.External(did, principal.FindFirst(AtprotoClaimTypes.Handle)?.Value), Context.RequestAborted);
             properties.Items.Remove(Constants.RequestedScopes);
             properties.Items.Remove(AuthConstants.Items.FailurePath);
             return HandleRequestResult.Success(new AuthenticationTicket(principal, properties, Scheme.Name));

@@ -14,5 +14,6 @@
     <ProjectReference Include="../../../../Koan.Web.Auth/Koan.Web.Auth.csproj" />
     <PackageReference Include="CarpaNet.OAuth" VersionOverride="1.1.0-alpha.5" />
     <PackageReference Include="DnsClient" VersionOverride="1.8.0" />
+    <PackageReference Include="BouncyCastle.Cryptography" VersionOverride="2.7.0" />
   </ItemGroup>
 </Project>

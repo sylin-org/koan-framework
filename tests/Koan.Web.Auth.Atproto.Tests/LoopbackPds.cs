@@ -15,6 +15,8 @@ internal sealed class LoopbackPds : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly ConcurrentDictionary<string, string> _handles = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, object> _signingKeys = new(StringComparer.Ordinal);
+    private int _documentReads;
     private readonly Dictionary<string, Grant> _grants = new(StringComparer.Ordinal);
     private readonly object _gate = new();
     private int _issued;
@@ -106,6 +108,16 @@ internal sealed class LoopbackPds : IAsyncDisposable
 
     /// <summary>An account this PLC directory resolves, with its PDS and authorization server here.</summary>
     public void Account(string did, string handle) => _handles[did] = handle;
+
+    /// <summary>The verification method <paramref name="did"/>'s document carries, or none when null.</summary>
+    public void SigningKey(string did, object? method)
+    {
+        if (method is null) _signingKeys.TryRemove(did, out _);
+        else _signingKeys[did] = method;
+    }
+
+    /// <summary>How many DID documents this directory served.</summary>
+    public int DocumentReads => Volatile.Read(ref _documentReads);
 
     /// <summary>A grant for <paramref name="did"/> whose current tokens are the ones given, as a sign-in left it.</summary>
     public void Seed(string did, string access, string refresh)
@@ -200,13 +212,17 @@ internal sealed class LoopbackPds : IAsyncDisposable
     private IResult Document(string rest)
     {
         if (_handles.TryGetValue(rest, out var handle))
+        {
+            Interlocked.Increment(ref _documentReads);
             return Results.Json(new
             {
                 id = rest,
                 alsoKnownAs = new[] { "at://" + handle },
-                verificationMethod = Array.Empty<object>(),
+                verificationMethod = _signingKeys.TryGetValue(rest, out var method) ? new[] { method } : [],
                 service = new[] { new { id = "#atproto_pds", type = "AtprotoPersonalDataServer", serviceEndpoint = Origin } },
             });
+        }
+
         return rest switch
         {
             ".well-known/oauth-protected-resource" => Results.Json(new { resource = Origin, authorization_servers = new[] { Origin } }),

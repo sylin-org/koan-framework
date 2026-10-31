@@ -702,3 +702,5 @@
       href: SEC-0032-access-opens-on-proof-and-revocation-reaches.md
     - name: SEC-0033 The authorization server's protocol is the host's, and a person's rows stay in their tenant
       href: SEC-0033-the-authorization-server-stands-under-closed-tenancy.md
+    - name: SEC-0034 An inbound atproto service-auth token proves its issuer, in the connector that resolves DIDs
+      href: SEC-0034-a-service-auth-token-proves-its-issuer.md

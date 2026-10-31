@@ -146,6 +146,28 @@ are per process.
   where the store allows it; elsewhere it is read again by its key and deleted only if it is
   still that version, which leaves the window WEB-0082 names. Every process may sweep.
 
+## Service-auth tokens
+
+`AtprotoServiceAuth` verifies an inbound service-auth token (SEC-0034) with no session, no grant and no row. `Read` takes the token
+apart with no network: at most 8192 characters, three base64url parts, JSON objects with no duplicate names, `typ` of
+`JWT`, no `crit`, a `kid` if any of `#atproto`; `alg` of ES256 or ES256K; `iss` exactly `did:plc:` and 24 base32 characters,
+or `did:web:` and a plain lowercase host with no path, with `%3A` and a port only for an exact development origin the
+transport allows; `aud` and `lxm` ordinally what the caller asked; `exp` in the future and at most five minutes away, `iat` before
+it, no more than five minutes before and at most 30 seconds ahead, `nbf` passed. Every wrong kind of value throws from its
+JSON accessor and reads as `Malformed`. Only then does `AtprotoSessions.ResolveDid` read the issuer's document, through the
+guarded transport. An `IdentityResolutionException` wraps what the resolver met: a directory that answered 4xx makes the
+issuer `IssuerUnknown`, and a connection, a timeout or a 5xx or 429 makes it `IssuerUnreachable`.
+
+`AtprotoSigningKey` takes the one `#atproto` verification method the document controls, as a Multikey (`e7 01` secp256k1,
+`80 24` P-256, a compressed point) or a 2019 key type (a raw point), bounded base58btc, and checks a compact 64-byte low-S
+ECDSA signature over the SHA-256 of the ASCII `header.payload` through BouncyCastle. The key's curve must be what `alg`
+says. `exp` is read again after resolving. `SignIn` is what the callback of a browser's sign-in does once it has a verified
+identity, through the same `AtprotoSessions.Principal` and `External`: it links the external identity and calls
+`SignInAsync` on the cookie scheme, so the cookie's `OnSigningIn` runs every sign-in contributor. The event reads the
+provider from the callback's path, so it sees none here. `VerifiedHandle` is the check a sign-in makes: the handle the document names, when it resolves back to
+the DID. `WebDid` derives a did:web from a base URL: its host, every loopback address as `localhost`, a port other than the
+default as `%3A<port>`, and each path segment after a colon.
+
 ## Clients
 
 A restored or signed-in SDK client is cached per DID in a `ClientCache` of `CachedClients`
@@ -213,7 +235,10 @@ Evidence boundaries:
   a row this application cannot read failing only its DID, a sign-in replacing a claimed grant,
   a provider-ended grant, a checked disconnect and one that ended nothing, the paged sweep,
   pruning on DuckDB, which deletes nothing conditionally, the client cache's bound, eviction
-  and disposal, and streamed responses at every limit from 0 to `long.MaxValue` (WEB-0082). The
+  and disposal, and streamed responses at every limit from 0 to `long.MaxValue` (WEB-0082);
+  service-auth tokens signed with real keys on both curves against the official atproto vectors
+  and a captured PLC signature, each refusal before any lookup, and the sign-in a verified token
+  ends in (SEC-0034). The
   destructive provider lifecycle test is skipped unless explicitly enabled. The generic
   sample additionally passed real correlation/issuer/state/replay, cookie sign-in and actual
   process-restart checks. Redacted receipts are in `evidence/`.

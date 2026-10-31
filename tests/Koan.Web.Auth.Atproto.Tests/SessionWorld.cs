@@ -28,7 +28,8 @@ internal sealed class SessionWorld : IAsyncDisposable
     public LoopbackPds Pds { get; }
     public string[] Dids { get; }
 
-    public static string Did(int number) => "did:plc:" + number.ToString().PadLeft(24, 'a');
+    /// <summary>A did:plc in its exact form: 24 base32 characters, the number's digits written as letters.</summary>
+    public static string Did(int number) => "did:plc:" + string.Concat(number.ToString().Select(digit => (char)('a' + (digit - '0')))).PadLeft(24, 'a');
 
     public static string HandleOf(string did) => did["did:plc:".Length..] + ".test";
 

@@ -86,6 +86,44 @@ public sealed class AtprotoSessions
         if (document.Id != did) throw new InvalidOperationException("Resolved AT DID document identifier mismatch.");
         return document;
     }
+    /// <summary>Who a verified AT identity signs in as, whichever way it was verified.</summary>
+    internal static ClaimsPrincipal Principal(string did, string? handle)
+    {
+        var claims = new ClaimsIdentity(Constants.Provider);
+        claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, did));
+        claims.AddClaim(new Claim("sub", did));
+        claims.AddClaim(new Claim(AtprotoClaimTypes.Did, did));
+        if (handle is not null) { claims.AddClaim(new Claim(AtprotoClaimTypes.Handle, handle)); claims.AddClaim(new Claim(ClaimTypes.Name, handle)); }
+        return new ClaimsPrincipal(claims);
+    }
+
+    /// <summary>The external identity a verified AT identity links, whichever way it was verified.</summary>
+    internal static ExternalIdentity External(string did, string? handle) => new()
+    {
+        UserId = did, Provider = Constants.Provider,
+        ProviderKeyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(did))),
+        ClaimsJson = JsonSerializer.Serialize(new { did, handle }),
+    };
+
+    /// <summary>Whether the transport reaches <paramref name="host"/> on <paramref name="port"/>, which only an exact
+    /// development origin does.</summary>
+    internal bool AdmitsPort(string host, string port)
+        => network.DevelopmentOrigin(new Uri($"https://{host}:{port}")) || network.DevelopmentOrigin(new Uri($"http://{host}:{port}"));
+
+    /// <summary>The handle <paramref name="document"/> names, when that handle resolves back to its DID. An identity does not
+    /// depend on it: a handle that does not resolve is simply no handle.</summary>
+    internal async Task<string?> VerifiedHandle(DidDocument document, CancellationToken ct)
+    {
+        if (document.Handle is not { } handle) return null;
+        if (development && options.DevelopmentHandles.TryGetValue(handle, out var mapped)) return mapped == document.Id ? handle : null;
+        try
+        {
+            using var resolver = Resolver(document.Id);
+            return (await resolver.ResolveAsync(handle, ct)).Id == document.Id ? handle : null;
+        }
+        catch (Exception error) when (error is not OperationCanceledException) { return null; }
+    }
+
     // The SDK reads and consumes pending authorizations through the store, and writes sessions only to a capture: the
     // connector stores a grant itself, conditionally.
     private OAuthSession OAuth(string clientId, string scope, string did, SessionCapture sessions) => new(new OAuthClientConfig
@@ -112,18 +150,7 @@ public sealed class AtprotoSessions
         if (metadata.Issuer != issuer || string.IsNullOrWhiteSpace(metadata.PushedAuthorizationRequestEndpoint))
             throw new AtprotoSignInException(SignInFailure.ProviderUnreachable, "AT authorization server metadata is inconsistent or lacks required PAR.");
         foreach (var endpoint in new[] { metadata.AuthorizationEndpoint, metadata.TokenEndpoint, metadata.PushedAuthorizationRequestEndpoint }) network.Validate(new Uri(endpoint!));
-        string? verifiedHandle = null;
-        if (document.Handle is { } handle)
-        {
-            if (development && options.DevelopmentHandles.TryGetValue(handle, out var mappedHandle))
-            { if (mappedHandle == document.Id) verifiedHandle = handle; }
-            else
-            {
-                try { if ((await resolver.ResolveAsync(handle, ct)).Id == document.Id) verifiedHandle = handle; }
-                catch (Exception error) when (error is not OperationCanceledException) { /* DID sign-in does not depend on an optional display handle. */ }
-            }
-        }
-        return (document.Id, verifiedHandle, pds.TrimEnd('/'), issuer);
+        return (document.Id, await VerifiedHandle(document, ct), pds.TrimEnd('/'), issuer);
     }
 
     internal async Task<string> Start(string identifier, AuthenticationProperties properties, string protectedProperties, CancellationToken ct)
@@ -338,12 +365,7 @@ public sealed class AtprotoSessions
                 clients.Admit(client.Did, new AtprotoClient(clientId, committed.Row.Grant!, identity.Pds, identity.Issuer, oauth, client, capture)).Dispose();
                 cached = true;
             }
-            var claims = new ClaimsIdentity(Constants.Provider);
-            claims.AddClaim(new Claim(ClaimTypes.NameIdentifier, identity.Did));
-            claims.AddClaim(new Claim("sub", identity.Did));
-            claims.AddClaim(new Claim(AtprotoClaimTypes.Did, identity.Did));
-            if (identity.Handle is { } handle) { claims.AddClaim(new Claim(AtprotoClaimTypes.Handle, handle)); claims.AddClaim(new Claim(ClaimTypes.Name, handle)); }
-            return new ClaimsPrincipal(claims);
+            return Principal(identity.Did, identity.Handle);
         }
         finally
         {

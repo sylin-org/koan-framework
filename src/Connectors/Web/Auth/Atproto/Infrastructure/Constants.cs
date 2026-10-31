@@ -45,4 +45,13 @@ internal static class Constants
     /// <summary>How often expired pending authorizations and sessions are swept, and how many rows each read takes.</summary>
     internal static readonly TimeSpan SweepInterval = TimeSpan.FromMinutes(10);
     internal const int SweepPageSize = 100;
+
+    /// <summary>The longest service-auth token read.</summary>
+    internal const int ServiceAuthLongestToken = 8192;
+
+    /// <summary>The longest life a service-auth token may claim.</summary>
+    internal static readonly TimeSpan ServiceAuthLongestLife = TimeSpan.FromMinutes(5);
+
+    /// <summary>How far ahead of this clock a service-auth token may say it was issued.</summary>
+    internal static readonly TimeSpan ServiceAuthIssuedAhead = TimeSpan.FromSeconds(30);
 }

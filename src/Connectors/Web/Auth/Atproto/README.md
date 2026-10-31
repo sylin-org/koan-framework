@@ -140,6 +140,22 @@ the same streaming limit while the caller owns headers and credential context.
 `AtprotoSessions.ResolveDid(did, ct)` returns the SDK DID document after an exact
 identifier check. Neither API exposes stored OAuth secrets or the raw HttpClient.
 
+## Verify an inbound service-auth token
+
+Inject `AtprotoServiceAuth` to know that a token came from a DID, for this service and this method, and to sign that DID
+in with no browser (SEC-0034):
+
+```csharp
+var proof = await serviceAuth.Verify(token, audience, "org.example.signIn", ct);
+if (proof.Verified) await serviceAuth.SignIn(HttpContext, proof);
+```
+
+`audience` is exactly what the token's `aud` must say, such as `AtprotoServiceAuth.WebDid(baseUrl) + "#service"`, and it
+comes from the application's own address, never a request's. Every refusal is an `Outcome`; `IssuerUnreachable` alone says
+nothing about the token, so a new attempt can pass. `SignIn` ends as a browser's sign-in does, with the same cookie session
+and every sign-in contributor. A token verifies each time it is presented until it expires, about a minute for one a PDS
+mints; an application that needs one use claims `jti` itself.
+
 ## Guarantees and boundaries
 
 ### Custody and processes
