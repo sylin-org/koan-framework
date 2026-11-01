@@ -8,7 +8,7 @@ namespace Koan.Media.Core.Tests.Specs.Svg;
 /// MEDIA-0006 end-to-end: source = SVG bytes, terminal = raster encoder.
 /// Exercises the SVG pre-decode branch in <c>MediaPipeline.ToBytesAsync</c>
 /// + the planner's implicit Vector → Raster Rasterize step + the
-/// Svg.Skia adapter + the existing ImageSharp encode pass. These tests
+/// Svg.Skia adapter + the raster encode pass. These tests
 /// don't open Skia themselves — they prove the whole chain stitches up.
 /// </summary>
 public sealed class SvgPipelineIntegrationSpec
@@ -43,7 +43,7 @@ public sealed class SvgPipelineIntegrationSpec
         // The planner sees Vector + Resize(640, 640) + EncodeAs("webp"):
         // webp accepts Raster only, so the planner forward-derives an
         // implicit Rasterize step at (640, 640). The executor calls
-        // SvgRasterizer.RenderToPng, then ImageSharp re-encodes to WebP.
+        // SvgRasterizer.RenderToPng, then the raster chain re-encodes to WebP.
         await using var src = SvgStream(BlackSquare100());
         var output = await src.AsMedia()
             .ResizeFit(640, 640)
@@ -113,11 +113,11 @@ public sealed class SvgPipelineIntegrationSpec
         // boundary without forward-deriving a Rasterize step. The SVG
         // executor's ResolveRasterizeTarget detects no implicit step and
         // falls back to the SVG's intrinsic viewBox (100x100) — the
-        // Skia render produces a 100x100 PNG, which ImageSharp re-emits
+        // Skia render produces a 100x100 PNG, which the raster chain re-emits
         // via the implicit format-preserving encoder pass.
         //
         // Net behavior: a no-step SVG pipeline rasterizes at intrinsic
-        // size and returns PNG bytes (PNG is what Skia emits; ImageSharp
+        // size and returns PNG bytes (PNG is what Skia emits; the raster chain
         // sees a PNG decoded from the rasterizer output and preserves
         // format).
         await using var src = SvgStream(BlackSquare100());

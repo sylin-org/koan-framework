@@ -54,26 +54,32 @@ public static class OverlayCompositor
         if (rendered is null) return; // resolver returned null; layer skipped
 
         // 1) scale per OverlaySize spec (against host's longest edge).
-        rendered = Replace(rendered, ScaleLayer(rendered, host.Width, host.Height, layer.Size));
-
-        // 2) rotate (bounds expand for non-orthogonal rotations).
-        rendered = Replace(rendered, FrameTransforms.Rotate(rendered, layer.Rotate));
-
-        using (rendered)
+        try
         {
+            rendered = Replace(rendered, ScaleLayer(rendered, host.Width, host.Height, layer.Size, limits));
+
+            // 2) rotate (bounds expand for non-orthogonal rotations).
+            var (rotatedW, rotatedH) = FrameTransforms.RotatedSize(rendered.Width, rendered.Height, layer.Rotate);
+            MediaDecoder.EnsureOutputFits(limits, rotatedW, rotatedH);
+            rendered = Replace(rendered, FrameTransforms.Rotate(rendered, layer.Rotate));
+
             // 3) resolve anchor + padding using the final rendered dimensions.
             var (drawX, drawY) = ComputeAnchor(host.Width, host.Height, rendered.Width, rendered.Height, layer.Position, layer.Padding);
 
             // 4) composite onto every frame of the host.
-            using var image = SKImage.FromBitmap(rendered);
+            using var image = FrameTransforms.View(rendered);
             var alpha = (byte)Math.Round(Math.Clamp(layer.Opacity, 0.0, 1.0) * byte.MaxValue);
-            host.Map(frame =>
+            host.Map(host.Width, host.Height, frame =>
             {
                 using var canvas = new SKCanvas(frame);
                 using var paint = new SKPaint { Color = SKColors.White.WithAlpha(alpha) };
                 canvas.DrawImage(image, drawX, drawY, new SKSamplingOptions(SKFilterMode.Nearest), paint);
                 return frame;
             }, ct);
+        }
+        finally
+        {
+            rendered.Dispose();
         }
     }
 
@@ -97,7 +103,7 @@ public static class OverlayCompositor
             case MediaOverlaySource media:
                 return await RenderMediaSourceAsync(media, resolver, limits, currentDepth, logger, ct).ConfigureAwait(false);
             case TextOverlaySource text:
-                return RenderTextSource(text, fonts);
+                return RenderTextSource(text, fonts, limits);
             default:
                 throw new InvalidOperationException(
                     $"Unsupported overlay source type: {layer.Source.GetType().Name}");
@@ -135,7 +141,7 @@ public static class OverlayCompositor
         return first.Bitmap;
     }
 
-    private static SKBitmap RenderTextSource(TextOverlaySource source, KoanFontRegistry? fonts)
+    private static SKBitmap RenderTextSource(TextOverlaySource source, KoanFontRegistry? fonts, MediaPipelineLimits limits)
     {
         if (fonts is null || !fonts.HasAny)
         {
@@ -152,7 +158,7 @@ public static class OverlayCompositor
                 $"Registered: [{string.Join(", ", fonts.Names)}].");
         }
 
-        return TextRenderer.Render(ApplyTextTemplate(source.Text), typeface, source.FontSize, source.Color ?? BackgroundColor.White);
+        return TextRenderer.Render(ApplyTextTemplate(source.Text), typeface, source.FontSize, source.Color ?? BackgroundColor.White, limits);
     }
 
     private static string ApplyTextTemplate(string template)
@@ -164,7 +170,7 @@ public static class OverlayCompositor
                 StringComparison.Ordinal);
     }
 
-    private static SKBitmap ScaleLayer(SKBitmap source, int hostWidth, int hostHeight, OverlaySize size)
+    private static SKBitmap ScaleLayer(SKBitmap source, int hostWidth, int hostHeight, OverlaySize size, MediaPipelineLimits limits)
     {
         switch (size.Kind)
         {
@@ -176,6 +182,7 @@ public static class OverlayCompositor
                 var scale = (double)targetLongest / sourceLongest;
                 var w = Math.Max(1, (int)Math.Round(source.Width * scale));
                 var h = Math.Max(1, (int)Math.Round(source.Height * scale));
+                MediaDecoder.EnsureOutputFits(limits, w, h);
                 return FrameTransforms.Scale(source, w, h);
             }
 
@@ -185,6 +192,7 @@ public static class OverlayCompositor
                 var h = size.Height > 0
                     ? size.Height
                     : (int)Math.Round(source.Height * ((double)w / source.Width));
+                MediaDecoder.EnsureOutputFits(limits, Math.Max(1, w), Math.Max(1, h));
                 return FrameTransforms.Scale(source, Math.Max(1, w), Math.Max(1, h));
             }
 

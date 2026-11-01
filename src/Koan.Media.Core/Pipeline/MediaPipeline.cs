@@ -327,6 +327,7 @@ public sealed class MediaPipeline : IMediaPipeline
         var plan = PlanOrThrow(probe, _steps);
 
         var (targetW, targetH) = ResolveRasterizeTarget(plan, probe);
+        MediaDecoder.EnsureOutputFits(_limits, targetW, targetH);
         var pngBytes = SvgRasterizer.RenderToPng(svgBytes, targetW, targetH);
 
         // Strip the implicit Rasterize step before re-entering the raster
@@ -557,6 +558,7 @@ public sealed class MediaPipeline : IMediaPipeline
 
             var plan = PlanOrThrow(svgProbe, branch.Steps);
             var (targetW, targetH) = ResolveRasterizeTarget(plan, svgProbe);
+            MediaDecoder.EnsureOutputFits(_limits, targetW, targetH);
 
             if (!rasterCache.TryGetValue((targetW, targetH), out var pngBytes))
             {
@@ -656,7 +658,11 @@ public sealed class MediaPipeline : IMediaPipeline
             switch (step)
             {
                 case AutoOrientStep ao when !ao.Keep:
-                    image.Map(frame => FrameTransforms.Orient(frame, image.Origin), ct);
+                {
+                    var (orientedW, orientedH) = FrameTransforms.OrientedSize(image.Width, image.Height, image.Origin);
+                    image.Map(orientedW, orientedH, frame => FrameTransforms.Orient(frame, image.Origin), ct);
+                    break;
+                }
                     break;
                 case AutoOrientStep:
                     // Keep — no-op
@@ -673,10 +679,14 @@ public sealed class MediaPipeline : IMediaPipeline
                     ApplyTrim(image, trim);
                     break;
                 case RotateStep rs:
-                    image.Map(frame => FrameTransforms.Rotate(frame, rs.Degrees), ct);
+                {
+                    var (rotatedW, rotatedH) = FrameTransforms.RotatedSize(image.Width, image.Height, rs.Degrees);
+                    image.Map(rotatedW, rotatedH, frame => FrameTransforms.Rotate(frame, rs.Degrees), ct);
+                    break;
+                }
                     break;
                 case FlipStep fs:
-                    image.Map(frame => FrameTransforms.Flip(frame, fs.Axis), ct);
+                    image.Map(image.Width, image.Height, frame => FrameTransforms.Flip(frame, fs.Axis), ct);
                     break;
                 case ShapeStep shape:
                     pendingShape = shape;
@@ -720,7 +730,7 @@ public sealed class MediaPipeline : IMediaPipeline
         // profile is the one thing that survives unless it is stripped.
         if (pendingStrip is not null && pendingStrip.Kinds.HasFlag(MetadataKinds.Icc))
         {
-            image.Map(FrameTransforms.DropColorProfile, ct);
+            image.Map(image.Width, image.Height, FrameTransforms.DropColorProfile, ct);
         }
 
         // Resolve encode step. Implicit format-preserving encode if none declared.
@@ -878,7 +888,7 @@ public sealed class MediaPipeline : IMediaPipeline
         if (shape?.Crop is { } crop)
         {
             var area = CropArea(image.Width, image.Height, crop, shape.Position);
-            image.Map(frame => FrameTransforms.Crop(frame, area), ct);
+            image.Map(area.Width, area.Height, frame => FrameTransforms.Crop(frame, area), ct);
         }
 
         if (resize is not { } rz) return;
@@ -899,25 +909,19 @@ public sealed class MediaPipeline : IMediaPipeline
             case Fit.None:
                 return;
             case Fit.Fill:
-                image.Map(frame => FrameTransforms.Scale(frame, targetW, targetH), ct);
+                image.Map(targetW, targetH, frame => FrameTransforms.Scale(frame, targetW, targetH), ct);
                 return;
             case Fit.Cover:
             {
                 var (scaledW, scaledH, offsetX, offsetY) = ResizePlan.Cover(currentW, currentH, targetW, targetH);
                 var box = SKRectI.Create(offsetX, offsetY, targetW, targetH);
-                image.Map(frame =>
-                {
-                    var scaled = FrameTransforms.Scale(frame, scaledW, scaledH);
-                    var cropped = FrameTransforms.Crop(scaled, box);
-                    if (!ReferenceEquals(cropped, scaled) && !ReferenceEquals(scaled, frame)) scaled.Dispose();
-                    return cropped;
-                }, ct);
+                image.Map(targetW, targetH, frame => FrameTransforms.ScaleToBox(frame, scaledW, scaledH, box), ct);
                 return;
             }
             default:
             {
                 var (fitW, fitH) = ResizePlan.Contain(currentW, currentH, targetW, targetH);
-                image.Map(frame => FrameTransforms.Scale(frame, fitW, fitH), ct);
+                image.Map(fitW, fitH, frame => FrameTransforms.Scale(frame, fitW, fitH), ct);
                 return;
             }
         }

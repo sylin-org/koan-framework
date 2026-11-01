@@ -91,7 +91,7 @@ public sealed class SourceLimitsSpec
         var limits = new MediaPipelineLimits { MaxSourceMegapixels = 1, MaxFrameCount = 2 };
         var act = async () => await src.AsMedia(limits: limits).ToBytesAsync();
         var ex = await act.Should().ThrowAsync<MediaSourceLimitException>();
-        // Megapixel check runs first per LoadOrThrowAsync ordering. Source
+        // Megapixel check runs first per the header check's ordering. Source
         // is under the MP cap, so the FRAME cap is what fires.
         ex.Which.LimitName.Should().Be("maxFrameCount");
     }

@@ -11,20 +11,26 @@ namespace Koan.Media.Core.Pipeline;
 /// <remarks>
 /// Output rows are processed in chunks in parallel. Each chunk holds a window of horizontally resampled source
 /// rows, at most one kernel tall: the buffer is <c>16 × target width × kernel rows</c> bytes per worker, however
-/// tall the source is.
+/// tall the source is. A box computes only the pixels it keeps of the scaled picture, with the same result as
+/// scaling all of it and cropping, so a cover at an extreme aspect allocates the output and no more.
 /// </remarks>
 internal static class Resampler
 {
     private const int Channels = 4;
     private const double Radius = 2.0;
 
-    public static SKBitmap Resize(SKBitmap source, int width, int height)
+    public static SKBitmap Resize(SKBitmap source, int width, int height) =>
+        Resize(source, width, height, SKRectI.Create(0, 0, width, height));
+
+    /// <summary>The <paramref name="box"/> of <paramref name="source"/> scaled to <paramref name="scaledWidth"/> by <paramref name="scaledHeight"/>.</summary>
+    public static SKBitmap Resize(SKBitmap source, int scaledWidth, int scaledHeight, SKRectI box)
     {
+        var (width, height) = (box.Width, box.Height);
         var target = RasterImage.Allocate(width, height, source.ColorSpace);
         try
         {
-            var (xStart, xWeights) = Contributions(source.Width, width);
-            var (yStart, yWeights) = Contributions(source.Height, height);
+            var (xStart, xWeights) = Contributions(source.Width, scaledWidth, box.Left, width);
+            var (yStart, yWeights) = Contributions(source.Height, scaledHeight, box.Top, height);
             var windowRows = yWeights.Max(w => w.Length);
             var chunk = Math.Max(16, height / Math.Max(1, Environment.ProcessorCount * 2));
 
@@ -112,16 +118,16 @@ internal static class Resampler
 
     private static byte ToByte(float value) => (byte)Math.Clamp(value + 0.5f, 0f, 255f);
 
-    private static (int[] Start, float[][] Weights) Contributions(int source, int target)
+    private static (int[] Start, float[][] Weights) Contributions(int source, int target, int first, int count)
     {
         var ratio = (double)source / target;
         var scale = Math.Max(ratio, 1.0);
         var radius = Radius * scale;
-        var start = new int[target];
-        var weights = new float[target][];
-        for (var i = 0; i < target; i++)
+        var start = new int[count];
+        var weights = new float[count][];
+        for (var i = 0; i < count; i++)
         {
-            var center = (i + 0.5) * ratio - 0.5;
+            var center = (first + i + 0.5) * ratio - 0.5;
             var low = Math.Max(0, (int)Math.Ceiling(center - radius));
             var high = Math.Min(source - 1, (int)Math.Floor(center + radius));
             var kernel = new float[high - low + 1];

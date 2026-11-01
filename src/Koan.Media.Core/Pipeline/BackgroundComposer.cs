@@ -41,14 +41,14 @@ internal static class BackgroundComposer
         };
         var (x, y) = AnchorOffset(canvasW, canvasH, image.Width, image.Height, shape.Position);
 
-        image.Map(frame =>
+        image.Map(canvasW, canvasH, frame =>
         {
             var canvas = bg.Kind == BackgroundKind.Blur
                 ? BuildBlurCanvas(frame, canvasW, canvasH, bg.BlurRadius)
                 : RasterImage.Allocate(canvasW, canvasH, frame.ColorSpace);
             using var draw = new SKCanvas(canvas);
             if (bg.Kind != BackgroundKind.Blur) draw.Clear(fill);
-            using var foreground = SKImage.FromBitmap(frame);
+            using var foreground = FrameTransforms.View(frame);
             draw.DrawImage(foreground, x, y, new SKSamplingOptions(SKFilterMode.Nearest));
             return canvas;
         }, ct);
@@ -118,14 +118,16 @@ internal static class BackgroundComposer
             : Math.Max(8, Math.Min(width, height) / 24);
 
         var (scaledW, scaledH, offsetX, offsetY) = ResizePlan.Cover(source.Width, source.Height, width, height);
-        var scaled = FrameTransforms.Scale(source, scaledW, scaledH);
+        var scaled = FrameTransforms.ScaleToBox(source, scaledW, scaledH, SKRectI.Create(offsetX, offsetY, width, height));
 
         var canvas = RasterImage.Allocate(width, height, source.ColorSpace);
         using var draw = new SKCanvas(canvas);
         using var blur = SKImageFilter.CreateBlur(effectiveRadius, effectiveRadius, SKShaderTileMode.Clamp);
         using var paint = new SKPaint { ImageFilter = blur };
-        using var image = SKImage.FromBitmap(scaled);
-        draw.DrawImage(image, -offsetX, -offsetY, new SKSamplingOptions(SKFilterMode.Nearest), paint);
+        using (var image = FrameTransforms.View(scaled))
+        {
+            draw.DrawImage(image, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest), paint);
+        }
         if (!ReferenceEquals(scaled, source)) scaled.Dispose();
         return canvas;
     }

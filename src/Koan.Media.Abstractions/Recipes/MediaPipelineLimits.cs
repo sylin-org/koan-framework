@@ -25,6 +25,13 @@ public sealed record MediaPipelineLimits
     /// </summary>
     public long MaxSourceBytes { get; init; }
 
+    /// <summary>
+    /// Reject a render whose frames would grow past this many pixels in total: width times height times
+    /// frames, on every step that produces frames. A render that does not grow is held by the source limits
+    /// instead. Zero = the engine's own ceiling of 512 megapixels.
+    /// </summary>
+    public int MaxOutputMegapixels { get; init; }
+
     public static MediaPipelineLimits Unlimited { get; } = new();
 
     /// <summary>Convenience for the documented MEDIA-0004 §13 defaults.</summary>
@@ -33,6 +40,7 @@ public sealed record MediaPipelineLimits
         MaxSourceMegapixels = 100,
         MaxFrameCount = 600,
         MaxSourceBytes = 256L * 1024 * 1024,
+        MaxOutputMegapixels = 256,
     };
 }
 

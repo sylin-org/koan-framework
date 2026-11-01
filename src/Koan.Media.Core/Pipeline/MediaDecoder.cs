@@ -24,7 +24,24 @@ internal static class MediaDecoder
     /// </summary>
     public const int MaxDecodedMegapixels = 512;
 
+    /// <summary>The most pixels a render's frames may grow to when the caller's limits name no lower cap.</summary>
+    public const int MaxOutputMegapixels = MaxDecodedMegapixels;
+
     private const int ReadChunkBytes = 81_920;
+
+    /// <summary>
+    /// Refuse, before anything is allocated, frames that would take more than the output limit.
+    /// <paramref name="heldPixels"/> is what the render already holds: a step that does not grow it is bounded
+    /// by the limits that admitted the source.
+    /// </summary>
+    public static void EnsureOutputFits(MediaPipelineLimits limits, int width, int height, int frames = 1, long heldPixels = 0)
+    {
+        var pixels = width * (long)height * frames;
+        if (pixels <= heldPixels) return;
+        var cap = limits.MaxOutputMegapixels > 0 ? Math.Min(limits.MaxOutputMegapixels, MaxOutputMegapixels) : MaxOutputMegapixels;
+        var megapixels = (long)Math.Ceiling(pixels / 1_000_000.0);
+        if (megapixels > cap) throw new MediaSourceLimitException("maxOutputMegapixels", megapixels, cap);
+    }
 
     /// <summary>Buffer the whole source, refusing it as soon as it passes the byte limit.</summary>
     public static async Task<byte[]> ReadSourceAsync(Stream source, MediaPipelineLimits limits, CancellationToken ct)
@@ -69,7 +86,7 @@ internal static class MediaDecoder
         var colorSpace = TaggedColorSpace(codec);
 
         var frames = new List<RasterFrame>(info.FrameCount);
-        var image = new RasterImage(info, codec.EncodedOrigin, frames);
+        var image = new RasterImage(info, codec.EncodedOrigin, frames, limits);
         try
         {
             if (codec.FrameCount <= 1)

@@ -93,6 +93,110 @@ public sealed class TextOverlaySpec
         }
     }
 
+    private static async Task<TestImage> OnHost(KoanFontRegistry fonts, string text, Position position)
+    {
+        await using var host = Fixtures.SolidPng(900, 300, new Rgba(0, 0, 0));
+        var output = await host.AsMedia(fonts: fonts)
+            .OverlayText(text, fontSize: 48, position: position)
+            .EncodeAs("png")
+            .ToBytesAsync();
+        return TestImage.Load(output.Bytes);
+    }
+
+    private static (int Left, int Top, int Right, int Bottom) Ink(TestImage img)
+    {
+        int left = int.MaxValue, top = int.MaxValue, right = -1, bottom = -1;
+        for (var y = 0; y < img.Height; y++)
+        {
+            for (var x = 0; x < img.Width; x++)
+            {
+                if (img[x, y].R <= 128) continue;
+                left = Math.Min(left, x); right = Math.Max(right, x);
+                top = Math.Min(top, y); bottom = Math.Max(bottom, y);
+            }
+        }
+        return (left, top, right, bottom);
+    }
+
+    /// <summary>The columns where two renders of the same layout differ.</summary>
+    private static (int Min, int Max) DifferingColumns(TestImage a, TestImage b)
+    {
+        int min = int.MaxValue, max = -1;
+        for (var y = 0; y < a.Height; y++)
+        {
+            for (var x = 0; x < a.Width; x++)
+            {
+                if (a[x, y].R == b[x, y].R) continue;
+                min = Math.Min(min, x);
+                max = Math.Max(max, x);
+            }
+        }
+        return (min, max);
+    }
+
+    [Fact]
+    public async Task An_anchor_places_the_words_not_the_fonts_box()
+    {
+        var fonts = Fonts();
+
+        using var topLeft = await OnHost(fonts, "Mending", Position.TopLeft);
+        var ink = Ink(topLeft);
+        ink.Left.Should().BeInRange(2, 9, "a small margin and the first letter's bearing");
+        ink.Top.Should().BeInRange(2, 12, "a small margin and the room above a capital");
+
+        using var bottomRight = await OnHost(fonts, "Mending", Position.BottomRight);
+        ink = Ink(bottomRight);
+        (899 - ink.Right).Should().BeLessThanOrEqualTo(1);
+        (299 - ink.Bottom).Should().BeLessThanOrEqualTo(1);
+
+        using var center = await OnHost(fonts, "Mending", Position.Center);
+        ink = Ink(center);
+        ((ink.Left + ink.Right) / 2.0).Should().BeApproximately(449.5, 4);
+        ((ink.Top + ink.Bottom) / 2.0).Should().BeApproximately(149.5, 6);
+    }
+
+    [Fact]
+    public async Task A_descender_is_not_clipped()
+    {
+        // The tail of a g at the bottom-right anchor stays on the canvas, below where an o ends.
+        var fonts = Fonts();
+        using var g = await OnHost(fonts, "g", Position.TopLeft);
+        using var o = await OnHost(fonts, "o", Position.TopLeft);
+        (Ink(g).Bottom - Ink(o).Bottom).Should().BeGreaterThan(5);
+    }
+
+    [Fact]
+    public async Task A_mark_at_the_end_of_an_arabic_word_stays_on_its_letter()
+    {
+        // abc [ktab] def: the word runs right to left, so its last letter and that letter's damma are at its left end.
+        var fonts = Fonts();
+        using var without = await OnHost(fonts, "abc \u0643\u062A\u0627\u0628 def", Position.TopLeft);
+        using var with = await OnHost(fonts, "abc \u0643\u062A\u0627\u0628\u064F def", Position.TopLeft);
+        using var before = await OnHost(fonts, "abc", Position.TopLeft);
+        using var upToWord = await OnHost(fonts, "abc \u0643\u062A\u0627\u0628", Position.TopLeft);
+
+        var (wordLeft, wordRight) = (Ink(before).Right, Ink(upToWord).Right);
+        var (min, max) = DifferingColumns(without, with);
+
+        min.Should().BeGreaterThan(wordLeft, "the mark is inside the word");
+        max.Should().BeLessThan((wordLeft + wordRight) / 2, "the mark is on the word's last letter, at its left end");
+    }
+
+    [Fact]
+    public async Task A_mark_on_a_latin_word_in_a_right_to_left_line_stays_on_its_letter()
+    {
+        // [ktab] cafe\u0301 [ktab]: the Latin word reads forward in the middle, so the acute is on its right side.
+        var fonts = Fonts();
+        using var without = await OnHost(fonts, "\u0643\u062A\u0627\u0628 cafe \u0643\u062A\u0627\u0628", Position.TopLeft);
+        using var with = await OnHost(fonts, "\u0643\u062A\u0627\u0628 cafe\u0301 \u0643\u062A\u0627\u0628", Position.TopLeft);
+
+        var ink = Ink(without);
+        var (min, max) = DifferingColumns(without, with);
+
+        ((min + max) / 2.0).Should().BeGreaterThan((ink.Left + ink.Right) / 2.0, "the e ends the Latin word; a stray mark lands left of its c");
+        (max - min).Should().BeLessThan(40, "one letter's mark, not a shifted word");
+    }
+
     [Fact]
     public async Task A_line_feed_starts_a_new_line()
     {

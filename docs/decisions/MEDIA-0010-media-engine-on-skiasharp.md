@@ -20,7 +20,7 @@ Replaces the engine underneath MEDIA-0004. Amends MEDIA-0004 (the pure-managed c
 |---|---|
 | **Inputs** | JPEG, PNG, WebP, GIF, BMP, ICO and WBMP bytes, seekable or not, and SVG through MEDIA-0006. |
 | **Outputs** | JPEG, PNG and WebP; animation on WebP only. Exif, XMP, IPTC and format text never appear in an output. A color profile other than sRGB does, unless stripped. |
-| **Error modes** | `MediaDecodeException` (422) for anything unreadable and for any decode that does not finish with `Success`; `MediaSourceLimitException` (400) from the header, before any pixel is allocated; a boot failure for a recipe pinning an unwritable format; a 404 for a shortcut seed naming one; `format=` naming one is reported as ignored, or a 400 in strict mode. |
+| **Error modes** | `MediaDecodeException` (422) for anything unreadable and for any decode that does not finish with `Success`; `MediaSourceLimitException` (400) from the header, or for output frames over `MaxOutputMegapixels`, before any pixel is allocated; a boot failure for a recipe pinning an unwritable format; a 404 for a shortcut seed naming one; `format=` naming one is reported as ignored, or a 400 in strict mode. |
 | **Success criteria** | A Release build and a single-file publish succeed with no licence key. No project references the previous engine. Reductions match the previous default sampler (PSNR 93.0–100.1 through the old and new pipelines). The native library, and the shaper's, load on a chiseled image as its non-root user. |
 
 ## Context
@@ -49,6 +49,12 @@ The source is read into memory first, asynchronously and cancellably: `MaxSource
 
 Frames are premultiplied RGBA8888. A 16-bit PNG reduces to 8 bits per channel.
 
+### Output limit
+
+A very small source can ask for very large frames: 3 KB of 16x16 WebP, 60 frames, into a 4096x4096 canvas is 4 GiB. `MaxOutputMegapixels` bounds what a render's frames may grow to in total, width times height times frames: 256 MP in `Defaults` and in Web (1 GiB of frames), with a ceiling of 512 MP when no limit is named. Every step that produces frames names their size to `RasterImage.Map`, which checks before the first is allocated; overlay layers and an SVG's rasterize target take the same check. Over it, the request gets `MediaSourceLimitException` (`maxOutputMegapixels`, HTTP 400). A step that does not grow the render is held by the source limits instead, so a large animation served at its own size still passes. At HTTP an overlay's pixel size also falls under `MaxOutputEdge`.
+
+Cover computes only the box it keeps of the scaled picture, with the same result as scaling all of it and cropping, so an extreme aspect allocates the output and no more. Drawing a layer or a frame takes a view of its pixels, not a copy.
+
 ### Formats
 
 | Source or request | What happens |
@@ -73,7 +79,7 @@ Stripping the profile converts the pixels to sRGB, so the picture looks the same
 
 ### Text
 
-Overlay text is split into lines on line feeds, each line into runs of one script and direction, and each run shaped by HarfBuzz; runs then reorder by level. Direction resolution follows the Unicode bidirectional algorithm where titles need it and does not interpret embedding controls. Arabic, combining marks and mixed titles render as they did under the previous engine, and descenders that it clipped no longer are. Fonts stay registered and loaded by file path, and nothing depends on a system font. There is still no fallback between fonts: a glyph the registered font lacks draws as that font's missing glyph.
+Overlay text is split into lines on line feeds, each line into runs of one script and direction, and each run shaped by HarfBuzz; runs then reorder by level. Direction resolution follows the Unicode bidirectional algorithm where titles need it and does not interpret embedding controls. A mark stays in its base character's run. The layer runs from a small margin to the far edge of the ink, so an anchor places the words as the previous engine did, within 4 px in the measured case. Descenders that it clipped no longer are. Fonts stay registered and loaded by file path, and nothing depends on a system font. There is still no fallback between fonts: a glyph the registered font lacks draws as that font's missing glyph.
 
 An SVG `<text>` is drawn by Svg.Skia through system fonts. On a host with none it draws nothing, with no error.
 

@@ -9,14 +9,39 @@ namespace Koan.Media.Core.Pipeline;
 /// </summary>
 internal static class FrameTransforms
 {
+    /// <summary>The size a frame has once <paramref name="origin"/> is applied.</summary>
+    public static (int Width, int Height) OrientedSize(int width, int height, SKEncodedOrigin origin) =>
+        origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom
+            ? (height, width)
+            : (width, height);
+
+    /// <summary>The size a frame has once rotated: a right angle swaps or keeps it, any other angle grows it.</summary>
+    public static (int Width, int Height) RotatedSize(int width, int height, int degrees)
+    {
+        var normalized = ((degrees % 360) + 360) % 360;
+        if (normalized % 90 == 0) return normalized is 90 or 270 ? (height, width) : (width, height);
+        var radians = normalized * Math.PI / 180.0;
+        var (sin, cos) = (Math.Abs(Math.Sin(radians)), Math.Abs(Math.Cos(radians)));
+        return ((int)Math.Ceiling(width * cos + height * sin), (int)Math.Ceiling(width * sin + height * cos));
+    }
+
+    /// <summary>
+    /// A drawable view of a bitmap's pixels with no copy of them. The bitmap must outlive it and must not change
+    /// while it is in use, which holds for every source here: a canvas draws onto a different bitmap.
+    /// </summary>
+    public static SKImage View(SKBitmap bitmap)
+    {
+        using var pixels = bitmap.PeekPixels();
+        return SKImage.FromPixels(pixels);
+    }
+
     /// <summary>Apply a declared orientation, so the stored pixels become the picture as it was meant to be seen.</summary>
     public static SKBitmap Orient(SKBitmap source, SKEncodedOrigin origin)
     {
         if (origin == SKEncodedOrigin.TopLeft) return source;
-        var swap = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
-            or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+        var (width, height) = OrientedSize(source.Width, source.Height, origin);
         var (w, h) = ((float)source.Width, (float)source.Height);
-        return Draw(source, swap ? source.Height : source.Width, swap ? source.Width : source.Height, canvas =>
+        return Draw(source, width, height, canvas =>
         {
             switch (origin)
             {
@@ -40,21 +65,17 @@ internal static class FrameTransforms
         var normalized = ((degrees % 360) + 360) % 360;
         if (normalized == 0) return source;
         var (w, h) = ((float)source.Width, (float)source.Height);
+        var (width, height) = RotatedSize(source.Width, source.Height, normalized);
 
         if (normalized % 90 == 0)
         {
-            var swap = normalized != 180;
-            return Draw(source, swap ? source.Height : source.Width, swap ? source.Width : source.Height, canvas =>
+            return Draw(source, width, height, canvas =>
             {
                 canvas.Translate(normalized == 270 ? 0 : normalized == 90 ? h : w, normalized == 90 ? 0 : normalized == 270 ? w : h);
                 canvas.RotateDegrees(normalized);
             });
         }
 
-        var radians = normalized * Math.PI / 180.0;
-        var (sin, cos) = (Math.Abs(Math.Sin(radians)), Math.Abs(Math.Cos(radians)));
-        var width = (int)Math.Ceiling(source.Width * cos + source.Height * sin);
-        var height = (int)Math.Ceiling(source.Width * sin + source.Height * cos);
         return Draw(source, width, height, canvas =>
         {
             canvas.Translate(width / 2f, height / 2f);
@@ -100,6 +121,12 @@ internal static class FrameTransforms
     public static SKBitmap Scale(SKBitmap source, int width, int height) =>
         source.Width == width && source.Height == height ? source : Resampler.Resize(source, width, height);
 
+    /// <summary>The box of the picture scaled to <paramref name="scaledWidth"/> by <paramref name="scaledHeight"/>; only the box is computed.</summary>
+    public static SKBitmap ScaleToBox(SKBitmap source, int scaledWidth, int scaledHeight, SKRectI box) =>
+        source.Width == scaledWidth && source.Height == scaledHeight
+            ? Crop(source, box)
+            : Resampler.Resize(source, scaledWidth, scaledHeight, box);
+
     /// <summary>Convert to sRGB and drop the profile, so the picture looks the same without it.</summary>
     public static SKBitmap DropColorProfile(SKBitmap source)
     {
@@ -121,7 +148,7 @@ internal static class FrameTransforms
         var target = RasterImage.Allocate(width, height, source.ColorSpace);
         using var canvas = new SKCanvas(target);
         place(canvas);
-        using var image = SKImage.FromBitmap(source);
+        using var image = View(source);
         canvas.DrawImage(image, 0, 0, sampling ?? new SKSamplingOptions(SKFilterMode.Nearest));
         return target;
     }

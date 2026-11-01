@@ -44,14 +44,21 @@ public sealed class CancellationSpec
     [Fact]
     public async Task Cancellation_is_honoured_between_frames()
     {
-        // Overlay resolution hands control back mid-render; the frame loop after it must observe the token.
-        await using var host = Fixtures.AnimatedWebp(frames: 4, width: 40, height: 40);
-        var overlay = await Fixtures.Snapshot(Fixtures.SolidPng(8, 8, Rgba.Red));
+        // A step's work on one frame runs to its end; the next frame must not start.
+        var bytes = await Fixtures.Snapshot(Fixtures.AnimatedWebp(frames: 4, width: 40, height: 40));
+        using var image = MediaDecoder.Decode(bytes, MediaPipelineLimits.Unlimited, CancellationToken.None);
         using var cts = new CancellationTokenSource();
-        var resolver = new CancellingOverlayResolver(cts, overlay);
+        var transformed = 0;
 
-        var act = async () => await host.AsMedia(overlayResolver: resolver).Overlay("logo").ToBytesAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        var act = () => image.Map(image.Width, image.Height, frame =>
+        {
+            transformed++;
+            cts.Cancel();
+            return frame;
+        }, cts.Token);
+
+        act.Should().Throw<OperationCanceledException>();
+        transformed.Should().Be(1);
     }
 
     [Fact]
@@ -146,15 +153,6 @@ public sealed class CancellationSpec
         {
             if (disposing) _inner.Dispose();
             base.Dispose(disposing);
-        }
-    }
-
-    private sealed class CancellingOverlayResolver(CancellationTokenSource cts, byte[] overlay) : IOverlayResolver
-    {
-        public Task<Stream?> OpenAsync(MediaOverlaySource source, int depth, CancellationToken ct)
-        {
-            cts.Cancel();
-            return Task.FromResult<Stream?>(new MemoryStream(overlay));
         }
     }
 

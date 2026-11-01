@@ -63,7 +63,7 @@ public sealed class MediaControllerSpec
     {
         await using var server = await MediaTestServer.StartAsync();
         // Synthesize "video bytes" - an MP4 magic header is enough to
-        // make ImageSharp reject them as not-an-image. The body is
+        // make the decoder reject them as not-an-image. The body is
         // arbitrary; we only need round-trip fidelity, not playable
         // video.
         var fakeMp4 = new byte[] {

@@ -312,6 +312,7 @@ public sealed class MediaController : ControllerBase
                         MaxSourceMegapixels = _options.MaxSourceMegapixels,
                         MaxFrameCount = _options.MaxFrameCount,
                         MaxSourceBytes = _options.MaxSourceBytes,
+                        MaxOutputMegapixels = _options.MaxOutputMegapixels,
                     })
                     .Apply(effectiveRecipe)
                     .WriteToAsync(buffer, ct)
@@ -515,6 +516,15 @@ public sealed class MediaController : ControllerBase
             {
                 if (crop.Width > maxEdge) { offending = crop.Width; return true; }
                 if (crop.Height > maxEdge) { offending = crop.Height; return true; }
+            }
+            if (step is OverlayStep overlay)
+            {
+                foreach (var layer in overlay.Layers)
+                {
+                    if (layer.Size.Kind != OverlaySizeKind.Pixels) continue;
+                    if (layer.Size.Width > maxEdge) { offending = layer.Size.Width; return true; }
+                    if (layer.Size.Height > maxEdge) { offending = layer.Size.Height; return true; }
+                }
             }
         }
         return false;

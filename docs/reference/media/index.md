@@ -203,6 +203,7 @@ Under `Koan:Media:Web`:
 | `MaxSourceMegapixels` | `100` | source pixel limit; `0` disables |
 | `MaxFrameCount` | `600` | source frame limit; `0` disables |
 | `MaxSourceBytes` | `268435456` | source bytes one render buffers (256 MiB); `0` means the engine's ceiling of 1 GiB |
+| `MaxOutputMegapixels` | `256` | pixels a render's frames may grow to, width × height × frames; `0` means the engine's ceiling of 512 |
 | `StrictUnknownParams` | `false` | reject rather than report unknown query parameters |
 | `AllowAdHoc` | `true` | allow requests without a named recipe |
 | `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | response cache policy |

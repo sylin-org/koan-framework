@@ -10,11 +10,14 @@ namespace Koan.Media.Core.Pipeline;
 /// </summary>
 internal sealed class RasterImage : IDisposable
 {
-    public RasterImage(MediaInfo info, SKEncodedOrigin origin, List<RasterFrame> frames)
+    private readonly MediaPipelineLimits _limits;
+
+    public RasterImage(MediaInfo info, SKEncodedOrigin origin, List<RasterFrame> frames, MediaPipelineLimits limits)
     {
         Info = info;
         Origin = origin;
         Frames = frames;
+        _limits = limits;
     }
 
     /// <summary>The source as its header declared it.</summary>
@@ -29,9 +32,14 @@ internal sealed class RasterImage : IDisposable
 
     public int Height => Frames[0].Bitmap.Height;
 
-    /// <summary>Replace every frame with its transform, honouring the token between frames.</summary>
-    public void Map(Func<SKBitmap, SKBitmap> transform, CancellationToken ct)
+    /// <summary>
+    /// Replace every frame with its transform, honouring the token between frames. Every step that produces
+    /// frames comes through here and names the size they will have, so the output limit is checked in one place,
+    /// before the first of them is allocated.
+    /// </summary>
+    public void Map(int width, int height, Func<SKBitmap, SKBitmap> transform, CancellationToken ct)
     {
+        MediaDecoder.EnsureOutputFits(_limits, width, height, Frames.Count, Width * (long)Height * Frames.Count);
         foreach (var frame in Frames)
         {
             ct.ThrowIfCancellationRequested();
@@ -50,7 +58,7 @@ internal sealed class RasterImage : IDisposable
     }
 
     public RasterImage Clone() =>
-        new(Info, Origin, Frames.Select(f => new RasterFrame(Copy(f.Bitmap), f.DurationMs)).ToList());
+        new(Info, Origin, Frames.Select(f => new RasterFrame(Copy(f.Bitmap), f.DurationMs)).ToList(), _limits);
 
     public void Dispose()
     {

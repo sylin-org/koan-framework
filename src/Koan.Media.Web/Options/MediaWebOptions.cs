@@ -30,6 +30,12 @@ public sealed class MediaWebOptions
     public long MaxSourceBytes { get; set; } = 256L * 1024 * 1024;
 
     /// <summary>
+    /// Hard cap on the pixels a render's frames may grow to in total, width times height
+    /// times frames. Default 256MP (1 GiB of frames). Set 0 for the engine's own ceiling of 512MP.
+    /// </summary>
+    public int MaxOutputMegapixels { get; set; } = 256;
+
+    /// <summary>
     /// When true, unknown query params return 400. When false (default),
     /// they're surfaced via <c>X-Koan-Media-IgnoredParams</c>.
     /// </summary>

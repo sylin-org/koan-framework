@@ -19,7 +19,7 @@ internal static class TextRenderer
 
     private const int Margin = 2;
 
-    public static SKBitmap Render(string text, SKTypeface typeface, float size, BackgroundColor color)
+    public static SKBitmap Render(string text, SKTypeface typeface, float size, BackgroundColor color, MediaPipelineLimits limits)
     {
         using var font = new SKFont(typeface, size)
         {
@@ -34,8 +34,10 @@ internal static class TextRenderer
             .ToList();
         var widest = lines.Max(l => l.Width);
 
+        // Pen positions run from the top-left of the first line's box, the ascent above its baseline.
         using var builder = new SKTextBlobBuilder();
-        var baseline = 0f;
+        var ink = SKRect.Empty;
+        var baseline = -font.Metrics.Ascent;
         foreach (var line in lines)
         {
             var x = line.RightToLeft ? widest - line.Width : 0f;
@@ -43,16 +45,21 @@ internal static class TextRenderer
             {
                 var points = run.Points.Select(p => new SKPoint(x + p.X, baseline + p.Y)).ToArray();
                 builder.AddPositionedRun(run.Glyphs, font, points);
+                ink = Union(ink, GlyphInk(run.Glyphs, points, font));
                 x += run.Width;
             }
             baseline += font.Spacing;
         }
 
-        using var blob = builder.Build();
-        var bounds = blob?.Bounds ?? SKRect.Empty;
-        var width = Math.Min(MaxEdge, (int)Math.Ceiling(bounds.Width) + Margin * 2);
-        var height = Math.Min(MaxEdge, (int)Math.Ceiling(bounds.Height) + Margin * 2);
+        // The layer is the line box from a small margin down to the far edge of the ink, so an anchor places the
+        // words, not the font's box: nothing trails the ink, and ink past the near edge moves the pen rather than clip.
+        var penX = Margin + Math.Max(0f, -ink.Left - Margin);
+        var penY = Margin + Math.Max(0f, -ink.Top - Margin);
+        var width = LayerEdge(ink.IsEmpty ? Margin * 2 : penX + ink.Right);
+        var height = LayerEdge(ink.IsEmpty ? Margin * 2 : penY + ink.Bottom);
+        Pipeline.MediaDecoder.EnsureOutputFits(limits, width, height);
 
+        using var blob = builder.Build();
         var bitmap = Pipeline.RasterImage.Allocate(width, height, colorSpace: null);
         if (blob is null) return bitmap;
         using var canvas = new SKCanvas(bitmap);
@@ -61,9 +68,30 @@ internal static class TextRenderer
             IsAntialias = true,
             Color = new SKColor(color.R, color.G, color.B, color.A),
         };
-        canvas.DrawText(blob, Margin - bounds.Left, Margin - bounds.Top, paint);
+        canvas.DrawText(blob, penX, penY, paint);
         return bitmap;
     }
+
+    private static int LayerEdge(float edge) => (int)Math.Clamp(Math.Ceiling((double)edge), 1, MaxEdge);
+
+    private static SKRect GlyphInk(ushort[] glyphs, SKPoint[] points, SKFont font)
+    {
+        var widths = new float[glyphs.Length];
+        var boxes = new SKRect[glyphs.Length];
+        font.GetGlyphWidths(glyphs, widths, boxes);
+        var ink = SKRect.Empty;
+        for (var i = 0; i < glyphs.Length; i++)
+        {
+            if (boxes[i].IsEmpty) continue;
+            var box = boxes[i];
+            box.Offset(points[i]);
+            ink = Union(ink, box);
+        }
+        return ink;
+    }
+
+    private static SKRect Union(SKRect a, SKRect b) =>
+        a.IsEmpty ? b : b.IsEmpty ? a : SKRect.Union(a, b);
 
     private static ShapedLine ShapeLine(string line, SKShaper shaper, SKFont font)
     {
@@ -90,13 +118,13 @@ internal static class TextRenderer
     /// Direction resolution for one line, following the Unicode bidirectional algorithm where titles need it:
     /// the paragraph takes the direction of its first strong character, numbers keep left-to-right order inside
     /// right-to-left text, neutrals between two like directions join them and otherwise take the paragraph's,
-    /// and runs reorder level by level. Embedding controls are not interpreted.
+    /// marks stay with their base character, and runs reorder level by level. Embedding controls are not interpreted.
     /// </summary>
     private static class TextRuns
     {
         internal readonly record struct Run(int Start, int Length, int Level, Script Script);
 
-        private enum Class { Left, Right, Number, Neutral }
+        private enum Class { Left, Right, Number, Neutral, Mark }
 
         public static (List<Run> Runs, bool RightToLeft) Split(string line)
         {
@@ -111,7 +139,13 @@ internal static class TextRenderer
             }
 
             var rightToLeft = units.Select(u => u.Class).FirstOrDefault(c => c is Class.Left or Class.Right, Class.Left) == Class.Right;
-            var levels = Resolve(units.Select(u => u.Class).ToArray(), rightToLeft);
+            var classes = units.Select(u => u.Class).ToArray();
+            for (var i = 0; i < classes.Length; i++)
+            {
+                // A mark belongs to its base character, so it takes that character's class and stays in its run.
+                if (classes[i] == Class.Mark) classes[i] = i > 0 ? classes[i - 1] : rightToLeft ? Class.Right : Class.Left;
+            }
+            var levels = Resolve(classes, rightToLeft);
 
             var runs = new List<Run>();
             var inherited = Script.Common;
@@ -136,10 +170,14 @@ internal static class TextRenderer
 
         private static Class Classify(Rune rune, Script script)
         {
-            if (script == Script.Common || script == Script.Inherited || script == Script.Unknown)
+            if (script == Script.Inherited || (script == Script.Common && IsMark(rune))) return Class.Mark;
+            if (script == Script.Common || script == Script.Unknown)
                 return Rune.IsDigit(rune) ? Class.Number : Class.Neutral;
             return script.HorizontalDirection == Direction.RightToLeft ? Class.Right : Class.Left;
         }
+
+        private static bool IsMark(Rune rune) => Rune.GetUnicodeCategory(rune)
+            is System.Globalization.UnicodeCategory.NonSpacingMark or System.Globalization.UnicodeCategory.EnclosingMark;
 
         private static int[] Resolve(Class[] classes, bool rightToLeft)
         {
