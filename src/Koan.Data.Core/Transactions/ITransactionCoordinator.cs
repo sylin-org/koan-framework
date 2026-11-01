@@ -35,9 +35,18 @@ public interface ITransactionCoordinator
 
     /// <summary>
     /// Run <paramref name="action"/> once the scope's commit has succeeded, for work that must not be seen before the
-    /// data is. It does not run after a rollback. A failure is logged and changes nothing, because the commit stands.
+    /// data is. It does not run after a rollback. It runs outside the scope, on the scope's route, so a write it makes
+    /// stands on its own. A failure is logged and changes nothing, because the commit stands.
     /// </summary>
     void AfterCommit(Func<CancellationToken, Task> action);
+
+    /// <summary>
+    /// Run <paramref name="action"/> once a hold's native transaction has ended, however it ended: a commit, a rollback, a
+    /// failed commit or the hold's limit; at once when it already has. It runs before <see cref="AfterCommit"/>'s work, for
+    /// what must be kept for exactly as long as the hold lasts. A failure is logged. A deferred scope holds nothing, and
+    /// refuses with a <see cref="NotSupportedException"/>.
+    /// </summary>
+    void WhenHoldEnds(Action action);
 
     /// <summary>
     /// Track an entity save operation for deferred execution.

@@ -6,7 +6,8 @@ namespace Koan.Identity.Roles;
 /// The compiled state role authorization reads: one bag per person (and one for the anonymous visitor), each
 /// resource's role overwrites, and each person's own overwrite on a resource or its absence. Each is single-flight,
 /// invalidated by generation, and sized by a capacity past which it evicts an entry nothing has read lately; a warm
-/// read is cache-only.
+/// read is cache-only. A flow inside a hold compiles what it reads from the hold's own rows and leaves the maps alone: those
+/// rows may yet roll back, and every other flow is right to read what is committed (SEC-0036).
 /// </summary>
 public sealed class RoleBagCache
 {
@@ -23,10 +24,12 @@ public sealed class RoleBagCache
         _personOverwrites = new(_options.MaxCachedPersonOverwrites, CompilePersonOverwrite);
     }
 
-    public Task<RoleBag> Get(string personId, CancellationToken ct)
-        => _bags.Get(new BagKey(true, RoleContract.Require(personId, nameof(personId))), ct);
+    public Task<RoleBag> Get(string personId, CancellationToken ct) => Bag(new BagKey(true, RoleContract.Require(personId, nameof(personId))), ct);
 
-    internal Task<RoleBag> Anonymous(CancellationToken ct) => _bags.Get(BagKey.Anonymous, ct);
+    internal Task<RoleBag> Anonymous(CancellationToken ct) => Bag(BagKey.Anonymous, ct);
+
+    private Task<RoleBag> Bag(BagKey key, CancellationToken ct)
+        => RoleChangeGate.CurrentHold is null ? _bags.Get(key, ct) : CompileBag(key, ct);
 
     public void Invalidate(string personId) => _bags.Invalidate(new BagKey(true, personId));
     public void Invalidate(IEnumerable<string> people) { foreach (var person in people.Distinct(StringComparer.Ordinal)) Invalidate(person); }
@@ -55,11 +58,14 @@ public sealed class RoleBagCache
 
     /// <summary>A resource's role overwrites by role key, shared by every reader; never handed out as is.</summary>
     internal Task<IReadOnlyDictionary<string, PermissionOverwrite>> RoleOverwrites(string resourceId, CancellationToken ct)
-        => _roleOverwrites.Get(resourceId, ct);
+        => RoleChangeGate.CurrentHold is null ? _roleOverwrites.Get(resourceId, ct) : CompileRoleOverwrites(resourceId, ct);
 
     /// <summary>A person's own overwrite on a resource, or null; shared by every reader, never handed out as is.</summary>
     internal Task<PermissionOverwrite?> PersonOverwrite(string resourceId, string personId, CancellationToken ct)
-        => _personOverwrites.Get(new PersonOverwriteKey(resourceId, personId), ct);
+    {
+        var key = new PersonOverwriteKey(resourceId, personId);
+        return RoleChangeGate.CurrentHold is null ? _personOverwrites.Get(key, ct) : CompilePersonOverwrite(key, ct);
+    }
 
     /// <summary>Whether a person's bag is compiled now, without reading it.</summary>
     internal bool HoldsBag(string personId) => _bags.Contains(new BagKey(true, personId));

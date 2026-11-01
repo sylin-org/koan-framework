@@ -158,6 +158,12 @@ public sealed class RoleOptions
 
     /// <summary>The (resource, person) pairs whose own overwrite, or its absence, stays in memory.</summary>
     public int MaxCachedPersonOverwrites { get; set; } = 16_384;
+
+    /// <summary>
+    /// How long a hold's first role change waits for the role changes already under way before it refuses. It is short
+    /// because such a change can be waiting for the store the hold keeps, and then only the hold's end lets it finish.
+    /// </summary>
+    public TimeSpan HeldChangeWait { get; set; } = TimeSpan.FromSeconds(2);
 }
 
 public sealed record RolePage(IReadOnlyList<Role> Items, long TotalCount, int Page, int PageSize);
@@ -176,7 +182,8 @@ internal static class RoleContract
         if (options.MaxCachedBags is < 1 or > 100_000 || options.MaxRolesPerPerson is < 1 or > 10_000 ||
             options.MaxPermissionsPerRole is < 1 or > 10_000 || options.MaxMetadataEntries is < 0 or > 1_000 ||
             options.MaxPageSize is < 1 or > 1_000 || options.MaxCachedResources is < 1 or > 100_000 ||
-            options.MaxCachedPersonOverwrites is < 1 or > 1_000_000)
+            options.MaxCachedPersonOverwrites is < 1 or > 1_000_000 ||
+            options.HeldChangeWait <= TimeSpan.Zero || options.HeldChangeWait > TimeSpan.FromMinutes(1))
             throw new InvalidOperationException("Koan:Identity:Roles contains an invalid or unsafe bound.");
         return options;
     }

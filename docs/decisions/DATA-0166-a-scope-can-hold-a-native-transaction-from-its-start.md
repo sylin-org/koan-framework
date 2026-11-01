@@ -10,9 +10,14 @@ related:
   - DATA-0131
   - DATA-0158
   - DATA-0161
+amended_by: SEC-0036
 ---
 
 # DATA-0166: A scope can hold a native transaction from its start, on a route that declares it
+
+> **Amended by [SEC-0036](SEC-0036-a-role-change-joins-a-hold.md) (2026-11-01): a role change joins a hold.** Everything else
+> stands, the refusal of a transfer in rule 5 included. `ITransactionCoordinator` also gains `WhenHoldEnds`, and work
+> registered with `AfterCommit` runs outside the scope.
 
 Amends [DATA-0131](DATA-0131-a-transaction-defers-or-refuses-every-write.md) and
 [DATA-0158](DATA-0158-sqlite-posture-and-atomic-commit.md) for a scope that asks. Whoever does not ask keeps both unchanged.

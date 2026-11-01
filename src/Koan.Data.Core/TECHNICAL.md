@@ -360,8 +360,10 @@ validation:
   operation (`AdmitToHold`): a write must land on the held route, and once the hold has ended early a read refuses too. A
   timer ends a hold past `TransactionOptions.HoldLimit` from a flow of its own. `TransactionHold` enters the ambient context
   as the await completes, the pattern `GuardedOperationAwaitable` uses, so a hold that could not begin leaves nothing in
-  the caller's flow. Work that must follow the data registers with `ITransactionCoordinator.AfterCommit`; the Entity cache
-  retires its entries that way and reads past itself inside a hold, so no flow sees uncommitted rows through it.
+  the caller's flow. Work that must follow the data registers with `ITransactionCoordinator.AfterCommit` and runs outside
+  the scope, on its route; the Entity cache retires its entries that way and reads past itself inside a hold, so no flow sees
+  uncommitted rows through it. What must be kept exactly as long as a hold lasts registers with `WhenHoldEnds`, which runs
+  once, first, however the hold ended, the limit included; `RoleCollection` keeps other flows' role changes out that way.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

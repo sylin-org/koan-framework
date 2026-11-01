@@ -1012,6 +1012,7 @@ using (await EntityContext.Hold("reply", ct))
 | `SaveWithOutcome`, `Insert`, conditional writes, batches, instructions refuse | they run inside it, and a receipt reports `NotCommitted` until `Commit` |
 | a lifecycle handler and a unique index act at `Commit` | they act at the save, and the scope can go on after a conflict |
 | other writers are kept out only while `Commit` runs | other writers wait from the start of the scope, in another process too |
+| a role, member or overwrite change refuses | it joins, and its cache invalidation and after-events wait for the commit ([SEC-0036](../decisions/SEC-0036-a-role-change-joins-a-hold.md)) |
 
 Awaiting `Hold` waits at most the store's busy timeout behind other writers, then throws `TransactionException` with
 `NotCommitted`; nothing was written, so the command can be tried again. Every other writer of the store waits while

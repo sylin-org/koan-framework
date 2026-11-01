@@ -130,14 +130,34 @@ deletion that stops part way leaves members holding only the role's denies. An o
 and overwrites. Discord's implicit permissions, such as a missing view hiding everything else, are the application's
 to apply.
 
-Role, member and overwrite changes commit immediately. Inside a deferred `EntityContext.Transaction` scope they are
-refused with `NotSupportedException` before anything happens; make them after `EntityContext.Commit()`, outside the
-scope.
+Role, member and overwrite changes commit immediately outside any scope. Inside `EntityContext.Hold` they join the hold,
+so a command decides, changes a role and writes its own rows as one outcome:
+
+```csharp
+using (await EntityContext.Hold("give-role", ct))
+{
+    if ((await roles.Bag(actor, true, ct)).Manages((await roles.Get(key, ct))!))   // sees this hold's own changes
+    {
+        await roles.Add(key, person, ct);
+        await new RoleGiven { Person = person, Role = key }.Save(ct);
+        await EntityContext.Commit(ct);
+    }
+}
+```
+
+A rollback or a failed commit leaves no row, no moved position and no changed bag, and raises no after-event. Other flows
+read what is committed until the commit, and their role changes wait for the hold to end. A hold's first role change waits
+`HeldChangeWait` for changes already under way, and past it refuses with `TimeoutException`, because such a change can be
+waiting for the store the hold keeps; end the scope and start again. A change that throws part way leaves what it wrote in
+the hold, so let the exception end the scope. Inside a deferred `EntityContext.Transaction` scope a change is refused with
+`NotSupportedException` before anything happens: such a scope cannot decide from what it reads. First use of the role tables
+belongs outside a hold, as DATA-0166 says of any table.
 
 Applications react through `Entity.Role.MemberAdding/Added`, `MemberRemoving/Removed`,
 `PermissionsChanging/Changed`, `RoleChanging/Changed`, `RoleDeleting/Deleted`, `OverwriteChanging/Changed`, and
-`OverwriteRemoving/Removed`. Before events may veto. Post events run after persistence and cache invalidation;
-recursive role mutation is rejected.
+`OverwriteRemoving/Removed`. Before events may veto, and what they write joins a hold. Post events run after persistence and
+cache invalidation: inside a hold, after its commit and outside it, where a failure is logged because the commit stands.
+Recursive role mutation is rejected.
 
 ## Configuration
 
@@ -146,9 +166,10 @@ Settings live under `Koan:Identity:Roles`. The bounds a person can meet are prop
 `MaxPageSize` bounds one page of a listing. The rest size memory and refuse nothing: `MaxCachedBags` (people),
 `MaxCachedResources` (resources whose role overwrites stay compiled) and `MaxCachedPersonOverwrites` (a person's own
 overwrite on a resource, or its absence). Past a capacity the cache evicts an entry nothing has read lately and keeps
-the rest warm.
+the rest warm. `HeldChangeWait` (2 seconds) is how long a hold's first role change waits for the changes already under way.
 
 Reference `Sylin.Koan.Identity.Web` for management routes. See [TECHNICAL.md](TECHNICAL.md),
 [SEC-0021](../../docs/decisions/SEC-0021-resource-overwrites-resolve-in-discord-order.md),
-[SEC-0030](../../docs/decisions/SEC-0030-bounds-belong-to-reads.md) and
-[SEC-0031](../../docs/decisions/SEC-0031-roles-stand-in-one-order.md).
+[SEC-0030](../../docs/decisions/SEC-0030-bounds-belong-to-reads.md),
+[SEC-0031](../../docs/decisions/SEC-0031-roles-stand-in-one-order.md) and
+[SEC-0036](../../docs/decisions/SEC-0036-a-role-change-joins-a-hold.md).
