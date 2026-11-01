@@ -21,6 +21,8 @@ internal static class SqliteFeatures
         DataCaps.Write.BulkDelete,
         DataCaps.Write.AtomicBatch,
         DataCaps.Write.AtomicCommit,
+        DataCaps.Write.HeldTransaction,
+        DataCaps.Write.MutationOutcomes,
         DataCaps.Write.FastRemove,
         DataCaps.Write.ConditionalReplace,
         DataCaps.Write.ConditionalDelete,

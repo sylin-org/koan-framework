@@ -353,6 +353,15 @@ validation:
   dispatch, so a provisioning failure there, like any failure of the native commit itself or of sequential dispatch,
   reports `Unknown` (DATA-0161). Only the scope's own refusal of `TransactionGuarantee.Atomic` escapes as
   `NotSupportedException`.
+- `EntityContext.Hold` (DATA-0166) is the same native boundary begun at the start of the scope. The coordinator resolves
+  the route from the ambient context, refuses one whose provider is not an `IHeldTransactionProvider`, counts the hold as
+  an active mutation of the route (`DataOperationHorizon.AdmitHold`, so a maintenance window waits for it), and tracks
+  nothing: `ContextState.Deferring` is null, so Data's verbs go to the repository, and the facade's guard admits each
+  operation (`AdmitToHold`): a write must land on the held route, and once the hold has ended early a read refuses too. A
+  timer ends a hold past `TransactionOptions.HoldLimit` from a flow of its own. `TransactionHold` enters the ambient context
+  as the await completes, the pattern `GuardedOperationAwaitable` uses, so a hold that could not begin leaves nothing in
+  the caller's flow. Work that must follow the data registers with `ITransactionCoordinator.AfterCommit`; the Entity cache
+  retires its entries that way and reads past itself inside a hold, so no flow sees uncommitted rows through it.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

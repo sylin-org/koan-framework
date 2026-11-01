@@ -60,6 +60,10 @@ public static class DataCaps
         /// <summary>Provider runs every record write a deferred coordination scope dispatches to one of its sources
         /// inside one native transaction, across entity types — see <see cref="Transactions.IAtomicCommitProvider"/>.</summary>
         public static readonly Capability AtomicCommit = new("write.atomicCommit");
+        /// <summary>Provider holds one native transaction from the start of a scope across awaited application code:
+        /// every read and write of the flow runs inside it and writers serialize, across processes too — see
+        /// <see cref="Transactions.IHeldTransactionProvider"/>.</summary>
+        public static readonly Capability HeldTransaction = new("write.heldTransaction");
         /// <summary>Provider returns an exact insert/update result from its native upsert boundary.</summary>
         public static readonly Capability MutationOutcomes = new("write.mutationOutcomes");
         /// <summary>Provider atomically inserts an absent identity without replacing an existing row.</summary>

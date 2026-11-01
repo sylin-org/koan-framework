@@ -8,7 +8,8 @@ namespace Koan.Tests.Data.Core.Specs.Transactions;
 /// DATA-0158: a scope opened with <see cref="TransactionGuarantee.Atomic"/> is one native transaction or a refusal.
 /// A route whose provider does not declare <c>write.atomicCommit</c>, or a second route, is refused when the
 /// operation is tracked, before any write, with the correction in the message. A coordinated scope keeps today's
-/// sequential dispatch on those routes.
+/// sequential dispatch on those routes. DATA-0166: <see cref="EntityContext.Hold"/> is refused where its route cannot hold
+/// a native transaction.
 /// </summary>
 public sealed class TransactionGuaranteeSpec
 {
@@ -80,6 +81,27 @@ public sealed class TransactionGuaranteeSpec
             foreach (var file in new[] { archive, archive + "-wal", archive + "-shm" })
                 if (File.Exists(file)) File.Delete(file);
         }
+    }
+
+    /// <summary>DATA-0166: a route that cannot hold a transaction refuses the request instead of quietly deferring.</summary>
+    [Theory]
+    [InlineData("json")]
+    [InlineData("inmemory")]
+    public async Task A_hold_refuses_a_route_whose_provider_cannot_hold_a_transaction(string adapter)
+    {
+        await using var runtime = await DataCoreRuntimeFixture.CreateAsync();
+        using var route = EntityContext.With(adapter: adapter, partition: $"tx-hold-{Guid.CreateVersion7():n}");
+
+        var hold = () => EntityContext.Hold("writer");
+        var refusal = hold.Should().Throw<NotSupportedException>().Which;
+        refusal.Message.Should().Contain("requires a held transaction")
+            .And.Contain(adapter)
+            .And.Contain("write.heldTransaction")
+            .And.Contain("EntityContext.Transaction");
+        EntityContext.InTransaction.Should().BeFalse("a refused hold leaves nothing ambient");
+
+        var entity = await new TodoEntity { Title = "the flow goes on" }.Save();
+        (await TodoEntity.Get(entity.Id)).Should().NotBeNull();
     }
 
     [Fact]

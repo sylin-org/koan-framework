@@ -442,6 +442,8 @@
       href: DATA-0164-numbers-stay-doubles-at-the-codec.md
     - name: DATA-0165 A lexical search reads a word being typed and takes a scope the store applies
       href: DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md
+    - name: DATA-0166 A scope can hold a native transaction from its start
+      href: DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md
 - name: Web (WEB)
   items:
     - name: WEB-0010 Separate AI web surface

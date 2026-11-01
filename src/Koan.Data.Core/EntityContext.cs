@@ -48,6 +48,9 @@ public static class EntityContext
         /// </summary>
         public ITransactionCoordinator? TransactionCoordinator { get; init; }
 
+        /// <summary>The coordinator that defers this context's writes; a held scope's writes act when issued (DATA-0166).</summary>
+        internal ITransactionCoordinator? Deferring => TransactionCoordinator is { IsHeld: false } deferring ? deferring : null;
+
         /// <summary>
         /// Create routing context with validation.
         /// </summary>
@@ -153,17 +156,14 @@ public static class EntityContext
         string? transaction,
         CacheBehavior? cacheBehavior,
         bool preserveTransaction,
-        TransactionGuarantee guarantee)
+        TransactionGuarantee guarantee,
+        ITransactionCoordinator? begun = null)
     {
         var prev = Current;
 
         // Prevent nested transactions when explicitly starting a new one
         if (!string.IsNullOrWhiteSpace(transaction) && prev?.Transaction != null)
-        {
-            throw new InvalidOperationException(
-                $"Cannot start transaction '{transaction}' inside existing transaction '{prev.Transaction}'. " +
-                "nested transactions are not supported.");
-        }
+            throw NestedTransaction(transaction, prev.Transaction);
 
         var effectiveSource = source ?? prev?.Source;
         var effectiveAdapter = adapter ?? prev?.Adapter;
@@ -185,7 +185,7 @@ public static class EntityContext
         // Create a new coordinator only when starting a new transaction
         if (!string.IsNullOrWhiteSpace(transaction))
         {
-            coordinatorForScope = CreateTransactionCoordinator(transaction, guarantee);
+            coordinatorForScope = begun ?? CreateTransactionCoordinator(transaction, guarantee);
             activeCoordinator = coordinatorForScope;
         }
 
@@ -261,6 +261,51 @@ public static class EntityContext
         Push(null, null, null, name, null, preserveTransaction: true, guarantee);
 
     /// <summary>
+    /// Start a named scope that holds one native transaction from its start, on the route the ambient context names (the
+    /// default route unless <see cref="Source"/> or <see cref="Adapter"/> says otherwise). Until <see cref="Commit"/> or
+    /// <see cref="Rollback"/>, every read and write of that route from this flow runs inside it: a read sees the scope's
+    /// own writes, a write acts when it is issued, so a lifecycle handler runs, a unique index answers and an outcome is
+    /// reported there and then, and any other writer of the store waits, in another process too. It commits one native
+    /// transaction or nothing, as <see cref="TransactionGuarantee.Atomic"/> does; the difference is what the body can see
+    /// and how long it keeps other writers out, so keep it short. Disposal without a commit rolls back.
+    /// <code>
+    /// using (await EntityContext.Hold("reply", ct))
+    /// {
+    ///     var topic = await Topic.Get(id, ct);
+    ///     await new Post { TopicId = topic!.Id, Sequence = topic.Posts + 1 }.Save(ct);
+    ///     await EntityContext.Commit(ct);
+    /// }
+    /// </code>
+    /// <para>A route whose provider does not declare <c>write.heldTransaction</c> refuses here with a
+    /// <see cref="NotSupportedException"/>; a write to another route refuses when it is issued, while a read there sees that
+    /// route's committed state. Awaiting waits at most the store's busy timeout behind other writers, then throws a
+    /// <see cref="TransactionException"/> reporting <c>NotCommitted</c>. A hold that outlasts
+    /// <see cref="TransactionOptions.HoldLimit"/> rolls back and refuses the rest of the scope, so an abandoned one cannot
+    /// keep the store. Await it in the method that uses the scope: an ambient context does not survive an async method's
+    /// return.</para>
+    /// </summary>
+    /// <param name="name">Transaction name for correlation and telemetry</param>
+    /// <param name="ct">Observed while the hold waits for its turn</param>
+    /// <exception cref="InvalidOperationException">Thrown when already in a transaction (nested transactions not supported)</exception>
+    public static TransactionHold Hold(string name, CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (Current?.Transaction is { } outer) throw NestedTransaction(name, outer);
+        var coordinator = (TransactionCoordinator)AppHost
+            .GetRequiredService<ITransactionCoordinatorFactory>(TransactionOperation)
+            .CreateHeld(name);
+        // Not async: the provider makes its transaction ambient for this flow, which an async frame would discard.
+        var begun = coordinator.BeginHold(ct);
+        return new TransactionHold(
+            begun,
+            () => Push(null, null, null, name, null, preserveTransaction: true, TransactionGuarantee.Atomic, coordinator));
+    }
+
+    private static InvalidOperationException NestedTransaction(string name, string outer) =>
+        new($"Cannot start transaction '{name}' inside existing transaction '{outer}'. " +
+            "nested transactions are not supported.");
+
+    /// <summary>
     /// Execute the current scope's tracked operations: inside one native transaction when they all target one route
     /// that commits atomically, otherwise sequentially across adapters, where the completion boundary is non-atomic
     /// and can fail after earlier operations have committed.
@@ -277,7 +322,8 @@ public static class EntityContext
     }
 
     /// <summary>
-    /// Roll back the current transaction by discarding tracked operations that have not been dispatched.
+    /// Roll back the current transaction by discarding tracked operations that have not been dispatched, or, in a
+    /// <see cref="Hold"/>, its native transaction.
     /// It cannot undo an operation completed before a failed commit. Idempotent no-op when there
     /// is no active transaction (or it has already completed) — calling Rollback without a transaction, or
     /// after a commit/rollback, never throws.

@@ -41,4 +41,12 @@ public sealed class TransactionOptions
     /// Warn if coordination duration exceeds this threshold. Default: 30 seconds.
     /// </summary>
     public TimeSpan LongRunningTransactionWarning { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How long <see cref="EntityContext.Hold"/> keeps its native transaction before rolling it back and refusing the rest
+    /// of the scope (DATA-0166). Every other writer of the store waits while it is held, so an abandoned or stuck hold must
+    /// end by itself; the default sits below SQLite's 30-second busy timeout so that a waiter outlives one. Default: 20
+    /// seconds. <see cref="Timeout.InfiniteTimeSpan"/> removes the bound.
+    /// </summary>
+    public TimeSpan HoldLimit { get; set; } = TimeSpan.FromSeconds(20);
 }

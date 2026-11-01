@@ -11,13 +11,15 @@ using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Transactions;
 using Microsoft.Extensions.Logging;
 using Koan.Data.Core.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Transactions;
 
 /// <summary>
 /// Coordinates deferred entity operations. Commit is one native transaction when every tracked operation targets one
 /// route whose provider is an <see cref="IAtomicCommitProvider"/>; otherwise it is sequential dispatch that claims
-/// neither native nor distributed atomicity.
+/// neither native nor distributed atomicity. A held scope (DATA-0166) tracks nothing: it owns one native transaction from
+/// its start, admits each operation of the flow to it, and ends it at commit or rollback.
 /// </summary>
 internal sealed class TransactionCoordinator : ITransactionCoordinator
 {
@@ -34,10 +36,16 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private readonly DataProviderCatalog _providers;
     // The one route an Atomic scope has admitted so far; a second route is refused at tracking time.
     private AtomicRoute? _requiredRoute;
+    private readonly List<Func<CancellationToken, Task>> _afterCommit = new();
+    private HeldRoute? _heldRoute;
+    private IHeldTransaction? _held;
+    private DataRouteHold? _routeHold;
+    private Timer? _holdLimit;
 
     public string Name { get; }
     public bool IsCompleted => _isCompleted;
     public TransactionGuarantee Guarantee { get; }
+    public bool IsHeld { get; }
 
     public TransactionCoordinator(
         string name,
@@ -47,7 +55,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         DataProviderCatalog providers,
         ILogger<TransactionCoordinator> logger,
         TransactionOptions options,
-        TransactionGuarantee guarantee)
+        TransactionGuarantee guarantee,
+        bool isHeld = false)
     {
         Name = name ?? throw new ArgumentNullException(nameof(name));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -56,13 +65,270 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         _operationHorizon = operationHorizon ?? throw new ArgumentNullException(nameof(operationHorizon));
         _providers = providers ?? throw new ArgumentNullException(nameof(providers));
         Guarantee = guarantee;
+        IsHeld = isHeld;
         // Deferred coordination is useful but is neither a native local transaction nor distributed atomicity. An
         // Atomic scope commits through one native transaction or refuses, so it owns a native boundary (TxCaps.Local).
         Capabilities = CapabilitySet.Build("transaction", c =>
         {
-            c.Add(TxCaps.DeferredCoordination);
+            if (!isHeld) c.Add(TxCaps.DeferredCoordination);
             if (guarantee == TransactionGuarantee.Atomic) c.Add(TxCaps.Local);
         });
+    }
+
+    public void AfterCommit(Func<CancellationToken, Task> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ThrowIfCompleted();
+        lock (_afterCommit) _afterCommit.Add(action);
+    }
+
+    /// <summary>One route a held transaction covers, and what it is held through.</summary>
+    private sealed record HeldRoute(string Adapter, string Source, string ConnectionIdentity);
+
+    /// <summary>
+    /// Begins the native transaction on the route the ambient context names. Everything up to the provider's call runs in
+    /// the caller's frame, because the provider makes its transaction ambient for that flow; a route that cannot hold one
+    /// refuses here, before anything is held.
+    /// </summary>
+    internal Task BeginHold(CancellationToken ct)
+    {
+        if (_options.HoldLimit <= TimeSpan.Zero && _options.HoldLimit != Timeout.InfiniteTimeSpan)
+            throw new InvalidOperationException(
+                $"{TransactionOptions.SectionPath}:{nameof(TransactionOptions.HoldLimit)} must be positive, or infinite to " +
+                $"remove the bound, and it is {_options.HoldLimit}.");
+        var binding = AdapterResolver
+            .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
+            .Binding ?? throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");
+        if (_providers.Find(binding.Plan.Adapter) is not IHeldTransactionProvider provider)
+            throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but route '{binding.Plan.Source}' on provider " +
+                $"'{binding.Plan.Adapter}' cannot hold one: the provider does not declare '{DataCaps.Write.HeldTransaction.Id}'. " +
+                "Route the scope to a provider that does (SQLite declares it) with EntityContext.Source or EntityContext.Adapter, " +
+                "or use EntityContext.Transaction, which defers the writes until Commit.");
+        _heldRoute = new HeldRoute(binding.Plan.Adapter, binding.Plan.Source, binding.Plan.ConnectionIdentity);
+        _routeHold = _operationHorizon.AdmitHold(binding);
+        try
+        {
+            return AwaitHold(provider.BeginHeld(_services, binding.Plan.Source, ct));
+        }
+        catch
+        {
+            _routeHold.Release();
+            throw;
+        }
+    }
+
+    private async Task AwaitHold(ValueTask<IHeldTransaction> beginning)
+    {
+        var route = _heldRoute!;
+        try
+        {
+            _held = await beginning.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _routeHold!.Release();
+            _isCompleted = true;
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _routeHold!.Release();
+            _isCompleted = true;
+            _logger.LogWarning(ex,
+                "Transaction '{TransactionName}' could not begin a held transaction on route '{Source}' ({Adapter})",
+                Name,
+                route.Source,
+                route.Adapter);
+            throw new TransactionException(
+                $"Transaction '{Name}' could not begin its held transaction on route '{route.Source}', which usually means " +
+                "another writer kept the store for the whole of the store's busy timeout. Nothing was written, and it will not be replayed.",
+                Name,
+                route.Adapter,
+                completedOperationCount: 0,
+                DataCommitOutcome.NotCommitted,
+                ex);
+        }
+
+        StartWorkTelemetry();
+        var limit = _options.HoldLimit;
+        if (limit == Timeout.InfiniteTimeSpan) return;
+        // The limit must be able to end a hold whose flow never comes back, so its timer carries no ambient of that flow.
+        using (ExecutionContext.SuppressFlow())
+            _holdLimit = new Timer(static state => _ = ((TransactionCoordinator)state!).EndAtLimit(), this, limit, Timeout.InfiniteTimeSpan);
+    }
+
+    /// <summary>The hold outlived its limit: other writers have waited long enough, so it rolls back and the scope refuses from here on.</summary>
+    private async Task EndAtLimit()
+    {
+        var held = _held!;
+        try
+        {
+            var limit = _options.HoldLimit;
+            await held.Abort($"it was held past its limit of {limit}").ConfigureAwait(false);
+            if (held.EndedBecause is null) return; // a commit or a rollback got there first
+            _routeHold!.Release();
+            _logger.LogWarning(
+                "Transaction '{TransactionName}' held its native transaction past its limit of {HoldLimit} and was rolled back",
+                Name,
+                limit);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Transaction '{TransactionName}' could not end its held transaction at its limit", Name);
+        }
+    }
+
+    /// <summary>
+    /// Admits one operation of the flow to the hold. Every operation refuses once the hold has ended early, a read too,
+    /// because it would otherwise read outside the transaction the scope believes it is in. A write must land on the held
+    /// route; a read elsewhere sees that route's committed state.
+    /// </summary>
+    internal void AdmitToHold(DataRouteBinding? binding, bool writes, string operation, string entity)
+    {
+        if (!_isCompleted && _held?.EndedBecause is { } reason)
+            throw new TransactionException(
+                $"Transaction '{Name}' refused '{operation}' on '{entity}': its held transaction was rolled back because {reason}. " +
+                "Nothing it wrote is durable, and it will not be replayed. End the scope and start again.",
+                Name,
+                _heldRoute?.Adapter,
+                completedOperationCount: 0,
+                DataCommitOutcome.NotCommitted,
+                innerException: null);
+        if (!writes) return;
+        ThrowIfCompleted();
+        var held = _heldRoute!;
+        if (binding is not null &&
+            string.Equals(binding.Plan.Adapter, held.Adapter, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(binding.Plan.ConnectionIdentity, held.ConnectionIdentity, StringComparison.Ordinal))
+            return;
+        throw new NotSupportedException(
+            $"Transaction '{Name}' holds a native transaction on route '{held.Source}' ({held.Adapter}), and '{operation}' on " +
+            $"'{entity}' is routed to '{binding?.Plan.Source ?? "an unbound store"}' ({binding?.Plan.Adapter ?? "unknown"}): one " +
+            "native transaction covers one route. Keep the scope to one route, name the route with EntityContext.Source before " +
+            "EntityContext.Hold, or write there outside the scope.");
+    }
+
+    private async Task CommitHold(CancellationToken ct)
+    {
+        var held = _held!;
+        var route = _heldRoute!;
+        await StopHoldLimit().ConfigureAwait(false);
+        try
+        {
+            if (held.EndedBecause is { } reason)
+                throw new TransactionException(
+                    $"Transaction '{Name}' cannot commit: its held transaction was rolled back because {reason}. Nothing it wrote " +
+                    "is durable, and it will not be replayed.",
+                    Name,
+                    route.Adapter,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.NotCommitted,
+                    innerException: null);
+            try
+            {
+                await held.Commit(ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (held.EndedBecause is null)
+            {
+                _logger.LogError(ex,
+                    "Transaction '{TransactionName}' native commit failed on route '{Source}' ({Adapter})",
+                    Name,
+                    route.Source,
+                    route.Adapter);
+                throw new TransactionException(
+                    $"Transaction '{Name}' failed while committing its held transaction on route '{route.Source}'. " +
+                    "Its commit outcome is unknown and it will not be replayed.",
+                    Name,
+                    route.Adapter,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.Unknown,
+                    ex);
+            }
+            catch (Exception ex)
+            {
+                throw new TransactionException(
+                    $"Transaction '{Name}' cannot commit: its held transaction was rolled back because {held.EndedBecause}. " +
+                    "Nothing it wrote is durable, and it will not be replayed.",
+                    Name,
+                    route.Adapter,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.NotCommitted,
+                    ex);
+            }
+
+            _isCompleted = true;
+            await EndHold(held).ConfigureAwait(false);
+            _logger.LogInformation("Transaction '{TransactionName}' committed its held transaction", Name);
+            _activity?.SetStatus(ActivityStatusCode.Ok);
+            _activity?.SetTag("transaction.outcome", "committed");
+            _activity?.SetTag("transaction.atomic", true);
+            await RunAfterCommit().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!_isCompleted)
+        {
+            _isCompleted = true;
+            await EndHold(held).ConfigureAwait(false);
+            _activity?.SetStatus(ActivityStatusCode.Error, "held transaction failed");
+            _activity?.SetTag("transaction.outcome", "failed");
+            _logger.LogError(ex, "Transaction '{TransactionName}' commit failed", Name);
+            throw;
+        }
+        finally
+        {
+            _activity?.Dispose();
+        }
+    }
+
+    private async Task RollbackHold()
+    {
+        _isCompleted = true;
+        await StopHoldLimit().ConfigureAwait(false);
+        await EndHold(_held!).ConfigureAwait(false);
+        _logger.LogInformation("Transaction '{TransactionName}' rolled back its held transaction", Name);
+        _activity?.SetTag("transaction.outcome", "rolled_back");
+        _activity?.Dispose();
+    }
+
+    private async Task EndHold(IHeldTransaction held)
+    {
+        try
+        {
+            // Disposal rolls back whatever a commit did not end, and leaves the ambient for this flow.
+            await held.DisposeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // The outcome is already decided, and a connection that would not close must not be reported as a failed commit.
+            _logger.LogError(ex, "Transaction '{TransactionName}' could not release its held transaction", Name);
+        }
+        finally
+        {
+            _routeHold!.Release();
+        }
+    }
+
+    private async Task StopHoldLimit()
+    {
+        if (_holdLimit is { } limit) await limit.DisposeAsync().ConfigureAwait(false);
+    }
+
+    private async Task RunAfterCommit()
+    {
+        Func<CancellationToken, Task>[] actions;
+        lock (_afterCommit) actions = _afterCommit.ToArray();
+        foreach (var action in actions)
+        {
+            try
+            {
+                await action(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Transaction '{TransactionName}' committed, and work that follows its commit failed", Name);
+            }
+        }
     }
 
     public void TrackSave<TEntity, TKey>(TEntity entity, EntityContext.ContextState context)
@@ -148,6 +414,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     private void TrackOperation(ITrackedOperation operation)
     {
+        // A held scope defers nothing, so what reaches here is a vector operation, which cannot join its transaction.
+        if (IsHeld)
+            throw new NotSupportedException(
+                $"Transaction '{Name}' holds a native transaction, and the {operation.GetAdapterHint()} operation cannot join " +
+                "it. Save the vector outside the scope.");
         // An Atomic scope refuses before the operation joins, so nothing it could not commit atomically is ever held.
         if (Guarantee == TransactionGuarantee.Atomic) RequireAtomicRoute(operation);
         StartWorkTelemetry();
@@ -165,6 +436,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     public async Task Commit(CancellationToken ct = default)
     {
         if (_isCompleted) return; // idempotent: a second Commit (or Commit after Rollback) is a no-op
+        if (IsHeld)
+        {
+            await CommitHold(ct).ConfigureAwait(false);
+            return;
+        }
         if (!_hasTrackedWork)
         {
             _isCompleted = true;
@@ -240,6 +516,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             _activity?.SetTag("transaction.outcome", "committed");
             _activity?.SetTag("transaction.atomic", atomic is not null);
             _activity?.SetTag("transaction.duration_ms", stopwatch.ElapsedMilliseconds);
+            await RunAfterCommit().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -278,6 +555,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     public async Task Rollback(CancellationToken ct = default)
     {
         if (_isCompleted) return; // idempotent: a second Rollback (or Rollback after Commit) is a no-op
+        if (IsHeld)
+        {
+            await RollbackHold().ConfigureAwait(false);
+            return;
+        }
         if (!_hasTrackedWork)
         {
             _isCompleted = true;

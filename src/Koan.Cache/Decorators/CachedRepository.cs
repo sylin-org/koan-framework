@@ -86,7 +86,23 @@ internal sealed class CachedRepository<TEntity, TKey> :
     private async ValueTask FlushEntity(CancellationToken ct)
     {
         if (_entityPolicy.Strategy is CacheStrategy.NoCache) return;
+        if (RetireAfterCommit(token => _cacheClient.FlushTags([_entityTag], typeof(TEntity), token).AsTask())) return;
         await _cacheClient.FlushTags([_entityTag], typeof(TEntity), ct);
+    }
+
+    /// <summary>
+    /// A held transaction's rows are visible to its own flow alone and may yet roll back (DATA-0166), so the shared cache
+    /// neither answers for them nor learns of them until the commit: a read inside the hold goes to the store, and a write
+    /// retires its entry once the commit has made it true. Before that, every other flow is right to read the committed
+    /// value the entry holds.
+    /// </summary>
+    private static bool InHold => EntityContext.CurrentTransaction is { IsHeld: true };
+
+    private static bool RetireAfterCommit(Func<CancellationToken, Task> retire)
+    {
+        if (EntityContext.CurrentTransaction is not { IsHeld: true } hold) return false;
+        hold.AfterCommit(retire);
+        return true;
     }
 
     private async Task<T> FlushingAfter<T>(Func<Task<T>> operation, CancellationToken ct)
@@ -121,7 +137,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     {
         // The cache decorates outside Data's canonical read fold. A dynamic request predicate therefore has to bypass
         // the global id entry here, before a cache hit can short-circuit the scoped store read.
-        if (_plan.IsReadScopedNow())
+        if (_plan.IsReadScopedNow() || InHold)
         {
             return await _inner.Get(id, ct);
         }
@@ -261,7 +277,8 @@ internal sealed class CachedRepository<TEntity, TKey> :
         CacheKey? key = _entityPolicy.Strategy != CacheStrategy.NoCache && TryBuildEntityKey(null, model.Id, out var captured)
             ? captured : (CacheKey?)null;
         var replaced = await conditional.ConditionalReplaceAsync(model, guard, ct);
-        if (replaced && key is { } committedKey)
+        if (replaced && key is { } committedKey &&
+            !RetireAfterCommit(token => _cacheClient.Remove(committedKey, typeof(TEntity), token).AsTask()))
             await _cacheClient.Remove(committedKey, typeof(TEntity), ct);
         return replaced;
     }
@@ -378,8 +395,9 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
-        // Never seed a globally keyed cache from a request-scoped write. Remove a possible older entry instead.
-        if (_plan.IsReadScopedNow())
+        // Never seed a globally keyed cache from a request-scoped write, or from one that is not committed yet. Remove a
+        // possible older entry instead.
+        if (_plan.IsReadScopedNow() || InHold)
         {
             if (!IsDefaultKey(entity.Id)) await Remove(entity.Id, ct);
             return;
@@ -417,6 +435,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
             return;
         }
 
+        if (RetireAfterCommit(token => _cacheClient.Remove(key, typeof(TEntity), token).AsTask())) return;
         await _cacheClient.Remove(key, typeof(TEntity), ct);
     }
 

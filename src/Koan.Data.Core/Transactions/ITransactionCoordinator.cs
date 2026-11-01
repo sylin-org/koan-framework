@@ -28,6 +28,18 @@ public interface ITransactionCoordinator
     TransactionGuarantee Guarantee { get; }
 
     /// <summary>
+    /// Whether the scope holds its native transaction from its start (<see cref="EntityContext.Hold"/>, DATA-0166): a
+    /// write acts when it is issued and nothing is tracked, so <see cref="TrackedOperationCount"/> stays zero.
+    /// </summary>
+    bool IsHeld { get; }
+
+    /// <summary>
+    /// Run <paramref name="action"/> once the scope's commit has succeeded, for work that must not be seen before the
+    /// data is. It does not run after a rollback. A failure is logged and changes nothing, because the commit stands.
+    /// </summary>
+    void AfterCommit(Func<CancellationToken, Task> action);
+
+    /// <summary>
     /// Track an entity save operation for deferred execution.
     /// </summary>
     void TrackSave<TEntity, TKey>(TEntity entity, EntityContext.ContextState context)
@@ -72,13 +84,16 @@ public interface ITransactionCoordinator
     /// the native transaction. On the sequential path a store is provisioned inside the first operation's dispatch, so a
     /// provisioning failure there reports <see cref="DataCommitOutcome.Unknown"/> with no completed operation. Only the
     /// scope's own refusal of <see cref="TransactionGuarantee.Atomic"/> escapes as <see cref="NotSupportedException"/>.
-    /// The coordinator never replays dispatched work.
+    /// The coordinator never replays dispatched work. A held scope has nothing to dispatch: this commits its native
+    /// transaction, which reports <see cref="DataCommitOutcome.NotCommitted"/> when the hold had already ended and
+    /// <see cref="DataCommitOutcome.Unknown"/> when the native commit itself fails.
     /// </summary>
     /// <exception cref="TransactionException">If any operation fails after zero or more earlier operations completed</exception>
     Task Commit(CancellationToken ct = default);
 
     /// <summary>
-    /// Discard all undispatched tracked operations and mark the scope as completed.
+    /// Discard all undispatched tracked operations and mark the scope as completed. A held scope rolls its native
+    /// transaction back.
     /// </summary>
     Task Rollback(CancellationToken ct = default);
 

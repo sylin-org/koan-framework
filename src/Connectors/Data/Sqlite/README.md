@@ -47,6 +47,13 @@ to whole seconds. `Synchronous` (`Full`, `Normal`, `Extra`, `Off`) is the flush 
 `Koan:Data:Sources:Default:sqlite` take precedence. A value outside the choices refuses at boot naming the key. The
 startup facts show the three settings; `/health/ready` shows them beside the journal mode each source's database holds.
 
+## Hold a transaction across a scope
+
+`await EntityContext.Hold("name", ct)` begins that native transaction at the start of the scope: reads see the scope's
+writes, a write acts when it is issued, and any other writer waits, in another process too, for at most the busy timeout.
+Keep it short, since it keeps every other writer out. See
+[DATA-0166](../../../docs/decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md).
+
 ## Commit several entity types at once
 
 On one SQLite route, `EntityContext.Transaction` commits everything it tracked inside one native transaction, begun

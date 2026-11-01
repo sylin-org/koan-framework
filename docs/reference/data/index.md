@@ -131,6 +131,13 @@ correction; a route whose DDL policy did not build it refuses the search, naming
 [DATA-0159](../../decisions/DATA-0159-lexical-search-over-declared-entity-text.md) and
 [DATA-0165](../../decisions/DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md).
 
+## Hold a transaction across a scope
+
+`await EntityContext.Hold("name", ct)` holds one native transaction from the start of its scope on a route that declares
+`write.heldTransaction` (SQLite) and refuses elsewhere: reads see the scope's writes, a write acts when it is issued, and
+any other writer waits, in another process too, for at most the store's busy timeout. See
+[DATA-0166](../../decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md).
+
 ## Keep a polymorphic family in one set
 
 Declare one Entity root when several runtime shapes must share one searchable table or collection.

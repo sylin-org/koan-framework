@@ -32,6 +32,33 @@ public sealed class RoleSqliteSpec
         finally { if (File.Exists(path)) File.Delete(path); }
     }
 
+    // DATA-0166: a hold could run the write, but a role change's events and cache invalidation would still run before its commit.
+    [Fact] public async Task A_role_change_inside_a_hold_refuses_before_any_write()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"koan-role-hold-{Guid.CreateVersion7():n}.db");
+        try
+        {
+            await using var host = await Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await roles.Define("role:held", "Held", ["global:held"]);
+
+            using (await EntityContext.Hold("role-change"))
+            {
+                var add = () => roles.Add("role:held", "person:held");
+                await add.Should().ThrowAsync<NotSupportedException>();
+                await EntityContext.Commit();
+            }
+
+            (await roles.Members("role:held")).Items.Should().BeEmpty("the refused change wrote nothing");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     [Fact] public async Task A_role_change_inside_an_atomic_scope_refuses_before_any_write_and_after_commit_the_bag_is_correct()
     {
         var path = Path.Combine(Path.GetTempPath(), $"koan-role-tx-{Guid.CreateVersion7():n}.db");

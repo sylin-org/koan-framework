@@ -144,6 +144,26 @@ public sealed class DataOperationHorizon
         return ValueTask.FromResult(new DataMultiOperationLease(this, admitted, node));
     }
 
+    /// <summary>
+    /// Counts one held transaction as an active mutation of its route until it is released, so a maintenance window waits
+    /// for it. It enters no ambient scope: the operations inside the hold are admitted one by one, and it can be released
+    /// from any thread when the hold outlives its limit (DATA-0166).
+    /// </summary>
+    internal DataRouteHold AdmitHold(DataRouteBinding binding)
+    {
+        ArgumentNullException.ThrowIfNull(binding);
+        _authority.Validate(binding);
+        var gate = _gates.GetOrAdd(binding.Plan.ConnectionIdentity, static _ => new RouteGate());
+        lock (gate.Sync)
+        {
+            if (gate.WritesClosed)
+                throw new DataSwitchInProgressException(binding.Plan.Source, DataOperationEffect.Write);
+            checked { gate.ActiveMutations++; }
+            gate.Drained = null;
+        }
+        return new DataRouteHold(gate);
+    }
+
     internal async Task<DataRouteMaintenanceWindow> CloseAndDrain(
         IReadOnlyList<DataRouteMaintenanceRequest> requests,
         CancellationToken ct)
@@ -267,7 +287,7 @@ public sealed class DataOperationHorizon
         return false;
     }
 
-    private static void ReleaseCounts(IReadOnlyList<RouteGate> gates)
+    internal static void ReleaseCounts(IReadOnlyList<RouteGate> gates)
     {
         foreach (var gate in gates.Reverse())
         {
@@ -310,6 +330,17 @@ internal readonly record struct DataRouteMaintenanceRequest(
     bool BlockReads,
     bool BlockWrites,
     bool AllowQuarantined = false);
+
+/// <summary>One held transaction's admission to its route; it releases once, whoever asks first.</summary>
+internal sealed class DataRouteHold(DataOperationHorizon.RouteGate gate)
+{
+    private int _released;
+
+    public void Release()
+    {
+        if (Interlocked.Exchange(ref _released, 1) == 0) DataOperationHorizon.ReleaseCounts([gate]);
+    }
+}
 
 internal sealed class DataOperationLease : IAsyncDisposable
 {

@@ -34,6 +34,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
     IConditionalWriteRepository<TEntity, TKey>,
     IConditionalDeleteRepository<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
+    IMutationOutcomeRepository<TEntity, TKey>,
     IInstructionExecutor<TEntity>,
     IDescribesCapabilities,
     IBulkUpsert<TKey>,
@@ -157,6 +158,26 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
             return new(model.Id, MutationOutcome.Conflict, null, DataCommitOutcome.NotCommitted);
         }
         return new(model.Id, MutationOutcome.Inserted, model, DataCommitOutcome.Committed);
+    }
+
+    /// <summary>
+    /// The insert or update a save was (DATA-0166): whether the row exists is read inside the write's own transaction,
+    /// which holds the write lock from its start, so the answer cannot be overtaken. Inside a hold it joins the hold.
+    /// </summary>
+    public async Task<MutationResult<TEntity, TKey>> UpsertWithOutcome(TEntity model, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var plan = Plan();
+        await Ready(plan, ct).ConfigureAwait(false);
+        _route.Policy.Demand(DataOperationEffect.Write, "upsert with outcome");
+        await using var connection = await Open(ct).ConfigureAwait(false);
+        await using var transaction = connection.BeginImmediate();
+        var work = connection.In(transaction);
+        var generated = plan.Mapping.Identity.IsGenerated && EqualityComparer<TKey>.Default.Equals(model.Id, default!);
+        var existed = !generated && await Get(work, plan, model.Id, ct).ConfigureAwait(false) is not null;
+        await Upsert(work, plan, model, ct).ConfigureAwait(false);
+        await transaction.Commit(ct).ConfigureAwait(false);
+        return new(model.Id, existed ? MutationOutcome.Updated : MutationOutcome.Inserted, model, DataCommitOutcome.Committed);
     }
 
     private static bool IsIdentityCollision(SqliteException error, SqliteEntityPlan<TEntity, TKey> plan)
@@ -405,6 +426,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
             case RelationalInstructions.SchemaValidate:
             {
                 await Ready(plan, ct).ConfigureAwait(false);
+                using var turn = await TurnOnUnit(ct).ConfigureAwait(false);
                 await using var ddl = Ddl(plan);
                 var validation = await _schema.ValidateAsync(
                     plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
@@ -476,6 +498,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
 
     private async Task Provision(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
+        using var turn = await TurnOnUnit(ct).ConfigureAwait(false);
         await using var ddl = Ddl(plan);
         await _schema.EnsureCreatedAsync(
             plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
@@ -483,6 +506,7 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
 
     private async Task Validate(SqliteEntityPlan<TEntity, TKey> plan, CancellationToken ct)
     {
+        using var turn = await TurnOnUnit(ct).ConfigureAwait(false);
         await using var ddl = Ddl(plan);
         var validation = await _schema.ValidateAsync(
             plan.Mapping, ddl, SqliteStoreFeatures.Instance, _schemaPolicy, ct).ConfigureAwait(false);
@@ -540,14 +564,14 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
     }
 
     /// <summary>
-    /// The session an operation runs in. Inside an atomic commit that covers this route (DATA-0158) it is the ambient
-    /// native transaction's own connection, shared by every read and write of the scope so a lifecycle read sees the
-    /// rows written earlier in it; otherwise a connection this operation opens and owns.
+    /// The session an operation runs in. Inside an atomic commit or a hold that covers this route (DATA-0158, DATA-0166)
+    /// it is the ambient native transaction's own connection, shared by every read and write of the scope so a read sees
+    /// the rows written earlier in it; otherwise a connection this operation opens and owns.
     /// </summary>
     private async Task<Session> Open(CancellationToken ct)
     {
         if (_connections.CurrentUnit(_route.ConnectionString, _route.Source) is { } unit)
-            return new Session(unit.Connection, unit.Transaction, Owned: false);
+            return new Session(unit.Connection, unit.Transaction, Owned: false, await unit.Enter(ct).ConfigureAwait(false));
         return new Session(
             await _connections.Open(_route.ConnectionString, _route.Source, ct).ConfigureAwait(false),
             null,
@@ -557,9 +581,26 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
     // The connection a raw read runs on (WEB-0074): the engine refuses any write through it. query_only is connection
     // state and a pooled connection goes back to its pool still holding it, so this one is never pooled - it is closed
     // for real when the read ends and no ordinary caller can inherit the mode. It never joins an atomic commit: the
-    // mode would fence the unit's own writes, so a raw read inside the scope sees committed state only.
+    // mode would fence the unit's own writes, so a raw read inside the scope sees committed state only. A hold is
+    // different: the read takes its turn on the unit's connection, fenced for that turn alone, so it sees what the hold
+    // wrote and still cannot write (DATA-0166).
     private async Task<Session> OpenReadOnly(CancellationToken ct)
     {
+        if (_connections.CurrentUnit(_route.ConnectionString, _route.Source) is { IsHeld: true } unit)
+        {
+            var turn = await unit.Enter(ct).ConfigureAwait(false);
+            try
+            {
+                var session = new Session(unit.Connection, unit.Transaction, Owned: false, turn, Fenced: true);
+                await session.SetQueryOnly(true, ct).ConfigureAwait(false);
+                return session;
+            }
+            catch
+            {
+                turn.Dispose();
+                throw;
+            }
+        }
         var connection = await _connections.Open(_route.ConnectionString, _route.Source, ct, pooled: false)
             .ConfigureAwait(false);
         try
@@ -572,8 +613,19 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         catch { await connection.DisposeAsync().ConfigureAwait(false); throw; }
     }
 
-    /// <summary>A connection and the transaction its commands run in; disposal closes only a connection the session owns.</summary>
-    private readonly record struct Session(SqliteConnection Connection, SqliteTransaction? Transaction, bool Owned) : IAsyncDisposable
+    private async ValueTask<SqliteConnections.Turn> TurnOnUnit(CancellationToken ct) =>
+        _connections.CurrentUnit(_route.ConnectionString, _route.Source) is { } unit
+            ? await unit.Enter(ct).ConfigureAwait(false)
+            : default;
+
+    /// <summary>A connection and the transaction its commands run in; disposal closes only a connection the session owns
+    /// and ends the turn a session on a hold's connection took.</summary>
+    private readonly record struct Session(
+        SqliteConnection Connection,
+        SqliteTransaction? Transaction,
+        bool Owned,
+        SqliteConnections.Turn Turn = default,
+        bool Fenced = false) : IAsyncDisposable
     {
         public SqliteCommand CreateCommand()
         {
@@ -587,9 +639,33 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
             ? new Unit(Transaction, Owned: false)
             : new Unit((SqliteTransaction)await Connection.BeginTransactionAsync(ct).ConfigureAwait(false), Owned: true);
 
+        /// <summary>The transaction a read that decides a write runs in: it takes the write lock first, so another
+        /// writer cannot change what it read.</summary>
+        public Unit BeginImmediate() => Transaction is not null
+            ? new Unit(Transaction, Owned: false)
+            : new Unit(Connection.BeginTransaction(deferred: false), Owned: true);
+
         public Session In(Unit unit) => new(Connection, unit.Transaction, Owned: false);
 
-        public ValueTask DisposeAsync() => Owned ? Connection.DisposeAsync() : ValueTask.CompletedTask;
+        public async Task SetQueryOnly(bool on, CancellationToken ct)
+        {
+            await using var fence = CreateCommand();
+            fence.CommandText = $"PRAGMA query_only = {(on ? "ON" : "OFF")}";
+            await fence.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                if (Fenced) await SetQueryOnly(false, CancellationToken.None).ConfigureAwait(false);
+                if (Owned) await Connection.DisposeAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                Turn.Dispose();
+            }
+        }
     }
 
     /// <summary>A transaction an operation begun itself and commits, or the ambient one it joined and leaves alone.</summary>

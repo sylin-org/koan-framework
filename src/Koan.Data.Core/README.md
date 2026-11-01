@@ -215,6 +215,9 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
   dispatch, a failed commit can leave its completed prefix durable, and rollback discards only undispatched work.
   `TransactionGuarantee.Atomic` makes the native transaction a requirement that is refused where it cannot be met
   (DATA-0158). For one Entity root, `BatchOptions(RequireAtomic: true)` is the per-root all-or-nothing seam.
+- `EntityContext.Hold` holds that native transaction from the start of the scope instead of opening it at commit, on a
+  route that declares `write.heldTransaction` (SQLite), and is refused elsewhere (DATA-0166). The body reads its own
+  writes, a write acts when it is issued, and other writers wait, in another process too.
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
 - `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
@@ -295,6 +298,30 @@ unknown commit outcome, and retry/replay dispositions. `EntityContext.Transactio
 TransactionGuarantee.Atomic)` requires the native transaction and refuses, when the operation is
 tracked, anything that cannot join it (DATA-0158). Coordination never claims atomicity across stores,
 and executing a tracked operation suppresses the surrounding transaction to prevent recursive enlistment.
+
+## Hold a transaction from the start of a scope
+
+Deferred writes cannot be read back, cannot report an outcome, and leave a read inside the scope free to be overtaken.
+A scope that needs those holds the native transaction from its start instead (DATA-0166):
+
+```csharp
+using (await EntityContext.Hold("reply", ct))
+{
+    var topic = await Topic.Get(id, ct);
+    var post = await new Post { TopicId = topic!.Id, Sequence = topic.Posts + 1 }.Save(ct);
+    var stored = await Post.Get(post.Id, ct);   // its own write
+    await EntityContext.Commit(ct);
+}
+```
+
+Every read and write of the route from that flow runs inside it, including batches, conditional writes and SQL
+instructions that a deferred scope refuses; a lifecycle handler runs and a unique index answers at the save, and a receipt
+reports `Inserted` or `Updated` with `NotCommitted`, because only `Commit` commits. Any other writer of the store waits,
+in another process too, for at most the store's busy timeout; a hold that waits that long throws `TransactionException`
+with `NotCommitted`. Disposal without a commit rolls back. A hold keeps every other writer out, so keep it short:
+past `TransactionOptions.HoldLimit` (20 seconds) it rolls back and refuses the rest of its scope. It covers the one route
+the ambient context names; a write elsewhere refuses, and a read elsewhere sees committed state. A Direct write, a transfer
+and a role change refuse inside it; a named read on a lane keeps its own connection and sees committed state.
 
 ## Insert without replacement
 

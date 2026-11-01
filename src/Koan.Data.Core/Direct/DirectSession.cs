@@ -71,6 +71,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
     {
         var ceiling = DemandBeforeRoute(_effect, "direct transaction begin");
         GuardDirect();
+        RefuseWriteInHold(_effect, "direct transaction begin");
         ct.ThrowIfCancellationRequested();
         var route = Resolve();
         var plan = DemandResolvedRoute(route, ceiling, _effect, "direct transaction begin");
@@ -307,6 +308,7 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
         DataSourcePlan? ceiling,
         CancellationToken ct)
     {
+        RefuseWriteInHold(effect, operation);
         var route = Resolve();
         var plan = DemandResolvedRoute(route, ceiling, effect, operation);
         var binding = Bind(HorizonPlan(plan, ceiling));
@@ -330,6 +332,23 @@ internal sealed class DirectSession(IServiceProvider sp, IConfiguration cfg, str
             await lease.DisposeAsync().ConfigureAwait(false);
             throw;
         }
+    }
+
+    /// <summary>
+    /// A Direct session opens a connection of its own, which cannot join a held transaction (DATA-0166). On the held store
+    /// its write would wait on the lock this very flow holds until the hold's limit rolled the hold back, and then land
+    /// outside it; anywhere else it would be a write the scope's rollback cannot undo. A declared read goes ahead and sees
+    /// committed state.
+    /// </summary>
+    private static void RefuseWriteInHold(DataOperationEffect effect, string operation)
+    {
+        if (effect == DataOperationEffect.Read ||
+            EntityContext.CurrentTransaction is not { IsHeld: true, IsCompleted: false } hold)
+            return;
+        throw new NotSupportedException(
+            $"'{operation}' cannot run inside the held transaction '{hold.Name}': a Direct session opens a connection of its " +
+            "own, which cannot join it. Use Entity verbs or a SQL instruction, which run inside the hold, declare " +
+            "Effect(DataOperationEffect.Read) for a read of committed state, or run this outside the scope.");
     }
 
     private DataSourcePlan? DemandBeforeRoute(DataOperationEffect effect, string operation)

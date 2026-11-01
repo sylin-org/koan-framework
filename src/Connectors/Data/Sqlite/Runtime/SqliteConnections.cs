@@ -32,6 +32,8 @@ internal sealed class SqliteConnections(
     private readonly Dictionary<string, SqliteConnection> _keepers = new(StringComparer.Ordinal);
     private readonly HashSet<string> _poolGroups = new(StringComparer.Ordinal);
     private readonly HashSet<string> _journalWarnings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SemaphoreSlim> _holdTurns = new(StringComparer.Ordinal);
+    private readonly HashSet<SqliteUnit> _heldUnits = [];
     private bool _disposed;
 
     /// <summary>
@@ -167,6 +169,24 @@ internal sealed class SqliteConnections(
     /// </summary>
     internal ValueTask<IAtomicCommitScope> BeginUnit(string connectionString, string source, CancellationToken ct)
     {
+        var (box, previous, key, normalized) = PrepareUnit(connectionString, source);
+        return new ValueTask<IAtomicCommitScope>(OpenAtomicUnit(box, previous, key, normalized, ct));
+    }
+
+    /// <summary>
+    /// Begins a unit held across awaited application code (DATA-0166). Holds of one database in this process queue here,
+    /// asynchronously and in arrival order, for at most the busy timeout, so a waiter blocks no thread and observes its
+    /// cancellation; only the one at the head waits on the file, where another process may hold the lock. The unit takes
+    /// one operation at a time, because the flows that inherit it share one connection.
+    /// </summary>
+    internal ValueTask<IHeldTransaction> BeginHeldUnit(string connectionString, string source, CancellationToken ct)
+    {
+        var (box, previous, key, normalized) = PrepareUnit(connectionString, source);
+        return new ValueTask<IHeldTransaction>(OpenHeldUnit(box, previous, key, normalized, ct));
+    }
+
+    private (UnitBox Box, UnitBox? Previous, string Key, string Normalized) PrepareUnit(string connectionString, string source)
+    {
         PrepareManaged(connectionString);
         string normalized;
         lock (_gate)
@@ -178,7 +198,50 @@ internal sealed class SqliteConnections(
         var box = new UnitBox();
         var previous = AmbientUnit.Value;
         AmbientUnit.Value = box;
-        return new ValueTask<IAtomicCommitScope>(OpenUnit(box, previous, key, normalized, ct));
+        return (box, previous, key, normalized);
+    }
+
+    private async Task<IAtomicCommitScope> OpenAtomicUnit(UnitBox box, UnitBox? previous, string key, string normalized, CancellationToken ct) =>
+        await OpenUnit(box, previous, key, normalized, ct).ConfigureAwait(false);
+
+    private async Task<IHeldTransaction> OpenHeldUnit(
+        UnitBox box,
+        UnitBox? previous,
+        string key,
+        string normalized,
+        CancellationToken ct)
+    {
+        var bound = options.Value.BusyTimeout;
+        SemaphoreSlim turn;
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_holdTurns.TryGetValue(key, out turn!)) _holdTurns[key] = turn = new SemaphoreSlim(1, 1);
+        }
+        if (!await turn.WaitAsync(bound, ct).ConfigureAwait(false))
+            throw new SqliteException(
+                $"Another held transaction in this process kept the database for the whole busy timeout of {bound}.",
+                Constants.BusyCode);
+        SqliteUnit unit;
+        try
+        {
+            unit = await OpenUnit(box, previous, key, normalized, ct, turn, bound).ConfigureAwait(false);
+        }
+        catch
+        {
+            turn.Release();
+            throw;
+        }
+        lock (_gate)
+        {
+            if (!_disposed)
+            {
+                _heldUnits.Add(unit);
+                return unit;
+            }
+        }
+        await unit.Abort("the host stopped").ConfigureAwait(false);
+        throw new ObjectDisposedException(nameof(SqliteConnections));
     }
 
     /// <summary>
@@ -189,19 +252,23 @@ internal sealed class SqliteConnections(
     private string UnitKey(string connectionString, string source, string normalized) =>
         StoreIdentity(connectionString, source) ?? normalized;
 
-    private async Task<IAtomicCommitScope> OpenUnit(
+    private async Task<SqliteUnit> OpenUnit(
         UnitBox box,
         UnitBox? previous,
         string key,
         string normalized,
-        CancellationToken ct)
+        CancellationToken ct,
+        SemaphoreSlim? holdTurn = null,
+        TimeSpan operationBound = default)
     {
         var connection = Postured(new SqliteConnectionStringBuilder(normalized) { Pooling = false }.ToString());
         try
         {
             await connection.OpenAsync(ct).ConfigureAwait(false);
             var transaction = connection.BeginTransaction(deferred: false);
-            var unit = new SqliteUnit(key, connection, transaction, box, previous);
+            var unit = new SqliteUnit(key, connection, transaction, box, previous, holdTurn is null
+                ? null
+                : new HeldState(holdTurn, operationBound, Released));
             box.Unit = unit;
             return unit;
         }
@@ -227,25 +294,46 @@ internal sealed class SqliteConnections(
             : null;
     }
 
+    private void Released(SqliteUnit unit)
+    {
+        lock (_gate) _heldUnits.Remove(unit);
+    }
+
     internal sealed class UnitBox
     {
         public SqliteUnit? Unit;
     }
 
-    /// <summary>One native transaction and the connection it runs on, shared by every operation of an atomic commit.</summary>
+    /// <summary>What a held unit adds: this process's queue for the database, its own queue of operations, and who to tell when it ends.</summary>
+    internal sealed record HeldState(SemaphoreSlim HoldTurn, TimeSpan OperationBound, Action<SqliteUnit> Released)
+    {
+        public SemaphoreSlim Operations { get; } = new(1, 1);
+    }
+
+    /// <summary>
+    /// One native transaction and the connection it runs on, shared by every operation of an atomic commit or a hold. An
+    /// atomic commit dispatches in one flow, in order. A hold is shared by whatever flows inherit it, so each operation
+    /// takes its turn on the connection, which is not safe for concurrent use.
+    /// </summary>
     internal sealed class SqliteUnit(
         string key,
         SqliteConnection connection,
         SqliteTransaction transaction,
         UnitBox box,
-        UnitBox? previous) : IAtomicCommitScope
+        UnitBox? previous,
+        HeldState? held) : IHeldTransaction
     {
         private readonly Dictionary<string, Action> _undo = new(StringComparer.Ordinal);
         private bool _committed;
+        private int _finishing;
+        private int _released;
+        private volatile string? _endedBecause;
 
         public string Key => key;
         public SqliteConnection Connection => connection;
         public SqliteTransaction Transaction => transaction;
+        public bool IsHeld => held is not null;
+        public string? EndedBecause => _endedBecause;
 
         /// <summary>
         /// Registers what to forget if the unit rolls back: a schema the unit provisioned rolls back with it, and the
@@ -256,10 +344,55 @@ internal sealed class SqliteConnections(
             lock (_undo) _undo.TryAdd(target, undo);
         }
 
+        /// <summary>
+        /// Takes this operation's turn on a held unit, which ends when the returned turn is disposed; an atomic commit's
+        /// unit gives it at once. A turn that does not come within the busy timeout is refused, because a turn taken from
+        /// inside another, as a batch's mutate callback would, can never come.
+        /// </summary>
+        public async ValueTask<Turn> Enter(CancellationToken ct)
+        {
+            if (held is null) return default;
+            if (!await held.Operations.WaitAsync(held.OperationBound, ct).ConfigureAwait(false))
+                throw new InvalidOperationException(
+                    $"An operation waited {held.OperationBound} for its turn on a held transaction. A hold runs one operation " +
+                    "at a time; an operation started from inside another, such as a batch's mutate callback, can never get its turn.");
+            if (Volatile.Read(ref _finishing) == 0) return new Turn(held.Operations);
+            held.Operations.Release();
+            throw new InvalidOperationException(
+                $"The held transaction has ended{(_endedBecause is { } reason ? $": {reason}" : "")}, so this operation cannot join it.");
+        }
+
         public async Task Commit(CancellationToken ct)
         {
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-            _committed = true;
+            if (held is not null) await held.Operations.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (Interlocked.Exchange(ref _finishing, 1) != 0)
+                    throw new InvalidOperationException(
+                        $"The held transaction has ended{(_endedBecause is { } reason ? $": {reason}" : "")}, so it cannot commit.");
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                _committed = true;
+            }
+            finally
+            {
+                held?.Operations.Release();
+            }
+        }
+
+        public async ValueTask Abort(string reason)
+        {
+            if (held is not null) await held.Operations.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (Interlocked.Exchange(ref _finishing, 1) != 0) return;
+                _endedBecause = reason;
+                ForgetRolledBackSchema();
+                await Release().ConfigureAwait(false);
+            }
+            finally
+            {
+                held?.Operations.Release();
+            }
         }
 
         public ValueTask DisposeAsync()
@@ -267,17 +400,43 @@ internal sealed class SqliteConnections(
             // Leave the ambient first, synchronously, so no operation that follows in this flow joins a closed unit.
             box.Unit = null;
             if (ReferenceEquals(AmbientUnit.Value, box)) AmbientUnit.Value = previous;
-            if (!_committed)
-            {
-                Action[] undo;
-                lock (_undo) undo = _undo.Values.ToArray();
-                foreach (var action in undo) action();
-            }
+            return held is null ? Finish() : FinishAfterTheOperationInFlight();
+        }
+
+        private ValueTask Finish()
+        {
+            if (!_committed) ForgetRolledBackSchema();
+            Interlocked.Exchange(ref _finishing, 1);
             return Release();
+        }
+
+        private async ValueTask FinishAfterTheOperationInFlight()
+        {
+            await held!.Operations.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await Finish().ConfigureAwait(false);
+            }
+            finally
+            {
+                held.Operations.Release();
+            }
+        }
+
+        private void ForgetRolledBackSchema()
+        {
+            Action[] undo;
+            lock (_undo)
+            {
+                undo = _undo.Values.ToArray();
+                _undo.Clear();
+            }
+            foreach (var action in undo) action();
         }
 
         private async ValueTask Release()
         {
+            if (Interlocked.Exchange(ref _released, 1) != 0) return;
             try
             {
                 // An uncommitted transaction rolls back when it is disposed.
@@ -286,8 +445,19 @@ internal sealed class SqliteConnections(
             finally
             {
                 await connection.DisposeAsync().ConfigureAwait(false);
+                if (held is not null)
+                {
+                    held.Released(this);
+                    held.HoldTurn.Release();
+                }
             }
         }
+    }
+
+    /// <summary>An operation's turn on a held unit; the default value is no turn at all.</summary>
+    internal readonly struct Turn(SemaphoreSlim? operations) : IDisposable
+    {
+        public void Dispose() => operations?.Release();
     }
 
     public void PrepareManaged(string connectionString)
@@ -494,10 +664,17 @@ internal sealed class SqliteConnections(
 
     public void Dispose()
     {
+        SqliteUnit[] held;
         lock (_gate)
         {
             if (_disposed) return;
             _disposed = true;
+            held = _heldUnits.ToArray();
+        }
+        // A hold still open when the host stops ends here, so the host leaves no write lock behind (DATA-0166).
+        foreach (var unit in held) unit.Abort("the host stopped").AsTask().GetAwaiter().GetResult();
+        lock (_gate)
+        {
             foreach (var keeper in _keepers.Values) keeper.Dispose();
             foreach (var connectionString in _poolGroups)
                 SqliteConnection.ClearPool(new SqliteConnection(connectionString));

@@ -902,6 +902,7 @@ from `Koan:Data:Transactions`:
   "Koan": {
     "Data": {
       "Transactions": {
+        "HoldLimit": "00:00:20",
         "DefaultTimeout": "00:02:00",
         "LongRunningTransactionWarning": "00:00:30",
         "MaxTrackedOperations": 10000,
@@ -986,6 +987,38 @@ commit atomically: the provider does not declare 'write.atomicCommit'. Route the
 does (SQLite declares it), or use TransactionGuarantee.Coordinated, which dispatches sequentially and can
 leave a durable prefix." `EntityContext.CurrentTransaction.Capabilities` carries `TxCaps.Local` for such a
 scope and not for a coordinated one.
+
+**Holding the transaction from the start of the scope:**
+
+A deferred scope cannot read its own writes, and a read inside it can be overtaken before it commits. A scope that decides
+from what it reads holds the transaction from its start instead
+([DATA-0166](../decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md)):
+
+```csharp
+using (await EntityContext.Hold("reply", ct))
+{
+    var topic = await Topic.Get(topicId, ct);       // no other writer can change this now
+    var result = await new Post { TopicId = topicId, Sequence = topic!.Posts + 1 }.SaveWithOutcome(ct);
+    topic.Posts++;
+    await topic.Save(ct);
+    await EntityContext.Commit(ct);
+}
+```
+
+| Inside a deferred scope | Inside a hold |
+|---|---|
+| Save and Remove wait for `Commit` | every write acts when it is issued |
+| a read sees committed state | a read sees the scope's own writes |
+| `SaveWithOutcome`, `Insert`, conditional writes, batches, instructions refuse | they run inside it, and a receipt reports `NotCommitted` until `Commit` |
+| a lifecycle handler and a unique index act at `Commit` | they act at the save, and the scope can go on after a conflict |
+| other writers are kept out only while `Commit` runs | other writers wait from the start of the scope, in another process too |
+
+Awaiting `Hold` waits at most the store's busy timeout behind other writers, then throws `TransactionException` with
+`NotCommitted`; nothing was written, so the command can be tried again. Every other writer of the store waits while
+a hold lasts, so do no slow work inside one. Past `Koan:Data:Transactions:HoldLimit` (20 seconds) it rolls back, and every
+later operation and the commit report `NotCommitted`. Await `Hold` in the method that uses the scope, because an ambient
+context does not survive an async method's return. Name another route with `EntityContext.Source` before `Hold`. A route
+that cannot hold a transaction refuses, naming `write.heldTransaction`, rather than quietly deferring.
 
 **Cross-adapter coordination:**
 

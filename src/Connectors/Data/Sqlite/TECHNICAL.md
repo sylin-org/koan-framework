@@ -133,6 +133,26 @@ failed `COMMIT` reports `Unknown`
 own `query_only` connection and see committed state only. `UpsertMany`, `DeleteMany`, conditional bulk deletes and
 `Batch().Save` join the ambient transaction instead of beginning their own.
 
+## Held transaction
+
+The factory also implements `IHeldTransactionProvider` and declares `write.heldTransaction`
+([DATA-0166](../../../../docs/decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md)): the same unit,
+begun at the start of a scope and held across awaited application code. Three things differ. Holds of one database in a
+process queue on an asynchronous semaphore, for at most the busy timeout, so a waiter blocks no thread and observes its
+token; only the one at the head waits on the file, where another process may hold the lock, so a waiter that meets both
+waits at most twice the busy timeout. Every flow that inherits the hold shares one connection, which is not safe for
+concurrent use, so each operation, schema work included, takes a turn on it (`SqliteUnit.Enter`); a turn that does not come
+within the busy timeout is refused, as one taken from inside another's callback never would. And a raw read runs on the
+unit's connection under `query_only` for that one turn, so it sees what the hold wrote and still cannot write. A unit
+ends at commit, at disposal, at `IHeldTransaction.Abort` (the hold's limit), or when the host stops, which aborts every
+hold still open so that no write lock outlives the host. Once aborted it stays in the flow's ambient and refuses every
+operation, so a write that raced the abort cannot fall through to a connection of its own. A table first used inside a
+hold is created inside it and forgotten if the hold rolls back; until then another flow can see its readiness and fail on
+the missing table, so first use belongs at boot on a route that holds. `IMutationOutcomeRepository` reads whether the row
+exists inside the write's own immediate transaction, or the hold, so the answer cannot be overtaken. A named read on a lane
+keeps its own connection and sees committed state. An in-memory database has no WAL: a reader on another connection
+waits for the hold.
+
 ## Lexical index
 
 An entity's `[Lexical]` properties are served by one FTS5 external-content table per table

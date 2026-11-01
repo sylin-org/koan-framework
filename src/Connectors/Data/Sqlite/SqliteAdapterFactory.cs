@@ -29,7 +29,8 @@ public sealed class SqliteAdapterFactory :
     IDataAdapterFactory,
     IDataSourceIntegrationFactory,
     IDataAdapterSetup,
-    IAtomicCommitProvider
+    IAtomicCommitProvider,
+    IHeldTransactionProvider
 {
     public string Provider => Constants.Provider;
     public IReadOnlyCollection<string> Aliases => ["sqlite3"];
@@ -117,6 +118,17 @@ public sealed class SqliteAdapterFactory :
         var route = ResolveRoute(services, source);
         route.Policy.Demand(DataOperationEffect.Write, "atomic commit");
         return services.GetRequiredService<SqliteConnections>().BeginUnit(route.ConnectionString, route.Source, ct);
+    }
+
+    /// <summary>
+    /// One native transaction held from the start of a scope (DATA-0166): the same unit as an atomic commit, begun after
+    /// this process's other holds of the database have ended, and taking one operation at a time.
+    /// </summary>
+    public ValueTask<IHeldTransaction> BeginHeld(IServiceProvider services, string source, CancellationToken ct)
+    {
+        var route = ResolveRoute(services, source);
+        route.Policy.Demand(DataOperationEffect.Write, "held transaction");
+        return services.GetRequiredService<SqliteConnections>().BeginHeldUnit(route.ConnectionString, route.Source, ct);
     }
 
     public IDataRepository<TEntity, TKey> Create<TEntity, TKey>(

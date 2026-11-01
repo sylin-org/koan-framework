@@ -18,6 +18,7 @@ using Koan.Data.Core.Querying;
 using Koan.Data.Core.Routing;
 using Koan.Data.Core.Semantics;
 using Koan.Data.Core.Sorting;
+using Koan.Data.Core.Transactions;
 
 namespace Koan.Data.Core;
 
@@ -560,7 +561,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         // Source policy is the first semantic action. It runs before cancellation observation,
         // segmentation callbacks, cross-cutting guards, readiness, lifecycle, or provider work.
         _sourcePlan.Demand(effect, operation);
-        RefuseImmediateWriteInDeferredScope(effect, operation);
+        AdmitToTransactionScope(effect, operation);
         // A declared lexical index the route cannot keep refuses the first write, before anything is held, so the
         // application never runs on a store that cannot search what it declared.
         if (effect != DataOperationEffect.Read && _lexicalRefusal is not null)
@@ -596,14 +597,19 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     /// NK-043/NK-044: Data defers single and bulk Save/Remove inside <c>EntityContext.Transaction</c>, so a write that
     /// reaches the facade there is one that cannot be deferred (DeleteAll, RemoveAll, Patch, Batch, instructions,
     /// transfers, a lifecycle- or extension-issued write). It would be durable before Commit and survive Rollback, so it
-    /// refuses before any write instead. Schema provisioning carries no rows and stays available.
+    /// refuses before any write instead. Schema provisioning carries no rows and stays available. A held scope has no such
+    /// write: its native transaction takes every write of its route, and it admits or refuses the rest (DATA-0166).
     /// </summary>
-    private static void RefuseImmediateWriteInDeferredScope(DataOperationEffect effect, string operation)
+    private void AdmitToTransactionScope(DataOperationEffect effect, string operation)
     {
-        if (effect == DataOperationEffect.Read ||
-            operation is EnsureReadyOperation or SchemaInstructionOperation ||
-            EntityContext.Current?.TransactionCoordinator is not { } coordinator)
+        if (EntityContext.Current?.TransactionCoordinator is not { } coordinator) return;
+        var carriesNoRows = effect == DataOperationEffect.Read || operation is EnsureReadyOperation or SchemaInstructionOperation;
+        if (coordinator is TransactionCoordinator { IsHeld: true } held)
+        {
+            held.AdmitToHold(_routeBinding, writes: !carriesNoRows, operation, typeof(TEntity).Name);
             return;
+        }
+        if (carriesNoRows) return;
         throw new NotSupportedException(
             $"'{operation}' on '{typeof(TEntity).Name}' cannot be deferred by the ambient EntityContext.Transaction " +
             $"('{coordinator.Name}'): it would run now and survive Rollback. Use Save/Remove (single or collection), " +
@@ -1019,7 +1025,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
     {
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity insert", ct, ensureReadiness: false);
         ArgumentNullException.ThrowIfNull(model);
-        if (EntityContext.Current?.TransactionCoordinator is not null)
+        if (EntityContext.Current?.Deferring is not null)
             throw new NotSupportedException(
                 "Atomic insertion cannot run in a deferred coordination scope. Perform the insertion outside that scope.");
         if (!DataCaps.Describe(_inner, _inner.GetType().Name).Has(DataCaps.Write.InsertOnly) ||
@@ -1074,8 +1080,17 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         if (!EqualityComparer<TKey>.Default.Equals(current.Id, result.Key))
             AggregateMetadata.GetIdSpec(current.GetType())!.Prop.SetValue(current, result.Key);
         if (context is not null) await Lifecycle!.CompleteUpsert(context, current);
-        return result with { Entity = current };
+        return InScope(result with { Entity = current });
     }
+
+    /// <summary>
+    /// The receipt's commit fact as the caller can rely on it: inside a held scope the write has happened and nothing is
+    /// committed until the scope commits, so only <c>Commit</c> can report <see cref="DataCommitOutcome.Committed"/> (DATA-0166).
+    /// </summary>
+    private static MutationResult<TEntity, TKey> InScope(MutationResult<TEntity, TKey> result)
+        => EntityContext.Current?.TransactionCoordinator is { IsHeld: true }
+            ? result with { CommitOutcome = DataCommitOutcome.NotCommitted }
+            : result;
 
     async Task<MutationResult<TEntity, TKey>> IDataMutationOutcomes<TEntity, TKey>.UpsertWithOutcome(
         TEntity model,
@@ -1121,7 +1136,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                 DataCommitOutcome.Unknown);
 
         if (context is not null) await Lifecycle!.CompleteUpsert(context, current);
-        return result with { Entity = current };
+        return InScope(result with { Entity = current });
     }
 
     async Task<MutationResult<TEntity, TKey>> IDataMutationOutcomes<TEntity, TKey>.DeleteWithOutcome(
@@ -1144,8 +1159,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
             return new MutationResult<TEntity, TKey>(
                 id, MutationOutcome.Conflict, current, DataCommitOutcome.NotCommitted);
         if (context is not null) await Lifecycle!.CompleteRemove(context);
-        return new MutationResult<TEntity, TKey>(
-            current.Id, MutationOutcome.Deleted, current, DataCommitOutcome.Committed);
+        return InScope(new MutationResult<TEntity, TKey>(
+            current.Id, MutationOutcome.Deleted, current, DataCommitOutcome.Committed));
     }
 
     public async Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
@@ -1398,7 +1413,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         if (FilterSplitter.Split(frozen, guardSupport, typeof(TEntity)).Residual is not null)
             throw new NotSupportedException("Conditional replacement requires a complete native row predicate. CLR or residual guards are not supported.");
         DemandConditionalFields(frozen);
-        if (routing?.TransactionCoordinator is not null)
+        if (routing?.Deferring is not null)
             throw new NotSupportedException("Conditional replacement cannot run in a deferred coordination scope.");
 
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity conditional replace", ct, ensureReadiness: false);
@@ -1449,7 +1464,7 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         if (FilterSplitter.Split(frozen, guardSupport, typeof(TEntity)).Residual is not null)
             throw new NotSupportedException("Conditional deletion requires a complete native row predicate. CLR or residual guards are not supported.");
         DemandConditionalFields(frozen);
-        if (routing?.TransactionCoordinator is not null)
+        if (routing?.Deferring is not null)
             throw new NotSupportedException("Conditional deletion cannot run in a deferred coordination scope.");
 
         await using var operationScope = await Guard(DataOperationEffect.Write, "entity conditional delete", ct, ensureReadiness: false);

@@ -466,17 +466,17 @@ public static partial class Data<TEntity, TKey>
     public static Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
         var context = EntityContext.Current;
-        if (context?.TransactionCoordinator != null)
+        if (context?.Deferring is { } deferring)
         {
             var repo = Repo;
             ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred entity delete");
-            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context);
+            deferring.TrackDelete<TEntity, TKey>(id, context);
             return Task.FromResult(true);
         }
         return Repo.Delete(id, ct);
     }
     public static Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
-        => EntityContext.Current is { TransactionCoordinator: not null } context
+        => EntityContext.Current is { Deferring: not null } context
             ? Task.FromResult(TrackDeletes(ids, context, "deferred entity bulk delete"))
             : Repo.DeleteMany(ids, ct);
 
@@ -489,7 +489,7 @@ public static partial class Data<TEntity, TKey>
         var tracked = 0;
         foreach (var id in ids)
         {
-            context.TransactionCoordinator!.TrackDelete<TEntity, TKey>(id, context);
+            context.Deferring!.TrackDelete<TEntity, TKey>(id, context);
             tracked++;
         }
         return tracked;
@@ -508,7 +508,7 @@ public static partial class Data<TEntity, TKey>
         foreach (var model in models)
         {
             await manager.EnsureIdAsync<TEntity, TKey>(model, ct).ConfigureAwait(false);
-            context.TransactionCoordinator!.TrackSave<TEntity, TKey>(model, context);
+            context.Deferring!.TrackSave<TEntity, TKey>(model, context);
             tracked++;
         }
         return tracked;
@@ -550,13 +550,13 @@ public static partial class Data<TEntity, TKey>
     public static async Task<TEntity> Upsert(TEntity model, CancellationToken ct = default)
     {
         var context = EntityContext.Current;
-        if (context?.TransactionCoordinator != null)
+        if (context?.Deferring is { } deferring)
         {
             var repo = Repo;
             ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred entity upsert");
             var manager = AppHost.GetRequiredService<IAggregateIdentityManager>(IdentityOperation);
             await manager.EnsureIdAsync<TEntity, TKey>(model, ct);
-            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context);
+            deferring.TrackSave<TEntity, TKey>(model, context);
             return model;
         }
         return await Repo.Upsert(model, ct);
@@ -566,7 +566,7 @@ public static partial class Data<TEntity, TKey>
         TEntity model,
         CancellationToken ct = default)
     {
-        if (EntityContext.Current?.TransactionCoordinator is not null)
+        if (EntityContext.Current?.Deferring is not null)
             throw new NotSupportedException(
                 "A deferred coordination scope cannot return an upsert outcome before commit. Use Save, or perform SaveWithOutcome outside that scope.");
         var repo = Repo;
@@ -577,14 +577,14 @@ public static partial class Data<TEntity, TKey>
         TKey id,
         CancellationToken ct = default)
     {
-        if (EntityContext.Current?.TransactionCoordinator is not null)
+        if (EntityContext.Current?.Deferring is not null)
             throw new NotSupportedException(
                 "A deferred coordination scope cannot return a delete outcome before commit. Use Remove, or perform RemoveWithOutcome outside that scope.");
         var repo = Repo;
         return ((IDataMutationOutcomes<TEntity, TKey>)repo).DeleteWithOutcome(id, ct);
     }
     public static Task<int> UpsertMany(IEnumerable<TEntity> models, CancellationToken ct = default)
-        => EntityContext.Current is { TransactionCoordinator: not null } context
+        => EntityContext.Current is { Deferring: not null } context
             ? TrackSaves(models, context, "deferred entity bulk upsert", ct)
             : Repo.UpsertMany(models, ct);
     public static IBatchSet<TEntity, TKey> Batch() => Repo.CreateBatch();
@@ -837,11 +837,11 @@ public static partial class Data<TEntity, TKey>
     public static Task<TEntity> Upsert(TEntity model, string partition, CancellationToken ct = default)
     {
         var context = EntityContext.Current;
-        if (context?.TransactionCoordinator != null)
+        if (context?.Deferring is { } deferring)
         {
             var repo = Repo;
             ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred partition entity upsert");
-            context.TransactionCoordinator.TrackSave<TEntity, TKey>(model, context with { Partition = partition });
+            deferring.TrackSave<TEntity, TKey>(model, context with { Partition = partition });
             return Task.FromResult(model);
         }
         using var _ = WithPartition(partition);
@@ -851,11 +851,11 @@ public static partial class Data<TEntity, TKey>
     public static Task<bool> Delete(TKey id, string partition, CancellationToken ct = default)
     {
         var context = EntityContext.Current;
-        if (context?.TransactionCoordinator != null)
+        if (context?.Deferring is { } deferring)
         {
             var repo = Repo;
             ((IDataOperationGate)repo).Demand(DataOperationEffect.Write, "deferred partition entity delete");
-            context.TransactionCoordinator.TrackDelete<TEntity, TKey>(id, context with { Partition = partition });
+            deferring.TrackDelete<TEntity, TKey>(id, context with { Partition = partition });
             return Task.FromResult(true);
         }
         using var _ = WithPartition(partition);
@@ -864,7 +864,7 @@ public static partial class Data<TEntity, TKey>
 
     public static Task<int> UpsertMany(IEnumerable<TEntity> models, string partition, CancellationToken ct = default)
     {
-        if (EntityContext.Current is { TransactionCoordinator: not null } context)
+        if (EntityContext.Current is { Deferring: not null } context)
             return TrackSaves(models, context with { Partition = partition }, "deferred partition entity bulk upsert", ct);
         using var _ = WithPartition(partition);
         return Repo.UpsertMany(models, ct);
@@ -872,7 +872,7 @@ public static partial class Data<TEntity, TKey>
 
     public static Task<int> DeleteMany(IEnumerable<TKey> ids, string partition, CancellationToken ct = default)
     {
-        if (EntityContext.Current is { TransactionCoordinator: not null } context)
+        if (EntityContext.Current is { Deferring: not null } context)
             return Task.FromResult(TrackDeletes(ids, context with { Partition = partition }, "deferred partition entity bulk delete"));
         using var _ = WithPartition(partition);
         return Repo.DeleteMany(ids, ct);

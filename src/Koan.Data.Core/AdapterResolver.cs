@@ -146,6 +146,48 @@ internal static class AdapterResolver
         return ResolveDefault(services);
     }
 
+    /// <summary>
+    /// The route the ambient context names with no entity in hand: its source, its adapter, or the default route. A scope
+    /// that begins before any entity is touched (DATA-0166) has only this to go on.
+    /// </summary>
+    internal static AdapterResolutionDecision ResolveDecisionForContext(
+        IServiceProvider services,
+        DataSourceRegistry sourceRegistry)
+    {
+        var context = EntityContext.Current;
+        var providers = services.GetRequiredService<DataProviderCatalog>();
+        if (!string.IsNullOrWhiteSpace(context?.Source))
+        {
+            var source = sourceRegistry.GetSource(context.Source);
+            if (source is null || string.IsNullOrWhiteSpace(source.Adapter))
+                throw new InvalidOperationException(
+                    $"Source '{context.Source}' is not configured with an adapter. " +
+                    $"Add 'Adapter' to Koan:Data:Sources:{context.Source}.");
+            return Required(
+                services,
+                sourceRegistry,
+                providers,
+                source.Adapter,
+                context.Source,
+                DataRouteOrigin.ExplicitSource,
+                Constants.Diagnostics.Reasons.ContextSource,
+                $"Correct Koan:Data:Sources:{context.Source}:Adapter or reference the requested connector.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(context?.Adapter))
+            return Required(
+                services,
+                sourceRegistry,
+                providers,
+                context.Adapter,
+                "Default",
+                DataRouteOrigin.AmbientAdapter,
+                Constants.Diagnostics.Reasons.ContextAdapter,
+                "Correct EntityContext.Adapter or reference the requested connector.");
+
+        return ResolveDefault(services);
+    }
+
     internal static AdapterResolutionDecision ResolveDefault(IServiceProvider services)
         => services.GetRequiredService<DefaultDataRouteAuthority>().ResolveDefault();
 

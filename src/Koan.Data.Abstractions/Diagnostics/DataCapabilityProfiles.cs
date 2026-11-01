@@ -20,6 +20,7 @@ public static class DataCapabilityProfiles
             [DataCaps.Write.BulkDelete] = DataClaimProfiles.EntityPersistence,
             [DataCaps.Write.AtomicBatch] = DataClaimProfiles.AtomicBatch,
             [DataCaps.Write.AtomicCommit] = DataClaimProfiles.AtomicCommit,
+            [DataCaps.Write.HeldTransaction] = DataClaimProfiles.HeldTransaction,
             [DataCaps.Write.MutationOutcomes] = DataClaimProfiles.EntityPersistence,
             [DataCaps.Write.FastRemove] = DataClaimProfiles.EntityPersistence,
             [DataCaps.Write.ConditionalReplace] = DataClaimProfiles.ConditionalReplace,

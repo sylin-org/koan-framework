@@ -34,6 +34,12 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
     }
 
     public ITransactionCoordinator Create(string name, TransactionGuarantee guarantee = TransactionGuarantee.Coordinated)
+        => Create(name, guarantee, isHeld: false);
+
+    public ITransactionCoordinator CreateHeld(string name)
+        => Create(name, TransactionGuarantee.Atomic, isHeld: true);
+
+    private TransactionCoordinator Create(string name, TransactionGuarantee guarantee, bool isHeld)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Transaction name cannot be null or empty", nameof(name));
@@ -46,6 +52,7 @@ internal sealed class TransactionCoordinatorFactory : ITransactionCoordinatorFac
             _providers,
             _logger,
             _options,
-            guarantee);
+            guarantee,
+            isHeld);
     }
 }

@@ -12,4 +12,11 @@ public interface ITransactionCoordinatorFactory
     /// <param name="name">Transaction name for correlation and telemetry</param>
     /// <param name="guarantee">What the scope promises at commit</param>
     ITransactionCoordinator Create(string name, TransactionGuarantee guarantee = TransactionGuarantee.Coordinated);
+
+    /// <summary>
+    /// Create a coordinator whose scope holds a native transaction from its start (DATA-0166). Nothing is begun until
+    /// <see cref="EntityContext.Hold"/> begins it.
+    /// </summary>
+    /// <param name="name">Transaction name for correlation and telemetry</param>
+    ITransactionCoordinator CreateHeld(string name);
 }
