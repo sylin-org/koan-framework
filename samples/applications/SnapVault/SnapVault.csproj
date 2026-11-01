@@ -53,9 +53,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Pinned to the ImageSharp line used by Koan.Media.Core. -->
-    <PackageReference Include="SixLabors.ImageSharp" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
+    <!-- Reads camera, capture date and GPS from an upload; Apache-2.0. -->
+    <PackageReference Include="MetadataExtractor" />
   </ItemGroup>
 
 </Project>

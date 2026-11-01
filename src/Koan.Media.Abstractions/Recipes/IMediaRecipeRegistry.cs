@@ -8,7 +8,7 @@ namespace Koan.Media.Abstractions.Recipes;
 /// Resolution order during URL handling:
 /// <list type="number">
 ///   <item>Named recipe → returns the recipe</item>
-///   <item>Format shortcut (<c>png</c>, <c>jpeg</c>, <c>webp</c>, <c>gif</c>, <c>avif</c>) → synthesises an EncodeAs recipe</item>
+///   <item>Format shortcut (<c>png</c>, <c>jpeg</c>, <c>webp</c>) → synthesises an EncodeAs recipe</item>
 ///   <item>Unrecognised seed → 404</item>
 /// </list>
 /// </summary>

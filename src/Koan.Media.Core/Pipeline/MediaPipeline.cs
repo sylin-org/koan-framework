@@ -5,12 +5,7 @@ using Koan.Media.Core.Fonts;
 using Koan.Media.Core.Formats;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Metadata;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Processing.Processors.Transforms;
+using SkiaSharp;
 
 namespace Koan.Media.Core.Pipeline;
 
@@ -20,7 +15,7 @@ namespace Koan.Media.Core.Pipeline;
 /// <list type="bullet">
 ///   <item>Single decode, multi-output via <see cref="MaterializeAsync"/></item>
 ///   <item>Format-preserving by default; <see cref="FlattenTo"/> opts into destructive change</item>
-///   <item>ImageSharp's <c>Image</c> already applies <c>Mutate(IImageProcessingContext)</c> to all frames, so animation survives resize/crop/rotate transparently</item>
+///   <item>Every transform maps over every frame, so animation survives resize/crop/rotate</item>
 /// </list>
 ///
 /// Disposal: source stream is disposed at the first terminal call
@@ -143,8 +138,7 @@ public sealed class MediaPipeline : IMediaPipeline
         Resize(maxWidth, maxHeight).Shape(fit: Fit.Contain);
 
     public IMediaPipeline ResizeCover(int width, int height, Position? position = null) =>
-        // Resize+Fit.Cover maps to ImageSharp's ResizeMode.Crop which already
-        // does scale-then-crop natively. Adding an explicit CropSpec.Pixels
+        // Resize+Fit.Cover already scales then crops. Adding an explicit CropSpec.Pixels
         // here would cause the Shape stage (40) to do a literal pixel-rect
         // crop BEFORE the Size stage (50) ever runs — producing a center
         // chunk of the source instead of a cover-scaled thumbnail.
@@ -232,22 +226,16 @@ public sealed class MediaPipeline : IMediaPipeline
         _consumed = true;
         try
         {
-            // MEDIA-0006: SVG pre-decode branch. The header sniff is the
-            // first thing every terminal does — Image.LoadAsync throws on
-            // SVG, and Content-Type / extension cannot be trusted.
-            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
-            if (svgBytes is not null)
-            {
-                SvgValidator.ValidateOrThrow(svgBytes);
-                return BuildSvgMediaInfo(svgBytes);
-            }
+            var source = await MediaDecoder.ReadSourceAsync(_source, _limits, ct).ConfigureAwait(false);
 
-            if (_source.CanSeek) _source.Position = 0;
-            // Full LoadAsync (not Identify-only) so the alpha-channel and frame-count
-            // info are reliably populated across all input formats. Probe is rarely
-            // hot; correctness wins over the millisecond savings.
-            using var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
-            return BuildMediaInfo(image);
+            // MEDIA-0006: SVG branch. The header sniff is the first thing
+            // every terminal does — Content-Type / extension cannot be trusted.
+            if (IsSvg(source))
+            {
+                SvgValidator.ValidateOrThrow(source);
+                return BuildSvgMediaInfo(source);
+            }
+            return MediaDecoder.Probe(source, _limits);
         }
         finally
         {
@@ -283,13 +271,12 @@ public sealed class MediaPipeline : IMediaPipeline
     }
 
     /// <summary>
-    /// Streaming terminal. Decodes the source, plans the pipeline, runs
-    /// the mutating stages, and encodes directly into
-    /// <paramref name="destination"/> via ImageSharp's
-    /// <see cref="Image.SaveAsync(Stream, IImageEncoder, CancellationToken)"/>.
-    /// No <see cref="MemoryStream"/> sits between the encoder and the
-    /// destination — animated and high-resolution encodes stream
-    /// through without buffering the full output. Per MEDIA-0008.
+    /// Streaming terminal. Decodes the source, plans the pipeline, runs the
+    /// mutating stages, and writes the encoded output into
+    /// <paramref name="destination"/> asynchronously, so an HTTP response
+    /// body that refuses synchronous writes is a valid destination. Per
+    /// MEDIA-0008, with the buffering MEDIA-0010 states: the encoders are
+    /// synchronous, so the encoded output sits in native memory until copied.
     /// </summary>
     public async Task<MediaOutput> WriteToAsync(Stream destination, CancellationToken ct = default)
     {
@@ -298,36 +285,26 @@ public sealed class MediaPipeline : IMediaPipeline
         _consumed = true;
         try
         {
-            // MEDIA-0006: SVG pre-decode branch. Validate, plan against a
-            // synthetic Vector probe, rasterize at the planner's forward-
-            // derived target, and hand a PNG MemoryStream off to the
-            // existing ImageSharp encode chain. The raw SVG is the source
-            // of truth in storage; rasterization only fires when a recipe
-            // demands a Raster target. Per MEDIA-0008 §d the SVG path
-            // remains buffered to a MemoryStream for the intermediate
-            // Skia-produced PNG, then streams the final raster encode.
-            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
-            if (svgBytes is not null)
+            var source = await MediaDecoder.ReadSourceAsync(_source, _limits, ct).ConfigureAwait(false);
+
+            // MEDIA-0006: SVG branch. Validate, plan against a synthetic
+            // Vector probe, rasterize at the planner's forward-derived
+            // target, and hand the PNG to the raster chain. The raw SVG is
+            // the source of truth in storage; rasterization only fires when
+            // a recipe demands a Raster target.
+            if (IsSvg(source))
             {
-                return await StreamEncodeSvgAsync(svgBytes, destination, ct).ConfigureAwait(false);
+                return await StreamEncodeSvgAsync(source, destination, ct).ConfigureAwait(false);
             }
 
-            if (_source.CanSeek) _source.Position = 0;
-            var image = await LoadOrThrowAsync(_source, ct).ConfigureAwait(false);
-            try
-            {
-                // MEDIA-0005: plan before execute. The planner is a pure
-                // function over (probe, steps, encoderAccepts); a failing plan
-                // throws synchronously and never reaches the encode pass.
-                var probe = BuildMediaInfo(image);
-                var plan = PlanOrThrow(probe, _steps);
-                return await StreamEncodeAsync(
-                    image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, destination, ct).ConfigureAwait(false);
-            }
-            finally
-            {
-                image.Dispose();
-            }
+            using var image = MediaDecoder.Decode(source, _limits, ct);
+
+            // MEDIA-0005: plan before execute. The planner is a pure
+            // function over (probe, steps, encoderAccepts); a failing plan
+            // throws synchronously and never reaches the encode pass.
+            var plan = PlanOrThrow(image.Info, _steps);
+            return await StreamEncodeAsync(
+                image, _steps, _overlayResolver, _fonts, _limits, _overlayDepth, _logger, plan, destination, ct).ConfigureAwait(false);
         }
         finally
         {
@@ -335,13 +312,12 @@ public sealed class MediaPipeline : IMediaPipeline
         }
     }
 
+    private static bool IsSvg(byte[] source) =>
+        SvgFormat.MatchHeader(source.AsSpan(0, Math.Min(source.Length, SvgFormat.HeaderSniffBytes)));
+
     /// <summary>
-    /// MEDIA-0006 + MEDIA-0008 streaming SVG terminal: validate, plan,
-    /// rasterize, then stream the recipe's terminal raster encode
-    /// directly into <paramref name="destination"/>. The intermediate
-    /// PNG bytes flow through a <see cref="MemoryStream"/> per MEDIA-0008
-    /// §d (Svg.Skia is buffered by nature; the streaming win comes from
-    /// the final encode).
+    /// MEDIA-0006 streaming SVG terminal: validate, plan, rasterize, then
+    /// run the recipe's stages and terminal encode on the rasterized pixels.
     /// </summary>
     private async Task<MediaOutput> StreamEncodeSvgAsync(byte[] svgBytes, Stream destination, CancellationToken ct)
     {
@@ -357,26 +333,18 @@ public sealed class MediaPipeline : IMediaPipeline
         // pipeline — the rasterizer has already produced bytes at the
         // planner's forward-derived target. Author steps (Resize, Shape,
         // Encode) flow through unchanged.
-        using var rasterized = new MemoryStream(pngBytes, writable: false);
-        var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
-        try
+        using var image = MediaDecoder.Decode(pngBytes, _limits, ct);
+
+        // Re-plan against the raster-sided probe so KindTrace records the
+        // full Vector -> Raster -> Encode transition.
+        var rasterPlan = PlanOrThrow(image.Info, _steps);
+        var output = await StreamEncodeAsync(
+            image, _steps, _overlayResolver, _fonts, _limits, _overlayDepth, _logger, rasterPlan, destination, ct).ConfigureAwait(false);
+        return output with
         {
-            // Re-plan against the raster-sided probe so KindTrace records the
-            // full Vector -> Raster -> Encode transition.
-            var rasterProbe = BuildMediaInfo(image);
-            var rasterPlan = PlanOrThrow(rasterProbe, _steps);
-            var output = await StreamEncodeAsync(
-                image, _steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, destination, ct).ConfigureAwait(false);
-            return output with
-            {
-                SourceFormat = SvgFormat.Slug,
-                KindTrace = plan.KindTrace,
-            };
-        }
-        finally
-        {
-            image.Dispose();
-        }
+            SourceFormat = SvgFormat.Slug,
+            KindTrace = plan.KindTrace,
+        };
     }
 
     private static (int Width, int Height) ResolveRasterizeTarget(PlanResult plan, MediaInfo svgProbe)
@@ -433,7 +401,7 @@ public sealed class MediaPipeline : IMediaPipeline
     /// Resolve the terminal encoder's admission set. The terminal step
     /// is the last <see cref="EncodeStep"/> / <see cref="FlattenToStep"/>;
     /// when absent or null-format (preserve source), fall back to the
-    /// source's own format slug.
+    /// format preserving the source writes.
     /// </summary>
     private static KindSet ResolveTerminalEncoderAccepts(IReadOnlyList<MediaStep> steps, string sourceFormatSlug)
     {
@@ -447,70 +415,18 @@ public sealed class MediaPipeline : IMediaPipeline
                     i = -1;
                     break;
                 case EncodeStep encode:
-                    targetSlug = encode.Format ?? sourceFormatSlug;
+                    targetSlug = encode.Format ?? EncoderSelector.PreservedFormat(sourceFormatSlug);
                     i = -1;
                     break;
             }
         }
-        targetSlug ??= sourceFormatSlug;
+        targetSlug ??= EncoderSelector.PreservedFormat(sourceFormatSlug);
         var accepts = EncoderAccepts.AcceptsFor(targetSlug);
         // Unregistered encoders fall through with KindSet.None; if we got
         // None for an unknown slug, leave it null so the planner doesn't
-        // refuse the source kind against an empty set (the existing
-        // EncoderSelector.For will throw NotSupportedException downstream).
+        // refuse the source kind against an empty set (EncoderSelector.Encode
+        // throws NotSupportedException downstream).
         return accepts.IsEmpty ? KindSet.All : accepts;
-    }
-
-    /// <summary>
-    /// Peek the first <see cref="SvgFormat.HeaderSniffBytes"/> bytes of the
-    /// source and, if the prefix matches the SVG sniff, return the entire
-    /// payload as a byte array. Returns null when the stream is not SVG
-    /// (the source is rewound for the existing ImageSharp path). The
-    /// returned bytes are subject to <see cref="SvgValidator.MaxSourceBytes"/>;
-    /// payloads beyond the cap are still read, then rejected at validation
-    /// time so the failure mode is one validator, one allowlist.
-    /// </summary>
-    private static async Task<byte[]?> TryReadSvgBytesAsync(Stream source, CancellationToken ct)
-    {
-        if (source is null) return null;
-
-        if (!source.CanSeek)
-        {
-            // Without seek we cannot rewind for the non-SVG fallback;
-            // route the entire stream through a buffered MemoryStream so
-            // the sniff can read freely. This is the legacy-stream slow
-            // path; CanSeek streams (the common case) take the cheap one.
-            // Note: callers that hand us non-seekable streams will incur
-            // a full copy here, but the overall cost is dominated by the
-            // decoder anyway.
-            return await BufferIfSvgAsync(source, ct).ConfigureAwait(false);
-        }
-
-        var origin = source.Position;
-        var header = new byte[SvgFormat.HeaderSniffBytes];
-        var read = await source.ReadAtLeastAsync(header, SvgFormat.HeaderSniffBytes, throwOnEndOfStream: false, ct).ConfigureAwait(false);
-        source.Position = origin;
-        if (!SvgFormat.MatchHeader(header.AsSpan(0, read)))
-        {
-            return null;
-        }
-
-        // SVG confirmed — read the full payload. We buffer here so the
-        // raster fallback can replace the stream with PNG bytes without
-        // touching the original source again.
-        using var ms = new MemoryStream();
-        await source.CopyToAsync(ms, ct).ConfigureAwait(false);
-        return ms.ToArray();
-    }
-
-    private static async Task<byte[]?> BufferIfSvgAsync(Stream source, CancellationToken ct)
-    {
-        using var ms = new MemoryStream();
-        await source.CopyToAsync(ms, ct).ConfigureAwait(false);
-        var bytes = ms.ToArray();
-        return SvgFormat.MatchHeader(bytes.AsSpan(0, Math.Min(bytes.Length, SvgFormat.HeaderSniffBytes)))
-            ? bytes
-            : null;
     }
 
     /// <summary>
@@ -565,93 +481,6 @@ public sealed class MediaPipeline : IMediaPipeline
             HasIccProfile: false);
     }
 
-    private async Task<Image> LoadOrThrowAsync(Stream source, CancellationToken ct)
-    {
-        // Pre-decode safety: if limits are configured, run a header-only
-        // Identify pass and reject oversized sources before allocating
-        // the full decoded buffer.
-        if (_limits.MaxSourceMegapixels > 0 || _limits.MaxFrameCount > 0)
-        {
-            await EnforceLimitsAsync(source, ct).ConfigureAwait(false);
-        }
-
-        try
-        {
-            return await Image.LoadAsync(source, ct).ConfigureAwait(false);
-        }
-        catch (SixLabors.ImageSharp.UnknownImageFormatException ex)
-        {
-            throw new MediaDecodeException("Source bytes did not match any registered image format.", ex);
-        }
-        catch (SixLabors.ImageSharp.InvalidImageContentException ex)
-        {
-            throw new MediaDecodeException($"Source bytes failed to decode: {ex.Message}", ex);
-        }
-    }
-
-    private async Task EnforceLimitsAsync(Stream source, CancellationToken ct)
-    {
-        if (!source.CanSeek)
-        {
-            // We need to re-read the bytes after the Identify pass; without
-            // seek support we can't enforce limits cheaply. Skip silently —
-            // most real-world inputs are seekable streams.
-            return;
-        }
-
-        var pos = source.Position;
-        ImageInfo? info;
-        try
-        {
-            info = await Image.IdentifyAsync(source, ct).ConfigureAwait(false);
-        }
-        catch (SixLabors.ImageSharp.UnknownImageFormatException)
-        {
-            // Defer to the full LoadAsync below; it will throw MediaDecodeException
-            // with a consistent error shape.
-            source.Position = pos;
-            return;
-        }
-        catch (SixLabors.ImageSharp.InvalidImageContentException)
-        {
-            // Corrupt-but-format-recognised source (e.g. PNG CRC mismatch on
-            // an IDAT chunk). Identify pre-decodes far enough to hit the
-            // corruption; LoadAsync would surface the same error wrapped as
-            // MediaDecodeException with the consistent error shape. Defer to
-            // it so the controller's existing 422 handler catches it instead
-            // of a raw ImageSharp exception escaping the pipeline as a 500.
-            source.Position = pos;
-            return;
-        }
-        finally
-        {
-            source.Position = pos;
-        }
-
-        if (info is null) return;
-
-        if (_limits.MaxSourceMegapixels > 0)
-        {
-            // Round up so a 100.01-megapixel source still trips a 100-cap.
-            var megapixels = (long)Math.Ceiling((info.Width * (long)info.Height) / 1_000_000.0);
-            if (megapixels > _limits.MaxSourceMegapixels)
-            {
-                throw new MediaSourceLimitException(
-                    "maxSourceMegapixels", megapixels, _limits.MaxSourceMegapixels);
-            }
-        }
-
-        if (_limits.MaxFrameCount > 0)
-        {
-            var frames = info.FrameMetadataCollection?.Count ?? 1;
-            if (frames > _limits.MaxFrameCount)
-            {
-                throw new MediaSourceLimitException(
-                    "maxFrameCount", frames, _limits.MaxFrameCount);
-            }
-        }
-    }
-
     public async Task<MediaBundle> MaterializeAsync(Action<MediaBundleBuilder> configure, CancellationToken ct = default)
     {
         if (configure is null) throw new ArgumentNullException(nameof(configure));
@@ -664,24 +493,23 @@ public sealed class MediaPipeline : IMediaPipeline
 
         try
         {
+            var source = await MediaDecoder.ReadSourceAsync(_source, _limits, ct).ConfigureAwait(false);
+
             // MEDIA-0006: SVG bundle path. Validate once, then rasterize
             // per-distinct-target across variants (dedupe key = (w, h)
             // tuple). Each branch re-enters the raster pipeline against
             // its dedicated PNG decode.
-            var svgBytes = await TryReadSvgBytesAsync(_source, ct).ConfigureAwait(false);
-            if (svgBytes is not null)
+            if (IsSvg(source))
             {
-                return await MaterializeSvgAsync(svgBytes, builder, ct).ConfigureAwait(false);
+                return await MaterializeSvgAsync(source, builder, ct).ConfigureAwait(false);
             }
 
-            if (_source.CanSeek) _source.Position = 0;
             // Decode once; clone per variant so transforms don't bleed across branches.
-            using var sourceImage = await Image.LoadAsync(_source, ct).ConfigureAwait(false);
+            using var sourceImage = MediaDecoder.Decode(source, _limits, ct);
 
             // MEDIA-0005: one probe drives planning for every branch (the
             // source kind is invariant across variants; only the steps
             // and terminal encoder differ).
-            var probe = BuildMediaInfo(sourceImage);
             var variants = new Dictionary<string, MediaOutput>(builder.Variants.Count, StringComparer.Ordinal);
             foreach (var (name, configureBranch) in builder.Variants)
             {
@@ -689,11 +517,10 @@ public sealed class MediaPipeline : IMediaPipeline
                 // Each branch records its own step list against a transient pipeline carrier
                 var branch = new StepRecorder();
                 configureBranch(branch);
-                var plan = PlanOrThrow(probe, branch.Steps);
+                var plan = PlanOrThrow(sourceImage.Info, branch.Steps);
                 // Clone the decoded image so transforms apply only to this branch
-                using var clone = sourceImage.Clone(_ => { });
-                var output = await EncodeAsync(clone, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, plan, ct).ConfigureAwait(false);
-                variants[name] = output;
+                using var clone = sourceImage.Clone();
+                variants[name] = await EncodeAsync(clone, branch.Steps, _overlayResolver, _fonts, _limits, _overlayDepth, _logger, plan, ct).ConfigureAwait(false);
             }
             return new MediaBundle(variants);
         }
@@ -737,12 +564,10 @@ public sealed class MediaPipeline : IMediaPipeline
                 rasterCache[(targetW, targetH)] = pngBytes;
             }
 
-            using var rasterized = new MemoryStream(pngBytes, writable: false);
-            using var image = await Image.LoadAsync(rasterized, ct).ConfigureAwait(false);
-            var rasterProbe = BuildMediaInfo(image);
-            var rasterPlan = PlanOrThrow(rasterProbe, branch.Steps);
+            using var image = MediaDecoder.Decode(pngBytes, _limits, ct);
+            var rasterPlan = PlanOrThrow(image.Info, branch.Steps);
             var output = await EncodeAsync(
-                image, branch.Steps, _overlayResolver, _fonts, _overlayDepth, _logger, rasterPlan, ct).ConfigureAwait(false);
+                image, branch.Steps, _overlayResolver, _fonts, _limits, _overlayDepth, _logger, rasterPlan, ct).ConfigureAwait(false);
             variants[name] = output with
             {
                 SourceFormat = SvgFormat.Slug,
@@ -756,18 +581,19 @@ public sealed class MediaPipeline : IMediaPipeline
     // ----- engine -----
 
     /// <summary>
-    /// Buffered legacy entry point used by <see cref="MaterializeAsync"/>
-    /// — each variant materialises into a self-contained byte buffer so
-    /// the returned <see cref="MediaBundle"/> can be inspected by name
-    /// without retaining the decoded image. Delegates to
+    /// Buffered entry point used by <see cref="MaterializeAsync"/> — each
+    /// variant materialises into a self-contained byte buffer so the
+    /// returned <see cref="MediaBundle"/> can be inspected by name without
+    /// retaining the decoded image. Delegates to
     /// <see cref="StreamEncodeAsync"/> for the actual mutate+encode and
     /// captures the bytes through an intermediate <see cref="MemoryStream"/>.
     /// </summary>
     private static async Task<MediaOutput> EncodeAsync(
-        Image image,
+        RasterImage image,
         IReadOnlyList<MediaStep> steps,
         IOverlayResolver? overlays,
         KoanFontRegistry? fonts,
+        MediaPipelineLimits limits,
         int overlayDepth,
         ILogger logger,
         PlanResult? plan,
@@ -775,7 +601,7 @@ public sealed class MediaPipeline : IMediaPipeline
     {
         await using var ms = new MemoryStream();
         var output = await StreamEncodeAsync(
-            image, steps, overlays, fonts, overlayDepth, logger, plan, ms, ct).ConfigureAwait(false);
+            image, steps, overlays, fonts, limits, overlayDepth, logger, plan, ms, ct).ConfigureAwait(false);
         var bytes = ms.ToArray();
 #pragma warning disable CS0618 // Bytes is obsolete; buffered Materialize branches still surface bytes for backward compatibility.
         return output with
@@ -787,18 +613,18 @@ public sealed class MediaPipeline : IMediaPipeline
     }
 
     /// <summary>
-    /// Streaming engine. Runs all <paramref name="steps"/> against
+    /// The engine. Runs all <paramref name="steps"/> against
     /// <paramref name="image"/> in canonical <see cref="PipelineStage"/>
-    /// order and writes the encoded output directly into
-    /// <paramref name="destination"/>. Caller owns image disposal. Per
-    /// MEDIA-0008: the encoder's <see cref="Image.SaveAsync"/> writes
-    /// straight into the destination — no intermediate buffer.
+    /// order and writes the encoded output into
+    /// <paramref name="destination"/>. Caller owns image disposal. The token
+    /// is honoured between steps and frames; no decode or encode call takes one.
     /// </summary>
     private static async Task<MediaOutput> StreamEncodeAsync(
-        Image image,
+        RasterImage image,
         IReadOnlyList<MediaStep> steps,
         IOverlayResolver? overlays,
         KoanFontRegistry? fonts,
+        MediaPipelineLimits limits,
         int overlayDepth,
         ILogger logger,
         PlanResult? plan,
@@ -830,7 +656,7 @@ public sealed class MediaPipeline : IMediaPipeline
             switch (step)
             {
                 case AutoOrientStep ao when !ao.Keep:
-                    image.Mutate(x => x.AutoOrient());
+                    image.Map(frame => FrameTransforms.Orient(frame, image.Origin), ct);
                     break;
                 case AutoOrientStep:
                     // Keep — no-op
@@ -847,10 +673,10 @@ public sealed class MediaPipeline : IMediaPipeline
                     ApplyTrim(image, trim);
                     break;
                 case RotateStep rs:
-                    image.Mutate(x => x.Rotate(rs.Degrees));
+                    image.Map(frame => FrameTransforms.Rotate(frame, rs.Degrees), ct);
                     break;
                 case FlipStep fs:
-                    image.Mutate(x => x.Flip(fs.Axis == FlipAxis.Horizontal ? FlipMode.Horizontal : FlipMode.Vertical));
+                    image.Map(frame => FrameTransforms.Flip(frame, fs.Axis), ct);
                     break;
                 case ShapeStep shape:
                     pendingShape = shape;
@@ -870,34 +696,31 @@ public sealed class MediaPipeline : IMediaPipeline
             }
         }
 
-        // Shape + Resize collapse into a single ImageSharp Mutate so we
-        // don't allocate intermediate frame buffers. Order: shape (crop +
-        // fit + position + bg) → size.
+        // Order: shape (crop + fit + position + bg) → size.
         if (pendingShape is not null || pendingResize is not null)
         {
-            image.Mutate(ctx => ApplyShapeAndResize(ctx, image.Size, pendingShape, pendingResize));
+            ApplyShapeAndResize(image, pendingShape, pendingResize, ct);
         }
 
         // Background compose: when bg is non-transparent + Fit.Contain has
-        // a fully-defined target canvas, build a new sized canvas, paint
-        // it (solid color / dominant / auto-border / cover-blur), and
-        // composite the shaped image onto it. The canvas becomes the
-        // working image for overlays, strip, and encode so all subsequent
-        // stages land on the final pixels.
-        using var composed = BackgroundComposer.TryCompose(image, pendingShape, pendingResize, ct);
-        var working = composed ?? image;
+        // a fully-defined target canvas, every frame lands on a sized,
+        // painted canvas (solid color / dominant / auto-border / cover-blur)
+        // so overlays, strip, and encode all work on the final pixels.
+        BackgroundComposer.Apply(image, pendingShape, pendingResize, ct);
 
         // Overlays composite onto the shaped/sized host before metadata
         // strip and encode so they're part of the final encoded bytes.
         if (pendingOverlay is not null)
         {
             await OverlayCompositor.ApplyAsync(
-                working, pendingOverlay, overlays, fonts, overlayDepth, logger, ct).ConfigureAwait(false);
+                image, pendingOverlay, overlays, fonts, limits, overlayDepth, logger, ct).ConfigureAwait(false);
         }
 
-        if (pendingStrip is not null)
+        // A re-encode never carries Exif, XMP, IPTC or format text; the color
+        // profile is the one thing that survives unless it is stripped.
+        if (pendingStrip is not null && pendingStrip.Kinds.HasFlag(MetadataKinds.Icc))
         {
-            ApplyStrip(working, pendingStrip.Kinds);
+            image.Map(FrameTransforms.DropColorProfile, ct);
         }
 
         // Resolve encode step. Implicit format-preserving encode if none declared.
@@ -908,7 +731,7 @@ public sealed class MediaPipeline : IMediaPipeline
             case FlattenToStep flatten:
                 targetFormat = flatten.Format;
                 quality = flatten.Quality;
-                ApplyFlatten(working, flatten.Format);
+                ApplyFlatten(image);
                 break;
             case EncodeStep encode:
                 targetFormat = encode.Format;
@@ -920,28 +743,28 @@ public sealed class MediaPipeline : IMediaPipeline
                 break;
         }
 
-        // Preserve source-format metadata for diagnostics even when we
-        // swap to a freshly-allocated canvas (which has no DecodedImageFormat).
-        var sourceFormat = image.Metadata.DecodedImageFormat;
-        var encoder = EncoderSelector.For(sourceFormat, targetFormat, quality);
-        var resolvedFormat = targetFormat?.ToLowerInvariant() ?? EncoderSelector.CanonicalSlug(sourceFormat);
+        var resolvedFormat = targetFormat is null
+            ? EncoderSelector.PreservedFormat(image.Info.Format)
+            : EncoderSelector.CanonicalizeSlug(targetFormat);
 
-        // Per MEDIA-0008: stream the encoder output directly into the
-        // destination. No intermediate MemoryStream — animated and
-        // high-resolution encodes flush through chunk-by-chunk.
-        await working.SaveAsync(destination, encoder, ct).ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        using (var encoded = EncoderSelector.Encode(image, resolvedFormat, quality))
+        await using (var bytes = encoded.AsStream())
+        {
+            ct.ThrowIfCancellationRequested();
+            await bytes.CopyToAsync(destination, ct).ConfigureAwait(false);
+        }
 
-        var sourceSlug = EncoderSelector.CanonicalSlug(sourceFormat);
 #pragma warning disable CS0618 // Streaming terminal: Bytes is intentionally empty; callers consume bytes via WriteToAsync during the encode.
         return new MediaOutput(
             Bytes: Array.Empty<byte>(),
             ContentType: EncoderSelector.ContentType(resolvedFormat),
             Format: resolvedFormat,
-            SourceFormat: sourceSlug,
-            Width: working.Width,
-            Height: working.Height,
-            FrameCount: working.Frames.Count,
-            Fingerprint: $"{resolvedFormat}-{working.Width}x{working.Height}-f{working.Frames.Count}-q{quality}")
+            SourceFormat: image.Info.Format,
+            Width: image.Width,
+            Height: image.Height,
+            FrameCount: image.Frames.Count,
+            Fingerprint: $"{resolvedFormat}-{image.Width}x{image.Height}-f{image.Frames.Count}-q{quality}")
         {
             KindTrace = plan?.KindTrace ?? Array.Empty<MediaKind>(),
             WriteToAsync = (_, _) => throw new InvalidOperationException(
@@ -953,12 +776,11 @@ public sealed class MediaPipeline : IMediaPipeline
     }
 
     /// <summary>
-    /// Apply a <see cref="SampleStep"/> to the running ImageSharp image.
-    /// No-op on a single-frame raster; selector-driven frame extraction
-    /// on an animated raster; Vector/Timeline paths are not reachable
-    /// here in MEDIA-0005 because no decoder produces those kinds yet.
+    /// Apply a <see cref="SampleStep"/> to the running image. No-op on a
+    /// single-frame raster; selector-driven frame extraction on an animated
+    /// raster.
     /// </summary>
-    private static void ApplySample(Image image, FrameSelector selector)
+    private static void ApplySample(RasterImage image, FrameSelector selector)
     {
         if (image.Frames.Count <= 1) return; // Raster path — no-op per MEDIA-0005 §2.
         switch (selector)
@@ -968,7 +790,7 @@ public sealed class MediaPipeline : IMediaPipeline
                 break;
             case FrameSelector.HeuristicBest:
                 // Heuristic best on AnimatedRaster degrades to first frame
-                // (no decoder-provided thumbnail on the ImageSharp surface).
+                // (the decoder provides no thumbnail).
                 ApplyExtractFrame(image, 0);
                 break;
             case FrameSelector.Time:
@@ -981,7 +803,7 @@ public sealed class MediaPipeline : IMediaPipeline
         }
     }
 
-    private static void ApplyExtractFrame(Image image, int index)
+    private static void ApplyExtractFrame(RasterImage image, int index)
     {
         if (image.Frames.Count <= 1) return; // no-op on static
         if (index < 0 || index >= image.Frames.Count)
@@ -991,80 +813,48 @@ public sealed class MediaPipeline : IMediaPipeline
         // the end so indices stay stable.
         for (var i = image.Frames.Count - 1; i >= 0; i--)
         {
-            if (i != index) image.Frames.RemoveFrame(i);
+            if (i != index) image.RemoveFrame(i);
         }
     }
 
     /// <summary>
     /// Apply a <see cref="TrimStep"/> to the running image. No-op on a
     /// static source (frame count &lt;= 1). The frames-variant trims
-    /// every index past the cap; the seconds-variant walks per-frame
-    /// delay metadata (WebP / GIF / APNG) summing playback time until
-    /// the cap is reached, then trims at that frame. Unrecognised
-    /// format metadata degrades to no-op so the step is never silently
-    /// destructive on a format we can't introspect.
+    /// every index past the cap; the seconds-variant sums per-frame
+    /// durations until the cap is reached, then trims at that frame.
     /// </summary>
-    private static void ApplyTrim(Image image, TrimStep step)
+    private static void ApplyTrim(RasterImage image, TrimStep step)
     {
         if (image.Frames.Count <= 1) return;
 
         var cutoffFrames = step.Frames ?? FramesUnderDuration(image, step.Seconds ?? 0);
-        if (cutoffFrames <= 0) return; // unknown metadata → preserve animation
+        if (cutoffFrames <= 0) return;
         if (cutoffFrames >= image.Frames.Count) return; // already short enough
 
         // Remove from the tail so earlier indices stay stable.
         for (var i = image.Frames.Count - 1; i >= cutoffFrames; i--)
         {
-            image.Frames.RemoveFrame(i);
+            image.RemoveFrame(i);
         }
     }
 
     /// <summary>
-    /// Walk per-frame delay metadata for the recognised animated formats
-    /// (WebP, GIF, APNG) summing playback time until <paramref name="seconds"/>
-    /// is met. Returns the first index whose cumulative time meets or
-    /// exceeds the cap (so frames [0..returnedIndex) are kept). Returns 0
-    /// when the format's frame-delay metadata isn't recognised — the
-    /// caller treats that as "leave animation alone."
+    /// Sum playback time until <paramref name="seconds"/> is met. Returns
+    /// the first index whose cumulative time meets or exceeds the cap (so
+    /// frames [0..returnedIndex) are kept).
     /// </summary>
-    private static int FramesUnderDuration(Image image, double seconds)
+    private static int FramesUnderDuration(RasterImage image, double seconds)
     {
         if (seconds <= 0) return 0;
         var capMs = seconds * 1000.0;
-        var decoded = image.Metadata.DecodedImageFormat;
 
         double cumulativeMs = 0;
         for (var i = 0; i < image.Frames.Count; i++)
         {
-            var meta = image.Frames[i].Metadata;
-            double frameMs;
-            if (decoded is SixLabors.ImageSharp.Formats.Webp.WebpFormat)
-            {
-                // WebpFrameMetadata.FrameDelay is documented in milliseconds.
-                frameMs = meta.GetWebpMetadata().FrameDelay;
-            }
-            else if (decoded is SixLabors.ImageSharp.Formats.Gif.GifFormat)
-            {
-                // GifFrameMetadata.FrameDelay is in 1/100s units (centiseconds).
-                frameMs = meta.GetGifMetadata().FrameDelay * 10.0;
-            }
-            else if (decoded is SixLabors.ImageSharp.Formats.Png.PngFormat)
-            {
-                // APNG: numerator/denominator in seconds. Default denominator is 100.
-                var png = meta.GetPngMetadata();
-                var num = png.FrameDelay.Numerator;
-                var denom = png.FrameDelay.Denominator == 0 ? 100u : png.FrameDelay.Denominator;
-                frameMs = num * 1000.0 / denom;
-            }
-            else
-            {
-                // Unknown — abort, signal "leave it alone."
-                return 0;
-            }
-
             // Many encoders set a per-frame delay of 0 to mean "use default"
             // (typically ~100ms). Without that fallback a 0-delay anim would
             // satisfy any cap at frame 1 and trim almost everything away.
+            double frameMs = image.Frames[i].DurationMs;
             if (frameMs <= 0) frameMs = 100;
 
             cumulativeMs += frameMs;
@@ -1079,96 +869,86 @@ public sealed class MediaPipeline : IMediaPipeline
     }
 
     private static void ApplyShapeAndResize(
-        IImageProcessingContext ctx,
-        Size source,
+        RasterImage image,
         ShapeStep? shape,
-        ResizeStep? resize)
+        ResizeStep? resize,
+        CancellationToken ct)
     {
         // Compute shape pass (crop to aspect / explicit pixels)
         if (shape?.Crop is { } crop)
         {
-            switch (crop.Kind)
-            {
-                case CropSpecKind.Aspect:
-                {
-                    var targetAspect = (double)crop.Width / crop.Height;
-                    var (cw, ch) = LargestFitting(source.Width, source.Height, targetAspect);
-                    var (cx, cy) = AnchorOffset(source.Width, source.Height, cw, ch, shape.Position);
-                    ctx.Crop(new Rectangle(cx, cy, cw, ch));
-                    break;
-                }
-                case CropSpecKind.Pixels:
-                {
-                    // Cover-style: scale source so the crop window fits, then crop centered on position.
-                    var (cw, ch) = (Math.Min(crop.Width, source.Width), Math.Min(crop.Height, source.Height));
-                    var (cx, cy) = AnchorOffset(source.Width, source.Height, cw, ch, shape.Position);
-                    ctx.Crop(new Rectangle(cx, cy, cw, ch));
-                    break;
-                }
-                case CropSpecKind.PixelsWithOffset:
-                {
-                    var x = Math.Clamp(crop.OffsetX, 0, Math.Max(0, source.Width - crop.Width));
-                    var y = Math.Clamp(crop.OffsetY, 0, Math.Max(0, source.Height - crop.Height));
-                    var w = Math.Min(crop.Width, source.Width - x);
-                    var h = Math.Min(crop.Height, source.Height - y);
-                    ctx.Crop(new Rectangle(x, y, w, h));
-                    break;
-                }
-            }
+            var area = CropArea(image.Width, image.Height, crop, shape.Position);
+            image.Map(frame => FrameTransforms.Crop(frame, area), ct);
         }
 
+        if (resize is not { } rz) return;
+
         // Resize pass
-        if (resize is { } rz)
+        var (currentW, currentH) = (image.Width, image.Height);
+        var (rw, rh) = ResolveResizeDimensions(currentW, currentH, rz);
+        if (rw is not { } targetW || rh is not { } targetH) return;
+
+        // No-upscale guard: when the source already fits inside the target on
+        // both axes and the caller did NOT opt into upscaling, skip the resize
+        // entirely. Silently enlarging small sources is expensive on animated
+        // ones, because every frame gets re-encoded at the inflated size.
+        if (!rz.Upscale && currentW <= targetW && currentH <= targetH) return;
+
+        switch (shape?.Fit)
         {
-            var currentSize = ctx.GetCurrentSize();
-            var (rw, rh) = ResolveResizeDimensions(currentSize, rz);
-            if (rw is not null && rh is not null)
+            case Fit.None:
+                return;
+            case Fit.Fill:
+                image.Map(frame => FrameTransforms.Scale(frame, targetW, targetH), ct);
+                return;
+            case Fit.Cover:
             {
-                // No-upscale guard: when the source already fits inside the
-                // target on both axes and the caller did NOT opt into
-                // upscaling, skip the resize entirely. Defaulting Upscale to
-                // false here covers Fit.ScaleDown (which historically had its
-                // own no-upscale check below) AND every plain Resize call
-                // that doesn't pin a Fit. The intent is to stop silently
-                // enlarging small sources — animated WebP/GIF sources are
-                // particularly painful because every frame gets re-encoded
-                // at the inflated size (see MEDIA-0010 thread).
-                var skip = !rz.Upscale
-                    && currentSize.Width <= rw.Value
-                    && currentSize.Height <= rh.Value;
-                if (skip)
+                var (scaledW, scaledH, offsetX, offsetY) = ResizePlan.Cover(currentW, currentH, targetW, targetH);
+                var box = SKRectI.Create(offsetX, offsetY, targetW, targetH);
+                image.Map(frame =>
                 {
-                    // no-op
-                }
-                else
-                {
-                    var resizeOptions = new ResizeOptions
-                    {
-                        Size = new Size(rw.Value, rh.Value),
-                        Mode = shape?.Fit switch
-                        {
-                            Fit.Cover => ResizeMode.Crop,
-                            Fit.Contain => ResizeMode.Max,
-                            Fit.Fill => ResizeMode.Stretch,
-                            Fit.ScaleDown => ResizeMode.Max,
-                            Fit.None => ResizeMode.Manual,
-                            _ => ResizeMode.Max,
-                        },
-                    };
-                    ctx.Resize(resizeOptions);
-                }
+                    var scaled = FrameTransforms.Scale(frame, scaledW, scaledH);
+                    var cropped = FrameTransforms.Crop(scaled, box);
+                    if (!ReferenceEquals(cropped, scaled) && !ReferenceEquals(scaled, frame)) scaled.Dispose();
+                    return cropped;
+                }, ct);
+                return;
             }
-        }
-        else if (shape is { Fit: Fit.Contain, Crop: { } cropForFit })
-        {
-            // Shape+contain without explicit resize: still honor contain by
-            // not exceeding crop dimensions. No-op here; the crop already
-            // bounded the image.
-            _ = cropForFit;
+            default:
+            {
+                var (fitW, fitH) = ResizePlan.Contain(currentW, currentH, targetW, targetH);
+                image.Map(frame => FrameTransforms.Scale(frame, fitW, fitH), ct);
+                return;
+            }
         }
     }
 
-    private static (int? Width, int? Height) ResolveResizeDimensions(Size current, ResizeStep rz)
+    private static SKRectI CropArea(int sourceW, int sourceH, CropSpec crop, Position position)
+    {
+        switch (crop.Kind)
+        {
+            case CropSpecKind.Aspect:
+            {
+                var (cw, ch) = LargestFitting(sourceW, sourceH, (double)crop.Width / crop.Height);
+                var (cx, cy) = AnchorOffset(sourceW, sourceH, cw, ch, position);
+                return SKRectI.Create(cx, cy, Math.Max(1, cw), Math.Max(1, ch));
+            }
+            case CropSpecKind.Pixels:
+            {
+                var (cw, ch) = (Math.Min(crop.Width, sourceW), Math.Min(crop.Height, sourceH));
+                var (cx, cy) = AnchorOffset(sourceW, sourceH, cw, ch, position);
+                return SKRectI.Create(cx, cy, cw, ch);
+            }
+            default:
+            {
+                var x = Math.Clamp(crop.OffsetX, 0, Math.Max(0, sourceW - crop.Width));
+                var y = Math.Clamp(crop.OffsetY, 0, Math.Max(0, sourceH - crop.Height));
+                return SKRectI.Create(x, y, Math.Min(crop.Width, sourceW - x), Math.Min(crop.Height, sourceH - y));
+            }
+        }
+    }
+
+    private static (int? Width, int? Height) ResolveResizeDimensions(int currentW, int currentH, ResizeStep rz)
     {
         var w = rz.Width;
         var h = rz.Height;
@@ -1180,11 +960,11 @@ public sealed class MediaPipeline : IMediaPipeline
         // Single-axis scale: derive the missing dimension to preserve aspect.
         if (w.HasValue && !h.HasValue)
         {
-            h = (int)Math.Round(current.Height * (w.Value / (double)current.Width));
+            h = Math.Max(1, (int)Math.Round(currentH * (w.Value / (double)currentW)));
         }
         else if (h.HasValue && !w.HasValue)
         {
-            w = (int)Math.Round(current.Width * (h.Value / (double)current.Height));
+            w = Math.Max(1, (int)Math.Round(currentW * (h.Value / (double)currentH)));
         }
         return (w, h);
     }
@@ -1240,115 +1020,18 @@ public sealed class MediaPipeline : IMediaPipeline
         return (x, y);
     }
 
-    private static void ApplyStrip(Image image, MetadataKinds kinds)
-    {
-        var md = image.Metadata;
-        if (kinds.HasFlag(MetadataKinds.Exif)) md.ExifProfile = null;
-        if (kinds.HasFlag(MetadataKinds.Icc))
-        {
-            md.IccProfile = null;
-            md.CicpProfile = null;
-        }
-        if (kinds.HasFlag(MetadataKinds.Xmp)) md.XmpProfile = null;
-        if (kinds.HasFlag(MetadataKinds.Iptc)) md.IptcProfile = null;
-        if (kinds.HasFlag(MetadataKinds.Text))
-        {
-            md.GetPngMetadata().TextData.Clear();
-            md.GetGifMetadata().Comments.Clear();
-        }
-
-        // Each frame of an animation carries profiles of its own.
-        foreach (var frame in image.Frames)
-        {
-            var fm = frame.Metadata;
-            if (kinds.HasFlag(MetadataKinds.Exif)) fm.ExifProfile = null;
-            if (kinds.HasFlag(MetadataKinds.Icc))
-            {
-                fm.IccProfile = null;
-                fm.CicpProfile = null;
-            }
-            if (kinds.HasFlag(MetadataKinds.Xmp)) fm.XmpProfile = null;
-            if (kinds.HasFlag(MetadataKinds.Iptc)) fm.IptcProfile = null;
-        }
-    }
-
     /// <summary>
-    /// FlattenTo behavior: collapse to single frame and drop alpha
-    /// against a sensible fill when the target lacks an alpha channel.
+    /// FlattenTo behavior: collapse to a single frame. A target without an
+    /// alpha channel composites what transparency remains onto black at
+    /// encode; the HTTP layer resolves a different fill through the Shape
+    /// step's background before it gets there.
     /// </summary>
-    private static void ApplyFlatten(Image image, string targetFormat)
+    private static void ApplyFlatten(RasterImage image)
     {
-        // Collapse animation
-        while (image.Frames.Count > 1) image.Frames.RemoveFrame(image.Frames.Count - 1);
-        // Drop alpha for JPEG (alpha matrix matters for visual fidelity later;
-        // ImageSharp's encoder will composite onto black by default, which is
-        // often not what callers want. The HTTP layer's bg-fallback resolves
-        // this by overriding the background before encode.)
-        if (!EncoderSelector.SupportsAlpha(targetFormat))
+        for (var i = image.Frames.Count - 1; i >= 1; i--)
         {
-            // No explicit fill here — bg-fallback applied via Shape step at HTTP
-            // layer when FlattenTo is invoked through a URL. For programmatic
-            // callers, FlattenTo into JPEG produces black-composited output —
-            // documented behavior.
+            image.RemoveFrame(i);
         }
-    }
-
-    private static MediaInfo BuildMediaInfo(Image image)
-    {
-        var format = EncoderSelector.CanonicalSlug(image.Metadata.DecodedImageFormat);
-        var frameCount = image.Frames.Count;
-        var hasAlpha = image.PixelType.AlphaRepresentation is PixelAlphaRepresentation.Associated
-            or PixelAlphaRepresentation.Unassociated;
-        // ImageSharp's PNG decoder may collapse an RgbWithAlpha source to Rgb24 when
-        // it determines all alpha samples are opaque. Consult the format metadata
-        // so the alpha-capability signal matches the source's declared color type,
-        // not the optimised pixel representation.
-        if (!hasAlpha)
-        {
-            hasAlpha = SourceFormatDeclaresAlpha(image);
-        }
-        var depth = image.PixelType.BitsPerPixel;
-        int? exifOrient = null;
-        var exif = image.Metadata.ExifProfile;
-        if (exif is not null && exif.TryGetValue(SixLabors.ImageSharp.Metadata.Profiles.Exif.ExifTag.Orientation, out var orientValue))
-        {
-            exifOrient = orientValue?.Value;
-        }
-        return new MediaInfo(
-            Format: format,
-            Width: image.Width,
-            Height: image.Height,
-            FrameCount: frameCount,
-            HasAlpha: hasAlpha,
-            ColorDepth: depth,
-            ExifOrientation: exifOrient,
-            HasIccProfile: image.Metadata.IccProfile is not null);
-    }
-
-    /// <summary>
-    /// Source format declares an alpha channel — covers the case where
-    /// ImageSharp optimised a sparsely-transparent source into Rgb24.
-    /// </summary>
-    private static bool SourceFormatDeclaresAlpha(Image image)
-    {
-        var decoded = image.Metadata.DecodedImageFormat;
-        if (decoded is SixLabors.ImageSharp.Formats.Png.PngFormat)
-        {
-            var meta = image.Metadata.GetPngMetadata();
-            return meta.ColorType is SixLabors.ImageSharp.Formats.Png.PngColorType.RgbWithAlpha
-                or SixLabors.ImageSharp.Formats.Png.PngColorType.GrayscaleWithAlpha;
-        }
-        if (decoded is SixLabors.ImageSharp.Formats.Webp.WebpFormat)
-        {
-            var meta = image.Metadata.GetWebpMetadata();
-            return meta.FileFormat == SixLabors.ImageSharp.Formats.Webp.WebpFileFormatType.Lossless;
-        }
-        if (decoded is SixLabors.ImageSharp.Formats.Gif.GifFormat)
-        {
-            // GIF supports 1-bit binary transparency
-            return true;
-        }
-        return false;
     }
 
     private MediaPipeline AddStep(MediaStep step)

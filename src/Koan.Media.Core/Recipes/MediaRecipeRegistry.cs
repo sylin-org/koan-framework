@@ -27,7 +27,7 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
     // by EncoderSelector — the single source of truth (DATA-0098). avif stays a reserved NAME (no recipe
     // may claim it, for forward-compat) but does not resolve until its encoder is wired into
     // EncoderSelector, so `?recipe=avif` returns an honest 404 rather than a 500 from
-    // EncoderSelector.For("avif"). It activates automatically once the format becomes producible.
+    // an encoder that does not exist. It activates automatically once the format becomes producible.
     private static readonly IReadOnlyList<string> _resolvableShortcuts =
         ReservedFormatShortcuts.Where(s => EncoderSelector.CanProduce(s)).ToArray();
 
@@ -80,7 +80,7 @@ public sealed class MediaRecipeRegistry : IMediaRecipeRegistry, IDisposable
 
         // 2) Format shortcut — synthesise an EncodeAs recipe with sensible mutators. Gated by
         // producibility (DATA-0098): a reserved-but-unproducible shortcut (avif) does NOT resolve
-        // here — it would otherwise pin a format EncoderSelector.For 500s on — so it resolves as
+        // here — it would otherwise pin a format the encoder 500s on — so it resolves as
         // "unknown" and the controller returns an honest 404.
         var lower = seed.Trim().ToLowerInvariant();
         if (ReservedFormatShortcuts.Contains(lower, StringComparer.OrdinalIgnoreCase) && EncoderSelector.CanProduce(lower))

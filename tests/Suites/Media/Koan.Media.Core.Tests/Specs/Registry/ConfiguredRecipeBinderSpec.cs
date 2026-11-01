@@ -81,13 +81,13 @@ public sealed class ConfiguredRecipeBinderSpec
         {
             Steps = new List<ConfiguredStep>
             {
-                new() { Op = "strip", Kinds = "exif,xmp" },
+                new() { Op = "strip", Kinds = "icc" },
                 new() { Op = "encodeAs", Format = "webp" },
             },
         };
         var recipe = ConfiguredRecipeBinder.Bind("clean", configured, RecipeSource.Config);
         var strip = recipe.Steps.OfType<StripStep>().Single();
-        strip.Kinds.Should().Be(MetadataKinds.Exif | MetadataKinds.Xmp);
+        strip.Kinds.Should().Be(MetadataKinds.Icc);
     }
 
     [Fact]

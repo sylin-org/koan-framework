@@ -24,6 +24,13 @@ public sealed record MediaRecipe
     /// <summary>Human-readable description; surfaces in <c>/media/recipes</c>.</summary>
     public string? Description { get; init; }
 
+    /// <summary>
+    /// The generation of the engine's output, folded into every <see cref="Fingerprint"/>. Bump it when the
+    /// same steps start producing different bytes, so derivations rendered earlier stop being served and
+    /// ETags change.
+    /// </summary>
+    public const int OutputGeneration = 2;
+
     /// <summary>Recipe schema version. Bump when step grammar changes.</summary>
     public int Version { get; init; } = 1;
 
@@ -58,7 +65,8 @@ public sealed record MediaRecipe
     public static MediaRecipeBuilder New() => new();
 
     /// <summary>
-    /// Stable SHA-256 fingerprint over the canonicalised step list.
+    /// Stable SHA-256 fingerprint over the engine's output generation and
+    /// the canonicalised step list.
     /// Used as the recipe-side cache key half. Returns the first 16
     /// hex characters (8 bytes / 64 bits) — collision-resistant enough
     /// for cache keys at expected scale, short enough for ETag values.
@@ -66,6 +74,7 @@ public sealed record MediaRecipe
     public string Fingerprint()
     {
         var sb = new StringBuilder(256);
+        sb.Append("g=").Append(OutputGeneration).Append('|');
         sb.Append("v=").Append(Version).Append('|');
         // Sort by stage then declaration index for stable hashing
         var ordered = Steps

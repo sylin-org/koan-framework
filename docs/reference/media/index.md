@@ -146,8 +146,37 @@ The pipeline is lazy until a terminal:
 | `MaterializeAsync` | decode once and produce a configured bundle |
 
 Canonical stages are orient, frame/sample, rotate, shape, size, overlay, metadata, and encode. Stage order is
-stable regardless of declaration order. Direct Core callers own source bounds; Web applies the limits below
-before full decode where possible.
+stable regardless of declaration order. Limits apply from the source's header, before any pixel is allocated,
+on non-seekable sources too. Direct Core callers pass their own limits; Web applies the ones below.
+
+### What the engine reads and writes
+
+| | Formats |
+|---|---|
+| Reads | JPEG, PNG, WebP, GIF, BMP, ICO, WBMP, and SVG (MEDIA-0006). An animated PNG reads as its first frame. |
+| Writes | JPEG, PNG, WebP. Animation on WebP only. |
+| Refuses | TIFF, TGA, and any decode that does not complete: partial images are never served. |
+
+A recipe that pins no format keeps the source's. GIF becomes WebP, which keeps its animation; BMP, ICO and WBMP
+become PNG. A `/media/{id}` request with no transform serves the stored bytes as they are.
+
+Exif, XMP, IPTC and format text never survive a re-encode, and no setting keeps them. A color profile other than
+sRGB does, unless a `Strip` step drops it, which converts the pixels to sRGB. The `strip` key takes `none`, `icc`,
+and `all`.
+
+Text overlays need a registered font (`AddKoanFont`) and shape any script the font covers; nothing falls back to
+system fonts, which a container usually lacks. For the same reason an SVG `<text>` can draw nothing on such a host.
+
+Cancellation applies between steps and frames, and while reading and writing; one native decode or encode call
+runs to its end.
+
+### Native code
+
+The engine is SkiaSharp, with HarfBuzz for shaping. On a chiseled image use a single-file publish with
+`IncludeNativeLibrariesForSelfExtract=true`, or copy `libSkiaSharp.so` and `libHarfBuzzSharp.so` beside the
+binary. Carry `THIRD-PARTY-NOTICES.txt` from the `SkiaSharp.NativeAssets.Linux.NoDependencies` package in what you
+distribute; it does not reach a publish output. NuGet audit does not cover the bundled codecs: watch them and bump
+the version (see [MEDIA-0010](../../decisions/MEDIA-0010-media-engine-on-skiasharp.md)).
 
 ## HTTP routes
 
@@ -173,6 +202,7 @@ Under `Koan:Media:Web`:
 | `MaxOutputEdge` | `4096` | largest requested output edge |
 | `MaxSourceMegapixels` | `100` | source pixel limit; `0` disables |
 | `MaxFrameCount` | `600` | source frame limit; `0` disables |
+| `MaxSourceBytes` | `268435456` | source bytes one render buffers (256 MiB); `0` means the engine's ceiling of 1 GiB |
 | `StrictUnknownParams` | `false` | reject rather than report unknown query parameters |
 | `AllowAdHoc` | `true` | allow requests without a named recipe |
 | `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | response cache policy |

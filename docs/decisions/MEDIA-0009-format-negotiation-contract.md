@@ -3,6 +3,9 @@
 **Status**: Accepted
 **Date**: 2026-06-01
 
+> **Amended by [MEDIA-0010](MEDIA-0010-media-engine-on-skiasharp.md) (2026-10-31).** The producible set is JPEG, PNG and
+> WebP; WebP alone preserves animation. Preserving a GIF writes WebP; preserving a BMP, ICO or WBMP writes PNG.
+
 Extends MEDIA-0005 (kind admission via `EncoderAccepts`), MEDIA-0007 (cache-as-storage keying), and MEDIA-0008 (streaming encoders). Closes the "every consumer hard-codes the output format" gap that the prior ADRs left intact: encoders today declare what they admit but never what they produce, and recipes declare a single pinned format or "preserve source" with no middle ground. Adding AVIF, animated WebP-as-static-fallback, or future video output forces a touch on every recipe call site instead of one encoder registration plus one recipe edit.
 
 ## Contract

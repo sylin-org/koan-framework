@@ -1,7 +1,5 @@
 using System.Text;
 using Koan.Media.Core.Formats;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Koan.Media.Core.Tests.Specs.Svg;
 
@@ -32,11 +30,11 @@ public sealed class SvgRasterizerSpec
     }
 
     [Fact]
-    public void RenderToPng_dimensions_round_trip_through_ImageSharp()
+    public void RenderToPng_dimensions_round_trip_through_the_decoder()
     {
         var svg = BlackSquareSvg(100);
         var png = SvgRasterizer.RenderToPng(Bytes(svg), targetWidth: 200, targetHeight: 200);
-        using var img = Image.Load<Rgba32>(png);
+        using var img = TestImage.Load(png);
         img.Width.Should().Be(200);
         img.Height.Should().Be(200);
     }
@@ -46,7 +44,7 @@ public sealed class SvgRasterizerSpec
     {
         var svg = BlackSquareSvg(100);
         var png = SvgRasterizer.RenderToPng(Bytes(svg), targetWidth: 50, targetHeight: 50);
-        using var img = Image.Load<Rgba32>(png);
+        using var img = TestImage.Load(png);
         img.Width.Should().Be(50);
         img.Height.Should().Be(50);
     }
@@ -61,7 +59,7 @@ public sealed class SvgRasterizerSpec
         var svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\">" +
                   "<circle cx=\"50\" cy=\"50\" r=\"10\" fill=\"red\"/></svg>";
         var png = SvgRasterizer.RenderToPng(Bytes(svg), targetWidth: 80, targetHeight: 80);
-        using var img = Image.Load<Rgba32>(png);
+        using var img = TestImage.Load(png);
         // Top-left and bottom-right corner pixels: transparent.
         img[0, 0].A.Should().Be(0, "the rasterizer clears the surface to transparent");
         img[79, 79].A.Should().Be(0);
@@ -124,7 +122,7 @@ public sealed class SvgRasterizerSpec
         // bands on the left and right.
         var svg = BlackSquareSvg(100);
         var png = SvgRasterizer.RenderToPng(Bytes(svg), targetWidth: 200, targetHeight: 100);
-        using var img = Image.Load<Rgba32>(png);
+        using var img = TestImage.Load(png);
         img.Width.Should().Be(200);
         img.Height.Should().Be(100);
         // Left edge: transparent letterbox band.

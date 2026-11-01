@@ -105,15 +105,15 @@ public sealed class RecipeJsonSerializerSpec
     }
 
     [Fact]
-    public void Serializes_strip_kinds_as_canonical_csv()
+    public void Serializes_a_strip_that_keeps_the_profile_as_none()
     {
         var recipe = MediaRecipe.New()
-            .Strip(MetadataKinds.Exif | MetadataKinds.Xmp)
+            .Strip(MetadataKinds.None)
             .EncodeAs("webp")
             .Build();
         var steps = RecipeJsonSerializer.Serialize(recipe)["steps"]!.AsArray();
         var strip = steps.Single(s => s!["op"]!.GetValue<string>() == "strip");
-        strip!["kinds"]!.GetValue<string>().Should().Be("exif,xmp");
+        strip!["kinds"]!.GetValue<string>().Should().Be("none");
     }
 
     [Fact]

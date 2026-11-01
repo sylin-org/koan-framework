@@ -1,5 +1,6 @@
 using System.Globalization;
 using Koan.Media.Abstractions.Recipes;
+using Koan.Media.Core.Pipeline;
 
 namespace Koan.Media.Web.Routing;
 
@@ -312,6 +313,11 @@ public static class MediaUrlParser
                 Reject(p, ignored, rejected, strict, "quality", quality);
                 q = Quality.Web;
             }
+            if (format is not null && !EncoderSelector.CanProduce(format))
+            {
+                Reject(p, ignored, rejected, strict, "format", format);
+                format = null;
+            }
             if (format is null) b.PreserveFormat(q);
             else b.EncodeAs(format.ToLowerInvariant(), q);
         }
@@ -395,6 +401,11 @@ public static class MediaUrlParser
             var formatRaw = Take(p, "format");
             var qualityRaw = Take(p, "quality");
             if (formatRaw is not null && !allowed.HasFlag(MutatorKind.Format))
+            {
+                Reject(p, ignored, rejected, strict, "format", formatRaw);
+                formatRaw = null;
+            }
+            if (formatRaw is not null && !EncoderSelector.CanProduce(formatRaw))
             {
                 Reject(p, ignored, rejected, strict, "format", formatRaw);
                 formatRaw = null;
@@ -815,9 +826,8 @@ public static class MediaUrlParser
         {
             switch (part.ToLowerInvariant())
             {
-                case "exif": kinds |= MetadataKinds.Exif; break;
+                case "none": break;
                 case "icc": kinds |= MetadataKinds.Icc; break;
-                case "xmp": kinds |= MetadataKinds.Xmp; break;
                 case "all": kinds |= MetadataKinds.All; break;
                 default: return null;
             }

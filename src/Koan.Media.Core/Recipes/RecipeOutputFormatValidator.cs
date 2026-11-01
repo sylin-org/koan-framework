@@ -8,7 +8,7 @@ namespace Koan.Media.Core.Recipes;
 /// Per DATA-0098 / MEDIA-0009: producibility is owned solely by <see cref="EncoderSelector"/>. A recipe
 /// pinning a non-producible format — "avif" before its encoder is wired, a typo, or an unknown slug —
 /// would otherwise bind clean and 500 at request time (the planner's terminal gate is intentionally
-/// permissive for unknown slugs, deferring to <see cref="EncoderSelector.For"/> which throws). Both the
+/// permissive for unknown slugs, deferring to the encoder which throws). Both the
 /// config path (<see cref="ConfiguredRecipeBinder"/>) and the code path
 /// (<c>MediaRecipeRegistry.DiscoverCodeRecipes</c>) run every built recipe through this, so a misconfigured
 /// format fails fast at startup with a clear message instead of per-request.

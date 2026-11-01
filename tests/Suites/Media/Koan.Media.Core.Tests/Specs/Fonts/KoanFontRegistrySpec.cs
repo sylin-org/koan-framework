@@ -1,16 +1,13 @@
 using Koan.Media.Core.Fonts;
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Koan.Media.Core.Tests.Specs.Fonts;
 
 /// <summary>
 /// KoanFontRegistry contract + the error path that fires when a text
 /// overlay is requested without a registered font. The "register from
-/// a real TTF" happy path requires a font file the test project doesn't
-/// bundle, so it lives in integration territory; what we cover here is
-/// the surface every consumer touches.
+/// a real TTF" happy path is in <see cref="TextOverlaySpec"/>; what we
+/// cover here is the surface every consumer touches.
 /// </summary>
 public sealed class KoanFontRegistrySpec
 {
@@ -23,10 +20,10 @@ public sealed class KoanFontRegistrySpec
     }
 
     [Fact]
-    public void CreateFont_on_unknown_name_returns_null()
+    public void An_unknown_name_is_not_contained()
     {
         var registry = new KoanFontRegistry();
-        registry.CreateFont("missing", 24f).Should().BeNull();
+        registry.Contains("missing").Should().BeFalse();
     }
 
     [Fact]
@@ -51,7 +48,7 @@ public sealed class KoanFontRegistrySpec
         // Engine-level: building a text overlay onto a host without any
         // font registry available must throw InvalidOperationException at
         // render time with a message that tells the operator what to do.
-        await using var host = MakeSolidPng(100, 100, new Rgba32(0, 0, 0, 255));
+        await using var host = Fixtures.SolidPng(100, 100, new Rgba(0, 0, 0, 255));
         var act = async () => await host.AsMedia()
             .OverlayText("Hello")
             .EncodeAs("png")
@@ -64,7 +61,7 @@ public sealed class KoanFontRegistrySpec
     [Fact]
     public async Task Text_overlay_with_empty_registry_throws()
     {
-        await using var host = MakeSolidPng(100, 100, new Rgba32(0, 0, 0, 255));
+        await using var host = Fixtures.SolidPng(100, 100, new Rgba(0, 0, 0, 255));
         var fonts = new KoanFontRegistry(); // declared but empty
 
         var act = async () => await host.AsMedia(fonts: fonts)
@@ -74,20 +71,4 @@ public sealed class KoanFontRegistrySpec
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    private static MemoryStream MakeSolidPng(int width, int height, Rgba32 color)
-    {
-        using var img = new Image<Rgba32>(width, height);
-        img.ProcessPixelRows(accessor =>
-        {
-            for (var y = 0; y < accessor.Height; y++)
-            {
-                var row = accessor.GetRowSpan(y);
-                for (var x = 0; x < row.Length; x++) row[x] = color;
-            }
-        });
-        var ms = new MemoryStream();
-        img.SaveAsPng(ms);
-        ms.Position = 0;
-        return ms;
-    }
 }

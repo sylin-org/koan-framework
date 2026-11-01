@@ -123,7 +123,10 @@ public interface IMediaPipeline
         double opacity = 1.0,
         int rotate = 0);
 
-    /// <summary>Strip selected metadata kinds before encode.</summary>
+    /// <summary>
+    /// Drop the color profile before encode, converting to sRGB. Nothing else needs stripping:
+    /// Exif, XMP, IPTC and format text never survive a re-encode.
+    /// </summary>
     IMediaPipeline Strip(MetadataKinds kinds = MetadataKinds.All);
 
     /// <summary>Encode in source format (default behaviour).</summary>
@@ -182,7 +185,7 @@ public interface IMediaPipeline
 /// <see cref="MemoryStream"/> on demand.
 /// </param>
 /// <param name="ContentType">MIME type matching <paramref name="Format"/>.</param>
-/// <param name="Format">Canonical output format slug (jpeg, png, webp, gif, ...).</param>
+/// <param name="Format">Canonical output format slug (jpeg, png, webp).</param>
 /// <param name="SourceFormat">Canonical source format slug as decoded. Equals <paramref name="Format"/> when the recipe preserves format.</param>
 /// <param name="Width">Output width in pixels.</param>
 /// <param name="Height">Output height in pixels.</param>

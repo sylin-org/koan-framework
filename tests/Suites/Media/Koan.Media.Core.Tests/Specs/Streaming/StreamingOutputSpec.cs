@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Pipeline;
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Streaming;
 
@@ -68,23 +67,19 @@ public sealed class StreamingOutputSpec
 
         sink.Length.Should().BeGreaterThan(0, "the encoder must have written something into the destination");
         sink.Position = 0;
-        using var decoded = await Image.LoadAsync(sink);
-        decoded.Frames.Count.Should().Be(frameCount,
+        using var decoded = TestImage.Load(sink.ToArray());
+        decoded.FrameCount.Should().Be(frameCount,
             "format-preservation must keep every frame across the streaming terminal");
         output.FrameCount.Should().Be(frameCount);
         output.IsAnimated.Should().BeTrue();
     }
 
     [Fact]
-    public async Task WriteToAsync_streams_into_destination_without_intermediate_buffer()
+    public async Task WriteToAsync_writes_only_asynchronously_into_the_destination()
     {
-        // Memory-ceiling property: the streaming terminal writes
-        // directly into the destination — no MemoryStream sits between
-        // the encoder and the sink. We verify this indirectly by
-        // counting writes against a tracking stream and asserting at
-        // least one chunk landed during the encode (the buffered path
-        // would emit exactly one large WriteAsync after building the
-        // full buffer).
+        // A response body refuses synchronous writes, and the encoders are
+        // synchronous: the encoded output must reach the destination through
+        // WriteAsync only, or every direct-to-response render would throw.
         await using var source = Fixtures.AnimatedWebp(frames: 5, width: 320, height: 240);
         await using var tracking = new TrackingStream();
 
@@ -92,7 +87,7 @@ public sealed class StreamingOutputSpec
             .WriteToAsync(tracking)
 ;
 
-        tracking.WriteCount.Should().BeGreaterThan(0,
+        tracking.AsyncWriteCount.Should().BeGreaterThan(0,
             "the streaming terminal must produce at least one write into the destination");
         tracking.TotalBytes.Should().BeGreaterThan(0);
     }
@@ -193,43 +188,30 @@ public sealed class StreamingOutputSpec
             "the default writer must copy Bytes verbatim so legacy MediaOutput producers stay correct");
     }
 
-    /// <summary>
-    /// Minimal sink that records how many WriteAsync calls have landed
-    /// and the cumulative byte count. Used by the streaming spec to
-    /// distinguish the streaming terminal (multiple chunked writes)
-    /// from the buffered shim (a single WriteAsync at the end).
-    /// </summary>
+    /// <summary>A sink that behaves like a response body: synchronous writes throw.</summary>
     private sealed class TrackingStream : MemoryStream
     {
-        public int WriteCount { get; private set; }
+        public int AsyncWriteCount { get; private set; }
         public long TotalBytes { get; private set; }
 
-        public override void Write(byte[] buffer, int offset, int count)
-        {
-            WriteCount++;
-            TotalBytes += count;
-            base.Write(buffer, offset, count);
-        }
+        public override void Write(byte[] buffer, int offset, int count) =>
+            throw new InvalidOperationException("Synchronous writes are not allowed.");
 
-        public override void Write(ReadOnlySpan<byte> buffer)
-        {
-            WriteCount++;
-            TotalBytes += buffer.Length;
-            base.Write(buffer);
-        }
+        public override void Write(ReadOnlySpan<byte> buffer) =>
+            throw new InvalidOperationException("Synchronous writes are not allowed.");
 
         public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
         {
-            WriteCount++;
+            AsyncWriteCount++;
             TotalBytes += buffer.Length;
-            return base.WriteAsync(buffer, cancellationToken);
+            return ValueTask.CompletedTask;
         }
 
         public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
-            WriteCount++;
+            AsyncWriteCount++;
             TotalBytes += count;
-            return base.WriteAsync(buffer, offset, count, cancellationToken);
+            return Task.CompletedTask;
         }
     }
 }

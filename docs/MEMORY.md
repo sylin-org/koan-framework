@@ -662,9 +662,13 @@ Sensitive or session-scoped notes stay out of git — see [local/README.md](../l
   an *unpooled* connection with `PRAGMA query_only` — a pooled one goes back to its pool still holding the
   pragma, which was measured, not assumed. A mode that must not leak is set on a connection that cannot be
   reused. (WEB-0074, 2026-10-19)
+- **A green NuGet audit says nothing about the media codecs.** SkiaSharp publishes no advisories for what it bundles
+  (libwebp, libpng, libjpeg-turbo, zlib, expat, FreeType, Brotli, Wuffs), so a codec CVE has to be watched for and
+  answered by a version bump. And when the same recipe steps start producing different bytes, bump
+  `MediaRecipe.OutputGeneration`, or old renders keep being served. (MEDIA-0010, 2026-10-31)
 - **Some test projects cannot restore today, and it is not your change.** `NuGetAudit` fetches advisories online
   and `tests/Directory.Build.props` turns warnings into errors, so a newly published advisory (MessagePack 3.1.8
-  NU1902, ImageSharp 3.1.12 NU1903) makes the MCP, Tenancy, and Cache.Web suites fail restore in 3 seconds with no
+  NU1902) makes the MCP, Tenancy, and Cache.Web suites fail restore in 3 seconds with no
   test output. Run them with `-p:NuGetAudit=false` before concluding anything about a change. Test outputs also
   live in `%TEMP%\Koan-framework\tests\<project>\` — shared by every worktree of this repository.
   (2026-10-19)

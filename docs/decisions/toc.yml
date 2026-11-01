@@ -578,6 +578,8 @@
       href: MEDIA-0003-media-variant-routing-and-transforms.md
     - name: MEDIA-0004 Recipe pipeline, format-preserving transforms, and overlay composition
       href: MEDIA-0004-recipe-pipeline.md
+    - name: MEDIA-0010 The media engine runs on SkiaSharp
+      href: MEDIA-0010-media-engine-on-skiasharp.md
 - name: Build (BUILD)
   items:
     - name: BUILD-0072 Script-owned versioning (superseded)

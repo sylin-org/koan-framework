@@ -213,13 +213,10 @@ public static class ConfiguredRecipeBinder
         {
             kinds |= part.ToLowerInvariant() switch
             {
-                "exif" => MetadataKinds.Exif,
+                "none" => MetadataKinds.None,
                 "icc" => MetadataKinds.Icc,
-                "xmp" => MetadataKinds.Xmp,
-                "iptc" => MetadataKinds.Iptc,
-                "text" => MetadataKinds.Text,
                 "all" => MetadataKinds.All,
-                _ => throw new MediaRecipeBindingException($"Unknown strip kind '{part}'. Allowed: exif, icc, xmp, iptc, text, all."),
+                _ => throw new MediaRecipeBindingException($"Unknown strip kind '{part}'. Allowed: none, icc, all. Exif, XMP, IPTC and format text never survive a re-encode."),
             };
         }
         return kinds;

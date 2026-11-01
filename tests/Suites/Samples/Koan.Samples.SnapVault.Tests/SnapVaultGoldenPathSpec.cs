@@ -6,8 +6,7 @@ using Koan.Core.Diagnostics;
 using Koan.Jobs;
 using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using SnapVault.Models;
 using Xunit;
 
@@ -82,11 +81,11 @@ public sealed class SnapVaultGoldenPathSpec(SnapVaultHostFixture fixture)
             && fact.State == KoanFactState.Selected);
     }
 
-    private static async Task<byte[]> TinyJpegAsync()
+    private static Task<byte[]> TinyJpegAsync()
     {
-        using var image = new Image<Rgba32>(8, 6);
-        using var stream = new MemoryStream();
-        await image.SaveAsJpegAsync(stream);
-        return stream.ToArray();
+        using var image = new SKBitmap(8, 6);
+        image.Erase(SKColors.Black);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 75);
+        return Task.FromResult(data.ToArray());
     }
 }

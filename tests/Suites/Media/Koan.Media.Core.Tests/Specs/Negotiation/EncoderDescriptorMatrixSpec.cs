@@ -11,7 +11,7 @@ public sealed class EncoderDescriptorMatrixSpec
     public void All_producible_encoders_are_registered()
     {
         // The live registry is exactly the producible set — what EncoderSelector can emit.
-        var slugs = new[] { "jpeg", "png", "webp", "gif", "bmp", "tiff" };
+        var slugs = new[] { "jpeg", "png", "webp" };
         foreach (var slug in slugs)
         {
             EncoderAccepts.All.Should().ContainKey(slug, $"encoder '{slug}' must be registered");
@@ -26,8 +26,7 @@ public sealed class EncoderDescriptorMatrixSpec
         // advertised but unproducible (MEDIA-0009) — a 500 at request time instead of a failed test.
         foreach (var slug in EncoderAccepts.All.Keys)
         {
-            var act = () => EncoderSelector.For(sourceFormat: null, targetFormat: slug, quality: 80);
-            act.Should().NotThrow($"advertised encoder '{slug}' must be producible by EncoderSelector");
+            EncoderSelector.CanProduce(slug).Should().BeTrue($"advertised encoder '{slug}' must be producible by EncoderSelector");
         }
     }
 
@@ -45,10 +44,7 @@ public sealed class EncoderDescriptorMatrixSpec
     [Theory]
     [InlineData("jpeg", false)]
     [InlineData("png", false)]
-    [InlineData("bmp", false)]
-    [InlineData("tiff", false)]
     [InlineData("webp", true)]
-    [InlineData("gif", true)]
     public void PreservesAnimation_matches_encoder_capability(string slug, bool expected)
     {
         EncoderAccepts.All[slug].PreservesAnimation.Should().Be(expected);
@@ -59,9 +55,6 @@ public sealed class EncoderDescriptorMatrixSpec
     [InlineData("jpeg", "image/jpeg")]
     [InlineData("png", "image/png")]
     [InlineData("webp", "image/webp")]
-    [InlineData("gif", "image/gif")]
-    [InlineData("bmp", "image/bmp")]
-    [InlineData("tiff", "image/tiff")]
     public void MediaType_matches_rfc_6838_image_subtype(string slug, string mediaType)
     {
         EncoderAccepts.All[slug].MediaType.Should().Be(mediaType);
@@ -71,8 +64,6 @@ public sealed class EncoderDescriptorMatrixSpec
     [Theory]
     [InlineData("jpeg")]
     [InlineData("png")]
-    [InlineData("bmp")]
-    [InlineData("tiff")]
     public void Still_only_encoders_accept_raster_but_not_animated(string slug)
     {
         var kinds = EncoderAccepts.All[slug].InputAccepts;
@@ -83,7 +74,6 @@ public sealed class EncoderDescriptorMatrixSpec
 
     [Theory]
     [InlineData("webp")]
-    [InlineData("gif")]
     public void Animated_capable_encoders_accept_both_raster_and_animated(string slug)
     {
         var kinds = EncoderAccepts.All[slug].InputAccepts;

@@ -46,7 +46,9 @@ names, reserved shortcut collisions, and unavailable output encoders stop host s
 - Media Core is an in-process Entity/media runtime, not a durable rendering job system.
 - `MediaEntity.Store(Stream, ...)` currently buffers the complete source to compute its hash.
 - A successful `Upload` writes storage and returns hydrated Entity metadata; callers own any additional domain save.
-- Pipeline output can stream, but decoders may retain complete pixel/frame state; direct callers own ingress limits.
+- The pipeline buffers the source and keeps complete pixel/frame state while it renders; direct callers pass their own limits.
+- Output is JPEG, PNG and WebP. Only a color profile survives a re-encode (MEDIA-0010).
+- The bundled native codecs get no NuGet audit coverage: watch them and bump the version (MEDIA-0010).
 - Recipes do not imply prewarming, background scheduling, orphan cleanup, HTTP routes, or access policy.
 - `Sylin.Koan.Media.Web` owns bounded HTTP rendering, negotiation, diagnostics, and access-gated source resolution.
 

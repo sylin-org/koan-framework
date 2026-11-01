@@ -311,6 +311,7 @@ public sealed class MediaController : ControllerBase
                     {
                         MaxSourceMegapixels = _options.MaxSourceMegapixels,
                         MaxFrameCount = _options.MaxFrameCount,
+                        MaxSourceBytes = _options.MaxSourceBytes,
                     })
                     .Apply(effectiveRecipe)
                     .WriteToAsync(buffer, ct)

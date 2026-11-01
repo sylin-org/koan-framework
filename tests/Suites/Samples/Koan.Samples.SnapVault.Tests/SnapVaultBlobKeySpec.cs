@@ -8,8 +8,7 @@ using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 using SnapVault.Models;
 using SnapVault.Services;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace Koan.Samples.SnapVault.Tests;
@@ -31,12 +30,12 @@ public sealed class SnapVaultBlobKeySpec
 
     private static string Stamp() => Guid.NewGuid().ToString("n").Substring(0, 8);
 
-    private static async Task<byte[]> JpegAsync(int w, int h)
+    private static Task<byte[]> JpegAsync(int w, int h)
     {
-        using var img = new Image<Rgba32>(w, h);
-        using var ms = new MemoryStream();
-        await img.SaveAsJpegAsync(ms);
-        return ms.ToArray();
+        using var image = new SKBitmap(w, h);
+        image.Erase(SKColors.Black);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 75);
+        return Task.FromResult(data.ToArray());
     }
 
     private static async Task<byte[]> ReadBlob(PhotoAsset photo)

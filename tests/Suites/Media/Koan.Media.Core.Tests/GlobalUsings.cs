@@ -9,3 +9,4 @@ global using System.Threading.Tasks;
 global using Koan.Media.Abstractions.Recipes;
 global using Koan.Media.Core.Pipeline;
 global using Koan.Media.Core.Recipes;
+global using Koan.Media.Core.Tests.Support;

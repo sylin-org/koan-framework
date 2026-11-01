@@ -1,6 +1,4 @@
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
@@ -21,7 +19,7 @@ public sealed class ExifAutoOrientSpec
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 6);
         var output = await src.AsMedia().ToBytesAsync();
 
-        using var img = Image.Load<Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         // Output dimensions match the LOGICAL (post-correction) frame.
         img.Width.Should().Be(200);
         img.Height.Should().Be(100);
@@ -42,7 +40,7 @@ public sealed class ExifAutoOrientSpec
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 3);
         var output = await src.AsMedia().ToBytesAsync();
 
-        using var img = Image.Load<Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         img.Width.Should().Be(200);
         img.Height.Should().Be(100);
         img[100, 20].R.Should().BeGreaterThan(200);
@@ -56,7 +54,7 @@ public sealed class ExifAutoOrientSpec
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 8);
         var output = await src.AsMedia().ToBytesAsync();
 
-        using var img = Image.Load<Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         img.Width.Should().Be(200);
         img.Height.Should().Be(100);
         img[100, 20].R.Should().BeGreaterThan(200);
@@ -72,7 +70,7 @@ public sealed class ExifAutoOrientSpec
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);
         var output = await src.AsMedia().ToBytesAsync();
 
-        using var img = Image.Load<Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         img.Width.Should().Be(200);
         img.Height.Should().Be(100);
         img[100, 20].R.Should().BeGreaterThan(200);
@@ -89,7 +87,7 @@ public sealed class ExifAutoOrientSpec
         await using var src = Fixtures.JpegWithExifOrientation(orientation: 6);
         var output = await src.AsMedia().AutoOrient(keep: true).ToBytesAsync();
 
-        using var img = Image.Load<Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         // Stored dimensions for orientation=6 are swapped from logical: 100x200
         img.Width.Should().Be(100);
         img.Height.Should().Be(200);

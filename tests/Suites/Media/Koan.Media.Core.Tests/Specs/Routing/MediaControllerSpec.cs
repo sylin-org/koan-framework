@@ -7,7 +7,6 @@ using Koan.Media.Web.Infrastructure;
 using Koan.Media.Web.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using SixLabors.ImageSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Routing;
 
@@ -30,8 +29,8 @@ public sealed class MediaControllerSpec
         response.Content.Headers.ContentType!.MediaType.Should().Be("image/webp");
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        using var roundTrip = Image.Load(bytes);
-        roundTrip.Frames.Count.Should().Be(3, "controller preserves animation on default GET");
+        using var roundTrip = TestImage.Load(bytes);
+        roundTrip.FrameCount.Should().Be(3, "controller preserves animation on default GET");
     }
 
     [Fact]
@@ -212,7 +211,7 @@ public sealed class MediaControllerSpec
         var response = await server.Client.GetAsync("/media/photo?w=400");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        using var img = Image.Load(bytes);
+        using var img = TestImage.Load(bytes);
         img.Width.Should().Be(400);
         img.Height.Should().Be(300, "single-axis resize preserves aspect ratio");
     }
@@ -227,7 +226,7 @@ public sealed class MediaControllerSpec
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        using var img = Image.Load(bytes);
+        using var img = TestImage.Load(bytes);
         img.Width.Should().Be(200);
     }
 
@@ -461,7 +460,7 @@ public sealed class MediaControllerSpec
         response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        using var img = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(bytes);
+        using var img = TestImage.Load(bytes);
         img.Width.Should().Be(600, "canvas extended to the requested 1:1 box");
         img.Height.Should().Be(600);
         var corner = img[10, 10];
@@ -481,7 +480,7 @@ public sealed class MediaControllerSpec
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var bytes = await response.Content.ReadAsByteArrayAsync();
-        using var img = SixLabors.ImageSharp.Image.Load(bytes);
+        using var img = TestImage.Load(bytes);
         img.Width.Should().Be(600);
         img.Height.Should().Be(600);
     }

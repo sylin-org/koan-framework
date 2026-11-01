@@ -220,8 +220,8 @@ public sealed class MediaRecipeBuilder
     /// requires enlarging a smaller source.
     /// </summary>
     public MediaRecipeBuilder ResizeCover(int width, int height, Position? position = null) =>
-        // Resize+Fit.Cover -> ImageSharp ResizeMode.Crop, which scales and
-        // crops natively. Don't add an explicit Pixels crop here: the Shape
+        // Resize+Fit.Cover scales and crops on its own. Don't add an explicit
+        // Pixels crop here: the Shape
         // stage runs BEFORE Size, so a Pixels crop would chop a literal
         // WxH rectangle out of the source center and the subsequent resize
         // would no-op on the already-sized image.
@@ -306,6 +306,7 @@ public sealed class MediaRecipeBuilder
 
     // ----- Stage 8: Strip -----
 
+    /// <summary>Drop the color profile, converting to sRGB. Exif, XMP, IPTC and format text never survive a re-encode.</summary>
     public MediaRecipeBuilder Strip(MetadataKinds kinds = MetadataKinds.All)
     {
         ReplaceOrAdd(new StripStep(kinds), PipelineStage.Metadata);

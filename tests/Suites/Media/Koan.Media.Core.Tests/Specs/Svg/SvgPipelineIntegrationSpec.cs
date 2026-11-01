@@ -1,7 +1,6 @@
 using System.Text;
 using Koan.Media.Core.Formats;
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Svg;
 
@@ -55,8 +54,8 @@ public sealed class SvgPipelineIntegrationSpec
         output.SourceFormat.Should().Be("svg", "the SVG-side source format is preserved on the output");
         output.Width.Should().Be(640);
         output.Height.Should().Be(640);
-        // Decode back through ImageSharp to confirm the bytes are a real webp.
-        using var img = Image.Load(output.Bytes);
+        // Decode back to confirm the bytes are a real webp.
+        using var img = TestImage.Load(output.Bytes);
         img.Width.Should().Be(640);
         img.Height.Should().Be(640);
         // KindTrace should record the Vector -> Raster transition.
@@ -82,7 +81,7 @@ public sealed class SvgPipelineIntegrationSpec
         output.SourceFormat.Should().Be("svg");
         output.Width.Should().Be(320);
         output.Height.Should().Be(320);
-        using var img = Image.Load(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         img.Width.Should().Be(320);
         img.Height.Should().Be(320);
     }

@@ -289,7 +289,8 @@ public sealed record OverlayStep(
 }
 
 /// <summary>
-/// Metadata stripping. Stage <see cref="PipelineStage.Metadata"/>.
+/// Color profile stripping. Stage <see cref="PipelineStage.Metadata"/>.
+/// See <see cref="MetadataKinds"/> for what a re-encode carries at all.
 /// </summary>
 public sealed record StripStep(MetadataKinds Kinds, string? Name = null, bool Primary = false)
     : MediaStep(PipelineStage.Metadata, Name, Primary)
@@ -298,23 +299,24 @@ public sealed record StripStep(MetadataKinds Kinds, string? Name = null, bool Pr
         sb.Append("strip(").Append((int)Kinds).Append(')');
 
     // Metadata strip is a passthrough across all kinds — the engine
-    // simply drops the requested metadata blocks where they exist.
+    // simply drops the color profile where one exists.
     public override KindSet AcceptsFrom => KindSet.All;
     public override MediaKind? ProducesTo => null;
 }
 
+/// <summary>
+/// What a recipe can choose to drop. A re-encode never carries Exif, XMP, IPTC or a format's own
+/// text, whatever the recipe says, so those are not choices. The color profile is the only metadata
+/// that survives a re-encode, and it survives unless stripped.
+/// </summary>
 [Flags]
 public enum MetadataKinds
 {
+    /// <summary>Keep the color profile.</summary>
     None = 0,
-    Exif = 1 << 0,
+    /// <summary>Drop the color profile, converting the pixels to sRGB so the picture looks the same.</summary>
     Icc = 1 << 1,
-    Xmp = 1 << 2,
-    /// <summary>IPTC: bylines, captions, places.</summary>
-    Iptc = 1 << 3,
-    /// <summary>Text a format carries of its own: PNG text chunks, GIF comments.</summary>
-    Text = 1 << 4,
-    All = Exif | Icc | Xmp | Iptc | Text,
+    All = Icc,
 }
 
 /// <summary>

@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using SixLabors.Fonts;
+using SkiaSharp;
 
 namespace Koan.Media.Core.Fonts;
 
@@ -12,12 +12,12 @@ namespace Koan.Media.Core.Fonts;
 ///
 /// <para>Per MEDIA-0004 §7, only registered fonts are usable — text
 /// overlays naming an unknown font are rejected. Keeps the surface
-/// bounded against arbitrary filesystem reads.</para>
+/// bounded against arbitrary filesystem reads, and nothing depends on the
+/// host having system fonts: a container image usually has none.</para>
 /// </summary>
 public sealed class KoanFontRegistry
 {
-    private readonly FontCollection _collection = new();
-    private readonly ConcurrentDictionary<string, FontFamily> _byName =
+    private readonly ConcurrentDictionary<string, SKTypeface> _byName =
         new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Names of every registered font (sorted, case-insensitive).</summary>
@@ -26,6 +26,9 @@ public sealed class KoanFontRegistry
 
     /// <summary>True when at least one font has been registered.</summary>
     public bool HasAny => !_byName.IsEmpty;
+
+    /// <summary>True when a font is registered under <paramref name="name"/>.</summary>
+    public bool Contains(string name) => _byName.ContainsKey(name);
 
     /// <summary>
     /// Register a font under <paramref name="name"/>, loading the TTF
@@ -36,20 +39,11 @@ public sealed class KoanFontRegistry
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Font name required.", nameof(name));
         if (!File.Exists(path)) throw new FileNotFoundException($"Font file not found: {path}");
-        var family = _collection.Add(path);
-        _byName[name] = family;
+        _byName[name] = SKTypeface.FromFile(path)
+            ?? throw new InvalidDataException($"Font file could not be read: {path}");
         return this;
     }
 
-    /// <summary>
-    /// Resolve a registered font name to a usable <see cref="Font"/>
-    /// at the requested em-size. Returns null when the name isn't
-    /// registered.
-    /// </summary>
-    public Font? CreateFont(string name, float emSize)
-    {
-        return _byName.TryGetValue(name, out var family)
-            ? family.CreateFont(emSize)
-            : null;
-    }
+    /// <summary>The registered typeface; shared across renders, which it is safe for.</summary>
+    internal SKTypeface? Find(string name) => _byName.GetValueOrDefault(name);
 }

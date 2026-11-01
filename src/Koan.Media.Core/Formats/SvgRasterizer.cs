@@ -8,9 +8,9 @@ namespace Koan.Media.Core.Formats;
 /// implementation of the planner's implicit Rasterize step for
 /// <see cref="Koan.Media.Abstractions.Recipes.MediaKind.Vector"/>.
 ///
-/// The output is always PNG. WebP / JPEG / AVIF re-encoding is handled by
-/// the existing ImageSharp encode pass after rasterization. The aspect-
-/// ratio policy is letterbox-into-transparent (no stretch, no crop).
+/// The output is always PNG. The recipe's stages and terminal encode run on
+/// it afterwards, like any raster source. The aspect-ratio policy is
+/// letterbox-into-transparent (no stretch, no crop).
 /// </summary>
 public static class SvgRasterizer
 {

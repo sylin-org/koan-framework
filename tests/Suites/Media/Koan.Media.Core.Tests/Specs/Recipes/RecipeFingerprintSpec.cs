@@ -68,4 +68,25 @@ public sealed class RecipeFingerprintSpec
         var b = MediaRecipe.New().Resize(100, 100).EncodeAs("webp", 80).WithVersion(2).Build();
         a.Fingerprint().Should().NotBe(b.Fingerprint());
     }
+
+    [Fact]
+    public void The_output_generation_is_part_of_the_fingerprint()
+    {
+        // Pinned: an engine change that alters output bumps MediaRecipe.OutputGeneration, and this literal
+        // with it, so renders stored under the old identity stop being served and ETags change.
+        var recipe = MediaRecipe.New().Resize(width: 100).EncodeAs("webp", 80).Build();
+
+        var canonical = $"g={MediaRecipe.OutputGeneration}|v={recipe.Version}|" + string.Concat(
+            recipe.Steps.OrderBy(s => (int)s.Stage).Select(s =>
+            {
+                var sb = new System.Text.StringBuilder();
+                s.WriteFingerprint(sb);
+                return sb.Append(';').ToString();
+            }));
+        var expected = Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical))[..8]);
+
+        recipe.Fingerprint().Should().Be(expected);
+        MediaRecipe.OutputGeneration.Should().Be(2);
+    }
 }

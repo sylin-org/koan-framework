@@ -1,104 +1,121 @@
+using System.Text;
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
 /// <summary>
-/// .Strip() actually strips. The recipe model and JSON layers are
-/// covered elsewhere; this spec proves end-to-end that requested
-/// metadata removal is reflected in the output bytes.
+/// What survives a re-encode. Exif, XMP, IPTC and format text never do, with or
+/// without a Strip step; the color profile does unless it is stripped.
 /// </summary>
 public sealed class StripMetadataSpec
 {
+    private const string Planted = "Koan-Planted-Secret";
+
+    private static string Latin1(byte[] bytes) => Encoding.Latin1.GetString(bytes);
+
     [Fact]
-    public async Task Source_carries_exif_by_default_through_AutoOrient_keep()
+    public async Task Exif_never_survives_a_re_encode_even_with_orientation_kept()
     {
-        // Establish the baseline: when we don't strip and use keep=true to
-        // skip the orient step (which itself reads/clears the orientation
-        // tag), the EXIF profile survives the round trip.
-        await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);
+        await using var src = Fixtures.JpegWithExifOrientation(orientation: 1, description: Planted);
+        Latin1(await Fixtures.Snapshot(src)).Should().Contain(Planted, "the source carries it");
+
         var output = await src.AsMedia().AutoOrient(keep: true).ToBytesAsync();
 
-        using var img = Image.Load(output.Bytes);
-        img.Metadata.ExifProfile.Should().NotBeNull("baseline: a no-strip round-trip keeps EXIF");
+        Latin1(output.Bytes).Should().NotContain(Planted);
+        Latin1(output.Bytes).Should().NotContain("Exif\0\0");
     }
 
     [Fact]
-    public async Task Strip_Exif_removes_exif_profile_from_output()
+    public async Task Iptc_never_survives_a_re_encode()
     {
-        await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);
-        var output = await src.AsMedia()
-            .AutoOrient(keep: true)
-            .Strip(MetadataKinds.Exif)
-            .ToBytesAsync();
+        await using var jpeg = Fixtures.WideJpeg(width: 8, height: 8);
+        await using var src = Fixtures.JpegWithSegment(jpeg, 0xED, Encoding.Latin1.GetBytes("Photoshop 3.0\0" + Planted));
+        Latin1(await Fixtures.Snapshot(src)).Should().Contain(Planted, "the source carries it");
 
-        using var img = Image.Load(output.Bytes);
-        img.Metadata.ExifProfile.Should().BeNull("Strip(Exif) must clear the EXIF profile");
+        var output = await src.AsMedia().PreserveFormat().ToBytesAsync();
+
+        Latin1(output.Bytes).Should().NotContain(Planted);
     }
 
     [Fact]
-    public async Task Strip_All_leaves_no_iptc_byline_in_a_jpeg()
+    public async Task Xmp_never_survives_a_re_encode()
     {
-        using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(8, 8);
-        image.Metadata.IptcProfile = new SixLabors.ImageSharp.Metadata.Profiles.Iptc.IptcProfile();
-        image.Metadata.IptcProfile.SetValue(SixLabors.ImageSharp.Metadata.Profiles.Iptc.IptcTag.Byline, "IPTC-Secret-Byline");
-        await using var src = new MemoryStream();
-        await image.SaveAsJpegAsync(src);
-        src.Position = 0;
-        System.Text.Encoding.Latin1.GetString(src.ToArray()).Should().Contain("IPTC-Secret-Byline", "the source carries it");
+        await using var jpeg = Fixtures.WideJpeg(width: 8, height: 8);
+        await using var src = Fixtures.JpegWithSegment(jpeg, 0xE1, Encoding.Latin1.GetBytes("http://ns.adobe.com/xap/1.0/\0" + Planted));
+
+        var output = await src.AsMedia().EncodeAs("webp").ToBytesAsync();
+
+        Latin1(output.Bytes).Should().NotContain(Planted);
+    }
+
+    [Fact]
+    public async Task Png_text_never_survives_a_re_encode()
+    {
+        await using var png = Fixtures.SolidPng(8, 8, new Rgba(1, 2, 3));
+        await using var src = Fixtures.PngWithChunk(png, "tEXt", Encoding.Latin1.GetBytes("Author\0" + Planted));
+        Latin1(await Fixtures.Snapshot(src)).Should().Contain(Planted, "the source carries it");
+
+        var output = await src.AsMedia().PreserveFormat().ToBytesAsync();
+
+        Latin1(output.Bytes).Should().NotContain(Planted);
+    }
+
+    [Theory]
+    [InlineData("png")]
+    [InlineData("webp")]
+    [InlineData("jpeg")]
+    public async Task Color_profile_survives_without_a_strip_step(string format)
+    {
+        await using var src = Fixtures.DisplayP3Png(16, 16, new Rgba(200, 40, 40));
+        (await Probe(src)).HasIccProfile.Should().BeTrue("the source carries it");
+
+        var output = await src.AsMedia().EncodeAs(format, 95).ToBytesAsync();
+
+        using var img = TestImage.Load(output.Bytes);
+        img.HasIccProfile.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Strip_None_keeps_the_color_profile()
+    {
+        await using var src = Fixtures.DisplayP3Png(16, 16, new Rgba(200, 40, 40));
+
+        var output = await src.AsMedia().Strip(MetadataKinds.None).PreserveFormat().ToBytesAsync();
+
+        using var img = TestImage.Load(output.Bytes);
+        img.HasIccProfile.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Strip_drops_the_profile_and_converts_so_the_picture_looks_the_same()
+    {
+        await using var src = Fixtures.DisplayP3Png(16, 16, new Rgba(200, 40, 40));
 
         var output = await src.AsMedia().Strip().PreserveFormat().ToBytesAsync();
 
-        System.Text.Encoding.Latin1.GetString(output.Bytes).Should().NotContain("IPTC-Secret-Byline");
+        using var img = TestImage.Load(output.Bytes);
+        img.HasIccProfile.Should().BeFalse();
+        // The same P3 red is more saturated in sRGB: red rises and green falls out of it.
+        img[8, 8].R.Should().BeGreaterThan(200);
+        img[8, 8].G.Should().BeLessThan(40);
     }
 
     [Fact]
-    public async Task Strip_All_leaves_no_text_chunk_in_a_png()
+    public async Task An_srgb_source_output_carries_no_profile()
     {
-        using var image = new Image<SixLabors.ImageSharp.PixelFormats.Rgba32>(8, 8);
-        image.Metadata.GetPngMetadata().TextData.Add(new SixLabors.ImageSharp.Formats.Png.Chunks.PngTextData("Author", "PNG-Secret-Text", "", ""));
-        await using var src = new MemoryStream();
-        await image.SaveAsPngAsync(src);
-        src.Position = 0;
-        System.Text.Encoding.Latin1.GetString(src.ToArray()).Should().Contain("PNG-Secret-Text", "the source carries it");
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
 
-        var output = await src.AsMedia().Strip().PreserveFormat().ToBytesAsync();
+        var output = await src.AsMedia().EncodeAs("jpeg", 90).ToBytesAsync();
 
-        System.Text.Encoding.Latin1.GetString(output.Bytes).Should().NotContain("PNG-Secret-Text");
+        using var img = TestImage.Load(output.Bytes);
+        img.HasIccProfile.Should().BeFalse();
+        Latin1(output.Bytes).Should().NotContain("ICC_PROFILE");
     }
 
-    [Fact]
-    public async Task Strip_All_removes_exif_profile()
+    private static async Task<MediaInfo> Probe(Stream source)
     {
-        await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);
-        var output = await src.AsMedia()
-            .AutoOrient(keep: true)
-            .Strip(MetadataKinds.All)
-            .ToBytesAsync();
-
-        using var img = Image.Load(output.Bytes);
-        img.Metadata.ExifProfile.Should().BeNull("Strip(All) removes EXIF among other profiles");
-        img.Metadata.IccProfile.Should().BeNull("Strip(All) removes ICC");
-        img.Metadata.XmpProfile.Should().BeNull("Strip(All) removes XMP");
-    }
-
-    [Fact]
-    public async Task Strip_runs_at_stage_8_before_encode_so_metadata_is_absent_from_bytes()
-    {
-        // Counter-test: declare Strip after Resize in the recipe. Stage
-        // ordering should still place strip just before encode, so the
-        // output bytes have no EXIF.
-        await using var src = Fixtures.JpegWithExifOrientation(orientation: 1);
-        var output = await src.AsMedia()
-            .Resize(150, 75)
-            .AutoOrient(keep: true)
-            .Strip(MetadataKinds.Exif)
-            .ToBytesAsync();
-
-        using var img = Image.Load(output.Bytes);
-        img.Metadata.ExifProfile.Should().BeNull();
-        img.Width.Should().Be(150, "resize ran first; strip didn't clobber pixel data");
-        img.Height.Should().Be(75);
+        var info = await MediaPipeline.From(source, disposeSource: false).ProbeAsync();
+        source.Position = 0;
+        return info;
     }
 }

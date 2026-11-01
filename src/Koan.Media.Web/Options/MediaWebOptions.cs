@@ -12,8 +12,8 @@ public sealed class MediaWebOptions
 
     /// <summary>
     /// Hard cap on source megapixels per MEDIA-0004 §13. Default 100MP
-    /// (= 10000x10000). Enforced via a header-only Image.Identify pass
-    /// before the full decode allocates memory. Set 0 to disable.
+    /// (= 10000x10000). Enforced from the source's header before the
+    /// decode allocates memory. Set 0 to disable.
     /// </summary>
     public int MaxSourceMegapixels { get; set; } = 100;
 
@@ -22,6 +22,12 @@ public sealed class MediaWebOptions
     /// Default 600. Set 0 to disable.
     /// </summary>
     public int MaxFrameCount { get; set; } = 600;
+
+    /// <summary>
+    /// Hard cap on the source bytes one render buffers to decode. Default
+    /// 256 MiB. Set 0 for the engine's own ceiling of 1 GiB.
+    /// </summary>
+    public long MaxSourceBytes { get; set; } = 256L * 1024 * 1024;
 
     /// <summary>
     /// When true, unknown query params return 400. When false (default),

@@ -1,27 +1,18 @@
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Bmp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Tiff;
-using SixLabors.ImageSharp.Formats.Webp;
+using SkiaSharp;
 
 namespace Koan.Media.Core.Pipeline;
 
 /// <summary>
-/// Maps decoded format + caller intent → encoder. The heart of the
-/// format-preservation guarantee that fixes the DX-0047 defect: when
-/// the recipe doesn't pin an explicit target format, the encoder is
-/// chosen from <see cref="Image.Metadata"/>.<c>DecodedImageFormat</c>
-/// so animation, alpha, and color depth survive the round trip.
+/// Which formats the framework can write, and the writing of them. The heart of the format-preservation
+/// guarantee: a recipe that does not pin a target keeps the source's format, or the writable format closest to
+/// it when the source's own cannot be written (<see cref="PreservedFormat"/>).
 /// </summary>
 public static class EncoderSelector
 {
     /// <summary>Canonical lowercase format slugs the encoder picker recognises.</summary>
     public static IReadOnlyList<string> SupportedFormats { get; } = new[]
     {
-        "jpeg", "png", "webp", "gif", "bmp", "tiff",
+        "jpeg", "png", "webp",
     };
 
     /// <summary>
@@ -41,77 +32,104 @@ public static class EncoderSelector
         !string.IsNullOrWhiteSpace(slug)
         && SupportedFormats.Contains(CanonicalizeSlug(slug), StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>True when the named format supports an alpha channel.</summary>
-    public static bool SupportsAlpha(string format) => format.ToLowerInvariant() switch
+    /// <summary>
+    /// The format a recipe that pins no target writes for a source of this format. GIF becomes WebP, which
+    /// keeps its animation and transparency; BMP, ICO and WBMP become PNG, which keeps every pixel.
+    /// </summary>
+    public static string PreservedFormat(string sourceFormat) => CanonicalizeSlug(sourceFormat) switch
     {
-        "png" or "webp" or "gif" or "tiff" => true,
+        "gif" => "webp",
+        "bmp" or "ico" or "wbmp" => "png",
+        var slug => slug,
+    };
+
+    /// <summary>True when the named format supports an alpha channel.</summary>
+    public static bool SupportsAlpha(string format) => CanonicalizeSlug(format) switch
+    {
+        "png" or "webp" => true,
         _ => false,
     };
 
     /// <summary>True when the named format can carry multiple frames.</summary>
-    public static bool SupportsAnimation(string format) => format.ToLowerInvariant() switch
-    {
-        "webp" or "gif" or "png" => true, // PNG = APNG
-        _ => false,
-    };
+    public static bool SupportsAnimation(string format) => CanonicalizeSlug(format) == "webp";
 
-    /// <summary>Map decoded format → canonical lowercase slug.</summary>
-    public static string CanonicalSlug(IImageFormat? format) => format switch
-    {
-        JpegFormat => "jpeg",
-        PngFormat => "png",
-        WebpFormat => "webp",
-        GifFormat => "gif",
-        BmpFormat => "bmp",
-        TiffFormat => "tiff",
-        _ => "png", // safe default when input format is unknown — preserves alpha
-    };
-
-    public static string ContentType(string format) => format.ToLowerInvariant() switch
+    public static string ContentType(string format) => CanonicalizeSlug(format) switch
     {
         "jpeg" => "image/jpeg",
         "png" => "image/png",
         "webp" => "image/webp",
-        "gif" => "image/gif",
-        "bmp" => "image/bmp",
-        "tiff" => "image/tiff",
         _ => "application/octet-stream",
     };
 
     /// <summary>
-    /// Pick the encoder for the given source format and target format
-    /// slug. When <paramref name="targetFormat"/> is null, the source
-    /// format is preserved. Quality is honoured per-encoder (JPEG +
-    /// WebP take quality; PNG ignores).
+    /// Encode into native memory. The encoders are synchronous and take no token, so the caller honours its
+    /// token around this call and copies the result to its destination asynchronously. The result is bounded by
+    /// the output pixels: the sizes the limits allowed, at most what an uncompressed frame of them would take.
+    /// Exif, XMP, IPTC and format text are never written; the only metadata an encoder writes is the color
+    /// profile of a bitmap that carries one.
     /// </summary>
-    public static IImageEncoder For(IImageFormat? sourceFormat, string? targetFormat, int quality)
+    internal static SKData Encode(RasterImage image, string format, int quality)
     {
-        var slug = targetFormat is null ? CanonicalSlug(sourceFormat) : CanonicalizeSlug(targetFormat);
-        return slug switch
+        var data = CanonicalizeSlug(format) switch
         {
-            "jpeg" => new JpegEncoder
-            {
-                Quality = NormalizeQuality(quality, defaultQ: 80),
-            },
-            "png" => new PngEncoder
-            {
-                // PNG is lossless; quality controls compression level (0=none, 9=max).
-                // Map "quality" 0-100 to compression 0-9; default to deflate level 6 for balance.
-                CompressionLevel = MapPngCompression(quality),
-            },
-            "webp" => quality < 0
-                ? new WebpEncoder { FileFormat = WebpFileFormatType.Lossless }
-                : new WebpEncoder
-                {
-                    Quality = NormalizeQuality(quality, defaultQ: 80),
-                    FileFormat = WebpFileFormatType.Lossy,
-                },
-            "gif" => new GifEncoder(),
-            "bmp" => new BmpEncoder(),
-            "tiff" => new TiffEncoder(),
+            "jpeg" => EncodeJpeg(image, quality),
+            "png" => EncodePng(image, quality),
+            "webp" => EncodeWebp(image, quality),
             _ => throw new NotSupportedException(
-                $"EncoderSelector: format '{targetFormat}' is not supported. Use one of: {string.Join(", ", SupportedFormats)}."),
+                $"EncoderSelector: format '{format}' is not supported. Use one of: {string.Join(", ", SupportedFormats)}."),
         };
+        return data ?? throw new InvalidOperationException($"The {format} encoder produced no output.");
+    }
+
+    private static SKData? EncodeJpeg(RasterImage image, int quality)
+    {
+        using var pixels = image.Frames[0].Bitmap.PeekPixels();
+        return pixels.Encode(new SKJpegEncoderOptions(
+            NormalizeQuality(quality, defaultQ: 80),
+            SKJpegEncoderDownsample.Downsample420,
+            SKJpegEncoderAlphaOption.BlendOnBlack));
+    }
+
+    private static SKData? EncodePng(RasterImage image, int quality)
+    {
+        var bitmap = image.Frames[0].Bitmap;
+        var options = new SKPngEncoderOptions(SKPngEncoderFilterFlags.AllFilters, MapPngCompression(quality));
+        // A picture with no transparency in it is written without an alpha channel.
+        if (IsOpaque(bitmap))
+        {
+            using var opaque = new SKPixmap(bitmap.Info.WithAlphaType(SKAlphaType.Opaque), bitmap.GetPixels(), bitmap.RowBytes);
+            return opaque.Encode(options);
+        }
+        using var pixels = bitmap.PeekPixels();
+        return pixels.Encode(options);
+    }
+
+    private static SKData? EncodeWebp(RasterImage image, int quality)
+    {
+        var options = quality < 0
+            ? new SKWebpEncoderOptions(SKWebpEncoderCompression.Lossless, 100)
+            : new SKWebpEncoderOptions(SKWebpEncoderCompression.Lossy, NormalizeQuality(quality, defaultQ: 80));
+
+        if (image.Frames.Count == 1)
+        {
+            using var pixels = image.Frames[0].Bitmap.PeekPixels();
+            return pixels.Encode(options);
+        }
+
+        var frames = image.Frames
+            .Select(f => new SKWebpEncoderFrame(f.Bitmap, TimeSpan.FromMilliseconds(f.DurationMs)))
+            .ToArray();
+        return SKWebpEncoder.EncodeAnimated(frames, options);
+    }
+
+    private static bool IsOpaque(SKBitmap bitmap)
+    {
+        ReadOnlySpan<byte> pixels = bitmap.GetPixelSpan();
+        for (var i = bitmap.BytesPerPixel - 1; i < pixels.Length; i += bitmap.BytesPerPixel)
+        {
+            if (pixels[i] != byte.MaxValue) return false;
+        }
+        return true;
     }
 
     private static int NormalizeQuality(int q, int defaultQ)
@@ -121,18 +139,17 @@ public static class EncoderSelector
         return Math.Min(q, 100);
     }
 
-    private static PngCompressionLevel MapPngCompression(int quality)
+    private static int MapPngCompression(int quality)
     {
         // Higher "quality" intent → spend more on compression (smaller output).
-        // For PNG we treat quality as compression effort.
-        if (quality < 0) return PngCompressionLevel.BestCompression;
+        // For PNG we treat quality as zlib effort.
+        if (quality < 0) return 9;
         return quality switch
         {
-            <= 10 => PngCompressionLevel.NoCompression,
-            <= 30 => PngCompressionLevel.BestSpeed,
-            <= 60 => PngCompressionLevel.DefaultCompression,
-            <= 85 => PngCompressionLevel.Level6,
-            _ => PngCompressionLevel.BestCompression,
+            <= 10 => 0,
+            <= 30 => 1,
+            <= 85 => 6,
+            _ => 9,
         };
     }
 }

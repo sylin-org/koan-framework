@@ -38,15 +38,12 @@ public static class EncoderAccepts
             // Still-only raster encoders.
             ["jpeg"] = new EncoderDescriptor("jpeg", KindSet.Of(MediaKind.Raster), "image/jpeg", PreservesAnimation: false),
             ["png"] = new EncoderDescriptor("png", KindSet.Of(MediaKind.Raster), "image/png", PreservesAnimation: false),
-            ["bmp"] = new EncoderDescriptor("bmp", KindSet.Of(MediaKind.Raster), "image/bmp", PreservesAnimation: false),
-            ["tiff"] = new EncoderDescriptor("tiff", KindSet.Of(MediaKind.Raster), "image/tiff", PreservesAnimation: false),
 
-            // Animated-capable raster encoders.
+            // The animated-capable raster encoder.
             ["webp"] = new EncoderDescriptor("webp", KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster), "image/webp", PreservesAnimation: true),
-            ["gif"] = new EncoderDescriptor("gif", KindSet.Of(MediaKind.Raster, MediaKind.AnimatedRaster), "image/gif", PreservesAnimation: true),
 
-            // AVIF: declared for forward-compat, but ImageSharp's AvifEncoder is not in the current
-            // package surface, so EncoderSelector cannot produce it. It is therefore filtered out of
+            // AVIF: declared for forward-compat, but the engine has no AVIF encoder, so
+            // EncoderSelector cannot produce it. It is therefore filtered out of
             // the live registry (see _live) and never negotiated; recipes that allowlist "avif" fall
             // through to their next-preferred producible format. Wiring the encoder into
             // EncoderSelector flips this descriptor live automatically (DATA-0098).
@@ -57,7 +54,7 @@ public static class EncoderAccepts
     /// The LIVE encoder registry: only the declared formats the producer (<see cref="EncoderSelector"/>)
     /// can actually emit. DATA-0098 single-source-of-truth — the capability table is DERIVED from what
     /// can be produced, never maintained as an independent list. A format declared above but with no
-    /// concrete encoder (e.g. <c>avif</c> until ImageSharp's AvifEncoder is wired into EncoderSelector)
+    /// concrete encoder (e.g. <c>avif</c>)
     /// is excluded here, so the negotiator never advertises or selects it and the next-preferred
     /// producible format wins. Re-wiring is automatic: add the encoder to EncoderSelector and the
     /// already-declared descriptor goes live.

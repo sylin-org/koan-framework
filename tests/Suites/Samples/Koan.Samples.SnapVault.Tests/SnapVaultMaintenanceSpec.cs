@@ -12,8 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using SnapVault.Controllers;
 using SnapVault.Models;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 using Xunit;
 
 namespace Koan.Samples.SnapVault.Tests;
@@ -33,12 +32,12 @@ public sealed class SnapVaultMaintenanceSpec
 
     private static string Stamp() => Guid.NewGuid().ToString("n").Substring(0, 8);
 
-    private static async Task<byte[]> TinyJpegAsync()
+    private static Task<byte[]> TinyJpegAsync()
     {
-        using var img = new Image<Rgba32>(8, 6);
-        using var ms = new MemoryStream();
-        await img.SaveAsJpegAsync(ms);
-        return ms.ToArray();
+        using var image = new SKBitmap(8, 6);
+        image.Erase(SKColors.Black);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 75);
+        return Task.FromResult(data.ToArray());
     }
 
     private static MaintenanceController Controller(Stream? responseBody = null)

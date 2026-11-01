@@ -1,12 +1,11 @@
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
 /// <summary>
 /// Source-side limits applied before the full decode allocates memory.
-/// Per MEDIA-0004 §13: <c>MaxSourceMegapixels</c> + <c>MaxFrameCount</c>.
+/// Per MEDIA-0004 §13: <c>MaxSourceMegapixels</c> + <c>MaxFrameCount</c>,
+/// plus the byte limit on what the pipeline buffers to decode.
 /// </summary>
 public sealed class SourceLimitsSpec
 {
@@ -97,14 +96,70 @@ public sealed class SourceLimitsSpec
         ex.Which.LimitName.Should().Be("maxFrameCount");
     }
 
+    [Fact]
+    public async Task Limits_apply_to_a_non_seekable_source_before_it_decodes()
+    {
+        await using var src = new ForwardOnlyStream(Fixtures.WideJpeg(width: 2000, height: 2000));
+        var limits = new MediaPipelineLimits { MaxSourceMegapixels = 2 };
+        var act = async () => await src.AsMedia(limits: limits).EncodeAs("png").ToBytesAsync();
+        var ex = await act.Should().ThrowAsync<MediaSourceLimitException>();
+        ex.Which.LimitName.Should().Be("maxSourceMegapixels");
+    }
+
+    [Fact]
+    public async Task A_non_seekable_source_renders()
+    {
+        await using var src = new ForwardOnlyStream(Fixtures.AnimatedWebp(frames: 3));
+        var output = await src.AsMedia().ToBytesAsync();
+        output.FrameCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task A_header_declaring_an_enormous_picture_is_refused_without_allocating_it()
+    {
+        // A GIF's logical screen and first frame claim 65535x65535 in 24 bytes.
+        byte[] gif =
+        [
+            (byte)'G', (byte)'I', (byte)'F', (byte)'8', (byte)'9', (byte)'a',
+            0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0,
+            0x2C, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0, 2, 1, 0, 0, 0x3B,
+        ];
+        await using var src = new MemoryStream(gif);
+        var act = async () => await src.AsMedia(limits: MediaPipelineLimits.Unlimited).ToBytesAsync();
+        var ex = await act.Should().ThrowAsync<MediaSourceLimitException>();
+        ex.Which.LimitName.Should().Be("maxDecodedMegapixels");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MaxSourceBytes_refuses_a_longer_source(bool seekable)
+    {
+        Stream src = Fixtures.WideJpeg(width: 400, height: 400);
+        if (!seekable) src = new ForwardOnlyStream(src);
+        await using (src)
+        {
+            var limits = new MediaPipelineLimits { MaxSourceBytes = 64 };
+            var act = async () => await src.AsMedia(limits: limits).ToBytesAsync();
+            var ex = await act.Should().ThrowAsync<MediaSourceLimitException>();
+            ex.Which.LimitName.Should().Be("maxSourceBytes");
+            ex.Which.Cap.Should().Be(64);
+        }
+    }
+
+    [Fact]
+    public async Task A_truncated_source_is_refused_rather_than_served_partially()
+    {
+        var whole = await Fixtures.Snapshot(Fixtures.WideJpeg(width: 400, height: 400));
+        await using var truncated = new MemoryStream(whole[..(whole.Length / 2)]);
+        var act = async () => await truncated.AsMedia().ToBytesAsync();
+        await act.Should().ThrowAsync<MediaDecodeException>();
+    }
+
     /// <summary>
-    /// Source bytes that decode-identify but fail their content CRC
-    /// (corrupt PNG IDAT chunk, truncated JPEG SOI segment, etc.) used to
-    /// escape EnforceLimitsAsync as a raw <see cref="InvalidImageContentException"/>
-    /// when limits were configured. The controller's catch block expected
-    /// <see cref="MediaDecodeException"/> and treated the leak as an
-    /// unhandled 500. EnforceLimitsAsync now defers to LoadAsync on
-    /// content-decode failure so the typed MediaDecodeException surfaces.
+    /// Source bytes with a valid header and a corrupt body (corrupt PNG IDAT
+    /// chunk, truncated JPEG segment, etc.) surface as the typed
+    /// <see cref="MediaDecodeException"/> the controller maps to 422.
     ///
     /// <para>Regression for the downstream consumer home-LAN incident where a
     /// stored thumbnail's PNG IDAT chunk got corrupted at rest and every
@@ -115,12 +170,8 @@ public sealed class SourceLimitsSpec
     {
         // Synthesise a "valid-header, busted-body" PNG: take a real PNG and
         // flip a byte inside its IDAT chunk so the CRC mismatches but the
-        // signature + IHDR still parse cleanly through Identify.
-        await using var seed = Fixtures.WideJpeg(width: 64, height: 64);
-        using var img = await Image.LoadAsync(seed);
-        await using var pngBuf = new MemoryStream();
-        await img.SaveAsync(pngBuf, new PngEncoder());
-        var bytes = pngBuf.ToArray();
+        // signature + IHDR still parse cleanly.
+        var bytes = await Fixtures.Snapshot(Fixtures.SolidPng(64, 64, new Rgba(10, 200, 30)));
         // Find the IDAT marker (bytes 'I','D','A','T'), then corrupt a byte
         // a few past it so the chunk content (and its trailing CRC32) no
         // longer match.
@@ -129,12 +180,29 @@ public sealed class SourceLimitsSpec
         bytes[idat + 12] ^= 0xFF;
         await using var corrupt = new MemoryStream(bytes, writable: false);
 
-        // Limits configured, so the EnforceLimitsAsync Identify pass runs.
-        // Pre-fix this threw raw InvalidImageContentException; post-fix the
-        // typed MediaDecodeException surfaces so the host catches it cleanly.
         var limits = new MediaPipelineLimits { MaxSourceMegapixels = 100, MaxFrameCount = 100 };
         var act = async () => await corrupt.AsMedia(limits: limits).ToBytesAsync();
         await act.Should().ThrowAsync<MediaDecodeException>();
+    }
+
+    /// <summary>A stream that reads forward only, like a network body.</summary>
+    private sealed class ForwardOnlyStream(Stream inner) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
     }
 
     private static int FindIdatOffset(byte[] bytes)

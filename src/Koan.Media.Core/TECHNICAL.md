@@ -30,8 +30,9 @@ throws from the change callback; it does not roll forward a partially rebuilt ca
 ## Pipeline posture
 
 The pipeline is lazy until `ProbeAsync`, `WriteToAsync`, `ToBytesAsync`, or `MaterializeAsync`. Prefer
-`WriteToAsync` for output; `ToBytesAsync` is the explicitly buffered terminal. Source limits supplied by Web
-are checked before full decode, while direct Core callers own their ingress bounds.
+`WriteToAsync` for output; `ToBytesAsync` is the explicitly buffered terminal. Limits are checked from the header
+before any pixel is allocated. `MediaDecoder`, `Resampler`, `FrameTransforms`, `EncoderSelector` and `TextRenderer`
+are the engine (MEDIA-0010); its types stay internal, and no Skia type crosses a public signature.
 
 ## Inspection
 

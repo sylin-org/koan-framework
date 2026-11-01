@@ -1,56 +1,60 @@
 using Koan.Media.Abstractions.Recipes;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace Koan.Media.Core.Pipeline;
 
 /// <summary>
 /// Computes the target canvas for a shape+resize pass and composites
-/// the shaped image onto a background derived from the recipe's
+/// every frame onto a background derived from the recipe's
 /// <see cref="Background"/>. Stage 7 (Overlay) runs before metadata
-/// strip and encode; bg compose runs between the shape/resize Mutate
+/// strip and encode; bg compose runs between the shape/resize pass
 /// and overlay application so overlays land on the final canvas.
 ///
-/// Returns <c>null</c> when no canvas extension is needed:
+/// Leaves the image as it is when no canvas extension is needed:
 /// <list type="bullet">
-///   <item>bg is transparent (current default — preserve existing behavior)</item>
+///   <item>bg is transparent (the default)</item>
 ///   <item>fit is not Contain (Cover/Fill leave no padding to fill)</item>
 ///   <item>target canvas dimensions can't be resolved (single-axis resize)</item>
 ///   <item>shaped image already exactly matches the target canvas</item>
 /// </list>
-/// Caller owns the returned canvas and is responsible for disposing it.
 /// </summary>
 internal static class BackgroundComposer
 {
-    public static Image? TryCompose(Image image, ShapeStep? shape, ResizeStep? resize, CancellationToken ct)
+    public static void Apply(RasterImage image, ShapeStep? shape, ResizeStep? resize, CancellationToken ct)
     {
-        if (shape is null) return null;
+        if (shape is null) return;
         var bg = shape.Background;
-        if (bg.Kind == BackgroundKind.Transparent) return null;
-        if (shape.Fit != Fit.Contain) return null;
+        if (bg.Kind == BackgroundKind.Transparent) return;
+        if (shape.Fit != Fit.Contain) return;
 
-        var (canvasW, canvasH) = ResolveCanvasSize(shape, resize, image.Size);
-        if (canvasW <= 0 || canvasH <= 0) return null;
-        if (image.Width == canvasW && image.Height == canvasH) return null;
+        var (canvasW, canvasH) = ResolveCanvasSize(shape, resize, image.Width, image.Height);
+        if (canvasW <= 0 || canvasH <= 0) return;
+        if (image.Width == canvasW && image.Height == canvasH) return;
 
-        ct.ThrowIfCancellationRequested();
-        var canvas = BuildCanvas(image, canvasW, canvasH, bg, ct);
-        try
+        // One sampled color for the whole animation, so the fill does not flicker between frames.
+        var fill = bg.Kind switch
         {
-            ct.ThrowIfCancellationRequested();
-            var (x, y) = AnchorOffset(canvasW, canvasH, image.Width, image.Height, shape.Position);
-            canvas.Mutate(c => c.DrawImage(image, new Point(x, y), 1f));
+            BackgroundKind.Solid => ToColor(bg.Color),
+            BackgroundKind.Dominant => SampleDominant(image.Frames[0].Bitmap),
+            BackgroundKind.Auto => SampleBorderAverage(image.Frames[0].Bitmap),
+            _ => SKColors.Transparent,
+        };
+        var (x, y) = AnchorOffset(canvasW, canvasH, image.Width, image.Height, shape.Position);
+
+        image.Map(frame =>
+        {
+            var canvas = bg.Kind == BackgroundKind.Blur
+                ? BuildBlurCanvas(frame, canvasW, canvasH, bg.BlurRadius)
+                : RasterImage.Allocate(canvasW, canvasH, frame.ColorSpace);
+            using var draw = new SKCanvas(canvas);
+            if (bg.Kind != BackgroundKind.Blur) draw.Clear(fill);
+            using var foreground = SKImage.FromBitmap(frame);
+            draw.DrawImage(foreground, x, y, new SKSamplingOptions(SKFilterMode.Nearest));
             return canvas;
-        }
-        catch
-        {
-            canvas.Dispose();
-            throw;
-        }
+        }, ct);
     }
 
-    private static (int Width, int Height) ResolveCanvasSize(ShapeStep shape, ResizeStep? resize, Size shapedSize)
+    private static (int Width, int Height) ResolveCanvasSize(ShapeStep shape, ResizeStep? resize, int shapedWidth, int shapedHeight)
     {
         // Resize step with both dimensions wins (target box is explicit).
         if (resize is { Width: int rw, Height: int rh })
@@ -82,17 +86,17 @@ internal static class BackgroundComposer
         }
 
         // Single-axis resize with aspect crop: derive missing axis from the
-        // shaped image (which preserved the aspect during the Mutate pass).
+        // shaped image (which preserved the aspect during the shape pass).
         if (resize is { Width: int singleW, Height: null })
         {
             var scaled = ApplyDpr(singleW, resize.Dpr);
-            var h = (int)Math.Round(shapedSize.Height * (scaled / (double)shapedSize.Width));
+            var h = (int)Math.Round(shapedHeight * (scaled / (double)shapedWidth));
             return (scaled, h);
         }
         if (resize is { Width: null, Height: int singleH })
         {
             var scaled = ApplyDpr(singleH, resize.Dpr);
-            var w = (int)Math.Round(shapedSize.Width * (scaled / (double)shapedSize.Height));
+            var w = (int)Math.Round(shapedWidth * (scaled / (double)shapedHeight));
             return (w, scaled);
         }
 
@@ -104,116 +108,94 @@ internal static class BackgroundComposer
             ? (int)Math.Round(value * dpr)
             : value;
 
-    private static Image BuildCanvas(Image source, int width, int height, Background bg, CancellationToken ct)
+    private static SKBitmap BuildBlurCanvas(SKBitmap source, int width, int height, int radius)
     {
-        return bg.Kind switch
-        {
-            BackgroundKind.Solid => new Image<Rgba32>(width, height, ToRgba32(bg.Color)),
-            BackgroundKind.Dominant => new Image<Rgba32>(width, height, SampleDominant(source, ct)),
-            BackgroundKind.Auto => new Image<Rgba32>(width, height, SampleBorderAverage(source, ct)),
-            BackgroundKind.Blur => BuildBlurCanvas(source, width, height, bg.BlurRadius, ct),
-            _ => new Image<Rgba32>(width, height),
-        };
-    }
-
-    private static Image<Rgba32> BuildBlurCanvas(Image source, int width, int height, int radius, CancellationToken ct)
-    {
-        // Cover-resize a clone of the source to fill the canvas, then
-        // Gaussian-blur. Radius 0 = pick a sensible default scaled to the
-        // canvas's short edge (about 4%) so callers can just say bg=blur.
+        // Cover-resize the frame to fill the canvas, then Gaussian-blur.
+        // Radius 0 = pick a sensible default scaled to the canvas's short
+        // edge (about 4%) so callers can just say bg=blur.
         var effectiveRadius = radius > 0
             ? radius
             : Math.Max(8, Math.Min(width, height) / 24);
 
-        var canvas = source.CloneAs<Rgba32>();
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-            canvas.Mutate(ctx =>
-            {
-                ctx.Resize(new ResizeOptions
-                {
-                    Size = new Size(width, height),
-                    Mode = ResizeMode.Crop,
-                    Position = AnchorPositionMode.Center,
-                });
-                ctx.GaussianBlur(effectiveRadius);
-            });
-            return canvas;
-        }
-        catch
-        {
-            canvas.Dispose();
-            throw;
-        }
+        var (scaledW, scaledH, offsetX, offsetY) = ResizePlan.Cover(source.Width, source.Height, width, height);
+        var scaled = FrameTransforms.Scale(source, scaledW, scaledH);
+
+        var canvas = RasterImage.Allocate(width, height, source.ColorSpace);
+        using var draw = new SKCanvas(canvas);
+        using var blur = SKImageFilter.CreateBlur(effectiveRadius, effectiveRadius, SKShaderTileMode.Clamp);
+        using var paint = new SKPaint { ImageFilter = blur };
+        using var image = SKImage.FromBitmap(scaled);
+        draw.DrawImage(image, -offsetX, -offsetY, new SKSamplingOptions(SKFilterMode.Nearest), paint);
+        if (!ReferenceEquals(scaled, source)) scaled.Dispose();
+        return canvas;
     }
 
-    private static Rgba32 SampleDominant(Image source, CancellationToken ct)
+    private static SKColor SampleDominant(SKBitmap source)
     {
-        // 1×1 box-resample gives the area-averaged color, a fast and
-        // visually reasonable approximation of "dominant" for most
-        // photographs and covers. True k-means is overkill at this scale.
-        using var sample = source.CloneAs<Rgba32>();
-        ct.ThrowIfCancellationRequested();
-        sample.Mutate(ctx => ctx.Resize(new ResizeOptions
-        {
-            Size = new Size(1, 1),
-            Sampler = KnownResamplers.Box,
-            Mode = ResizeMode.Stretch,
-        }));
-        var px = sample[0, 0];
-        return new Rgba32(px.R, px.G, px.B, byte.MaxValue);
+        // The area-averaged color: a fast and visually reasonable
+        // approximation of "dominant" for most photographs and covers.
+        // True k-means is overkill at this scale.
+        var (r, g, b, a) = Average(source, new SKRectI(0, 0, source.Width, source.Height));
+        return Unpremultiply(r, g, b, a);
     }
 
-    private static Rgba32 SampleBorderAverage(Image source, CancellationToken ct)
+    private static SKColor SampleBorderAverage(SKBitmap source)
     {
-        // Down-sample to a small grid so the border-strip read is cheap
-        // and stable against single-pixel noise. 16×16 keeps the four
-        // border strips at 16+16+14+14 = 60 samples — plenty for an
-        // average that "looks like the frame" without measuring pixels
-        // on full-res sources.
-        using var sample = source.CloneAs<Rgba32>();
-        ct.ThrowIfCancellationRequested();
-        sample.Mutate(ctx => ctx.Resize(new ResizeOptions
-        {
-            Size = new Size(16, 16),
-            Sampler = KnownResamplers.Box,
-            Mode = ResizeMode.Stretch,
-        }));
+        // Average the four strips a 16×16 grid would leave along the edge,
+        // so the read is stable against single-pixel noise and "looks like
+        // the frame" without weighing the inside of the picture.
+        var stripW = Math.Max(1, source.Width / 16);
+        var stripH = Math.Max(1, source.Height / 16);
+        SKRectI[] strips =
+        [
+            new(0, 0, source.Width, stripH),
+            new(0, source.Height - stripH, source.Width, source.Height),
+            new(0, stripH, stripW, source.Height - stripH),
+            new(source.Width - stripW, stripH, source.Width, source.Height - stripH),
+        ];
 
-        long r = 0, g = 0, b = 0;
-        int n = 0;
-        var w = sample.Width;
-        var h = sample.Height;
-        sample.ProcessPixelRows(accessor =>
+        double r = 0, g = 0, b = 0, a = 0, weight = 0;
+        foreach (var strip in strips)
         {
-            for (int y = 0; y < h; y++)
+            if (strip.Width <= 0 || strip.Height <= 0) continue;
+            var area = strip.Width * (double)strip.Height;
+            var (sr, sg, sb, sa) = Average(source, strip);
+            r += sr * area; g += sg * area; b += sb * area; a += sa * area;
+            weight += area;
+        }
+        return weight == 0 ? SKColors.Black : Unpremultiply(r / weight, g / weight, b / weight, a / weight);
+    }
+
+    private static (double R, double G, double B, double A) Average(SKBitmap source, SKRectI area)
+    {
+        ReadOnlySpan<byte> pixels = source.GetPixelSpan();
+        long r = 0, g = 0, b = 0, a = 0;
+        for (var y = area.Top; y < area.Bottom; y++)
+        {
+            var row = pixels.Slice(y * source.RowBytes);
+            for (var x = area.Left; x < area.Right; x++)
             {
-                var row = accessor.GetRowSpan(y);
-                if (y == 0 || y == h - 1)
-                {
-                    for (int x = 0; x < w; x++)
-                    {
-                        r += row[x].R; g += row[x].G; b += row[x].B; n++;
-                    }
-                }
-                else
-                {
-                    var left = row[0];
-                    var right = row[w - 1];
-                    r += left.R + right.R;
-                    g += left.G + right.G;
-                    b += left.B + right.B;
-                    n += 2;
-                }
+                var at = x * 4;
+                r += row[at]; g += row[at + 1]; b += row[at + 2]; a += row[at + 3];
             }
-        });
-
-        if (n == 0) return new Rgba32(0, 0, 0, byte.MaxValue);
-        return new Rgba32((byte)(r / n), (byte)(g / n), (byte)(b / n), byte.MaxValue);
+        }
+        double count = area.Width * (double)area.Height;
+        return (r / count, g / count, b / count, a / count);
     }
 
-    private static Rgba32 ToRgba32(BackgroundColor color) =>
+    /// <summary>An opaque color from a premultiplied average.</summary>
+    private static SKColor Unpremultiply(double r, double g, double b, double a)
+    {
+        if (a <= 0) return SKColors.Black;
+        var scale = 255.0 / a;
+        return new SKColor(
+            (byte)Math.Clamp(Math.Round(r * scale), 0, 255),
+            (byte)Math.Clamp(Math.Round(g * scale), 0, 255),
+            (byte)Math.Clamp(Math.Round(b * scale), 0, 255),
+            byte.MaxValue);
+    }
+
+    private static SKColor ToColor(BackgroundColor color) =>
         new(color.R, color.G, color.B, color.A);
 
     private static (int X, int Y) AnchorOffset(int canvasW, int canvasH, int imageW, int imageH, Position position)

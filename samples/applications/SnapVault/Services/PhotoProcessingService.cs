@@ -1,3 +1,6 @@
+using Koan.Media.Core.Pipeline;
+using MetadataExtractor;
+using MetadataExtractor.Formats.Exif;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Koan.AI;
@@ -15,8 +18,6 @@ using SnapVault.Media;
 using SnapVault.Models;
 using SnapVault.Progress;
 using SnapVault.Services.AI;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 
 namespace SnapVault.Services;
 
@@ -57,23 +58,16 @@ public sealed class PhotoProcessingService
         await content.CopyToAsync(sourceStream, ct);
         sourceStream.Position = 0;
 
-        // Dimensions (identify, no full decode).
-        int width, height;
-        using (var dimensionCheck = new MemoryStream())
-        {
-            await sourceStream.CopyToAsync(dimensionCheck, ct);
-            dimensionCheck.Position = 0;
-            sourceStream.Position = 0;
-            var info = await Image.IdentifyAsync(dimensionCheck, ct);
-            width = info.Width;
-            height = info.Height;
-        }
+        // Dimensions (from the header, no full decode).
+        var info = await MediaPipeline.From(sourceStream, disposeSource: false).ProbeAsync(ct);
+        var (width, height) = (info.Width, info.Height);
+        sourceStream.Position = 0;
 
         await Progress(0.25, PhotoProcessingStage.Exif);
 
         // EXIF (camera, capture date, GPS) — read into a scratch entity, then applied to the stored photo below.
         var scratch = new PhotoAsset { Width = width, Height = height };
-        await ExtractExifMetadata(scratch, sourceStream, ct);
+        ExtractExifMetadata(scratch, sourceStream);
         sourceStream.Position = 0;
 
         // Auto-assign a daily album from the capture date when no event was chosen (INV-2 half-open UTC range).
@@ -245,58 +239,42 @@ public sealed class PhotoProcessingService
         return photos.Take(topK).ToList();
     }
 
-    private async Task ExtractExifMetadata(PhotoAsset photo, Stream stream, CancellationToken ct)
+    private void ExtractExifMetadata(PhotoAsset photo, Stream stream)
     {
         try
         {
             stream.Position = 0;
-            // Identify (header-only) — reads the EXIF profile without decompressing the full pixel buffer
+            // Reads the metadata segments without decompressing the pixel buffer
             // (a 25 MB JPEG would otherwise unpack to hundreds of MB just to read a few tags).
-            var info = await Image.IdentifyAsync(stream, ct);
-            var exif = info?.Metadata.ExifProfile;
-            if (exif == null) return;
+            var directories = ImageMetadataReader.ReadMetadata(stream);
+            var camera = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
+            var exif = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+            var gps = directories.OfType<GpsDirectory>().FirstOrDefault();
 
-            if (exif.TryGetValue(ExifTag.Model, out var modelValue))
-                photo.CameraModel = modelValue.Value?.ToString();
-            if (exif.TryGetValue(ExifTag.LensModel, out var lensValue))
-                photo.LensModel = lensValue.Value?.ToString();
-            if (exif.TryGetValue(ExifTag.FocalLength, out var focalLengthValue))
-                photo.FocalLength = $"{focalLengthValue.Value}mm";
-            if (exif.TryGetValue(ExifTag.FNumber, out var apertureValue))
-                photo.Aperture = $"f/{apertureValue.Value}";
-            if (exif.TryGetValue(ExifTag.ExposureTime, out var shutterValue))
-                photo.ShutterSpeed = shutterValue.Value.ToString();
-            if (exif.TryGetValue(ExifTag.ISOSpeedRatings, out var isoValue) && isoValue.Value is ushort[] isoArray && isoArray.Length > 0)
-                photo.ISO = isoArray[0];
-
-            if (exif.TryGetValue(ExifTag.DateTimeOriginal, out var dateValue) &&
-                dateValue.Value != null &&
-                DateTime.TryParse(dateValue.Value.ToString(), out var capturedAt))
+            photo.CameraModel = camera?.GetString(ExifDirectoryBase.TagModel);
+            if (exif is not null)
             {
-                photo.CapturedAt = DateTime.SpecifyKind(capturedAt, DateTimeKind.Utc);
+                photo.LensModel = exif.GetString(ExifDirectoryBase.TagLensModel);
+                if (exif.TryGetRational(ExifDirectoryBase.TagFocalLength, out var focalLength))
+                    photo.FocalLength = $"{focalLength.ToSimpleString()}mm";
+                if (exif.TryGetRational(ExifDirectoryBase.TagFNumber, out var aperture))
+                    photo.Aperture = $"f/{aperture.ToSimpleString()}";
+                if (exif.TryGetRational(ExifDirectoryBase.TagExposureTime, out var shutter))
+                    photo.ShutterSpeed = shutter.ToSimpleString(allowDecimal: false);
+                if (exif.TryGetInt32(ExifDirectoryBase.TagIsoEquivalent, out var iso))
+                    photo.ISO = iso;
+                if (exif.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out var capturedAt))
+                    photo.CapturedAt = DateTime.SpecifyKind(capturedAt, DateTimeKind.Utc);
             }
 
-            if (exif.TryGetValue(ExifTag.GPSLatitude, out var latValue) &&
-                exif.TryGetValue(ExifTag.GPSLongitude, out var lonValue) &&
-                latValue.Value is Rational[] gpsLatitude &&
-                lonValue.Value is Rational[] gpsLongitude)
+            // GetGeoLocation honors the hemisphere refs: S latitudes and W longitudes are negative.
+            if (gps?.GetGeoLocation() is { } location)
             {
-                var latitude = ConvertToDecimalDegrees(gpsLatitude);
-                var longitude = ConvertToDecimalDegrees(gpsLongitude);
-                // Honor the hemisphere refs: S latitudes and W longitudes are negative. Without this the whole
-                // southern/western hemisphere is silently mirrored into the northern/eastern (Sydney → Mediterranean).
-                if (exif.TryGetValue(ExifTag.GPSLatitudeRef, out var latRef) &&
-                    string.Equals(latRef.Value?.ToString(), "S", StringComparison.OrdinalIgnoreCase))
-                    latitude = -latitude;
-                if (exif.TryGetValue(ExifTag.GPSLongitudeRef, out var lonRef) &&
-                    string.Equals(lonRef.Value?.ToString(), "W", StringComparison.OrdinalIgnoreCase))
-                    longitude = -longitude;
-
-                photo.Location = new GpsCoordinates { Latitude = latitude, Longitude = longitude };
-                if (exif.TryGetValue(ExifTag.GPSAltitude, out var altValue))
+                photo.Location = new GpsCoordinates { Latitude = location.Latitude, Longitude = location.Longitude };
+                if (gps.TryGetRational(GpsDirectory.TagAltitude, out var altitudeValue))
                 {
-                    var altitude = Convert.ToDouble(altValue.Value);
-                    if (exif.TryGetValue(ExifTag.GPSAltitudeRef, out var altRef) && Convert.ToInt32(altRef.Value) == 1)
+                    var altitude = altitudeValue.ToDouble();
+                    if (gps.TryGetInt32(GpsDirectory.TagAltitudeRef, out var altitudeRef) && altitudeRef == 1)
                         altitude = -altitude;   // GPSAltitudeRef == 1 ⇒ below sea level
                     photo.Location.Altitude = altitude;
                 }
@@ -308,12 +286,6 @@ public sealed class PhotoProcessingService
         {
             _logger.LogWarning(ex, "Failed to extract EXIF metadata");
         }
-    }
-
-    private static double ConvertToDecimalDegrees(Rational[] coordinate)
-    {
-        if (coordinate == null || coordinate.Length != 3) return 0;
-        return coordinate[0].ToDouble() + (coordinate[1].ToDouble() / 60.0) + (coordinate[2].ToDouble() / 3600.0);
     }
 
     /// <summary>Robust JSON parsing using JObject navigation (INV-1: fact keys normalized to lowercase).</summary>

@@ -3,6 +3,10 @@
 **Status**: Accepted
 **Date**: 2026-05-31
 
+> **Amended by [MEDIA-0010](MEDIA-0010-media-engine-on-skiasharp.md) (2026-10-31).** `WriteToAsync` remains the terminal,
+> but the encoders are synchronous: the encoded output sits in native memory until copied to the destination
+> asynchronously, and the token is honoured between steps and frames rather than inside an encoder.
+
 Extends MEDIA-0005 (kind-aware pipeline) and MEDIA-0007 (cache-as-storage unification). Builds on the substrate from MEDIA-0004 (recipe pipeline). Closes the "encoded buffer sits in memory until the response flushes" gap that all three prior ADRs explicitly deferred.
 
 ## Contract

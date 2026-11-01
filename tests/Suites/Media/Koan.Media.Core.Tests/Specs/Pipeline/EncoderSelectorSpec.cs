@@ -1,34 +1,21 @@
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Webp;
+using Koan.Media.Core.Tests.Support;
+using SkiaSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
 public sealed class EncoderSelectorSpec
 {
-    [Theory]
-    [InlineData("jpeg", true)]
-    [InlineData("JPEG", true)]
-    [InlineData("png", true)]
-    [InlineData("webp", true)]
-    [InlineData("gif", true)]
-    [InlineData("bmp", true)]
-    [InlineData("tiff", true)]
-    public void Supports_canonical_format_slugs(string slug, bool supported)
+    [Fact]
+    public void Writes_exactly_jpeg_png_and_webp()
     {
-        EncoderSelector.SupportedFormats.Should().Contain(s =>
-            string.Equals(s, slug, StringComparison.OrdinalIgnoreCase) == supported);
+        EncoderSelector.SupportedFormats.Should().BeEquivalentTo("jpeg", "png", "webp");
     }
 
     [Theory]
     [InlineData("png", true)]
     [InlineData("webp", true)]
-    [InlineData("gif", true)]
-    [InlineData("tiff", true)]
     [InlineData("jpeg", false)]
-    [InlineData("bmp", false)]
+    [InlineData("gif", false)]
     public void SupportsAlpha_matches_format_capabilities(string format, bool expected)
     {
         EncoderSelector.SupportsAlpha(format).Should().Be(expected);
@@ -36,10 +23,9 @@ public sealed class EncoderSelectorSpec
 
     [Theory]
     [InlineData("webp", true)]
-    [InlineData("gif", true)]
-    [InlineData("png", true)]   // APNG via PNG encoder
+    [InlineData("png", false)]
     [InlineData("jpeg", false)]
-    [InlineData("bmp", false)]
+    [InlineData("gif", false)]
     public void SupportsAnimation_matches_format_capabilities(string format, bool expected)
     {
         EncoderSelector.SupportsAnimation(format).Should().Be(expected);
@@ -47,97 +33,104 @@ public sealed class EncoderSelectorSpec
 
     [Theory]
     [InlineData("jpeg", "image/jpeg")]
+    [InlineData("jpg", "image/jpeg")]
     [InlineData("png", "image/png")]
     [InlineData("webp", "image/webp")]
-    [InlineData("gif", "image/gif")]
     public void ContentType_matches_format(string format, string expected)
     {
         EncoderSelector.ContentType(format).Should().Be(expected);
     }
 
-    [Fact]
-    public void For_with_null_target_preserves_source_format_jpeg()
+    [Theory]
+    [InlineData("jpeg", "jpeg")]
+    [InlineData("png", "png")]
+    [InlineData("webp", "webp")]
+    [InlineData("gif", "webp")]
+    [InlineData("bmp", "png")]
+    [InlineData("ico", "png")]
+    [InlineData("wbmp", "png")]
+    public void PreservedFormat_is_the_source_or_the_closest_writable(string source, string expected)
     {
-        var enc = EncoderSelector.For(JpegFormat.Instance, targetFormat: null, quality: 80);
-        enc.Should().BeOfType<JpegEncoder>();
+        EncoderSelector.PreservedFormat(source).Should().Be(expected);
     }
 
     [Fact]
-    public void For_with_null_target_preserves_source_format_png()
+    public async Task No_target_preserves_a_jpeg_source()
     {
-        var enc = EncoderSelector.For(PngFormat.Instance, targetFormat: null, quality: 80);
-        enc.Should().BeOfType<PngEncoder>();
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
+        using var img = TestImage.Load((await src.AsMedia().ToBytesAsync()).Bytes);
+        img.Format.Should().Be(SKEncodedImageFormat.Jpeg);
     }
 
     [Fact]
-    public void For_with_null_target_preserves_source_format_webp()
+    public async Task No_target_preserves_a_png_source()
     {
-        var enc = EncoderSelector.For(WebpFormat.Instance, targetFormat: null, quality: 80);
-        enc.Should().BeOfType<WebpEncoder>();
+        await using var src = Fixtures.TransparentPng(16, 16);
+        using var img = TestImage.Load((await src.AsMedia().ToBytesAsync()).Bytes);
+        img.Format.Should().Be(SKEncodedImageFormat.Png);
     }
 
     [Fact]
-    public void For_with_null_target_preserves_source_format_gif()
+    public async Task An_explicit_target_overrides_the_source_format()
     {
-        var enc = EncoderSelector.For(GifFormat.Instance, targetFormat: null, quality: 80);
-        enc.Should().BeOfType<GifEncoder>();
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
+        using var img = TestImage.Load((await src.AsMedia().EncodeAs("webp").ToBytesAsync()).Bytes);
+        img.Format.Should().Be(SKEncodedImageFormat.Webp);
     }
 
     [Fact]
-    public void For_explicit_target_overrides_source_format()
+    public async Task Lossless_quality_keeps_every_pixel_in_webp()
     {
-        var enc = EncoderSelector.For(JpegFormat.Instance, targetFormat: "webp", quality: 80);
-        enc.Should().BeOfType<WebpEncoder>();
+        await using var src = Fixtures.SolidPng(32, 32, new Rgba(13, 77, 201));
+        var output = await src.AsMedia().EncodeAs("webp", Quality.Lossless).ToBytesAsync();
+        using var img = TestImage.Load(output.Bytes);
+        img[16, 16].Should().Be(new Rgba(13, 77, 201));
     }
 
     [Fact]
-    public void For_lossless_quality_picks_webp_lossless_mode()
+    public async Task Lower_quality_means_fewer_bytes()
     {
-        var enc = EncoderSelector.For(WebpFormat.Instance, targetFormat: "webp", quality: Quality.Lossless);
-        var webp = enc.Should().BeOfType<WebpEncoder>().Subject;
-        webp.FileFormat.Should().Be(WebpFileFormatType.Lossless);
+        await using var low = Fixtures.DisplayP3Png(64, 64, new Rgba(13, 77, 201));
+        await using var high = Fixtures.DisplayP3Png(64, 64, new Rgba(13, 77, 201));
+        var small = await low.AsMedia().EncodeAs("jpeg", 10).ToBytesAsync();
+        var large = await high.AsMedia().EncodeAs("jpeg", 100).ToBytesAsync();
+        small.Bytes.Length.Should().BeLessThan(large.Bytes.Length);
     }
 
     [Fact]
-    public void For_normal_quality_picks_webp_lossy_mode()
+    public async Task Quality_past_100_clamps_rather_than_fails()
     {
-        var enc = EncoderSelector.For(WebpFormat.Instance, targetFormat: "webp", quality: 75);
-        var webp = enc.Should().BeOfType<WebpEncoder>().Subject;
-        webp.FileFormat.Should().Be(WebpFileFormatType.Lossy);
-        webp.Quality.Should().Be(75);
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
+        var output = await src.AsMedia().EncodeAs("jpeg", 250).ToBytesAsync();
+        output.Format.Should().Be("jpeg");
     }
 
     [Fact]
-    public void For_jpeg_quality_clamps_to_100()
+    public async Task An_unknown_target_is_refused()
     {
-        var enc = EncoderSelector.For(JpegFormat.Instance, "jpeg", 250);
-        var jpg = enc.Should().BeOfType<JpegEncoder>().Subject;
-        jpg.Quality.Should().Be(100);
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
+        var act = async () => await src.AsMedia().EncodeAs("wat").ToBytesAsync();
+        await act.Should().ThrowAsync<NotSupportedException>();
     }
 
     [Fact]
-    public void For_unknown_target_throws()
+    public async Task The_jpg_alias_produces_a_jpeg()
     {
-        var act = () => EncoderSelector.For(JpegFormat.Instance, "wat", 80);
-        act.Should().Throw<NotSupportedException>();
+        // "jpg" is an alias for "jpeg"; a config/code recipe pinning "jpg" must validate and produce end to end.
+        await using var src = Fixtures.SolidPng(16, 16, Rgba.Red);
+        var output = await src.AsMedia().EncodeAs("jpg").ToBytesAsync();
+        output.Format.Should().Be("jpeg");
+        output.ContentType.Should().Be("image/jpeg");
     }
 
     [Fact]
-    public void For_unknown_source_defaults_to_png_preserving_alpha_capability()
+    public async Task An_opaque_png_is_written_without_an_alpha_channel()
     {
-        // Null source format → CanonicalSlug returns "png" so the round-trip
-        // doesn't accidentally drop alpha.
-        var enc = EncoderSelector.For(sourceFormat: null, targetFormat: null, quality: 80);
-        enc.Should().BeOfType<PngEncoder>();
-    }
-
-    [Fact]
-    public void For_jpg_alias_is_canonicalised_to_jpeg()
-    {
-        // "jpg" is an alias for "jpeg"; For must produce a JpegEncoder rather than hit the switch
-        // default. Closes the latent alias-500 (a config/code recipe pinning "jpg" used to throw).
-        var enc = EncoderSelector.For(PngFormat.Instance, targetFormat: "jpg", quality: 80);
-        enc.Should().BeOfType<JpegEncoder>();
+        await using var src = Fixtures.WideJpeg(width: 16, height: 16);
+        var output = await src.AsMedia().EncodeAs("png").ToBytesAsync();
+        using var data = SKData.CreateCopy(output.Bytes);
+        using var codec = SKCodec.Create(data);
+        codec.Info.AlphaType.Should().Be(SKAlphaType.Opaque);
     }
 
     [Theory]
@@ -155,7 +148,10 @@ public sealed class EncoderSelectorSpec
     [InlineData("jpeg", true)]
     [InlineData("jpg", true)]      // alias for the producible jpeg
     [InlineData("WEBP", true)]
-    [InlineData("avif", false)]    // declared/reserved but no concrete encoder yet
+    [InlineData("gif", false)]
+    [InlineData("bmp", false)]
+    [InlineData("tiff", false)]
+    [InlineData("avif", false)]    // declared/reserved but no concrete encoder
     [InlineData("wat", false)]
     [InlineData("", false)]
     [InlineData(null, false)]

@@ -16,6 +16,11 @@ title: Recipe-based media pipeline, format-preserving transforms, and overlay co
 
 ---
 
+> **Amended by [MEDIA-0010](MEDIA-0010-media-engine-on-skiasharp.md) (2026-10-31).** The engine is SkiaSharp, not
+> ImageSharp, and Koan.Media.Core carries native code. The "pure-managed surface" in Alternative 3 was true when
+> written and is not a property of Koan today. Output formats are JPEG, PNG and WebP; only a color profile survives
+> a re-encode. Where this record names ImageSharp types, GIF or BMP output, or EXIF preservation, MEDIA-0010 governs.
+
 > **Current implementation (R07-17, 2026-07-16).** Named recipes, configuration overrides, the canonical
 > pipeline, HTTP rendering, negotiation, derivative write-through, and inspection are implemented. Signed and
 > content-addressed routes, BlurHash, automatic prewarming, and a warm endpoint are not. The inert `Eager`
@@ -756,7 +761,7 @@ Drop the pipeline entirely; proxy media requests to a managed image service. **R
 
 ### Alternative 3 — Switch to Magick.NET
 
-Replace ImageSharp with ImageMagick bindings (richer format support, native HEIC, AVIF encoder today). **Rejected**: native dependencies (libMagick) complicate cross-platform deploys and container images; ImageSharp's pure-managed surface is a load-bearing Koan property. We can revisit Magick.NET if and when ImageSharp's AVIF gap becomes blocking.
+Replace ImageSharp with ImageMagick bindings (richer format support, native HEIC, AVIF encoder today). **Rejected**: native dependencies (libMagick) complicate cross-platform deploys and container images; ImageSharp's pure-managed surface is a load-bearing Koan property (no longer so: see MEDIA-0010). We can revisit Magick.NET if and when ImageSharp's AVIF gap becomes blocking.
 
 ### Alternative 4 — Defer overlays to a future ADR
 

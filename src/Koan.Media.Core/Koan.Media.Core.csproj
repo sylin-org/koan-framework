@@ -17,18 +17,16 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
-    <PackageReference Include="SixLabors.ImageSharp" />
-    <!-- MEDIA-0004 overlays: ImageSharp.Drawing brings DrawImage (compositing),
-         DrawText (text overlays), and Fill (background fills). Brings SixLabors.Fonts
-         transitively for text rendering. -->
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" />
-    <!-- MEDIA-0006: SVG decoder + Skia rasterizer. SkiaSharp + Svg.Skia provide
-         the Vector → Raster bridge for SVG inputs. Native binaries are pulled per
-         platform RID at publish time; the managed assembly weight is ~8.3 MiB.
-         Windows natives come implicitly via the default SkiaSharp dependency chain. -->
+    <!-- MEDIA-0010: the media engine. SkiaSharp decodes, transforms, composites and encodes;
+         SkiaSharp.HarfBuzz shapes overlay text; Svg.Skia is the Vector to Raster bridge (MEDIA-0006).
+         Native binaries are pulled per platform RID at publish time. On Linux the NoDependencies
+         asset is the one that loads on an image without fontconfig; Windows natives come via the
+         default SkiaSharp dependency chain. -->
     <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="SkiaSharp.HarfBuzz" />
     <PackageReference Include="Svg.Skia" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
     <PackageReference Include="SkiaSharp.NativeAssets.macOS" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" />
   </ItemGroup>
 </Project>

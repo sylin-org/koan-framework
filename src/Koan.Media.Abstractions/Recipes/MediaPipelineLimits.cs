@@ -6,10 +6,10 @@ namespace Koan.Media.Abstractions.Recipes;
 /// field disables that specific check; <see cref="Unlimited"/> disables
 /// every check.
 ///
-/// <para>The pipeline checks these via ImageSharp's
-/// <c>Image.IdentifyAsync</c> (header-only read) before
-/// <c>Image.LoadAsync</c> so a malicious 50000×50000 PNG can be
-/// rejected without ever allocating the decoded buffer.</para>
+/// <para>The pipeline reads dimensions and frame count from the header
+/// and checks these before decoding, on non-seekable sources too, so a
+/// malicious 50000×50000 PNG is rejected without ever allocating the
+/// decoded buffer.</para>
 /// </summary>
 public sealed record MediaPipelineLimits
 {
@@ -19,6 +19,12 @@ public sealed record MediaPipelineLimits
     /// <summary>Reject animated sources with more than this many frames. Zero = unlimited.</summary>
     public int MaxFrameCount { get; init; }
 
+    /// <summary>
+    /// Reject sources longer than this many bytes, which the pipeline buffers to decode.
+    /// Zero = the engine's own ceiling of 1 GiB.
+    /// </summary>
+    public long MaxSourceBytes { get; init; }
+
     public static MediaPipelineLimits Unlimited { get; } = new();
 
     /// <summary>Convenience for the documented MEDIA-0004 §13 defaults.</summary>
@@ -26,6 +32,7 @@ public sealed record MediaPipelineLimits
     {
         MaxSourceMegapixels = 100,
         MaxFrameCount = 600,
+        MaxSourceBytes = 256L * 1024 * 1024,
     };
 }
 

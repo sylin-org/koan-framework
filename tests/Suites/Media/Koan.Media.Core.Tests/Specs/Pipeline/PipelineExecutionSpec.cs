@@ -1,6 +1,5 @@
 using Koan.Media.Abstractions.Recipes;
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
@@ -57,8 +56,8 @@ public sealed class PipelineExecutionSpec
         // A literal pixel-chunk crop from the center would yield pure
         // green — the border never reached.
         await using var src = Fixtures.JpegWithBorder(
-            innerColor: Color.Lime,
-            borderColor: Color.Red,
+            innerColor: Rgba.Lime,
+            borderColor: Rgba.Red,
             width: 1920,
             height: 1080,
             borderThickness: 120);
@@ -70,7 +69,7 @@ public sealed class PipelineExecutionSpec
         output.Width.Should().Be(480);
         output.Height.Should().Be(480);
 
-        using var img = Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(output.Bytes);
+        using var img = TestImage.Load(output.Bytes);
         // Top-center pixel: after a correct cover scale (1080 -> 480,
         // factor ~0.44), the 120px border compresses to ~53px. The
         // pixel at (240, 10) should still land inside the red border.

@@ -7,6 +7,9 @@
 **Extends:** MEDIA-0005 (Kind-aware pipeline, Sample primitive, and data-driven encoder admission)
 **Related:** MEDIA-0004 (Recipe-based media pipeline), MEDIA-0001 (Media pillar baseline)
 
+> **Amended by [MEDIA-0010](MEDIA-0010-media-engine-on-skiasharp.md) (2026-10-31).** The chain after rasterization is
+> SkiaSharp too, and there is no second engine. An SVG `<text>` draws nothing on a host with no system fonts.
+
 ---
 
 | **Contract**         | **Details**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

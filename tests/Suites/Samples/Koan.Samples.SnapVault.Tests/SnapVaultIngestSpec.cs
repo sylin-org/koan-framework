@@ -11,8 +11,8 @@ using Koan.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
 using SnapVault.Models;
 using SnapVault.Progress;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using System.Text;
+using SkiaSharp;
 using Xunit;
 
 namespace Koan.Samples.SnapVault.Tests;
@@ -37,12 +37,80 @@ public sealed class SnapVaultIngestSpec
 
     private static string Stamp() => Guid.NewGuid().ToString("n").Substring(0, 8);
 
-    private static async Task<byte[]> TinyJpegAsync()
+    private static Task<byte[]> TinyJpegAsync()
     {
-        using var img = new Image<Rgba32>(8, 6);   // 8x6 so width != height proves the dimensions are read, not guessed
-        using var ms = new MemoryStream();
-        await img.SaveAsJpegAsync(ms);
-        return ms.ToArray();
+        // 8x6 so width != height proves the dimensions are read, not guessed
+        using var image = new SKBitmap(8, 6);
+        image.Erase(SKColors.Black);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, 75);
+        return Task.FromResult(data.ToArray());
+    }
+
+    /// <summary>A JPEG whose Exif names a camera, an ISO and a capture date.</summary>
+    private static async Task<byte[]> JpegWithExifAsync()
+    {
+        var model = Encoding.ASCII.GetBytes("Koan Test Camera\0");
+        var date = Encoding.ASCII.GetBytes("2026:03:14 09:26:53\0");
+
+        // TIFF, little-endian: IFD0 holds Model and a pointer to the Exif IFD, which holds ISO and the date.
+        const int ifd0 = 8, exifIfd = ifd0 + 2 + 2 * 12 + 4, values = exifIfd + 2 + 2 * 12 + 4;
+        using var tiff = new MemoryStream();
+        using var w = new BinaryWriter(tiff);
+        w.Write("II*\0"u8.ToArray());
+        w.Write(ifd0);
+        w.Write((short)2);
+        w.Write((short)0x0110); w.Write((short)2); w.Write(model.Length); w.Write(values);
+        w.Write(unchecked((short)0x8769)); w.Write((short)4); w.Write(1); w.Write(exifIfd);
+        w.Write(0);
+        w.Write((short)2);
+        w.Write(unchecked((short)0x8827)); w.Write((short)3); w.Write(1); w.Write((short)400); w.Write((short)0);
+        w.Write(unchecked((short)0x9003)); w.Write((short)2); w.Write(date.Length); w.Write(values + model.Length);
+        w.Write(0);
+        w.Write(model);
+        w.Write(date);
+
+        byte[] payload = [.. "Exif\0\0"u8.ToArray(), .. tiff.ToArray()];
+        var jpeg = await TinyJpegAsync();
+        var length = payload.Length + 2;
+        return [.. jpeg[..2], 0xFF, 0xE1, (byte)(length >> 8), (byte)length, .. payload, .. jpeg[2..]];
+    }
+
+    [Fact(DisplayName = "ingest: camera, ISO and capture date come from the upload's Exif")]
+    public async Task Ingest_reads_exif_from_the_upload()
+    {
+        var studio = "studio-" + Stamp();
+        var jpeg = await JpegWithExifAsync();
+
+        PhotoProcessingJob job;
+        using (Tenant.Use(studio))
+        {
+            var staged = await UploadStaging.Onboard($"{Stamp()}.jpg", new MemoryStream(jpeg), "image/jpeg");
+            job = new PhotoProcessingJob
+            {
+                EventId = null,
+                OriginalFileName = "camera.jpg",
+                ContentType = "image/jpeg",
+                StagingKey = staged.Key,
+                BatchJobId = "batch-" + Stamp(),
+            };
+            await job.Job.Submit(PhotoProcessingJob.Ingest);
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            await Drain();
+            var status = await PhotoProcessingJob.Jobs.Status(job.Id);
+            if (status is JobStatus.Completed or JobStatus.Failed or JobStatus.Dead or JobStatus.Cancelled) break;
+        }
+        (await PhotoProcessingJob.Jobs.Status(job.Id)).Should().Be(JobStatus.Completed);
+
+        using (Tenant.Use(studio))
+        {
+            var photo = (await PhotoAsset.All()).Single(p => p.OriginalFileName == "camera.jpg");
+            photo.CameraModel.Should().Be("Koan Test Camera");
+            photo.ISO.Should().Be(400);
+            photo.CapturedAt.Should().Be(new DateTime(2026, 3, 14, 9, 26, 53, DateTimeKind.Utc));
+        }
     }
 
     [Fact(DisplayName = "ingest: a submitted PhotoProcessingJob stages → creates the photo (dims + daily event) → completes, progress on the ledger")]

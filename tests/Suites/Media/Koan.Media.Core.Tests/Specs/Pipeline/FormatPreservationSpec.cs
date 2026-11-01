@@ -1,8 +1,4 @@
 using Koan.Media.Core.Tests.Support;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Webp;
 
 namespace Koan.Media.Core.Tests.Specs.Pipeline;
 
@@ -34,19 +30,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 4, width: 160, height: 120);
         var output = await src.AsMedia().ResizeFit(80, 60).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(4, "every frame must survive the resize pass");
-    }
-
-    [Fact]
-    public async Task Animated_gif_resize_preserves_format_and_frames()
-    {
-        await using var src = Fixtures.AnimatedGif(frames: 3, width: 100, height: 80);
-        var output = await src.AsMedia().ResizeFit(50, 40).ToBytesAsync();
-
-        output.Format.Should().Be("gif");
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3);
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(4, "every frame must survive the resize pass");
     }
 
     [Fact]
@@ -56,9 +41,9 @@ public sealed class FormatPreservationSpec
         var output = await src.AsMedia().ResizeFit(200, 150).ToBytesAsync();
 
         output.Format.Should().Be("png", "non-destructive resize must preserve source format");
-        using var roundTrip = Image.Load(output.Bytes);
+        using var roundTrip = TestImage.Load(output.Bytes);
         // A pixel in the punched-out hole should still be transparent
-        var center = roundTrip.CloneAs<SixLabors.ImageSharp.PixelFormats.Rgba32>()[output.Width / 2, output.Height / 2];
+        var center = roundTrip[output.Width / 2, output.Height / 2];
         center.A.Should().Be(0, "the transparent hole survives the resize");
     }
 
@@ -73,15 +58,22 @@ public sealed class FormatPreservationSpec
     }
 
     [Fact]
-    public async Task EncodeAs_changes_format_but_preserves_animation_if_supported()
+    public async Task EncodeAs_a_still_format_refuses_an_animated_source()
     {
         await using var src = Fixtures.AnimatedWebp(frames: 3);
-        // WebP → GIF — both support animation, so frames should survive
-        var output = await src.AsMedia().EncodeAs("gif", 75).ToBytesAsync();
+        var act = async () => await src.AsMedia().EncodeAs("png", 75).ToBytesAsync();
+        await act.Should().ThrowAsync<MediaPipelineKindMismatchException>();
+    }
 
-        output.Format.Should().Be("gif");
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3);
+    [Fact]
+    public async Task EncodeAs_changes_format_and_keeps_animation_when_the_source_is_gif()
+    {
+        await using var src = Fixtures.AnimatedGif(frames: 3);
+        var output = await src.AsMedia().EncodeAs("webp", 75).ToBytesAsync();
+
+        output.Format.Should().Be("webp");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(3);
     }
 
     [Fact]
@@ -92,8 +84,8 @@ public sealed class FormatPreservationSpec
 
         output.Format.Should().Be("jpeg",
             "FlattenTo is the explicit destructive escape hatch and is allowed to drop animation");
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(1);
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(1);
     }
 
     [Fact]
@@ -102,8 +94,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 4, width: 200, height: 200);
         var output = await src.AsMedia().Shape(crop: CropSpec.Pixels(100, 100)).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(4);
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(4);
         output.Format.Should().Be("webp");
     }
 
@@ -124,8 +116,8 @@ public sealed class FormatPreservationSpec
         var output = await src.AsMedia().ToBytesAsync();
         output.Format.Should().Be("webp");
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(2, "no-op pipeline preserves frame count");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(2, "no-op pipeline preserves frame count");
     }
 
     /// <summary>
@@ -146,8 +138,8 @@ public sealed class FormatPreservationSpec
 
         output.Width.Should().Be(120, "smaller source must not be enlarged at default Resize");
         output.Height.Should().Be(80);
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(4, "all frames survive the no-op pass");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(4, "all frames survive the no-op pass");
     }
 
     /// <summary>
@@ -162,8 +154,8 @@ public sealed class FormatPreservationSpec
 
         output.Width.Should().Be(400, "explicit upscale opt-in must enlarge");
         output.Height.Should().Be(320, "aspect preserved on width-only resize");
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3, "upscaled animation keeps frames");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(3, "upscaled animation keeps frames");
     }
 
     /// <summary>
@@ -207,8 +199,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 6);
         var output = await src.AsMedia().Trim(frames: 3).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3, "Trim caps the animation at the requested frame count");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(3, "Trim caps the animation at the requested frame count");
         output.Format.Should().Be("webp");
     }
 
@@ -218,8 +210,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 3);
         var output = await src.AsMedia().Trim(frames: 10).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3, "no frames to drop — source kept verbatim");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(3, "no frames to drop — source kept verbatim");
     }
 
     [Fact]
@@ -228,22 +220,21 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.TransparentPng();
         var output = await src.AsMedia().Trim(frames: 1).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(1, "Trim on a static source is silently a no-op");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(1, "Trim on a static source is silently a no-op");
     }
 
     [Fact]
     public async Task Trim_seconds_walks_frame_delays_to_pick_the_cutoff()
     {
-        // The Fixtures.AnimatedWebp doesn't set per-frame delays explicitly,
-        // so the engine's fallback (100ms per delay-zero frame) kicks in.
+        // Fixtures.AnimatedWebp shows each frame for 100ms.
         // 10 frames × 100ms = 1000ms of playback; capping at 0.3s should
         // keep the first 3 frames (cumulative 300ms meets the cap).
         await using var src = Fixtures.AnimatedWebp(frames: 10);
         var output = await src.AsMedia().Trim(seconds: 0.3).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(3, "300ms cap maps to 3 × 100ms-fallback frames");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(3, "300ms cap maps to 3 × 100ms frames");
     }
 
     [Fact]
@@ -253,8 +244,8 @@ public sealed class FormatPreservationSpec
         // 4 frames × 100ms = 400ms total; cap at 5s easily covers everything.
         var output = await src.AsMedia().Trim(seconds: 5.0).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(4);
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(4);
     }
 
     [Fact]
@@ -263,8 +254,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 5);
         var output = await src.AsMedia().Freeze().ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(1, "Freeze is the loud explicit single-frame collapse");
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(1, "Freeze is the loud explicit single-frame collapse");
     }
 
     [Fact]
@@ -273,8 +264,8 @@ public sealed class FormatPreservationSpec
         await using var src = Fixtures.AnimatedWebp(frames: 5);
         var output = await src.AsMedia().Freeze(at: 2).ToBytesAsync();
 
-        using var roundTrip = Image.Load(output.Bytes);
-        roundTrip.Frames.Count.Should().Be(1);
+        using var roundTrip = TestImage.Load(output.Bytes);
+        roundTrip.FrameCount.Should().Be(1);
     }
 
     [Fact]

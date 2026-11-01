@@ -11,7 +11,7 @@ public sealed class MediaRecipeRegistrySpec
     public void Format_shortcuts_resolve_to_synthetic_encode_recipes()
     {
         var registry = NewRegistry();
-        foreach (var f in new[] { "png", "jpeg", "webp", "gif" })
+        foreach (var f in new[] { "png", "jpeg", "webp" })
         {
             registry.TryResolve(f, out var r).Should().BeTrue($"shortcut '{f}' must resolve");
             var encode = r.Steps.OfType<EncodeStep>().Single();
@@ -50,7 +50,9 @@ public sealed class MediaRecipeRegistrySpec
     public void FormatShortcuts_advertises_only_producible_formats()
     {
         var registry = NewRegistry();
-        registry.FormatShortcuts.Should().Contain(new[] { "jpeg", "jpg", "png", "webp", "gif", "bmp", "tiff" });
+        registry.FormatShortcuts.Should().Contain(new[] { "jpeg", "jpg", "png", "webp" });
+        registry.FormatShortcuts.Should().NotContain(new[] { "gif", "bmp", "tiff" },
+            "the engine cannot write them, so they must not be advertised as usable shortcuts");
         registry.FormatShortcuts.Should().NotContain("avif",
             "avif is declared/reserved but not producible, so it must not be advertised as a usable shortcut");
     }
