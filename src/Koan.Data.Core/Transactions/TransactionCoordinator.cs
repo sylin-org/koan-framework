@@ -230,6 +230,17 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             {
                 await held.Commit(ct).ConfigureAwait(false);
             }
+            catch (OperationCanceledException ex) when (held.EndedBecause is null)
+            {
+                throw new TransactionException(
+                    $"Transaction '{Name}' was cancelled before its native commit began, so its held transaction rolls back. " +
+                    "Nothing it wrote is durable, and it will not be replayed.",
+                    Name,
+                    route.Adapter,
+                    completedOperationCount: 0,
+                    DataCommitOutcome.NotCommitted,
+                    ex);
+            }
             catch (Exception ex) when (held.EndedBecause is null)
             {
                 _logger.LogError(ex,
@@ -414,11 +425,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     private void TrackOperation(ITrackedOperation operation)
     {
-        // A held scope defers nothing, so what reaches here is a vector operation, which cannot join its transaction.
-        if (IsHeld)
-            throw new NotSupportedException(
-                $"Transaction '{Name}' holds a native transaction, and the {operation.GetAdapterHint()} operation cannot join " +
-                "it. Save the vector outside the scope.");
         // An Atomic scope refuses before the operation joins, so nothing it could not commit atomically is ever held.
         if (Guarantee == TransactionGuarantee.Atomic) RequireAtomicRoute(operation);
         StartWorkTelemetry();

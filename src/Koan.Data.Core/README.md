@@ -315,13 +315,14 @@ using (await EntityContext.Hold("reply", ct))
 ```
 
 Every read and write of the route from that flow runs inside it, including batches, conditional writes and SQL
-instructions that a deferred scope refuses; a lifecycle handler runs and a unique index answers at the save, and a receipt
-reports `Inserted` or `Updated` with `NotCommitted`, because only `Commit` commits. Any other writer of the store waits,
+instructions that a deferred scope refuses; a lifecycle handler runs and a unique index answers at the save, a failed batch
+or bulk save leaves nothing of itself while the hold goes on, and a receipt reports `Inserted` or `Updated` with `NotCommitted`, because only
+`Commit` commits. Any other writer of the store waits,
 in another process too, for at most the store's busy timeout; a hold that waits that long throws `TransactionException`
 with `NotCommitted`. Disposal without a commit rolls back. A hold keeps every other writer out, so keep it short:
 past `TransactionOptions.HoldLimit` (20 seconds) it rolls back and refuses the rest of its scope. It covers the one route
-the ambient context names; a write elsewhere refuses, and a read elsewhere sees committed state. A Direct write, a transfer
-and a role change refuse inside it; a named read on a lane keeps its own connection and sees committed state.
+the ambient context names; a write elsewhere refuses, and a read elsewhere sees committed state. A Direct write, a vector write, a
+transfer and a role change refuse inside it; a named read on a lane keeps its own connection and sees committed state.
 
 ## Insert without replacement
 

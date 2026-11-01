@@ -23,6 +23,7 @@ namespace Koan.Cache.Decorators;
 internal sealed class CachedRepository<TEntity, TKey> :
     IDataRepository<TEntity, TKey>,
     IInsertOnlyRepository<TEntity, TKey>,
+    IMutationOutcomeRepository<TEntity, TKey>,
     IConditionalWriteRepository<TEntity, TKey>,
     IConditionalDeleteRepository<TEntity, TKey>,
     ICounterpartQueryRepository,
@@ -265,6 +266,17 @@ internal sealed class CachedRepository<TEntity, TKey> :
             (IsDefaultKey(submittedKey) || EqualityComparer<TKey>.Default.Equals(submittedKey, result.Key)) &&
             !IsDefaultKey(result.Key))
             await Remove(result.Key, ct);
+        return result;
+    }
+
+    public async Task<MutationResult<TEntity, TKey>> UpsertWithOutcome(TEntity model, CancellationToken ct = default)
+    {
+        if (_inner is not IMutationOutcomeRepository<TEntity, TKey> outcomes ||
+            !DataCaps.Describe(_inner, _inner.GetType().Name).Has(DataCaps.Write.MutationOutcomes))
+            throw new NotSupportedException($"The adapter backing {_entityName} does not expose exact native upsert outcomes.");
+        var result = await outcomes.UpsertWithOutcome(model, ct);
+        // As for an insertion: retire the entry rather than seed it from a receipt the Data facade has yet to accept.
+        if (!IsDefaultKey(result.Key)) await Remove(result.Key, ct);
         return result;
     }
 

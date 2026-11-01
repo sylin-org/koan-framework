@@ -4,6 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Cache.Abstractions.Policies;
+using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
 using Koan.Tenancy.Tests.Support;
@@ -22,6 +25,14 @@ public sealed class CacheHoldSpec
     [Cacheable(300)]
     public sealed class HeldCachedNote : Entity<HeldCachedNote>
     {
+        public string Title { get; set; } = "";
+    }
+
+    [HostScoped]
+    [Cacheable(300)]
+    public sealed class HeldCachedClaim : Entity<HeldCachedClaim>
+    {
+        [Index(Name = "ix_held_cached_claim_code", Unique = true)] public string Code { get; set; } = "";
         public string Title { get; set; } = "";
     }
 
@@ -58,6 +69,82 @@ public sealed class CacheHoldSpec
 
         (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("held", "the commit retired the cached entry");
         (await ReadOutside(note.Id, partition))!.Title.Should().Be("held");
+    }
+
+    [Fact]
+    public async Task A_save_reports_its_outcome_on_a_cached_entity_and_the_cache_follows_it()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture);
+        runtime.ResetEntityCaches();
+        var partition = "p" + Guid.CreateVersion7().ToString("n");
+        using var _ = EntityContext.Partition(partition);
+        var note = new HeldCachedNote { Title = "first" };
+
+        (await note.SaveWithOutcome()).Outcome.Should().Be(MutationOutcome.Inserted);
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("first", "this read primes the shared cache");
+        note.Title = "second";
+        var updated = await note.SaveWithOutcome();
+        updated.Outcome.Should().Be(MutationOutcome.Updated);
+        updated.CommitOutcome.Should().Be(DataCommitOutcome.Committed);
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("second", "the outcome retired the cached entry");
+
+        using (await EntityContext.Hold("cached outcome"))
+        {
+            note.Title = "held";
+            var held = await note.SaveWithOutcome();
+            held.Outcome.Should().Be(MutationOutcome.Updated);
+            held.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted);
+            (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("held");
+            (await ReadOutside(note.Id, partition))!.Title.Should().Be("second", "the hold's write is not committed");
+            await EntityContext.Commit();
+        }
+
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("held", "the commit retired the cached entry");
+        (await ReadOutside(note.Id, partition))!.Title.Should().Be("held");
+    }
+
+    [Fact]
+    public async Task A_failed_batch_inside_a_hold_leaves_the_store_and_the_cache_agreeing()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture);
+        runtime.ResetEntityCaches();
+        using var _ = EntityContext.Partition("p" + Guid.CreateVersion7().ToString("n"));
+        var claim = await new HeldCachedClaim { Code = "taken", Title = "committed" }.Save();
+        (await HeldCachedClaim.Get(claim.Id))!.Title.Should().Be("committed", "this read primes the shared cache");
+
+        using (await EntityContext.Hold("failed batch"))
+        {
+            var batch = () => Data<HeldCachedClaim, string>.Batch()
+                .Add(new HeldCachedClaim { Id = claim.Id, Code = "taken", Title = "never" })
+                .Add(new HeldCachedClaim { Code = "taken", Title = "conflict" })
+                .Save();
+            await batch.Should().ThrowAsync<UniqueValueConflictException>();
+            await EntityContext.Commit();
+        }
+
+        using (EntityContext.NoCache())
+            (await HeldCachedClaim.Get(claim.Id))!.Title.Should().Be("committed", "nothing of the batch landed");
+        (await HeldCachedClaim.Get(claim.Id))!.Title.Should().Be("committed");
+    }
+
+    [Fact]
+    public async Task A_successful_batch_inside_a_hold_retires_its_entries_at_the_commit()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture);
+        runtime.ResetEntityCaches();
+        var partition = "p" + Guid.CreateVersion7().ToString("n");
+        using var _ = EntityContext.Partition(partition);
+        var note = await new HeldCachedNote { Title = "committed" }.Save();
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("committed", "this read primes the shared cache");
+
+        using (await EntityContext.Hold("batch"))
+        {
+            await Data<HeldCachedNote, string>.Batch().Update(new HeldCachedNote { Id = note.Id, Title = "batched" }).Save();
+            (await ReadOutside(note.Id, partition))!.Title.Should().Be("committed");
+            await EntityContext.Commit();
+        }
+
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("batched");
     }
 
     [Fact]

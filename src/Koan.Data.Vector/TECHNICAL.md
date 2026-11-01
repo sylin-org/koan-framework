@@ -60,3 +60,9 @@ reports the configured default-provider posture and connector modules report the
   indexing failures pass through their functional owner.
 - Cancellation is carried through facade, coordination, query-gating, and repository calls.
 - Runtime memoization assumes provider registration/configuration is immutable after host composition freezes.
+
+## Inside a held transaction
+
+A vector store cannot join `EntityContext.Hold`, so `ScopedVectorRepository` refuses every vector write while a hold is open: the write would
+run at once and survive the hold's rollback. Reads go on, and writes after the hold has committed go ahead
+([DATA-0166](../../docs/decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md)).

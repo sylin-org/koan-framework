@@ -838,10 +838,10 @@ public sealed class SqliteHeldTransactionSpec(SqliteFixture fixture, ITestOutput
     }
 
     [Fact]
-    public async Task A_failure_of_the_native_commit_reports_unknown_and_rolls_back()
+    public async Task A_commit_cancelled_before_it_begins_reports_nothing_landed_and_rolls_back()
     {
         RequireBackingStore();
-        var path = TempDatabase("commit-failure");
+        var path = TempDatabase("commit-cancelled");
         try
         {
             await using var host = await BootAsync(Settings(path));
@@ -849,16 +849,154 @@ public sealed class SqliteHeldTransactionSpec(SqliteFixture fixture, ITestOutput
             using var cancelled = new CancellationTokenSource();
             await cancelled.CancelAsync();
 
-            using (await EntityContext.Hold("commit fails"))
+            using (await EntityContext.Hold("commit cancelled"))
             {
                 await new Ticket { Title = "never" }.Save();
                 var commit = () => EntityContext.Commit(cancelled.Token);
-                (await commit.Should().ThrowAsync<TransactionException>()).Which.CommitOutcome
-                    .Should().Be(DataCommitOutcome.Unknown, "a failed commit cannot say whether the store committed");
+                var failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+                failure.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted, "the native commit never began");
+                failure.InnerException.Should().BeAssignableTo<OperationCanceledException>();
             }
 
             (await CommittedCount(path, Tickets)).Should().Be(1);
             (await WriteLockIsFree(path)).Should().BeTrue();
+        }
+        finally
+        {
+            Delete(path);
+        }
+    }
+
+    /// <summary>A deferred foreign key is checked by COMMIT itself, so this is the store refusing the native commit.</summary>
+    [Fact]
+    public async Task A_native_commit_the_store_refuses_reports_unknown_and_rolls_back()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("commit-refused");
+        try
+        {
+            await using var host = await BootAsync(new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+                ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={path};Foreign Keys=True",
+            });
+            await new Ticket { Title = "table exists" }.Save();
+            await using (var ddl = new SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                await ddl.OpenAsync();
+                await using var create = ddl.CreateCommand();
+                create.CommandText =
+                    "CREATE TABLE koan_hold_parent (id TEXT PRIMARY KEY);" +
+                    "CREATE TABLE koan_hold_child (parent TEXT REFERENCES koan_hold_parent (id) DEFERRABLE INITIALLY DEFERRED);";
+                await create.ExecuteNonQueryAsync();
+            }
+
+            using (await EntityContext.Hold("commit refused"))
+            {
+                await new Ticket { Title = "never" }.Save();
+                (await Data<Ticket, string>.Execute<int>(InstructionSql.NonQuery(
+                    "INSERT INTO koan_hold_child (parent) VALUES ('missing')", DataOperationEffect.Write))).Should().Be(1);
+                var commit = () => EntityContext.Commit();
+                var failure = (await commit.Should().ThrowAsync<TransactionException>()).Which;
+                failure.CommitOutcome.Should().Be(DataCommitOutcome.Unknown, "a failed commit cannot say whether the store committed");
+                failure.InnerException.Should().BeOfType<SqliteException>().Which.SqliteErrorCode.Should().Be(19);
+            }
+
+            (await CommittedCount(path, Tickets)).Should().Be(1, "the transaction rolled back when the scope ended");
+            (await CommittedCount(path, "koan_hold_child")).Should().Be(0);
+            (await WriteLockIsFree(path)).Should().BeTrue();
+        }
+        finally
+        {
+            Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_batch_inside_a_hold_leaves_nothing_of_itself_and_the_hold_goes_on()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("failed-batch");
+        try
+        {
+            await using var host = await BootAsync(Settings(path));
+            var before = new Claim { Code = "before" };
+            var after = new Claim { Code = "after" };
+
+            using (await EntityContext.Hold("batches"))
+            {
+                await before.Save();
+                var batch = () => Data<Claim, string>.Batch()
+                    .Add(new Claim { Code = "twice" })
+                    .Add(new Claim { Code = "twice" })
+                    .Save();
+                await batch.Should().ThrowAsync<UniqueValueConflictException>();
+                (await Claim.Query(item => item.Code == "twice")).Should().BeEmpty("an atomic batch that failed left nothing");
+                await after.Save();
+                await EntityContext.Commit();
+            }
+
+            (await Claim.Query(item => item.Code == "twice")).Should().BeEmpty("the hold committed, and nothing of the batch was in it");
+            (await Claim.Get(before.Id)).Should().NotBeNull();
+            (await Claim.Get(after.Id)).Should().NotBeNull();
+        }
+        finally
+        {
+            Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_successful_batch_inside_a_hold_commits_with_it_and_says_it_has_not_yet()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("good-batch");
+        try
+        {
+            await using var host = await BootAsync(Settings(path));
+            var ticket = new Ticket { Title = "batched" };
+
+            using (await EntityContext.Hold("batches"))
+            {
+                var result = await Data<Ticket, string>.Batch().Add(ticket).Save();
+                result.Atomicity.Should().Be(BatchAtomicity.Atomic);
+                result.CommitOutcome.Should().Be(DataCommitOutcome.NotCommitted, "only the scope's commit commits");
+                await EntityContext.Commit();
+            }
+
+            (await Ticket.Get(ticket.Id)).Should().NotBeNull();
+            (await Data<Ticket, string>.Batch().Add(new Ticket { Title = "outside" }).Save())
+                .CommitOutcome.Should().Be(DataCommitOutcome.Committed, "outside a hold the batch is its own commit");
+        }
+        finally
+        {
+            Delete(path);
+        }
+    }
+
+    /// <summary>More rows than one statement carries, so the conflict falls in a later statement than the rows before it.</summary>
+    [Fact]
+    public async Task A_failed_bulk_save_across_statements_inside_a_hold_leaves_nothing_of_itself_and_the_hold_goes_on()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("failed-bulk");
+        try
+        {
+            await using var host = await BootAsync(Settings(path));
+            var claims = Enumerable.Range(0, 5000).Select(index => new Claim { Code = $"bulk-{index}" }).ToList();
+            claims.Add(new Claim { Code = "bulk-0" });
+            var after = new Claim { Code = "after" };
+
+            using (await EntityContext.Hold("bulk"))
+            {
+                var bulk = () => Data<Claim, string>.UpsertMany(claims);
+                await bulk.Should().ThrowAsync<UniqueValueConflictException>();
+                await after.Save();
+                await EntityContext.Commit();
+            }
+
+            (await Data<Claim, string>.Count()).Should().Be(1, "only the save after the failure was left to commit");
+            (await Claim.Get(after.Id)).Should().NotBeNull();
         }
         finally
         {

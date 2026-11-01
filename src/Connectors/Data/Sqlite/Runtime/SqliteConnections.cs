@@ -364,18 +364,27 @@ internal sealed class SqliteConnections(
 
         public async Task Commit(CancellationToken ct)
         {
-            if (held is not null) await held.Operations.WaitAsync(ct).ConfigureAwait(false);
+            if (held is null)
+            {
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                _committed = true;
+                return;
+            }
+            await held.Operations.WaitAsync(ct).ConfigureAwait(false);
             try
             {
+                // The token is honoured up to here, and the native commit runs without it, so a cancellation always means
+                // the commit never began (IHeldTransaction).
+                ct.ThrowIfCancellationRequested();
                 if (Interlocked.Exchange(ref _finishing, 1) != 0)
                     throw new InvalidOperationException(
                         $"The held transaction has ended{(_endedBecause is { } reason ? $": {reason}" : "")}, so it cannot commit.");
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                transaction.Commit();
                 _committed = true;
             }
             finally
             {
-                held?.Operations.Release();
+                held.Operations.Release();
             }
         }
 

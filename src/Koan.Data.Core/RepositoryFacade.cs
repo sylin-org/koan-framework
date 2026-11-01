@@ -1903,7 +1903,9 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
                     await lifecycle.CompleteRemove(context);
             }
 
-            return result;
+            return EntityContext.Current?.TransactionCoordinator is { IsHeld: true }
+                ? result with { CommitOutcome = DataCommitOutcome.NotCommitted }
+                : result;
         }
 
         private IReadOnlyList<BatchItemResult> RemapCompleteOutcomes(

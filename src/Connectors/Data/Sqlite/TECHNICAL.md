@@ -149,9 +149,10 @@ hold still open so that no write lock outlives the host. Once aborted it stays i
 operation, so a write that raced the abort cannot fall through to a connection of its own. A table first used inside a
 hold is created inside it and forgotten if the hold rolls back; until then another flow can see its readiness and fail on
 the missing table, so first use belongs at boot on a route that holds. `IMutationOutcomeRepository` reads whether the row
-exists inside the write's own immediate transaction, or the hold, so the answer cannot be overtaken. A named read on a lane
-keeps its own connection and sees committed state. An in-memory database has no WAL: a reader on another connection
-waits for the hold.
+exists inside the write's own immediate transaction, or the hold, so the answer cannot be overtaken. A batch, bulk save or bulk delete that joins a
+unit runs in a savepoint of it, so a failure leaves nothing of that operation and the unit goes on. A held commit observes its token only
+until the native commit begins. A named read on a lane keeps its own connection and sees committed state. An in-memory database has no WAL:
+a reader on another connection waits for the hold.
 
 ## Lexical index
 

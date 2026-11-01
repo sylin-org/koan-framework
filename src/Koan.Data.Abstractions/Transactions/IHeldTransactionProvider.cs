@@ -18,7 +18,11 @@ public interface IHeldTransactionProvider
     ValueTask<IHeldTransaction> BeginHeld(IServiceProvider services, string source, CancellationToken ct);
 }
 
-/// <summary>One native transaction begun by <see cref="IHeldTransactionProvider.BeginHeld"/>.</summary>
+/// <summary>
+/// One native transaction begun by <see cref="IHeldTransactionProvider.BeginHeld"/>. Its
+/// <see cref="IAtomicCommitScope.Commit"/> observes its token only until the native commit begins, so an
+/// <see cref="OperationCanceledException"/> from it means the native commit never began.
+/// </summary>
 public interface IHeldTransaction : IAtomicCommitScope
 {
     /// <summary>Why the transaction ended before its scope did, or <see langword="null"/> while it has not.</summary>

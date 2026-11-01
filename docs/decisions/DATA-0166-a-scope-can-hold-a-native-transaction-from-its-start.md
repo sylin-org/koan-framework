@@ -46,7 +46,7 @@ record is sound only with all four.
 3. **A waiter blocks no thread.** The driver's busy wait is synchronous. A holder's continuation needs the thread pool, so
    waiters that occupy the pool slow down the very hold they wait for. And a synchronous wait cannot observe a token: a
    cancelled wait lasted 21 seconds.
-4. **The shared cache must not see uncommitted rows.** `CachedRepository` answers a read before the facade and seeds the
+4. **The shared cache must not see uncommitted rows.** `CachedRepository` answers a read before the store does and seeds the
    shared cache from a write. Left alone, a read inside the hold returns the stale entry instead of its own write, and a
    rollback leaves a phantom other flows then read.
 
@@ -72,18 +72,23 @@ durably outside it.
 3. **Inside a hold, nothing defers.** Save, Remove, `Patch`, batches, conditional writes, `Insert`, mass deletes and SQL
    instructions run at once on the hold's connection, and its rollback undoes them. A read sees the scope's own writes, a raw read
    included, which takes its turn on the connection under `query_only` for that turn, so it still cannot write. A lifecycle handler
-   runs at the save and what it writes joins the hold. A unique index answers at the save and costs the statement, not the
-   transaction, so the scope can go on. `TrackedOperationCount` stays zero.
+   runs at the save and what it writes joins the hold. A unique index answers at the save and costs the operation, not the
+   transaction, so the scope can go on. An operation of several statements, a batch or a bulk save or delete, runs in a savepoint of
+   the transaction, so a failure leaves nothing of that operation and the hold goes on; its `Atomic` receipt stays true, and because
+   no row of it landed the cache has nothing to follow. `TrackedOperationCount` stays zero.
 4. **A receipt reports what is true.** `SaveWithOutcome`, `RemoveWithOutcome` and `Insert` report `Inserted`, `Updated` or `Deleted`
-   with `DataCommitOutcome.NotCommitted`, because only `Commit` commits. `Commit` reports as DATA-0158 and DATA-0161 do: `Unknown`
-   when the native commit fails, `NotCommitted` when the hold had already ended. To answer the insert or the update at all, SQLite
-   now declares `write.mutationOutcomes`, reading whether the row exists inside the write's own immediate transaction; this works
-   outside a hold too.
+   with `DataCommitOutcome.NotCommitted`, and a batch reports `NotCommitted`, because only `Commit` commits. `Commit` reports as
+   DATA-0158 and DATA-0161 do: `Unknown` when the native commit fails, `NotCommitted` when the hold had already ended or the commit
+   was cancelled before it began. A held commit observes its token only until then, because a native commit cannot be abandoned
+   part way. To answer the insert or the update at all, SQLite now declares `write.mutationOutcomes`, reading whether the row exists
+   inside the write's own immediate transaction; this works outside a hold too, and on a cached entity, whose entry the outcome
+   retires as an insertion's does.
 5. **One hold covers one store.** A write routed elsewhere refuses when it is issued, naming the route and the correction. A read
    elsewhere sees that store's committed state. A write through another source naming the same file joins, by the store identity
-   DATA-0158 keys units with. A transfer, a role change and a vector save still refuse. A Direct write refuses at once, on any
-   route, because its connection cannot join; a declared Direct read, and a named read on a lane, keep their own connections and
-   see committed state.
+   DATA-0158 keys units with. A transfer and a role change still refuse. Every vector write refuses at `ScopedVectorRepository`, the
+   chokepoint every path to a vector adapter passes, because a vector store cannot join and the write would survive the rollback; a
+   vector read goes on. A Direct write refuses at once, on any route, because its connection cannot join; a declared Direct read,
+   and a named read on a lane, keep their own connections and see committed state.
 6. **Writers wait, in order, for a bounded time.** On SQLite the hold is `BEGIN IMMEDIATE`, so a writer in another process waits on the
    store's busy timeout. Within a process, holds of one database queue on an asynchronous semaphore for at most that timeout, so a waiter
    costs no thread and observes its token; only the one at the head waits on the file. A waiter that meets both waits at most twice the
@@ -105,6 +110,8 @@ durably outside it.
 - `ITransactionCoordinator` gains `IsHeld` and `AfterCommit`; `ITransactionCoordinatorFactory` gains `CreateHeld`;
   `TransactionOptions` gains `HoldLimit`; `TransactionHold` and `IHeldTransactionProvider` are new. No stored format changes.
 - On SQLite, `SaveWithOutcome` now answers outside a scope, where it refused as unsupported.
+- A SQLite batch, bulk save or bulk delete that joins any ambient transaction now runs in a savepoint, so a lifecycle handler that catches
+  such a failure during an atomic commit also finds nothing of it left. Nothing else about an atomic commit changes.
 - A hold keeps every other writer of the file out for as long as it lasts. That is what it asks for; its cost is the application's.
 - A table first used inside a hold is created inside it. If the hold rolls back, its readiness is forgotten (DATA-0158 rule 5), but until
   then another flow can see that readiness and fail on the missing table; and a flow provisioning that table on its own connection can
@@ -113,22 +120,26 @@ durably outside it.
 
 ## Evidence
 
-- `SqliteHeldTransactionSpec` (Connector.Sqlite, 35 specs). **Two real processes on one file**, the test assembly started again through
+- `SqliteHeldTransactionSpec` (Connector.Sqlite, 39 specs). **Two real processes on one file**, the test assembly started again through
   `AddKoan()`: 25 read-increment-commit holds from each of two processes lose no update on one counter; a hold here waits for a hold
   there and then reads what it committed; a waiter on another process's hold, a hold and a plain save alike, fails within the configured
   busy timeout with nothing landed; a process killed mid-hold leaves nothing and frees the store. **The flow**: a read sees its own write
   while another connection does not; disposing without a commit and throwing both leave nothing; a batch, a conditional replace and delete,
   a SQL instruction and `DeleteAll` all roll back; outcomes report as they happen and `NotCommitted`; a unique conflict costs the statement;
-  a handler's write joins and rolls back; a raw read sees its own write and a mislabelled write still fails at the engine; a stream's body
+  a failed batch, and a failed bulk save across statements, leave nothing of themselves while the hold goes on and commits; a handler's write joins and rolls back; a raw read sees its own write and a mislabelled write still fails at the engine; a stream's body
   may write; forty concurrent operations take turns; a read lane and a Direct read see committed state and a Direct write refuses at once.
-  **The bounds**: a hold past its limit frees the store and refuses reads, writes and the commit; an abandoned hold ends and the writer behind
+  **The commit**: one cancelled before it begins reports `NotCommitted`, and a deferred foreign key the store refuses at `COMMIT` reports
+  `Unknown`, and both roll back. **The bounds**: a hold past its limit frees the store and refuses reads, writes and the commit; an abandoned hold ends and the writer behind
   it goes on; a stopped host leaves no lock; a cancelled wait ends in well under the busy timeout; `8 x ProcessorCount` holds serialize without
   starving their continuations; a failed `Hold` leaves nothing ambient.
 - `RoleSqliteSpec` (Koan.Identity.Sqlite.Tests): a role change inside a hold refuses and writes nothing.
+- `HeldVectorSpec` (Koan.Data.Axes.Integration.Tests, SQLite with InMemoryVector): every vector write refuses, through `Vector<T>` and the
+  repository alike, while a vector read goes on, and nothing reached the vector store.
 - `TransactionGuaranteeSpec` (Koan.Tests.Data.Core): a hold on the JSON and InMemory routes refuses naming `write.heldTransaction` and the
   correction, and the flow goes on.
 - `CacheHoldSpec` (Koan.Tenancy.Tests, SQLite with Koan.Cache): a hit does not answer for the hold's write, another flow reads the committed value,
-  the commit retires the entry, and a rollback leaves no phantom.
+  the commit retires the entry, and a rollback leaves no phantom; a save reports its outcome on a cached entity, in and out of a hold, and the
+  entry follows it; a failed batch leaves store and cache agreeing, and a successful one retires its entries at the commit.
 - Three conditions were measured by removing them: without turns the driver throws `ArgumentOutOfRangeException` from its command list, without
   the in-process queue a cancelled wait lasted 21 seconds, and without the cache's awareness both `CacheHoldSpec` specs fail. What pool exhaustion
   would cost without the queue was reasoned and not measured separately.

@@ -14,6 +14,7 @@ using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Naming;
 using Koan.Data.Abstractions.Pipeline;
+using Koan.Data.Core;
 using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Semantics;
 using Koan.Data.Vector.Abstractions;
@@ -101,6 +102,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     public Task Upsert(TKey id, float[] embedding, object? metadata = null, CancellationToken ct = default)
     {
+        RefuseInHold("vector write");
         var segmented = _segmentation.Bind("vector write").Values;
         RunGuards();
         return _inner.Upsert(id, embedding, StampScope(metadata, segmented), ct);
@@ -108,6 +110,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     public Task<int> UpsertMany(IEnumerable<(TKey Id, float[] Embedding, object? Metadata)> items, CancellationToken ct = default)
     {
+        RefuseInHold("vector batch write");
         var segmented = _segmentation.Bind("vector batch write").Values;
         RunGuards();
         return _inner.UpsertMany(items.Select(x => (x.Id, x.Embedding, StampScope(x.Metadata, segmented))), ct);
@@ -116,6 +119,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     public Task Save(VectorPoint<TKey> point, VectorScope ignored, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(point);
+        RefuseInHold("vector save");
         var scope = CompileScope("vector save");
         return _inner.Save(point with { Metadata = StampScope(point.Metadata, scope.Values) }, scope, ct);
     }
@@ -126,6 +130,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(points);
+        RefuseInHold("vector batch save");
         var scope = CompileScope("vector batch save");
         var stamped = points.Select(point => point with
         {
@@ -152,6 +157,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     public Task<bool> Delete(TKey id, VectorScope ignored, CancellationToken ct = default)
     {
+        RefuseInHold("vector delete");
         var scope = CompileScope("vector delete");
         return _inner.Delete(id, scope, ct);
     }
@@ -162,6 +168,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(ids);
+        RefuseInHold("vector batch delete");
         var scope = CompileScope("vector batch delete");
         return _inner.Delete(ids, scope, ct);
     }
@@ -195,6 +202,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
 
     public Task Clear(VectorScope ignored, CancellationToken ct = default)
     {
+        RefuseInHold("vector clear");
         var scope = CompileScope("vector clear");
         return _inner.Clear(scope, ct);
     }
@@ -234,12 +242,14 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     // an unqualified by-id/admin operation. A future capability may earn a faithful native realization.
     public Task<bool> Delete(TKey id, CancellationToken ct = default)
     {
+        RefuseInHold("vector delete");
         RejectUnscoped("vector delete");
         return _inner.Delete(id, ct);
     }
 
     public Task<int> DeleteMany(IEnumerable<TKey> ids, CancellationToken ct = default)
     {
+        RefuseInHold("vector batch delete");
         RejectUnscoped("vector batch delete");
         return _inner.DeleteMany(ids, ct);
     }
@@ -258,6 +268,7 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
     public Task VectorEnsureCreated(CancellationToken ct = default) => _inner.VectorEnsureCreated(ct);
     public Task Flush(CancellationToken ct = default)
     {
+        RefuseInHold("vector flush");
         RejectUnscoped("vector flush");
         return _inner.Flush(ct);
     }
@@ -408,6 +419,19 @@ internal sealed class ScopedVectorRepository<TEntity, TKey> :
             Not n => new Not(RenameOverlayFields(n.Operand)),
             _ => f,                                                   // ClrFilter: opaque, never pushed to a vector store
         };
+    }
+
+    /// <summary>
+    /// A vector store cannot join a held transaction (DATA-0166): the write would run now and survive the hold's rollback,
+    /// so this chokepoint, which every path to a vector adapter passes, refuses it. A read goes on.
+    /// </summary>
+    private static void RefuseInHold(string operation)
+    {
+        if (EntityContext.CurrentTransaction is not { IsHeld: true, IsCompleted: false } hold) return;
+        throw new NotSupportedException(
+            $"'{operation}' cannot join the held transaction '{hold.Name}': a vector store is not part of its native " +
+            "transaction, so the write would run now and survive its rollback. Write the vector after EntityContext.Commit, " +
+            "outside the scope.");
     }
 
     private void RejectUnscoped(string operation)

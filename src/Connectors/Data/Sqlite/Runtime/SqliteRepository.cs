@@ -634,15 +634,16 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
             return command;
         }
 
-        /// <summary>The transaction a multi-statement operation runs in: the ambient one when it exists, else a new one.</summary>
+        /// <summary>The transaction a multi-statement operation runs in: a savepoint of the ambient one when it exists, so
+        /// the operation stays all-or-nothing while the ambient one goes on, else a new one.</summary>
         public async ValueTask<Unit> Begin(CancellationToken ct) => Transaction is not null
-            ? new Unit(Transaction, Owned: false)
+            ? Unit.Join(Transaction)
             : new Unit((SqliteTransaction)await Connection.BeginTransactionAsync(ct).ConfigureAwait(false), Owned: true);
 
         /// <summary>The transaction a read that decides a write runs in: it takes the write lock first, so another
         /// writer cannot change what it read.</summary>
         public Unit BeginImmediate() => Transaction is not null
-            ? new Unit(Transaction, Owned: false)
+            ? Unit.Join(Transaction)
             : new Unit(Connection.BeginTransaction(deferred: false), Owned: true);
 
         public Session In(Unit unit) => new(Connection, unit.Transaction, Owned: false);
@@ -668,12 +669,53 @@ internal sealed partial class SqliteRepository<TEntity, TKey> :
         }
     }
 
-    /// <summary>A transaction an operation begun itself and commits, or the ambient one it joined and leaves alone.</summary>
-    private readonly record struct Unit(SqliteTransaction Transaction, bool Owned) : IAsyncDisposable
+    /// <summary>
+    /// A transaction an operation begun itself and commits, or a savepoint of the ambient one it joined. Either way a failure
+    /// undoes the operation and nothing else: the ambient transaction goes on and may still commit (DATA-0166).
+    /// </summary>
+    private sealed class Unit(SqliteTransaction transaction, bool Owned) : IAsyncDisposable
     {
-        public Task Commit(CancellationToken ct) => Owned ? Transaction.CommitAsync(ct) : Task.CompletedTask;
+        private const string Savepoint = "koan_operation";
+        private bool _released;
 
-        public ValueTask DisposeAsync() => Owned ? Transaction.DisposeAsync() : ValueTask.CompletedTask;
+        public SqliteTransaction Transaction => transaction;
+
+        public static Unit Join(SqliteTransaction ambient)
+        {
+            ambient.Save(Savepoint);
+            return new Unit(ambient, Owned: false);
+        }
+
+        public async Task Commit(CancellationToken ct)
+        {
+            if (Owned)
+            {
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                return;
+            }
+            transaction.Release(Savepoint);
+            _released = true;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Owned)
+            {
+                await transaction.DisposeAsync().ConfigureAwait(false);
+                return;
+            }
+            if (_released) return;
+            try
+            {
+                transaction.Rollback(Savepoint);
+                transaction.Release(Savepoint);
+            }
+            catch (SqliteException)
+            {
+                // A failure SQLite answers by rolling back the whole transaction took the savepoint with it. The operation's
+                // own exception is the one to report, and the ambient commit will report what became of the rest.
+            }
+        }
     }
 
     private static async Task<TEntity?> Get(

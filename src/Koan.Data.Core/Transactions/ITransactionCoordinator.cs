@@ -85,8 +85,8 @@ public interface ITransactionCoordinator
     /// provisioning failure there reports <see cref="DataCommitOutcome.Unknown"/> with no completed operation. Only the
     /// scope's own refusal of <see cref="TransactionGuarantee.Atomic"/> escapes as <see cref="NotSupportedException"/>.
     /// The coordinator never replays dispatched work. A held scope has nothing to dispatch: this commits its native
-    /// transaction, which reports <see cref="DataCommitOutcome.NotCommitted"/> when the hold had already ended and
-    /// <see cref="DataCommitOutcome.Unknown"/> when the native commit itself fails.
+    /// transaction, which reports <see cref="DataCommitOutcome.NotCommitted"/> when the hold had already ended or the commit
+    /// was cancelled before it began, and <see cref="DataCommitOutcome.Unknown"/> when the native commit itself fails.
     /// </summary>
     /// <exception cref="TransactionException">If any operation fails after zero or more earlier operations completed</exception>
     Task Commit(CancellationToken ct = default);
