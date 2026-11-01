@@ -663,7 +663,6 @@ public sealed class MediaPipeline : IMediaPipeline
                     image.Map(orientedW, orientedH, frame => FrameTransforms.Orient(frame, image.Origin), ct);
                     break;
                 }
-                    break;
                 case AutoOrientStep:
                     // Keep — no-op
                     break;
@@ -684,7 +683,6 @@ public sealed class MediaPipeline : IMediaPipeline
                     image.Map(rotatedW, rotatedH, frame => FrameTransforms.Rotate(frame, rs.Degrees), ct);
                     break;
                 }
-                    break;
                 case FlipStep fs:
                     image.Map(image.Width, image.Height, frame => FrameTransforms.Flip(frame, fs.Axis), ct);
                     break;
