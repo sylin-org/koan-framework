@@ -5,7 +5,8 @@ namespace Koan.Web.OpenGraph;
 /// reader may read; a server-rendered page hands one to <see cref="IOpenGraphCardRenderer.RenderHead"/> from what it has
 /// already read. A value left null takes the configured default: the title takes the site name, the description
 /// <see cref="OpenGraphOptions.DefaultDescription"/>, the image <see cref="OpenGraphOptions.DefaultImage"/>, the URL the
-/// request's path, the type <see cref="OpenGraphOptions.DefaultType"/> and the site name <see cref="OpenGraphOptions.SiteName"/>.
+/// request's path, the type <see cref="OpenGraphOptions.DefaultType"/>, the site name <see cref="OpenGraphOptions.SiteName"/>
+/// and the <c>twitter:card</c> value <see cref="OpenGraphOptions.TwitterCard"/>.
 /// <see cref="Url"/> is root-relative or absolute.
 /// </summary>
 public sealed record SocialCard(
@@ -14,4 +15,5 @@ public sealed record SocialCard(
     CardImage Image = default,
     string? Url = null,
     string? Type = null,
-    string? SiteName = null);
+    string? SiteName = null,
+    string? TwitterCard = null);

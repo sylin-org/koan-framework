@@ -70,7 +70,8 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
             .Description(w => w.Summary)
             .Image(w => CardImage.Recipe("share-card", w.CoverMediaId))
             .Url(w => $"/work/{w.Id}")
-            .Type("article");
+            .Type("article")
+            .TwitterCard(w => w.CoverMediaId is null ? "summary" : null);
     }
 
     [Fact]
@@ -88,6 +89,20 @@ public sealed class OpenGraphCardRendererSpec : IAsyncLifetime
         await app.Build()(request.HttpContext);
         request.HttpContext.Response.StatusCode.Should().Be(404);
         request.HttpContext.Response.Body.Length.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_declared_card_chooses_its_twitter_card_from_the_entity()
+    {
+        var bare = new TestWork { Name = "No cover", Summary = "Words only." };
+        await bare.Save();
+        var covered = new TestWork { Name = "Covered", Summary = "A picture.", CoverMediaId = "cover1" };
+        await covered.Save();
+
+        (await Renderer.RenderShellAsync(Navigation($"/work/{bare.Id}")))!
+            .Should().Contain("<meta name=\"twitter:card\" content=\"summary\" />");
+        (await Renderer.RenderShellAsync(Navigation($"/work/{covered.Id}")))!
+            .Should().Contain("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
     }
 
     [Fact]

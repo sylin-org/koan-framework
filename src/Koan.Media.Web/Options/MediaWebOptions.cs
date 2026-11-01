@@ -42,8 +42,10 @@ public sealed class MediaWebOptions
     public bool StrictUnknownParams { get; set; } = false;
 
     /// <summary>
-    /// When true (default), allows ad-hoc URLs (no recipe seed). Set
-    /// false in production to require a named recipe for every request.
+    /// When true (default), allows ad-hoc URLs: query parameters with no recipe
+    /// seed, and format shortcuts such as <c>/media/{id}/png</c>. Set false so a URL
+    /// can only produce an output the host named in a recipe; the stored original at
+    /// <c>/media/{id}</c> is still served.
     /// </summary>
     public bool AllowAdHoc { get; set; } = true;
 

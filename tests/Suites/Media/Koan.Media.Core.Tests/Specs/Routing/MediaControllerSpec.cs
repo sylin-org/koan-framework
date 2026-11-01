@@ -356,6 +356,80 @@ public sealed class MediaControllerSpec
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    private static Task<MediaTestServer> ServerWithoutAdHoc() => MediaTestServer.StartAsync(
+        settings: new() { [$"{Koan.Media.Web.Options.MediaWebOptions.SectionPath}:AllowAdHoc"] = "false" },
+        configureServices: services => services.PostConfigure<RecipesOptions>(opts =>
+        {
+            opts.Recipes["pinned"] = new ConfiguredRecipe
+            {
+                Steps = new List<ConfiguredStep> { new() { Op = "resize", Width = 100 } },
+            };
+            opts.Recipes["open"] = new ConfiguredRecipe
+            {
+                Steps = new List<ConfiguredStep> { new() { Op = "resize", Width = 100 } },
+                Mutators = new List<string> { "dimensions" },
+            };
+        }));
+
+    [Theory]
+    [InlineData("/media/photo/png?w=33")]
+    [InlineData("/media/photo/png")]
+    [InlineData("/media/photo/jpeg")]
+    [InlineData("/media/photo/jpg?w=33")]
+    [InlineData("/media/photo/webp?q=10")]
+    public async Task AdHoc_disabled_refuses_a_format_shortcut(string url)
+    {
+        await using var server = await ServerWithoutAdHoc();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 400, height: 300));
+
+        var response = await server.Client.GetAsync(url);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task AdHoc_disabled_keeps_the_original_and_what_the_host_named()
+    {
+        await using var server = await ServerWithoutAdHoc();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 400, height: 300));
+
+        var original = await server.Client.GetAsync("/media/photo");
+        original.StatusCode.Should().Be(HttpStatusCode.OK);
+        original.Content.Headers.ContentType!.MediaType.Should().Be("image/jpeg");
+
+        var named = await server.Client.GetAsync("/media/photo/pinned");
+        named.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var img = TestImage.Load(await named.Content.ReadAsByteArrayAsync())) img.Width.Should().Be(100);
+
+        // A mutator the host declared is the host's to offer.
+        var declared = await server.Client.GetAsync("/media/photo/open?w=33");
+        using (var img = TestImage.Load(await declared.Content.ReadAsByteArrayAsync())) img.Width.Should().Be(33);
+    }
+
+    [Fact]
+    public async Task AdHoc_disabled_a_named_recipe_with_no_mutators_makes_one_output_whatever_the_query()
+    {
+        await using var server = await ServerWithoutAdHoc();
+        await server.Source.AddAsync("photo", Fixtures.WideJpeg(width: 400, height: 300));
+
+        var plain = await server.Client.GetAsync("/media/photo/pinned");
+        var asked = await server.Client.GetAsync("/media/photo/pinned?w=33");
+
+        asked.Headers.ETag!.Tag.Should().Be(plain.Headers.ETag!.Tag, "the query cannot name a new render");
+        using var img = TestImage.Load(await asked.Content.ReadAsByteArrayAsync());
+        img.Width.Should().Be(100);
+    }
+
+    [Fact]
+    public async Task AdHoc_disabled_advertises_no_format_shortcuts()
+    {
+        await using var server = await ServerWithoutAdHoc();
+
+        var json = await server.Client.GetStringAsync("/media/recipes");
+
+        System.Text.Json.Nodes.JsonNode.Parse(json)!["formatShortcuts"]!.AsArray().Should().BeEmpty();
+    }
+
     [Fact]
     public async Task AdHoc_decode_failure_returns_422()
     {

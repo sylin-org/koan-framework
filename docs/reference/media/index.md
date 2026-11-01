@@ -183,7 +183,7 @@ the version (see [MEDIA-0010](../../decisions/MEDIA-0010-media-engine-on-skiasha
 | Route | Result |
 |---|---|
 | `GET /media/{id}` | original bytes |
-| `GET /media/{id}/{seed}` | named recipe or producible format shortcut |
+| `GET /media/{id}/{seed}` | named recipe, or a producible format shortcut while `AllowAdHoc` is on |
 | `GET /media/{id}/{seed}?w=...&q=...` | recipe plus allowlisted request overrides |
 | `GET /media/recipes` | recipes, shortcuts, aliases, and ad-hoc grammar |
 | `GET /media/recipes/{name}` | one canonical recipe |
@@ -205,7 +205,7 @@ Under `Koan:Media:Web`:
 | `MaxSourceBytes` | `268435456` | source bytes one render buffers (256 MiB); `0` means the engine's ceiling of 1 GiB |
 | `MaxOutputMegapixels` | `256` | pixels a render's frames may grow to, width × height × frames; `0` means the engine's ceiling of 512 |
 | `StrictUnknownParams` | `false` | reject rather than report unknown query parameters |
-| `AllowAdHoc` | `true` | allow requests without a named recipe |
+| `AllowAdHoc` | `true` | allow query parameters without a recipe, and format shortcuts; when `false`, a shortcut is a 404 and only named recipes render |
 | `DefaultCacheControl` | `public, max-age=3600, stale-while-revalidate=86400` | response cache policy |
 
 Routes are currently fixed under `/media`.

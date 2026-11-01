@@ -72,7 +72,9 @@ public sealed class MediaController : ControllerBase
     [HttpGet("media/recipes")]
     public IActionResult ListRecipes()
     {
-        var payload = RecipeJsonSerializer.SerializeAll(_registry.All, _registry.FormatShortcuts);
+        var payload = RecipeJsonSerializer.SerializeAll(
+            _registry.All,
+            _options.AllowAdHoc ? _registry.FormatShortcuts : Array.Empty<string>());
         return Content(payload.ToJsonString(), "application/json");
     }
 
@@ -122,7 +124,10 @@ public sealed class MediaController : ControllerBase
         var seedIsFormatShortcut = false;
         if (!string.IsNullOrWhiteSpace(seed))
         {
-            if (!_registry.TryResolve(seed, out var resolved))
+            // A format shortcut is an ad-hoc URL with the format pinned: every mutator class is open on it, so
+            // with ad-hoc off it resolves as unknown, and only a recipe the host named can produce an output.
+            if (!_registry.TryResolve(seed, out var resolved)
+                || (resolved.Source == RecipeSource.AdHoc && !_options.AllowAdHoc))
             {
                 return NotFound(new { error = $"Unknown recipe or format shortcut '{seed}'." });
             }

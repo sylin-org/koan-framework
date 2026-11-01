@@ -60,6 +60,19 @@ public sealed class RenderHeadSpec
     }
 
     [Fact]
+    public async Task A_card_chooses_its_own_twitter_card()
+    {
+        await using var host = await Host(settings: ("Koan:Web:OpenGraph:TwitterCard", "summary"));
+
+        var chosen = Render(host, new SocialCard("Hello", TwitterCard: "summary_large_image"));
+        chosen.Should().Contain("<meta name=\"twitter:card\" content=\"summary_large_image\" />");
+        chosen.Should().NotContain("<meta name=\"twitter:card\" content=\"summary\" />");
+
+        Render(host, new SocialCard("Hello")).Should().Contain("<meta name=\"twitter:card\" content=\"summary\" />",
+            "a card that says nothing takes the configured value");
+    }
+
+    [Fact]
     public async Task Values_are_encoded_and_truncated_as_a_declared_cards_are()
     {
         await using var host = await Host();

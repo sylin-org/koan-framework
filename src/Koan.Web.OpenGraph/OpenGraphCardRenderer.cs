@@ -83,6 +83,7 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
         var imageUrl = Absolutize(card?.Image.ToPath() ?? options.DefaultImage, request);
         var url = Absolutize(card?.Url ?? request.Path.Value, request);
         var ogType = card?.Type ?? options.DefaultType;
+        var twitterCard = card?.TwitterCard ?? options.TwitterCard;
 
         var sb = new StringBuilder();
 
@@ -106,7 +107,7 @@ internal sealed class OpenGraphCardRenderer : IOpenGraphCardRenderer
 
         if (options.EmitTwitterTags)
         {
-            if (!string.IsNullOrEmpty(options.TwitterCard)) Name(sb, "twitter:card", options.TwitterCard);
+            if (!string.IsNullOrEmpty(twitterCard)) Name(sb, "twitter:card", twitterCard);
             if (!string.IsNullOrEmpty(title)) Name(sb, "twitter:title", title);
             if (!string.IsNullOrEmpty(description)) Name(sb, "twitter:description", description);
             if (!string.IsNullOrEmpty(imageUrl)) Name(sb, "twitter:image", imageUrl);

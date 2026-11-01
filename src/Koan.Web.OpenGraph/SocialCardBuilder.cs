@@ -19,6 +19,7 @@ public sealed class SocialCardBuilder<T> where T : Entity<T>
     private Func<T, CardImage>? _image;
     private Func<T, string?>? _url;
     private string? _ogType;
+    private Func<T, string?>? _twitterCard;
 
     internal SocialCardBuilder()
     {
@@ -52,6 +53,13 @@ public sealed class SocialCardBuilder<T> where T : Entity<T>
         return this;
     }
 
+    /// <summary>twitter:card, which can follow the Entity: a large image only where it has one (defaults to <c>OpenGraphOptions.TwitterCard</c> when unset).</summary>
+    public SocialCardBuilder<T> TwitterCard(Func<T, string?> selector)
+    {
+        _twitterCard = selector ?? throw new ArgumentNullException(nameof(selector));
+        return this;
+    }
+
     /// <summary>og:url and the canonical link (defaults to the request URL when unset).</summary>
     public SocialCardBuilder<T> Url(Func<T, string?> selector)
     {
@@ -68,5 +76,6 @@ public sealed class SocialCardBuilder<T> where T : Entity<T>
         Description: _description?.Invoke(entity),
         Image: _image?.Invoke(entity) ?? CardImage.Default,
         Url: _url?.Invoke(entity),
-        Type: _ogType);
+        Type: _ogType,
+        TwitterCard: _twitterCard?.Invoke(entity));
 }

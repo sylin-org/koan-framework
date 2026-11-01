@@ -66,6 +66,7 @@ Cover computes only the box it keeps of the scaled picture, with the same result
 | Source TIFF, TGA | Refused as unreadable |
 | `/media/{id}` with no transform | The stored bytes as they are, whatever their format |
 | `/media/{id}/gif`, `/bmp`, `/tiff` | 404: unproducible shortcuts resolve as unknown (MEDIA-0009 addendum) |
+| `/media/{id}/png`, `/jpeg`, `/webp` with `AllowAdHoc` false | 404: a shortcut is an ad-hoc URL with its format pinned, and with ad-hoc off only a named recipe renders |
 | `?format=gif`, `bmp`, `tiff` | Reported in `X-Koan-Media-IgnoredParams` and the format preserved; 400 in strict mode |
 | Recipe pinning `gif`, `bmp`, `tiff` | Boot failure (`RecipeOutputFormatValidator`) |
 | `EncodeAs("gif")` in code | `NotSupportedException` |
