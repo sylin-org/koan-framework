@@ -25,12 +25,12 @@ public sealed class AuditChain
 
     /// <summary>
     /// Stamp Sequence/PrevHash/Hash from the store's head and persist, as one turn. A write that fails or rolls back leaves no head to
-    /// correct, so a verification never reports a gap nobody made. In a scope that defers its writes the append follows its commit,
-    /// since nothing it would chain from has landed.
+    /// correct, so a verification never reports a gap nobody made. In a scope that defers its writes, its atomic commit included, the append follows the
+    /// commit, since nothing it would chain from has landed and a hold of its own would wait for the flow's own transaction.
     /// </summary>
     public Task AppendAsync(AuditEvent e, Func<AuditEvent, Task> save, CancellationToken ct = default)
     {
-        if (EntityContext.CurrentTransaction is { IsHeld: false, IsCompleted: false } deferring)
+        if (EntityContext.UncommittedScope is { IsHeld: false } deferring)
         {
             deferring.AfterCommit(token => AppendAsync(e, save, token));
             return Task.CompletedTask;
@@ -66,7 +66,7 @@ public sealed class AuditChain
             using (EntityContext.With(preserveTransaction: false))
                 return await InATurn(work, ct).ConfigureAwait(false);
 
-        if (EntityContext.CurrentTransaction is { IsHeld: true }) return await work().ConfigureAwait(false);
+        if (EntityContext.UncommittedScope is { IsHeld: true }) return await work().ConfigureAwait(false);
         if (EntityContext.CurrentTransaction is null && Data<AuditEvent, string>.Capabilities.Has(DataCaps.Write.HeldTransaction))
         {
             using (await EntityContext.Hold("audit-chain", ct))

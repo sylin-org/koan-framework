@@ -134,8 +134,8 @@ public sealed class PhotoProcessingService
 
     public async Task<PhotoAsset> GenerateAIMetadata(PhotoAsset photo, CancellationToken ct = default)
     {
-        // Transaction coordination: atomic commit across entity + vector operations. The [Embedding] attribute
-        // handles embedding generation + vectorization automatically via lifecycle hooks on Save.
+        // Transaction coordination: the entity's writes commit together. The [Embedding] attribute handles
+        // embedding generation + vectorization on its own, through lifecycle hooks on Save.
         using var tx = EntityContext.Transaction($"ai-metadata-{photo.Id}");
 
         try

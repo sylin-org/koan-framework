@@ -167,12 +167,14 @@ public sealed class WebContext
             _context = context;
             _original = context.User;
             _originalResult = context.Features.Get<IAuthenticateResultFeature>();
+            // Read before the user changes: ASP.NET's own feature forgets its result when it does.
+            var authenticated = _originalResult?.AuthenticateResult;
             context.User = replacement;
             // ASP.NET's policy evaluator goes by the request's authentication result, and a principal placed here is the caller, so a policy
             // denies it with 403 and not 401. A credential a handler rejected stays rejected (WEB-0083).
-            if (replacement.Identity?.IsAuthenticated == true && _originalResult?.AuthenticateResult?.Failure is null)
+            if (replacement.Identity?.IsAuthenticated == true && authenticated?.Failure is null)
                 context.Features.Set<IAuthenticateResultFeature>(new PlacedResult(
-                    AuthenticateResult.Success(new AuthenticationTicket(replacement, _originalResult?.AuthenticateResult?.Ticket?.AuthenticationScheme ?? replacement.Identity.AuthenticationType ?? "koan"))));
+                    AuthenticateResult.Success(new AuthenticationTicket(replacement, authenticated?.Ticket?.AuthenticationScheme ?? replacement.Identity.AuthenticationType ?? "koan"))));
         }
 
         public void Dispose()

@@ -53,16 +53,31 @@ internal sealed class EventCoordinator(
             }
         }
 
-        var capturedContext = contextPlan.Capture(typeof(TEntity), CommunicationLane.Events);
+        return await Publish<TEntity, TEvent>(
+            source, hasDetails, detailsPayload, route, contract, operation, contextPlan.Capture(typeof(TEntity), CommunicationLane.Events), ct).ConfigureAwait(false);
+    }
+
+    private async Task<EventAcceptance> Publish<TEntity, TEvent>(
+        IAsyncEnumerable<TEntity> source,
+        bool hasDetails,
+        string? detailsPayload,
+        CommunicationRouteDecision route,
+        string contract,
+        CommunicationOperation operation,
+        IReadOnlyDictionary<string, string>? capturedContext,
+        CancellationToken ct)
+        where TEntity : class, IEntity
+        where TEvent : class
+    {
         var ordinal = 0L;
         try
         {
-            // What a write in a scope did has not happened until the scope commits, and a rollback means it never did.
-            if (EntityContext.CurrentTransaction is { IsCompleted: false } scope)
+            // What a write in a scope did has not happened until the scope commits, and a rollback means it never did. It publishes under the context it was raised in.
+            if (EntityContext.UncommittedScope is { } scope)
             {
                 var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
-                var copied = hasDetails ? detailsPayload!.FromJson<TEvent>() : null;
-                scope.AfterCommit(token => Raise(CommunicationOperation.Copies<TEntity>(copies), copied, hasDetails, channel, token));
+                scope.AfterCommit(token => Publish<TEntity, TEvent>(
+                    CommunicationOperation.Copies<TEntity>(copies), hasDetails, detailsPayload, route, contract, new CommunicationOperation(route), capturedContext, token));
                 return new EventAcceptance(operation.Snapshot());
             }
 

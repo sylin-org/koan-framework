@@ -15,7 +15,7 @@ public enum TransactionGuarantee
 
     /// <summary>
     /// Commit is one native transaction or nothing. An operation that cannot join one — a second route, a provider
-    /// without <c>write.atomicCommit</c>, a vector operation — is refused when it is tracked, before any write.
+    /// without <c>write.atomicCommit</c> — is refused when it is tracked, before any write.
     /// <see cref="EntityContext.Hold"/> promises the same at commit and begins the native transaction at the start of the
     /// scope instead of at commit.
     /// </summary>

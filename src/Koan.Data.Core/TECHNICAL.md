@@ -370,7 +370,7 @@ validation:
   `EndHold` releases the turn, so that it is in commit order, and what it throws is logged, so that the turn always passes on. It runs under the context captured before the
   hold, so what a watcher starts is off the hold. `EndedByItsOwner` refuses `Commit` and `Rollback` while `Run` runs. `TrySend` is `Send` on a task of its own, under a
   process-wide count of what is waiting, whose slot ends when the hold begins.
-- Deferred entity and vector operations restore their captured source, adapter and partition exactly during
+- Deferred entity operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.
 

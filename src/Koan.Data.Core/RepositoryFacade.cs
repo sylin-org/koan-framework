@@ -572,7 +572,8 @@ internal sealed partial class RepositoryFacade<TEntity, TKey> :
         {
             if (_operationHorizon is not null && _routeBinding is not null)
                 lease = await _operationHorizon.Enter(_routeBinding, effect, operation, ct);
-            var segmentation = _segmentation.Bind(operation);
+            // A shared-row dimension is a column of one table, so a table is made with no tenant in scope.
+            var segmentation = operation == EnsureReadyOperation ? DataSegmentationBinding.Empty : _segmentation.Bind(operation);
             // Generic fail-closed pre-op checks at the chokepoint, BEFORE touching the store (DATA-0105 §0).
             // Cross-cutting modules register guards (Koan.Tenancy registers the tenant gate, ARCH-0095 P1); the
             // data core never names them. No registered guard ⇒ empty loop ⇒ no-op.

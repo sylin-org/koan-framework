@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Koan.Communication.Tests.Support;
 using Koan.Data.Core;
+using Koan.Tenancy;
 
 namespace Koan.Communication.Tests.Specs;
 
@@ -96,6 +97,42 @@ public sealed class ScopedPublicationSpec
         await seen.FirstSnapshot.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
         seen.Events.Should().Equal("as raised/as raised");
         seen.Snapshots.Should().Equal("as raised");
+    }
+
+    [Fact]
+    public async Task An_event_committed_under_another_tenant_publishes_under_the_tenant_it_was_raised_in()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = new EventTestState();
+        await using var host = await CommunicationTestHost.Start(state, ct);
+        using var hostScope = AppHost.PushScope(host.Services);
+
+        using (EntityContext.Transaction("two tenants"))
+        {
+            using (Tenant.Use("tenant-a")) await new EventHandlerFixtures.TenantEventOrder().Events.Raise<EventHandlerFixtures.TenantEvent>(ct);
+            using (Tenant.Use("tenant-b")) await EntityContext.Commit(ct);
+        }
+
+        for (var wait = 0; wait < 100 && state.TenantObservations.IsEmpty; wait++) await Task.Delay(50, ct);
+        state.TenantObservations.Should().Equal("tenant-a");
+    }
+
+    [Fact]
+    public async Task A_snapshot_committed_under_another_tenant_publishes_under_the_tenant_it_was_sent_in()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var state = new TransportTestState();
+        await using var host = await CommunicationTestHost.Start(state, ct);
+        using var hostScope = AppHost.PushScope(host.Services);
+
+        using (EntityContext.Transaction("two tenants"))
+        {
+            using (Tenant.Use("tenant-a")) await new TransportReceiverFixtures.TenantOrder().Transport.Send(ct);
+            using (Tenant.Use("tenant-b")) await EntityContext.Commit(ct);
+        }
+
+        for (var wait = 0; wait < 100 && state.TenantObservations.IsEmpty; wait++) await Task.Delay(50, ct);
+        state.TenantObservations.Should().Equal("tenant-a");
     }
 
     [Fact]

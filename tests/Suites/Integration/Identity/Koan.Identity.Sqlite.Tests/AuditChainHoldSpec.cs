@@ -20,7 +20,8 @@ public sealed class AuditChainHoldSpec
 
     private static string Temp(string label) => Path.Combine(Path.GetTempPath(), $"koan-audit-chain-{label}-{Guid.CreateVersion7():n}.db");
 
-    private static Task<IntegrationHost> Start(string path) => KoanIntegrationHost.Configure()
+    private static Task<IntegrationHost> Start(string path, params (string Key, string Value)[] more) => KoanIntegrationHost.Configure()
+        .WithSettings(more.Select(static setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)))
         .WithSetting("Koan:Environment", "Test")
         .WithSetting("Koan:Data:Sqlite:DdlPolicy", "AutoCreate")
         .WithSetting("Koan:Data:Sqlite:ConnectionString", $"Data Source={path}")
@@ -126,6 +127,34 @@ public sealed class AuditChainHoldSpec
             var verified = await chain.VerifyAsync(Ct);
             verified.Intact.Should().BeTrue(verified.Detail);
             verified.EventsOrBrokenAt.Should().Be(2);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
+    public async Task An_audited_write_in_a_deferring_scope_chains_after_its_commit_with_no_stall()
+    {
+        var path = Temp("hook");
+        try
+        {
+            await using var host = await Start(path, ("Koan:Data:Sqlite:BusyTimeout", "00:00:03"));
+            using var app = AppHost.PushScope(host.Services);
+            var chain = host.Services.GetRequiredService<AuditChain>();
+
+            var clock = Stopwatch.StartNew();
+            using (EntityContext.Transaction("deferring"))
+            {
+                await new Koan.Identity.Identity { DisplayName = "audited" }.Save(Ct);
+                await EntityContext.Commit(Ct);
+            }
+
+            clock.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(2), "nothing waits on its own transaction");
+            (await AuditEvent.Query(audit => audit.Action == "identity.created", Ct)).Should().ContainSingle().Which.Hash.Should().NotBeNull();
+            var verified = await chain.VerifyAsync(Ct);
+            verified.Intact.Should().BeTrue(verified.Detail);
         }
         finally
         {

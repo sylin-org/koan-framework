@@ -4,6 +4,8 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Core.Lexical;
 using Koan.Data.Core.Transactions;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 
@@ -150,11 +152,27 @@ public sealed class SqlitePartitionIndexNameSpec(SqliteFixture fixture, ITestOut
             $"USING INDEX ix_partition_article_topics_{TableHash($"{root}#{Audit}")}", StringComparison.OrdinalIgnoreCase));
     }
 
+    private sealed class WarningLog : ILoggerProvider, ILogger
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Warnings { get; } = new();
+        public ILogger CreateLogger(string categoryName) => this;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => logLevel == LogLevel.Warning;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning) Warnings.Enqueue(formatter(state, exception));
+        }
+        public void Dispose() { }
+    }
+
     [Fact]
     public async Task Two_entities_that_declare_one_name_are_still_refused_on_their_own_tables()
     {
         RequireBackingStore();
-        await using var host = await BootAsync();
+        var logs = new WarningLog();
+        await using var host = await BootAsync(services => services.AddSingleton<ILoggerProvider>(logs));
+        // The boot settles it in one order and says so, whichever the host goes on to use.
+        logs.Warnings.Should().Contain(warning => warning.Contains("SecondOwner: Index 'ix_partition_shared_code'", StringComparison.Ordinal));
         await new FirstOwner { Id = "first", Code = "c-1" }.Save();
 
         var second = () => new SecondOwner { Id = "second", Code = "c-1" }.Save();

@@ -63,8 +63,8 @@ look never becomes a write.
 
 ## Capability envelope (declared)
 
-Everything `SqliteFeatures` declares, plus `Write.MutationOutcomes` (`RETURNING`). Deliberately
-undeclared: `query.fastCount`/`query.optimizedCount` (conservative v1), vector/FTS (upstream VSS
+`DuckDbFeatures` lists what it declares. Deliberately undeclared: `Write.MutationOutcomes`, which the
+repository does not implement, `query.fastCount`/`query.optimizedCount` (conservative v1), vector/FTS (upstream VSS
 remains experimental), and `SupportsRewriteFreeExpressionIndexes = false` — document-expression
 mapped indexes are declined until planner matching is demonstrated.
 

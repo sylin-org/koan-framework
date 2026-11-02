@@ -129,6 +129,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                 {
                     RunStage(app, KoanWebPipelineStage.BeforeRouting);
                     app.UseRouting();
+                    // A default policy the application added answers before authorization, or a browser reads a 401 as a CORS failure.
+                    app.UseCors();
                     // Ensure auth middleware is in the correct position (after routing, before endpoints)
                     // Safe even if no authentication schemes are registered. AddControllers registers the services both
                     // need, so a host without them stops here with ASP.NET's correction naming AddAuthorization.

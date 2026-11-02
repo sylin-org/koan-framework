@@ -871,7 +871,7 @@ on commit, in the order the application issued them, each under the context it w
 axes, source, adapter, partition). When every tracked operation targets one route whose provider declares
 `write.atomicCommit` (SQLite does), the commit is one native transaction: the operations land together or
 not at all, across entity types, and a failure reports `DataCommitOutcome.NotCommitted` with nothing durable.
-On any other shape — two routes, a provider without the token, a vector operation — the commit is sequential
+On any other shape — two routes, a provider without the token — the commit is sequential
 dispatch, not a native or distributed transaction: a later failure can leave the successfully completed
 prefix durable, and `TransactionException.CompletedOperationCount` says how long it is, cancellation included
 (DATA-0158). A failure before the first operation is dispatched reports `NotCommitted`: on the atomic shape a store

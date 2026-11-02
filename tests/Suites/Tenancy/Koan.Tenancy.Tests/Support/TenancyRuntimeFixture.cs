@@ -28,6 +28,9 @@ internal sealed class TenancyRuntimeFixture : IAsyncDisposable
 
     public IServiceProvider Services => _host.Services;
 
+    /// <summary>The fixture's SQLite file.</summary>
+    public string DatabasePath => Path.Combine(_rootPath, "tenancy.db");
+
     public static async Task<TenancyRuntimeFixture> CreateAsync(
         IReadOnlyDictionary<string, string?>? extraSettings = null,
         string adapter = "sqlite",

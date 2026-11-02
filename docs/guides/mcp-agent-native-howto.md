@@ -332,7 +332,7 @@ With `RequireAuthentication: true`, `/mcp` is an OAuth 2.1 **resource server**. 
 
 Sometimes the agent's job is to *operate* the system, not just its data — trigger a background job, flush a cache. Reference **`Koan.Mcp.Operations`** to make those toolsets available, then explicitly enable the ones the host intends to expose. They use the *same* grant/audit rails as everything above (rung 8):
 
-- `koan.jobs.{trigger,cancel,status}` · `koan.cache.{flush,flushAll}`
+- `koan_jobs_trigger`, `koan_jobs_cancel`, `koan_jobs_status` · `koan_cache_flush`, `koan_cache_flush_all`
 
 They are **off by default** — operational verbs are privileged, so each toolset is opt-in (posture, not wiring):
 

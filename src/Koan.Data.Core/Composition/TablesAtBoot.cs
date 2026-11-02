@@ -26,17 +26,17 @@ internal static class TablesAtBoot
     {
         if (!DefaultRouteHolds(services)) return;
         var refused = new List<string>();
-        foreach (var (root, key) in Roots().Distinct())
+        // In one order, so that two entities declaring one index name settle the same way on every run.
+        foreach (var (root, key) in Roots().Distinct().OrderBy(static entity => entity.Root.FullName, StringComparer.Ordinal))
         {
             if (DataApplicationManifest.ScopeOf(root) != DataEntityRouteScope.Default) continue;
             var ready = (Task<Exception?>)One.MakeGenericMethod(root, key).Invoke(null, [services, ct])!;
             if (await ready.ConfigureAwait(false) is not { } failure) continue;
-            refused.Add(root.Name);
-            logger?.LogDebug(failure, "The table of {Entity} could not be made at start.", root.Name);
+            refused.Add($"{root.Name}: {failure.GetBaseException().Message}");
         }
 
         if (refused.Count > 0)
-            logger?.LogWarning("These entities have no table yet and answer at their first use: {Entities}.", string.Join(", ", refused));
+            logger?.LogWarning("These entities have no table yet, and answer at their first use: {Entities}", string.Join(Environment.NewLine, refused));
     }
 
     /// <summary>Every concrete entity's root. One declared wrongly says so at its first use, as it does without this.</summary>

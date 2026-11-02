@@ -667,8 +667,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     {
         var binding = operation.ResolveDataBinding(_services);
         if (binding is null)
-            throw Refuse($"the {operation.GetAdapterHint()} operation is a vector operation, which cannot join a native transaction. " +
-                         "Save the vector outside the scope, or use TransactionGuarantee.Coordinated");
+            throw Refuse($"the {operation.GetAdapterHint()} operation is not bound to a physical store, so it cannot join a native transaction. " +
+                         "Route it to a store, or use TransactionGuarantee.Coordinated");
         var route = AtomicRouteOf(binding) ?? throw Refuse(
             $"route '{binding.Plan.Source}' on provider '{binding.Plan.Adapter}' cannot commit atomically: the provider does " +
             $"not declare '{DataCaps.Write.AtomicCommit.Id}'. Route the scope to a provider that does (SQLite declares it), " +

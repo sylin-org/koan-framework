@@ -130,12 +130,15 @@ public sealed class ApplicationMiddlewareSpec
         }
     }
 
-    [Fact]
-    public async Task On_WebApplication_a_principal_a_web_context_placed_is_the_one_the_middleware_and_the_action_read()
+    [Theory]
+    [InlineData(Always.Name)]
+    [InlineData("AuthenticationTypes.Federation")]
+    public async Task On_WebApplication_a_principal_a_web_context_placed_is_the_one_the_middleware_and_the_action_read(string identityType)
     {
         var path = NewPath();
         try
         {
+            Always.IdentityType = identityType;
             var builder = NewApplication(path);
             builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, Always>(Always.Name, _ => { });
             builder.Services.PostConfigure<AuthenticationOptions>(options => options.DefaultAuthenticateScheme = options.DefaultScheme = Always.Name);
@@ -153,6 +156,109 @@ public sealed class ApplicationMiddlewareSpec
             answer.StatusCode.Should().Be(HttpStatusCode.OK);
             (await answer.Content.ReadAsStringAsync(Ct)).Should().Be("true");
             answer.Headers.GetValues("X-App-Sees-Role").Should().Equal("True");
+            using var gated = await client.GetAsync("/middleware-seen/needs-role", Ct);
+            gated.StatusCode.Should().Be(HttpStatusCode.OK, "the policy reads the principal placed, whatever type its identity has");
+            await app.StopAsync(Ct);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
+    public async Task On_WebApplication_a_principal_narrowed_by_a_web_context_does_not_fall_back_to_the_wider_one()
+    {
+        var path = NewPath();
+        try
+        {
+            Always.IdentityType = "AuthenticationTypes.Federation";
+            var builder = NewApplication(path);
+            builder.Services.AddAuthentication().AddScheme<AuthenticationSchemeOptions, Always>(Always.Name, _ => { });
+            builder.Services.PostConfigure<AuthenticationOptions>(options => options.DefaultAuthenticateScheme = options.DefaultScheme = Always.Name);
+            builder.Services.AddSingleton<IWebContextContributor, NarrowsIt>();
+            await using var app = builder.Build();
+            await app.StartAsync(Ct);
+            using var client = app.GetTestClient();
+
+            using var answer = await client.GetAsync("/middleware-seen/name", Ct);
+            (await answer.Content.ReadAsStringAsync(Ct)).Should().Be("narrowed");
+            await app.StopAsync(Ct);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_default_cors_policy_answers_a_refusal_so_a_browser_reads_it_as_a_refusal()
+    {
+        var path = NewPath();
+        try
+        {
+            var builder = NewApplication(path);
+            builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins("https://other.test").AllowAnyHeader().AllowAnyMethod()));
+            await using var app = builder.Build();
+            await app.StartAsync(Ct);
+            using var client = app.GetTestClient();
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/middleware-seen/closed");
+            request.Headers.Add("Origin", "https://other.test");
+            using var refused = await client.SendAsync(request, Ct);
+            refused.IsSuccessStatusCode.Should().BeFalse();
+            refused.Headers.Contains("Access-Control-Allow-Origin").Should().BeTrue();
+
+            using var preflight = new HttpRequestMessage(HttpMethod.Options, "/middleware-seen/closed");
+            preflight.Headers.Add("Origin", "https://other.test");
+            preflight.Headers.Add("Access-Control-Request-Method", "GET");
+            using var allowed = await client.SendAsync(preflight, Ct);
+            allowed.Headers.Contains("Access-Control-Allow-Origin").Should().BeTrue();
+            await app.StopAsync(Ct);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
+    public async Task With_no_cors_policy_a_cross_origin_request_is_answered_as_it_was()
+    {
+        var path = NewPath();
+        try
+        {
+            await using var app = NewApplication(path).Build();
+            await app.StartAsync(Ct);
+            using var client = app.GetTestClient();
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/middleware-seen/open");
+            request.Headers.Add("Origin", "https://other.test");
+            using var answer = await client.SendAsync(request, Ct);
+            answer.StatusCode.Should().Be(HttpStatusCode.OK);
+            answer.Headers.Contains("Access-Control-Allow-Origin").Should().BeFalse();
+            await app.StopAsync(Ct);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
+    public async Task A_fallback_the_application_maps_answers_only_what_no_route_answers()
+    {
+        var path = NewPath();
+        try
+        {
+            await using var app = NewApplication(path).Build();
+            app.MapFallback(() => "fallback");
+            await app.StartAsync(Ct);
+            using var client = app.GetTestClient();
+
+            (await client.GetStringAsync("/nothing-here", Ct)).Should().Be("fallback");
+            using var route = await client.GetAsync("/middleware-seen/role", Ct);
+            (await route.Content.ReadAsStringAsync(Ct)).Should().Be("false", "a controller answers before a fallback");
             await app.StopAsync(Ct);
         }
         finally
@@ -247,8 +353,23 @@ public sealed class ApplicationMiddlewareSpec
     {
         public const string Name = "always";
 
+        /// <summary>What the identity's type says, which need not be the scheme's name. This assembly's tests run one at a time.</summary>
+        public static string IdentityType { get; set; } = Name;
+
         protected override Task<AuthenticateResult> HandleAuthenticateAsync() => Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(
-            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], Name)), Name)));
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "alice")], IdentityType)), Name)));
+    }
+
+    private sealed class NarrowsIt : IWebContextContributor
+    {
+        public int Order => 0;
+
+        public ValueTask ContributeAsync(WebContext context)
+        {
+            if (context.HttpContext.User.Identity?.IsAuthenticated == true)
+                context.UsePrincipal(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "narrowed")], Always.IdentityType)));
+            return ValueTask.CompletedTask;
+        }
     }
 
     private sealed class ProjectsARole : IWebContextContributor
@@ -272,6 +393,13 @@ public sealed class MiddlewareSeenController : ControllerBase
 
     [HttpGet("role")]
     public IActionResult Role() => Content(User.IsInRole("projected") ? "true" : "false");
+
+    [HttpGet("needs-role")]
+    [Authorize(Roles = "projected")]
+    public IActionResult NeedsRole() => Ok();
+
+    [HttpGet("name")]
+    public IActionResult Who() => Content(User.Identity?.Name ?? "nobody");
 
     [HttpGet("closed")]
     [Authorize]

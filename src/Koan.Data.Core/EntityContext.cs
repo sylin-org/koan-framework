@@ -44,7 +44,7 @@ public static class EntityContext
 
         /// <summary>
         /// Transaction coordinator instance for deferred execution.
-        /// Used by entity and vector operations to participate in transactions.
+        /// Used by entity operations to participate in transactions.
         /// </summary>
         public ITransactionCoordinator? TransactionCoordinator { get; init; }
 
@@ -113,11 +113,12 @@ public static class EntityContext
         Current?.TransactionCoordinator;
 
     /// <summary>
-    /// The scope this flow's writes are not yet committed in, which holds them in one native transaction: an open hold, or an atomic commit
-    /// while it dispatches the operations it tracked. For what must not be told of a row until it stands, as a shared cache must not.
+    /// The scope this flow's writes wait on: an open hold, an open deferring scope, or an atomic commit while it dispatches what it tracked, when
+    /// <see cref="CurrentTransaction"/> is clear so that an operation does not track itself. For what must not be told of a row until it stands: a shared
+    /// cache, a publication, an audit chain.
     /// </summary>
     public static Transactions.ITransactionCoordinator? UncommittedScope =>
-        CurrentTransaction is { IsHeld: true, IsCompleted: false } hold ? hold : Transactions.TransactionCoordinator.AtomicDispatch;
+        Transactions.TransactionCoordinator.AtomicDispatch ?? (CurrentTransaction is { IsCompleted: false } open ? open : null);
 
     /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built

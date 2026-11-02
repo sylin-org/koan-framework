@@ -27,15 +27,26 @@ internal sealed class TransportCoordinator(
             throw NoReceivers<TEntity>(operation);
         }
 
-        var capturedContext = contextPlan.Capture(typeof(TEntity), CommunicationLane.Transport);
+        return await Publish(source, route, contract, operation, contextPlan.Capture(typeof(TEntity), CommunicationLane.Transport), ct).ConfigureAwait(false);
+    }
+
+    private async Task<TransportAcceptance> Publish<TEntity>(
+        IAsyncEnumerable<TEntity> source,
+        CommunicationRouteDecision route,
+        string contract,
+        CommunicationOperation operation,
+        IReadOnlyDictionary<string, string>? capturedContext,
+        CancellationToken ct)
+        where TEntity : class, IEntity
+    {
         var ordinal = 0L;
         try
         {
-            // A write in a scope has not landed until the scope commits, and a rollback means it never did.
-            if (EntityContext.CurrentTransaction is { IsCompleted: false } scope)
+            // A write in a scope has not landed until the scope commits, and a rollback means it never did. It publishes under the context it was sent in.
+            if (EntityContext.UncommittedScope is { } scope)
             {
                 var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
-                scope.AfterCommit(token => Send(CommunicationOperation.Copies<TEntity>(copies), channel, token));
+                scope.AfterCommit(token => Publish(CommunicationOperation.Copies<TEntity>(copies), route, contract, new CommunicationOperation(route), capturedContext, token));
                 return new TransportAcceptance(operation.Snapshot());
             }
 
