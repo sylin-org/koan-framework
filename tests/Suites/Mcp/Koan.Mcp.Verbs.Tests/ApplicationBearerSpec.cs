@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using AwesomeAssertions;
 using Koan.Security.Trust.Issuer;
+using Koan.Web.Attributes;
 using Koan.Web.Auth.Extensions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
@@ -25,6 +26,29 @@ public sealed class CookieSignInController : ControllerBase
             [new Claim(ClaimTypes.NameIdentifier, subject), new Claim("sub", subject)], AuthenticationExtensions.CookieScheme)));
         return Ok();
     }
+}
+
+public sealed record ListsInput(string[]? Permissions, List<string>? Others);
+
+public sealed record LimitedInput(string? Words);
+
+/// <summary>What a tool call meets of a request, and what binding makes of a body.</summary>
+public sealed class ToolRequestController : ControllerBase
+{
+    [HttpGet("/bearer-spec/scheme"), Tool(Name = "bearer_scheme")]
+    public IActionResult Scheme() => Ok(new { scheme = HttpContext.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Ticket?.AuthenticationScheme });
+
+    [HttpPost("/bearer-spec/lists"), Tool(Name = "bearer_lists")]
+    public IActionResult Lists(ListsInput input, string[]? plain) => Ok(new { permissions = input.Permissions?.Length, others = input.Others?.Count, plain = plain?.Length });
+
+    [HttpPost("/bearer-spec/limited"), Tool(Name = "bearer_limited"), RequestSizeLimit(64)]
+    public IActionResult Limited(LimitedInput input) => Ok(new { words = input.Words });
+
+    [HttpPost("/bearer-spec/limited-body"), Tool(Name = "bearer_limited_body"), RequestSizeLimit(64)]
+    public IActionResult LimitedBody([FromBody] LimitedInput input) => Ok(new { words = input.Words });
+
+    [HttpGet("/bearer-spec/both"), HttpHead("/bearer-spec/both"), Tool]
+    public IActionResult Both() => Ok(new { read = true });
 }
 
 /// <summary>A host that says its MCP edge is part of it, and nothing else about the edge: not even that it requires authentication.</summary>
@@ -118,6 +142,101 @@ public sealed class ApplicationBearerSpec(ApplicationBearerFixture host) : IClas
         tool.Failed.Should().BeFalse(tool.ToString());
         JObject.Parse(tool.Text)["id"]!.Value<string>().Should().Be("bob");
         tool.Text.Should().Be(route.Text);
+    }
+
+    [Fact]
+    public async Task A_tool_call_reads_as_the_bearer_that_established_it_on_either_door()
+    {
+        var token = host.Token(host.BaseUrl);
+
+        var tool = await host.Tool("bearer_scheme", new JObject(), token);
+        var route = await host.Route(HttpMethod.Get, "/bearer-spec/scheme", null, token);
+
+        JObject.Parse(tool.Text)["scheme"]!.Value<string>().Should().Be("Koan.bearer", tool.ToString());
+        tool.Text.Should().Be(route.Text);
+    }
+
+    [Fact]
+    public async Task A_tool_call_with_a_cookie_beside_its_bearer_reads_as_the_bearer()
+    {
+        var ct = Ct;
+        using var browser = host.Browser();
+        (await browser.GetAsync("/bearer-spec/signin?subject=bob", ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var session = await host.Open(browser, host.Token(host.BaseUrl));
+        using var call = ApplicationBearerFixture.Message("tools/call", host.Token(host.BaseUrl), session);
+        call.Content = new StringContent(new JObject
+        {
+            ["jsonrpc"] = "2.0", ["id"] = 2, ["method"] = "tools/call", ["params"] = new JObject { ["name"] = "bearer_scheme", ["arguments"] = new JObject() },
+        }.ToString(), Encoding.UTF8, "application/json");
+
+        using var answer = await browser.SendAsync(call, ct);
+
+        (await answer.Content.ReadAsStringAsync(ct)).Should().Contain("Koan.bearer");
+    }
+
+    [Theory]
+    [InlineData("{\"permissions\":[],\"others\":[],\"plain\":[]}", 0, 0, 0)]
+    [InlineData("{\"permissions\":[\"a\",\"b\"],\"others\":[\"a\"],\"plain\":[\"a\",\"b\",\"c\"]}", 2, 1, 3)]
+    [InlineData("{\"permissions\":[]}", 0, null, 0)] // a parameter that is itself a collection binds empty whenever it is left out, as ASP.NET binds it
+    public async Task An_empty_array_binds_empty_and_is_not_a_field_left_out_on_either_door(string body, int? permissions, int? others, int? plain)
+    {
+        var token = host.Token(host.BaseUrl);
+
+        var route = await host.Route(HttpMethod.Post, "/bearer-spec/lists", JObject.Parse(body), token);
+        var tool = await host.Tool("bearer_lists", JObject.Parse(body), token);
+
+        foreach (var answer in new[] { route, tool })
+        {
+            var read = JObject.Parse(answer.Text);
+            read["permissions"]?.Value<int?>().Should().Be(permissions, answer.ToString());
+            read["others"]?.Value<int?>().Should().Be(others, answer.ToString());
+            read["plain"]?.Value<int?>().Should().Be(plain, answer.ToString());
+        }
+    }
+
+    [Theory]
+    [InlineData("/bearer-spec/limited", "bearer_limited")]
+    [InlineData("/bearer-spec/limited-body", "bearer_limited_body")]
+    public async Task A_body_past_the_limit_is_413_in_koans_refusal_on_either_door(string path, string name)
+    {
+        var token = host.Token(host.BaseUrl);
+        var body = new JObject { ["words"] = new string('x', 500) };
+
+        var route = await host.Route(HttpMethod.Post, path, body, token);
+        var tool = await host.Tool(name, body, token);
+
+        route.Status.Should().Be(413, route.ToString());
+        route.Kind.Should().Be("invalid", route.ToString());
+        tool.Status.Should().Be(413, tool.ToString());
+        tool.Kind.Should().Be("invalid", tool.ToString());
+    }
+
+    [Fact]
+    public async Task A_get_and_a_head_on_one_action_are_one_tool_and_both_stay_routes()
+    {
+        var token = host.Token(host.BaseUrl);
+        using var client = host.Browser();
+        using var head = new HttpRequestMessage(HttpMethod.Head, "/bearer-spec/both");
+
+        var names = (await host.Tools(token)).Select(tool => tool["name"]!.Value<string>()).ToArray();
+        using var answered = await client.SendAsync(head, Ct);
+
+        names.Where(name => name!.StartsWith("bearer_spec_both", StringComparison.Ordinal)).Should().Equal("bearer_spec_both_get");
+        answered.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await host.Tool("bearer_spec_both_get", new JObject(), token)).Failed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task An_application_that_exposes_tools_alone_gets_no_code_modes_sdk()
+    {
+        using var client = host.Browser();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/mcp/sdk/definitions");
+        request.Headers.TryAddWithoutValidation("Authorization", host.Token(host.BaseUrl));
+
+        using var answer = await client.SendAsync(request, Ct);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        host.Services.GetRequiredService<Koan.Mcp.CodeMode.Sdk.ITypeScriptSdkProvider>().Current.Should().BeNull("nothing generated it, so nothing wrote it");
     }
 
     [Fact]
@@ -313,34 +432,27 @@ public sealed class UnaddressedEdgeSpec(UnaddressedFixture host) : IClassFixture
 
         using var answer = await client.SendAsync(request, TestContext.Current.CancellationToken);
 
-        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        answer.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
 
+    /// <summary>A 401 would send a standard client through OAuth for a token no edge takes: it starts none, and is told why.</summary>
     [Theory]
     [InlineData("http://sibling.example/mcp", "sibling.example")]
     [InlineData("{base}/mcp", null)]
     [InlineData("{base}", null)]
-    public async Task With_nothing_naming_the_application_the_edge_takes_no_token_whatever_the_host(string audience, string? claimed)
+    [InlineData(null, null)]
+    public async Task With_nothing_naming_the_application_the_edge_says_so_and_starts_no_oauth(string? audience, string? claimed)
     {
+        var ct = TestContext.Current.CancellationToken;
         using var client = host.Browser();
-        using var request = ApplicationBearerFixture.Message("initialize", host.Token(audience.Replace("{base}", host.BaseUrl)));
+        using var request = ApplicationBearerFixture.Message("initialize", audience is null ? null : host.Token(audience.Replace("{base}", host.BaseUrl)));
         if (claimed is not null) request.Headers.Host = claimed;
 
-        using var answer = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        using var answer = await client.SendAsync(request, ct);
 
-        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        answer.Headers.WwwAuthenticate.ToString().Should().Contain("error=\"invalid_token\"");
-    }
-
-    [Fact]
-    public async Task With_nothing_naming_the_application_no_credential_is_still_the_challenge()
-    {
-        using var client = host.Browser();
-
-        using var answer = await client.SendAsync(ApplicationBearerFixture.Message("initialize"), TestContext.Current.CancellationToken);
-
-        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        answer.Headers.WwwAuthenticate.ToString().Should().Be($"Bearer resource_metadata=\"{host.Metadata}\"");
+        answer.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        answer.Headers.WwwAuthenticate.Should().BeEmpty();
+        (await answer.Content.ReadAsStringAsync(ct)).Should().Contain("Koan:Web:ApplicationUrl");
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using Koan.Mcp.CodeMode.Execution;
 using Koan.Mcp.Diagnostics;
 using Koan.Mcp.Hosting;
 using Koan.Mcp.Options;
+using Koan.Mcp;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +43,8 @@ internal static class McpEndpointMapping
             baseRoute = "/mcp";
         }
         var configuredResource = options.ResourceUri;
+        // An application that exposes tools alone gets no code mode's SDK, published or written, whatever CodeMode:Enabled says.
+        var codeModeOn = McpExposure.ExposesCode(McpExposure.Resolve(options));
 
         void ApplyCors(IEndpointConventionBuilder builder)
         {
@@ -165,7 +168,7 @@ internal static class McpEndpointMapping
                     status = "ok",
                     codeMode = new
                     {
-                        enabled = codeModeOpts?.Enabled ?? false,
+                        enabled = codeModeOn && (codeModeOpts?.Enabled ?? false),
                         entities = registry?.Registrations.Count ?? 0,
                         dtsBytes = tsProvider?.Current?.Length ?? 0,
                         sandbox = sandboxOpts is null ? null : new
@@ -192,7 +195,7 @@ internal static class McpEndpointMapping
 
             // SDK definitions endpoint for code mode
             var codeModeOptions = services.GetService<IOptions<CodeModeOptions>>()?.Value;
-            if (codeModeOptions?.Enabled == true && codeModeOptions.PublishSdkEndpoint)
+            if (codeModeOn && codeModeOptions?.Enabled == true && codeModeOptions.PublishSdkEndpoint)
             {
                 var sdkGenerator = services.GetService<TypeScriptSdkGenerator>();
                 var registry = services.GetService<McpEntityRegistry>();

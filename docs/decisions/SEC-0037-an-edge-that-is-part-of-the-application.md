@@ -73,11 +73,12 @@ return token is null ? StatusCode(StatusCodes.Status403Forbidden) : Ok(new { acc
    when it speaks it, else `2025-06-18`, as the specification says. The client then decides.
 7. **Outside Development a request's `Host` names no audience, at any door.** `KoanWebBaseUrl.Audience` is the one rule:
    the configured or accepted URL, and in Development the request's. Until one exists elsewhere, even under
-   `DerivesUntilAccepted`, no token is for the application: the pages' resource edge and the MCP edge answer every bearer
-   401 `invalid_token`, whichever audience it names, a cookie still signs in, and no credential at `/mcp` is still the
-   challenge. `AccessToken.For` refuses with the correction. An explicit `ResourceServer:Resource` or `ResourceUri` names
-   its own and needs no URL. Discovery still answers from the request, because it grants nothing: a client that completes
-   OAuth before the application has a URL holds a token the edges refuse until it does. In Development, before a URL
+   `DerivesUntilAccepted`, no token is for the application. The pages' resource edge answers every bearer 401
+   `invalid_token`, and a cookie still signs in. The MCP edge answers 503 with the correction, with or without a bearer,
+   and no `WWW-Authenticate`: a 401 sends a standard client through registration and sign-in for a token no edge takes,
+   again each time. `AccessToken.For` refuses with the correction. An explicit `ResourceServer:Resource` or `ResourceUri` names
+   its own and needs no URL. Discovery still answers from the request, because it grants nothing, and a client following
+   the edge never reaches it. In Development, before a URL
    exists, the `Host` chooses, as it does for every absolute URL there. A token only ever carried its own subject, so what
    this closes is a replay and not an escalation.
 8. **SEC-0006 D6 is now what the code does: a token holds what was requested and what the person holds.** Any signed-in
@@ -130,7 +131,7 @@ beside `ConsentPage`. `IIssuer` stays public for what is not this.
 - Opt-in, but for rules 6, 7 and 8. **Outside Development, a bearer is refused until the application has a URL** (rule 7),
   where a token for the request's own `Host` passed, on the pages and at `/mcp`. A Staging or test host with no
   `Koan:Web:ApplicationUrl` that relies on a bearer must set it. In Production with no URL and no consent, a bearer on a page
-  answers 401 where the base URL's refusal was a 500; the edge's challenge still refuses with that correction.
+  answers 401 and the MCP edge 503, each where the base URL's refusal was a 500.
 - A client asking for a version the server does not speak is answered `2025-06-18` where
   it was echoed. On Streamable HTTP, a client that then sent the echoed version in its header was refused on its next
   request; one that sends no header, and every other transport, never was, and now reads the version it should speak.
@@ -145,7 +146,7 @@ beside `ConsentPage`. `IIssuer` stays public for what is not this.
 
 ## Evidence
 
-- `ApplicationBearerSpec` (Koan.Mcp.Verbs.Tests, 24), `NamedResourceSpec` (1), `UnaddressedEdgeSpec` (6) and `AddressedEdgeSpec` (2): a real host on a real port, the resource edge on, every call real HTTP. A token for the application reaches a route tool as its subject, with its trailing slash too; `[Authorize]`, `[Access]` and `[RequireScope]` answer alike on both doors, each with a caller who passes and one who fails; a scope narrows nothing a role opens; the token is `remote` at the edge; a token for the edge works there and on no route; the metadata names the edge; a sibling's token, the issuer's default audience, another issuer, an expired, a tampered and a malformed token each answer exactly `Bearer error="invalid_token", resource_metadata=...`; no credential, in Development with nothing else set, is the challenge; a `Basic` header and a cookie are no credential, on POST and on the stream, and a rejected bearer does not fall back to the cookie; a cookie does not drive a session its subject opened; another subject is refused 403 on a session and its DELETE, and the same subject's other tokens pass. A configured resource replaces the base URL at the edge. In Staging with nothing naming the application, no token is taken at the edge or on a page whatever the `Host`, no credential is still the challenge and a cookie still signs in; with a URL configured, it is the application and the edge whatever the `Host` says.
+- `ApplicationBearerSpec` (Koan.Mcp.Verbs.Tests), `NamedResourceSpec` (1), `UnaddressedEdgeSpec` (6) and `AddressedEdgeSpec` (2): a real host on a real port, the resource edge on, every call real HTTP. A token for the application reaches a route tool as its subject, with its trailing slash too; `[Authorize]`, `[Access]` and `[RequireScope]` answer alike on both doors, each with a caller who passes and one who fails; a scope narrows nothing a role opens; the token is `remote` at the edge; a token for the edge works there and on no route; the metadata names the edge; a sibling's token, the issuer's default audience, another issuer, an expired, a tampered and a malformed token each answer exactly `Bearer error="invalid_token", resource_metadata=...`; no credential, in Development with nothing else set, is the challenge; a `Basic` header and a cookie are no credential, on POST and on the stream, and a rejected bearer does not fall back to the cookie; a cookie does not drive a session its subject opened; another subject is refused 403 on a session and its DELETE, and the same subject's other tokens pass. A configured resource replaces the base URL at the edge. In Staging with nothing naming the application, the edge answers 503 with the correction and no challenge, with a token whatever the `Host` and with none, a page refuses a token and a cookie still signs in; with a URL configured, it is the application and the edge whatever the `Host` says.
 - `AccessTokenSpec` (15), `NamedAccessTokenSpec` (1), `UnaddressedAccessTokenSpec` (1) and `AddressedAccessTokenSpec` (1) (Koan.Web.Auth.Server.IntegrationTests): the token names the application and the metadata's issuer, lasts the configured lifetime and names no client; it is good on a route and at the edge; it carries the roles it was given; a verb no route offers is reached as far as its subject may; a subject who may not act gets none; standing replaces what the proof captured; a principal with no subject is refused saying so; a code-flow token for the application with `scope=notes.read` answers as the person's cookie does on a role and on a scope, on both doors. The code flow and the device flow grant no scope the person lacks and the ones they hold; a consent to fewer scopes than requested is remembered; the consent seam says what approving gives; a grant still answers at the gate. A configured resource is the audience; in Staging with nothing naming the application it refuses naming the key; with a URL configured it names that URL, whatever the `Host`.
 - `AccessTokenAfterSignInSpec` (Koan.Identity.Revocation.Tests, 2), on a host with Koan.Identity: a new account gets no token until it has signed in and then gets its own; an account linked to a person gets that person's.
 - `StreamableHttpTransportSpec.Initialize_answers_a_version_it_speaks_and_the_next_request_may_say_it` (3): `2025-11-25` and an unknown version are answered `2025-06-18`, `2025-03-26` is answered in kind, and the next request saying the answer is accepted.
@@ -156,5 +157,4 @@ beside `ConsentPage`. `IIssuer` stays public for what is not this.
 
 - A loopback redirect is matched exactly (D4), where RFC 8252 §7.3 and D5's own words allow any port. A client that keeps
   its registration and changes its port registers again.
-- Discovery answers from the request until a URL exists, so a client can complete OAuth for a token no edge takes yet.
 - The protected-resource metadata offers no `scopes_supported`, because Koan has no scope vocabulary to state.

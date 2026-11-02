@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
 using Koan.Security.Trust.Inbound;
 using Microsoft.AspNetCore.Authentication;
@@ -19,6 +20,8 @@ namespace Koan.Mcp.Hosting;
 /// </summary>
 internal static class McpEdgeAuth
 {
+    private const string NoApplicationUrl = "This application has no address yet, so no token can be for it. Set Koan:Web:ApplicationUrl or accept a URL, then connect again.";
+
     /// <summary>
     /// Authenticate + audience-check this request. Returns <c>true</c> to proceed; on failure it writes the
     /// 401 challenge itself and returns <c>false</c>. A no-op (returns true) when authentication is not required.
@@ -45,8 +48,17 @@ internal static class McpEdgeAuth
         // the RFC 8707 audience must name this resource: an authentic token for another resource (a sibling API, the
         // application's own pages, a service-mesh aud=koan token) is rejected here — the confused-deputy fix. A
         // conformant client re-authorizes with resource=<this> on the challenge. No token at all is a plain challenge.
-        // SEC-0037: an application that says this edge is part of it names one resource more, its own.
-        var result = await KoanBearerResource.Authenticate(context, McpResourceIdentity.Accepted(context, baseRoute, options));
+        // SEC-0037: an application that says this edge is part of it names one resource more, its own. With no name at all
+        // no token could pass, and a 401 would send a standard client through OAuth for one, again and again: it is told why.
+        var accepted = McpResourceIdentity.Accepted(context, baseRoute, options);
+        if (accepted.Length == 0)
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await context.Response.WriteAsJsonAsync(new { error = "no_application_url", message = NoApplicationUrl }, cancellationToken: context.RequestAborted);
+            return false;
+        }
+
+        var result = await KoanBearerResource.Authenticate(context, accepted);
         if (!result.Succeeded || result.Principal?.Identity?.IsAuthenticated != true)
         {
             if (result.None) await WriteChallenge(context, baseRoute, "unauthorized");
@@ -55,6 +67,7 @@ internal static class McpEdgeAuth
         }
 
         context.User = result.Principal;
+        context.Features.Set<IAuthenticateResultFeature>(new RouteToolInvoker.Authenticated(result));
         return true;
     }
 

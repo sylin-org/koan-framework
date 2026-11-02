@@ -107,9 +107,10 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         http.Features.Set(route);
         if (OriginStamp.TierOf(http.User) is { } tier) http.Features.Set(new OriginFeature(tier));
         // What ASP.NET's policy evaluator goes by, for 403 or 401. The edge's result for a principal it accepted, which the application's default scheme might refuse. WEB-0083: a
-        // credential rejected at the edge with nothing to replace it is rejected here too.
+        // credential rejected at the edge with nothing to replace it is rejected here too. The ticket names the scheme that established the caller, as a request of its own would say.
         if (http.User.Identity is { IsAuthenticated: true, AuthenticationType: var type })
-            http.Features.Set<IAuthenticateResultFeature>(new Authenticated(AuthenticateResult.Success(new AuthenticationTicket(http.User, type ?? "mcp"))));
+            http.Features.Set<IAuthenticateResultFeature>(new Authenticated(AuthenticateResult.Success(new AuthenticationTicket(http.User,
+                outer?.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Ticket?.AuthenticationScheme ?? type ?? "mcp"))));
         else if (outer?.Features.Get<IAuthenticateResultFeature>() is { AuthenticateResult.Failure: not null } rejected)
             http.Features.Set(rejected);
 
@@ -133,7 +134,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         }
     }
 
-    private sealed class Authenticated(AuthenticateResult result) : IAuthenticateResultFeature
+    internal sealed class Authenticated(AuthenticateResult result) : IAuthenticateResultFeature
     {
         public AuthenticateResult? AuthenticateResult { get; set; } = result;
     }

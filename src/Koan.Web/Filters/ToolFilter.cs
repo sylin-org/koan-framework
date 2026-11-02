@@ -17,7 +17,7 @@ namespace Koan.Web.Filters;
 
 /// <summary>What every <c>[Tool]</c> action answers to, on either door (ARCH-0141): the one gate before anything is read of the
 /// request, a body read as a form or one JSON object alike, and a value that cannot bind refused with its field named.</summary>
-internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, IActionFilter
+internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, IActionFilter, IExceptionFilter
 {
     public static readonly ToolFilter Instance = new();
 
@@ -57,6 +57,14 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
 
     public void OnActionExecuted(ActionExecutedContext context) { }
 
+    /// <summary>A body past the route's limit, met wherever binding read it, is refused as a tool call of that size is.</summary>
+    public void OnException(ExceptionContext context)
+    {
+        if (context.Exception is not BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge }) return;
+        context.Result = Answers.TooLarge(context.HttpContext);
+        context.ExceptionHandled = true;
+    }
+
     /// <summary>A JSON object's members as form values, after the route's so that a body never names the address.</summary>
     private sealed class JsonFields : IValueProviderFactory
     {
@@ -94,6 +102,8 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
                         Flatten(member.Value, name.Length == 0 ? member.Name : $"{name}.{member.Name}", fields);
                     break;
                 case JsonValueKind.Array:
+                    // The name with no values: a collection binds empty, which is not a field left out.
+                    if (element.GetArrayLength() == 0) fields[name] = StringValues.Empty;
                     var index = 0;
                     foreach (var item in element.EnumerateArray()) Flatten(item, $"{name}[{index++}]", fields);
                     break;

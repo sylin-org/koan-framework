@@ -22,9 +22,19 @@ namespace Koan.Mcp.CustomTools;
 internal static class RouteTools
 {
     public static IEnumerable<McpCustomTool> Discover(IActionDescriptorCollectionProvider actions)
-        => actions.ActionDescriptors.Items.OfType<ControllerActionDescriptor>()
+    {
+        var exposed = actions.ActionDescriptors.Items.OfType<ControllerActionDescriptor>()
             .Where(action => ToolAttribute.Exposes(action.MethodInfo, action.ControllerTypeInfo))
+            .ToList();
+        // [HttpGet] and [HttpHead] on one action make two descriptors of one read, and that is one tool.
+        return exposed.Where(action => !(Answers(action, HttpMethods.Head) && exposed.Any(other => other.MethodInfo == action.MethodInfo
+                && other.AttributeRouteInfo?.Template == action.AttributeRouteInfo?.Template && Answers(other, HttpMethods.Get))))
             .Select(Build);
+    }
+
+    private static bool Answers(ControllerActionDescriptor action, string method)
+        => action.ActionConstraints?.OfType<HttpMethodActionConstraint>().FirstOrDefault()?.HttpMethods.FirstOrDefault() is { } first
+           && string.Equals(first, method, StringComparison.OrdinalIgnoreCase);
 
     private static McpCustomTool Build(ControllerActionDescriptor action)
     {
