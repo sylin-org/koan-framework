@@ -6,6 +6,7 @@ using Koan.Web.Auth.Extensions;
 using Koan.Web.Auth.Providers;
 using Koan.Web.Auth.Server.Options;
 using Koan.Web.Auth.Standing;
+using Koan.Web.Authorization;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.WebUtilities;
@@ -78,15 +79,15 @@ internal static class OAuthProtocolEndpoints
             return;
         }
 
-        var scopeList = q["scope"].ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
         // D9 — remembered consent: a person signed in by their session whose consent to this (client, scope-set,
         // resource) is remembered skips the consent page; the code is minted directly. New scopes, or revoking any of
         // the person's live approvals for it (SEC-0005), re-prompt. SEC-0026: the session alone — a bearer for the
         // person never stands in for the browser.
+        // A grant's key names the scopes the person holds of those requested, so that is what is asked after here.
         var session = await Session(ctx);
+        var heldScopes = session is null ? [] : Granted(q["scope"], session);
         if (options.RememberConsent && session is not null && Subject(session) is { } rememberedSub
-            && await OAuthGrants.RemembersAsync(rememberedSub, clientId, scopeList, resource, now, ctx.RequestAborted))
+            && await OAuthGrants.RemembersAsync(rememberedSub, clientId, heldScopes, resource, now, ctx.RequestAborted))
         {
             var remembered = new AuthorizationCode
             {
@@ -99,7 +100,7 @@ internal static class OAuthProtocolEndpoints
                 SubjectName = session.FindFirst(ClaimTypes.Name)?.Value ?? session.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
                 SubjectEmail = session.FindFirst(ClaimTypes.Email)?.Value ?? session.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
                 Roles = session.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
-                GrantedScopes = scopeList,
+                GrantedScopes = heldScopes,
                 Remembered = true,
                 ExpiresUtc = now + options.AuthorizationCodeLifetime,
             };
@@ -178,7 +179,6 @@ internal static class OAuthProtocolEndpoints
             if (await RequireSession(ctx) is not { } consenting) return;
             var (sub, person) = consenting;
 
-            var granted = consent.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
             var code = new AuthorizationCode
             {
                 Id = OpaqueToken.New(),
@@ -190,7 +190,7 @@ internal static class OAuthProtocolEndpoints
                 SubjectName = person.FindFirst(ClaimTypes.Name)?.Value ?? person.FindFirst(JwtRegisteredClaimNames.Name)?.Value,
                 SubjectEmail = person.FindFirst(ClaimTypes.Email)?.Value ?? person.FindFirst(JwtRegisteredClaimNames.Email)?.Value,
                 Roles = person.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList(),
-                GrantedScopes = granted,
+                GrantedScopes = Granted(consent.Scope, person),
                 ExpiresUtc = now + options.AuthorizationCodeLifetime,
             };
             await code.Save(ctx.RequestAborted);
@@ -217,7 +217,7 @@ internal static class OAuthProtocolEndpoints
         device.SubjectName = approver.FindFirst(ClaimTypes.Name)?.Value ?? approver.FindFirst(JwtRegisteredClaimNames.Name)?.Value;
         device.SubjectEmail = approver.FindFirst(ClaimTypes.Email)?.Value ?? approver.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
         device.Roles = approver.FindAll(ClaimTypes.Role).Select(c => c.Value).Distinct(StringComparer.Ordinal).ToList();
-        device.GrantedScopes = device.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        device.GrantedScopes = Granted(device.Scope, approver);
         await device.Save(ctx.RequestAborted);
 
         // The device (polling /oauth/token) gets the token; the user's browser goes to the "you can close" page, which
@@ -614,6 +614,16 @@ internal static class OAuthProtocolEndpoints
         await JsonError(ctx, StatusCodes.Status404NotFound, "invalid_request", "Unknown or expired request.");
         return true;
     }
+
+    /// <summary>
+    /// SEC-0006 D6 — what a token holds: what was requested and what the person holds. A client asking for a scope, and the
+    /// person approving their own consent, never gives anyone a scope; a grant still answers at the gate (SEC-0005).
+    /// </summary>
+    internal static List<string> Granted(string? requested, ClaimsPrincipal person)
+        => Requested(requested).Where(scope => AccessGateEvaluator.HasScope(person, scope)).ToList();
+
+    internal static string[] Requested(string? scope)
+        => (scope ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     internal static string? Subject(ClaimsPrincipal user)
         => user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value

@@ -52,10 +52,11 @@ public sealed class McpServerOptions
     /// SEC-0037 — this edge is part of the application, so a bearer issued for the application's own resource is good
     /// here too: <c>Koan:Web:Auth:ResourceServer:Resource</c> when set, else the application's base URL, the one its
     /// ordinary routes accept. The edge still advertises its own resource, and a token for it still works here and
-    /// nowhere else, so a client that knows only this edge holds the narrower token. Every token for any other resource
-    /// is still refused. A token for the application then reaches every tool its subject may call, a verb with no route
-    /// included. On, the edge requires authentication unless <see cref="RequireAuthentication"/> says otherwise. False,
-    /// the default, keeps the edge's own audience alone.
+    /// nowhere else, so a client that knows only this edge holds the narrower token. A token for any other resource is still
+    /// refused. A token for the application then reaches every tool its subject may call, a verb with no route included.
+    /// Outside Development only a configured or accepted URL names the application, never a request's <c>Host</c>. On, the
+    /// edge requires authentication unless <see cref="RequireAuthentication"/> says otherwise. False, the default, keeps
+    /// the edge's own audience alone.
     /// </summary>
     public bool AcceptApplicationBearer { get; set; }
 

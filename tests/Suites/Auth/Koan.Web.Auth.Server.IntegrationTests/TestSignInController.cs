@@ -15,7 +15,7 @@ namespace Koan.Web.Auth.Server.IntegrationTests;
 public sealed class TestSignInController : ControllerBase
 {
     [HttpGet("/test/signin")]
-    public async Task<IActionResult> SignIn([FromQuery] string? sub = null)
+    public async Task<IActionResult> SignIn([FromQuery] string? sub = null, [FromQuery] string? scope = null)
     {
         var identity = new ClaimsIdentity(new[]
         {
@@ -25,6 +25,7 @@ public sealed class TestSignInController : ControllerBase
             new Claim(ClaimTypes.Role, "admin"),
             new Claim("Koan.permission", "recs:write"),
         }, AuthenticationExtensions.CookieScheme);
+        if (scope is not null) identity.AddClaim(new Claim("scope", scope));
 
         await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, new ClaimsPrincipal(identity));
         return Ok(new { ok = true });

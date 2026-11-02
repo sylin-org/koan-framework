@@ -82,7 +82,7 @@ public sealed class ConsentPageSpec : IClassFixture<ConsentPageFixture>
         pending.GetProperty("id").GetString().Should().Be(rid);
         pending.GetProperty("clientId").GetString().Should().Be("notes-code");
         pending.GetProperty("clientName").GetString().Should().Be("Notes Client");
-        pending.GetProperty("scopes").EnumerateArray().Select(scope => scope.GetString()).Should().Equal("notes.read");
+        pending.GetProperty("scopes").EnumerateArray().Should().BeEmpty("signed in, the page shows what the person holds of what was requested");
         pending.GetProperty("resource").GetString().Should().Be(ConsentPageFixture.Url);
         pending.GetProperty("redirectUri").GetString().Should().Be(Redirect);
         Text(pending, "userCode").Should().BeNull();

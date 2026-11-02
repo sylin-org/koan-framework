@@ -1,9 +1,11 @@
 using System;
+using Koan.Core;
 using Koan.Mcp.Infrastructure;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Koan.Mcp.Hosting;
 
@@ -32,12 +34,16 @@ public static class McpResourceIdentity
     /// <summary>
     /// SEC-0037 — the resource the application's ordinary routes accept: <c>Koan:Web:Auth:ResourceServer:Resource</c> when
     /// set, else the base URL. This package does not reference Koan.Web.Auth, so it reads the key the resource edge binds
-    /// rather than its own idea of the application.
+    /// rather than its own idea of the application. Null when nothing has named the application outside Development: a
+    /// request's <c>Host</c> would choose a token's audience, and only Development lets it.
     /// </summary>
-    internal static string Application(HttpContext ctx)
-        => ctx.RequestServices?.GetService<IConfiguration>()?[ConfigurationConstants.ApplicationResource] is { Length: > 0 } configured
-            ? configured
-            : Base(ctx);
+    internal static string? Application(HttpContext ctx)
+    {
+        var services = ctx.RequestServices;
+        if (services.GetService<IConfiguration>()?[ConfigurationConstants.ApplicationResource] is { Length: > 0 } configured) return configured;
+        if (services.GetService<KoanWebBaseUrl>()?.Current is { } current) return current;
+        return KoanEnv.Gate.DevelopmentOnly(services.GetService<IHostEnvironment>()) ? Base(ctx) : null;
+    }
 
     /// <summary>The Authorization Server base (the application's base URL) — where RFC 8414 metadata + the AS endpoints live.</summary>
     public static string AuthorizationServer(HttpContext ctx) => Base(ctx);

@@ -284,6 +284,70 @@ public sealed class ApplicationBearerSpec(ApplicationBearerFixture host) : IClas
     }
 }
 
+/// <summary>Outside Development with nothing naming the application: what Tangent is until a place has its address.</summary>
+public sealed class UnaddressedFixture : ApplicationBearerFixture
+{
+    protected override string EnvironmentName => "Staging";
+}
+
+/// <summary>Outside Development with the application's URL configured.</summary>
+public sealed class AddressedFixture : ApplicationBearerFixture
+{
+    protected override string EnvironmentName => "Staging";
+
+    protected override Dictionary<string, string?> Settings() => new(base.Settings())
+    {
+        ["Koan:Web:ApplicationUrl"] = BaseUrl,
+    };
+}
+
+/// <summary>SEC-0037: outside Development a request's <c>Host</c> names no application.</summary>
+public sealed class UnaddressedEdgeSpec(UnaddressedFixture host) : IClassFixture<UnaddressedFixture>
+{
+    [Fact]
+    public async Task A_token_for_the_host_a_request_claims_is_not_the_applications()
+    {
+        using var client = host.Browser();
+        using var request = ApplicationBearerFixture.Message("initialize", host.Token("http://sibling.example"));
+        request.Headers.Host = "sibling.example";
+
+        using var answer = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task With_nothing_naming_the_application_only_a_token_for_the_edge_is_taken()
+    {
+        var edge = await host.Tool("whoami_get", new JObject(), host.Token($"{host.BaseUrl}/mcp"));
+        using var client = host.Browser();
+        using var application = await client.SendAsync(ApplicationBearerFixture.Message("initialize", host.Token(host.BaseUrl)), TestContext.Current.CancellationToken);
+
+        edge.Failed.Should().BeFalse(edge.ToString());
+        application.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+}
+
+/// <summary>SEC-0037: a configured URL names the application whatever the request's <c>Host</c> says.</summary>
+public sealed class AddressedEdgeSpec(AddressedFixture host) : IClassFixture<AddressedFixture>
+{
+    [Fact]
+    public async Task The_configured_url_is_the_application_and_a_claimed_host_is_not()
+    {
+        using var client = host.Browser();
+        using var spoofed = ApplicationBearerFixture.Message("initialize", host.Token("http://sibling.example"));
+        spoofed.Headers.Host = "sibling.example";
+        using var named = ApplicationBearerFixture.Message("initialize", host.Token(host.BaseUrl));
+        named.Headers.Host = "sibling.example";
+
+        using var refused = await client.SendAsync(spoofed, TestContext.Current.CancellationToken);
+        using var accepted = await client.SendAsync(named, TestContext.Current.CancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+}
+
 /// <summary>An application whose ordinary routes name their resource themselves.</summary>
 public sealed class NamedResourceFixture : ApplicationBearerFixture
 {

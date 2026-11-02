@@ -47,8 +47,8 @@ internal static class McpEdgeAuth
         // conformant client re-authorizes with resource=<this> on the challenge. No token at all is a plain challenge.
         // SEC-0037: an application that says this edge is part of it names one resource more, its own.
         var resource = McpResourceIdentity.Resolve(context, baseRoute, options.ResourceUri);
-        var result = options.AcceptApplicationBearer
-            ? await KoanBearerResource.Authenticate(context, resource, McpResourceIdentity.Application(context))
+        var result = options.AcceptApplicationBearer && McpResourceIdentity.Application(context) is { } application
+            ? await KoanBearerResource.Authenticate(context, resource, application)
             : await KoanBearerResource.Authenticate(context, resource);
         if (!result.Succeeded || result.Principal?.Identity?.IsAuthenticated != true)
         {

@@ -60,7 +60,7 @@ uses before applying its exact audience check. You write declarations, not cerem
 
 The framework owns the OAuth **protocol**. Your app owns **two rendered pages** — mirroring how your existing sign-in page renders while the framework serves `/.well-known/auth/providers`:
 
-1. **A consent page** (e.g. `/me/connect`) — renders the requesting client, the requested scopes, and **Allow / Deny**.
+1. **A consent page** (e.g. `/me/connect`) — renders the requesting client, the scopes approving gives (for a person signed in, those they hold of what was requested), and **Allow / Deny**.
 2. **A terminal page** (e.g. `/me/connect/done`) — a simple "you can close this page now".
 
 Tell the framework where they are:
@@ -194,13 +194,20 @@ entity's tools), as far as its subject may. See [SEC-0037](../decisions/SEC-0037
 At a door where an account proved itself some other way, the application asks for the token the server's flows mint:
 
 ```csharp
-var token = await AccessToken.For(HttpContext, principal, ct);
-return token is null ? Forbid() : Ok(new { access_token = token.Value, token_type = "Bearer", expires_in = (int)token.Lifetime.TotalSeconds });
+await HttpContext.SignInAsync(AuthenticationExtensions.CookieScheme, person); // AtprotoServiceAuth.SignIn answers its person
+var token = await AccessToken.For(HttpContext, person, ct);
+return token is null ? StatusCode(StatusCodes.Status403Forbidden) : Ok(new { access_token = token.Value, token_type = "Bearer", expires_in = (int)token.Lifetime.TotalSeconds });
 ```
 
+**Sign in first, and pass the principal you signed in.** Under Koan.Identity a subject with no row has no standing, so a new
+account gets no token until it has signed in; sign-in also runs your admission, roles and ban, and settles a linked subject
+on its person's id. The answer is `StatusCode`, not `Forbid()`, which forwards to the cookie scheme and redirects.
+
 It is for the application's own resource and lasts `AccessTokenLifetime`. It carries the principal's subject, name, email,
-roles and scopes, with the subject's standing over them, and is null for a subject who may not act. It has no refresh token:
-the account proves itself again. A door that itself admits a stale bearer carries `[ResourceServerExempt]`.
+roles and scopes, with the subject's standing over the name and the roles, and is null for a subject who may not act. It has
+no refresh token: the account proves itself again. Outside Development, with no configured or accepted URL to name the
+application, it refuses rather than take a caller's `Host` for its audience. A door that itself admits a stale bearer carries
+`[ResourceServerExempt]`.
 
 ## Testing locally before a full client: `/oauth/dev-token`
 
@@ -240,7 +247,7 @@ This is the fast path to exercise the authenticated `/mcp` edge end-to-end witho
 ## The security model in one breath
 
 - **Asymmetric signing.** Tokens are ES256, signed by a framework-managed key the verifier never holds ("whoever can verify must not be able to forge"). The key is auto-generated, **persisted encrypted-at-rest, auto-rotated** with JWKS overlap; a **fail-closed boot guard** refuses to start a production AS on an ephemeral key. (Development uses an ephemeral per-process key unless the application names a key ring folder, `Koan:Web:KeyRingDirectory`, in which case the keys persist there too and a local install's tokens outlive a restart.)
-- **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are consented as-requested; the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate reads (not the inert `Koan.permission`).
+- **Down-scope only.** A token's roles come from the user's **session**, never the request. Scopes are what was requested and what the person holds (SEC-0006 D6); the request can never widen authority. Granted scopes ride the RFC 9068 `scope` claim — the authorization grant the `[Access(has:scope:x)]` gate reads (not the inert `Koan.permission`).
 - **Audience-bound (RFC 8707).** Every token is bound to a specific resource and validated `aud == this resource` at the edge.
 - **Revocable.** Refresh is backed by a SEC-0005 `AgentGrant` — the user (or an admin) can revoke it fleet-wide, and the next refresh fails closed. Each approval is its own grant, stating when it was issued (`IssuedAt`) and to which client (`ClientId`, and the `ClientName` the client registered, unverified), so a page lists a person's live approvals newest first with `AgentGrant.Approvals(personId, take)` and revokes one with `Remove()`: that connection stops refreshing, the client's next connection asks the person again, and the person's other approvals keep working. Grants issued before Koan recorded these answer null for them, are not listed, and never keep consent remembered.
 

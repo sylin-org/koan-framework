@@ -60,8 +60,9 @@ public sealed class ServiceAuth
         using var scope = world.Store.Services.CreateScope();
         var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
 
-        await verifier.SignIn(context, proof);
+        var person = await verifier.SignIn(context, proof);
 
+        Assert.Equal(did, person.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value);
         Assert.Contains(context.Response.Headers.SetCookie, cookie => cookie!.StartsWith(".AspNetCore.Koan.cookie=", StringComparison.Ordinal));
         await Assert.ThrowsAsync<ArgumentException>(() => verifier.SignIn(new DefaultHttpContext { RequestServices = scope.ServiceProvider },
             new AtprotoServiceAuthResult(AtprotoServiceAuthOutcome.BadSignature)));

@@ -8,7 +8,8 @@ namespace Koan.Web.Auth.Server.Protocol;
 /// <param name="ClientId">The requesting client's <c>client_id</c>.</param>
 /// <param name="ClientName">The name the client registered, or its <c>client_id</c> when it has none. Untrusted display
 /// text: a dynamically registered client chose it; render it escaped and unverified.</param>
-/// <param name="Scopes">The scopes requested.</param>
+/// <param name="Scopes">What approving gives: once the person is signed in, the scopes they hold of those requested, and
+/// until then the scopes requested.</param>
 /// <param name="Resource">The resource the token will be issued for (RFC 8707).</param>
 /// <param name="UserCode">The Device flow's user code as a device shows it (<c>BCDF-GHJK</c>); null for the code flow.</param>
 /// <param name="RedirectUri">Where a code-flow client returns; null for the Device flow.</param>

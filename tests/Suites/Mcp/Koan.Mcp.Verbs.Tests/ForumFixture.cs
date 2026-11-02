@@ -95,6 +95,8 @@ public class ForumFixture : IAsyncLifetime
 
     protected virtual Dictionary<string, string?> Settings() => new();
 
+    protected virtual string EnvironmentName => "Development";
+
     protected virtual void Compose(IServiceCollection services) { }
 
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
@@ -120,7 +122,7 @@ public class ForumFixture : IAsyncLifetime
             .ConfigureWebHostDefaults(web =>
             {
                 web.UseUrls($"http://127.0.0.1:{_port}");
-                web.UseEnvironment("Development");
+                web.UseEnvironment(EnvironmentName);
                 web.ConfigureServices(services =>
                 {
                     AppHost.Current = null;

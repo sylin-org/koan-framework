@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Core;
 using Koan.Mcp;
 using Koan.Web.Attributes;
 using Koan.Web.Auth.Server.Options;
@@ -38,17 +39,19 @@ public sealed class ProofDoorController : ControllerBase
     {
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, subject), new(ClaimTypes.Name, "As proved") };
         if (role is not null) claims.Add(new Claim(ClaimTypes.Role, role));
-        var token = await AccessToken.For(HttpContext, new ClaimsPrincipal(new ClaimsIdentity(claims, "proof")), ct);
-        return token is null ? StatusCode(403) : Ok(new { token = token.Value, seconds = token.Lifetime.TotalSeconds });
+        return await Answer(new ClaimsPrincipal(new ClaimsIdentity(claims, "proof")), ct);
     }
 
     [HttpPost("/test/proof/nobody")]
-    public async Task<IActionResult> Nobody(CancellationToken ct)
+    public Task<IActionResult> Nobody(CancellationToken ct)
+        => Answer(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "Nameless")], "proof")), ct);
+
+    private async Task<IActionResult> Answer(ClaimsPrincipal principal, CancellationToken ct)
     {
         try
         {
-            await AccessToken.For(HttpContext, new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "Nameless")], "proof")), ct);
-            return Ok();
+            var token = await AccessToken.For(HttpContext, principal, ct);
+            return token is null ? StatusCode(403) : Ok(new { token = token.Value, seconds = token.Lifetime.TotalSeconds });
         }
         catch (InvalidOperationException refused)
         {
@@ -99,9 +102,11 @@ public class AccessTokenFixture : IAsyncLifetime
     public string BaseUrl => $"http://127.0.0.1:{Port}";
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started");
 
+    protected virtual string EnvironmentName => "Development";
+
     protected virtual Dictionary<string, string?> Settings() => new()
     {
-        ["Koan:Environment"] = "Development",
+        ["Koan:Environment"] = EnvironmentName,
         ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
         ["Koan:Data:Sources:Default:ConnectionString"] = "memory://access-token-tests",
         ["Koan:Web:Auth:ResourceServer:Enabled"] = "true",
@@ -126,7 +131,7 @@ public class AccessTokenFixture : IAsyncLifetime
             .ConfigureWebHostDefaults(web =>
             {
                 web.UseUrls(BaseUrl);
-                web.UseEnvironment("Development");
+                web.UseEnvironment(EnvironmentName);
                 web.ConfigureServices(s =>
                 {
                     AppHost.Current = null;
@@ -147,11 +152,13 @@ public class AccessTokenFixture : IAsyncLifetime
         BaseAddress = new Uri(BaseUrl),
     };
 
-    public async Task<string> Proved(string subject, string? role = null)
+    public async Task<string> Proved(string subject, string? role = null, string? asHost = null)
     {
         using var client = NewClient();
         var path = $"/test/proof?subject={subject}" + (role is null ? "" : $"&role={role}");
-        using var answer = await client.PostAsync(path, null, Ct);
+        using var request = new HttpRequestMessage(HttpMethod.Post, path);
+        if (asHost is not null) request.Headers.Host = asHost;
+        using var answer = await client.SendAsync(request, Ct);
         answer.StatusCode.Should().Be(HttpStatusCode.OK);
         using var doc = JsonDocument.Parse(await answer.Content.ReadAsStringAsync(Ct));
         doc.RootElement.GetProperty("seconds").GetDouble().Should().Be(420);
@@ -287,28 +294,197 @@ public sealed class AccessTokenSpec(AccessTokenFixture host) : IClassFixture<Acc
         (await answer.Content.ReadAsStringAsync(Ct)).Should().Contain("no subject");
     }
 
-    [Fact]
-    public async Task A_code_flow_token_for_the_application_is_judged_alike_and_its_scope_narrows_nothing()
+    /// <summary>The person approves a client through the code flow, for the application, whatever it asks.</summary>
+    private async Task<(HttpClient Browser, string Token)> Approved(string client, string scope, string? holding = null, string subject = "alice")
     {
         const string redirect = "http://127.0.0.1:7841/cb";
-        await RegisterCodeClient(host.Services, "scope-walk", redirect);
+        await RegisterCodeClient(host.Services, client, redirect);
         var (verifier, challenge) = Pkce();
-        using var browser = host.NewClient();
-        (await browser.GetAsync("/test/signin", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
-        using var authorize = await browser.GetAsync(Authorize("", "scope-walk", redirect, challenge, host.BaseUrl), Ct);
+        var browser = host.NewClient();
+        var signIn = $"/test/signin?sub={subject}" + (holding is null ? "" : $"&scope={Uri.EscapeDataString(holding)}");
+        (await browser.GetAsync(signIn, Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        using var authorize = await browser.GetAsync(ScopedAuthorize(client, redirect, challenge, scope), Ct);
         using var approved = await Decide(browser, "", Query(authorize.Headers.Location!.ToString(), "rid"), "approve");
-        var token = await Redeem(browser, "", "scope-walk", Query(approved.Headers.Location!.ToString(), "code"), verifier, redirect);
+        return (browser, await Redeem(browser, "", client, Query(approved.Headers.Location!.ToString(), "code"), verifier, redirect));
+    }
 
-        Read(token).Claims.Single(claim => claim.Type == "scope").Value.Should().Be("notes.read");
+    private string ScopedAuthorize(string client, string redirect, string challenge, string scope)
+        => Authorize("", client, redirect, challenge, host.BaseUrl).Replace("scope=notes.read", "scope=" + Uri.EscapeDataString(scope));
+
+    private static string? ScopeOf(string token) => Read(token).Claims.SingleOrDefault(claim => claim.Type == "scope")?.Value;
+
+    [Fact]
+    public async Task A_code_flow_token_for_the_application_is_judged_alike_and_a_scope_it_asked_for_opens_nothing()
+    {
+        var (browser, token) = await Approved("scope-walk", "notes.read");
+        using var _ = browser;
+
+        ScopeOf(token).Should().BeNull("the person holds no scope");
 
         // The person is an admin: a role opens the same door on the page, as a tool, and by their cookie.
         (await browser.PostAsync("/test/proof/admin", null, Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
         (await host.Route(token, HttpMethod.Post, "/test/proof/admin")).Should().Be(HttpStatusCode.OK);
         (await host.Tool(token, "proof_admin")).GetProperty("isError").GetBoolean().Should().BeFalse();
 
-        // A scope it did not ask for is not held on either door.
+        // A scope is not held on either door, nor by their cookie.
+        (await browser.PostAsync("/test/proof/scoped", null, Ct)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await host.Route(token, HttpMethod.Post, "/test/proof/scoped")).Should().Be(HttpStatusCode.Forbidden);
         (await host.Tool(token, "proof_scoped")).GetProperty("isError").GetBoolean().Should().BeTrue();
+    }
+
+    /// <summary>D6: any signed-in person could approve their own consent for any scope, and the gate read it as held.</summary>
+    [Fact]
+    public async Task The_code_flow_grants_no_scope_the_person_lacks()
+    {
+        var (browser, token) = await Approved("scope-lacks", "notes.write anything:else");
+        using var _ = browser;
+
+        ScopeOf(token).Should().BeNull();
+        (await host.Route(token, HttpMethod.Post, "/test/proof/scoped")).Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task The_code_flow_grants_the_scope_the_person_holds_of_those_requested()
+    {
+        var (browser, token) = await Approved("scope-holds", "notes.write anything:else", holding: "notes.write other:one");
+        using var _ = browser;
+
+        ScopeOf(token).Should().Be("notes.write");
+        (await browser.PostAsync("/test/proof/scoped", null, Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await host.Route(token, HttpMethod.Post, "/test/proof/scoped")).Should().Be(HttpStatusCode.OK);
+        (await host.Tool(token, "proof_scoped")).GetProperty("isError").GetBoolean().Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("notes.write", "notes.write")]
+    public async Task The_device_flow_grants_what_the_person_holds_of_what_was_requested(string? holding, string? granted)
+    {
+        var client = "device-scope-" + (holding is null ? "lacks" : "holds");
+        await RegisterDeviceClient(host.Services, client);
+        using var device = host.NewClient();
+        using var started = await device.PostAsync("/oauth/device", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["client_id"] = client,
+            ["scope"] = "notes.write anything:else",
+            ["resource"] = host.BaseUrl,
+        }), Ct);
+        using var doc = JsonDocument.Parse(await started.Content.ReadAsStringAsync(Ct));
+        var deviceCode = doc.RootElement.GetProperty("device_code").GetString()!;
+        var userCode = doc.RootElement.GetProperty("user_code").GetString()!;
+        using var browser = host.NewClient();
+        (await browser.GetAsync("/test/signin" + (holding is null ? "" : $"?scope={holding}"), Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        using var approved = await Decide(browser, "", userCode, "approve");
+
+        var token = await PollForToken(device, "", client, deviceCode);
+
+        ScopeOf(token).Should().Be(granted);
+    }
+
+    /// <summary>A grant's key names the scopes it holds, so asking after the requested ones would ask every time.</summary>
+    [Fact]
+    public async Task A_consent_to_fewer_scopes_than_requested_is_remembered()
+    {
+        const string redirect = "http://127.0.0.1:7841/cb";
+        var (browser, _) = await Approved("scope-remembered", "notes.write anything:else", holding: "notes.write");
+        using var __ = browser;
+
+        var (verifier, challenge) = Pkce();
+        using var again = await browser.GetAsync(ScopedAuthorize("scope-remembered", redirect, challenge, "notes.write anything:else"), Ct);
+
+        again.Headers.Location!.ToString().Should().StartWith(redirect, "the person's consent is remembered");
+        var token = await Redeem(browser, "", "scope-remembered", Query(again.Headers.Location!.ToString(), "code"), verifier, redirect);
+        ScopeOf(token).Should().Be("notes.write", "the remembered path grants what the person holds too");
+    }
+
+    /// <summary>A person sees what approving gives, as they will be holding it, and until they sign in what was asked for.</summary>
+    [Fact]
+    public async Task The_consent_seam_says_what_approving_gives()
+    {
+        const string redirect = "http://127.0.0.1:7841/cb";
+        await RegisterCodeClient(host.Services, "scope-shown", redirect);
+        var (_, challenge) = Pkce();
+        using var browser = host.NewClient();
+        using var authorize = await browser.GetAsync(ScopedAuthorize("scope-shown", redirect, challenge, "notes.write anything:else"), Ct);
+        var rid = Query(authorize.Headers.Location!.ToString(), "rid");
+
+        async Task<string?[]> Shown()
+        {
+            using var doc = JsonDocument.Parse(await browser.GetStringAsync($"/oauth/request/{rid}", Ct));
+            return doc.RootElement.GetProperty("scopes").EnumerateArray().Select(scope => scope.GetProperty("id").GetString()).ToArray();
+        }
+
+        (await Shown()).Should().Equal("notes.write", "anything:else");
+        (await browser.GetAsync("/test/signin?scope=notes.write", Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await Shown()).Should().Equal("notes.write");
+    }
+
+    /// <summary>The application's own word, and the door's: a principal that carries a scope hands it on.</summary>
+    [Fact]
+    public async Task A_grant_still_answers_at_the_gate_for_a_token_that_holds_no_scope()
+    {
+        var (browser, token) = await Approved("scope-granted", "notes.write", subject: "granted-person");
+        using var _ = browser;
+        ScopeOf(token).Should().BeNull();
+
+        using (AppHost.PushScope(host.Services))
+            await new AgentGrant { Subject = "granted-person", Capability = "has:scope:notes.write", Resource = "*", IssuedAt = DateTimeOffset.UtcNow }.Save(Ct);
+
+        (await host.Route(token, HttpMethod.Post, "/test/proof/scoped")).Should().Be(HttpStatusCode.OK);
+    }
+}
+
+/// <summary>Outside Development with nothing naming the application: what Tangent is until a place has its address.</summary>
+public sealed class UnaddressedAccessTokenFixture : AccessTokenFixture
+{
+    protected override string EnvironmentName => "Staging";
+
+    protected override Dictionary<string, string?> Settings() => new(base.Settings())
+    {
+        ["Koan:Data:Sources:Default:ConnectionString"] = "memory://access-token-unaddressed",
+    };
+}
+
+/// <summary>SEC-0037: outside Development a caller's <c>Host</c> does not choose a token's audience.</summary>
+[Collection(AuthServerHostCollection.Name)]
+public sealed class UnaddressedAccessTokenSpec(UnaddressedAccessTokenFixture host) : IClassFixture<UnaddressedAccessTokenFixture>
+{
+    [Fact]
+    public async Task With_nothing_naming_the_application_no_token_is_issued_and_the_refusal_says_what_to_do()
+    {
+        using var client = host.NewClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/test/proof?subject=agent");
+        request.Headers.Host = "sibling.example";
+
+        using var answer = await client.SendAsync(request, Ct);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await answer.Content.ReadAsStringAsync(Ct)).Should().Contain("Koan:Web:ApplicationUrl");
+    }
+}
+
+/// <summary>Outside Development with the application's URL configured.</summary>
+public sealed class AddressedAccessTokenFixture : AccessTokenFixture
+{
+    protected override string EnvironmentName => "Staging";
+
+    protected override Dictionary<string, string?> Settings() => new(base.Settings())
+    {
+        ["Koan:Web:ApplicationUrl"] = BaseUrl,
+        ["Koan:Data:Sources:Default:ConnectionString"] = "memory://access-token-addressed",
+    };
+}
+
+/// <summary>SEC-0037: a configured URL names the application whatever the request's <c>Host</c> says.</summary>
+[Collection(AuthServerHostCollection.Name)]
+public sealed class AddressedAccessTokenSpec(AddressedAccessTokenFixture host) : IClassFixture<AddressedAccessTokenFixture>
+{
+    [Fact]
+    public async Task The_token_names_the_configured_url_and_not_the_host_it_was_asked_on()
+    {
+        var token = await host.Proved("agent", asHost: "sibling.example");
+
+        Read(token).Audiences.Should().Equal(host.BaseUrl);
     }
 }
 

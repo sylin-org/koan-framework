@@ -46,6 +46,12 @@ public sealed class IdentityAuthFlowHandler : IKoanAuthFlowHandler
             {
                 if (ctx.Identity.FindFirst(ClaimTypes.NameIdentifier) is { } nameId) ctx.Identity.RemoveClaim(nameId);
                 ctx.Identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, person.Id));
+                // A token reads its subject from this claim first, so a provider's own would name no one here.
+                if (ctx.Identity.FindFirst("sub") is { } sub)
+                {
+                    ctx.Identity.RemoveClaim(sub);
+                    ctx.Identity.AddClaim(new Claim("sub", person.Id));
+                }
                 subject = person.Id;
             }
         }

@@ -123,7 +123,10 @@ public static class ConsentPage
         string resource, string? userCode, string? redirectUri, CancellationToken ct)
     {
         var client = await OAuthClient.Get(clientId, ct);
-        var scopes = scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // The page shows what approving would give: for a person signed in, what they hold of what was requested (D6).
+        IReadOnlyList<string> scopes = await OAuthProtocolEndpoints.Session(context) is { } person
+            ? OAuthProtocolEndpoints.Granted(scope, person)
+            : OAuthProtocolEndpoints.Requested(scope);
         return new PendingConsent(
             id,
             clientId,

@@ -45,7 +45,8 @@ The AS **must not** be built on the existing `SharedKeyIssuer` (HS256 symmetric)
 
 > **Amended 2026-11-02 ([SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md)).** An application may say its MCP
 > edge is part of it (`Koan:Mcp:AcceptApplicationBearer`), and the edge then answers to the application's resource as well
-> as its own. A token for anything else is still refused, which is the confused deputy this decision closes.
+> as its own. A token for anything else is still refused, which is the confused deputy this decision closes. D6's
+> intersection of what was requested and what the person holds is what the code does from that decision on.
 
 **D3 — Wire `Koan.bearer` into the MCP route (the single highest-leverage change).**
 `EndpointRouteBuilderExtensions` calls `RequireAuthorization()` against the default scheme (`Koan.cookie`), so an MCP client's `Authorization: Bearer …` is **never validated into `context.User`** today — an issued token is inert at the edge. Decision: the `/mcp` group authenticates with **`Koan.bearer`** (per-route scheme or a combined cookie+bearer policy). Once the bearer identity lands in `context.User`, the existing `OriginStamp` → `HttpSseSession.User` → `HttpSseRpcBridge` → SEC-0004/0005 chain enforces it unchanged — **no downstream work**.
