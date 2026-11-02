@@ -1052,13 +1052,15 @@ switch (await new Reply(topicId, "hi").Send(ct))
 | `Gated(why)` | this sender may not, or not now |
 | `Invalid(field, reason)` | that field's value cannot be taken |
 | `Conflict(reason)` | it disagrees with what is there |
-| `Failed(landed, cause)` | `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed |
+| `Failed` | what only the queue says, with `Landed` and `Cause`. `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed, or work following it outlasted the limit |
 
 Code below the command that has no `Outcome<T>` to return throws `Refusal.Gated(why)` and its siblings. `Send`'s token bounds the sender: once
 queued, a cancelled wait throws and the command still runs. `TrySend()` never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a
 column carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. `CommandQueue.Committed` tells this process what
-committed, in order. There is one queue, for the default route, and a route with no holds is refused at start. A command does no network, since
-every other writer waits while it runs. Send it outside any transaction scope, and make the tables it writes exist at boot, as for any hold.
+committed, in order. A command runs in its sender's partition, source and tenant, on one queue, and a default route with no holds is refused at
+start. A command does no network, since every other writer waits while it runs, and past `HoldLimit` it is answered `NotCommitted` and the queue moves
+on. The queue ends its hold, so `Commit` and `Rollback` refuse inside it. Send it outside any transaction scope and outside any command, and make the
+tables it writes exist at boot, as for any hold. A sequence refuses an entity a read scope such as soft delete hides rows of.
 
 **Cross-adapter coordination:**
 

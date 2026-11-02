@@ -1,43 +1,72 @@
 using System.Threading.Channels;
-using Koan.Core.BackgroundServices;
+using Koan.Core;
 using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core.Transactions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Koan.Data.Core.Commands;
 
 /// <summary>
-/// One queue, one hold per command, in arrival order, on the default route (DATA-0167). Holds keep it correct across processes;
-/// the queue gives back-pressure, fairness, announcements in commit order and a stop at a command boundary that answers what is queued.
+/// One queue, one hold per command, in arrival order (DATA-0167). Holds keep it correct across processes; the queue gives
+/// back-pressure, fairness, announcements in commit order and a stop at a command boundary that answers what is queued. Its loop
+/// starts with the first send, so a send is answered at any point in a host's life, whatever else has started.
 /// </summary>
-public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration configuration, IServiceProvider services)
-    : KoanBackgroundServiceBase(logger, configuration)
+public sealed class CommandQueue : IHostedService, IHealthContributor, IDisposable
 {
-    /// <summary>How many commands wait at most; a sender past this bound waits for a place.</summary>
-    public const int QueueBound = 1024;
+    private const int QueueBound = 1024;
+
+    /// <summary>True on the loop's own flow, and on what it runs, none of which can wait for the loop.</summary>
+    private static readonly AsyncLocal<bool> OnTheLoop = new();
 
     private readonly Channel<Pending> _queue = Channel.CreateBounded<Pending>(new BoundedChannelOptions(QueueBound) { SingleReader = true });
+    private readonly CancellationTokenSource _stop = new();
+    private readonly Lazy<Task> _loop;
+    private readonly IServiceProvider _services;
+    private readonly ILogger<CommandQueue> _logger;
+    private readonly TimeSpan _holdLimit;
     private volatile Exception? _ended;
 
+    internal CommandQueue(IServiceProvider services, ILogger<CommandQueue> logger, TimeSpan holdLimit)
+    {
+        (_services, _logger, _holdLimit) = (services, logger, holdLimit);
+        _loop = new Lazy<Task>(StartLoop);
+    }
+
     /// <summary>Raised in this process after each commit that wrote, in commit order, on the queue and before the sender is
-    /// answered, so a subscriber returns at once. What it throws is logged and changes nothing.</summary>
+    /// answered, so a subscriber returns at once. What one throws is logged and reaches no other. Work it starts does not run on
+    /// the queue's flow, so that work can send.</summary>
     public event Action<CommandCommitted>? Committed;
 
-    public override bool IsCritical => true;
+    string IHealthContributor.Name => nameof(CommandQueue);
+
+    bool IHealthContributor.IsCritical => true;
+
+    Task<HealthReport> IHealthContributor.Check(CancellationToken ct) => Task.FromResult(_ended is { } ended
+        ? HealthReport.Unhealthy($"{nameof(CommandQueue)} has ended: {ended.Message}")
+        : HealthReport.Healthy($"{nameof(CommandQueue)} is answering"));
+
+    Task IHostedService.StartAsync(CancellationToken ct) => Task.CompletedTask;
+
+    async Task IHostedService.StopAsync(CancellationToken ct)
+    {
+        _stop.Cancel();
+        await _loop.Value.WaitAsync(ct);
+    }
+
+    void IDisposable.Dispose() => _stop.Cancel();
 
     internal async Task<Outcome<TResult>> Send<TResult>(ICommand<TResult> command, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(command);
+        var pending = Admit(command);
         if (EntityContext.CurrentTransaction is { IsCompleted: false } open)
             throw new InvalidOperationException(
                 $"Sending {command.GetType().Name} from inside transaction '{open.Name}' would wait for a turn that scope keeps from it. " +
                 "Do the work in this scope, or send it after this scope ends.");
-        var pending = new Pending<TResult>(command);
         try
         {
             await _queue.Writer.WriteAsync(pending, ct);
@@ -59,20 +88,51 @@ public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration co
 
     internal Task<Outcome<TResult>>? TrySend<TResult>(ICommand<TResult> command)
     {
-        ArgumentNullException.ThrowIfNull(command);
-        var pending = new Pending<TResult>(command);
+        var pending = Admit(command);
         return _queue.Writer.TryWrite(pending) ? pending.Answer.Task : null;
     }
 
-    public override async Task ExecuteCore(CancellationToken stop)
+    /// <summary>The send's turn in the sender's own context, or the refusal of one sent from the loop, which would wait for itself.</summary>
+    private Pending<TResult> Admit<TResult>(ICommand<TResult> command)
     {
-        using var host = AppHost.PushScope(services);
-        Exception ended = new OperationCanceledException("The command queue stopped before the command ran.");
+        ArgumentNullException.ThrowIfNull(command);
+        if (OnTheLoop.Value)
+            throw new InvalidOperationException(
+                $"Sending {command.GetType().Name} from a command or from what follows its commit would wait for the queue that is running it. " +
+                "Do the work in this command, or send it from a Committed subscriber's own task.");
+        _ = _loop.Value;
+        return new Pending<TResult>(command, EntityContext.Current ?? new EntityContext.ContextState(), CapturedCarriers.Capture(_services));
+    }
+
+    /// <summary>Ends the queue at start when the application has commands and the default route cannot hold, with the refusal a hold would give.</summary>
+    internal void RefuseARouteThatCannotHold()
+    {
+        if (KoanRegistry.GetDiscoveredImplementors(typeof(ICommand)).Length == 0) return;
         try
         {
-            // Only an application with commands answers for the route; the coordinator's refusal is the one a hold would give.
-            if (KoanRegistry.GetDiscoveredImplementors(typeof(ICommand)).Length > 0)
-                ((TransactionCoordinator)services.GetRequiredService<ITransactionCoordinatorFactory>().CreateHeld(Name)).HoldRoute();
+            ((TransactionCoordinator)_services.GetRequiredService<ITransactionCoordinatorFactory>().CreateHeld(nameof(CommandQueue))).HoldRoute();
+        }
+        catch (Exception refused)
+        {
+            _logger.LogError(refused, "The command queue cannot run on this route");
+            End(refused);
+        }
+    }
+
+    private Task StartLoop()
+    {
+        // The loop inherits nothing of the first sender's flow.
+        if (ExecutionContext.IsFlowSuppressed()) return Task.Run(Loop);
+        using (ExecutionContext.SuppressFlow()) return Task.Run(Loop);
+    }
+
+    private async Task Loop()
+    {
+        OnTheLoop.Value = true;
+        using var host = AppHost.PushScope(_services);
+        var stop = _stop.Token;
+        try
+        {
             while (await _queue.Reader.WaitToReadAsync(stop))
                 // A stop is honoured at the command boundary: what is still queued never runs.
                 while (!stop.IsCancellationRequested && _queue.Reader.TryRead(out var pending)) await pending.Turn(this, stop);
@@ -80,23 +140,35 @@ public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration co
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
         {
         }
-        catch (Exception failure)
-        {
-            ended = failure;
-            Logger.LogError(failure, "The command queue ended");
-            throw;
-        }
         finally
         {
-            _ended = ended;
-            _queue.Writer.TryComplete();
-            while (_queue.Reader.TryRead(out var unrun)) unrun.NeverRan(ended);
+            End(new OperationCanceledException("The command queue stopped before the command ran."));
         }
     }
 
-    public override Task<HealthReport> Check(CancellationToken ct = default) => Task.FromResult(_ended is { } ended
-        ? HealthReport.Unhealthy($"{Name} has ended: {ended.Message}")
-        : HealthReport.Healthy($"{Name} is running"));
+    private void End(Exception cause)
+    {
+        _ended ??= cause;
+        _queue.Writer.TryComplete();
+        while (_queue.Reader.TryRead(out var unrun)) unrun.NeverRan(_ended);
+    }
+
+    private void Announce(CommandCommitted commit)
+    {
+        if (Committed is not { } subscribers) return;
+        using (ExecutionContext.SuppressFlow())
+            foreach (var subscriber in subscribers.GetInvocationList().Cast<Action<CommandCommitted>>())
+            {
+                try
+                {
+                    subscriber(commit);
+                }
+                catch (Exception failure)
+                {
+                    _logger.LogError(failure, "A subscriber of the command queue threw for {Command}", commit.Command.GetType().Name);
+                }
+            }
+    }
 
     private abstract class Pending
     {
@@ -105,7 +177,7 @@ public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration co
         public abstract void NeverRan(Exception cause);
     }
 
-    private sealed class Pending<TResult>(ICommand<TResult> command) : Pending
+    private sealed class Pending<TResult>(ICommand<TResult> command, EntityContext.ContextState context, CapturedCarriers carriers) : Pending
     {
         public TaskCompletionSource<Outcome<TResult>> Answer { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -120,19 +192,12 @@ public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration co
             var landed = DataCommitOutcome.NotDispatched;
             try
             {
+                using (carriers.Enter(context))
                 using (await EntityContext.Hold(name, stop))
                 {
                     landed = DataCommitOutcome.NotCommitted;
-                    Outcome<TResult> outcome;
-                    try
-                    {
-                        outcome = await command.Run(stop) ?? throw new InvalidOperationException($"{name} returned no outcome.");
-                    }
-                    catch (Refusal refusal)
-                    {
-                        outcome = refusal.As<TResult>();
-                    }
-
+                    var hold = (TransactionCoordinator)EntityContext.CurrentTransaction!;
+                    var outcome = await RunWithinTheLimit(queue, hold, name, stop);
                     if (outcome is not Outcome<TResult>.Done)
                     {
                         await EntityContext.Rollback(CancellationToken.None);
@@ -140,23 +205,48 @@ public sealed class CommandQueue(ILogger<CommandQueue> logger, IConfiguration co
                     }
 
                     landed = DataCommitOutcome.Unknown;
-                    var hold = (TransactionCoordinator)EntityContext.CurrentTransaction!;
                     if (hold.Wrote)
                         hold.AfterCommit(_ =>
                         {
-                            queue.Committed?.Invoke(new CommandCommitted(command, hold.Sequences));
+                            queue.Announce(new CommandCommitted(command, hold.Sequences));
                             return Task.CompletedTask;
                         });
-                    // The commit is not cut short by a stop: a command that reached it commits or fails on its own terms.
-                    await EntityContext.Commit(CancellationToken.None);
+                    // The commit is not cut short by a stop, and what follows it costs its own answer at most.
+                    await EntityContext.Commit(CancellationToken.None).WaitAsync(queue._holdLimit, CancellationToken.None);
                     return outcome;
                 }
             }
             catch (Exception failure)
             {
-                queue.Logger.LogError(failure, "Command {Command} failed", name);
-                // The coordinator reports what it left. Otherwise, a hold that never began leaves a command that never ran.
-                return new Outcome<TResult>.Failed(failure is TransactionException reported ? reported.CommitOutcome : landed, failure);
+                queue._logger.LogError(failure, "Command {Command} failed", name);
+                // Only a commit reports what it left; before it, the phase says.
+                return new Outcome<TResult>.Failed(landed == DataCommitOutcome.Unknown && failure is TransactionException reported ? reported.CommitOutcome : landed, failure);
+            }
+        }
+
+        /// <summary>The command's own part. It is waited for only as long as the hold can last: past that the hold has rolled back and
+        /// refuses whatever the command still tries, so a command that never returns costs its own answer and nothing else.</summary>
+        private async Task<Outcome<TResult>> RunWithinTheLimit(CommandQueue queue, TransactionCoordinator hold, string name, CancellationToken stop)
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(stop);
+            limit.CancelAfter(queue._holdLimit);
+            hold.EndedByItsOwner = true;
+            try
+            {
+                return await Task.Run(() => command.Run(limit.Token), limit.Token).WaitAsync(limit.Token)
+                       ?? throw new InvalidOperationException($"{name} returned no outcome.");
+            }
+            catch (Refusal refusal)
+            {
+                return refusal.As<TResult>();
+            }
+            catch (OperationCanceledException) when (limit.IsCancellationRequested && !stop.IsCancellationRequested)
+            {
+                throw new TimeoutException($"{name} was still running at the hold's limit of {queue._holdLimit}. Nothing it wrote landed.");
+            }
+            finally
+            {
+                hold.EndedByItsOwner = false;
             }
         }
     }

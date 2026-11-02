@@ -58,29 +58,6 @@ public sealed class PageOrderOwnershipSpec
         adapterQuery.Sort[1].Path.Members.Single().Name.Should().Be(nameof(Entity<Widget>.Id));
     }
 
-    private sealed class Numbered : Entity<Numbered>
-    {
-        [Koan.Data.Abstractions.Annotations.Index(Unique = true)] public long Number { get; set; }
-        [Koan.Data.Abstractions.Annotations.Index(Unique = true)] public long? Optional { get; set; }
-        [Koan.Data.Abstractions.Annotations.Index] public long Plain { get; set; }
-    }
-
-    [Theory(DisplayName = "a key a unique index forbids repeating needs no tiebreaker, and any other key does")]
-    [InlineData("-Number", 1)]
-    [InlineData("-Optional", 2)]
-    [InlineData("-Plain", 2)]
-    public void A_key_that_cannot_repeat_has_no_ties_to_settle(string sort, int keys)
-    {
-        // A tiebreaker past the unique key keeps the store from answering out of that index: the top row of a numbered
-        // column, 0.1 ms read out of its index on SQLite, cost 13 ms over 20000 rows with the identity behind it (DATA-0167).
-        // A nullable key can repeat, since a unique index lets nulls repeat.
-        var query = QueryDefinition.All.WithPagination(1, 1).WithSort(Koan.Data.Core.Sorting.SortSpecParser.ParseStrict<Numbered>(sort));
-
-        var (adapterQuery, _) = FilterPushdownCoordinator.Plan(query, FilterSupport.None, typeof(Numbered));
-
-        adapterQuery.Sort.Should().HaveCount(keys);
-    }
-
     [Fact(DisplayName = "an unpaged read keeps exactly the order the caller named")]
     public void Unpaged_caller_order_is_untouched()
     {

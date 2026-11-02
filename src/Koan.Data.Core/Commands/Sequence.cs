@@ -1,6 +1,10 @@
 using System.Linq.Expressions;
+using Koan.Core.Hosting.App;
+using Koan.Data.Abstractions.Pipeline;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Pipeline;
 using Koan.Data.Core.Transactions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Data.Core.Commands;
 
@@ -23,7 +27,10 @@ public sealed class Sequence
                 $"A sequence over {typeof(TEntity).Name} reads the top of its column as one row: name a long property that carries [Index(Unique = true)].");
         var read = column.Compile();
         return new Sequence(async ct =>
-            (await Entity<TEntity>.FirstPage(1, sort => sort.OrderByDescending(column), ct)).FirstOrDefault() is { } top ? read(top) : 0);
+        {
+            RefuseAReadThatHidesRows(typeof(TEntity));
+            return await Data<TEntity, string>.Top(sort => sort.OrderByDescending(column), ct) is { } top ? read(top) : 0;
+        });
     }
 
     /// <summary>The highest value stored, or zero, in one bounded read: committed state, or inside a hold what it has written too.</summary>
@@ -37,4 +44,15 @@ public sealed class Sequence
             : throw new InvalidOperationException(
                 "A sequence numbers inside a hold, so that the read and the write are one transaction. " +
                 "Take it in a command's Run, or inside EntityContext.Hold.");
+
+    /// <summary>A read scope that hides rows inside one unique index, as soft delete does, hides the top of the column, and the next number
+    /// collides with a row nobody can see. An equality scope such as a tenant is a domain of its own, and leaves this alone.</summary>
+    private static void RefuseAReadThatHidesRows(Type entity)
+    {
+        var hiding = AppHost.Current?.GetServices<IReadFilterContributor>().Where(contributor => contributor is not ManagedEqualityReadContributor).ToArray();
+        if (hiding is not null && ReadScopeFold.Fold(hiding, entity) is not null)
+            throw new InvalidOperationException(
+                $"A read scope hides rows of {entity.Name}, so a sequence over it would take a number a hidden row already holds. " +
+                "Number an entity no read scope hides rows of.");
+    }
 }

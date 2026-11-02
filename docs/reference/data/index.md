@@ -140,7 +140,7 @@ any other writer waits, in another process too, for at most the store's busy tim
 
 ## Send a write as a value
 
-`await new Reply(...).Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in arrival order on one queue for the default route, and
+`await new Reply(...).Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in arrival order on one queue, in its sender's context, and
 answers with an `Outcome<TResult>`: `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, which says what landed. `Sequence.Of<T>(column)`
 numbers a uniquely indexed column with no gap in what commits. See
 [DATA-0167](../../decisions/DATA-0167-an-application-sends-a-write-as-a-value.md).

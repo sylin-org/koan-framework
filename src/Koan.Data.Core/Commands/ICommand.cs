@@ -14,7 +14,8 @@ public interface ICommand;
 /// </summary>
 public interface ICommand<TResult> : ICommand
 {
-    /// <summary>Runs in the command's turn. <paramref name="ct"/> is the queue's stop, not the sender's. Any throw but a
-    /// <see cref="Refusal"/> becomes <see cref="Outcome{TResult}.Failed"/>.</summary>
+    /// <summary>Runs in the command's turn, in its sender's context. <paramref name="ct"/> ends at the queue's stop and the hold's limit,
+    /// and is not the sender's. Any throw but a <see cref="Refusal"/> becomes <see cref="Outcome{TResult}.Failed"/>. The queue ends the
+    /// hold, so <c>EntityContext.Commit</c> and <c>Rollback</c> refuse here.</summary>
     Task<Outcome<TResult>> Run(CancellationToken ct);
 }

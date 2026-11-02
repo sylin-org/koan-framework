@@ -155,6 +155,16 @@ public static class ServiceCollectionExtensions
 
         // Auto-register transaction support (AI-0020) - "Reference = Intent" pattern
         Transactions.TransactionServiceCollectionExtensions.AddKoanTransactions(services);
+
+        // One command queue per host (DATA-0167): a standard hosted service, so it stops with the host before Data does.
+        services.TryAddSingleton(static provider => new Commands.CommandQueue(
+            provider,
+            provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Commands.CommandQueue>>(),
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Transactions.TransactionOptions>>().Value.HoldLimit));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<Microsoft.Extensions.Hosting.IHostedService, Commands.CommandQueue>(
+            static provider => provider.GetRequiredService<Commands.CommandQueue>()));
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHealthContributor, Commands.CommandQueue>(
+            static provider => provider.GetRequiredService<Commands.CommandQueue>()));
     }
 
     /// <summary>

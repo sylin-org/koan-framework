@@ -1,3 +1,5 @@
+using Koan.Core;
+using Koan.Core.Hosting.Registry;
 using Koan.Core.Observability.Health;
 using Koan.Data.Core.Commands;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,7 +8,8 @@ namespace Koan.Data.Connector.InMemory.Tests.Specs.Hosting;
 
 /// <summary>
 /// DATA-0167: this assembly declares no command, on a route that cannot hold, which is every application that never heard of
-/// commands. Its queue answers for no route and stays healthy. <c>CommandRouteSpec</c> proves the other side.
+/// commands. What leaves its queue healthy is that discovery, since a queue answers for the route when the host starts:
+/// <c>CommandRouteSpec</c> proves the other side, on this same route.
 /// </summary>
 public sealed class CommandQueueWithoutCommandsSpec(InMemoryFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<InMemoryFixture>(fixture, output)
@@ -16,10 +19,12 @@ public sealed class CommandQueueWithoutCommandsSpec(InMemoryFixture fixture, ITe
     {
         await using var host = await BootAsync();
 
-        // Long past the start, when an application with commands would have been refused.
-        await Task.Delay(TimeSpan.FromSeconds(1), TestContext.Current.CancellationToken);
+        KoanRegistry.GetDiscoveredImplementors(typeof(ICommand)).Should().BeEmpty();
+        var hold = async () => { using (await EntityContext.Hold("cannot")) { } };
+        (await hold.Should().ThrowAsync<NotSupportedException>()).Which.Message.Should().Contain("write.heldTransaction");
 
-        var report = await host.Services.GetRequiredService<CommandQueue>().Check(TestContext.Current.CancellationToken);
+        var report = await host.Services.GetServices<IHealthContributor>().Single(contributor => contributor.Name == nameof(CommandQueue))
+            .Check(TestContext.Current.CancellationToken);
         report.State.Should().Be(HealthState.Healthy);
     }
 }

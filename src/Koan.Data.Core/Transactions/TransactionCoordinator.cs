@@ -129,6 +129,16 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         return (binding, provider);
     }
 
+    /// <summary>While a command runs, the queue that opened its hold is what ends it.</summary>
+    internal bool EndedByItsOwner { get; set; }
+
+    private void RefuseWhileItsOwnerEndsIt()
+    {
+        if (EndedByItsOwner)
+            throw new InvalidOperationException(
+                $"Command '{Name}' does not end its own hold: the queue commits when it returns Done, and rolls back on anything else.");
+    }
+
     /// <summary>Whether this hold has admitted a write. <see cref="TrackedOperationCount"/> stays zero in a hold.</summary>
     internal bool Wrote { get; private set; }
 
@@ -478,6 +488,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Commit(CancellationToken ct = default)
     {
+        RefuseWhileItsOwnerEndsIt();
         if (_isCompleted) return; // idempotent: a second Commit (or Commit after Rollback) is a no-op
         if (IsHeld)
         {
@@ -597,6 +608,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     public async Task Rollback(CancellationToken ct = default)
     {
+        RefuseWhileItsOwnerEndsIt();
         if (_isCompleted) return; // idempotent: a second Rollback (or Rollback after Commit) is a no-op
         if (IsHeld)
         {

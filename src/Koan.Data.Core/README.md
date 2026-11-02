@@ -321,16 +321,21 @@ public sealed record Reply(string TopicId, string Body) : ICommand<Post>
 var outcome = await new Reply(topicId, "hi").Send(ct);
 ```
 
-- It runs in a hold of its own on the default route, one at a time in arrival order. Only `Done` commits; every other outcome, a
-  `Refusal` thrown from below it and any other throw leave nothing. A role change joins it (SEC-0036).
+- It runs in a hold of its own, in its sender's partition, source and tenant, one at a time in arrival order. Only `Done` commits; every other
+  outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it (SEC-0036). The queue ends the hold, so
+  `Commit` and `Rollback` refuse inside it.
 - `Outcome<T>` is `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, and `Failed.Landed` says `NotDispatched` (it never ran),
-  `NotCommitted` (nothing landed) or `Unknown` (the native commit itself failed).
+  `NotCommitted` (nothing landed) or `Unknown` (the native commit itself failed, or work following it outlasted the hold's limit). A command that
+  fails throws; only the queue says `Failed`.
+- A command still running at `HoldLimit` is answered `NotCommitted`, and the queue moves on. A send or a try from a command, or from work following its
+  commit, refuses, since it would wait for the queue that is running it.
 - The token bounds the sender and never the command. Once queued, a cancelled wait throws `OperationCanceledException` and the command
   still runs. `TrySend()` never waits: null, and the command never runs, when the queue is full or has ended.
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
-  processes too. It reads the top of the column at its first use in a hold, and refuses outside one.
-- `CommandQueue.Committed` announces each commit that wrote, in this process, in commit order, before the sender is answered. A queue that has
-  ended reports unhealthy.
+  processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
+  delete hides rows of.
+- `CommandQueue.Committed` announces each commit that wrote, in this process, in commit order, before the sender is answered. A subscriber that
+  throws costs no other, and its own task can send. A queue that has ended reports unhealthy.
 
 ## Hold a transaction from the start of a scope
 

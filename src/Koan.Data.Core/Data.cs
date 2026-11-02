@@ -802,6 +802,18 @@ public static partial class Data<TEntity, TKey>
     public static Task<IReadOnlyList<TEntity>> Page(int page, int size, Action<ISortBuilder<TEntity>> sort, CancellationToken ct = default)
         => PageCore(page, size, QueryDefinition.All.WithSort<TEntity>(sort), ct);
 
+    /// <summary>The first row of an order the caller knows cannot tie. A page takes the identity as a tiebreaker, for a total order across
+    /// pages; one row needs none, and the tiebreaker would keep the store from answering out of the key's own index (DATA-0167).</summary>
+    internal static async Task<TEntity?> Top(Action<ISortBuilder<TEntity>> sort, CancellationToken ct)
+    {
+        var query = QueryDefinition.All.WithSort<TEntity>(sort).WithPagination(1, 1);
+        var repo = Repo;
+        var found = await DataQueryExecution<TEntity, TKey>.QueryCandidates(repo, repo as IQueryRepository<TEntity, TKey> ?? RequireQuery(repo), query, ct).ConfigureAwait(false);
+        var page = FilterPushdownCoordinator.Finalize(query, query, null, found).Page;
+        await DataQueryExecution<TEntity, TKey>.MaterializeVisible(repo, page, ct).ConfigureAwait(false);
+        return page.FirstOrDefault();
+    }
+
     private static async Task<IReadOnlyList<TEntity>> PageCore(int page, int size, QueryDefinition query, CancellationToken ct)
     {
         if (page <= 0) throw new System.ArgumentOutOfRangeException(nameof(page));
