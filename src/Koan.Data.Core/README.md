@@ -308,10 +308,15 @@ A write that decides from what it reads is a command, and it answers with what h
 ```csharp
 public sealed record Reply(string TopicId, string Body) : ICommand<Post>
 {
+    public static readonly Reason NoTopic = Reason.Absent("No Topic has this Id.");
+    public static readonly Reason Locked = Reason.Gated("locked");
+    public const string NeedsBody = "A Post's body holds at least one visible character.";
+
     public async Task<Outcome<Post>> Run(CancellationToken ct)
     {
-        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Absent();
-        if (topic.Locked) return new Outcome<Post>.Gated("locked");
+        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Refused(NoTopic);
+        if (topic.Locked) return new Outcome<Post>.Refused(Locked);
+        if (string.IsNullOrWhiteSpace(Body)) throw new Refusal(NeedsBody);
         var post = await new Post { ParentId = topic.Id, Body = Body }.Save(ct);
         await new Event { Seq = await Event.Log.Next(ct), PostId = post.Id }.Save(ct);
         return new Outcome<Post>.Done(post);
@@ -324,16 +329,17 @@ var outcome = await new Reply(topicId, "hi").Send(ct);
 - It runs in a hold of its own, in this flow, so in its sender's partition, source and tenant. Commands take turns in arrival order, with every other
   hold of the store. Only `Done` commits; every other outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it
   (SEC-0036). `Commit` and `Rollback` refuse inside it.
-- `Outcome<T>` is `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, and `Failed.Landed` says `NotDispatched` (it never ran: the sender gave up, the
-  store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit itself
-  failed). A command that fails throws; only `Send` says `Failed`.
+- `Outcome<T>` is `Done`, `Refused` or `Failed`. A `Reason` declares its kind once, where it is defined: `Reason.Absent`, `Reason.Gated`, `Reason.Conflict`, or a plain
+  string, which is an invalid reason. `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
+  sender gave up, the store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit
+  itself failed). A command that fails throws; only `Send` says `Failed`.
 - The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. `TrySend()` starts the command beside this flow and
   never waits: null, and the command never runs, when too many tries are waiting. A command that never returns hangs its own sender, and `HoldLimit` frees the store.
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
   processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
   delete hides rows of.
-- An `ICommandWatcher` registered in DI is told each commit that wrote, in this process, in commit order, before the sender is answered. One that throws costs no
-  other, and its own task can send.
+- An `ICommandWatcher` registered in DI is told each commit that wrote, in this process, in commit order, before the sender is answered. What goes wrong there costs
+  nothing but itself, and a send it starts takes its turn behind this command.
 
 ## Hold a transaction from the start of a scope
 

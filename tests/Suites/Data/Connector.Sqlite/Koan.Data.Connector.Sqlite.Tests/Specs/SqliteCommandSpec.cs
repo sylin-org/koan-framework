@@ -17,6 +17,8 @@ namespace Koan.Data.Connector.Sqlite.Tests.Specs;
 [Storage(Name = "KOAN_COMMAND_SLIP")]
 public sealed class CommandSlip : Entity<CommandSlip>
 {
+    public const string NeedsBody = "A slip needs a body.";
+
     public static readonly Sequence Numbers = Sequence.Of<CommandSlip>(slip => slip.Number);
 
     [Index(Name = "ix_command_slip_number", Unique = true)] public long Number { get; set; }
@@ -27,7 +29,7 @@ public sealed class CommandSlip : Entity<CommandSlip>
     /// <summary>What an entity does when it refuses: it knows no command's result type, so it throws.</summary>
     public static CommandSlip Write(string id, string sender, long ordinal, string body, long number) =>
         string.IsNullOrWhiteSpace(body)
-            ? throw Refusal.Invalid(nameof(Body), "A slip needs a body.")
+            ? throw new Refusal(NeedsBody)
             : new CommandSlip { Id = id, Sender = sender, Ordinal = ordinal, Body = body, Number = number };
 }
 
@@ -45,7 +47,7 @@ public sealed record CreateSlip(string Id, string Sender, int Ordinal, string Bo
         if (await CommandSlip.Get(Id, ct) is { } existing)
             return existing.Body == Body
                 ? new Outcome<CommandSlip>.Done(existing)
-                : new Outcome<CommandSlip>.Conflict($"Slip '{Id}' already exists with a different body.");
+                : new Outcome<CommandSlip>.Refused(Reason.Conflict($"Slip '{Id}' already exists with a different body."));
         // The number is taken before the entity can refuse, so a refusal proves the hold gives it back.
         return new Outcome<CommandSlip>.Done(await CommandSlip.Write(Id, Sender, Ordinal, Body, await CommandSlip.Numbers.Next(ct)).Save(ct));
     }
@@ -348,6 +350,13 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
 
     private static CommitLog Commits(IntegrationHost host) => host.Services.GetRequiredService<CommitLog>();
 
+    /// <summary>A watcher that takes longer than a commit, now and then. If the store's turn passed on before watchers ran, the next
+    /// command would commit and announce past this one, which an instant watcher never shows.</summary>
+    private static void Yield(long number)
+    {
+        if (number % 3 == 0) Thread.Sleep(25);
+    }
+
     private static T Done<T>(Outcome<T> outcome) => outcome.Should().BeOfType<Outcome<T>.Done>().Which.Result;
 
     /// <summary>What a connection of its own reads.</summary>
@@ -369,7 +378,11 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         {
             await using var host = await Start(Settings(path));
             var announced = new List<Commit>();
-            Commits(host).Committed += announced.Add;
+            Commits(host).Committed += commit =>
+            {
+                Yield(commit.Sequences[CommandSlip.Numbers]);
+                lock (announced) announced.Add(commit);
+            };
             const int senders = 4, each = 25;
 
             var outcomes = await Task.WhenAll(Enumerable.Range(0, senders).Select(sender => Task.Run(() =>
@@ -451,31 +464,28 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             var announced = 0;
             Commits(host).Committed += _ => announced++;
 
-            foreach (var answer in new Outcome<string>[]
+            Reason[] reasons = [Reason.Absent("gone"), Reason.Gated("locked"), Reason.Conflict("taken"), "not a value"];
+            foreach (var reason in reasons)
             {
-                new Outcome<string>.Absent(),
-                new Outcome<string>.Gated("locked"),
-                new Outcome<string>.Invalid("Body", "empty"),
-                new Outcome<string>.Conflict("taken"),
-            })
+                var answer = new Outcome<string>.Refused(reason);
                 (await new SaveThenAnswer("returned", answer).Send(Cancellation)).Should().Be(answer);
+                (await new WriteSlipAndStub("thrown", () => new Refusal(reason)).Send(Cancellation)).Should().Be(answer);
+            }
 
-            foreach (var (thrown, expected) in new (Refusal, Outcome<string>)[]
-            {
-                (Refusal.Absent(), new Outcome<string>.Absent()),
-                (Refusal.Gated("locked"), new Outcome<string>.Gated("locked")),
-                (Refusal.Invalid("Body", "empty"), new Outcome<string>.Invalid("Body", "empty")),
-                (Refusal.Conflict("taken"), new Outcome<string>.Conflict("taken")),
-            })
-                (await new WriteSlipAndStub("thrown", () => thrown).Send(Cancellation)).Should().Be(expected);
+            // A plain string is an invalid reason, as a literal and as an interpolated one, and a kind is part of what a reason is.
+            reasons[3].Kind.Should().Be(ReasonKind.Invalid);
+            reasons[0].Kind.Should().Be(ReasonKind.Absent);
+            reasons[1].Kind.Should().Be(ReasonKind.Gated);
+            reasons[2].Kind.Should().Be(ReasonKind.Conflict);
+            new Refusal($"not {"a"} value").Reason.Should().Be(reasons[3]);
+            Reason.Absent("not a value").Should().NotBe(reasons[3]);
 
             // An entity refusing from below the command, after the command has taken a number.
-            (await new CreateSlip("blank", "s", 0, " ").Send(Cancellation)).Should().BeOfType<Outcome<CommandSlip>.Invalid>()
-                .Which.Field.Should().Be(nameof(CommandSlip.Body));
+            (await new CreateSlip("blank", "s", 0, " ").Send(Cancellation)).Should().Be(new Outcome<CommandSlip>.Refused(CommandSlip.NeedsBody));
 
             (await CommittedCount(path, Slips)).Should().Be(0);
             announced.Should().Be(0);
-            Done(await new CreateSlip("written", "s", 1, "body").Send(Cancellation)).Number.Should().Be(1, "no gap across nine commands that did not commit");
+            Done(await new CreateSlip("written", "s", 1, "body").Send(Cancellation)).Number.Should().Be(1, "no gap across the commands that did not commit");
             announced.Should().Be(1);
         }
         finally { Delete(path); }
@@ -500,7 +510,9 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
 
             (again.Id, again.Number, again.Body).Should().Be((first.Id, first.Number, first.Body));
             announcedForBoth.Should().Be(1, "the replay wrote nothing, so there is nothing to announce");
-            differs.Should().BeOfType<Outcome<CommandSlip>.Conflict>().Which.Reason.Should().Contain("'same'");
+            var conflict = differs.Should().BeOfType<Outcome<CommandSlip>.Refused>().Which.Reason;
+            conflict.Kind.Should().Be(ReasonKind.Conflict);
+            conflict.Text.Should().Contain("'same'");
             (await CommandSlip.Get("same", Cancellation))!.Body.Should().Be("one");
             after.Number.Should().Be(2);
             announced.Should().HaveCount(2);
@@ -576,7 +588,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             while (!finished.IsCompleted)
             {
                 // One in three gives its number back, so a refused command sits between the two processes' commits too.
-                if (here % 3 == 0) (await new SaveThenAnswer($"given-back-{here}", new Outcome<string>.Gated("no")).Send(Cancellation)).Should().BeOfType<Outcome<string>.Gated>();
+                if (here % 3 == 0) (await new SaveThenAnswer($"given-back-{here}", new Outcome<string>.Refused(Reason.Gated("no"))).Send(Cancellation)).Should().BeOfType<Outcome<string>.Refused>();
                 Done(await new NumberASlip("here", here++).Send(Cancellation));
             }
             await finished;
@@ -665,7 +677,11 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         {
             await using var host = await Start(Settings(path));
             var announced = new List<long>();
-            Commits(host).Committed += commit => announced.Add(commit.Sequences[CommandSlip.Numbers]);
+            Commits(host).Committed += commit =>
+            {
+                Yield(commit.Sequences[CommandSlip.Numbers]);
+                lock (announced) announced.Add(commit.Sequences[CommandSlip.Numbers]);
+            };
             const int burst = 500;
 
             var clock = Stopwatch.StartNew();
@@ -704,6 +720,13 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         finally { Delete(path); }
     }
 
+    /// <summary>The host's first lexical measurement provisions its tables (this assembly declares lexical entities), which needs the write
+    /// lock, and the driver's busy wait cannot observe a token. So a stop that overtakes it behind an open hold waits for the hold: that is
+    /// <see cref="A_stop_that_overtakes_a_first_measurement_behind_a_hold_waits_no_longer_than_the_hold_can_last"/>. Taken first, as a first use
+    /// belongs at boot, it leaves nothing for a stop to wait for.</summary>
+    private static Task FirstMeasurement(IntegrationHost host) =>
+        host.Services.GetServices<IHealthContributor>().Single(contributor => contributor.Name == "data:lexical").Check(Cancellation);
+
     [Fact]
     public async Task A_host_that_ends_rolls_back_the_command_that_is_running()
     {
@@ -712,6 +735,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         try
         {
             var host = await Start(Settings(path));
+            await FirstMeasurement(host);
             using var app = host.Enter();
             var holding = new HoldTheTurn("in-flight");
             var held = holding.Send(Cancellation);
@@ -720,11 +744,38 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             var clock = Stopwatch.StartNew();
             await host.DisposeAsync().AsTask().WaitAsync(Bound, Cancellation);
             Output.WriteLine($"ended in {clock.ElapsedMilliseconds}ms");
-            clock.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(15));
+            clock.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
 
             holding.Release.SetResult();
             (await held.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotCommitted);
             (await CommittedCount(path, Slips)).Should().Be(0);
+        }
+        finally { Delete(path); }
+    }
+
+    [Fact]
+    public async Task A_stop_that_overtakes_a_first_measurement_behind_a_hold_waits_no_longer_than_the_hold_can_last()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("stop-bound");
+        try
+        {
+            var settings = Settings(path);
+            settings[$"{TransactionOptions.SectionPath}:HoldLimit"] = TimeSpan.FromSeconds(2).ToString();
+            var host = await Start(settings);
+            using var app = host.Enter();
+            var holding = new HoldTheTurn("in-flight");
+            var held = holding.Send(Cancellation);
+            await holding.Running.Task.WaitAsync(Bound, Cancellation);
+
+            // Whether the measurement is still running here is a race, so this holds either way: at once, or when the limit frees the store.
+            var clock = Stopwatch.StartNew();
+            await host.DisposeAsync().AsTask().WaitAsync(Bound, Cancellation);
+            Output.WriteLine($"ended in {clock.ElapsedMilliseconds}ms");
+            clock.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10));
+
+            holding.Release.SetResult();
+            (await held.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotCommitted);
         }
         finally { Delete(path); }
     }
@@ -838,6 +889,93 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             Done(await new CreateSlip("first", "s", 0, "body").Send(Cancellation));
 
             Done(await handedOff.Task.WaitAsync(Bound, Cancellation)).Number.Should().Be(2);
+        }
+        finally { Delete(path); }
+    }
+
+    /// <summary>A watcher that cannot even be resolved must not keep the store's turn: the commit landed, and every later send goes on.</summary>
+    [Fact]
+    public async Task A_watcher_that_cannot_be_resolved_costs_nothing_the_commit_landed_and_the_next_send_goes_on()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("unresolvable");
+        try
+        {
+            var host = await KoanIntegrationHost.Configure()
+                .WithSettings(Settings(path, busyTimeout: TimeSpan.FromSeconds(2)))
+                .ConfigureServices(services =>
+                {
+                    services.AddKoan();
+                    services.AddSingleton<ICommandWatcher>(_ => throw new InvalidOperationException("this watcher cannot be built"));
+                })
+                .StartAsync(Cancellation);
+            await using (host)
+            {
+                Done(await new CreateSlip("first", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(1, "the commit landed, and says so");
+                Done(await new CreateSlip("second", "s", 1, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(2, "the turn passed on");
+                (await CommittedCount(path, Slips)).Should().Be(2);
+            }
+        }
+        finally { Delete(path); }
+    }
+
+    /// <summary>What a consumer writes without thinking: calling an async method from a watcher, which runs synchronously up to its first wait.</summary>
+    [Fact]
+    public async Task A_send_started_by_calling_an_async_method_from_a_watcher_takes_its_turn_behind_this_command()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("follow-up");
+        try
+        {
+            await using var host = await Start(Settings(path));
+            var followedUp = new TaskCompletionSource<Outcome<CommandSlip>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var once = 0;
+            async Task FollowUp() => followedUp.SetResult(await new CreateSlip("followed-up", "s", 1, "body").Send());
+            Commits(host).Committed += commit =>
+            {
+                if (Interlocked.Exchange(ref once, 1) == 0) _ = FollowUp();
+            };
+
+            Done(await new CreateSlip("first", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(1);
+
+            Done(await followedUp.Task.WaitAsync(Bound, Cancellation)).Number.Should().Be(2);
+        }
+        finally { Delete(path); }
+    }
+
+    /// <summary>A try's slot ends when it has been answered, and when its hold has begun, however long the command then runs: a command that
+    /// never returns must not use up the bound.</summary>
+    [Fact]
+    public async Task A_try_gives_its_slot_back_when_answered_and_when_its_hold_begins()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("try-slot");
+        try
+        {
+            var settings = Settings(path);
+            settings[$"{TransactionOptions.SectionPath}:HoldLimit"] = TimeSpan.FromSeconds(1).ToString();
+            await using var host = await Start(settings);
+            for (var ordinal = 0; ordinal < 5; ordinal++) Done(await new NumberASlip("answered", ordinal).TrySend()!.WaitAsync(Bound, Cancellation));
+            var stuck = new IgnoresItsToken("stuck", blocks: false);
+            var stuckTry = stuck.TrySend()!;
+            await stuck.Running.Task.WaitAsync(Bound, Cancellation);
+
+            // Nothing is waiting now but what this spec adds behind a turn it keeps, past the limit that ends the stuck hold.
+            var next = new NumberASlip("next", 0).Send(Cancellation);
+            Done(await next.WaitAsync(Bound, Cancellation));
+            var holding = new HoldTheTurn();
+            var held = holding.Send(Cancellation);
+            await holding.Running.Task.WaitAsync(Bound, Cancellation);
+            var tried = new List<Task<Outcome<long>>>();
+            while (tried.Count < 5000 && new NumberASlip("tried", tried.Count).TrySend() is { } sent) tried.Add(sent);
+
+            tried.Should().HaveCount(1024, "every slot came back: the five answered, and the one whose command has never returned");
+
+            holding.Release.SetResult();
+            await held.WaitAsync(Bound, Cancellation);
+            await Task.WhenAll(tried).WaitAsync(TimeSpan.FromMinutes(2), Cancellation);
+            stuck.Release.SetResult();
+            await stuckTry.WaitAsync(Bound, Cancellation);
         }
         finally { Delete(path); }
     }
@@ -1043,7 +1181,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             Commits(host).Committed += announced.Add;
 
             Done(await new NumberTwoThings().Send(Cancellation)).Should().Be((1L, 41L));
-            (await new NumberTwoThings(new Outcome<(long, long)>.Gated("no")).Send(Cancellation)).Should().BeOfType<Outcome<(long, long)>.Gated>();
+            (await new NumberTwoThings(new Outcome<(long, long)>.Refused(Reason.Gated("no"))).Send(Cancellation)).Should().BeOfType<Outcome<(long, long)>.Refused>();
             Done(await new NumberTwoThings().Send(Cancellation)).Should().Be((2L, 42L), "both numbers the refused command took were given back");
 
             announced.Should().HaveCount(2);
@@ -1092,7 +1230,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
         {
             await using var host = await Start(Settings(path), provision: false);
 
-            (await new SaveThenAnswer("gated", new Outcome<string>.Gated("no")).Send(Cancellation)).Should().BeOfType<Outcome<string>.Gated>();
+            (await new SaveThenAnswer("gated", new Outcome<string>.Refused(Reason.Gated("no"))).Send(Cancellation)).Should().BeOfType<Outcome<string>.Refused>();
             Done(await new CreateSlip("after", "s", 0, "body").Send(Cancellation)).Number.Should().Be(1);
             (await CommandSlip.Get("after", Cancellation)).Should().NotBeNull();
         }

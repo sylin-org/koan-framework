@@ -13,8 +13,8 @@ using Xunit;
 namespace Koan.Tenancy.Tests;
 
 /// <summary>
-/// DATA-0167: a command runs in its sender's context, so a tenant's command writes that tenant's rows, however the queue's own flow
-/// is scoped, and a sequence over a tenant-scoped entity counts within the tenant.
+/// DATA-0167: a command runs in its sender's context, so a tenant's command writes that tenant's rows, and a sequence over a
+/// tenant-scoped entity counts within the tenant.
 /// </summary>
 public sealed class CommandTenantSpec
 {

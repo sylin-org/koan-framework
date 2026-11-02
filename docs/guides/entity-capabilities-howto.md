@@ -1029,9 +1029,11 @@ A command is a hold with an answer behind it, in the sender's own flow
 ```csharp
 public sealed record Reply(string TopicId, string Body) : ICommand<Post>
 {
+    public static readonly Reason NoTopic = Reason.Absent("No Topic has this Id.");
+
     public async Task<Outcome<Post>> Run(CancellationToken ct)
     {
-        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Absent();
+        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Refused(NoTopic);
         var post = await new Post { ParentId = topic.Id, Body = Body }.Save(ct);
         await new Event { Seq = await Event.Log.Next(ct), PostId = post.Id }.Save(ct);
         return new Outcome<Post>.Done(post);
@@ -1048,13 +1050,17 @@ switch (await new Reply(topicId, "hi").Send(ct))
 | Outcome | Means |
 |---|---|
 | `Done(result)` | it committed |
-| `Absent()` | what it acts on is not there, for this sender |
-| `Gated(why)` | this sender may not, or not now |
-| `Invalid(field, reason)` | that field's value cannot be taken |
-| `Conflict(reason)` | it disagrees with what is there |
+| `Refused(reason)` | it was refused, and the reason says what kind of refusal it is |
 | `Failed` | what only `Send` says, with `Landed` and `Cause`. `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed |
 
-Code below the command that has no `Outcome<T>` to return throws `Refusal.Gated(why)` and its siblings. `Send`'s token ends the wait and the command, and the outcome
+| A reason | Means |
+|---|---|
+| `"a plain string"` | a value the sender gave cannot be taken |
+| `Reason.Absent(text)` | what it acts on is not there, for this sender |
+| `Reason.Gated(text)` | this sender may not, or not now |
+| `Reason.Conflict(text)` | it disagrees with what is there |
+
+Declare a reason's kind once, where the reason is defined. Code below the command that has no `Outcome<T>` to return throws `new Refusal(reason)`. `Send`'s token ends the wait and the command, and the outcome
 says which: nothing cuts a commit short. `TrySend()` starts it beside this flow and never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a column
 carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. An `ICommandWatcher` registered in DI is told what committed, in order.
 

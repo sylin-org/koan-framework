@@ -126,9 +126,9 @@ public sealed class RoleHoldSpec
             await new HeldRoleNote { Text = "table exists" }.Save();
             var bag = await roles.Bag("person:refused", true);
 
-            var refused = await new GiveRoleAndNote("person:refused", "refused", new Outcome<string>.Gated("no")).Send();
+            var refused = await new GiveRoleAndNote("person:refused", "refused", new Outcome<string>.Refused(Reason.Gated("no"))).Send();
 
-            refused.Should().BeOfType<Outcome<string>.Gated>();
+            refused.Should().BeOfType<Outcome<string>.Refused>();
             (await roles.Members("role:commanded")).Items.Should().BeEmpty();
             (await HeldRoleNote.Get("refused")).Should().BeNull();
             (await roles.Bag("person:refused", true)).Should().BeSameAs(bag, "no compiled bag was touched");

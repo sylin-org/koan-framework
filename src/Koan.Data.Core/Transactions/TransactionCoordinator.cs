@@ -310,7 +310,15 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             }
 
             _isCompleted = true;
-            BeforeItsTurnEnds?.Invoke();
+            try
+            {
+                BeforeItsTurnEnds?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                // The commit stands and the turn must pass on, whatever an announcement does.
+                _logger.LogError(ex, "Transaction '{TransactionName}' committed, and what it announces before its turn ends failed", Name);
+            }
             await EndHold(held).ConfigureAwait(false);
             _logger.LogInformation("Transaction '{TransactionName}' committed its held transaction", Name);
             _activity?.SetStatus(ActivityStatusCode.Ok);
