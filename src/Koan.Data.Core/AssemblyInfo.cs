@@ -7,5 +7,6 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Koan.Data.Core.Tests")]
 [assembly: InternalsVisibleTo("Koan.Tests.Data.Core")]
 [assembly: InternalsVisibleTo("Koan.Data.Backup")]
+[assembly: InternalsVisibleTo("Koan.Identity")]
 [assembly: InternalsVisibleTo("Koan.Data.Cutover")]
 [assembly: InternalsVisibleTo("Koan.Data.Cutover.Tests")]

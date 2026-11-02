@@ -43,6 +43,7 @@ public sealed class AuditEvent : Entity<AuditEvent>, IAmbientExempt
     // --- Tamper-evidence (Layer 3, optional hash-chaining; null/0 when chaining is off) ---
 
     /// <summary>Monotonic position in the hash chain (0-based); 0 with a null <see cref="Hash"/> = unchained.</summary>
+    [Index]
     public long Sequence { get; set; }
 
     /// <summary>The previous event's <see cref="Hash"/> this one chains from (<c>GENESIS</c> for the first).</summary>

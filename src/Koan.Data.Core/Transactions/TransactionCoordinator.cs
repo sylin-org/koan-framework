@@ -503,6 +503,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         if (!_hasTrackedWork)
         {
             _isCompleted = true;
+            await RunAfterCommit().ConfigureAwait(false);
             return;
         }
 
