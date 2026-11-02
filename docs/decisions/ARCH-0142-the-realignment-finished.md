@@ -23,11 +23,11 @@ silently false, and so on. This record closes that list. Each decision is small,
 
 ## Decision
 
-1. **Every entity on a default route that holds has its table before the host reports started.** `KoanDataCoreModule.Start` runs before any hosted service, and `TablesAtBoot` asks each discovered root's
-   repository for `EnsureReady` when the route declares `write.heldTransaction`. Nothing changes the schema under a running application, so a table is never first made inside a hold (DATA-0166's first-use note) and
+1. **Every entity on a default route that holds has its table before the host reports started.** `KoanDataCoreModule.Start` runs before any hosted service. `TablesAtBoot` asks the default route's provider, once, whether it holds, and if so asks each discovered root's
+   repository for `EnsureReady`, so a store that holds nothing has no repository made for it. Nothing changes the schema under a running application, so a table is never first made inside a hold (DATA-0166's first-use note) and
    a new connection's first use of an FTS5 table never meets a burst of schema changes, which it cannot survive: SQLite retries a statement once, and answers error 17 if the schema has moved again.
    - An entity that names its own source or adapter stays at its first use, so a store nothing elected is not touched; so does one under a Database axis, which has no finite list of tables, and a partition's table.
-   - A store that refuses says so once, at start, and answers at first use as it would have, so a boot does not depend on it.
+   - A store that refuses says so once, at start, and answers at first use as it would have, so a boot does not depend on it. An entity declared wrongly says so at its first use, as it did.
    - `SecIdentityModule`'s own list of tables is gone.
 2. **A string compared with a reason compares its text, whatever its kind, and no string is no reason.** `string == Reason` used to convert the string and compare kinds. `Reason? r = cond ? Fixed : null` no longer throws. Plain strings stay valid reasons.
 3. **One mapping answers a browser with a page and a client with a problem.** `this.Answer`, a `[Tool]` action's refusal and its binding failure go through one `Negotiated`: a request whose `Accept` names HTML at least as highly as JSON reads a page, and everything else, `*/*` included, reads
@@ -91,7 +91,8 @@ An application writes nothing for items 1, 5 to 10. A new table costs nothing at
 - `SqliteBootProvisioningSpec` (4) and `SchemaSettledSpec`, a host whose job worker starts with it: an untouched entity, its FTS5 table and a non-string key exist at start; `schema_version` does not move after start; a file missing a table has it back; `NoDdl` does not stop a boot.
 - **What SQLite does,** measured through Koan's verbs on a new connection each round for five seconds, with DDL on another connection: one `CREATE TABLE` every 30 ms, all 273 rounds of search, rebuild, status, save and query answered. Eight in a burst every 30 ms, 2 to 4 of about 223 failed, a save through its trigger included. A tight loop, most failed, and an ordinary query failed with "database schema has changed". The reproducer's tight loop stands outside what Koan does now.
 - `ReasonSpec` (4), `ProblemNegotiationSpec` (7), `ToolRouteSpec`, `ApplicationMiddlewareSpec` (5: on `WebApplication` and a generic host, a tool call through it, a placed principal surviving, an application's view), `ScopedPublicationSpec` (3), `CacheHoldSpec`'s atomic case, `AuditChainHoldSpec` (4), `AuthEndToEndSpec`'s 403, `ToolNameWireSpec` (4), `ToolsThatCannotStartSpec`'s name cases, `DuckDbCapabilitySpec`'s outcome case.
-- **Measured by removing them,** one at a time: see the package report for each spec shown to fail without its fix.
+- **Measured by removing them,** one at a time: with no tables at start, the boot spec's three cases and the job worker's fail; with `==` and the conversion as they were, `ReasonSpec` fails; with no page, `ProblemNegotiationSpec` fails; with `TriesWaiting` answering zero, its case fails; with either coordinator publishing in a scope, `ScopedPublicationSpec` fails; with no placed result, the 403 fails; with the head in memory, a rollback reports a gap and an append outside a hold holds the hold to its limit; with a deferring scope not deferred, its case fails; with endpoints mapped before the application's pipeline, four of `ApplicationMiddlewareSpec`'s five fail; with no `PlacedAuthentication`, the placed principal fails; with a dot in a name and the check off, `ToolNameWireSpec` fails; with `meta`, its case fails; with DuckDB's declaration back, its case fails; with the cache reading only a hold, the atomic case fails.
+- **The consumer:** Tangent on these commits, its merge check: build, 471 specs, its rules. With a table made at start on a fresh file of 116 tables, a boot took 417 ms, and 218 ms on the same file again, in a process already warm.
 
 ## Later
 
