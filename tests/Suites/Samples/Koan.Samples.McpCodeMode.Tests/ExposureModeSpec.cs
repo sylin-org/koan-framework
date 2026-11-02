@@ -24,8 +24,8 @@ public class ExposureModeSpec : IClassFixture<TestPipelineFixture>
         }
         // Extract names
         var names = tools.Select(t => t["name"]?.Value<string>()).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
-        names.Should().Contain("koan.code.execute", "code execution tool must be present in Auto mode fallback");
+        names.Should().Contain("koan_code_execute", "code execution tool must be present in Auto mode fallback");
         // At least one entity tool (heuristic: any tool not equal to code execution)
-        names.Any(n => n != null && n != "koan.code.execute").Should().BeTrue("Expected at least one entity tool in Auto mode fallback");
+        names.Any(n => n != null && n != "koan_code_execute").Should().BeTrue("Expected at least one entity tool in Auto mode fallback");
     }
 }

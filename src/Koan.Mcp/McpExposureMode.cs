@@ -15,7 +15,7 @@ public enum McpExposureMode
     Auto = 0,
 
     /// <summary>
-    /// Expose code execution only (koan.code.execute).
+    /// Expose code execution only (koan_code_execute).
     /// Best for: Modern LLM agents, token optimization.
     /// </summary>
     Code = 1,

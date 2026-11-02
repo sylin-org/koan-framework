@@ -3,14 +3,20 @@ using Microsoft.Extensions.Hosting;
 
 namespace Koan.Mcp.CustomTools;
 
-/// <summary>Stops the host at start over what could never work (ARCH-0141). Two tools of one name: a client sees one name, and only one of them would ever run. A tool whose ASP.NET
+/// <summary>Stops the host at start over what could never work (ARCH-0141). A name a client would refuse (ARCH-0142). Two tools of one name: a client sees one name, and only one of them would ever run. A tool whose ASP.NET
 /// policy names an authentication scheme: its evaluator authenticates that scheme again, from a credential a tool call does not carry, and the caller would be refused.</summary>
 internal sealed class McpToolStartCheck(McpEntityRegistry entities, McpCustomToolRegistry custom, IAuthorizationPolicyProvider? policies = null) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        var duplicates = entities.Registrations.SelectMany(registration => registration.Tools.Select(tool => tool.Name))
+        var names = entities.Registrations.SelectMany(registration => registration.Tools.Select(tool => tool.Name))
             .Concat(custom.Tools.Select(tool => tool.Name))
+            .ToArray();
+        var refused = names.Where(name => !ToolName.IsGood(name)).ToArray();
+        if (refused.Length > 0)
+            throw new InvalidOperationException($"Tool name {string.Join(", ", refused)} is not {ToolName.Rule}, so a client could refuse it. State another with [McpTool(Name = ...)], or a shorter [McpEntity(Name = ...)] for an entity's.");
+
+        var duplicates = names
             .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
             .Where(names => names.Count() > 1)
             .Select(names => names.Key)

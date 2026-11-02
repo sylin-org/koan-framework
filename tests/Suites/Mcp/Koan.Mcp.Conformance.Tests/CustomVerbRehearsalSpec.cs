@@ -23,7 +23,7 @@ public sealed class CustomVerbRehearsalSpec : IClassFixture<DryRunFixture>
 
         var text = McpHarnessFixtureBase.ContentText(call) ?? "";
         text.Should().NotContain("recomputed:w-1", "a rehearsal must not invoke the un-inspectable verb");
-        var diag = call["meta"]?["diagnostics"] as JObject;
+        var diag = call["_meta"]?["diagnostics"] as JObject;
         diag?["dryRun"]?.Value<bool>().Should().BeTrue();
         diag?["rehearsable"]?.Value<bool>().Should().BeFalse("the verb's effects are not framework-inspectable");
     }

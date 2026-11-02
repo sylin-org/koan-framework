@@ -2,7 +2,6 @@ using System.Collections;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using Koan.Mcp.Execution;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
@@ -20,19 +19,8 @@ namespace Koan.Mcp.CustomTools;
 /// Projects <c>[Tool]</c> actions as custom tools (ARCH-0141). Name, description and input schema all come from the action,
 /// which has no other definition: its route, its parameters and the properties of its input type.
 /// </summary>
-internal static partial class RouteTools
+internal static class RouteTools
 {
-    /// <summary>Lower-case words joined by underscores, within what every client takes: MCP allows a dot, and Claude's API refuses
-    /// one; its documents state 64 characters on one page and 128 on another.</summary>
-    [GeneratedRegex("^[a-z0-9_]{1,64}$")]
-    private static partial Regex GoodName();
-
-    [GeneratedRegex("[^a-z0-9]+")]
-    private static partial Regex NotAWord();
-
-    [GeneratedRegex("(?<=[a-z0-9])(?=[A-Z])")]
-    private static partial Regex WordBoundary();
-
     public static IEnumerable<McpCustomTool> Discover(IActionDescriptorCollectionProvider actions)
         => actions.ActionDescriptors.Items.OfType<ControllerActionDescriptor>()
             .Where(action => ToolAttribute.Exposes(action.MethodInfo, action.ControllerTypeInfo))
@@ -48,8 +36,8 @@ internal static partial class RouteTools
         var method = action.ActionConstraints?.OfType<HttpMethodActionConstraint>().FirstOrDefault()?.HttpMethods.FirstOrDefault() ?? HttpMethods.Post;
         var attribute = action.MethodInfo.GetCustomAttribute<ToolAttribute>(inherit: false);
         var name = attribute?.Name ?? Derive(pattern, attribute?.Particle ?? method);
-        if (!GoodName().IsMatch(name))
-            throw new InvalidOperationException($"The tool name '{name}' of {where} is not lower-case words joined by underscores, at most 64 characters. State one with [Tool(Name = ...)].");
+        if (!ToolName.IsGood(name))
+            throw new InvalidOperationException($"The tool name '{name}' of {where} is not {ToolName.Rule}. State one with [Tool(Name = ...)].");
 
         var (schema, query, bodyField) = Input(action, pattern, method, where);
         var isGet = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
@@ -62,13 +50,7 @@ internal static partial class RouteTools
     /// <summary>The route's literal segments, then the particle or HTTP method: <c>/data/posts/{id}</c> with <c>getById</c> makes
     /// <c>data_posts_get_by_id</c>.</summary>
     private static string Derive(RoutePattern pattern, string particle)
-    {
-        var words = pattern.PathSegments.SelectMany(segment => segment.Parts).OfType<RoutePatternLiteralPart>().Select(part => part.Content).Append(particle);
-        return string.Join('_', words.Select(Words).Where(word => word.Length > 0));
-    }
-
-    private static string Words(string text)
-        => NotAWord().Replace(WordBoundary().Replace(text, "_").ToLowerInvariant(), "_").Trim('_');
+        => ToolName.Of(pattern.PathSegments.SelectMany(segment => segment.Parts).OfType<RoutePatternLiteralPart>().Select(part => part.Content).Append(particle));
 
     private static (JObject Schema, IReadOnlySet<string> Query, string? BodyField) Input(ControllerActionDescriptor action, RoutePattern pattern, string method, string where)
     {

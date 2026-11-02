@@ -89,7 +89,7 @@ The host refuses to start if questions are declared but no engine is elected —
 
 - Code: `Analytics.Of<Todo, Guid>().Run("open-count-by-priority")`.
 - HTTP: `GET /analytics/catalog` and `GET /analytics/run/open-count-by-priority`.
-- Agents (MCP): `analytics.list_questions` and `analytics.ask(name)`.
+- Agents (MCP): `analytics_list_questions` and `analytics_ask(name)`.
 - The entity's own controller: derive `AnalyticsController<Todo, Guid>` with a route and get
   `GET .../recipes` (the recipe sheet) plus `GET .../results/{recipe}?n=100` (any recipe, bounded) —
   governed by the same auth and access machinery as the entity.
@@ -128,7 +128,7 @@ blind spot (`DeletesInvisible`: deleted source rows leave no trace in a derived 
 **delta door** — `GET /analytics/{name}/delta?since=wm1.…` — returns rows written after the
 cursor plus the next cursor; consumers never construct watermarks, they pass back what the last
 response handed over. In code: `Analytics.Facets(name, by, since)` and
-`Analytics.Delta(name, since)`; for agents, `analytics.facets` and `analytics.delta`.
+`Analytics.Delta(name, since)`; for agents, `analytics_facets` and `analytics_delta`.
 Four more doors expose facts the declaration and refresh state already own. **Explain** —
 `GET /analytics/{name}/explain` — says what the ask *would* do (serve, compute, or refuse, with the
 exact corrective), the composed SQL, bounds, parameters, and the engine's capabilities — without
@@ -140,8 +140,8 @@ parameters, and posture from the declaration alone; bind before asking. **Freshn
 materialization is served, older computes live (labeled so). Materialized answers carry `ETag`,
 `Last-Modified`, and `Cache-Control: no-cache`, so a polling dashboard revalidates and takes 304s.
 In code: `Analytics.Explain(name, parameters)`, `Analytics.History(name)`, `Analytics.Shape(name)`,
-`Run(name, parameters, maxAge: TimeSpan.FromMinutes(15))`; for agents, `analytics.explain`,
-`analytics.history`, `analytics.shape`.
+`Run(name, parameters, maxAge: TimeSpan.FromMinutes(15))`; for agents, `analytics_explain`,
+`analytics_history`, `analytics_shape`.
 
 A parameterized projection refreshes through its **declared defaults**
 (`WithParameterDefault<T>(name, value)`); ask-time values still override them.

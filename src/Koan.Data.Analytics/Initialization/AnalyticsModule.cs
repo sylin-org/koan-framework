@@ -38,6 +38,6 @@ public sealed class AnalyticsModule : KoanModule
     public override void Report(ProvenanceModuleWriter module, IConfiguration configuration, IHostEnvironment environment)
     {
         module.Describe(Version);
-        module.AddNote("Analytics declares named questions over entities; the catalog is served at /analytics/catalog and to agents as analytics.list_questions / analytics.ask.");
+        module.AddNote("Analytics declares named questions over entities; the catalog is served at /analytics/catalog and to agents as analytics_list_questions / analytics_ask.");
     }
 }

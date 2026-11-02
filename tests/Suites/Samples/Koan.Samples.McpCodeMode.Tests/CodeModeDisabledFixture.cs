@@ -11,7 +11,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 
 /// <summary>
 /// Exposure=Full but <c>CodeMode:Enabled=false</c>. The kill switch must hide the code tools from
-/// tools/list AND refuse koan.code.execute / koan.code.validate when called by name — discovery
+/// tools/list AND refuse koan_code_execute / koan_code_validate when called by name — discovery
 /// hiding is not a security control on its own. Entity tools stay exposed (Full).
 /// </summary>
 public class CodeModeDisabledFixture : TestHostFixtureBase

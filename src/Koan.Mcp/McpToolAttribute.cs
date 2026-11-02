@@ -22,7 +22,7 @@ namespace Koan.Mcp;
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
 public sealed class McpToolAttribute : Attribute
 {
-    /// <summary>Tool name advertised to MCP clients. Defaults to the method name when unset.</summary>
+    /// <summary>Tool name advertised to MCP clients: lower-case words joined by underscores, at most 64 characters. Defaults to the method name in those words when unset.</summary>
     public string? Name { get; set; }
 
     /// <summary>Human-readable description shown during tool discovery.</summary>

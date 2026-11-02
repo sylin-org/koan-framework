@@ -26,7 +26,7 @@ public sealed class ProjectionMetadataSpec : IClassFixture<ToolsetFixture>
         var collection = _fx.ResolveToolName("sprocket", EntityEndpointOperationKind.Collection);
         var result = await _fx.CallToolAsync(collection, new JObject());
 
-        var access = result["meta"]?["diagnostics"]?["access"] as JObject;
+        var access = result["_meta"]?["diagnostics"]?["access"] as JObject;
         access.Should().NotBeNull("the MCP edge attaches the can:[] manifest to the tool-result metadata by default");
 
         var can = access!["spr-proj-1"]?["can"] as JArray;

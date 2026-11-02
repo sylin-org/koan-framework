@@ -30,7 +30,7 @@ public sealed class SelfDescriptionGatingSpec : IClassFixture<StreamableHttpFixt
 
         var names = ((JArray)JObject.Parse(await res.Content.ReadAsStringAsync(Quick))["tools"]!)
             .Select(t => t["name"]!.Value<string>()).ToArray();
-        names.Should().Contain("gizmo.collection");
+        names.Should().Contain("gizmo_collection");
         names.Should().NotContain(n => n!.StartsWith("strongroom."), "an anonymous caller can call no strongroom verb");
     }
 

@@ -118,7 +118,7 @@ public sealed class McpRpcDispatcher
         }
         if (filtered.Count != response.Tools.Count)
         {
-            response = new McpRpcHandler.ToolsListResponse { Tools = filtered.ToArray(), Next = response.Next };
+            response = new McpRpcHandler.ToolsListResponse { Tools = filtered.ToArray() };
         }
         return Wrap(envelope.Id, JToken.FromObject(response, JsonSerializer.Create(SerializerSettings)));
     }

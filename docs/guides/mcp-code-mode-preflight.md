@@ -23,31 +23,31 @@ It takes JavaScript source and returns `{ valid: boolean, error?: string }`. It 
 mutates nothing, and spends no execution quota, so an agent can check a draft as often as it likes.
 
 Invalid source is not an error here: the tool still returns a success envelope, with `valid=false` and
-the parse message. The point is that `koan.code.execute` is only ever called with source already known
+the parse message. The point is that `koan_code_execute` is only ever called with source already known
 to parse.
 
 ## Tools
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
-| `koan.code.validate` | Parse-only syntax check | Before first execution or after edits |
-| `koan.code.execute` | Execute script with SDK bindings | After a successful (or skipped) preflight |
+| `koan_code_validate` | Parse-only syntax check | Before first execution or after edits |
+| `koan_code_execute` | Execute script with SDK bindings | After a successful (or skipped) preflight |
 
 ## Basic Flow
 1. Draft script (LLM or human).
-2. Call `koan.code.validate` with `{ code }`.
+2. Call `koan_code_validate` with `{ code }`.
 3. If `valid=false`, refine using `error` message.
-4. On `valid=true`, call `koan.code.execute`.
+4. On `valid=true`, call `koan_code_execute`.
 5. Inspect diagnostics (`sdkCalls`, `cpuMs`) to tune subsequent scripts.
 
 ## Example (Client-Side JSON-RPC)
 ```jsonc
-// tools/call → koan.code.validate
+// tools/call → koan_code_validate
 {
   "jsonrpc": "2.0",
   "id": "1",
   "method": "tools/call",
   "params": {
-    "name": "koan.code.validate",
+    "name": "koan_code_validate",
     "arguments": { "code": "function run() { SDK.Out.answer('ok'); }" }
   }
 }
@@ -62,13 +62,13 @@ Response:
 ```
 Then execute:
 ```jsonc
-// tools/call → koan.code.execute
+// tools/call → koan_code_execute
 {
   "jsonrpc": "2.0",
   "id": "2",
   "method": "tools/call",
   "params": {
-    "name": "koan.code.execute",
+    "name": "koan_code_execute",
     "arguments": { "code": "function run() { SDK.Out.answer('ok'); }" }
   }
 }
@@ -82,7 +82,7 @@ Then execute:
   "id": "v1",
   "method": "tools/call",
   "params": {
-    "name": "koan.code.validate",
+    "name": "koan_code_validate",
     "arguments": { "code": "function run( {" }
   }
 }
@@ -113,9 +113,9 @@ Response:
 ## Recommended Agent Prompt Snippet
 ```
 Before executing JavaScript against Koan:
-1. Call koan.code.validate with the draft code.
+1. Call koan_code_validate with the draft code.
 2. If valid=false, incorporate the error message exactly once and regenerate.
-3. Only call koan.code.execute when valid=true.
+3. Only call koan_code_execute when valid=true.
 4. Always call SDK.Out.answer(text) exactly once before the script ends.
 ```
 

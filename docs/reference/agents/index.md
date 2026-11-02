@@ -61,7 +61,7 @@ An agent sees only what you deliberately expose and what its identity may use.
 | `[Access(...)]` and `EntityAccess<T>` | The same gate and row boundaries used by other Entity surfaces |
 | `[Tool]` on a controller or action | That route as a tool: one definition, with the same input, gate, refusals and effect |
 | `[McpTool]` | One business action with no route |
-| `analytics.list_questions` / `analytics.ask` | Declared analytics questions over entities (no free-form SQL) |
+| `analytics_list_questions` / `analytics_ask` | Declared analytics questions over entities (no free-form SQL) |
 | `[McpDescription]` and `[McpIgnore]` | A clearer schema with only the fields you intend |
 | `[McpReadOnly]`, `[McpDestructive]`, and `[McpIdempotent]` | Useful behavioral hints on a custom tool |
 | `IMcpResourceProvider` | An inspectable `koan://...` resource |

@@ -24,7 +24,7 @@ public sealed class DidYouMeanSpec : IClassFixture<DryRunFixture>
         return await _fx.CallToolAsync(tool, new JObject { ["model"] = model });
     }
 
-    private static JArray? DidYouMean(JToken call) => call["meta"]?["diagnostics"]?["didYouMean"] as JArray;
+    private static JArray? DidYouMean(JToken call) => call["_meta"]?["diagnostics"]?["didYouMean"] as JArray;
 
     [Fact]
     public async Task An_invalid_enum_value_is_corrected_from_the_schema_members()
@@ -49,7 +49,7 @@ public sealed class DidYouMeanSpec : IClassFixture<DryRunFixture>
         var enumIssue = issues!.OfType<JObject>().Single(i => i["field"]!.Value<string>()!.Contains("color", System.StringComparison.OrdinalIgnoreCase));
         (enumIssue["validValues"] as JArray)!.Should().HaveCount(3, "the members are schema facts, not a row count");
         // The error channel reveals nothing about existence — no count/exists/total leaks.
-        var diag = call["meta"]!["diagnostics"]!.ToString().ToLowerInvariant();
+        var diag = call["_meta"]!["diagnostics"]!.ToString().ToLowerInvariant();
         diag.Should().NotContain("\"count\"").And.NotContain("\"exists\"").And.NotContain("\"total\"");
     }
 

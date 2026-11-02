@@ -247,7 +247,7 @@ public class ForumFixture : IAsyncLifetime
     {
         var result = await Call(name, arguments, user);
         var text = result["content"]![0]!["text"]!.Value<string>()!;
-        var meta = result["meta"] as JObject ?? new JObject();
+        var meta = result["_meta"] as JObject ?? new JObject();
         return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>(),
             result["structuredContent"]?["gate"]?.Value<string>(), result["structuredContent"]?["next"]?.Value<string>());
     }

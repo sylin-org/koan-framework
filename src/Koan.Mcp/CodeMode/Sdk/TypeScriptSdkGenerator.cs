@@ -164,10 +164,8 @@ public sealed partial class TypeScriptSdkGenerator
 
         sb.AppendLine($"    interface I{entityName}Operations {{");
 
-        var allowMutations = registration.Attribute.AllowMutations != false;
         foreach (var tool in registration.Tools.OrderBy(t => t.Operation))
         {
-            if (!allowMutations && tool.IsMutation) continue; // omit mutation signatures when not allowed
             var signature = GenerateMethodSignature(registration, entityName, tool);
             if (!string.IsNullOrWhiteSpace(signature))
             {

@@ -36,12 +36,12 @@ public sealed class ScopedInsertSafetySpec : IClassFixture<ScopedInsertFixture>
         };
         var preview = await _fixture.CallToolAsAsync(tool, request, principal);
         preview.ToString().Should().NotContain("Private original").And.NotContain("alice");
-        preview["meta"]?["diagnostics"]?["dryRun"]?.Value<bool>().Should().BeTrue();
+        preview["_meta"]?["diagnostics"]?["dryRun"]?.Value<bool>().Should().BeTrue();
         _fixture.Completed.Should().Be(0);
         request.Remove("dry_run");
         var rejected = await _fixture.CallToolAsAsync(tool, request, principal);
         McpHarnessFixtureBase.IsShortCircuited(rejected).Should().BeTrue();
-        rejected["meta"]?["diagnostics"]?["delta"].Should().BeNull();
+        rejected["_meta"]?["diagnostics"]?["delta"].Should().BeNull();
         rejected.ToString().Should().NotContain("Private original").And.NotContain("alice");
         _fixture.Completed.Should().Be(0);
         _fixture.FilterEnabled = false;

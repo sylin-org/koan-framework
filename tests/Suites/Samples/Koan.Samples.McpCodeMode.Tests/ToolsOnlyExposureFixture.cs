@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 namespace Koan.Samples.McpCodeMode.Tests;
 
 /// <summary>
-/// Exposure=Tools with code mode otherwise enabled. The exposure mode hides koan.code.execute from
+/// Exposure=Tools with code mode otherwise enabled. The exposure mode hides koan_code_execute from
 /// tools/list; the RPC invoke-by-name path must still refuse it, proving the gate is the exposure
 /// mode itself and not merely the listing filter (the originally-reported bypass).
 /// </summary>

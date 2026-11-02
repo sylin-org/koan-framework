@@ -77,7 +77,7 @@ public sealed class StreamableAuthSpec : IClassFixture<StreamableAuthFixture>
         using var client = _fx.NewClient();
         var sessionId = await InitializeAs(client, Token("carol", "items:read", "items:write"));
 
-        var body = Rpc("tools/call", id: 2, @params: new { name = "ledgerbook.upsert", arguments = new { model = new { entry = "x" } } });
+        var body = Rpc("tools/call", id: 2, @params: new { name = "ledgerbook_upsert", arguments = new { model = new { entry = "x" } } });
         using var req = PostRequest(Route, body, sessionId, accept: "application/json, text/event-stream", protocolVersion: "2025-06-18");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token("carol", "items:read"));
         var res = await client.SendAsync(req, Quick);

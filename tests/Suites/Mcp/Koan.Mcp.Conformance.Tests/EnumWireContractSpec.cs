@@ -62,10 +62,10 @@ public sealed class EnumWireContractSpec(EnumWireFixture fixture) : IClassFixtur
     }
 
     [Theory]
-    [InlineData("enum-wire-task", false)]
-    [InlineData("enum-wire-task", true)]
-    [InlineData("enum-wire-value-task", false)]
-    [InlineData("enum-wire-value-task", true)]
+    [InlineData("enum_wire_task", false)]
+    [InlineData("enum_wire_task", true)]
+    [InlineData("enum_wire_value_task", false)]
+    [InlineData("enum_wire_value_task", true)]
     public async Task Custom_async_output_keeps_enum_names_and_field_policy(string tool, bool admin)
     {
         var body = Body(await fixture.CallToolAsAsync(tool, null, User(admin)));
@@ -87,7 +87,7 @@ public sealed class EnumWireContractSpec(EnumWireFixture fixture) : IClassFixtur
                 ["dry_run"] = dryRun
             });
         Named(Body(call)["color"], "Green");
-        var change = call["meta"]!["diagnostics"]!["delta"]!["changes"]!
+        var change = call["_meta"]!["diagnostics"]!["delta"]!["changes"]!
             .Single(value => value["field"]!.Value<string>() == "color");
         Named(change["to"], "Green");
         (await Widget.Get(id) is not null).Should().Be(!dryRun);
@@ -96,7 +96,7 @@ public sealed class EnumWireContractSpec(EnumWireFixture fixture) : IClassFixtur
     [Fact]
     public async Task Legacy_numeric_input_remains_accepted_but_output_is_named()
     {
-        var body = Body(await fixture.CallToolAsync("enum-wire-echo",
+        var body = Body(await fixture.CallToolAsync("enum_wire_echo",
             new JObject { ["value"] = new JObject { ["state"] = 1 } }));
         Named(body["state"], "Green");
         var json = fixture.Services.GetRequiredService<IJsonFacade>();
@@ -106,7 +106,7 @@ public sealed class EnumWireContractSpec(EnumWireFixture fixture) : IClassFixtur
     [Fact]
     public async Task Undefined_typed_custom_output_fails_instead_of_emitting_a_number()
     {
-        var call = await fixture.CallToolAsync("enum-wire-undefined", null);
+        var call = await fixture.CallToolAsync("enum_wire_undefined", null);
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
     }
 
@@ -186,12 +186,12 @@ internal sealed class EnumWireSummaryHook : IEmitHook<EnumWireRecord>
 
 public static class EnumWireTools
 {
-    [McpTool(Name = "enum-wire-task")]
+    [McpTool(Name = "enum_wire_task")]
     public static Task<EnumWireDetail> Detail() => Task.FromResult(new EnumWireDetail());
-    [McpTool(Name = "enum-wire-value-task")]
+    [McpTool(Name = "enum_wire_value_task")]
     public static ValueTask<EnumWireDetail> ValueDetail() => ValueTask.FromResult(new EnumWireDetail());
-    [McpTool(Name = "enum-wire-echo")]
+    [McpTool(Name = "enum_wire_echo")]
     public static EnumWireSummary Echo(EnumWireSummary value) => value;
-    [McpTool(Name = "enum-wire-undefined")]
+    [McpTool(Name = "enum_wire_undefined")]
     public static EnumWireSummary Undefined() => new() { State = (WidgetColor)99 };
 }

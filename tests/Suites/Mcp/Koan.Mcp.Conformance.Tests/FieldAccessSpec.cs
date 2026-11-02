@@ -52,8 +52,8 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
         call.ToString().Should().NotContain(record.Id).And.NotContain(record.InternalSecret);
-        call["meta"]?["diagnostics"]?["totalCount"].Should().BeNull();
-        call["meta"]?["diagnostics"]?["delta"].Should().BeNull();
+        call["_meta"]?["diagnostics"]?["totalCount"].Should().BeNull();
+        call["_meta"]?["diagnostics"]?["delta"].Should().BeNull();
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
                 new JObject { ["filter"] = new JObject { [field] = value }.ToString() }, admin);
             McpHarnessFixtureBase.IsError(call).Should().BeFalse("{0}: {1}", field, call.ToString());
             Payload(call).Should().BeOfType<JArray>().Subject.Select(item => item["id"]!.Value<string>()).Should().Equal(record.Id);
-            call["meta"]!["diagnostics"]!["totalCount"]!.Value<int>().Should().Be(1);
+            call["_meta"]!["diagnostics"]!["totalCount"]!.Value<int>().Should().Be(1);
         }
     }
 
@@ -100,9 +100,9 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         var shaped = await fixture.CallToolAsAsync(fixture.ResolveToolName("field-shape-record", EntityEndpointOperationKind.Collection),
             arguments, principal);
         McpHarnessFixtureBase.IsShortCircuited(shaped).Should().BeTrue();
-        shaped["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(403);
+        shaped["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(403);
         shaped.ToString().Should().NotContain(record.Name).And.NotContain(record.Id);
-        shaped["meta"]?["diagnostics"]?["totalCount"].Should().BeNull();
+        shaped["_meta"]?["diagnostics"]?["totalCount"].Should().BeNull();
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
             new JObject { ["query"] = new JObject { ["WriteOnlyToken"] = record.WriteOnlyToken }.ToString() }, admin: true);
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
-        call["meta"]?["diagnostics"]?["delta"].Should().BeNull();
+        call["_meta"]?["diagnostics"]?["delta"].Should().BeNull();
         (await FieldAccessRecord.Get(record.Id)).Should().NotBeNull();
     }
 
@@ -163,7 +163,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
             new JObject { ["id"] = record.Id, ["patch"] = new JArray(operation) }, admin);
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
-        call["meta"]?["diagnostics"]?["delta"].Should().BeNull();
+        call["_meta"]?["diagnostics"]?["delta"].Should().BeNull();
         var stored = await FieldAccessRecord.Get(record.Id);
         stored!.Title.Should().Be(record.Title);
         stored.InternalSecret.Should().Be(record.InternalSecret);
@@ -182,7 +182,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         var call = await Call(batch ? EntityEndpointOperationKind.UpsertMany : EntityEndpointOperationKind.Upsert, args, admin: true);
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
-        call["meta"]?["diagnostics"]?["delta"].Should().BeNull();
+        call["_meta"]?["diagnostics"]?["delta"].Should().BeNull();
         var stored = await FieldAccessRecord.Get(record.Id);
         stored!.Title.Should().Be(record.Title);
         stored.InternalSecret.Should().Be(record.InternalSecret);
@@ -203,7 +203,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         McpHarnessFixtureBase.IsShortCircuited(call).Should().BeFalse();
         (await FieldAccessRecord.Get(record.Id))!.WriteOnlyToken.Should().Be(next);
         call.ToString().Should().NotContain(next).And.NotContain(record.WriteOnlyToken).And.NotContain("writeOnlyToken");
-        var delta = call["meta"]?["diagnostics"]?["delta"];
+        var delta = call["_meta"]?["diagnostics"]?["delta"];
         delta.Should().NotBeNull();
     }
 
@@ -213,7 +213,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
     public async Task Typed_custom_output_and_input_use_the_same_field_policy(bool admin)
     {
         var principal = User(admin);
-        foreach (var name in new[] { "field-access-detail", "field-access-value-detail" })
+        foreach (var name in new[] { "field_access_detail", "field_access_value_detail" })
         {
             var output = await fixture.CallToolAsAsync(name, new JObject(), principal);
             McpHarnessFixtureBase.IsError(output).Should().BeFalse("{0}: {1}", name, output.ToString());
@@ -221,7 +221,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
             operatorCode.Should().Be(admin ? "custom-operator-secret" : null);
         }
         var callsBefore = FieldAccessTools.InputCalls;
-        var input = await fixture.CallToolAsAsync("field-access-input", new JObject
+        var input = await fixture.CallToolAsAsync("field_access_input", new JObject
         {
             ["detail"] = new JObject { ["label"] = "public-input", ["operator_code"] = "caller-value" }
         }, principal);
@@ -243,7 +243,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         McpHarnessFixtureBase.IsError(call).Should().BeFalse();
         McpHarnessFixtureBase.IsShortCircuited(call).Should().BeFalse();
         (await FieldAccessRecord.Get(record.Id))!.Metadata.OperatorCode.Should().Be("rotated-private-code");
-        var changesToken = call["meta"]?["diagnostics"]?["delta"]?["changes"];
+        var changesToken = call["_meta"]?["diagnostics"]?["delta"]?["changes"];
         var changes = changesToken.Should().BeOfType<JArray>().Subject;
         changes.Select(change => change["field"]!.Value<string>()).Should().Equal("title");
         call.ToString().Should().NotContain("rotated-private-code").And.NotContain(record.Metadata.OperatorCode);
@@ -252,7 +252,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
     [Fact]
     public async Task Unprepared_polymorphic_output_refuses_without_a_partial_value()
     {
-        var call = await fixture.CallToolAsAsync("field-access-polymorphic", new JObject(), User(admin: true));
+        var call = await fixture.CallToolAsAsync("field_access_polymorphic", new JObject(), User(admin: true));
         McpHarnessFixtureBase.IsError(call).Should().BeTrue();
         McpHarnessFixtureBase.ContentText(call).Should().Contain("was not prepared");
         call.ToString().Should().NotContain("unprepared-secret");
@@ -268,13 +268,13 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         var arguments = new JObject { ["detail"] = detail };
         var callsBefore = FieldAccessTools.InputCalls;
 
-        var denied = await fixture.CallToolAsAsync("field-access-constructor-input", arguments, User(admin: false));
+        var denied = await fixture.CallToolAsAsync("field_access_constructor_input", arguments, User(admin: false));
         McpHarnessFixtureBase.IsError(denied).Should().BeTrue();
         McpHarnessFixtureBase.ContentText(denied).Should().Contain("replace");
         denied.ToString().Should().NotContain("caller-constructor-secret");
         FieldAccessTools.InputCalls.Should().Be(callsBefore);
 
-        var admitted = await fixture.CallToolAsAsync("field-access-constructor-input", arguments, User(admin: true));
+        var admitted = await fixture.CallToolAsAsync("field_access_constructor_input", arguments, User(admin: true));
         McpHarnessFixtureBase.IsError(admitted).Should().BeFalse("{0}", admitted.ToString());
         McpHarnessFixtureBase.ContentText(admitted).Should().Be(includeProtected ? "caller-constructor-secret" : "public-input");
         FieldAccessTools.InputCalls.Should().Be(callsBefore + 1);
@@ -288,7 +288,7 @@ public sealed class FieldAccessSpec(FieldAccessFixture fixture) : IClassFixture<
         {
             var detail = new JObject { ["label"] = "public-input" };
             if (includeProtected) detail["secret"] = "caller-private-field";
-            var call = await fixture.CallToolAsAsync("field-access-field-input", new JObject { ["detail"] = detail }, User(admin: true));
+            var call = await fixture.CallToolAsAsync("field_access_field_input", new JObject { ["detail"] = detail }, User(admin: true));
             McpHarnessFixtureBase.IsError(call).Should().BeTrue();
             McpHarnessFixtureBase.ContentText(call).Should().Contain("replace");
             call.ToString().Should().NotContain("caller-private-field").And.NotContain("default-private-field");

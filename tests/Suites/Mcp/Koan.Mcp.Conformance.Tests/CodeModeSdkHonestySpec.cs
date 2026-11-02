@@ -49,7 +49,7 @@ public sealed class CodeModeSdkHonestySpec : IClassFixture<CodeModeSdkFixture>
     private async Task<string> Run(string body)
     {
         var code = "try { " + body + " } catch (e) { SDK.Out.answer('threw: ' + e); }";
-        var call = await _fx.CallToolAsync("koan.code.execute", new JObject { ["code"] = code });
+        var call = await _fx.CallToolAsync("koan_code_execute", new JObject { ["code"] = code });
         return McpHarnessFixtureBase.ContentText(call) ?? call.ToString();
     }
 

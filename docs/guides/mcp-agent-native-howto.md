@@ -66,17 +66,17 @@ public sealed class Note : Entity<Note>
 
 ```jsonc
 { "tools": [
-  { "name": "note.collection", "description": "List Note records …",
+  { "name": "note_collection", "description": "List Note records …",
     "inputSchema": { "type": "object", "properties": { "filter": {…}, "page": {…} } },
     "annotations": { "title": "List Note", "readOnlyHint": true } },
-  { "name": "note.upsert", "description": "Insert or update a Note record.",
+  { "name": "note_upsert", "description": "Insert or update a Note record.",
     "annotations": { "readOnlyHint": false, "idempotentHint": true } },
-  { "name": "note.delete", "annotations": { "destructiveHint": true } }
+  { "name": "note_delete", "annotations": { "destructiveHint": true } }
   // …get-by-id, query, get-new, patch, delete-many, …
 ] }
 ```
 
-**What happens** — a `note.upsert` call runs through the *same* governed path a REST `POST /api/note` would: identical schema, identical validation, identical visibility. The hints (`readOnlyHint`/`destructiveHint`/`idempotentHint`) are derived mechanically from the verb, so an agent knows a `delete` is dangerous without you saying so. `AllowMutations = false` makes the entity read-only.
+**What happens** — a `note_upsert` call runs through the *same* governed path a REST `POST /api/note` would: identical schema, identical validation, identical visibility. The hints (`readOnlyHint`/`destructiveHint`/`idempotentHint`) are derived mechanically from the verb, so an agent knows a `delete` is dangerous without you saying so. `AllowMutations = false` makes the entity read-only.
 
 ---
 
@@ -90,7 +90,7 @@ You write nothing. The framework ships two introspection **resources** so an age
 // resources/read  koan://entities
 { "entities": [
   { "name": "note", "description": "A personal note",
-    "verbs": [ { "name": "note.collection", "operation": "Collection", "isMutation": false }, … ],
+    "verbs": [ { "name": "note_collection", "operation": "Collection", "isMutation": false }, … ],
     "edges": [ { "kind": "parent", "target": "author", "via": "AuthorId" } ] }
 ] }
 ```
@@ -118,7 +118,7 @@ You write nothing. The framework ships two introspection **resources** so an age
 public sealed class Note : Entity<Note> { public string Title { get; set; } = ""; public string Body { get; set; } = ""; }
 ```
 
-**What the agent sees** — exactly the verbs it may invoke. An anonymous caller's `tools/list` and catalog show `note.collection`/`note.get-by-id` (read = anyone) but **not** `note.delete` (remove = is:admin) — a walled verb is *absent*, never a redaction (**walled-means-silent**: no name, no count, no existence signal).
+**What the agent sees** — exactly the verbs it may invoke. An anonymous caller's `tools/list` and catalog show `note_collection`/`note_get_by_id` (read = anyone) but **not** `note_delete` (remove = is:admin) — a walled verb is *absent*, never a redaction (**walled-means-silent**: no name, no count, no existence signal).
 
 **What happens** — the gate is the **same authority on REST and MCP** (one seam, no per-transport copy). If an agent calls a verb it can't see, the data-layer gate denies it and the call fails (`isError: true`, `meta.errorCode` `unauthenticated` or `forbidden`) — the MCP mirror of a REST `401`/`403`. The denial never names a role; a `[Door]` entity's non-role gate adds its `needs` (SEC-0010). The catalog never advertises what a call would deny.
 
@@ -179,7 +179,7 @@ Some verbs should depend on *where the call arrived*, not *who* the caller is �
 [Access(read: "anyone", write: "owner", remove: "origin:local, is:admin")]   // local agent OR an admin may remove
 ```
 
-**What the agent sees** — a STDIO agent (running beside the app) sees `note.delete`; a remote Streamable HTTP agent does not (its `can:[]` simply omits the local-only verb).
+**What the agent sees** — a STDIO agent (running beside the app) sees `note_delete`; a remote Streamable HTTP agent does not (its `can:[]` simply omits the local-only verb).
 
 **What happens** — the framework stamps an **un-forgeable** `koan:origin` claim at the transport edge (STDIO → `local`, HTTP → `remote`, or `internal` when the source IP is in a declared trusted network — fail-closed). Origin is *orthogonal to identity*: a STDIO call is `local` yet anonymous, so it satisfies `origin:local` without signing in. Declare the LAN once (`Koan:Web:Origin:InternalNetworks`) and homelab clients are treated as `internal`.
 
@@ -236,7 +236,7 @@ For multi-entity workflows, an agent can send one sandboxed script instead of N 
 **What the agent sends** — JavaScript over a synchronous SDK mirroring your entities:
 
 ```js
-// tools/call  koan.code.execute  { "code": "...", "correlationId": "..." }
+// tools/call  koan_code_execute  { "code": "...", "correlationId": "..." }
 function run() {
   const note = SDK.Entities.Note.upsert({ title: "Groceries", body: "milk, eggs" });
   const all  = SDK.Entities.Note.collection();
@@ -299,8 +299,8 @@ public sealed class Note : Entity<Note> { /* … */ }
 
 ```jsonc
 { "name": "note",
-  "verbs": [ { "name": "note.collection", "operation": "Collection" } ],
-  "doors": [ { "name": "note.upsert", "operation": "Upsert", "needs": "requires scope:notes:write" } ] }
+  "verbs": [ { "name": "note_collection", "operation": "Collection" } ],
+  "doors": [ { "name": "note_upsert", "operation": "Upsert", "needs": "requires scope:notes:write" } ] }
 ```
 
 **What happens** — the `needs` is rendered from the **same gate that enforces** it (Description = Enforcement — it can't drift), and the verb is still denied on call. **Admin stays a Wall:** a verb gated on a *role* is never disclosed even with `[Door]` (disclosing it would let an agent enumerate that a privileged capability exists). So `[Door]` discloses *capabilities you could be granted*, never *privilege tiers*.
@@ -344,7 +344,7 @@ A disabled toolset's verbs are simply **absent** from `tools/list`. When enabled
 
 ```text
 new AgentGrant { Subject = "kitchen-agent", Resource = "@ops:jobs" }.Save();   // issue
-agent → koan.jobs.trigger { "workType": "ImportJob", "action": "import" }     → { "jobId": "…" }
+agent → koan_jobs_trigger { "workType": "ImportJob", "action": "import" }     → { "jobId": "…" }
 ```
 
 **Destructive** verbs (`cancel`, `flushAll`) require `"confirm": true`; called without it they return a **dry-run** describing what *would* happen (the safe default). Every mutating call writes an `AgentAction` audit row (rung 8). An anonymous/STDIO caller has no subject and so cannot hold an ops grant — ops are for governed *remote* agents.

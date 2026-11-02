@@ -40,11 +40,11 @@ Cache operations require `@ops:cache`. A blanket Entity grant does not confer op
 
 | Tool | Result and guard |
 |---|---|
-| `koan.jobs.trigger` | Trigger a registered job action; exact Jobs grant; mutation audited. |
-| `koan.jobs.cancel` | Cancel active work by type/id; exact Jobs grant; `confirm:true`; mutation audited. |
-| `koan.jobs.status` | Read latest work status; exact Jobs grant. |
-| `koan.cache.flush` | Flush entries tagged for one Entity type name; exact Cache grant; mutation audited. |
-| `koan.cache.flushAll` | Flush every registered cacheable Entity tag; exact Cache grant; `confirm:true`; mutation audited. |
+| `koan_jobs_trigger` | Trigger a registered job action; exact Jobs grant; mutation audited. |
+| `koan_jobs_cancel` | Cancel active work by type/id; exact Jobs grant; `confirm:true`; mutation audited. |
+| `koan_jobs_status` | Read latest work status; exact Jobs grant. |
+| `koan_cache_flush` | Flush entries tagged for one Entity type name; exact Cache grant; mutation audited. |
+| `koan_cache_flush_all` | Flush every registered cacheable Entity tag; exact Cache grant; `confirm:true`; mutation audited. |
 
 Without `confirm:true`, destructive tools return a dry-run description and make no change. Startup reporting names
 the available and enabled toolsets plus the grant/confirmation posture.

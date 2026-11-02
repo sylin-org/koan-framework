@@ -79,7 +79,7 @@ public sealed class BulkDeleteHookParitySpec : IClassFixture<CrateFixture>
         foreach (var call in new[] { many, byQuery, all })
         {
             McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
-            call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(409);
+            call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(409);
         }
         var still = await _fx.CallToolAsync(Tool(EntityEndpointOperationKind.GetById), new JObject { ["id"] = locked });
         McpHarnessFixtureBase.IsError(still).Should().BeFalse("the locked crate survives: {0}", still);

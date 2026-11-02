@@ -9,14 +9,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Koan.Mcp.Operations.IntegrationTests;
 
-/// <summary>A trivial job work-type so <c>koan.jobs.trigger</c> reaches the real ledger.</summary>
+/// <summary>A trivial job work-type so <c>koan_jobs_trigger</c> reaches the real ledger.</summary>
 public sealed class ImportJob : Entity<ImportJob>, IKoanJob<ImportJob>
 {
     public string Note { get; set; } = "";
     public static Task Execute(ImportJob job, JobContext ctx, CancellationToken ct) => Task.CompletedTask;
 }
 
-/// <summary>A cacheable entity so <c>ICachePolicyRegistry</c> has a policy for <c>koan.cache.flushAll</c> to enumerate.</summary>
+/// <summary>A cacheable entity so <c>ICachePolicyRegistry</c> has a policy for <c>koan_cache_flush_all</c> to enumerate.</summary>
 [Cacheable(60)]
 public sealed class CachedThing : Entity<CachedThing>
 {

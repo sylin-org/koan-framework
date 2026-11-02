@@ -35,7 +35,7 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
         {
             var denied = await _fx.CallToolAsAsync("gadget_admin", new JObject(), caller);
             McpHarnessFixtureBase.IsError(denied).Should().BeTrue(denied.ToString());
-            denied["meta"]!["errorCode"]!.Value<string>().Should().Be("gated");
+            denied["_meta"]!["errorCode"]!.Value<string>().Should().Be("gated");
         }
 
         (await _fx.CallToolAsync("gadget_admin", new JObject()))["isError"]!.Value<bool>().Should().BeTrue("STDIO asks as anyone does");
@@ -49,7 +49,7 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
         var unreadable = await _fx.CallToolAsync("gadget_count", new JObject { ["count"] = "many" });
         McpHarnessFixtureBase.IsError(unreadable).Should().BeTrue(unreadable.ToString());
         McpHarnessFixtureBase.ContentText(unreadable).Should().StartWith("count:");
-        unreadable["meta"]!["errorCode"]!.Value<string>().Should().Be("invalid");
+        unreadable["_meta"]!["errorCode"]!.Value<string>().Should().Be("invalid");
 
         var missing = await _fx.CallToolAsync("gadget_count", new JObject { ["step"] = 2 });
         McpHarnessFixtureBase.IsError(missing).Should().BeTrue(missing.ToString());
@@ -64,7 +64,7 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
     {
         var absent = await _fx.CallToolAsync("gadget_missing", new JObject());
         McpHarnessFixtureBase.IsError(absent).Should().BeTrue(absent.ToString());
-        absent["meta"]!["errorCode"]!.Value<string>().Should().Be("absent");
+        absent["_meta"]!["errorCode"]!.Value<string>().Should().Be("absent");
         McpHarnessFixtureBase.ContentText(absent).Should().Be(Koan.Data.Core.Commands.Reason.Absent("anything").Said);
     }
 

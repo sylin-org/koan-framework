@@ -27,7 +27,7 @@ public sealed class DryRunStateDeltaSpec : IClassFixture<DryRunFixture>
         return await _fx.CallToolAsync(tool, args);
     }
 
-    private static JObject? Diagnostics(JToken call) => call["meta"]?["diagnostics"] as JObject;
+    private static JObject? Diagnostics(JToken call) => call["_meta"]?["diagnostics"] as JObject;
     private static JObject? Delta(JToken call) => Diagnostics(call)?["delta"] as JObject;
 
     // Field names follow the shared application camelCase contract.

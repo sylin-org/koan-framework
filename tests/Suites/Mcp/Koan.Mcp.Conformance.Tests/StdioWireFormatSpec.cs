@@ -22,13 +22,13 @@ public sealed class StdioWireFormatSpec
     public void Tool_call_arguments_survive_the_wire()
     {
         const string json = """
-        {"name":"book.upsert","arguments":{"model":{"title":"Fix Verification","status":"Unread"}}}
+        {"name":"book_upsert","arguments":{"model":{"title":"Fix Verification","status":"Unread"}}}
         """;
 
         var parameters = JsonSerializer.Deserialize<McpRpcHandler.ToolsCallParams>(json, WireOptions());
 
         Assert.NotNull(parameters);
-        Assert.Equal("book.upsert", parameters!.Name);
+        Assert.Equal("book_upsert", parameters!.Name);
         Assert.NotNull(parameters.Arguments);
         Assert.Equal("Fix Verification", (string?)parameters.Arguments!["model"]?["title"]);
     }
@@ -37,7 +37,7 @@ public sealed class StdioWireFormatSpec
     public void Absent_arguments_stay_null()
     {
         var parameters = JsonSerializer.Deserialize<McpRpcHandler.ToolsCallParams>(
-            """{"name":"book.collection"}""", WireOptions());
+            """{"name":"book_collection"}""", WireOptions());
 
         Assert.NotNull(parameters);
         Assert.Null(parameters!.Arguments);

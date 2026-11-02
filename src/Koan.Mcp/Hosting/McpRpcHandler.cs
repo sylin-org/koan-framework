@@ -118,7 +118,7 @@ public sealed class McpRpcHandler
                   || await visibility.Allows(custom, cancellationToken).ConfigureAwait(false);
             if (callable) listed.Add(tool);
         }
-        return new ToolsListResponse { Tools = listed.ToArray(), Next = exposed.Next };
+        return new ToolsListResponse { Tools = listed.ToArray() };
     }
 
     /// <summary>The tools the exposure mode surfaces, before any per-caller authorization; each transport filters it
@@ -160,8 +160,7 @@ public sealed class McpRpcHandler
 
         var response = new ToolsListResponse
         {
-            Tools = toolsList.ToArray(),
-            Next = null
+            Tools = toolsList.ToArray()
         };
 
         _logger.LogDebug(
@@ -192,13 +191,13 @@ public sealed class McpRpcHandler
         _logger.LogDebug("MCP tools/call for {Tool} invoked.", parameters.Name);
 
         // Handle code execution tool
-        if (parameters.Name == "koan.code.execute")
+        if (parameters.Name == "koan_code_execute")
         {
             var res = await ExecuteCode(parameters.Arguments, user, cancellationToken);
             return ToCallToolResult(res);
         }
         // Handle code validation tool
-        if (parameters.Name == "koan.code.validate")
+        if (parameters.Name == "koan_code_validate")
         {
             var res = ExecuteCodeValidation(parameters.Arguments);
             return ToCallToolResult(res);
@@ -408,8 +407,8 @@ public sealed class McpRpcHandler
         => _codeExecutor != null
            && (_services.GetService<IOptions<CodeModeOptions>>()?.Value.Enabled ?? false);
 
-    // Defense-in-depth gate for the RPC invoke-by-name path. Hiding koan.code.execute /
-    // koan.code.validate from tools/list is not a security control on its own — a client can still
+    // Defense-in-depth gate for the RPC invoke-by-name path. Hiding koan_code_execute /
+    // koan_code_validate from tools/list is not a security control on its own — a client can still
     // call them by name. Both the disabled kill switch and the active exposure mode are enforced here
     // so the invoke path cannot run sandboxed JavaScript that discovery would never have surfaced.
     private bool TryDenyCodeExecution(out ToolsCallResult denial)
@@ -492,7 +491,7 @@ public sealed class McpRpcHandler
 
         return new ToolDescriptor
         {
-            Name = "koan.code.execute",
+            Name = "koan_code_execute",
             Description = "Execute JavaScript code against Koan entity operations. Use SDK.Entities.* for entity operations and SDK.Out.answer() to return results.",
             InputSchema = inputSchema,
             // Code execution can mutate entities (SDK.Entities.*) — not read-only; effects depend on the script.
@@ -530,7 +529,7 @@ public sealed class McpRpcHandler
         };
         return new ToolDescriptor
         {
-            Name = "koan.code.validate",
+            Name = "koan_code_validate",
             Description = "Validate JavaScript code for syntax errors before execution.",
             InputSchema = inputSchema,
             // Validation only parses — it never executes code or touches state.
@@ -793,10 +792,6 @@ public sealed class McpRpcHandler
         [JsonPropertyName("tools")]
         [Newtonsoft.Json.JsonProperty("tools")]
         public IReadOnlyList<ToolDescriptor> Tools { get; init; } = [];
-
-        [JsonPropertyName("next")]
-        [Newtonsoft.Json.JsonProperty("next")]
-        public object? Next { get; init; }
     }
 
     public sealed class ToolDescriptor
@@ -1123,8 +1118,8 @@ public sealed class McpRpcHandler
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public bool IsError { get; set; }
 
-        [JsonPropertyName("meta")]
-        [Newtonsoft.Json.JsonProperty("meta")]
+        [JsonPropertyName("_meta")]
+        [Newtonsoft.Json.JsonProperty("_meta")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public JObject? Meta { get; set; }
 

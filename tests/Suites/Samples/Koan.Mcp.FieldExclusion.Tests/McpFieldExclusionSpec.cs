@@ -19,7 +19,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
     [Fact(DisplayName = "Input schema omits input-excluded fields, keeps the rest")]
     public void Schema_OmitsInputExcludedFields()
     {
-        var schema = _fx.GetToolInputSchema("catalog-item.upsert");
+        var schema = _fx.GetToolInputSchema("catalog_item_upsert");
         var modelProps = (JObject?)schema["properties"]?["model"]?["properties"];
         modelProps.Should().NotBeNull("the upsert schema describes the entity model");
 
@@ -35,7 +35,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
     {
         var id = await SeedViaRest("seed-public", "SEED-INTERNAL-SECRET", "SEED-SERVER-OWNED", "SEED-WRITEONLY");
 
-        var result = await _fx.CallToolAsync("catalog-item.get-by-id", new JObject { ["id"] = id });
+        var result = await _fx.CallToolAsync("catalog_item_get_by_id", new JObject { ["id"] = id });
         var text = ContentText(result);
         text.Should().NotBeNullOrEmpty();
 
@@ -51,7 +51,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
         var id = await SeedViaRest("codemode-public", "CODEMODE-INTERNAL-SECRET", "codemode-server", "codemode-writeonly");
 
         var code = "function run() { const x = SDK.Entities.CatalogItem.getById('" + id + "'); SDK.Out.answer(JSON.stringify(x)); }";
-        var result = await _fx.CallToolAsync("koan.code.execute", new JObject { ["code"] = code, ["correlationId"] = "field-exclusion-codemode" });
+        var result = await _fx.CallToolAsync("koan_code_execute", new JObject { ["code"] = code, ["correlationId"] = "field-exclusion-codemode" });
         var text = ContentText(result);
         text.Should().NotBeNullOrEmpty();
 
@@ -70,7 +70,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
             ["writeOnlyToken"] = "UPSERT-WRITEONLY"
         };
 
-        var upsert = await _fx.CallToolAsync("catalog-item.upsert", new JObject { ["model"] = model });
+        var upsert = await _fx.CallToolAsync("catalog_item_upsert", new JObject { ["model"] = model });
         upsert["isError"]!.Value<bool>().Should().BeTrue();
         ContentText(upsert).Should().Contain("replace");
 
@@ -82,7 +82,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
             .And.Contain("STORED-SERVER").And.Contain("STORED-WRITEONLY");
         restBody.Should().NotContain("upsert-public").And.NotContain("UPSERT-WRITEONLY");
 
-        var patch = await _fx.CallToolAsync("catalog-item.patch", new JObject
+        var patch = await _fx.CallToolAsync("catalog_item_patch", new JObject
         {
             ["id"] = id,
             ["patch"] = new JArray(new JObject
@@ -103,7 +103,7 @@ public class McpFieldExclusionSpec : IClassFixture<FieldExclusionFixture>
         {
             new JObject { ["op"] = "replace", ["path"] = "/internalSecret", ["value"] = "tampered" }
         };
-        var result = await _fx.CallToolAsync("catalog-item.patch", new JObject { ["id"] = id, ["patch"] = patch });
+        var result = await _fx.CallToolAsync("catalog_item_patch", new JObject { ["id"] = id, ["patch"] = patch });
 
         result["isError"]?.Value<bool>().Should().BeTrue();
         ContentText(result).Should().Contain("cannot write", "the shared field policy rejects input-excluded targets");

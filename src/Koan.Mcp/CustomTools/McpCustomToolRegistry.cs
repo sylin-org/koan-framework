@@ -131,7 +131,7 @@ public sealed class McpCustomToolRegistry
         if (method.IsDefined(typeof(AuthorizeAttribute), true) || method.ReflectedType?.IsDefined(typeof(AuthorizeAttribute), true) == true)
             throw new InvalidOperationException($"[Authorize] on [McpTool] {method.ReflectedType?.Name}.{method.Name} would answer to nothing. Declare [Access(...)] or [RequireScope(...)], or make it a route with [Tool].");
 
-        var name = string.IsNullOrWhiteSpace(attribute.Name) ? method.Name : attribute.Name!.Trim();
+        var name = string.IsNullOrWhiteSpace(attribute.Name) ? ToolName.Of(method.Name) : attribute.Name!.Trim();
 
         var parameters = new List<McpCustomToolParameter>();
         var properties = new JObject();

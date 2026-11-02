@@ -196,7 +196,7 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
     /// or a refusal status, which SEC-0010 also flags <c>isError</c> with a stable <c>meta.errorCode</c>; null = the
     /// endpoint ran the call.</summary>
     public static bool IsShortCircuited(JToken callResult)
-        => callResult["meta"]?["shortCircuit"] is { Type: not JTokenType.Null and not JTokenType.None };
+        => callResult["_meta"]?["shortCircuit"] is { Type: not JTokenType.Null and not JTokenType.None };
 
     /// <summary>Returns the input schema (JObject) for a tool, read straight from the registry.</summary>
     public JObject GetToolInputSchema(string toolName)

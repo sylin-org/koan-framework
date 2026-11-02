@@ -18,23 +18,23 @@ public class QuotaStrictSpec : IClassFixture<StrictQuotaTestPipelineFixture>
     public async Task Quota_ShouldEnforceDeterministically()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'a'}); SDK.Entities.Todo.upsert({ title: 'b'}); SDK.Entities.Todo.upsert({ title: 'c'}); SDK.Out.answer('done'); }";
-        var result = await Call("koan.code.execute", new { code, correlationId = "strict-maxsdk" });
-        result["meta"]?["errorCode"]!.Value<string>().Should().Be("sdk_calls_exceeded");
+        var result = await Call("koan_code_execute", new { code, correlationId = "strict-maxsdk" });
+        result["_meta"]?["errorCode"]!.Value<string>().Should().Be("sdk_calls_exceeded");
     }
 
     [Fact(DisplayName = "RequireAnswer=true returns missing_answer when no answer produced")]
     public async Task RequireAnswer_ShouldAlwaysEnforce()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'x'}); }"; // no answer
-        var result = await Call("koan.code.execute", new { code, correlationId = "strict-miss-answer" });
-        result["meta"]?["errorCode"]!.Value<string>().Should().Be("missing_answer");
+        var result = await Call("koan_code_execute", new { code, correlationId = "strict-miss-answer" });
+        result["_meta"]?["errorCode"]!.Value<string>().Should().Be("missing_answer");
     }
 
     [Fact(DisplayName = "Valid script within quotas succeeds and returns diagnostics")]
     public async Task Success_ShouldReturnDiagnostics()
     {
         var code = "function run() { SDK.Entities.Todo.upsert({ title: 'ok'}); SDK.Out.answer('yes'); }"; // 1 call <= quota
-        var result = await Call("koan.code.execute", new { code, correlationId = "strict-success" });
+        var result = await Call("koan_code_execute", new { code, correlationId = "strict-success" });
         result["content"]?[0]?["text"]!.Value<string>().Should().Be("yes");
     }
 }

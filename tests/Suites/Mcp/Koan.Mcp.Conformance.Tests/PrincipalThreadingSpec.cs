@@ -64,12 +64,12 @@ public sealed class PrincipalThreadingSpec : IClassFixture<GatedEntityFixture>
         const string code = "SDK.Out.answer(JSON.stringify(SDK.Entities.coffer.collection()));";
 
         // Authed with the scope: the sandbox's read passes the gate → the seeded row is visible.
-        var authed = await _fx.CallToolAsAsync("koan.code.execute", new JObject { ["code"] = code }, McpHarnessFixtureBase.Principal(scopes: "coffer:read"));
+        var authed = await _fx.CallToolAsAsync("koan_code_execute", new JObject { ["code"] = code }, McpHarnessFixtureBase.Principal(scopes: "coffer:read"));
         McpHarnessFixtureBase.ContentText(authed).Should().Contain("treasure",
             "the principal threads into the sandbox — the code runs AS the scoped caller and sees the row");
 
         // Anonymous: the sandbox's read is gate-denied → it sees an empty collection, never the row.
-        var anon = await _fx.CallToolAsync("koan.code.execute", new JObject { ["code"] = code });
+        var anon = await _fx.CallToolAsync("koan_code_execute", new JObject { ["code"] = code });
         McpHarnessFixtureBase.ContentText(anon).Should().NotContain("treasure",
             "an anonymous sandbox is gate-denied the read — code mode is not a bypass of the data-layer gate");
     }

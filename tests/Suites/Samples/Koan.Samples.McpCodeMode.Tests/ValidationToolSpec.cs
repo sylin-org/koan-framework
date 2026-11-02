@@ -31,14 +31,14 @@ public class ValidationToolSpec : IClassFixture<TestPipelineFixture>
     {
         var tools = await ListTools();
         var names = tools.Select(t => t["name"]?.Value<string>()).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
-        names.Should().Contain("koan.code.validate");
-        names.Should().Contain("koan.code.execute");
+        names.Should().Contain("koan_code_validate");
+        names.Should().Contain("koan_code_execute");
     }
 
     [Fact(DisplayName = "Validation tool returns valid=true for simple script")]
     public async Task Validate_ValidScript()
     {
-        var resp = await Call("koan.code.validate", new { code = "function run() { return 1+1; }" });
+        var resp = await Call("koan_code_validate", new { code = "function run() { return 1+1; }" });
         var text = resp["content"]?[0]?["text"]?.Value<string>();
         var obj = JObject.Parse(text!);
         obj["valid"]!.Value<bool>().Should().BeTrue();
@@ -47,7 +47,7 @@ public class ValidationToolSpec : IClassFixture<TestPipelineFixture>
     [Fact(DisplayName = "Validation tool returns valid=false with error for syntax issue")]
     public async Task Validate_InvalidScript()
     {
-        var resp = await Call("koan.code.validate", new { code = "function run( {" });
+        var resp = await Call("koan_code_validate", new { code = "function run( {" });
         var text = resp["content"]?[0]?["text"]?.Value<string>();
         var obj = JObject.Parse(text!);
         obj["valid"]!.Value<bool>().Should().BeFalse();
@@ -57,7 +57,7 @@ public class ValidationToolSpec : IClassFixture<TestPipelineFixture>
     [Fact(DisplayName = "Validation tool returns valid=false for empty code")]
     public async Task Validate_Empty()
     {
-        var resp = await Call("koan.code.validate", new { code = "" });
+        var resp = await Call("koan_code_validate", new { code = "" });
         var text = resp["content"]?[0]?["text"]?.Value<string>();
         var obj = JObject.Parse(text!);
         obj["valid"]!.Value<bool>().Should().BeFalse();

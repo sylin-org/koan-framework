@@ -7,29 +7,29 @@ public static class FieldAccessTools
 {
     public static int InputCalls;
 
-    [McpTool(Name = "field-access-detail")]
+    [McpTool(Name = "field_access_detail")]
     public static Task<FieldAccessRecord.Detail> Detail()
         => Task.FromResult(new FieldAccessRecord.Detail { Label = "public-custom", OperatorCode = "custom-operator-secret" });
 
-    [McpTool(Name = "field-access-value-detail")]
+    [McpTool(Name = "field_access_value_detail")]
     public static ValueTask<FieldAccessRecord.Detail> ValueDetail()
         => ValueTask.FromResult(new FieldAccessRecord.Detail { Label = "public-custom", OperatorCode = "custom-operator-secret" });
 
-    [McpTool(Name = "field-access-input")]
+    [McpTool(Name = "field_access_input")]
     public static string Input(FieldAccessRecord.Detail detail)
     {
         Interlocked.Increment(ref InputCalls);
         return detail.Label;
     }
 
-    [McpTool(Name = "field-access-constructor-input")]
+    [McpTool(Name = "field_access_constructor_input")]
     public static string ConstructorInput(ConstructorDetail detail)
     {
         Interlocked.Increment(ref InputCalls);
         return detail.OperatorCode ?? detail.Label;
     }
 
-    [McpTool(Name = "field-access-field-input")]
+    [McpTool(Name = "field_access_field_input")]
     public static string FieldInput(FieldDetail detail)
     {
         Interlocked.Increment(ref InputCalls);
@@ -44,7 +44,7 @@ public static class FieldAccessTools
         public string Secret = "default-private-field";
     }
 
-    [McpTool(Name = "field-access-polymorphic")]
+    [McpTool(Name = "field_access_polymorphic")]
     public static DynamicResult Polymorphic()
         => new() { Value = new FieldAccessRecord.Detail { OperatorCode = "unprepared-secret" } };
 

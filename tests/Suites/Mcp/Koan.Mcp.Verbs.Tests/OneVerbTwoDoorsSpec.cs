@@ -444,12 +444,12 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
     public async Task A_tool_controller_over_an_entity_exposes_its_operations_and_its_own_actions()
     {
         var names = (await forum.Tools(Mara)).Select(tool => tool["name"]!.Value<string>()!).ToArray();
-        names.Should().Contain("article.collection", "the entity's operations are the entity's own tools");
-        names.Should().Contain("article.upsert");
+        names.Should().Contain("article_collection", "the entity's operations are the entity's own tools");
+        names.Should().Contain("article_upsert");
         names.Should().Contain("data_articles_words_count", "the route with the particle in lower-case words");
         names.Should().Contain("data_articles_retitle_post");
 
-        var upsert = await forum.Tool("article.upsert", new JObject { ["model"] = new JObject { ["id"] = "a1", ["title"] = "two words" } }, Mara);
+        var upsert = await forum.Tool("article_upsert", new JObject { ["model"] = new JObject { ["id"] = "a1", ["title"] = "two words" } }, Mara);
         upsert.Failed.Should().BeFalse(upsert.ToString());
 
         var route = await forum.Route(HttpMethod.Get, "/data/articles/a1/words", null, Mara);

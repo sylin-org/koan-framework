@@ -23,7 +23,7 @@ public sealed class CorrelationPinSpec : IClassFixture<ConformanceFixture>
     {
         var tool = _fx.ResolveToolName("gadget", EntityEndpointOperationKind.Collection);
         var result = await _fx.CallToolAsync(tool, arguments);
-        return result["meta"]?["diagnostics"]?["correlationId"]?.Value<string>();
+        return result["_meta"]?["diagnostics"]?["correlationId"]?.Value<string>();
     }
 
     [Fact]

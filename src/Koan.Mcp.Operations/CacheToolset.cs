@@ -28,7 +28,7 @@ public sealed class CacheToolset : Toolset
         _policies = policies;
     }
 
-    [McpTool(Name = "koan.cache.flush", Description = "Flush all cache entries for one entity type (by name). Requires an @ops:cache grant.", IsMutation = true)]
+    [McpTool(Name = "koan_cache_flush", Description = "Flush all cache entries for one entity type (by name). Requires an @ops:cache grant.", IsMutation = true)]
     public async Task<object> Flush(string entity, ClaimsPrincipal? user, CancellationToken ct)
     {
         var subject = await OpsGate.RequireGrant(user, "cache", ct);
@@ -37,7 +37,7 @@ public sealed class CacheToolset : Toolset
         return new { entity, flushed };
     }
 
-    [McpTool(Name = "koan.cache.flushAll", Description = "Flush the ENTIRE cache (every cacheable entity type). Destructive — pass confirm:true. Requires an @ops:cache grant.", IsMutation = true)]
+    [McpTool(Name = "koan_cache_flush_all", Description = "Flush the ENTIRE cache (every cacheable entity type). Destructive — pass confirm:true. Requires an @ops:cache grant.", IsMutation = true)]
     [McpDestructive]
     public async Task<object> FlushAll(ClaimsPrincipal? user, CancellationToken ct, bool confirm = false)
     {

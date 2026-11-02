@@ -9,7 +9,7 @@ namespace Koan.Samples.McpCodeMode.Tests;
 ///   1. <c>CodeMode:Enabled=false</c> kill switch (covered by <see cref="CodeModeDisabledFixture"/>).
 ///   2. The active exposure mode does not surface code (covered by <see cref="ToolsOnlyExposureFixture"/>).
 /// The headline regression: hiding a tool from tools/list is not a security control — a client can
-/// still call koan.code.execute by name and run sandboxed JavaScript unless the invoke path refuses it.
+/// still call koan_code_execute by name and run sandboxed JavaScript unless the invoke path refuses it.
 /// </summary>
 public class CodeModeGatingSpec :
     IClassFixture<CodeModeDisabledFixture>,
@@ -30,23 +30,23 @@ public class CodeModeGatingSpec :
     public async Task Disabled_hides_code_tools_keeps_entity_tools()
     {
         var names = await ListToolNames(_disabled);
-        names.Should().NotContain("koan.code.execute");
-        names.Should().NotContain("koan.code.validate");
-        names.Any(n => n is not null && !n.StartsWith("koan.code.")).Should()
+        names.Should().NotContain("koan_code_execute");
+        names.Should().NotContain("koan_code_validate");
+        names.Any(n => n is not null && !n.StartsWith("koan_code_")).Should()
             .BeTrue("entity tools must still be exposed under Full when only code mode is disabled");
     }
 
-    [Fact(DisplayName = "Disabled kill switch refuses koan.code.execute called by name")]
+    [Fact(DisplayName = "Disabled kill switch refuses koan_code_execute called by name")]
     public async Task Disabled_refuses_execute_by_name()
     {
-        var resp = await Call(_disabled, "koan.code.execute", new { code = "SDK.Out.answer('should never run');" });
+        var resp = await Call(_disabled, "koan_code_execute", new { code = "SDK.Out.answer('should never run');" });
         AssertCodeModeDisabled(resp);
     }
 
-    [Fact(DisplayName = "Disabled kill switch refuses koan.code.validate called by name")]
+    [Fact(DisplayName = "Disabled kill switch refuses koan_code_validate called by name")]
     public async Task Disabled_refuses_validate_by_name()
     {
-        var resp = await Call(_disabled, "koan.code.validate", new { code = "function run() { return 1; }" });
+        var resp = await Call(_disabled, "koan_code_validate", new { code = "function run() { return 1; }" });
         AssertCodeModeDisabled(resp);
     }
 
@@ -56,28 +56,28 @@ public class CodeModeGatingSpec :
     public async Task ToolsExposure_hides_code_tools()
     {
         var names = await ListToolNames(_toolsOnly);
-        names.Should().NotContain("koan.code.execute");
-        names.Should().NotContain("koan.code.validate");
+        names.Should().NotContain("koan_code_execute");
+        names.Should().NotContain("koan_code_validate");
     }
 
-    [Fact(DisplayName = "Tools exposure refuses koan.code.execute called by name (the reported bypass)")]
+    [Fact(DisplayName = "Tools exposure refuses koan_code_execute called by name (the reported bypass)")]
     public async Task ToolsExposure_refuses_execute_by_name()
     {
-        var resp = await Call(_toolsOnly, "koan.code.execute", new { code = "SDK.Out.answer('should never run');" });
+        var resp = await Call(_toolsOnly, "koan_code_execute", new { code = "SDK.Out.answer('should never run');" });
         AssertCodeModeDisabled(resp);
     }
 
-    [Fact(DisplayName = "Tools exposure refuses koan.code.validate called by name")]
+    [Fact(DisplayName = "Tools exposure refuses koan_code_validate called by name")]
     public async Task ToolsExposure_refuses_validate_by_name()
     {
-        var resp = await Call(_toolsOnly, "koan.code.validate", new { code = "function run() { return 1; }" });
+        var resp = await Call(_toolsOnly, "koan_code_validate", new { code = "function run() { return 1; }" });
         AssertCodeModeDisabled(resp);
     }
 
     private static void AssertCodeModeDisabled(JToken resp)
     {
         resp["isError"]?.Value<bool>().Should().BeTrue("a gated code call must return an error envelope");
-        resp["meta"]?["errorCode"]?.Value<string>().Should().Be("code_mode_disabled");
+        resp["_meta"]?["errorCode"]?.Value<string>().Should().Be("code_mode_disabled");
     }
 
     private static async Task<List<string?>> ListToolNames(TestHostFixtureBase fx)

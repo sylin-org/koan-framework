@@ -46,7 +46,7 @@ mirroring the model or writing CRUD tool handlers.
 | Local or remote | STDIO when the client owns the local process | Streamable HTTP only when a network client must connect — it is secure opt-in: `Koan:Mcp:EnableStreamableHttpTransport=true` (default `/mcp`) |
 | Human inspection | facts and caller-visible resources first | add Explorer when operators need governed try-it |
 
-Generated tools are named `{Name}.{operation}` (e.g. `article.collection`, `article.get-by-id`);
+Generated tools are named `{Name}.{operation}` (e.g. `article_collection`, `article_get_by_id`);
 `AllowMutations = false` filters persisting verbs but keeps `new` — a non-persisting factory for
 client-side construction.
 

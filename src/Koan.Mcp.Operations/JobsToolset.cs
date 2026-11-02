@@ -18,7 +18,7 @@ public sealed class JobsToolset : Toolset
 
     public JobsToolset(IJobCoordinator jobs) => _jobs = jobs;
 
-    [McpTool(Name = "koan.jobs.trigger", Description = "Trigger a job action at the type level for a work type (the on-demand twin of a scheduled tick). Requires an @ops:jobs grant.", IsMutation = true)]
+    [McpTool(Name = "koan_jobs_trigger", Description = "Trigger a job action at the type level for a work type (the on-demand twin of a scheduled tick). Requires an @ops:jobs grant.", IsMutation = true)]
     public async Task<object> Trigger(string workType, string action, ClaimsPrincipal? user, CancellationToken ct)
     {
         var subject = await OpsGate.RequireGrant(user, "jobs", ct);
@@ -27,7 +27,7 @@ public sealed class JobsToolset : Toolset
         return new { jobId = handle.JobId, workType, action };
     }
 
-    [McpTool(Name = "koan.jobs.cancel", Description = "Durably cancel a work item's active job(s). Destructive — pass confirm:true. Requires an @ops:jobs grant.", IsMutation = true)]
+    [McpTool(Name = "koan_jobs_cancel", Description = "Durably cancel a work item's active job(s). Destructive — pass confirm:true. Requires an @ops:jobs grant.", IsMutation = true)]
     [McpDestructive]
     public async Task<object> Cancel(string workType, string workId, ClaimsPrincipal? user, CancellationToken ct, bool confirm = false)
     {
@@ -38,7 +38,7 @@ public sealed class JobsToolset : Toolset
         return new { cancelled = true, workType, workId };
     }
 
-    [McpTool(Name = "koan.jobs.status", Description = "Latest ledger status for a work item. Requires an @ops:jobs grant.")]
+    [McpTool(Name = "koan_jobs_status", Description = "Latest ledger status for a work item. Requires an @ops:jobs grant.")]
     [McpReadOnly]
     public async Task<object> Status(string workType, string workId, ClaimsPrincipal? user, CancellationToken ct)
     {

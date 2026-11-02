@@ -34,6 +34,6 @@ public static class McpExposure
     /// <summary>Entity tools and custom <c>[McpTool]</c> verbs are listed and callable.</summary>
     public static bool ExposesTools(McpExposureMode mode) => mode is McpExposureMode.Tools or McpExposureMode.Full;
 
-    /// <summary>The <c>koan.code.*</c> tools are listed and callable.</summary>
+    /// <summary>The <c>koan_code_*</c> tools are listed and callable.</summary>
     public static bool ExposesCode(McpExposureMode mode) => mode is McpExposureMode.Code or McpExposureMode.Full;
 }

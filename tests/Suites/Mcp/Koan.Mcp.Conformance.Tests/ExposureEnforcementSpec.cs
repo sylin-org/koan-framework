@@ -30,7 +30,7 @@ public sealed class ExposureEnforcementSpec : IClassFixture<CodeExposureFixture>
         var call = await _fx.CallToolAsync(_fx.ResolveToolName("marble", EntityEndpointOperationKind.DeleteAll), new JObject());
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
-        call["meta"]!["errorCode"]!.Value<string>().Should().Be("exposure_mode");
+        call["_meta"]!["errorCode"]!.Value<string>().Should().Be("exposure_mode");
     }
 
     [Fact]
@@ -39,13 +39,13 @@ public sealed class ExposureEnforcementSpec : IClassFixture<CodeExposureFixture>
         var call = await _fx.CallToolAsync("gadget_ping", new JObject());
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
-        call["meta"]!["errorCode"]!.Value<string>().Should().Be("exposure_mode");
+        call["_meta"]!["errorCode"]!.Value<string>().Should().Be("exposure_mode");
     }
 
     [Fact]
     public async Task The_sandbox_still_reaches_entities()
     {
-        var call = await _fx.CallToolAsync("koan.code.execute",
+        var call = await _fx.CallToolAsync("koan_code_execute",
             new JObject { ["code"] = "SDK.Out.answer('' + SDK.Entities.marble.collection().count);" });
 
         McpHarnessFixtureBase.IsError(call).Should().BeFalse(call.ToString());

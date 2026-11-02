@@ -3,7 +3,7 @@
 Declared analytics for Koan entities: name a question once — a measure, an optional grouping, an
 optional filter, a row cap — and it becomes part of the application's shared vocabulary: runnable from
 code, listed over HTTP at `/analytics/catalog` (with `Koan.Data.Analytics.Web`), and askable by agents
-through the `analytics.list_questions` / `analytics.ask` MCP tools.
+through the `analytics_list_questions` / `analytics_ask` MCP tools.
 
 ## Declare
 

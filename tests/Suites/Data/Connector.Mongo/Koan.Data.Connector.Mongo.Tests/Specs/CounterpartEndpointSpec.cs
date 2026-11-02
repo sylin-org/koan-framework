@@ -61,7 +61,7 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
         var missing = await Call(host.Services, EntityEndpointOperationKind.GetById,
             new JObject { ["id"] = "hidden", ["set"] = state.Content });
         missing.ToString().Should().NotContain("Hidden title");
-        missing["meta"]?["shortCircuit"].Should().NotBeNull();
+        missing["_meta"]?["shortCircuit"].Should().NotBeNull();
         await host.StopAsync();
     }
 
@@ -139,10 +139,10 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
                 .Select(row => row["id"]!.Value<string>()).Should().Contain(id);
             (await client.GetAsync("/counterpart-pages/" + id)).StatusCode.Should().Be(HttpStatusCode.OK);
             var mcpCollection = await Call(host.Services, EntityEndpointOperationKind.Collection, new JObject());
-            mcpCollection["meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
+            mcpCollection["_meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
             mcpCollection.ToString().Should().Contain(id);
             var mcpKeyed = await Call(host.Services, EntityEndpointOperationKind.GetById, new JObject { ["id"] = id });
-            mcpKeyed["meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
+            mcpKeyed["_meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
             mcpKeyed.ToString().Should().Contain(id);
         }
         finally
@@ -227,12 +227,12 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
         state.MapCalls = 0;
         var mcp = await Call(host.Services, EntityEndpointOperationKind.Query,
             new JObject { ["set"] = state.Content, ["filter"] = new JObject(), ["sort"] = "Title", ["page"] = 1, ["pageSize"] = 1 }, principal);
-        mcp["meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
+        mcp["_meta"]!["shortCircuit"]!.Type.Should().Be(JTokenType.Null);
         var views = JArray.Parse(mcp["content"]![0]!["text"]!.Value<string>()!);
         views.Select(view => view["id"]!.Value<string>()).Should().Equal("b");
         views.Select(view => view["label"]!.Value<string>()).Should().Equal("Translated A");
-        mcp["meta"]!["headers"]!["X-Total-Count"]!.Value<string>().Should().Be("2");
-        mcp["meta"]!["diagnostics"]!["access"]!.Children<JProperty>().Select(item => item.Name).Should().Equal("b");
+        mcp["_meta"]!["headers"]!["X-Total-Count"]!.Value<string>().Should().Be("2");
+        mcp["_meta"]!["diagnostics"]!["access"]!.Children<JProperty>().Select(item => item.Name).Should().Equal("b");
         views.Select(view => view["personalized"]!.Value<bool>()).Should().OnlyContain(value => value == authenticated);
         mcp.ToString().Should().NotContain("Hidden title");
         state.MapCalls.Should().Be(1);
@@ -274,12 +274,12 @@ public sealed class CounterpartEndpointSpec(MongoFixture mongo)
             rest.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
             (await rest.Content.ReadAsStringAsync()).Should().NotContain("mapper exception data");
             var mcp = await Call(host.Services, EntityEndpointOperationKind.Query, new JObject { ["set"] = state.Content });
-            mcp["meta"]!["shortCircuit"]!["statusCode"]!.Value<int>().Should().Be(500);
+            mcp["_meta"]!["shortCircuit"]!["statusCode"]!.Value<int>().Should().Be(500);
             // SEC-0010: a refusal is a failed tool call carrying a problem object, never an empty success.
             mcp["isError"]!.Value<bool>().Should().BeTrue();
-            mcp["meta"]!["errorCode"]!.Value<string>().Should().Be("rejected");
+            mcp["_meta"]!["errorCode"]!.Value<string>().Should().Be("rejected");
             mcp["content"]![0]!["text"]!.Value<string>().Should().NotContain("mapper exception data");
-            mcp["meta"]!["diagnostics"]!["access"].Should().BeNull();
+            mcp["_meta"]!["diagnostics"]!["access"].Should().BeNull();
         }
         await host.StopAsync();
     }

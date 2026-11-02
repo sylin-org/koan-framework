@@ -64,7 +64,7 @@ public sealed class McpPagingSpec : IClassFixture<PagingFixture>
 
         McpHarnessFixtureBase.IsError(call).Should().BeFalse(call.ToString());
         Names(call).Should().Equal("n04", "n05", "n06");
-        call["meta"]!["headers"]!["X-Page"]!.Value<string>().Should().Be("2");
+        call["_meta"]!["headers"]!["X-Page"]!.Value<string>().Should().Be("2");
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class McpPagingSpec : IClassFixture<PagingFixture>
         var call = await Call(Tool(EntityEndpointOperationKind.Collection), new JObject());
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
-        call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(413);
+        call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(413);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class McpPagingSpec : IClassFixture<PagingFixture>
     {
         const string code = "const a = SDK.Entities.leaf.page(1, 3, { sort: 'name' }); const b = SDK.Entities.leaf.page(2, 3, { sort: 'name' });" +
                             "SDK.Out.answer(JSON.stringify({ a: a.items.map(x => x.name), b: b.items.map(x => x.name) }));";
-        var call = await Call("koan.code.execute", new JObject { ["code"] = code });
+        var call = await Call("koan_code_execute", new JObject { ["code"] = code });
 
         var answer = JObject.Parse(McpHarnessFixtureBase.ContentText(call)!);
         answer["a"]!.Values<string>().Should().Equal("n01", "n02", "n03");

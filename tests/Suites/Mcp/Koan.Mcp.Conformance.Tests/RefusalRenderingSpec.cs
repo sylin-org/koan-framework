@@ -31,7 +31,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
 
     private string Tool(string entity, EntityEndpointOperationKind operation) => _fx.ResolveToolName(entity, operation);
 
-    private static string? ErrorCode(JToken call) => call["meta"]?["errorCode"]?.Value<string>();
+    private static string? ErrorCode(JToken call) => call["_meta"]?["errorCode"]?.Value<string>();
 
     [Fact]
     public async Task A_forbidden_collection_is_an_error_and_does_not_name_the_role()
@@ -42,7 +42,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
         ErrorCode(call).Should().Be("forbidden");
         McpHarnessFixtureBase.ContentText(call).Should().NotBe("[]", "a denied read is not an empty collection");
-        call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(403);
+        call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(403);
         call.ToString().Should().NotContain("admin").And.NotContain("role in", "a role gate is a privilege tier and stays silent");
     }
 
@@ -54,7 +54,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
         ErrorCode(call).Should().Be("unauthenticated");
-        call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(401);
+        call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(401);
         McpHarnessFixtureBase.IsShortCircuited(call).Should().BeTrue("the rendered refusal stays readable in meta.shortCircuit");
     }
 
@@ -67,7 +67,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
         ErrorCode(call).Should().Be("forbidden");
         McpHarnessFixtureBase.ContentText(call).Should().Contain("requires scope:showcase:write");
-        call["meta"]!["shortCircuit"]!["needs"]!.Value<string>().Should().Be("requires scope:showcase:write");
+        call["_meta"]!["shortCircuit"]!["needs"]!.Value<string>().Should().Be("requires scope:showcase:write");
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
         ErrorCode(call).Should().Be("not_found");
-        call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(404);
+        call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(404);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class RefusalRenderingSpec : IClassFixture<RefusalFixture>
 
         McpHarnessFixtureBase.IsError(call).Should().BeTrue(call.ToString());
         ErrorCode(call).Should().Be("rejected");
-        call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(400);
+        call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(400);
         McpHarnessFixtureBase.ContentText(call).Should().Contain("q is not accepted on this endpoint");
     }
 }

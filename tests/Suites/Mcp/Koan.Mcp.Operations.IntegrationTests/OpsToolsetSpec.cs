@@ -31,15 +31,15 @@ public sealed class OpsEnabledSpec : IClassFixture<OpsEnabledFixture>
     {
         var tools = await _fx.ListToolsAsync();
         var names = tools.Select(t => t["name"]?.Value<string>()).ToList();
-        names.Should().Contain("koan.jobs.trigger");
-        names.Should().Contain("koan.cache.flush");
-        names.Should().Contain("koan.cache.flushAll");
+        names.Should().Contain("koan_jobs_trigger");
+        names.Should().Contain("koan_cache_flush");
+        names.Should().Contain("koan_cache_flush_all");
     }
 
     [Fact]
     public async Task Trigger_without_a_grant_fails_loud_naming_the_ops_grant()
     {
-        var result = await _fx.CallToolAsAsync("koan.jobs.trigger",
+        var result = await _fx.CallToolAsAsync("koan_jobs_trigger",
             new JObject { ["workType"] = typeof(ImportJob).FullName, ["action"] = "import" },
             Agent("ungranted-agent"));
 
@@ -53,7 +53,7 @@ public sealed class OpsEnabledSpec : IClassFixture<OpsEnabledFixture>
         await new AgentGrant { Subject = "jobs-agent", Resource = "@ops:jobs" }.Save();
         var workType = typeof(ImportJob).FullName!;
 
-        var result = await _fx.CallToolAsAsync("koan.jobs.trigger",
+        var result = await _fx.CallToolAsAsync("koan_jobs_trigger",
             new JObject { ["workType"] = workType, ["action"] = "import" }, Agent("jobs-agent"));
 
         McpHarnessFixtureBase.IsError(result).Should().BeFalse(McpHarnessFixtureBase.ContentText(result));
@@ -63,7 +63,7 @@ public sealed class OpsEnabledSpec : IClassFixture<OpsEnabledFixture>
         using var scope = _fx.Services.CreateScope();
         var coordinator = scope.ServiceProvider.GetRequiredService<IJobCoordinator>();
         var records = await coordinator.WhereAsync(new JobQuery(WorkType: workType), CancellationToken.None);
-        records.Should().NotBeEmpty("koan.jobs.trigger submitted a job to the ledger");
+        records.Should().NotBeEmpty("koan_jobs_trigger submitted a job to the ledger");
 
         // the mutation was audited (SEC-0005 AgentAction).
         var audits = await AgentAction.Query(a => a.Subject == "jobs-agent");
@@ -75,7 +75,7 @@ public sealed class OpsEnabledSpec : IClassFixture<OpsEnabledFixture>
     {
         await new AgentGrant { Subject = "cache-agent", Resource = "@ops:cache" }.Save();
 
-        var result = await _fx.CallToolAsAsync("koan.cache.flushAll", new JObject(), Agent("cache-agent"));
+        var result = await _fx.CallToolAsAsync("koan_cache_flush_all", new JObject(), Agent("cache-agent"));
 
         McpHarnessFixtureBase.IsError(result).Should().BeFalse(McpHarnessFixtureBase.ContentText(result));
         McpHarnessFixtureBase.ContentText(result).Should().Contain("DRY RUN");
@@ -93,8 +93,8 @@ public sealed class OpsDisabledSpec : IClassFixture<OpsDisabledFixture>
     {
         var tools = await _fx.ListToolsAsync();
         var names = tools.Select(t => t["name"]?.Value<string>()).ToList();
-        names.Should().NotContain("koan.jobs.trigger");
-        names.Should().NotContain("koan.cache.flush");
-        names.Should().NotContain("koan.cache.flushAll");
+        names.Should().NotContain("koan_jobs_trigger");
+        names.Should().NotContain("koan_cache_flush");
+        names.Should().NotContain("koan_cache_flush_all");
     }
 }

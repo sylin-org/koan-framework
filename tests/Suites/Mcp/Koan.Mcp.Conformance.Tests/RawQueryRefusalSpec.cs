@@ -80,8 +80,8 @@ public sealed class RawQueryRefusalSpec : IClassFixture<ConformanceFixture>
             var call = await _fx.CallToolAsync(tool, new JObject { ["q"] = payload });
 
             McpHarnessFixtureBase.IsShortCircuited(call).Should().BeTrue($"q={payload}: {call}");
-            call["meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(400);
-            var refusal = call["meta"]!["shortCircuit"]!["payload"]!;
+            call["_meta"]!["diagnostics"]!["shortCircuitStatusCode"]!.Value<int>().Should().Be(400);
+            var refusal = call["_meta"]!["shortCircuit"]!["payload"]!;
             refusal["code"]!.Value<string>().Should().Be("web.read.freeTextUnsupported");
             refusal["message"]!.Value<string>().Should().Contain("filter", "the refusal names the fix");
             call.ToString().Should().NotContain("does not support raw",

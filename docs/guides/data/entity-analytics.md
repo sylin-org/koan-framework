@@ -79,7 +79,7 @@ Every declared question appears in:
 
 - `AnalyticsCatalog.Names()` / `All()` — in code;
 - `GET /analytics/catalog` — over HTTP, including each question's measure, grouping, and bounds;
-- `analytics.list_questions` — to agents over MCP.
+- `analytics_list_questions` — to agents over MCP.
 
 Names are the contract. They are unique (a duplicate declaration fails startup), deterministic
 in ordering, and they are what HTTP routes, MCP tools, and log lines all use.
@@ -226,10 +226,10 @@ Every path — query, filter, export — passes the same tenant scoping as the s
 
 The catalog is the agent's vocabulary. Four MCP tools, read-only by construction:
 
-- `analytics.list_questions` — the catalog: names, measures, groupings, bounds.
-- `analytics.ask(name)` — run a declared question; the answer carries question, engine, age, bounds.
-- `analytics.facets(name, by, since?)` — a column's distribution, or movement since a watermark.
-- `analytics.delta(name, since?)` — changed rows plus the next watermark, for incremental consumption.
+- `analytics_list_questions` — the catalog: names, measures, groupings, bounds.
+- `analytics_ask(name)` — run a declared question; the answer carries question, engine, age, bounds.
+- `analytics_facets(name, by, since?)` — a column's distribution, or movement since a watermark.
+- `analytics_delta(name, since?)` — changed rows plus the next watermark, for incremental consumption.
 
 Free-form SQL is not offered to agents: an unanswerable ask returns `unknown-question` with the
 catalog, and the ask is recorded so the gap can close as a new declaration. Hallucinated joins and

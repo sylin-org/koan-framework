@@ -117,31 +117,11 @@ public sealed class DescriptorMapper
     }
 
     private static string BuildToolName(string displayName, string? prefix, EntityEndpointOperationKind operation)
-    {
-        var entitySegment = ToKebabCase(displayName);
-        var operationSegment = operation switch
+        => CustomTools.ToolName.Of(prefix, displayName, operation switch
         {
-            EntityEndpointOperationKind.Collection => "collection",
-            EntityEndpointOperationKind.Query => "query",
             EntityEndpointOperationKind.GetNew => "new",
-            EntityEndpointOperationKind.GetById => "get-by-id",
-            EntityEndpointOperationKind.Upsert => "upsert",
-            EntityEndpointOperationKind.UpsertMany => "upsert-many",
-            EntityEndpointOperationKind.Delete => "delete",
-            EntityEndpointOperationKind.DeleteMany => "delete-many",
-            EntityEndpointOperationKind.DeleteByQuery => "delete-by-query",
-            EntityEndpointOperationKind.DeleteAll => "delete-all",
-            EntityEndpointOperationKind.Patch => "patch",
-            _ => operation.ToString().ToLowerInvariant()
-        };
-
-        if (string.IsNullOrWhiteSpace(prefix))
-        {
-            return $"{entitySegment}.{operationSegment}";
-        }
-
-        return $"{ToKebabCase(prefix)}.{entitySegment}.{operationSegment}";
-    }
+            _ => operation.ToString()
+        });
 
     private static string BuildDescription(string? entityDescription, EntityEndpointOperationKind operation, string displayName)
     {
@@ -162,22 +142,5 @@ public sealed class DescriptorMapper
             EntityEndpointOperationKind.Patch => $"Apply a JSON Patch document to a {focus} record.",
             _ => $"Execute {operation} for {focus}."
         };
-    }
-
-    private static string ToKebabCase(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value)) return value;
-
-        var chars = new List<char>(value.Length);
-        foreach (var c in value)
-        {
-            if (char.IsUpper(c) && chars.Count > 0 && chars[^1] != '-')
-            {
-                chars.Add('-');
-            }
-            chars.Add(char.ToLowerInvariant(c));
-        }
-
-        return new string(chars.ToArray());
     }
 }

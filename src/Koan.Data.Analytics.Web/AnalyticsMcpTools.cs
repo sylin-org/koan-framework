@@ -12,7 +12,7 @@ namespace Koan.Data.Analytics.Web;
 /// </summary>
 public static class AnalyticsMcpTools
 {
-    [McpTool(Name = "analytics.list_questions",
+    [McpTool(Name = "analytics_list_questions",
         Description = "List the analytics questions this application has declared, with each question's measure, grouping, and bounds.")]
     public static object ListQuestions(IServiceProvider services)
     {
@@ -30,7 +30,7 @@ public static class AnalyticsMcpTools
 
     /// <param name="name">The declared question to run.</param>
     /// <param name="rowCap">Optional override of the question's row cap, within the host's ceiling.</param>
-    [McpTool(Name = "analytics.ask",
+    [McpTool(Name = "analytics_ask",
         Description = "Run a declared analytics question by name and receive the answer with its provenance (engine, age, bounds). Free-form queries are not supported by design: ask a declared question or list the catalog.")]
     public static async Task<object> Ask(
         string name,
@@ -86,7 +86,7 @@ public static class AnalyticsMcpTools
     /// <param name="by">A declared column of the materialization.</param>
     /// <param name="since">Optional watermark from a previous facets or delta response; omit for the full distribution.</param>
     /// <param name="limit">Bucket ceiling; capped answers say so.</param>
-    [McpTool(Name = "analytics.facets",
+    [McpTool(Name = "analytics_facets",
         Description = "Distinct values of one materialized analytics column with counts — the distribution, or with a watermark, what has been moving since. Refuses on-demand questions and undeclared columns.")]
     public static async Task<object> Facets(
         string name,
@@ -120,7 +120,7 @@ public static class AnalyticsMcpTools
     /// <param name="name">The declared materialized question to consume incrementally.</param>
     /// <param name="since">Optional watermark from a previous response; omit to start from the beginning.</param>
     /// <param name="limit">Row ceiling; capped answers say so.</param>
-    [McpTool(Name = "analytics.delta",
+    [McpTool(Name = "analytics_delta",
         Description = "Rows a materialization wrote after a watermark, plus the next watermark — incremental consumption for agents. Pass back the cursor from the previous response unchanged.")]
     public static async Task<object> Delta(
         string name,
@@ -151,8 +151,8 @@ public static class AnalyticsMcpTools
     }
 
     /// <param name="name">The declared question to explain.</param>
-    /// <param name="parametersJson">Optional JSON object of parameter values, as in analytics.ask.</param>
-    [McpTool(Name = "analytics.explain",
+    /// <param name="parametersJson">Optional JSON object of parameter values, as in analytics_ask.</param>
+    [McpTool(Name = "analytics_explain",
         Description = "What a declared analytics question would do — serve, compute, or refuse — with its composed query, bounds, parameters, and capabilities. Never executes: safe to call before asking.")]
     public static async Task<object> Explain(
         string name,
@@ -173,7 +173,7 @@ public static class AnalyticsMcpTools
 
     /// <param name="name">The declared materialized question whose refreshes to list.</param>
     /// <param name="take">Ledger depth, newest first (max 100).</param>
-    [McpTool(Name = "analytics.history",
+    [McpTool(Name = "analytics_history",
         Description = "A materialized question's refresh ledger, newest first: when each refresh ran, how many rows it wrote, how long it took, and what triggered it. On-demand questions refuse.")]
     public static object History(string name, IServiceProvider services, int take = 20)
     {
@@ -189,7 +189,7 @@ public static class AnalyticsMcpTools
     }
 
     /// <param name="name">The declared question to describe.</param>
-    [McpTool(Name = "analytics.shape",
+    [McpTool(Name = "analytics_shape",
         Description = "A declared analytics question's answer shape — output columns with types, declared parameters, bounds, and whether it materializes — without computing anything. Use it to bind before asking.")]
     public static object Shape(string name, IServiceProvider services)
     {

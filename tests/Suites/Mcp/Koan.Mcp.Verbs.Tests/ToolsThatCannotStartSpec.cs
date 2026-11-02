@@ -1,7 +1,9 @@
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Data.Core.Model;
 using Koan.Mcp.CustomTools;
+using Koan.Mcp.Options;
 using Koan.Web.Attributes;
 using Microsoft.AspNetCore.Authorization;
 using Koan.Web.Extensions;
@@ -190,6 +192,31 @@ public sealed class ToolsThatCannotStartSpec
         (await Assert.ThrowsAsync<InvalidOperationException>(() => Start(Default, typeof(ByDefaultPolicy)))).Message.Should().Contain("Elsewhere");
         await Start(Default, typeof(AnonymousUnderAScheme));
     }
+
+    [Fact]
+    public async Task A_name_a_client_would_refuse_stops_the_host_whichever_door_made_it()
+    {
+        void TooLong(IServiceCollection services) => services.PostConfigure<McpServerOptions>(options =>
+            options.EntityOverrides[typeof(LongNamedRecord).FullName!] = new McpEntityOverride { Name = new string('a', 70) });
+
+        var stopped = await Assert.ThrowsAsync<InvalidOperationException>(() => Start(TooLong));
+        stopped.Message.Should().Contain("at most 64 characters");
+    }
+
+    [McpEntity]
+    public sealed class LongNamedRecord : Entity<LongNamedRecord>;
+
+    [Fact]
+    public void A_method_with_no_name_stated_is_named_in_words()
+    {
+        var registry = new McpCustomToolRegistry(Microsoft.Extensions.Logging.Abstractions.NullLogger<McpCustomToolRegistry>.Instance);
+        var build = typeof(McpCustomToolRegistry).GetMethod("Build", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var tool = (McpCustomTool)build.Invoke(registry, [typeof(ToolsThatCannotStartSpec).GetMethod(nameof(UnnamedVerb)), new McpToolAttribute()])!;
+        tool.Name.Should().Be("unnamed_verb");
+    }
+
+    /// <summary>Not an [McpTool], or it would be listed by every host of this assembly.</summary>
+    public static string UnnamedVerb() => "";
 
     /// <summary>Not an [McpTool], or nothing in this assembly could boot: discovery stops the host at this.</summary>
     [Authorize]

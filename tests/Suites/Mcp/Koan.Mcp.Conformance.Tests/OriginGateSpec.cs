@@ -54,12 +54,12 @@ public sealed class OriginGateSpec : IClassFixture<OriginEntityFixture>
         const string code = "SDK.Out.answer(JSON.stringify(SDK.Entities.lockbox.collection()));";
 
         // STDIO code mode runs as local → the sandbox read passes origin:local and sees the row.
-        var local = await _fx.CallToolAsync("koan.code.execute", new JObject { ["code"] = code });
+        var local = await _fx.CallToolAsync("koan_code_execute", new JObject { ["code"] = code });
         McpHarnessFixtureBase.ContentText(local).Should().Contain("gold",
             "code mode over STDIO is local — origin:local admits the sandbox read");
 
         // Remote code mode is gate-denied the local-only read → it never sees the row (not a bypass).
-        var remote = await _fx.CallToolAsAsync("koan.code.execute", new JObject { ["code"] = code },
+        var remote = await _fx.CallToolAsAsync("koan_code_execute", new JObject { ["code"] = code },
             McpHarnessFixtureBase.Principal(scopes: "anything"));
         McpHarnessFixtureBase.ContentText(remote).Should().NotContain("gold",
             "a remote sandbox is denied the local-only read — origin gates code mode too");
