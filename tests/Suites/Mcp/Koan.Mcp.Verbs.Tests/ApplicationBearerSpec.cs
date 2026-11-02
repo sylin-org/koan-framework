@@ -26,9 +26,18 @@ public sealed class CookieSignInController : ControllerBase
             [new Claim(ClaimTypes.NameIdentifier, subject), new Claim("sub", subject)], AuthenticationExtensions.CookieScheme)));
         return Ok();
     }
+
+    [HttpPost("/bearer-spec/signout")]
+    public async Task<IActionResult> Leave()
+    {
+        await HttpContext.SignOutAsync(AuthenticationExtensions.CookieScheme);
+        return Ok();
+    }
 }
 
 public sealed record ListsInput(string[]? Permissions, List<string>? Others);
+
+public sealed record OptionalListsInput(string[]? Permissions = null, List<string>? Others = null, string? Words = null);
 
 public sealed record LimitedInput(string? Words);
 
@@ -40,6 +49,15 @@ public sealed class ToolRequestController : ControllerBase
 
     [HttpPost("/bearer-spec/lists"), Tool(Name = "bearer_lists")]
     public IActionResult Lists(ListsInput input, string[]? plain) => Ok(new { permissions = input.Permissions?.Length, others = input.Others?.Count, plain = plain?.Length });
+
+    [HttpPost("/bearer-spec/optional-lists"), Tool(Name = "bearer_optional_lists")]
+    public IActionResult OptionalLists(OptionalListsInput input) => Ok(new { permissions = input.Permissions?.Length, others = input.Others?.Count });
+
+    [HttpPost("/bearer-spec/nothing"), Tool(Name = "bearer_nothing")]
+    public IActionResult Nothing(string? why) => Ok(new { why });
+
+    [HttpGet("/bearer-spec/read"), Tool(Name = "bearer_read")]
+    public IActionResult Read(string? q) => Ok(new { q });
 
     [HttpPost("/bearer-spec/limited"), Tool(Name = "bearer_limited"), RequestSizeLimit(64)]
     public IActionResult Limited(LimitedInput input) => Ok(new { words = input.Words });
@@ -192,6 +210,64 @@ public sealed class ApplicationBearerSpec(ApplicationBearerFixture host) : IClas
             (read["others"]?.Value<int?>()).Should().Be(others, answer.ToString());
             (read["plain"]?.Value<int?>()).Should().Be(plain, answer.ToString());
         }
+    }
+
+    /// <summary>= null is how an optional field on these inputs is written.</summary>
+    [Theory]
+    [InlineData("{\"permissions\":[],\"others\":[]}", 0, 0)]
+    [InlineData("{\"permissions\":[\"a\",\"b\"]}", 2, null)]
+    [InlineData("{\"words\":\"x\"}", null, null)]
+    public async Task An_empty_array_binds_empty_where_the_field_has_a_default_on_either_door(string body, int? permissions, int? others)
+    {
+        var token = host.Token(host.BaseUrl);
+
+        var route = await host.Route(HttpMethod.Post, "/bearer-spec/optional-lists", JObject.Parse(body), token);
+        var tool = await host.Tool("bearer_optional_lists", JObject.Parse(body), token);
+
+        foreach (var answer in new[] { route, tool })
+        {
+            var read = JObject.Parse(answer.Text);
+            (read["permissions"]?.Value<int?>()).Should().Be(permissions, answer.ToString());
+            (read["others"]?.Value<int?>()).Should().Be(others, answer.ToString());
+        }
+    }
+
+    /// <summary>A wrapper that says JSON on every request. An action with no parameters never asks for its fields, so these have one.</summary>
+    [Theory]
+    [InlineData("GET", "/bearer-spec/read")]
+    [InlineData("POST", "/bearer-spec/nothing")]
+    public async Task A_json_content_type_with_no_body_reads_as_no_fields(string method, string path)
+    {
+        using var client = host.Browser();
+        using var request = new HttpRequestMessage(new HttpMethod(method), path) { Content = new ByteArrayContent([]) };
+        request.Content.Headers.TryAddWithoutValidation("Content-Type", "application/json");
+
+        using var answer = await client.SendAsync(request, Ct);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.OK, await answer.Content.ReadAsStringAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_form_past_the_limit_is_413_as_a_json_body_is()
+    {
+        using var client = host.Browser();
+        using var form = new MultipartFormDataContent { { new StringContent(new string('x', 500)), "words" } };
+
+        using var answer = await client.PostAsync("/bearer-spec/limited", form, Ct);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge, await answer.Content.ReadAsStringAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_form_under_the_limit_that_cannot_be_read_is_still_not_accepted()
+    {
+        using var client = host.Browser();
+        using var cut = new ByteArrayContent(Encoding.ASCII.GetBytes("--b\r\nno"));
+        cut.Headers.TryAddWithoutValidation("Content-Type", "multipart/form-data; boundary=b");
+
+        using var answer = await client.PostAsync("/bearer-spec/limited", cut, Ct);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.BadRequest, await answer.Content.ReadAsStringAsync(Ct));
     }
 
     [Theory]
@@ -520,6 +596,181 @@ public sealed class AddressedEdgeSpec(AddressedFixture host) : IClassFixture<Add
 
         refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+}
+
+/// <summary>
+/// SEC-0037: a browser sends its session cookie whoever asks, so one that no longer holds reads as a visitor, on a route that is a tool and on
+/// an entity's, with the edge on and off. A bearer a caller presented stays refused.
+/// </summary>
+public abstract class StaleCookieSpecBase(ApplicationBearerFixture host)
+{
+    private const string Session = ".AspNetCore.Koan.cookie";
+
+    protected ApplicationBearerFixture Forum => host;
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private async Task<string> SignedIn(string subject)
+    {
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(host.BaseUrl) };
+        using var answer = await client.GetAsync($"/bearer-spec/signin?subject={subject}", Ct);
+        answer.StatusCode.Should().Be(HttpStatusCode.OK);
+        return answer.Headers.GetValues("Set-Cookie").Single(cookie => cookie.StartsWith(Session, StringComparison.Ordinal)).Split(';')[0];
+    }
+
+    private async Task<(HttpStatusCode Status, string Text)> Read(string path, string cookie)
+    {
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(host.BaseUrl) };
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.TryAddWithoutValidation("Cookie", cookie);
+        using var answer = await client.SendAsync(request, Ct);
+        return (answer.StatusCode, await answer.Content.ReadAsStringAsync(Ct));
+    }
+
+    private async Task ReadsAsAVisitor(string cookie)
+    {
+        var tool = await Read("/fidelity/whoami", cookie);
+        tool.Status.Should().Be(HttpStatusCode.OK, tool.Text);
+        JObject.Parse(tool.Text)["id"]?.Value<string>().Should().BeNull();
+        var entity = await Read("/data/articles", cookie);
+        entity.Status.Should().Be(HttpStatusCode.OK, entity.Text);
+    }
+
+    [Fact]
+    public async Task A_good_cookie_is_its_person()
+    {
+        var cookie = await SignedIn($"stale-{Guid.CreateVersion7():N}");
+
+        var read = await Read("/fidelity/whoami", cookie);
+
+        JObject.Parse(read.Text)["id"]!.Value<string>().Should().StartWith("stale-");
+    }
+
+    [Fact]
+    public async Task A_tampered_cookie_reads_as_a_visitor()
+    {
+        var cookie = await SignedIn($"stale-{Guid.CreateVersion7():N}");
+
+        await ReadsAsAVisitor(cookie[..^8] + "AAAAAAAA");
+    }
+
+    [Fact]
+    public async Task A_cookie_replayed_after_sign_out_reads_as_a_visitor()
+    {
+        var cookie = await SignedIn($"stale-{Guid.CreateVersion7():N}");
+        using (var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(host.BaseUrl) })
+        using (var signOut = new HttpRequestMessage(HttpMethod.Post, "/bearer-spec/signout"))
+        {
+            signOut.Headers.TryAddWithoutValidation("Cookie", cookie);
+            (await client.SendAsync(signOut, Ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        await ReadsAsAVisitor(cookie);
+    }
+
+    [Fact]
+    public async Task A_stale_cookie_on_a_gated_route_is_asked_to_sign_in_as_a_visitor_is()
+    {
+        var visitor = await host.Route(HttpMethod.Post, "/ledger/inherited", new JObject(), null);
+        using var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false }) { BaseAddress = new Uri(host.BaseUrl) };
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/ledger/inherited") { Content = new StringContent("{}", Encoding.UTF8, "application/json") };
+        request.Headers.TryAddWithoutValidation("Cookie", $"{Session}=not-a-cookie");
+
+        using var answer = await client.SendAsync(request, Ct);
+
+        ((int)answer.StatusCode).Should().Be(visitor.Status);
+    }
+}
+
+public sealed class StaleCookieWithTheEdgeSpec(ApplicationBearerFixture host) : StaleCookieSpecBase(host), IClassFixture<ApplicationBearerFixture>
+{
+    [Fact]
+    public async Task A_rejected_bearer_stays_refused_on_a_tool_route_and_an_entitys()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        foreach (var path in new[] { "/fidelity/whoami", "/data/articles" })
+        {
+            using var client = Forum.Browser();
+            using var request = new HttpRequestMessage(HttpMethod.Get, path);
+            request.Headers.TryAddWithoutValidation("Authorization", "Bearer not-a-token");
+
+            using var answer = await client.SendAsync(request, ct);
+
+            answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized, path);
+        }
+    }
+}
+
+/// <summary>The same host with no resource edge: the session cookie is the default scheme itself.</summary>
+public sealed class CookieDefaultFixture : ApplicationBearerFixture
+{
+    protected override Dictionary<string, string?> Settings() => new()
+    {
+        ["Koan:Mcp:AcceptApplicationBearer"] = "true",
+    };
+}
+
+public sealed class StaleCookieWithoutTheEdgeSpec(CookieDefaultFixture host) : StaleCookieSpecBase(host), IClassFixture<CookieDefaultFixture>;
+
+/// <summary>Outside Development with only the routes' own resource named, an absolute URL on this origin.</summary>
+public sealed class NamedResourceNoUrlFixture : ApplicationBearerFixture
+{
+    protected override string EnvironmentName => "Staging";
+
+    public string Resource => BaseUrl + "/app";
+
+    protected override Dictionary<string, string?> Settings() => new(base.Settings())
+    {
+        ["Koan:Web:Auth:ResourceServer:Resource"] = Resource,
+    };
+}
+
+/// <summary>SEC-0037: what the metadata names is what the edge takes, or a client that follows it gets a token refused, again each time.</summary>
+public sealed class NamedResourceNoUrlSpec(NamedResourceNoUrlFixture host) : IClassFixture<NamedResourceNoUrlFixture>
+{
+    [Fact]
+    public async Task The_metadata_names_the_resource_the_edge_takes()
+    {
+        using var client = host.Browser();
+
+        var metadata = JObject.Parse(await client.GetStringAsync(host.Metadata, TestContext.Current.CancellationToken));
+        var tool = await host.Tool("whoami_get", new JObject(), host.Token(metadata["resource"]!.Value<string>()!));
+
+        metadata["resource"]!.Value<string>().Should().Be(host.Resource);
+        tool.Failed.Should().BeFalse(tool.ToString());
+    }
+}
+
+/// <summary>Production with a fixed resource and no URL or consent: a token can pass, and a challenge has nowhere to point.</summary>
+public sealed class FixedResourceInProductionFixture : ApplicationBearerFixture
+{
+    public const string Resource = "urn:forum:edge";
+
+    protected override string EnvironmentName => "Production";
+
+    protected override Dictionary<string, string?> Settings() => new()
+    {
+        ["Koan:Mcp:ResourceUri"] = Resource,
+        ["Koan:Mcp:RequireAuthentication"] = "true",
+    };
+}
+
+public sealed class FixedResourceInProductionSpec(FixedResourceInProductionFixture host) : IClassFixture<FixedResourceInProductionFixture>
+{
+    [Fact]
+    public async Task No_credential_is_told_why_and_a_token_for_the_resource_gets_past_the_edge()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = host.Browser();
+
+        using var none = await client.SendAsync(ApplicationBearerFixture.Message("initialize"), ct);
+        using var token = await client.SendAsync(ApplicationBearerFixture.Message("initialize", host.Token(FixedResourceInProductionFixture.Resource)), ct);
+
+        none.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable, await none.Content.ReadAsStringAsync(ct));
+        (await none.Content.ReadAsStringAsync(ct)).Should().Contain("Koan:Web:ApplicationUrl");
+        token.StatusCode.Should().NotBe(HttpStatusCode.ServiceUnavailable);
+        token.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized);
     }
 }
 

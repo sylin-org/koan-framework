@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Koan.Mcp.CustomTools;
 using Koan.Mcp.Options;
 using Koan.Security.Trust.Inbound;
+using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,8 +54,7 @@ internal static class McpEdgeAuth
         var accepted = McpResourceIdentity.Accepted(context, baseRoute, options);
         if (accepted.Length == 0)
         {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "no_application_url", message = NoApplicationUrl }, cancellationToken: context.RequestAborted);
+            await WriteNoApplicationUrl(context);
             return false;
         }
 
@@ -86,9 +86,22 @@ internal static class McpEdgeAuth
     private static string? Subject(ClaimsPrincipal p)
         => p.FindFirst("sub")?.Value ?? p.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
+    private static Task WriteNoApplicationUrl(HttpContext context)
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        return context.Response.WriteAsJsonAsync(new { error = "no_application_url", message = NoApplicationUrl }, cancellationToken: context.RequestAborted);
+    }
+
     private static async Task WriteChallenge(HttpContext context, string baseRoute, string body,
         string? error = null, string? description = null)
     {
+        // A fixed resource needs no URL for a token to pass; a challenge needs one to point at the metadata, and Production derives none.
+        if (context.RequestServices.GetService<KoanWebBaseUrl>() is { Current: null, DerivesFromRequests: false })
+        {
+            await WriteNoApplicationUrl(context);
+            return;
+        }
+
         context.Response.Headers.WWWAuthenticate = KoanBearerResource.Challenge(error, description, McpResourceIdentity.MetadataUrl(context, baseRoute));
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         await context.Response.WriteAsJsonAsync(new { error = body }, cancellationToken: context.RequestAborted);

@@ -86,6 +86,8 @@ internal static class ServiceCollectionExtensions
 
         // Ensure a default cookie scheme is registered so the centralized challenge/callback can sign users in.
         // External provider handlers (OIDC/OAuth2) are not registered here; flows are handled centrally by AuthController.
+        // What AddCookie registers beside its handler, since SessionCookieHandler stands in for that handler.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<CookieAuthenticationOptions>, PostConfigureCookieAuthenticationOptions>());
         services.AddAuthentication(options =>
             {
                 options.DefaultScheme = Extensions.AuthenticationExtensions.CookieScheme;
@@ -93,7 +95,7 @@ internal static class ServiceCollectionExtensions
                 options.DefaultChallengeScheme = Extensions.AuthenticationExtensions.CookieScheme;
                 options.DefaultSignInScheme = Extensions.AuthenticationExtensions.CookieScheme;
             })
-            .AddCookie(Extensions.AuthenticationExtensions.CookieScheme, o =>
+            .AddScheme<CookieAuthenticationOptions, SessionCookieHandler>(Extensions.AuthenticationExtensions.CookieScheme, o =>
             {
                 o.Cookie.HttpOnly = true;
                 // Allow HTTP in Development/container scenarios; production should run behind HTTPS/terminator

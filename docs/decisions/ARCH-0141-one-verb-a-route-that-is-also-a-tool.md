@@ -19,6 +19,8 @@ amended_by: ARCH-0142
 
 > **Amended by [ARCH-0142](ARCH-0142-the-realignment-finished.md) (2026-11-02): `Answer` answers a browser with a page, every tool name follows rule 12's words, and `_meta` and the list's shape are the specification's.** Rule 2's edge result is one of the places a principal becomes the request's authentication result.
 
+> **Amended by [SEC-0037](SEC-0037-an-edge-that-is-part-of-the-application.md) (2026-11-02):** rule 2's rejected credential is one a caller presented. A Koan session cookie that no longer holds is a visitor.
+
 ## Context
 
 ARCH-0092 gave entity operations one core with two faces: `EntityController<T>` and the MCP tools both call `IEntityEndpointService`, so a gate declared

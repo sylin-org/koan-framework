@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Koan.Mcp.CodeMode.Sdk;
 using Koan.Mcp.CodeMode.Execution;
 using Koan.Mcp.Diagnostics;
@@ -100,7 +101,8 @@ internal static class McpEndpointMapping
             {
                 var doc = new
                 {
-                    resource = McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
+                    // SEC-0037: what a token here must name, so a client that follows this gets one the edge takes.
+                    resource = McpResourceIdentity.Accepted(context, baseRoute, options).FirstOrDefault() ?? McpResourceIdentity.Resolve(context, baseRoute, configuredResource),
                     authorization_servers = new[] { McpResourceIdentity.AuthorizationServer(context) },
                     bearer_methods_supported = new[] { "header" },
                 };

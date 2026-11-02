@@ -5,6 +5,7 @@ using Koan.Web.Controllers;
 using Koan.Web.Hooks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -24,7 +25,8 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var http = context.HttpContext;
-        // WEB-0083: a credential a handler rejected is not the anonymous case, whatever the gate would say to a visitor.
+        // WEB-0083: a credential a handler rejected is not the anonymous case, whatever the gate would say to a visitor. A session
+        // cookie that no longer holds was presented by nobody, and its handler reports no credential (SEC-0037).
         if (http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure is not null)
         {
             context.Result = Answers.Denied(http, AuthorizeDecision.Challenged());
@@ -52,12 +54,17 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
 
     public void OnActionExecuting(ActionExecutingContext context)
     {
-        if (!context.ModelState.IsValid) context.Result = Answers.Unbound(context.HttpContext, context.ModelState);
+        if (context.ModelState.IsValid) return;
+        // ASP.NET's form provider reports a body past the limit as a model error: its length says which it was.
+        var http = context.HttpContext;
+        context.Result = http.Request.ContentLength > http.Features.Get<IHttpMaxRequestBodySizeFeature>()?.MaxRequestBodySize
+            ? Answers.TooLarge(http)
+            : Answers.Unbound(http, context.ModelState);
     }
 
     public void OnActionExecuted(ActionExecutedContext context) { }
 
-    /// <summary>A body past the route's limit, met wherever binding read it, is refused as a tool call of that size is.</summary>
+    /// <summary>A JSON body past the route's limit, met wherever binding read it, is refused as a tool call of that size is.</summary>
     public void OnException(ExceptionContext context)
     {
         if (context.Exception is not BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge }) return;
@@ -77,6 +84,9 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
             request.EnableBuffering();
             try
             {
+                // A wrapper that says JSON on every request, a GET's included, has sent no fields.
+                if (await request.Body.ReadAsync(new byte[1], request.HttpContext.RequestAborted) == 0) return;
+                request.Body.Position = 0;
                 using var json = await JsonDocument.ParseAsync(request.Body, cancellationToken: request.HttpContext.RequestAborted);
                 if (json.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
                 var fields = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
