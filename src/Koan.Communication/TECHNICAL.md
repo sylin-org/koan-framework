@@ -151,8 +151,8 @@ confidentiality; and remote settlement remains unavailable unless an adapter exp
 
 ## In a scope
 
-A `Raise` or `Send` inside `EntityContext.Transaction` or `EntityContext.Hold` publishes nothing. It reads its source and copies it, inside the scope, and
-`ITransactionCoordinator.AfterCommit` publishes the copies once the scope has committed (ARCH-0142). A rollback publishes nothing, the acceptance says `AwaitsCommit`, and a failure of
+A `Raise` or `Send` inside `EntityContext.Transaction` or `EntityContext.Hold`, or from a lifecycle hook while an atomic commit dispatches, publishes nothing. It reads its source and copies it, inside the scope, and
+`ITransactionCoordinator.AfterCommit` publishes the copies once the scope has committed, under the context of the raise (ARCH-0142). A rollback publishes nothing, the acceptance says `AwaitsCommit`, and a failure of
 the publication is logged, because the commit stands. A process that ends between the commit and the publication loses it.
 
 ## Unsupported scenarios
