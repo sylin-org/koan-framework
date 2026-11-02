@@ -125,13 +125,14 @@ people by id, and `OverwritesOf(subjectKind, subjectId, after, take)` pages one 
 order. Nothing bounds how many overwrites a resource or a subject holds.
 
 A role subject must exist unless it is `everyone` or `authenticated`; deleting a role deletes its members and its
-overwrites. It first takes away everything the role grants — its permissions and its overwrites' allows — so a
-deletion that stops part way leaves members holding only the role's denies. An overwrite cannot allow or deny `global:administrator`. Identity erasure removes a person's memberships
+overwrites. It first takes away everything the role grants — its permissions and its overwrites' allows — so on a route
+with no holds a deletion that stops part way leaves members holding only the role's denies; on a route that offers holds it
+leaves the role as it was. An overwrite cannot allow or deny `global:administrator`. Identity erasure removes a person's memberships
 and overwrites. Discord's implicit permissions, such as a missing view hiding everything else, are the application's
 to apply.
 
-Role, member and overwrite changes commit immediately outside any scope. Inside `EntityContext.Hold` they join the hold,
-so a command decides, changes a role and writes its own rows as one outcome:
+Inside `EntityContext.Hold` a role, member or overwrite change joins the hold, so a command decides, changes a role and writes
+its own rows as one outcome:
 
 ```csharp
 using (await EntityContext.Hold("give-role", ct))
@@ -146,18 +147,19 @@ using (await EntityContext.Hold("give-role", ct))
 ```
 
 A rollback or a failed commit leaves no row, no moved position and no changed bag, and raises no after-event. Other flows
-read what is committed until the commit, and their role changes wait for the hold to end. A hold's first role change waits
-`HeldChangeWait` for changes already under way, and past it refuses with `TimeoutException`, because such a change can be
-waiting for the store the hold keeps; end the scope and start again. A change that throws part way leaves what it wrote in
-the hold, so let the exception end the scope. Inside a deferred `EntityContext.Transaction` scope a change is refused with
-`NotSupportedException` before anything happens: such a scope cannot decide from what it reads. First use of the role tables
-belongs outside a hold, as DATA-0166 says of any table.
+read what is committed until the commit, and their role changes wait for the hold to end. A change that throws part way leaves
+what it wrote in the hold, so let the exception end the scope.
+
+Outside any scope, on a route that offers holds, a change is a short hold of its own: one outcome, in its turn behind the holds
+ahead of it. On a route that does not, it commits as it goes. Inside a deferred `EntityContext.Transaction` scope it is refused
+with `NotSupportedException` before anything happens, because such a scope cannot decide from what it reads.
 
 Applications react through `Entity.Role.MemberAdding/Added`, `MemberRemoving/Removed`,
 `PermissionsChanging/Changed`, `RoleChanging/Changed`, `RoleDeleting/Deleted`, `OverwriteChanging/Changed`, and
-`OverwriteRemoving/Removed`. Before events may veto, and what they write joins a hold. Post events run after persistence and
-cache invalidation: inside a hold, after its commit and outside it, where a failure is logged because the commit stands.
-Recursive role mutation is rejected.
+`OverwriteRemoving/Removed`. Before events may veto; in a hold what they write joins it, so they stay short and on its route.
+Post events run after persistence and cache invalidation: in a hold, after its commit and outside it, where a failure is logged
+because the commit stands; on a route with no holds, a failure reaches the caller as `RolePostEventException`. Recursive role
+mutation is rejected.
 
 ## Configuration
 
@@ -166,7 +168,7 @@ Settings live under `Koan:Identity:Roles`. The bounds a person can meet are prop
 `MaxPageSize` bounds one page of a listing. The rest size memory and refuse nothing: `MaxCachedBags` (people),
 `MaxCachedResources` (resources whose role overwrites stay compiled) and `MaxCachedPersonOverwrites` (a person's own
 overwrite on a resource, or its absence). Past a capacity the cache evicts an entry nothing has read lately and keeps
-the rest warm. `HeldChangeWait` (2 seconds) is how long a hold's first role change waits for the changes already under way.
+the rest warm.
 
 Reference `Sylin.Koan.Identity.Web` for management routes. See [TECHNICAL.md](TECHNICAL.md),
 [SEC-0021](../../docs/decisions/SEC-0021-resource-overwrites-resolve-in-discord-order.md),

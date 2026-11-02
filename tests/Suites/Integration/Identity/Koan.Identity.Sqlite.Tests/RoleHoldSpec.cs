@@ -18,9 +18,10 @@ using Xunit;
 namespace Koan.Identity.Sqlite.Tests;
 
 /// <summary>
-/// SEC-0036: a role, member or overwrite change inside <c>EntityContext.Hold</c> joins that transaction. A rollback or a
-/// failed commit leaves no row, no moved position, no changed bag and no after-event; a commit makes all of it visible at
-/// once, and only then. Every handler registered here filters on the keys it owns, because the registry is process-wide.
+/// SEC-0036: a role, member or overwrite change inside <c>EntityContext.Hold</c> joins that transaction, and outside any scope
+/// it is a short hold of its own. A rollback or a failed commit leaves no row, no moved position, no changed bag and no
+/// after-event; a commit makes all of it visible at once, and only then. Every handler registered here filters on the keys it
+/// owns, because the registry is process-wide.
 /// </summary>
 public sealed class RoleHoldSpec
 {
@@ -112,8 +113,8 @@ public sealed class RoleHoldSpec
             await roles.Define("role:base", "Base", ["global:base"]);
             await roles.Add("role:base", "person:held");
             var before = await roles.Bag("person:held", true);
-            await roles.Overwrites("resource:held"); // first use of a table belongs outside a hold (DATA-0166)
             await new HeldRoleNote { Text = "table exists" }.Save();
+            (await roles.OverwritesFor(before, "resource:held")).Should().BeEmpty("this compiles the shared entries a read inside must read past");
             var note = new HeldRoleNote { Text = "with the role" };
 
             using (await EntityContext.Hold("committed"))
@@ -123,23 +124,20 @@ public sealed class RoleHoldSpec
                 await roles.Add("role:held", "person:held");
                 await roles.SetPermissions("role:base", ["global:changed"]);
                 await roles.Overwrite("resource:held", OverwriteSubjectKind.Person, "person:held", [], ["global:held"]);
+                await roles.Overwrite("resource:held", OverwriteSubjectKind.Role, "role:base", ["global:held"], []);
 
                 var inside = await roles.Bag("person:held", true);
                 inside.InRole("role:held").Should().BeTrue("a read inside the hold sees the hold's change");
                 inside.Permissions.Should().BeEquivalentTo(["global:held", "global:changed"]);
                 inside.Highest.Should().Be(2);
-                (await roles.OverwritesFor(inside, "resource:held")).Should().ContainSingle();
+                (await roles.OverwritesFor(inside, "resource:held")).Select(row => row.SubjectKind).Should()
+                    .BeEquivalentTo([OverwriteSubjectKind.Role, OverwriteSubjectKind.Person], "a read inside sees both overwrites it wrote");
                 (await roles.Members("role:held")).Items.Should().ContainSingle();
 
                 (await Outside(host.Services, () => roles.Bag("person:held", true))).Should().BeSameAs(before, "nothing uncommitted reached the shared cache");
                 (await Outside(host.Services, () => roles.Get("role:held"))).Should().BeNull("the row is not committed");
                 (await Outside(host.Services, () => roles.Bag("person:fresh", true))).InRole("role:held").Should().BeFalse("a fresh compile outside reads committed rows");
-                var outsideRows = await Outside(host.Services, async () =>
-                {
-                    var bag = new RoleBag("person:held", true, [], []);
-                    return await roles.OverwritesFor(bag, "resource:held");
-                });
-                outsideRows.Should().BeEmpty("the overwrite is not committed");
+                (await Outside(host.Services, () => roles.OverwritesFor(before, "resource:held"))).Should().BeEmpty("neither overwrite is committed");
                 (await Outside<HeldRoleNote?>(host.Services, () => HeldRoleNote.Get(note.Id))).Should().BeNull();
 
                 await EntityContext.Commit();
@@ -152,7 +150,7 @@ public sealed class RoleHoldSpec
             after.Should().NotBeSameAs(before);
             after.InRole("role:held").Should().BeTrue();
             after.Permissions.Should().BeEquivalentTo(["global:held", "global:changed"]);
-            (await Outside(host.Services, () => roles.OverwritesFor(after, "resource:held"))).Should().ContainSingle("the compiled overwrite followed the commit");
+            (await Outside(host.Services, () => roles.OverwritesFor(after, "resource:held"))).Should().HaveCount(2, "the compiled overwrites followed the commit");
             (await HeldRoleNote.Get(note.Id)).Should().NotBeNull("the role and the row committed as one");
         }
         finally { RoleSqliteSpec.Delete(path); }
@@ -211,7 +209,7 @@ public sealed class RoleHoldSpec
             (await roles.Bag("person:failed", true)).Should().BeSameAs(before);
             Volatile.Read(ref raised).Should().Be(0);
             await roles.Add("role:failed", "person:failed").WaitAsync(TimeSpan.FromSeconds(30));
-            Volatile.Read(ref raised).Should().Be(1, "the gate came free, and a change outside a scope raises at once");
+            Volatile.Read(ref raised).Should().Be(1, "the store came free, and a change outside a scope has raised by the time it returns");
         }
         finally
         {
@@ -226,6 +224,7 @@ public sealed class RoleHoldSpec
         var path = Temp("after-events");
         var added = new List<string>();
         RoleBag? seen = null;
+        RoleBag? seenLater = null;
         ITransactionCoordinator? ambient = null;
         var cancelledToken = false;
         var note = new HeldRoleNote { Text = "from a handler" };
@@ -239,16 +238,20 @@ public sealed class RoleHoldSpec
             await roles.Define("role:failing", "Failing", ["global:failing"]);
             await roles.Add("role:events", "person:other");
             var otherBefore = await roles.Bag("person:other", true);
+            await roles.Bag("person:held", true);
+            await roles.Bag("person:later", true);
 
             Entity.Role.MemberAdded(async context =>
             {
                 if (context.Current.Key == "role:failing") throw new InvalidOperationException("a failing handler");
                 if (context.Current.Key != "role:events") return;
                 lock (added) added.Add(context.Subject!);
+                if (context.Subject != "person:held") return;
                 ambient = EntityContext.CurrentTransaction;
                 cancelledToken = context.CancellationToken.IsCancellationRequested;
                 context.Phase.Should().Be(RoleChangePhase.After);
                 seen = await roles.Bag(context.Subject!, true);
+                seenLater = await roles.Bag("person:later", true);
                 await note.Save();
                 try { await roles.Add("role:events", "person:recursive"); }
                 catch (InvalidOperationException recursive) { refused = recursive; }
@@ -260,16 +263,18 @@ public sealed class RoleHoldSpec
                 await roles.Add("role:failing", "person:held", change.Token);
                 await roles.Add("role:events", "person:held", change.Token);
                 await roles.SetPermissions("role:events", ["global:changed"], change.Token);
+                await roles.Add("role:events", "person:later");
                 change.Cancel();
                 lock (added) added.Should().BeEmpty("nothing has committed");
                 await EntityContext.Commit();
-                lock (added) added.Should().Equal("person:held");
+                lock (added) added.Should().Equal("person:held", "person:later");
             }
 
             cancelledToken.Should().BeFalse("the change's token belongs to the change, and this runs after it");
             ambient.Should().BeNull("an after-event runs outside the hold that has ended");
-            seen!.InRole("role:events").Should().BeTrue("every invalidation of the hold ran before its first after-event");
+            seen!.InRole("role:events").Should().BeTrue("its bag was compiled before the hold, and its invalidation ran first");
             seen!.Permissions.Should().Contain("global:changed");
+            seenLater!.InRole("role:events").Should().BeTrue("the invalidation of a later change in the hold ran before this after-event too");
             (await HeldRoleNote.Get(note.Id)).Should().NotBeNull("a write from an after-event stands on its own");
             refused.Should().NotBeNull("a role change from a handler is refused as it always was");
             (await roles.Members("role:failing")).Items.Should().ContainSingle("a failing after-event does not undo the commit");
@@ -283,6 +288,9 @@ public sealed class RoleHoldSpec
             }
 
             added.Should().BeEmpty("a rollback raises nothing");
+
+            await roles.Add("role:failing", "person:plain");
+            (await roles.Members("role:failing")).Items.Should().HaveCount(2, "outside a scope too, a failing after-event is logged, because the commit stands");
         }
         finally
         {
@@ -382,68 +390,71 @@ public sealed class RoleHoldSpec
     }
 
     /// <summary>
-    /// The inversion SEC-0036 answers: a change already under way needs the store the hold keeps, and the hold's first change
-    /// needs it to finish. The hold's change refuses within its short wait, not at the hold's limit, and then both can go on.
+    /// A backlog is the normal state of an application that runs its commands one at a time. A plain change takes its place in
+    /// the same queue, so it lands behind whoever is ahead, and every command behind it lands too.
     /// </summary>
     [Fact]
-    public async Task A_change_under_way_that_needs_the_store_costs_the_holds_change_its_short_wait_and_not_a_stall()
+    public async Task A_plain_change_beside_a_backlog_of_commands_lands_and_so_does_every_command()
     {
-        var path = Temp("inversion");
-        var underWay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var goOn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var path = Temp("backlog");
         try
         {
-            await using var host = await RoleSqliteSpec.Start(path, settings: new() { [$"{RoleOptions.SectionPath}:HeldChangeWait"] = TimeSpan.FromMilliseconds(500).ToString() });
+            await using var host = await RoleSqliteSpec.Start(path);
             using var app = AppHost.PushScope(host.Services);
             var roles = host.Services.GetRequiredService<RoleCollection>();
             await roles.Define("role:plain", "Plain");
             await roles.Define("role:held", "Held");
-            Entity.Role.MemberAdding(async context =>
+            await new HeldRoleNote { Text = "table exists" }.Save();
+
+            using var stop = new CancellationTokenSource();
+            var running = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queue = Outside(host.Services, async () =>
             {
-                if (context.Subject != "person:plain") return RoleChangeDecision.Continue();
-                underWay.TrySetResult();
-                await goOn.Task;
-                return RoleChangeDecision.Continue();
+                var committed = 0;
+                while (!stop.IsCancellationRequested)
+                {
+                    using (await EntityContext.Hold("command"))
+                    {
+                        await new HeldRoleNote { Text = $"command {committed}" }.Save();
+                        running.TrySetResult();
+                        await Task.Delay(20);
+                        await roles.Add("role:held", $"person:{committed}");
+                        await EntityContext.Commit();
+                    }
+
+                    committed++;
+                }
+
+                return committed;
             });
+            await running.Task.WaitAsync(TimeSpan.FromSeconds(30));
 
             var plain = Outside(host.Services, () => roles.Add("role:plain", "person:plain"));
-            await underWay.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            await plain.WaitAsync(TimeSpan.FromSeconds(10));
+            stop.Cancel();
+            var commands = await queue.WaitAsync(TimeSpan.FromSeconds(30));
 
-            using (await EntityContext.Hold("second to the gate"))
+            (await roles.Members("role:plain")).Items.Should().ContainSingle();
+            var members = 0;
+            for (string? after = null; ;)
             {
-                goOn.TrySetResult();
-                var began = Stopwatch.GetTimestamp();
-                var change = () => roles.Add("role:held", "person:held");
-                (await change.Should().ThrowAsync<TimeoutException>()).Which.Message.Should().Contain(nameof(RoleOptions.HeldChangeWait));
-                Stopwatch.GetElapsedTime(began).Should().BeLessThan(TimeSpan.FromSeconds(10), "the hold's limit is 20 seconds and the store's busy timeout 30");
-                plain.IsCompleted.Should().BeFalse("it is waiting for the store this hold keeps");
-                await EntityContext.Rollback();
+                var page = await roles.Members("role:held", after, take: 100);
+                members += page.Items.Count;
+                if ((after = page.Next) is null) break;
             }
 
-            await plain.WaitAsync(TimeSpan.FromSeconds(60));
-            (await roles.Members("role:plain")).Items.Should().ContainSingle("the change under way landed once the store was free");
-
-            using (await EntityContext.Hold("after it"))
-            {
-                await roles.Add("role:held", "person:held").WaitAsync(TimeSpan.FromSeconds(10));
-                await EntityContext.Commit();
-            }
-
-            (await roles.Members("role:held")).Items.Should().ContainSingle("the refusal left the gate as it found it");
+            members.Should().Be(commands, "every command landed");
         }
-        finally
-        {
-            goOn.TrySetResult();
-            Entity.Role.Reset();
-            RoleSqliteSpec.Delete(path);
-        }
+        finally { RoleSqliteSpec.Delete(path); }
     }
 
     [Fact]
-    public async Task A_change_under_way_that_finishes_without_the_store_only_delays_the_hold()
+    public async Task A_plain_change_is_a_hold_of_its_own_and_one_under_way_keeps_a_hold_behind_it()
     {
-        var path = Temp("delay");
+        var path = Temp("own-hold");
         var underWay = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var goOn = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        ITransactionCoordinator? inside = null;
         try
         {
             await using var host = await RoleSqliteSpec.Start(path);
@@ -453,38 +464,164 @@ public sealed class RoleHoldSpec
             await roles.Define("role:held", "Held");
             Entity.Role.MemberAdding(async context =>
             {
-                if (context.Subject != "person:vetoed") return RoleChangeDecision.Continue();
+                if (context.Subject != "person:plain") return RoleChangeDecision.Continue();
+                inside = EntityContext.CurrentTransaction;
                 underWay.TrySetResult();
-                await Task.Delay(300);
-                return RoleChangeDecision.Veto("no", "not this one");
+                await goOn.Task;
+                return RoleChangeDecision.Continue();
             });
 
-            var vetoed = Outside(host.Services, async () =>
-            {
-                try { await roles.Add("role:plain", "person:vetoed"); return false; }
-                catch (UnauthorizedAccessException) { return true; }
-            });
+            var plain = Outside(host.Services, () => roles.Add("role:plain", "person:plain"));
             await underWay.Task.WaitAsync(TimeSpan.FromSeconds(30));
+            inside.Should().NotBeNull();
+            inside!.IsHeld.Should().BeTrue("on a route that offers holds, a change outside a scope is one");
 
-            using (await EntityContext.Hold("behind it"))
+            var behind = Outside(host.Services, () => roles.Add("role:held", "person:held"));
+            var hold = Outside(host.Services, async () =>
             {
-                await roles.Add("role:held", "person:held");
-                await EntityContext.Commit();
-            }
+                using (await EntityContext.Hold("behind it"))
+                {
+                    await roles.Add("role:held", "person:hold");
+                    await EntityContext.Commit();
+                }
 
-            (await vetoed.WaitAsync(TimeSpan.FromSeconds(30))).Should().BeTrue();
-            (await roles.Members("role:held")).Items.Should().ContainSingle();
+                return true;
+            });
+            (await Task.WhenAny(behind, hold, Task.Delay(300))).Should().NotBeOfType<Task<RoleMember>>("the change under way has the store");
+            hold.IsCompleted.Should().BeFalse();
+
+            goOn.TrySetResult();
+            await Task.WhenAll(plain, behind, hold).WaitAsync(TimeSpan.FromSeconds(30));
+            (await roles.Members("role:plain")).Items.Should().ContainSingle();
+            (await roles.Members("role:held")).Items.Should().HaveCount(2);
         }
         finally
         {
+            goOn.TrySetResult();
             Entity.Role.Reset();
             RoleSqliteSpec.Delete(path);
         }
     }
 
+    /// <summary>A deletion is many writes. Outside a scope too it is one outcome, so one that stops part way leaves the role whole.</summary>
+    [Fact]
+    public async Task A_plain_deletion_that_stops_part_way_leaves_the_role_as_it_was()
+    {
+        var path = Temp("stopped");
+        using var stop = new CancellationTokenSource();
+        try
+        {
+            await using var host = await KoanIntegrationHost.Configure().WithSettings(new Dictionary<string, string?>
+            {
+                ["Koan:Data:Sources:Default:Adapter"] = "sqlite",
+                ["Koan:Data:Sources:Default:ConnectionString"] = $"Data Source={path};Pooling=False",
+            }).ConfigureServices(services => services.AddKoan(() => RoleMember.Lifecycle.BeforeRemove(context =>
+            {
+                if (context.Current.PersonId == "person:stops:here") stop.Cancel();
+                return context.Proceed();
+            }))).StartAsync();
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await roles.Define("role:stops", "Stops", ["global:stops"]);
+            await roles.Add("role:stops", "person:stops:here");
+            await roles.Add("role:stops", "person:stops:next");
+            await roles.Overwrite("resource:stops", OverwriteSubjectKind.Role, "role:stops", ["global:stops"], []);
+
+            var delete = () => roles.Delete("role:stops", stop.Token);
+            await delete.Should().ThrowAsync<OperationCanceledException>();
+
+            (await roles.Get("role:stops"))!.Permissions.Should().Equal("global:stops");
+            (await roles.Members("role:stops")).Items.Should().HaveCount(2);
+            (await roles.Overwrites("resource:stops")).Items.Should().ContainSingle().Which.Allow.Should().Equal("global:stops");
+            (await roles.Delete("role:stops")).Should().BeTrue("nothing was left behind to stop a later one");
+        }
+        finally { RoleSqliteSpec.Delete(path); }
+    }
+
+    /// <summary>A change waiting in the queue observes its token, and leaves the queue and the store as it found them.</summary>
+    [Fact]
+    public async Task A_plain_change_cancelled_in_the_queue_ends_at_once_and_leaves_nothing()
+    {
+        var path = Temp("cancelled");
+        try
+        {
+            await using var host = await RoleSqliteSpec.Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await roles.Define("role:queue", "Queue");
+            using var cancel = new CancellationTokenSource();
+
+            using (await EntityContext.Hold("ahead"))
+            {
+                await roles.Add("role:queue", "person:ahead");
+                var waiting = Outside(host.Services, () => roles.Add("role:queue", "person:cancelled", cancel.Token));
+                (await Task.WhenAny(waiting, Task.Delay(200))).Should().NotBe(waiting);
+                cancel.Cancel();
+                var ended = await Task.WhenAny(waiting, Task.Delay(TimeSpan.FromSeconds(5)));
+                ended.Should().Be(waiting, "it ends while the hold ahead of it is still open");
+                var outcome = () => waiting;
+                await outcome.Should().ThrowAsync<OperationCanceledException>();
+                await EntityContext.Commit();
+            }
+
+            await roles.Add("role:queue", "person:after").WaitAsync(TimeSpan.FromSeconds(10));
+            (await roles.Members("role:queue")).Items.Select(member => member.PersonId).Should().Equal("person:after", "person:ahead");
+        }
+        finally { RoleSqliteSpec.Delete(path); }
+    }
+
     /// <summary>
-    /// Why the gate outlasts the change: a lock released when the change returned would let another flow place a role from
-    /// the committed top, and write it over the place the hold had taken.
+    /// A first use inside a hold would meet a read on its way to the same table: the read provisions on a connection of its own,
+    /// waiting for the hold's store, while the hold waits for that provisioning. So the tables exist before anything can.
+    /// </summary>
+    [Fact]
+    public async Task On_a_fresh_store_the_tables_exist_at_boot_so_a_first_change_and_a_first_bag_cannot_meet_on_them()
+    {
+        var path = Temp("fresh");
+        try
+        {
+            await using var host = await RoleSqliteSpec.Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await using (var connection = new SqliteConnection($"Data Source={path};Pooling=False"))
+            {
+                await connection.OpenAsync();
+                foreach (var type in new[] { typeof(Role), typeof(RoleMember), typeof(PermissionOverwrite), typeof(AuditEvent) })
+                    (await RoleSqliteSpec.Scalar(connection, $"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = '{type.FullName}'"))
+                        .Should().Be(1L, "{0} exists before anything used it", type.Name);
+            }
+
+            await new HeldRoleNote { Text = "table exists" }.Save();
+
+            // A read first, then the hold's change.
+            using (await EntityContext.Hold("first change"))
+            {
+                await new HeldRoleNote { Text = "the hold has the store" }.Save();
+                var read = Outside(host.Services, () => roles.Bag("person:fresh", true));
+                await Task.Delay(300);
+                await roles.Define("role:fresh", "Fresh", ["global:fresh"]).WaitAsync(TimeSpan.FromSeconds(10));
+                await roles.Add("role:fresh", "person:fresh").WaitAsync(TimeSpan.FromSeconds(10));
+                (await read.WaitAsync(TimeSpan.FromSeconds(10))).InRole("role:fresh").Should().BeFalse("it reads what is committed");
+                await EntityContext.Commit();
+            }
+
+            (await roles.Bag("person:fresh", true)).InRole("role:fresh").Should().BeTrue();
+
+            // The hold's change first, then a read.
+            using (await EntityContext.Hold("second change"))
+            {
+                await roles.Overwrite("resource:fresh", OverwriteSubjectKind.Role, "role:fresh", [], ["global:fresh"]);
+                var bag = await Outside(host.Services, () => roles.Bag("person:other", true)).WaitAsync(TimeSpan.FromSeconds(10));
+                (await Outside(host.Services, () => roles.OverwritesFor(bag, "resource:fresh")).WaitAsync(TimeSpan.FromSeconds(10))).Should().BeEmpty();
+                await EntityContext.Commit();
+            }
+        }
+        finally { RoleSqliteSpec.Delete(path); }
+    }
+
+    /// <summary>
+    /// Why another flow's change waits for the whole hold: deciding beside it would place a role from the committed top, and
+    /// write it over the place the hold had taken.
     /// </summary>
     [Theory]
     [InlineData(true, 3)]
@@ -498,7 +635,6 @@ public sealed class RoleHoldSpec
             using var app = AppHost.PushScope(host.Services);
             var roles = host.Services.GetRequiredService<RoleCollection>();
             await roles.Define("role:base", "Base");
-            await roles.Bag("person:first", true); // first use of a table belongs outside a hold (DATA-0166)
             Task<Role> other;
 
             using (await EntityContext.Hold("first"))
@@ -519,7 +655,7 @@ public sealed class RoleHoldSpec
     }
 
     [Fact]
-    public async Task The_flows_of_one_hold_take_turns_many_holds_never_refuse_each_other_and_a_plain_change_beside_a_hold_keeps_the_order_dense()
+    public async Task The_flows_of_one_hold_take_turns_and_holds_and_plain_changes_together_keep_the_order_dense()
     {
         var path = Temp("many");
         try
@@ -540,41 +676,25 @@ public sealed class RoleHoldSpec
             (await roles.Members("role:shared")).Items.Should().HaveCount(15);
             await ShouldBeDense(roles);
 
-            await Task.WhenAll(Enumerable.Range(0, 8).Select(i => Outside(host.Services, () => InAHold(roles, $"role:parallel:{i}", $"person:{i}"))))
-                .WaitAsync(TimeSpan.FromSeconds(60));
-            await ShouldBeDense(roles);
-
-            for (var round = 0; round < 10; round++)
+            await Task.WhenAll(Enumerable.Range(0, 24).Select(i => Outside(host.Services, async () =>
             {
-                var key = $"role:round:{round}";
-                var plain = Outside(host.Services, () => roles.Define($"{key}:plain", "Plain"));
-                var held = Outside(host.Services, async () =>
+                if (i % 2 == 0) return await roles.Add(await Plain(i), $"person:{i}");
+                using (await EntityContext.Hold($"hold {i}"))
                 {
-                    for (var tries = 1; ; tries++)
-                    {
-                        // A refused hold has freed the store for the change it met: give that change the time to take it.
-                        try { return await InAHold(roles, $"{key}:held", "person:round"); }
-                        catch (TimeoutException) when (tries < 10) { await Task.Delay(300); }
-                    }
-                });
-                await Task.WhenAll(plain, held).WaitAsync(TimeSpan.FromSeconds(60));
-            }
+                    await roles.Define($"role:held:{i}", $"Held {i}");
+                    var member = await roles.Add($"role:held:{i}", $"person:{i}");
+                    await EntityContext.Commit();
+                    return member;
+                }
+
+                async Task<string> Plain(int at) => (await roles.Define($"role:plain:{at}", $"Plain {at}")).Key;
+            }))).WaitAsync(TimeSpan.FromSeconds(60));
 
             await ShouldBeDense(roles);
-            (await roles.Page(pageSize: 100)).TotalCount.Should().Be(1 + 5 + 8 + 20);
-            (await roles.Bag("person:round", true)).Roles.Should().HaveCount(10 + 2);
+            (await roles.Page(pageSize: 100)).TotalCount.Should().Be(1 + 5 + 24);
+            foreach (var i in Enumerable.Range(0, 24))
+                (await roles.Bag($"person:{i}", true)).Roles.Should().HaveCount(3);
         }
         finally { RoleSqliteSpec.Delete(path); }
-
-        static async Task<RoleMember> InAHold(RoleCollection roles, string role, string person)
-        {
-            using (await EntityContext.Hold(role))
-            {
-                await roles.Define(role, role);
-                var member = await roles.Add(role, person);
-                await EntityContext.Commit();
-                return member;
-            }
-        }
     }
 }

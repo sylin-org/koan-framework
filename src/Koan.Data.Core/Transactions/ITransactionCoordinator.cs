@@ -41,14 +41,6 @@ public interface ITransactionCoordinator
     void AfterCommit(Func<CancellationToken, Task> action);
 
     /// <summary>
-    /// Run <paramref name="action"/> once a hold's native transaction has ended, however it ended: a commit, a rollback, a
-    /// failed commit or the hold's limit; at once when it already has. It runs before <see cref="AfterCommit"/>'s work, for
-    /// what must be kept for exactly as long as the hold lasts. A failure is logged. A deferred scope holds nothing, and
-    /// refuses with a <see cref="NotSupportedException"/>.
-    /// </summary>
-    void WhenHoldEnds(Action action);
-
-    /// <summary>
     /// Track an entity save operation for deferred execution.
     /// </summary>
     void TrackSave<TEntity, TKey>(TEntity entity, EntityContext.ContextState context)

@@ -10,22 +10,17 @@ deadlock. Mutations persist first, invalidate the compiled state they affect, th
 change is refused before any lock when a role lifecycle handler asks for it, and before anything happens inside a
 deferred `EntityContext.Transaction` scope (SEC-0021) or a hold that has ended: neither has a transaction to decide in.
 
-Inside `EntityContext.Hold` a change joins the transaction (SEC-0036). `RoleChangeGate` is passed before every lock above:
-a change outside a scope passes with others like it, and a hold passes alone at its first change and stays until
-`ITransactionCoordinator.WhenHoldEnds`, whichever of a commit, a rollback, a failed commit or the limit ends it. The locks
-above are still released as each change returns, because the gate keeps every other flow from them, and within a hold they
-order the flows that share it. So no flow can decide from committed state a hold is about to replace. Reads pass no gate
-and see what is committed. The one wait that can be futile is a hold's first change waiting for a change under way: the
-hold has the store, and that change may be waiting for it. `RoleOptions.HeldChangeWait` bounds it, and past it the hold's
-change refuses and frees the store when its scope ends. Every other wait at the gate ends with a hold, which its limit
-bounds. Across processes a hold's change decides inside the store's write lock, while a change outside a scope still
-decides from what it read before its write.
+Every change passes through `RoleCollection.Change` (SEC-0036). Inside an open hold it joins. Outside any scope, on a route
+that declares `write.heldTransaction`, it is a short hold of its own, so the store's queue is the only gate: holds take turns in
+arrival order, no change decides beside one, and none holds a lock while it waits for the store. The locks above order the flows
+of one hold, and changes on a route with no holds, which run as they did. Reads wait for nothing and see what is committed.
 
-Inside a hold, invalidation and post-events register with `ITransactionCoordinator.AfterCommit`: every invalidation first,
-so a post-event reads compiled state that has followed the whole hold, and each post-event alone, so one failing is logged
-and costs no other. They run with a token of their own, outside the hold, with the gate already open, so a handler's write
-lands and cannot be waited on by a change behind it. `RoleBagCache` compiles past its maps inside a hold, so a flow reads its
-own changes and nothing uncommitted reaches a shared entry. A change that throws part way leaves what it wrote in the hold.
+In a hold, invalidation and post-events register with `ITransactionCoordinator.AfterCommit`: every invalidation first, so a
+post-event reads compiled state that has followed the whole hold, and each post-event alone, so one failing is logged and costs no
+other. They run with a token of their own, outside the hold, once the store is free. `RoleBagCache` compiles past its maps inside a
+hold, so a flow reads its own changes and nothing uncommitted reaches a shared entry. A change that throws part way leaves what it
+wrote in a caller's hold; its own hold rolls back. `SecIdentityModule` makes the role and audit tables exist at boot on such a route,
+because a table first used inside a hold is a wait with no way out.
 
 A role's row id is `Role.KeyFor(key)`, composed from its key; `Role.Key` is the token, and every read and write of a
 role by key goes through the composed id and requires the key read back to match exactly.

@@ -37,8 +37,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     // The one route an Atomic scope has admitted so far; a second route is refused at tracking time.
     private AtomicRoute? _requiredRoute;
     private readonly List<Func<CancellationToken, Task>> _afterCommit = new();
-    private readonly List<Action> _whenHoldEnds = new();
-    private bool _holdEnded;
     private HeldRoute? _heldRoute;
     private IHeldTransaction? _held;
     private DataRouteHold? _routeHold;
@@ -82,22 +80,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         ArgumentNullException.ThrowIfNull(action);
         ThrowIfCompleted();
         lock (_afterCommit) _afterCommit.Add(action);
-    }
-
-    public void WhenHoldEnds(Action action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-        if (!IsHeld)
-            throw new NotSupportedException($"Transaction '{Name}' defers its writes and holds nothing, so it has no hold to end.");
-        lock (_whenHoldEnds)
-        {
-            if (!_holdEnded)
-            {
-                _whenHoldEnds.Add(action);
-                return;
-            }
-        }
-        action();
     }
 
     /// <summary>One route a held transaction covers, and what it is held through.</summary>
@@ -187,7 +169,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             await held.Abort($"it was held past its limit of {limit}").ConfigureAwait(false);
             if (held.EndedBecause is null) return; // a commit or a rollback got there first
             _routeHold!.Release();
-            HoldEnded();
             _logger.LogWarning(
                 "Transaction '{TransactionName}' held its native transaction past its limit of {HoldLimit} and was rolled back",
                 Name,
@@ -336,30 +317,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         finally
         {
             _routeHold!.Release();
-            HoldEnded();
-        }
-    }
-
-    /// <summary>Tells who asked that the hold has ended: the first of a commit, a rollback or the limit to end it, once.</summary>
-    private void HoldEnded()
-    {
-        Action[] actions;
-        lock (_whenHoldEnds)
-        {
-            if (_holdEnded) return;
-            _holdEnded = true;
-            actions = _whenHoldEnds.ToArray();
-        }
-        foreach (var action in actions)
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Transaction '{TransactionName}' ended, and work that follows its end failed", Name);
-            }
         }
     }
 

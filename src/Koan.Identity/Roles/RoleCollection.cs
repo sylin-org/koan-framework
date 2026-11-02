@@ -1,18 +1,22 @@
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
 using Koan.Data.Core.Lifecycle;
 using Koan.Data.Core;
 using Koan.Data.Core.Sorting;
+using Koan.Data.Core.Transactions;
 using Koan.Data.Abstractions;
+using Koan.Data.Abstractions.Capabilities;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Identity.Roles;
 
 /// <summary>
 /// The only supported mutation and compilation surface for server roles, their members and their per-resource
-/// overwrites. Outside any scope every change commits immediately. Inside <see cref="EntityContext.Hold"/> it joins the
-/// hold: it commits or rolls back with everything else there, its compiled state and its after-events wait for the commit,
-/// and every other flow's change waits for the hold to end (SEC-0036). A change asked for inside a deferred
-/// <see cref="EntityContext.Transaction(string)"/> scope is refused before any write. What grows — a role's members, a
+/// overwrites. Every change is a hold on a route that offers one (SEC-0036): inside <see cref="EntityContext.Hold"/> it joins
+/// that hold, and outside any scope it is a short one of its own, so it decides and writes with no other writer beside it,
+/// and its compiled state and after-events follow the commit. On a route with no holds it commits as it goes, serialized
+/// within this process. A change asked for inside a deferred <see cref="EntityContext.Transaction(string)"/> scope is
+/// refused before any write. What grows — a role's members, a
 /// resource's or a subject's overwrites — is read a page at a time; evaluating a bag on a resource reads only the rows
 /// that bag can meet there. Roles stand in one order (<see cref="Role.Position"/>), kept dense as roles are defined,
 /// moved and deleted, and a bag manages the roles below its highest one (<see cref="Manages"/>).
@@ -23,9 +27,8 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _overwriteLock = new(1, 1);
 
-    // Passed before any other lock. It keeps the locks here from being contended between a hold and any other flow, so a
-    // hold never waits for a lock whose holder is waiting for the store the hold keeps.
-    private readonly RoleChangeGate _gate = new(options.Value.HeldChangeWait);
+    // What each open hold's commit invalidates, run before any of its after-events.
+    private readonly ConditionalWeakTable<ITransactionCoordinator, List<Action>> _heldInvalidations = new();
 
     // Every write of a role's row — its own change, and each position a placement, a move or a deletion shifts — is
     // serialized, so the order stays dense within this process and a change never writes back a position that a shift
@@ -125,16 +128,14 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     /// Adds <paramref name="personId"/> to <paramref name="roleKey"/>, which must exist: one membership row, and the
     /// person's bag compiles again. Adding a member again returns their membership and publishes nothing. A person
     /// already holding <see cref="RoleOptions.MaxRolesPerPerson"/> roles is refused with <see cref="RoleBoundException"/>;
-    /// joins of one person are serialized in this process, so the bound holds here. Processes that share a store do
-    /// not coordinate, so two of them can each admit the last role, and the bag of a person left over the bound then
-    /// fails closed.
+    /// on a route that offers holds the check and the write are one transaction, so the bound holds across processes too.
+    /// Elsewhere joins of one person are serialized in this process only, so two processes can each admit the last role,
+    /// and the bag of a person left over the bound then fails closed.
     /// </summary>
-    public async Task<RoleMember> Add(string roleKey, string personId, CancellationToken ct = default)
+    public Task<RoleMember> Add(string roleKey, string personId, CancellationToken ct = default) => Change<RoleMember>(async () =>
     {
-        DemandChangeable();
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
         personId = RoleContract.Require(personId, nameof(personId));
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await Enter(roleKey, ct);
         await using var personGate = await EnterPerson(personId, ct);
         var role = Require(await RoleReads.ExactRole(roleKey, ct), roleKey);
@@ -149,32 +150,30 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         await RoleEventRegistry.Before(RoleEventKind.MemberAdding, context);
         var member = new RoleMember { Id = id, RoleKey = roleKey, PersonId = personId, AddedAt = DateTimeOffset.UtcNow, AddedBy = actor?.CurrentActorSubject };
         using (RoleMutationGuard.Allow<RoleMember>(id, EntityLifecycleOperation.Upsert)) member = await member.Save(ct);
-        _gate.Invalidate(() => bags.Invalidate(personId));
-        await RoleChangeGate.Published(RoleEventKind.MemberAdded, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        Invalidate(() => bags.Invalidate(personId));
+        await Published(RoleEventKind.MemberAdded, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
         return member;
-    }
+    }, ct);
 
     /// <summary>
     /// Removes <paramref name="personId"/> from <paramref name="roleKey"/>: one membership row, and the person's bag
     /// compiles again. False when they are not a member. A membership whose role no longer exists is removed without
     /// events, since there is no role to name.
     /// </summary>
-    public async Task<bool> Remove(string roleKey, string personId, CancellationToken ct = default)
+    public Task<bool> Remove(string roleKey, string personId, CancellationToken ct = default) => Change<bool>(async () =>
     {
-        DemandChangeable();
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
         personId = RoleContract.Require(personId, nameof(personId));
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await Enter(roleKey, ct);
         var member = Exact(await RoleMember.Get(RoleMember.KeyFor(roleKey, personId), ct), roleKey, personId);
         if (member is null) return false;
         var context = await RoleReads.ExactRole(roleKey, ct) is { } role ? Context(role, role, personId, RoleChangePhase.Before, ct) : null;
         if (context is not null) await RoleEventRegistry.Before(RoleEventKind.MemberRemoving, context);
         using (RoleMutationGuard.Allow<RoleMember>(member.Id, EntityLifecycleOperation.Remove)) await member.Remove(ct);
-        _gate.Invalidate(() => bags.Invalidate(personId));
-        if (context is not null) await RoleChangeGate.Published(RoleEventKind.MemberRemoved, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        Invalidate(() => bags.Invalidate(personId));
+        if (context is not null) await Published(RoleEventKind.MemberRemoved, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
         return true;
-    }
+    }, ct);
 
     /// <summary>
     /// A page of the roles in their order, the highest first, so <see cref="RoleTokens.Everyone"/> ends the last page;
@@ -201,14 +200,12 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     /// role did; once it is neutralized, a deletion that stops leaves members holding only the role's denies, and a
     /// retry finishes it. The overwrites of <see cref="RoleTokens.Everyone"/> and <see cref="RoleTokens.Authenticated"/>
     /// stay: those roles hold every bag whether or not a row defines their permissions. Once the role is gone, every role
-    /// above it moves down one, so the order stays dense, and every bag compiles again. Inside a hold all of it is one
-    /// outcome: a deletion that stops rolls back with the hold, and the hold's limit bounds how large a role it can delete.
+    /// above it moves down one, so the order stays dense, and every bag compiles again. In a hold all of it is one outcome,
+    /// so a deletion that stops leaves the role as it was, and the hold's limit bounds how large a role one hold can delete.
     /// </summary>
-    public async Task<bool> Delete(string roleKey, CancellationToken ct = default)
+    public Task<bool> Delete(string roleKey, CancellationToken ct = default) => Change<bool>(async () =>
     {
-        DemandChangeable();
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await Enter(roleKey, ct);
         await using var overwriteGate = await EnterOverwrites(ct);
         var current = await RoleReads.ExactRole(roleKey, ct); if (current is null) return false;
@@ -241,18 +238,18 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
                 denying.Allow = [];
                 denying.UpdatedBy = actor?.CurrentActorSubject;
                 using (RoleMutationGuard.Allow<PermissionOverwrite>(denying.Id, EntityLifecycleOperation.Upsert)) await denying.Save(ct);
-                _gate.Invalidate(() => bags.InvalidateOverwrite(denying));
+                Invalidate(() => bags.InvalidateOverwrite(denying));
             }, ct);
         }
 
-        _gate.Invalidate(bags.InvalidateAll);
+        Invalidate(bags.InvalidateAll);
         for (string? after = null; ;)
         {
             var page = await Members(roleKey, after, _options.MaxPageSize, ct);
             foreach (var member in page.Items)
             {
                 using (RoleMutationGuard.Allow<RoleMember>(member.Id, EntityLifecycleOperation.Remove)) await member.Remove(ct);
-                _gate.Invalidate(() => bags.Invalidate(member.PersonId));
+                Invalidate(() => bags.Invalidate(member.PersonId));
             }
 
             if ((after = page.Next) is null) break;
@@ -266,10 +263,10 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
             if (roleKey != RoleTokens.Everyone) await Shift(last.Position, null, ct);
         }
 
-        _gate.Invalidate(bags.InvalidateAll);
-        await RoleChangeGate.Published(RoleEventKind.RoleDeleted, token => before with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        Invalidate(bags.InvalidateAll);
+        await Published(RoleEventKind.RoleDeleted, token => before with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
         return true;
-    }
+    }, ct);
 
     /// <summary>
     /// The overwrites that evaluate <paramref name="bag"/> on <paramref name="resourceId"/>: the resource's overwrites
@@ -345,10 +342,9 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     /// <c>global:*</c> permissions, never <see cref="RoleTokens.Administrator"/>; a permission in both is allowed, as
     /// within one Discord step. <paramref name="expiresAt"/>, when set, is when it stops applying.
     /// </summary>
-    public async Task<PermissionOverwrite> Overwrite(string resourceId, OverwriteSubjectKind subjectKind, string subjectId,
-        IEnumerable<string> allow, IEnumerable<string> deny, DateTimeOffset? expiresAt = null, CancellationToken ct = default)
+    public Task<PermissionOverwrite> Overwrite(string resourceId, OverwriteSubjectKind subjectKind, string subjectId,
+        IEnumerable<string> allow, IEnumerable<string> deny, DateTimeOffset? expiresAt = null, CancellationToken ct = default) => Change<PermissionOverwrite>(async () =>
     {
-        DemandChangeable();
         resourceId = RoleContract.Require(resourceId, nameof(resourceId));
         subjectId = RequireSubject(subjectKind, subjectId);
         var allowed = NormalizeOverwritePermissions(allow, nameof(allow));
@@ -358,7 +354,6 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         if (expiresAt is { } expires && expires <= DateTimeOffset.UtcNow)
             throw new ArgumentException("expiresAt must be in the future; to end an overwrite now, remove it.", nameof(expiresAt));
 
-        await using var turn = await _gate.Enter(ct);
         await using var roleGate = subjectKind == OverwriteSubjectKind.Role ? await Enter(subjectId, ct) : null;
         await using var gate = await EnterOverwrites(ct);
         if (subjectKind == OverwriteSubjectKind.Role && !RoleContract.IsImplicitRole(subjectId) && await RoleReads.ExactRole(subjectId, ct) is null)
@@ -372,33 +367,29 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         };
         if (previous is not null && Equivalent(previous, next)) return previous;
         return await SaveOverwrite(previous, next, ct);
-    }
+    }, ct);
 
     /// <summary>Removes the overwrite of <paramref name="subjectId"/> on <paramref name="resourceId"/>; false when there is none.</summary>
-    public async Task<bool> RemoveOverwrite(string resourceId, OverwriteSubjectKind subjectKind, string subjectId, CancellationToken ct = default)
+    public Task<bool> RemoveOverwrite(string resourceId, OverwriteSubjectKind subjectKind, string subjectId, CancellationToken ct = default) => Change<bool>(async () =>
     {
-        DemandChangeable();
         resourceId = RoleContract.Require(resourceId, nameof(resourceId));
         subjectId = RequireSubject(subjectKind, subjectId);
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await EnterOverwrites(ct);
         var current = await PermissionOverwrite.Get(PermissionOverwrite.KeyFor(resourceId, subjectKind, subjectId), ct);
         if (current is null) return false;
         await RemoveOverwrite(current, ct);
         return true;
-    }
+    }, ct);
 
     /// <summary>
     /// Takes one permission out of an overwrite's allow list or deny list and leaves the rest as it was, so revoking an
     /// allow never lifts a deny; the overwrite is removed only when both lists are then empty. False when the
     /// overwrite does not exist, does not name the permission in that list, or either value cannot be one.
     /// </summary>
-    internal async Task<bool> RevokeFromOverwrite(string? overwriteId, bool deny, string? permission, CancellationToken ct)
+    internal Task<bool> RevokeFromOverwrite(string? overwriteId, bool deny, string? permission, CancellationToken ct) => Change<bool>(async () =>
     {
-        DemandChangeable();
         if (!RoleContract.TryRequire(overwriteId, out var id) || !RoleContract.TryRequirePermission(permission, out var token)) return false;
         (overwriteId, permission) = (id, token);
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await EnterOverwrites(ct);
         var previous = await PermissionOverwrite.Get(overwriteId, ct);
         if (previous is null || !(deny ? previous.Deny : previous.Allow).Contains(permission, StringComparer.Ordinal)) return false;
@@ -408,7 +399,7 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         if (next.Allow.Count == 0 && next.Deny.Count == 0) await RemoveOverwrite(previous, ct);
         else await SaveOverwrite(previous, next, ct);
         return true;
-    }
+    }, ct);
 
     /// <summary>Saves an overwrite change; the overwrite lock is held.</summary>
     private async Task<PermissionOverwrite> SaveOverwrite(PermissionOverwrite? previous, PermissionOverwrite next, CancellationToken ct)
@@ -417,8 +408,8 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         await RoleEventRegistry.Before(RoleEventKind.OverwriteChanging, context);
         using (RoleMutationGuard.Allow<PermissionOverwrite>(next.Id, EntityLifecycleOperation.Upsert)) next = await next.Save(ct);
         var saved = next;
-        _gate.Invalidate(() => bags.InvalidateOverwrite(saved));
-        await RoleChangeGate.Published(RoleEventKind.OverwriteChanged, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        Invalidate(() => bags.InvalidateOverwrite(saved));
+        await Published(RoleEventKind.OverwriteChanged, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
         return next;
     }
 
@@ -428,17 +419,17 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         var context = Removal(current, ct);
         await RoleEventRegistry.Before(RoleEventKind.OverwriteRemoving, context);
         using (RoleMutationGuard.Allow<PermissionOverwrite>(current.Id, EntityLifecycleOperation.Remove)) await current.Remove(ct);
-        _gate.Invalidate(() => bags.InvalidateOverwrite(current));
-        await RoleChangeGate.Published(RoleEventKind.OverwriteRemoved, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        Invalidate(() => bags.InvalidateOverwrite(current));
+        await Published(RoleEventKind.OverwriteRemoved, token => context with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
     }
 
     /// <summary>Removes one of a deleted role's overwrites, whose before-event already ran; the overwrite lock is held.</summary>
     private async ValueTask RemoveWithRole(PermissionOverwrite row, CancellationToken ct)
     {
         using (RoleMutationGuard.Allow<PermissionOverwrite>(row.Id, EntityLifecycleOperation.Remove)) await row.Remove(ct);
-        _gate.Invalidate(() => bags.InvalidateOverwrite(row));
+        Invalidate(() => bags.InvalidateOverwrite(row));
         var removal = Removal(row, ct);
-        await RoleChangeGate.Published(RoleEventKind.OverwriteRemoved, token => removal with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        await Published(RoleEventKind.OverwriteRemoved, token => removal with { Phase = RoleChangePhase.After, CancellationToken = token }, ct);
     }
 
     /// <summary>Visits every overwrite of a role, a page at a time; changing or removing the one visited does not move the cursor.</summary>
@@ -461,12 +452,10 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     /// permissions changed — compiles every bag again rather than reading the role's members: such changes are rare,
     /// and a bag compiles from two bounded reads. A rename or a metadata change alters no bag.
     /// </summary>
-    private async Task<Role> Mutate(string roleKey, RoleEventKind beforeKind, RoleEventKind afterKind,
-        Func<Role?, Role> change, int? position, CancellationToken ct)
+    private Task<Role> Mutate(string roleKey, RoleEventKind beforeKind, RoleEventKind afterKind,
+        Func<Role?, Role> change, int? position, CancellationToken ct) => Change<Role>(async () =>
     {
-        DemandChangeable();
         roleKey = RoleContract.Require(roleKey, nameof(roleKey));
-        await using var turn = await _gate.Enter(ct);
         await using var gate = await Enter(roleKey, ct);
         await using var order = await EnterOrder(ct);
         var previous = await RoleReads.ExactRole(roleKey, ct);
@@ -482,12 +471,12 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
         var placed = previous?.Position != next.Position;
         if (placed && roleKey != RoleTokens.Everyone) await Shift(previous?.Position, next.Position, ct);
         using (RoleMutationGuard.Allow<Role>(next.Id, EntityLifecycleOperation.Upsert)) next = await next.Save(ct);
-        if (placed || permissionsChanged) _gate.Invalidate(bags.InvalidateAll);
+        if (placed || permissionsChanged) Invalidate(bags.InvalidateAll);
         var saved = next;
-        if (alsoPermissions) await RoleChangeGate.Published(RoleEventKind.PermissionsChanged, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
-        await RoleChangeGate.Published(afterKind, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        if (alsoPermissions) await Published(RoleEventKind.PermissionsChanged, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
+        await Published(afterKind, token => context with { Current = saved, Phase = RoleChangePhase.After, CancellationToken = token }, ct);
         return next;
-    }
+    }, ct);
 
     /// <summary>
     /// Where a change puts the role: <see cref="RoleTokens.Everyone"/> at 0, and a position elsewhere refused; a role
@@ -555,20 +544,71 @@ public sealed class RoleCollection(RoleBagCache bags, IOptions<RoleOptions> opti
     }
 
     /// <summary>
-    /// Refuses, before any lock is taken, a change asked for by a role lifecycle handler, a change asked for inside a
-    /// deferred scope, and one inside a hold that has committed or rolled back. A role, member or overwrite change is a
-    /// read-modify-write under this collection's locks, deciding from what it reads; a deferred scope has no transaction to
-    /// decide in, and would hold the write until its commit while the decision went stale.
+    /// One change, as one outcome where the route allows it. It is refused, before any lock, when a role lifecycle handler
+    /// asks for it, and inside a deferred scope or a hold that has ended: a change decides from what it reads, and neither
+    /// has a transaction to decide in. Inside an open hold it joins. Outside any scope, on a route that offers holds, it is
+    /// a short hold of its own, which queues with the others, so it never decides beside one. Elsewhere it runs as it is.
     /// </summary>
-    private static void DemandChangeable()
+    private static async Task<T> Change<T>(Func<Task<T>> change, CancellationToken ct)
     {
         RoleEventRegistry.DemandMutationAllowed();
-        if (EntityContext.Current?.TransactionCoordinator is { } scope && RoleChangeGate.CurrentHold is null)
-            throw new NotSupportedException(
-                $"A role or overwrite change cannot join scope '{scope.Name}': a deferred EntityContext.Transaction scope " +
-                "writes only at its commit, while a role change decides from what it reads, and a hold that has ended has " +
-                "nothing left to join. Make the change inside EntityContext.Hold, or after EntityContext.Commit(), outside the scope.");
+        if (EntityContext.CurrentTransaction is { } scope)
+        {
+            if (RoleReads.OpenHold is null)
+                throw new NotSupportedException(
+                    $"A role or overwrite change cannot join scope '{scope.Name}': a deferred EntityContext.Transaction scope " +
+                    "writes only at its commit, while a role change decides from what it reads, and a hold that has ended has " +
+                    "nothing left to join. Make the change inside EntityContext.Hold, or after EntityContext.Commit(), outside the scope.");
+            return await change();
+        }
+
+        if (!Data<Role, string>.Capabilities.Has(DataCaps.Write.HeldTransaction)) return await change();
+        using (await EntityContext.Hold(nameof(RoleCollection), ct))
+        {
+            var result = await change();
+            await EntityContext.Commit(ct);
+            return result;
+        }
     }
+
+    /// <summary>
+    /// Compiled state follows a change: now, or inside a hold at its commit, every invalidation before any after-event, so a
+    /// handler reads what has followed the whole hold, and a rollback touches nothing.
+    /// </summary>
+    private void Invalidate(Action invalidate)
+    {
+        if (RoleReads.OpenHold is not { } hold)
+        {
+            invalidate();
+            return;
+        }
+
+        var pending = HeldInvalidations(hold);
+        lock (pending) pending.Add(invalidate);
+    }
+
+    /// <summary>
+    /// An after-event: now, or inside a hold after its commit, on a token of that moment and outside the hold, with a failure
+    /// logged by the coordinator because the commit stands.
+    /// </summary>
+    private ValueTask Published<TContext>(RoleEventKind kind, Func<CancellationToken, TContext> context, CancellationToken ct)
+    {
+        if (RoleReads.OpenHold is not { } hold) return RoleEventRegistry.After(kind, context(ct));
+        _ = HeldInvalidations(hold);
+        hold.AfterCommit(token => RoleEventRegistry.After(kind, context(token)).AsTask());
+        return ValueTask.CompletedTask;
+    }
+
+    private List<Action> HeldInvalidations(ITransactionCoordinator hold) => _heldInvalidations.GetValue(hold, static scope =>
+    {
+        var pending = new List<Action>();
+        scope.AfterCommit(_ =>
+        {
+            lock (pending) pending.ForEach(static invalidate => invalidate());
+            return Task.CompletedTask;
+        });
+        return pending;
+    });
 
     private void RequireTake(int take)
     {

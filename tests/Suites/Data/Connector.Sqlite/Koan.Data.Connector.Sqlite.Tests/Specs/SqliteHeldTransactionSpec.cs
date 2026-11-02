@@ -868,54 +868,27 @@ public sealed class SqliteHeldTransactionSpec(SqliteFixture fixture, ITestOutput
     }
 
     [Fact]
-    public async Task What_waits_for_a_hold_to_end_runs_once_however_it_ended_and_what_follows_a_commit_can_write()
+    public async Task What_follows_a_commit_runs_outside_the_scope_and_can_write()
     {
         RequireBackingStore();
-        var path = TempDatabase("hold-ends");
+        var path = TempDatabase("after-commit");
         try
         {
-            await using var host = await BootAsync(Settings(path, holdLimit: TimeSpan.FromSeconds(1)));
+            await using var host = await BootAsync(Settings(path));
             await new Ticket { Title = "table exists" }.Save();
-            var ended = 0;
             var followed = new Ticket { Title = "follows the commit" };
 
             using (await EntityContext.Hold("committed"))
             {
-                var hold = EntityContext.CurrentTransaction!;
-                hold.WhenHoldEnds(() => Interlocked.Increment(ref ended));
-                hold.AfterCommit(async ct =>
+                EntityContext.CurrentTransaction!.AfterCommit(async ct =>
                 {
-                    Volatile.Read(ref ended).Should().Be(1, "the hold ended before what follows its commit");
                     EntityContext.CurrentTransaction.Should().BeNull();
                     await followed.Save(ct);
                 });
-                Volatile.Read(ref ended).Should().Be(0);
                 await EntityContext.Commit();
-                hold.WhenHoldEnds(() => Interlocked.Increment(ref ended));
-                Volatile.Read(ref ended).Should().Be(2, "a hold that has ended runs it at once");
             }
 
             (await Ticket.Get(followed.Id)).Should().NotBeNull();
-
-            ended = 0;
-            using (await EntityContext.Hold("disposed"))
-                EntityContext.CurrentTransaction!.WhenHoldEnds(() => Interlocked.Increment(ref ended));
-            Volatile.Read(ref ended).Should().Be(1);
-
-            ended = 0;
-            using (await EntityContext.Hold("past its limit"))
-            {
-                EntityContext.CurrentTransaction!.WhenHoldEnds(() => Interlocked.Increment(ref ended));
-                await Task.Delay(TimeSpan.FromSeconds(2));
-                Volatile.Read(ref ended).Should().Be(1, "the limit ended it while the scope is still open");
-            }
-            Volatile.Read(ref ended).Should().Be(1);
-
-            using (EntityContext.Transaction("deferred"))
-            {
-                var deferred = () => EntityContext.CurrentTransaction!.WhenHoldEnds(() => { });
-                deferred.Should().Throw<NotSupportedException>();
-            }
         }
         finally
         {

@@ -3,6 +3,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Filtering;
 using Koan.Data.Core;
 using Koan.Data.Core.Sorting;
+using Koan.Data.Core.Transactions;
 
 namespace Koan.Identity.Roles;
 
@@ -15,6 +16,10 @@ namespace Koan.Identity.Roles;
 internal static class RoleReads
 {
     private const char CursorSeparator = ':';
+
+    /// <summary>The hold the calling flow is in, while it is open.</summary>
+    public static ITransactionCoordinator? OpenHold =>
+        EntityContext.CurrentTransaction is { IsHeld: true, IsCompleted: false } hold ? hold : null;
 
     /// <summary>The role keyed exactly <paramref name="roleKey"/>, or null: one read of its composed id.</summary>
     public static async Task<Role?> ExactRole(string roleKey, CancellationToken ct)

@@ -119,6 +119,26 @@ public sealed class RoleCollectionSpec : IdentityHostScopedSpec
         finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
     }
 
+    /// <summary>SEC-0036: a route with no holds keeps a change as it is: no scope around it, and a failing after-event reaches the caller.</summary>
+    [Fact] public async Task On_a_route_with_no_holds_a_change_runs_as_it_is()
+    {
+        var key = $"role:plain:{Guid.NewGuid():N}";
+        Koan.Data.Core.EntityContext.CurrentTransaction.Should().BeNull();
+        var scoped = true;
+        Koan.Data.Core.Model.Entity.Role.Reset()
+            .MemberAdding(_ => { scoped = Koan.Data.Core.EntityContext.CurrentTransaction is not null; return ValueTask.FromResult(RoleChangeDecision.Continue()); })
+            .MemberAdded(_ => throw new InvalidOperationException("a failing handler"));
+        try
+        {
+            await Roles.Define(key, "Plain");
+            var add = () => Roles.Add(key, "person:plain");
+            await add.Should().ThrowAsync<RolePostEventException>();
+            scoped.Should().BeFalse();
+            (await Roles.Members(key)).Items.Should().ContainSingle("the change had committed");
+        }
+        finally { Koan.Data.Core.Model.Entity.Role.Reset(); }
+    }
+
     /// <summary>A person's roles are one read of their membership rows by person; a role's other members do not
     /// enter it.</summary>
     [Fact] public async Task A_persons_roles_are_read_through_the_person_index()
