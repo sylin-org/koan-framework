@@ -1,6 +1,9 @@
 using System.Reflection;
+using Koan.Core.Hosting.Registry;
 using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Capabilities;
+using Koan.Data.Abstractions.Transactions;
+using Koan.Data.Core.Routing;
+using Koan.Data.Core.Polymorphism;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -21,34 +24,59 @@ internal static class TablesAtBoot
 
     public static async Task Make(IServiceProvider services, ILogger? logger, CancellationToken ct)
     {
+        if (!DefaultRouteHolds(services)) return;
         var refused = new List<string>();
-        foreach (var root in services.GetRequiredService<DataApplicationManifest>().Roots)
+        foreach (var (root, key) in Roots().Distinct())
         {
-            if (root.RouteScope != DataEntityRouteScope.Default) continue;
-            var ready = (Task<Exception?>)One.MakeGenericMethod(root.RootType, root.KeyType).Invoke(null, [services, ct])!;
+            if (DataApplicationManifest.ScopeOf(root) != DataEntityRouteScope.Default) continue;
+            var ready = (Task<Exception?>)One.MakeGenericMethod(root, key).Invoke(null, [services, ct])!;
             if (await ready.ConfigureAwait(false) is not { } failure) continue;
-            refused.Add(root.RootType.Name);
-            logger?.LogDebug(failure, "The table of {Entity} could not be made at start.", root.RootType.Name);
+            refused.Add(root.Name);
+            logger?.LogDebug(failure, "The table of {Entity} could not be made at start.", root.Name);
         }
 
         if (refused.Count > 0)
             logger?.LogWarning("These entities have no table yet and answer at their first use: {Entities}.", string.Join(", ", refused));
     }
 
+    /// <summary>Every concrete entity's root. One declared wrongly says so at its first use, as it does without this.</summary>
+    private static IEnumerable<(Type Root, Type Key)> Roots()
+    {
+        foreach (var type in KoanRegistry.GetDiscoveredImplementors(typeof(IEntity)))
+        {
+            if (!type.IsClass || type.IsAbstract || type.ContainsGenericParameters) continue;
+            EntityRootDescriptor descriptor;
+            try
+            {
+                descriptor = EntityRootDescriptor.For(type);
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
+            }
+
+            yield return (descriptor.RootType, descriptor.KeyType);
+        }
+    }
+
+    /// <summary>Asked of the provider, so a store that holds nothing has no repository made for it. One that cannot be resolved says so at first use.</summary>
+    private static bool DefaultRouteHolds(IServiceProvider services)
+    {
+        try
+        {
+            return AdapterResolver.ResolveDefault(services).Binding is { } binding &&
+                   services.GetRequiredService<DataProviderCatalog>().Find(binding.Plan.Adapter) is IHeldTransactionProvider;
+        }
+        catch (Exception failure) when (failure is AdapterResolutionException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     private static async Task<Exception?> Ready<TEntity, TKey>(IServiceProvider services, CancellationToken ct)
         where TEntity : class, IEntity<TKey>
         where TKey : notnull
     {
-        try
-        {
-            // A route whose adapter cannot be resolved has nothing to make, and says so at first use.
-            if (!Data<TEntity, TKey>.Capabilities.Has(DataCaps.Write.HeldTransaction)) return null;
-        }
-        catch (Exception failure) when (failure is not OperationCanceledException)
-        {
-            return null;
-        }
-
         try
         {
             await services.GetRequiredService<IDataService>().GetRepository<TEntity, TKey>().EnsureReady(ct).ConfigureAwait(false);

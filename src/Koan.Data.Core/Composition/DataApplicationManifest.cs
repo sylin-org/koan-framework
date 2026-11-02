@@ -77,7 +77,7 @@ internal sealed class DataApplicationManifest
     {
         var descriptor = EntityRootDescriptor.For(root);
         var blockers = new List<DataManifestBlocker>();
-        var scope = DataEntityRouteScope.Default;
+        var scope = ScopeOf(root);
         var family = familyTypes.Append(root).Distinct().ToArray();
 
         if (descriptor.KeyType != typeof(string))
@@ -86,19 +86,10 @@ internal sealed class DataApplicationManifest
                 $"Entity root '{root.FullName}' uses key '{descriptor.KeyType.FullName}'.",
                 "Use a provider-stable string Entity identity for this cutover envelope."));
         if (DatabaseRouteRegistry.AppliesTo(root))
-        {
-            scope = DataEntityRouteScope.OutsideDefault;
             blockers.Add(new(
                 "koan.data.cutover.database-axis",
                 $"Entity root '{root.FullName}' is routed by a Database axis.",
                 "Exclude the root from default-route promotion or supply a finite axis inventory in a later envelope."));
-        }
-        if (root.GetCustomAttribute<SourceAdapterAttribute>(inherit: true) is not null ||
-            root.GetCustomAttribute<DataAdapterAttribute>(inherit: true) is not null ||
-            root.GetCustomAttribute<Koan.Data.Abstractions.Annotations.DataSourceAttribute>(inherit: false) is not null)
-        {
-            scope = DataEntityRouteScope.OutsideDefault;
-        }
         var managedTypes = family.Where(type => ManagedFieldRegistry.ForType(type).Count != 0).ToArray();
         if (managedTypes.Length != 0)
             blockers.Add(new(
@@ -148,6 +139,15 @@ internal sealed class DataApplicationManifest
             blockers,
             accessor);
     }
+
+    /// <summary>Whether a root lives on the default route: not under a Database axis, and naming no adapter or source of its own.</summary>
+    internal static DataEntityRouteScope ScopeOf(Type root)
+        => DatabaseRouteRegistry.AppliesTo(root) ||
+           root.GetCustomAttribute<SourceAdapterAttribute>(inherit: true) is not null ||
+           root.GetCustomAttribute<DataAdapterAttribute>(inherit: true) is not null ||
+           root.GetCustomAttribute<Koan.Data.Abstractions.Annotations.DataSourceAttribute>(inherit: false) is not null
+            ? DataEntityRouteScope.OutsideDefault
+            : DataEntityRouteScope.Default;
 
     private static string Types(IEnumerable<Type> types)
         => string.Join(", ", types

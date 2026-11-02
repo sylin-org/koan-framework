@@ -156,6 +156,8 @@ public sealed class AggregateConfigHostOwnershipSpec
         RecordingAdapterFactory factory,
         int? repositoryEntries = null)
         => KoanIntegrationHost.Configure()
+            // A cache this small holds what its spec names: a default route that holds would fill it with the tables it makes at start (ARCH-0142).
+            .WithSetting("Koan:Data:Sources:Default:Adapter", repositoryEntries is null ? null : RecordingAdapterFactory.ProviderId)
             .ConfigureServices(services =>
             {
                 services.AddKoan();
