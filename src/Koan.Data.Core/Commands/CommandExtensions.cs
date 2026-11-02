@@ -15,6 +15,10 @@ public static class CommandExtensions
 
     private static int _trying;
 
+    /// <summary>How many tries of this process are waiting for their hold. At zero, every try sent so far has begun or been told it never ran,
+    /// so a command sent now runs behind all of them.</summary>
+    public static int TriesWaiting => Volatile.Read(ref _trying);
+
     extension<TResult>(ICommand<TResult> command)
     {
         /// <summary>Runs the command in a hold of its own, in this flow and this context, and answers with what happened. Holds take turns, so

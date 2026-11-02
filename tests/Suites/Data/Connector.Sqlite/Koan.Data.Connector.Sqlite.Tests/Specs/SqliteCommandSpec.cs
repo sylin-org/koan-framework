@@ -622,6 +622,7 @@ public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper o
             var tried = new List<Task<Outcome<long>>>();
             while (tried.Count < 5000 && new NumberASlip("tried", tried.Count).TrySend() is { } sent) tried.Add(sent);
             tried.Should().HaveCountLessThan(5000, "tries are bounded");
+            CommandExtensions.TriesWaiting.Should().Be(tried.Count, "each one waits for its hold, behind the one holding the turn");
 
             var waiting = new NumberASlip("waited", 0).Send(Cancellation);
             (await Task.WhenAny(waiting, Task.Delay(200, Cancellation))).Should().NotBe(waiting, "a send waits for its turn");

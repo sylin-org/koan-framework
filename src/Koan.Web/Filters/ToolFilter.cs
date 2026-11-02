@@ -27,7 +27,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
         // WEB-0083: a credential a handler rejected is not the anonymous case, whatever the gate would say to a visitor.
         if (http.Features.Get<IAuthenticateResultFeature>()?.AuthenticateResult?.Failure is not null)
         {
-            context.Result = Answers.Denied(AuthorizeDecision.Challenged());
+            context.Result = Answers.Denied(http, AuthorizeDecision.Challenged());
             return;
         }
 
@@ -39,7 +39,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
             ((ControllerActionDescriptor)context.ActionDescriptor).MethodInfo,
             http.Request.RouteValues,
             http.RequestAborted);
-        if (decision is not null) context.Result = Answers.Denied(decision);
+        if (decision is not null) context.Result = Answers.Denied(http, decision);
     }
 
     public void OnResourceExecuting(ResourceExecutingContext context)
@@ -52,7 +52,7 @@ internal sealed class ToolFilter : IAsyncAuthorizationFilter, IResourceFilter, I
 
     public void OnActionExecuting(ActionExecutingContext context)
     {
-        if (!context.ModelState.IsValid) context.Result = Answers.Unbound(context.ModelState);
+        if (!context.ModelState.IsValid) context.Result = Answers.Unbound(context.HttpContext, context.ModelState);
     }
 
     public void OnActionExecuted(ActionExecutedContext context) { }

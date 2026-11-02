@@ -141,7 +141,8 @@ public sealed class ToolRouteController : ControllerBase
     public IActionResult Refused(string kind) => this.Answer<string>(kind switch
     {
         "absent" => new Outcome<string>.Refused(Reason.Absent("A sentence that says too much.")),
-        "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.", next: "/appeal")),
+        "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.", next: "/appeal", heading: "Timed out")),
+        "script" => new Outcome<string>.Refused("<script>alert(1)</script>"),
         "conflict" => new Outcome<string>.Refused(Reason.Conflict("Already there.")),
         _ => new Outcome<string>.Refused("Not like that."),
     }, _ => Ok());
