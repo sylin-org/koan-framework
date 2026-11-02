@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +47,14 @@ public static class ServiceCollectionExtensions
             j.SerializerSettings.Converters.Add(new StringEnumConverter());
             j.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
         });
+
+        // ARCH-0142: a principal a web context placed survives WebApplication's own authentication around what an application adds in Program.
+        services.AddAuthentication();
+        if (services.Last(static descriptor => descriptor.ServiceType == typeof(IAuthenticationService)) is { ImplementationType: { } authentication } registered)
+        {
+            services.Remove(registered);
+            services.AddScoped<IAuthenticationService>(provider => new Context.PlacedAuthentication((IAuthenticationService)ActivatorUtilities.CreateInstance(provider, authentication)));
+        }
 
         services.TryAddEnumerable(ServiceDescriptor.Transient<IConfigureOptions<MvcOptions>, OptionalTransformerInputFormatterConfigurator>());
         services.TryAddEnumerable(ServiceDescriptor.Transient<IPostConfigureOptions<MvcOptions>, Serialization.FieldAccessMvcOptions>());

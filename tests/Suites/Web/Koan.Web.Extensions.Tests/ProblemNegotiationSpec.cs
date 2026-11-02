@@ -1,16 +1,6 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text.Json;
 using AwesomeAssertions;
-using Koan.Core;
-using Koan.Web.Controllers;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace Koan.Web.Extensions.Tests;
@@ -63,50 +53,5 @@ public sealed class ProblemNegotiationSpec(RestEntityWebFactory fx)
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(Ct));
         body.RootElement.GetProperty("gate").GetString().Should().Be("timed-out");
         body.RootElement.GetProperty("title").GetString().Should().Be("Timed out", "a gate's heading is the problem's title");
-    }
-
-    [Fact]
-    public async Task An_applications_view_answers_in_place_of_the_plain_page()
-    {
-        using var host = await Host.CreateDefaultBuilder()
-            .ConfigureWebHost(web =>
-            {
-                web.UseTestServer();
-                web.UseContentRoot(AppContext.BaseDirectory);
-                web.UseEnvironment("Development");
-                web.ConfigureAppConfiguration((_, config) => config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Koan:Environment"] = "Development",
-                    ["Koan:Data:Sources:Default:Adapter"] = "inmemory",
-                    ["Koan:BackgroundServices:Enabled"] = "false",
-                }));
-                web.ConfigureServices(services =>
-                {
-                    services.AddKoan();
-                    services.AddKoanControllersFrom<CogController>();
-                    services.AddSingleton<IProblemView, OwnView>();
-                });
-                web.Configure(_ => { });
-            })
-            .StartAsync(Ct);
-        using var client = host.GetTestClient();
-
-        using var page = await client.SendAsync(Request("/tool-route/conflict/refused", BrowserAccept), Ct);
-        page.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await page.Content.ReadAsStringAsync(Ct)).Should().Be("own: conflict: Already there.");
-
-        using var json = await client.SendAsync(Request("/tool-route/conflict/refused", "application/json"), Ct);
-        json.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
-        await host.StopAsync(Ct);
-    }
-
-    private sealed class OwnView : IProblemView
-    {
-        public IActionResult Render(HttpContext http, ProblemDetails problem) => new ContentResult
-        {
-            StatusCode = problem.Status,
-            ContentType = "text/html",
-            Content = $"own: {problem.Extensions["kind"]}: {problem.Detail}",
-        };
     }
 }

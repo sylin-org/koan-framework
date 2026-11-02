@@ -172,12 +172,7 @@ public sealed class WebContext
             // denies it with 403 and not 401. A credential a handler rejected stays rejected (WEB-0083).
             if (replacement.Identity?.IsAuthenticated == true && _originalResult?.AuthenticateResult?.Failure is null)
                 context.Features.Set<IAuthenticateResultFeature>(new PlacedResult(
-                    AuthenticateResult.Success(new AuthenticationTicket(replacement, replacement.Identity.AuthenticationType ?? "koan"))));
-        }
-
-        private sealed class PlacedResult(AuthenticateResult result) : IAuthenticateResultFeature
-        {
-            public AuthenticateResult? AuthenticateResult { get; set; } = result;
+                    AuthenticateResult.Success(new AuthenticationTicket(replacement, _originalResult?.AuthenticateResult?.Ticket?.AuthenticationScheme ?? replacement.Identity.AuthenticationType ?? "koan"))));
         }
 
         public void Dispose()

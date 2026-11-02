@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -32,6 +33,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
             var opts = options.Value;
             var pipeline = pipelineOptions.Value ?? new WebPipelineOptions();
             const string appliedKey = "Koan.Web.Applied";
+            var mapsEndpoints = false;
+            KeyValuePair<string, object?> routes = default;
             if (!app.Properties.ContainsKey(appliedKey))
             {
                 app.Properties[appliedKey] = true;
@@ -151,20 +154,8 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                         }
                         await next();
                     });
-                    app.UseEndpoints(endpoints =>
-                    {
-                        // MVC controllers handle all endpoints including health
-                        endpoints.MapControllers();
-
-                        // WEB-0069: modules map their own endpoints via IKoanEndpointContributor (e.g. MCP),
-                        // replacing reflection into module assemblies.
-                        foreach (var contributor in app.ApplicationServices
-                                     .GetServices<IKoanEndpointContributor>()
-                                     .OrderBy(c => c.Order))
-                        {
-                            contributor.Map(endpoints);
-                        }
-                    });
+                    mapsEndpoints = true;
+                    routes = app.Properties.First(static property => property.Value is IEndpointRouteBuilder);
                 }
                 else if (pipeline.UseRateLimiter)
                 {
@@ -172,7 +163,26 @@ internal sealed class KoanWebStartupFilter(IOptions<KoanWebOptions> options, IOp
                     UseRateLimiterIfRegistered(app);
                 }
             }
+            // ARCH-0142: what the application adds in Program runs here, after authorization and before the endpoint, because
+            // an endpoint ends the pipeline: placed after this, it would run only for a request no route answers.
             next(app);
+            if (!mapsEndpoints) return;
+            // An application that called UseRouting left its own route builder here. Koan's endpoints belong to the routing Koan placed.
+            app.Properties[routes.Key] = routes.Value;
+            app.UseEndpoints(endpoints =>
+            {
+                // MVC controllers handle all endpoints including health
+                endpoints.MapControllers();
+
+                // WEB-0069: modules map their own endpoints via IKoanEndpointContributor (e.g. MCP),
+                // replacing reflection into module assemblies.
+                foreach (var contributor in app.ApplicationServices
+                             .GetServices<IKoanEndpointContributor>()
+                             .OrderBy(c => c.Order))
+                {
+                    contributor.Map(endpoints);
+                }
+            });
         };
     }
 
