@@ -81,8 +81,9 @@ public abstract class UniqueIndexTenancySpecsBase<TFixture> : KoanDataSpec<TFixt
             using (ConformanceTenancy.Use("acme")) await AssertConflict(() => new ConformanceMember { Email = "a@x.test" }.Save());
             using (ConformanceTenancy.Use("globex")) await AssertConflict(() => new ConformanceMember { Email = "a@x.test" }.Save());
 
+            // The partition's own table: a store that makes tables at start reports the entity's own table there too (ARCH-0142).
             var report = logs.Warnings.Should().ContainSingle(entry =>
-                    entry.Message.Contains("global unique index", StringComparison.Ordinal))
+                    entry.Message.Contains("global unique index", StringComparison.Ordinal) && entry.Message.Contains(partition, StringComparison.Ordinal))
                 .Which;
             Output.WriteLine(report.Message);
             report.State.Should().ContainKey("Index");

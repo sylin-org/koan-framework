@@ -70,8 +70,9 @@ public sealed class SqliteUniqueIndexTenancySpec(SqliteFixture fixture, ITestOut
             using var _ = Lease(partition);
             using (ConformanceTenancy.Use("acme")) await new ConformanceNamedMember { Code = "a-1" }.Save();
 
+            // The partition's own table: a store that makes tables at start reports the entity's own table there too (ARCH-0142).
             var report = logs.Warnings.Should().ContainSingle(entry =>
-                    entry.Message.Contains("global unique index", StringComparison.Ordinal))
+                    entry.Message.Contains("global unique index", StringComparison.Ordinal) && entry.Message.Contains(partition, StringComparison.Ordinal))
                 .Which;
             Output.WriteLine(report.Message);
             report.State["Index"].Should().Be(NamedIndex);
