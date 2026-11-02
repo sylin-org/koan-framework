@@ -203,7 +203,7 @@ public sealed class NoteArchiveController : ControllerBase
 }
 ```
 
-`Answer` maps a command's outcome once: invalid 400, absent 404, gated 401 or 403, conflict 409, and the action says what success answers. A value that cannot bind is refused with its field named. With no MCP module the route is all there is.
+A tool call goes through the application's whole pipeline, so `[Authorize]`, a route constraint, `[EnableRateLimiting]` and your own middleware answer it as they answer a request. `Answer` maps a command's outcome once: invalid 400, absent 404 in one sentence, gated 401 or 403, conflict 409, and the action says what success answers. A gated reason can carry a stable word and a next step: `Reason.Gated("sign-in", "Sign in to write here.", next: "/sign-in")`. A value that cannot bind is refused with its field named. With no MCP module the route is all there is.
 
 When a verb has no route on purpose, expose a public static method.
 

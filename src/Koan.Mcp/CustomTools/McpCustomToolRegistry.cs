@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Threading;
 using Koan.Core.Hosting.Bootstrap;
 using Koan.Web.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -126,6 +127,10 @@ public sealed class McpCustomToolRegistry
 
     private McpCustomTool? Build(MethodInfo method, McpToolAttribute attribute)
     {
+        // Nothing would enforce it: only ASP.NET's middleware reads [Authorize], on a route.
+        if (method.IsDefined(typeof(AuthorizeAttribute), true) || method.ReflectedType?.IsDefined(typeof(AuthorizeAttribute), true) == true)
+            throw new InvalidOperationException($"[Authorize] on [McpTool] {method.ReflectedType?.Name}.{method.Name} would answer to nothing. Declare [Access(...)] or [RequireScope(...)], or make it a route with [Tool].");
+
         var name = string.IsNullOrWhiteSpace(attribute.Name) ? method.Name : attribute.Name!.Trim();
 
         var parameters = new List<McpCustomToolParameter>();

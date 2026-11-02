@@ -1,7 +1,9 @@
 using AwesomeAssertions;
 using Koan.Core;
 using Koan.Core.Hosting.App;
+using Koan.Mcp.CustomTools;
 using Koan.Web.Attributes;
+using Microsoft.AspNetCore.Authorization;
 using Koan.Web.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -61,6 +63,25 @@ public sealed class ToolsThatCannotStartSpec
         [HttpPost("/upload")]
         [Tool]
         public IActionResult Write(IFormFile file) => Ok(file.Length);
+    }
+
+    public sealed class ByOneScheme : ControllerBase
+    {
+        [HttpPost("/schemed")]
+        [Tool, Authorize(AuthenticationSchemes = "Elsewhere")]
+        public IActionResult Write() => Ok();
+    }
+
+    public sealed record Nested(Nested.Inner Deep)
+    {
+        public sealed record Inner(string? Name);
+    }
+
+    public sealed class NestedInQuery : ControllerBase
+    {
+        [HttpGet("/nested")]
+        [Tool]
+        public IActionResult Read([FromQuery] Nested filter) => Ok();
     }
 
     public sealed class Unrouted : ControllerBase
@@ -127,9 +148,26 @@ public sealed class ToolsThatCannotStartSpec
     [InlineData(typeof(NamedLikeAnEntityTool), "not.a.good.name")]
     [InlineData(typeof(FileTaking), "file")]
     [InlineData(typeof(Unrouted), "attribute route")]
+    [InlineData(typeof(ByOneScheme), "Elsewhere")]
+    [InlineData(typeof(NestedInQuery), "deep")]
     public async Task A_tool_that_cannot_be_one_stops_the_host_and_says_why(Type controller, string says)
     {
         var stopped = await Assert.ThrowsAnyAsync<Exception>(() => Start(controller));
         stopped.ToString().Should().Contain(says);
+    }
+
+    /// <summary>Not an [McpTool], or nothing in this assembly could boot: discovery stops the host at this.</summary>
+    [Authorize]
+    public static string AuthorizedVerb() => "";
+
+    [Fact]
+    public void Authorize_on_a_verb_with_no_route_is_refused_because_nothing_would_answer_to_it()
+    {
+        var registry = new McpCustomToolRegistry(Microsoft.Extensions.Logging.Abstractions.NullLogger<McpCustomToolRegistry>.Instance);
+        var build = typeof(McpCustomToolRegistry).GetMethod("Build", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var refused = Assert.Throws<TargetInvocationException>(() => build.Invoke(registry, [typeof(ToolsThatCannotStartSpec).GetMethod(nameof(AuthorizedVerb)), new McpToolAttribute { Name = "authorized" }]));
+
+        refused.InnerException.Should().BeOfType<InvalidOperationException>().Which.Message.Should().Contain("[Access");
     }
 }

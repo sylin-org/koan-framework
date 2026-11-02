@@ -36,6 +36,9 @@ internal static class McpServiceRegistration
         services.TryAddSingleton<Koan.Mcp.CustomTools.McpCustomToolInvoker>();
         services.TryAddSingleton<Koan.Mcp.CustomTools.RouteToolInvoker>();
         services.AddHttpContextAccessor();
+        services.TryAddSingleton<Koan.Mcp.CustomTools.RoutePipeline>();
+        services.Replace(ServiceDescriptor.Singleton<Microsoft.AspNetCore.Hosting.Builder.IApplicationBuilderFactory>(
+            provider => provider.GetRequiredService<Koan.Mcp.CustomTools.RoutePipeline>()));
         services.AddHostedService<Koan.Mcp.CustomTools.McpToolNameCheck>();
         services.TryAddSingleton<RequestTranslator>();
         services.TryAddSingleton<ResponseTranslator>();

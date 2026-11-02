@@ -28,6 +28,6 @@ internal static class CustomToolProjection
         ArgumentNullException.ThrowIfNull(tool);
         ArgumentNullException.ThrowIfNull(options);
         return (tool.OperationalToolsetKey is not { Length: > 0 } key || options.IsOperationalToolsetEnabled(key))
-               && await visibility.Allows(tool.Method, tool.GateAction, ct).ConfigureAwait(false);
+               && await visibility.Allows(tool, ct).ConfigureAwait(false);
     }
 }

@@ -4,7 +4,10 @@ using System.Reflection;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
+using Koan.Mcp.CustomTools;
 using Koan.Web.Authorization;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Koan.Web.Endpoints;
 using Koan.Web.Hooks;
 using Microsoft.Extensions.DependencyInjection;
@@ -65,6 +68,22 @@ internal sealed class McpVerbVisibility : IDisposable
             : await EntityAuthorization.Decide(_authorize, _user, action, verb, ct: ct).ConfigureAwait(false) is null;
         _memo[(verb, action)] = allowed;
         return allowed;
+    }
+
+    /// <summary>Whether this caller may reach a custom tool, as far as that is knowable with no resource: the gate, and for a route the part of its
+    /// ASP.NET policy that reads only the principal. A policy's own handlers may need what the request addresses, so a tool only they could deny stays listed.</summary>
+    public async Task<bool> Allows(McpCustomTool tool, CancellationToken ct = default)
+    {
+        if (_user is null) return true;
+        if (!await Allows(tool.Method, tool.GateAction, ct).ConfigureAwait(false)) return false;
+        if (tool.Route is not { Action.EndpointMetadata: var metadata } || metadata.OfType<IAllowAnonymous>().Any()) return true;
+        if (_scope?.ServiceProvider is not { } services || services.GetService<IAuthorizationPolicyProvider>() is not { } policies) return true;
+        var policy = await AuthorizationPolicy.CombineAsync(policies, metadata.OfType<IAuthorizeData>().ToArray()).ConfigureAwait(false)
+                     ?? await policies.GetFallbackPolicyAsync().ConfigureAwait(false);
+        var knowable = policy?.Requirements.Where(requirement =>
+            requirement is DenyAnonymousAuthorizationRequirement or RolesAuthorizationRequirement or ClaimsAuthorizationRequirement or NameAuthorizationRequirement).ToArray();
+        return knowable is not { Length: > 0 }
+               || (await services.GetRequiredService<IAuthorizationService>().AuthorizeAsync(_user, null, knowable).ConfigureAwait(false)).Succeeded;
     }
 
     public void Dispose() => _scope?.Dispose();

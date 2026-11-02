@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Koan.Mcp.Execution;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -51,12 +52,15 @@ internal static partial class RouteTools
         if (!GoodName().IsMatch(name))
             throw new InvalidOperationException($"The tool name '{name}' of {where} is not lower-case words joined by underscores, at most 64 characters. State one with [Tool(Name = ...)].");
 
-        var (schema, query) = Input(action, pattern, method, where);
+        if (action.EndpointMetadata.OfType<IAuthorizeData>().FirstOrDefault(data => !string.IsNullOrEmpty(data.AuthenticationSchemes)) is { } schemed)
+            throw new InvalidOperationException($"{where} authorizes by the scheme {schemed.AuthenticationSchemes}, whose credential a tool call does not carry. Leave the default scheme to answer it, or move it to a controller without [Tool].");
+
+        var (schema, query, bodyField) = Input(action, pattern, method, where);
         var isGet = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
         var description = action.MethodInfo.GetCustomAttribute<DescriptionAttribute>()?.Description;
         return McpCustomToolRegistry.Assemble(name, description ?? $"{method} /{template}", schema, action.MethodInfo, !isGet,
             readOnly: isGet ? true : null, destructive: HttpMethods.IsDelete(method) ? true : null,
-            gateAction: EntityAuthorization.ActionOf(method), route: new RouteTool(action, method, pattern, query));
+            gateAction: EntityAuthorization.ActionOf(method), route: new RouteTool(action, method, pattern, query, bodyField));
     }
 
     /// <summary>The route's literal segments, then the particle or HTTP method: <c>/data/posts/{id}</c> with <c>getById</c> makes
@@ -70,11 +74,12 @@ internal static partial class RouteTools
     private static string Words(string text)
         => NotAWord().Replace(WordBoundary().Replace(text, "_").ToLowerInvariant(), "_").Trim('_');
 
-    private static (JObject Schema, IReadOnlySet<string> Query) Input(ControllerActionDescriptor action, RoutePattern pattern, string method, string where)
+    private static (JObject Schema, IReadOnlySet<string> Query, string? BodyField) Input(ControllerActionDescriptor action, RoutePattern pattern, string method, string where)
     {
         var properties = new JObject();
         var required = new JArray();
         var query = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string? bodyField = null;
         var routed = pattern.Parameters.ToDictionary(parameter => parameter.Name, StringComparer.OrdinalIgnoreCase);
         var isRead = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);
         var bodiless = isRead || HttpMethods.IsDelete(method);
@@ -85,6 +90,8 @@ internal static partial class RouteTools
             var schema = McpCustomToolRegistry.BuildParameterSchema(type);
             var described = sources.SelectMany(source => source.GetCustomAttributes(typeof(DescriptionAttribute), true)).OfType<DescriptionAttribute>().FirstOrDefault();
             if (described is not null) schema["description"] = described.Description;
+            if (asQuery && IsComplex(type))
+                throw new InvalidOperationException($"{where} reads '{name}', a nested object, from its query, which a tool call cannot carry. Flatten it, or take it from the body.");
             properties[name] = schema;
             if (isRequired) required.Add(name);
             if (asQuery) query.Add(name);
@@ -98,10 +105,15 @@ internal static partial class RouteTools
                 throw new InvalidOperationException($"{where} takes '{parameter.Name}' from {(source ?? BindingSource.FormFile).DisplayName}, which a tool call cannot carry. Move it to a controller without [Tool].");
 
             var attributes = new ICustomAttributeProvider[] { parameter.ParameterInfo };
-            if (routed.TryGetValue(parameter.Name, out var route))
-                Field(route.Name, parameter.ParameterType, attributes, !route.IsOptional, asQuery: false);
+            var bound = parameter.BindingInfo?.BinderModelName ?? parameter.Name;
+            if (routed.TryGetValue(bound, out var route))
+                Field(route.Name, parameter.ParameterType, attributes, IsRequired(route), asQuery: false);
             else if (!IsComplex(parameter.ParameterType))
-                Field(Camel(parameter.Name), parameter.ParameterType, attributes, parameter.ParameterInfo.IsDefined(typeof(RequiredAttribute), true), AsQuery(source));
+            {
+                // A body that is one value, or a list: the argument of that name is the whole body.
+                if (source == BindingSource.Body) bodyField = Camel(bound);
+                Field(Camel(bound), parameter.ParameterType, attributes, parameter.ParameterInfo.IsDefined(typeof(RequiredAttribute), true), AsQuery(source));
+            }
             else
             {
                 var constructor = parameter.ParameterType.GetConstructors().OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
@@ -109,13 +121,15 @@ internal static partial class RouteTools
                 {
                     var argument = constructor?.GetParameters().FirstOrDefault(p => string.Equals(p.Name, property.Name, StringComparison.OrdinalIgnoreCase));
                     ICustomAttributeProvider[] sources = argument is null ? [property] : [property, argument];
-                    Field(Camel(property.Name), property.PropertyType, sources, sources.Any(s => s.IsDefined(typeof(RequiredAttribute), true)), AsQuery(source));
+                    var named = sources.SelectMany(s => s.GetCustomAttributes(true)).OfType<IModelNameProvider>().FirstOrDefault(n => n.Name is { Length: > 0 })?.Name
+                                ?? property.GetCustomAttribute<Newtonsoft.Json.JsonPropertyAttribute>()?.PropertyName ?? Camel(property.Name);
+                    Field(named, property.PropertyType, sources, sources.Any(s => s.IsDefined(typeof(RequiredAttribute), true)), AsQuery(source));
                 }
             }
         }
 
         foreach (var parameter in pattern.Parameters.Where(parameter => !properties.ContainsKey(parameter.Name)))
-            Field(parameter.Name, typeof(string), [], !parameter.IsOptional, asQuery: false);
+            Field(parameter.Name, typeof(string), [], IsRequired(parameter), asQuery: false);
 
         // Mutating verbs advertise a rehearsal as every custom verb does; the handler answers it without running the action.
         if (!isRead)
@@ -123,13 +137,15 @@ internal static partial class RouteTools
 
         var result = new JObject { ["type"] = "object", ["properties"] = properties };
         if (required.Count > 0) result["required"] = required;
-        return (result, query);
+        return (result, query, bodyField);
     }
+
+    private static bool IsRequired(RoutePatternParameterPart parameter) => !parameter.IsOptional && parameter.Default is null;
 
     /// <summary>What MVC binds property by property rather than from one value.</summary>
     private static bool IsComplex(Type type)
         => !TypeDescriptor.GetConverter(Nullable.GetUnderlyingType(type) ?? type).CanConvertFrom(typeof(string))
-           && !(typeof(IEnumerable).IsAssignableFrom(type) && type != typeof(string));
+           && (typeof(IDictionary).IsAssignableFrom(type) || !typeof(IEnumerable).IsAssignableFrom(type));
 
     private static string Camel(string name) => char.ToLowerInvariant(name[0]) + name[1..];
 }

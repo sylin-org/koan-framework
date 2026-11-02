@@ -13,6 +13,8 @@ using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Controllers;
 using Koan.Web.Hooks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
@@ -63,14 +65,16 @@ public sealed record Reply(string Id, string PlaceId, string TopicId, string? Bo
 {
     public static readonly Reason NoTopic = Reason.Absent("No such Topic.");
     public static readonly Reason NoPlace = Reason.Absent("No such place, and a different sentence.");
-    public static readonly Reason SignIn = Reason.Gated("Sign in to write here.");
-    public static readonly Reason Locked = Reason.Gated("This Topic is locked, so no one replies in it.");
+    public static readonly Reason SignIn = Reason.Gated("sign-in", "Sign in to write here.", next: "/sign-in");
+    public static readonly Reason Locked = Reason.Gated("locked", "This Topic is locked, so no one replies in it.");
     public static readonly Reason Taken = Reason.Conflict("That id already holds other words.");
     public const string NeedsBody = "A reply says something.";
 
     public async Task<Outcome<Post>> Run(CancellationToken ct)
     {
         if (await Place.Get(PlaceId, ct) is not { } place) return new Outcome<Post>.Refused(NoPlace);
+        // A visitor to a private place is told what to do at every address in it, whether anything is there or not; someone signed in who may not see it is told nothing.
+        if (place.Private && AuthorId is null) return new Outcome<Post>.Refused(SignIn);
         if (place.Private && !place.Members.Contains(AuthorId)) return new Outcome<Post>.Refused(NoTopic);
         if (await Topic.Get(TopicId, ct) is not { } topic || topic.PlaceId != place.Id) return new Outcome<Post>.Refused(NoTopic);
         if (AuthorId is null) return new Outcome<Post>.Refused(SignIn);
@@ -184,7 +188,109 @@ public sealed class AdminController : ControllerBase
     /// <summary>What only the application's own rule can decide.</summary>
     [HttpGet("/places/{place}/census")]
     public async Task<IActionResult> Census(string place, [FromQuery] int limit = 10, CancellationToken ct = default)
-        => Ok(new { place, limit, posts = (await Post.Query(_ => true, ct)).Count });
+        => await Place.Get(place, ct) is null
+            ? this.Answer<int>(new Outcome<int>.Refused(Reply.NoPlace), _ => Ok())
+            : Ok(new { place, limit, posts = (await Post.Query(_ => true, ct)).Count });
+}
+
+public abstract class ShelfBase : ControllerBase
+{
+    [HttpPost("/shelf/inherited")]
+    public IActionResult Inherited() => Ok(new { taken = true });
+}
+
+/// <summary>ASP.NET's own declarations on a tool: its middleware enforces them on either door.</summary>
+[Tool]
+[Authorize(Roles = "keeper")]
+public sealed class KeptShelfController : ShelfBase
+{
+    [HttpPost("/shelf/own")]
+    public IActionResult Own() => Ok(new { taken = true });
+
+    [HttpPost("/shelf/open")]
+    [AllowAnonymous]
+    public IActionResult Open() => Ok(new { taken = true });
+}
+
+public abstract class LedgerBase : ControllerBase
+{
+    [HttpPost("/ledger/inherited")]
+    public IActionResult Inherited() => Ok(new { read = true });
+}
+
+/// <summary>The gate on a derived controller reaches what it inherits.</summary>
+[Tool]
+[Access(all: "is:keeper")]
+public sealed class KeptLedgerController : LedgerBase;
+
+public abstract class VaultBase : ControllerBase
+{
+    [HttpPost("/vault/inherited")]
+    public IActionResult Inherited() => Ok(new { opened = true });
+}
+
+[Tool]
+[Authorize(Policy = Forum.NobodyPasses)]
+public sealed class VaultController : VaultBase;
+
+/// <summary>A class's declarations and a method's all hold.</summary>
+[Authorize(Roles = "keeper")]
+public sealed class StackedController : ControllerBase
+{
+    [HttpPost("/stack/scope"), Tool(Name = "stack_scope"), RequireScope("x")]
+    public IActionResult Scoped() => Ok(new { ran = true });
+
+    [HttpPost("/stack/roles"), Tool(Name = "stack_roles"), Authorize(Roles = "editor")]
+    public IActionResult Roles() => Ok(new { ran = true });
+}
+
+[Access(all: "is:keeper")]
+public sealed class GatedTwiceController : ControllerBase
+{
+    [HttpPost("/twice/scope"), Tool(Name = "twice_scope"), RequireScope("x")]
+    public IActionResult Scoped() => Ok(new { ran = true });
+
+    [HttpPost("/twice/role"), Tool(Name = "twice_role"), Access(all: "is:editor")]
+    public IActionResult Role() => Ok(new { ran = true });
+}
+
+/// <summary>What a request is made of, on either door.</summary>
+public sealed class FidelityController : ControllerBase
+{
+    [HttpGet("/fidelity/files/{name:regex(^[[a-z]]+$)}"), Tool(Name = "file_get")]
+    public IActionResult File(string name) => Ok(new { name });
+
+    [HttpGet("/fidelity/pages/{page=1}"), Tool(Name = "page_get")]
+    public IActionResult Page(int page) => Ok(new { page });
+
+    [HttpGet("/fidelity/search"), Tool(Name = "search_get")]
+    public IActionResult Search([FromQuery(Name = "q")] string? search) => Ok(new { search });
+
+    [HttpPost("/fidelity/many"), Tool(Name = "many_post")]
+    public IActionResult Many([FromBody] List<string> items) => Ok(new { count = items.Count });
+
+    [HttpPost("/fidelity/text"), Tool(Name = "text_post")]
+    public IActionResult Text([FromBody] string text) => Ok(new { text });
+
+    [HttpGet("/fidelity/tenant"), Tool(Name = "tenant_get")]
+    public IActionResult Tenant([FromServices] TenantHolder holder) => Ok(new { scoped = holder.Tenant, item = HttpContext.Items["tenant"] });
+
+    [HttpPost("/fidelity/timeout"), Tool(Name = "timeout_post")]
+    public IActionResult TimesOut() => throw new TaskCanceledException("downstream timed out, secret=abc");
+
+    [HttpPost("/fidelity/limited"), Tool(Name = "limited_post"), EnableRateLimiting(Forum.OnePermit)]
+    public IActionResult Limited() => Ok(new { ran = true });
+
+    [HttpPost("/fidelity/signed-in"), Tool(Name = "signed_in_post"), Authorize]
+    public IActionResult SignedIn() => Ok(new { signedIn = true });
+
+    [HttpGet("/fidelity/whoami"), Tool(Name = "whoami_get")]
+    public IActionResult WhoAmI() => Ok(new { id = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub") });
+}
+
+public sealed class TenantHolder
+{
+    public string? Tenant { get; set; }
 }
 
 /// <summary>The local process alone, and nobody signed in needs to be anyone.</summary>
@@ -223,8 +329,8 @@ public sealed class ArticlesController : EntityController<Article>
         => await Article.Get(id, ct) is { } article ? Ok(new { words = article.Title.Split(' ').Length }) : NotFound();
 }
 
-/// <summary>An application's own rule: hides the census from anyone flagged, knowable with no resource, and at a call refuses the
-/// place named "sealed", which only a resource can say.</summary>
+/// <summary>An application's own rule: hides the census from anyone flagged, knowable with no resource, and at a call hides the place named
+/// "sealed", which only a resource can say, as a place that is not there.</summary>
 public sealed class CensusRule : IAuthorizationProvider
 {
     public int Order => 10;
@@ -234,7 +340,7 @@ public sealed class CensusRule : IAuthorizationProvider
         if (request.Resource is not MethodInfo { Name: nameof(AdminController.Census) }) return Task.FromResult<AuthorizeDecision?>(null);
         if (request.Subject.HasClaim("flagged", "true")) return Task.FromResult<AuthorizeDecision?>(AuthorizeDecision.Forbidden("flagged"));
         return Task.FromResult<AuthorizeDecision?>(request.Context?.TryGetValue("place", out var place) == true && Equals(place, "sealed")
-            ? AuthorizeDecision.Forbidden("sealed")
+            ? AuthorizeDecision.Hidden()
             : null);
     }
 }
@@ -244,6 +350,8 @@ public static class Forum
     public const string Steward = "role:steward";
     public const string Member = "role:member";
     public const string Doomed = "role:doomed";
+    public const string NobodyPasses = "nobody-passes";
+    public const string OnePermit = "one-permit";
 
     public static string? PersonId(ClaimsPrincipal user)
         => user.Identity?.IsAuthenticated == true ? user.FindFirstValue(ClaimTypes.NameIdentifier) : null;

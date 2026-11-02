@@ -7,9 +7,9 @@ namespace Koan.Web.Attributes;
 
 /// <summary>
 /// One definition, two doors (ARCH-0141): a route that is also a tool where the MCP module is present. On a controller it
-/// exposes every action the controller declares; on an action, that action. The action stays the only definition: a tool
-/// call is a request to it, so input, gate, refusals and effect cannot differ. With no MCP module the route is all there is.
-/// A command is never a tool: only what already answers at a route can be one.
+/// exposes every action that controller answers, inherited ones included; on an action, that action. The action stays the only definition: a tool
+/// call is a request to it through the application's whole pipeline, so input, gate, refusals and effect cannot differ. With no MCP module the route is
+/// all there is. A command is never a tool: only what already answers at a route can be one.
 /// </summary>
 /// <remarks>
 /// The tool's name is the route's literal segments, then the particle or else the HTTP method, in lower-case words joined

@@ -59,6 +59,15 @@ public sealed class EnforcementConsolidationSpec : IClassFixture<ConformanceFixt
         McpHarnessFixtureBase.ContentText(good).Should().Be("4", "an optional argument left out takes its default");
     }
 
+    [Fact]
+    public async Task A_refusal_a_custom_verb_throws_keeps_its_kind_and_absence_says_one_thing()
+    {
+        var absent = await _fx.CallToolAsync("gadget_missing", new JObject());
+        McpHarnessFixtureBase.IsError(absent).Should().BeTrue(absent.ToString());
+        absent["meta"]!["errorCode"]!.Value<string>().Should().Be("absent");
+        McpHarnessFixtureBase.ContentText(absent).Should().Be(Koan.Data.Core.Commands.Reason.Absent("anything").Said);
+    }
+
     // ---- Entity-tool authority: the data-layer [Access] gate ------------------------------------
 
     [Fact]

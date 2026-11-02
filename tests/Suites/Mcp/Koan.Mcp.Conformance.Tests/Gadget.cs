@@ -1,4 +1,5 @@
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core.Commands;
 using Koan.Data.Core.Model;
 using Koan.Mcp;
 using Koan.Web.Authorization;
@@ -38,6 +39,9 @@ public static class ConformanceTools
     [McpTool(Name = "gadget_admin", Description = "Performs a scope-protected gadget operation.")]
     [RequireScope("gadget:admin")]
     public static string GadgetAdmin() => "admin";
+
+    [McpTool(Name = "gadget_missing", Description = "Refuses as absent.")]
+    public static string GadgetMissing() => throw new Refusal(Reason.Absent("A sentence that says too much."));
 
     [McpTool(Name = "gadget_count", Description = "Counts to a number of gadgets.")]
     public static int GadgetCount(int count, int step = 1) => count + step;

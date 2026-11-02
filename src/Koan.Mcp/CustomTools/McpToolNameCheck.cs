@@ -2,7 +2,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Koan.Mcp.CustomTools;
 
-/// <summary>Stops the host at start over two tools of one name, or a <c>[Tool]</c> action that cannot be one (ARCH-0141): a client
+/// <summary>Stops the host at start over two tools of one name, or a <c>[Tool]</c> action a call could not reach (ARCH-0141): a client
 /// sees one name, and only one of them would ever run.</summary>
 internal sealed class McpToolNameCheck(McpEntityRegistry entities, McpCustomToolRegistry custom) : IHostedService
 {

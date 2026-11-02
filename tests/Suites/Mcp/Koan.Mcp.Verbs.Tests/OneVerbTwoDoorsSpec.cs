@@ -52,9 +52,11 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
     {
         tool.Status.Should().Be(route.Status, "route said {0}, tool said {1}", route, tool);
         tool.Failed.Should().Be(route.Failed);
-        tool.Kind.Should().Be(route.Kind);
-        tool.Text.Should().Be(route.Text);
+        if (route.Kind is not null) tool.Kind.Should().Be(route.Kind);
+        if (route.Text.Length > 0) tool.Text.Should().Be(route.Text);
         tool.Location.Should().Be(route.Location);
+        tool.Gate.Should().Be(route.Gate);
+        tool.Next.Should().Be(route.Next);
     }
 
     private async Task<int> PostsWith(string body)
@@ -97,23 +99,21 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
     }
 
     [Fact]
-    public async Task An_absent_topic_a_hidden_topic_and_a_visitor_to_a_private_place_answer_alike_on_both_doors()
+    public async Task An_absent_topic_and_a_hidden_topic_answer_alike_to_someone_signed_in_on_both_doors()
     {
-        var cases = new (string Place, string Topic, string? User)[]
+        var cases = new (string Place, string Topic)[]
         {
-            ("open", "t-nothing", Sam),      // absent
-            ("walled", "t-walled", Sam),     // hidden from someone signed in
-            ("walled", "t-walled", null),    // an anonymous visitor to a private place
-            ("walled", "t-nothing", null),   // the same visitor, at an address that holds nothing
-            ("nowhere", "t-open", Sam),      // a reason worded differently
+            ("open", "t-nothing"),     // absent
+            ("walled", "t-walled"),    // hidden from someone signed in
+            ("walled", "t-nothing"),   // the same person, at an address that holds nothing
+            ("nowhere", "t-open"),     // a reason worded differently
         };
 
         var answers = new List<Answer>();
-        foreach (var (place, topic, user) in cases)
+        foreach (var (place, topic) in cases)
         {
-            var route = await ReplyRoute(place, topic, Replying("into the void"), user);
-            var tool = await ReplyTool(place, topic, Replying("into the void"), user);
-            Alike(route, tool);
+            var route = await ReplyRoute(place, topic, Replying("into the void"), Sam);
+            Alike(route, await ReplyTool(place, topic, Replying("into the void"), Sam));
             answers.Add(route);
         }
 
@@ -121,6 +121,23 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         answers[0].Status.Should().Be(404);
         answers[0].Kind.Should().Be("absent");
         (await PostsWith("into the void")).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_visitor_to_a_private_place_is_told_to_sign_in_at_every_address_in_it_on_both_doors()
+    {
+        var there = await ReplyRoute("walled", "t-walled", Replying("hello?"), null);
+        var nothing = await ReplyRoute("walled", "t-nothing", Replying("hello?"), null);
+
+        Alike(there, await ReplyTool("walled", "t-walled", Replying("hello?"), null));
+        Alike(nothing, await ReplyTool("walled", "t-nothing", Replying("hello?"), null));
+        nothing.Should().Be(there, "nothing leaks of what the place holds");
+        there.Status.Should().Be(401);
+        there.Kind.Should().Be("gated");
+        there.Gate.Should().Be("sign-in");
+        there.Next.Should().Be("/sign-in");
+        there.Text.Should().Be(Reply.SignIn.Text);
+        (await PostsWith("hello?")).Should().Be(0);
     }
 
     [Fact]
@@ -323,7 +340,7 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         openTool.Status.Should().Be(200, openTool.ToString());
         JObject.Parse(openTool.Text)["limit"]!.Value<int>().Should().Be(3, "a query field reached the action from the tool's arguments");
         Alike(sealedRoute, sealedTool);
-        sealedRoute.Status.Should().Be(403);
+        sealedRoute.Status.Should().Be(404);
     }
 
     [Fact]
@@ -461,5 +478,158 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         tool.Kind.Should().Be("invalid");
         route.Text.Should().Contain("tries", because: route.ToString());
         tool.Text.Should().Contain("tries", because: tool.ToString());
+    }
+
+    private static readonly string Keeper = "kit;role=keeper";
+
+    private async Task<(Answer Route, Answer Tool)> Both(string path, string tool, string? user)
+    {
+        var route = await forum.Route(HttpMethod.Post, path, new JObject(), user);
+        var called = await forum.Tool(tool, new JObject(), user);
+        Alike(route, called);
+        return (route, called);
+    }
+
+    [Theory]
+    [InlineData("/shelf/own", "shelf_own_post")]
+    [InlineData("/shelf/inherited", "shelf_inherited_post")]
+    [InlineData("/ledger/inherited", "ledger_inherited_post")]
+    public async Task What_a_controller_declares_holds_on_what_it_declares_and_what_it_inherits_on_both_doors(string path, string tool)
+    {
+        (await Both(path, tool, Sam)).Route.Status.Should().Be(403);
+        (await Both(path, tool, null)).Route.Status.Should().Be(401);
+        (await Both(path, tool, Keeper)).Route.Status.Should().Be(200);
+    }
+
+    [Fact]
+    public async Task An_aspnet_policy_and_allow_anonymous_answer_on_both_doors()
+    {
+        (await Both("/vault/inherited", "vault_inherited_post", Keeper)).Route.Status.Should().Be(403, "the named policy runs, on the tool too");
+        (await Both("/shelf/open", "shelf_open_post", null)).Route.Status.Should().Be(200);
+    }
+
+    [Theory]
+    [InlineData("/stack/scope", "stack_scope", "kit;role=editor;scope=x", 403)]
+    [InlineData("/stack/scope", "stack_scope", "kit;role=keeper", 403)]
+    [InlineData("/stack/scope", "stack_scope", "kit;role=keeper;scope=x", 200)]
+    [InlineData("/stack/roles", "stack_roles", "kit;role=editor", 403)]
+    [InlineData("/stack/roles", "stack_roles", "kit;role=keeper", 403)]
+    [InlineData("/stack/roles", "stack_roles", "kit;role=keeper;role=editor", 200)]
+    [InlineData("/twice/scope", "twice_scope", "kit;scope=x", 403)]
+    [InlineData("/twice/scope", "twice_scope", "kit;role=keeper", 403)]
+    [InlineData("/twice/scope", "twice_scope", "kit;role=keeper;scope=x", 200)]
+    [InlineData("/twice/role", "twice_role", "kit;role=editor", 403)]
+    [InlineData("/twice/role", "twice_role", "kit;role=keeper;role=editor", 200)]
+    public async Task A_class_and_a_method_both_hold_on_both_doors(string path, string tool, string user, int status)
+        => (await Both(path, tool, user)).Route.Status.Should().Be(status);
+
+    [Fact]
+    public async Task The_list_hides_what_a_callers_claims_answer_and_keeps_what_a_policy_handler_would_decide()
+    {
+        var sam = (await forum.Tools(Sam)).Select(tool => tool["name"]!.Value<string>()).ToArray();
+        var keeper = (await forum.Tools(Keeper)).Select(tool => tool["name"]!.Value<string>()).ToArray();
+
+        sam.Should().NotContain("shelf_own_post").And.NotContain("shelf_inherited_post").And.NotContain("ledger_inherited_post").And.NotContain("stack_roles");
+        sam.Should().Contain("shelf_open_post", "[AllowAnonymous] on the action");
+        keeper.Should().Contain("shelf_own_post").And.Contain("shelf_inherited_post").And.Contain("ledger_inherited_post", "inherited actions are the controller's");
+        keeper.Should().Contain("vault_inherited_post", "only its handler can say, and it may need the request");
+        keeper.Should().NotContain("stack_roles", "the caller holds keeper and not editor");
+    }
+
+    [Fact]
+    public async Task A_route_constraint_answers_as_it_does_on_http()
+    {
+        (await forum.Route(HttpMethod.Get, "/fidelity/files/..%2Fsecret", null, Sam)).Status.Should().Be(404);
+        var tool = await forum.Tool("file_get", new JObject { ["name"] = "../secret" }, Sam);
+        tool.Status.Should().Be(404, tool.ToString());
+        tool.Kind.Should().Be("absent");
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/files/good", null, Sam), await forum.Tool("file_get", new JObject { ["name"] = "good" }, Sam));
+    }
+
+    [Fact]
+    public async Task Each_shape_of_input_an_action_takes_works_on_the_tool()
+    {
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/pages", null, Sam), await forum.Tool("page_get", new JObject(), Sam));
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/pages/3", null, Sam), await forum.Tool("page_get", new JObject { ["page"] = 3 }, Sam));
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/search?q=hello", null, Sam), await forum.Tool("search_get", new JObject { ["q"] = "hello" }, Sam));
+
+        var many = await forum.Tool("many_post", new JObject { ["items"] = new JArray("a", "b") }, Sam);
+        many.Status.Should().Be(200, many.ToString());
+        JObject.Parse(many.Text)["count"]!.Value<int>().Should().Be(2);
+        var text = await forum.Tool("text_post", new JObject { ["text"] = "hi" }, Sam);
+        text.Status.Should().Be(200, text.ToString());
+        JObject.Parse(text.Text)["text"]!.Value<string>().Should().Be("hi");
+
+        var search = (await forum.Tools(Sam)).Single(tool => tool["name"]!.Value<string>() == "search_get");
+        ((JObject)search["inputSchema"]!["properties"]!).Properties().Select(field => field.Name).Should().Equal("q");
+    }
+
+    [Fact]
+    public async Task What_middleware_sets_reaches_the_action_and_a_tool_call_leaves_the_callers_request_as_it_was()
+    {
+        forum.Sent["X-Tenant"] = "acme";
+        try
+        {
+            TenantMiddleware.AccessorAfterMcp = null;
+            var route = await forum.Route(HttpMethod.Get, "/fidelity/tenant", null, Sam);
+            var tool = await forum.Tool("tenant_get", new JObject(), Sam);
+
+            Alike(route, tool);
+            JObject.Parse(tool.Text)["scoped"]!.Value<string>().Should().Be("acme");
+            JObject.Parse(tool.Text)["item"]!.Value<string>().Should().Be("acme");
+            TenantMiddleware.AccessorAfterMcp.Should().Be("present");
+        }
+        finally
+        {
+            forum.Sent.Remove("X-Tenant");
+        }
+    }
+
+    [Fact]
+    public async Task A_rate_limit_on_a_route_binds_its_tool()
+    {
+        var route = await forum.Route(HttpMethod.Post, "/fidelity/limited", new JObject(), Sam);
+        var tool = await forum.Tool("limited_post", new JObject(), Sam);
+
+        route.Status.Should().Be(200, "the one permit of the window");
+        tool.Status.Should().Be(429, "the same limit counted the route's call");
+        tool.Failed.Should().BeTrue();
+        (await forum.Route(HttpMethod.Post, "/fidelity/limited", new JObject(), Sam)).Status.Should().Be(429);
+    }
+
+    [Fact]
+    public async Task A_failure_downstream_of_the_action_is_a_failed_call_and_names_nothing()
+    {
+        var tool = await forum.Tool("timeout_post", new JObject(), Sam);
+        tool.Failed.Should().BeTrue();
+        tool.Kind.Should().Be("failed");
+        tool.Text.Should().NotContain("secret");
+    }
+
+    [Fact]
+    public async Task A_rehearsal_is_gated_as_a_call_is()
+    {
+        var denied = await forum.Tool("admin_sweep_post", new JObject { ["dry_run"] = true }, Sam);
+        denied.Failed.Should().BeTrue(denied.ToString());
+        denied.Kind.Should().Be("gated");
+
+        var asked = await forum.Tool("admin_sweep_post", new JObject { ["dry_run"] = true }, "root;role=admin");
+        asked.Failed.Should().BeFalse(asked.ToString());
+        asked.Text.Should().StartWith("Not executed.");
+
+        var unprivileged = await forum.Tool("shelf_own_post", new JObject { ["dry_run"] = true }, Sam);
+        unprivileged.Failed.Should().BeTrue("ASP.NET's declaration answers a rehearsal too: {0}", unprivileged);
+    }
+
+    [Fact]
+    public async Task A_provider_can_answer_absent_as_a_missing_resource_does()
+    {
+        var hidden = await forum.Route(HttpMethod.Get, "/places/sealed/census", null, Sam);
+        var missing = await forum.Route(HttpMethod.Get, "/places/nowhere/census", null, Sam);
+
+        hidden.Should().Be(missing);
+        hidden.Status.Should().Be(404);
+        Alike(hidden, await forum.Tool("places_census_get", new JObject { ["place"] = "sealed" }, Sam));
+        Alike(missing, await forum.Tool("places_census_get", new JObject { ["place"] = "nowhere" }, Sam));
     }
 }

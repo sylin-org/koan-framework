@@ -115,7 +115,7 @@ public sealed class McpRpcHandler
             var callable = _registry.TryGetTool(tool.Name, out var registration, out var definition)
                 ? await visibility.Allows(registration.EntityType, definition.Operation, cancellationToken).ConfigureAwait(false)
                 : _customTools is null || !_customTools.TryGet(tool.Name, out var custom)
-                  || await visibility.Allows(custom.Method, custom.GateAction, cancellationToken).ConfigureAwait(false);
+                  || await visibility.Allows(custom, cancellationToken).ConfigureAwait(false);
             if (callable) listed.Add(tool);
         }
         return new ToolsListResponse { Tools = listed.ToArray(), Next = exposed.Next };
@@ -231,19 +231,20 @@ public sealed class McpRpcHandler
                 };
             }
 
-            // A route tool answers to the gate as its route does, in the request; a verb with no route, here (ARCH-0141).
-            if (customTool.Route is null)
+            // A route tool answers to its gate in the request, which a rehearsal never makes; a verb with no route, always here (ARCH-0141).
+            var rehearsal = IsDryRunRequested(parameters.Arguments);
+            if (customTool.Route is null || rehearsal)
             {
-                await using var gateScope = _services.CreateAsyncScope();
-                var denied = await Koan.Web.Authorization.EntityAuthorization.Decide(gateScope.ServiceProvider.GetService<Koan.Web.Authorization.IAuthorize>(),
-                    Koan.Web.Endpoints.EntityRequestContextBuilder.NonHttpPrincipal(user), customTool.GateAction, customTool.Method, ct: cancellationToken);
-                if (denied is not null) return Refused(denied is Koan.Web.Hooks.AuthorizeDecision.Challenge ? "Sign in to do this." : "This isn't open to you.", "gated");
+                var caller = Koan.Web.Endpoints.EntityRequestContextBuilder.NonHttpPrincipal(user);
+                using var gate = McpVerbVisibility.For(_services.GetService<IServiceScopeFactory>(), _services.GetRequiredService<Koan.Web.Authorization.IAccessGateCache>(), caller);
+                if (!await gate.Allows(customTool, cancellationToken).ConfigureAwait(false))
+                    return Refused(caller.Identity?.IsAuthenticated == true ? "This isn't open to you." : "Sign in to do this.", "gated");
             }
 
             // AN11 (A10) — a custom verb's effects live in imperative code the framework cannot inspect. A
             // dry-run must NOT invoke it; it returns an honest PARTIAL rehearsal naming the limit (never a
             // silently/falsely-complete — or, worse, actually-executing — "dry-run").
-            if (IsDryRunRequested(parameters.Arguments))
+            if (rehearsal)
             {
                 return BuildCustomPartialRehearsal(customTool);
             }
@@ -261,7 +262,7 @@ public sealed class McpRpcHandler
             }
             catch (Koan.Data.Core.Commands.Refusal refusal)
             {
-                return Refused(refusal.Reason.Text, "invalid");
+                return Refused(refusal.Reason.Said, refusal.Reason.Kind.ToString().ToLowerInvariant());
             }
             catch (Exception ex)
             {
@@ -1126,6 +1127,12 @@ public sealed class McpRpcHandler
         [Newtonsoft.Json.JsonProperty("meta")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public JObject? Meta { get; set; }
+
+        // What a route tool answered, as data, where a client that reads the specification's field will find it.
+        [JsonPropertyName("structuredContent")]
+        [Newtonsoft.Json.JsonProperty("structuredContent", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public JToken? StructuredContent { get; set; }
     }
 
     public sealed class McpContent

@@ -86,10 +86,8 @@ internal static class AccessGateRegistrar
                 foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly))
                     if (property.GetCustomAttribute<AccessAttribute>(inherit: false) is not null)
                         yield return property;
-                // A verb's own declarations, and whatever a tool answers to: ASP.NET enforces [Authorize] on a route alone.
                 foreach (var verb in type.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
-                    if (verb.IsDefined(typeof(AccessAttribute), false) || verb.IsDefined(typeof(RequireScopeAttribute), false)
-                        || Attributes.ToolAttribute.Exposes(verb, type))
+                    if (verb.IsDefined(typeof(AccessAttribute), false))
                         yield return verb;
             }
         }

@@ -40,7 +40,7 @@ public sealed class McpCustomTool
 }
 
 /// <summary>Where a <c>[Tool]</c> action answers: what a call needs to reach it as a request (ARCH-0141).</summary>
-internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields);
+internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields, string? BodyField);
 
 /// <summary>One parameter of a custom tool method and how it is supplied at call time.</summary>
 public sealed class McpCustomToolParameter

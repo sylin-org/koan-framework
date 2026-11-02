@@ -7,7 +7,6 @@ using Koan.Data.Core.Commands;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
 using Koan.Web.Controllers;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Xunit;
@@ -26,13 +25,6 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
         public Task<Outcome<string>> Run(CancellationToken ct) => Task.FromResult<Outcome<string>>(new Outcome<string>.Done(Why));
     }
 
-    /// <summary>Without its [Tool], or nothing in this assembly could boot: a tool with a named policy stops the host at start.</summary>
-    public sealed class NamedPolicy
-    {
-        [Authorize(Policy = "a-named-one")]
-        public void Verb() { }
-    }
-
     public sealed class ScopedOnItsClass
     {
         [Access(all: "has:scope:widgets:write")]
@@ -43,6 +35,14 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
             [RequireScope("widgets:read")]
             public void Own() { }
         }
+
+        public class Base
+        {
+            public void Inherited() { }
+        }
+
+        [Access(all: "has:scope:widgets:write")]
+        public sealed class Derived : Base;
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -96,6 +96,11 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
         answer.Status.Should().Be(status);
         answer.Body.GetProperty("kind").GetString().Should().Be(kind);
         answer.Body.GetProperty("detail").GetString().Should().Be(says);
+        if (kind == "gated")
+        {
+            answer.Body.GetProperty("gate").GetString().Should().Be("timed-out");
+            answer.Body.GetProperty("next").GetString().Should().Be("/appeal");
+        }
     }
 
     [Fact]
@@ -109,15 +114,15 @@ public sealed class ToolRouteSpec(RestEntityWebFactory fx)
     }
 
     [Fact]
-    public void A_verb_declares_its_own_gate_or_takes_its_class_and_a_named_policy_cannot_compile()
+    public void A_verb_and_its_class_both_hold_and_a_derived_class_reaches_what_it_inherits()
     {
-        var plain = typeof(ScopedOnItsClass.Inner).GetMethod(nameof(ScopedOnItsClass.Inner.Plain))!;
-        var own = typeof(ScopedOnItsClass.Inner).GetMethod(nameof(ScopedOnItsClass.Inner.Own))!;
-        AccessGateEvaluator.Describe(AccessGateCache.Compile(plain).For(EntityAuthorizeActions.Write)).Should().Contain("widgets:write");
-        AccessGateEvaluator.Describe(AccessGateCache.Compile(own).For(EntityAuthorizeActions.Write)).Should().Contain("widgets:read");
+        var own = AccessGateEvaluator.Describe(AccessGateCache.Compile(typeof(ScopedOnItsClass.Inner).GetMethod(nameof(ScopedOnItsClass.Inner.Own))!).For(EntityAuthorizeActions.Write));
+        own.Should().Contain("widgets:write").And.Contain("widgets:read");
 
-        var named = typeof(NamedPolicy).GetMethod(nameof(NamedPolicy.Verb))!;
-        Assert.Throws<AccessGateException>(() => AccessGateCache.Compile(named)).Message.Should().Contain("a-named-one");
+        var inherited = AccessGateEvaluator.Describe(AccessGateCache.Compile(typeof(ScopedOnItsClass.Derived).GetMethod(nameof(ScopedOnItsClass.Base.Inherited))!).For(EntityAuthorizeActions.Write));
+        inherited.Should().Contain("widgets:write");
+
+        AccessGateCache.Compile(typeof(ScopedOnItsClass.Base).GetMethod(nameof(ScopedOnItsClass.Base.Inherited))!).For(EntityAuthorizeActions.Write).IsOpen.Should().BeTrue();
     }
 }
 
@@ -136,7 +141,7 @@ public sealed class ToolRouteController : ControllerBase
     public IActionResult Refused(string kind) => this.Answer<string>(kind switch
     {
         "absent" => new Outcome<string>.Refused(Reason.Absent("A sentence that says too much.")),
-        "gated" => new Outcome<string>.Refused(Reason.Gated("Not for you.")),
+        "gated" => new Outcome<string>.Refused(Reason.Gated("timed-out", "Not for you.", next: "/appeal")),
         "conflict" => new Outcome<string>.Refused(Reason.Conflict("Already there.")),
         _ => new Outcome<string>.Refused("Not like that."),
     }, _ => Ok());

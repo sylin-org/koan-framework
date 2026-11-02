@@ -10,6 +10,10 @@ using Koan.Identity.Roles;
 using Koan.Mcp.Options;
 using Koan.Web.Authorization;
 using Koan.Web.Extensions;
+using Koan.Web.Options;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -50,15 +54,43 @@ internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> opti
 }
 
 /// <summary>One answer of one door, for comparing.</summary>
-public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null);
+public sealed record Answer(int Status, string? Kind, string Text, bool Failed, string? Location = null, string? Gate = null, string? Next = null);
+
+/// <summary>Middleware an application composed outside everything else: a tenant from a header, into a scoped service and <c>Items</c>, and what the
+/// accessor holds when it gets the request back.</summary>
+internal sealed class TenantMiddleware : IStartupFilter
+{
+    public static string? AccessorAfterMcp;
+
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use(async (context, inner) =>
+        {
+            var tenant = context.Request.Headers["X-Tenant"].ToString();
+            context.RequestServices.GetRequiredService<TenantHolder>().Tenant = tenant;
+            context.Items["tenant"] = tenant;
+            await inner();
+            if (context.Request.Path.StartsWithSegments("/mcp") && tenant.Length > 0)
+                AccessorAfterMcp = context.RequestServices.GetRequiredService<IHttpContextAccessor>().HttpContext is null ? "null" : "present";
+        });
+        next(app);
+    };
+}
 
 /// <summary>A real host on a real port and a SQLite file: every request is real HTTP, and every call a real <c>tools/call</c> over the
 /// Streamable transport.</summary>
-public sealed class ForumFixture : IAsyncLifetime
+public class ForumFixture : IAsyncLifetime
 {
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"koan-verbs-{Guid.CreateVersion7():n}.db");
     private IHost? _host;
     private int _port;
+
+    public string BaseUrl => $"http://127.0.0.1:{_port}";
+
+    /// <summary>Whether <see cref="TestAuth"/> is the default scheme, or the host's own schemes answer.</summary>
+    protected virtual bool TestScheme => true;
+
+    protected virtual Dictionary<string, string?> Settings() => new();
 
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
 
@@ -79,7 +111,7 @@ public sealed class ForumFixture : IAsyncLifetime
                 ["Koan:Mcp:Exposure"] = "Tools",
                 ["Koan:Mcp:EnableStdioTransport"] = "false",
                 ["Koan:Mcp:EnableStreamableHttpTransport"] = "true",
-            }))
+            }.Concat(Settings())))
             .ConfigureWebHostDefaults(web =>
             {
                 web.UseUrls($"http://127.0.0.1:{_port}");
@@ -87,10 +119,28 @@ public sealed class ForumFixture : IAsyncLifetime
                 web.ConfigureServices(services =>
                 {
                     AppHost.Current = null;
+                    services.AddSingleton<IStartupFilter, TenantMiddleware>();
+                    services.AddScoped<TenantHolder>();
+                    services.AddDataProtection().UseEphemeralDataProtectionProvider();
                     services.AddKoan();
                     services.AddKoanWeb();
                     services.AddKoanControllersFrom<RepliesController>();
-                    services.AddAuthentication(TestAuth.Name).AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.Name, _ => { });
+                    services.AddAuthorization(options => options.AddPolicy(Forum.NobodyPasses, policy => policy.RequireAssertion(_ => false)));
+                    services.AddRateLimiter(options =>
+                    {
+                        options.RejectionStatusCode = 429;
+                        options.AddFixedWindowLimiter(Forum.OnePermit, window => { window.PermitLimit = 1; window.Window = TimeSpan.FromHours(1); });
+                    });
+                    services.Configure<WebPipelineOptions>(pipeline => pipeline.UseRateLimiter = true);
+                    if (TestScheme)
+                    {
+                        services.AddAuthentication(TestAuth.Name).AddScheme<AuthenticationSchemeOptions, TestAuth>(TestAuth.Name, _ => { });
+                        services.PostConfigure<AuthenticationOptions>(options =>
+                        {
+                            options.DefaultScheme = options.DefaultAuthenticateScheme = options.DefaultChallengeScheme = options.DefaultForbidScheme = TestAuth.Name;
+                        });
+                    }
+
                     services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, CensusRule>());
                     services.Configure<McpServerOptions>(options => options.Transport.StreamableJsonResponse = true);
                 });
@@ -132,10 +182,15 @@ public sealed class ForumFixture : IAsyncLifetime
 
     private HttpClient Client(string? user)
     {
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri($"http://127.0.0.1:{_port}"), Timeout = TimeSpan.FromSeconds(60) };
-        if (user is not null) client.DefaultRequestHeaders.Add(TestAuth.Header, user);
+        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
+        if (user?.StartsWith("Bearer ", StringComparison.Ordinal) == true) client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", user);
+        else if (user is not null) client.DefaultRequestHeaders.Add(TestAuth.Header, user);
+        foreach (var (name, value) in Sent) client.DefaultRequestHeaders.Add(name, value);
         return client;
     }
+
+    /// <summary>Headers every request of this flow carries as well as its credential.</summary>
+    public Dictionary<string, string> Sent { get; } = new();
 
     /// <summary>A real request to the route.</summary>
     public async Task<Answer> Route(HttpMethod method, string path, JObject? json, string? user)
@@ -159,11 +214,12 @@ public sealed class ForumFixture : IAsyncLifetime
     private static Answer Read(int status, string text)
     {
         if (status < 400) return new Answer(status, null, text, false);
+        if (text.Length == 0) return new Answer(status, null, "", true);
         var problem = JObject.Parse(text);
         var said = problem["errors"] is JObject errors
             ? string.Join(' ', errors.Properties().Select(field => $"{field.Name}: {string.Join(' ', field.Value.Values<string>())}"))
             : problem["detail"]?.Value<string>() ?? problem["title"]!.Value<string>()!;
-        return new Answer(status, problem["kind"]?.Value<string>(), said, true);
+        return new Answer(status, problem["kind"]?.Value<string>(), said, true, null, problem["gate"]?.Value<string>(), problem["next"]?.Value<string>());
     }
 
     /// <summary>A real <c>tools/call</c> over Streamable HTTP, in a session of the caller's own.</summary>
@@ -172,7 +228,8 @@ public sealed class ForumFixture : IAsyncLifetime
         var result = await Rpc("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }, user);
         var text = result["content"]![0]!["text"]!.Value<string>()!;
         var meta = result["meta"] as JObject ?? new JObject();
-        return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>());
+        return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>(),
+            result["structuredContent"]?["gate"]?.Value<string>(), result["structuredContent"]?["next"]?.Value<string>());
     }
 
     /// <summary>A real <c>tools/list</c>.</summary>
@@ -184,11 +241,11 @@ public sealed class ForumFixture : IAsyncLifetime
         using var client = Client(user);
         var ct = TestContext.Current.CancellationToken;
         using var initialize = await client.SendAsync(Envelope("initialize", new JObject { ["protocolVersion"] = "2025-06-18" }, null), ct);
-        initialize.EnsureSuccessStatusCode();
+        if (!initialize.IsSuccessStatusCode) throw new InvalidOperationException($"initialize answered {initialize.StatusCode}: {await initialize.Content.ReadAsStringAsync(ct)} {initialize.Headers.WwwAuthenticate} on {client.BaseAddress}");
         var session = initialize.Headers.GetValues("Mcp-Session-Id").Single();
         using var response = await client.SendAsync(Envelope(method, parameters, session), ct);
         var body = await response.Content.ReadAsStringAsync(ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) throw new InvalidOperationException($"{method} answered {response.StatusCode}: {body} {response.Headers.WwwAuthenticate}");
         var reply = JObject.Parse(body);
         return reply["result"] ?? throw new InvalidOperationException($"{method} answered {body}");
     }
