@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using System.Collections.ObjectModel;
 using System.Linq.Expressions;
 using System.Security.Claims;
@@ -158,13 +159,25 @@ public sealed class WebContext
     {
         private readonly HttpContext _context;
         private readonly ClaimsPrincipal _original;
+        private readonly IAuthenticateResultFeature? _originalResult;
         private bool _disposed;
 
         public PrincipalScope(HttpContext context, ClaimsPrincipal replacement)
         {
             _context = context;
             _original = context.User;
+            _originalResult = context.Features.Get<IAuthenticateResultFeature>();
             context.User = replacement;
+            // ASP.NET's policy evaluator goes by the request's authentication result, and a principal placed here is the caller, so a policy
+            // denies it with 403 and not 401. A credential a handler rejected stays rejected (WEB-0083).
+            if (replacement.Identity?.IsAuthenticated == true && _originalResult?.AuthenticateResult?.Failure is null)
+                context.Features.Set<IAuthenticateResultFeature>(new PlacedResult(
+                    AuthenticateResult.Success(new AuthenticationTicket(replacement, replacement.Identity.AuthenticationType ?? "koan"))));
+        }
+
+        private sealed class PlacedResult(AuthenticateResult result) : IAuthenticateResultFeature
+        {
+            public AuthenticateResult? AuthenticateResult { get; set; } = result;
         }
 
         public void Dispose()
@@ -172,6 +185,7 @@ public sealed class WebContext
             if (_disposed) return;
             _disposed = true;
             _context.User = _original;
+            _context.Features.Set(_originalResult);
         }
     }
 
