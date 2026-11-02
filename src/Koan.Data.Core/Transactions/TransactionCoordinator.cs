@@ -78,6 +78,11 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         });
     }
 
+    private static readonly AsyncLocal<TransactionCoordinator?> Dispatching = new();
+
+    /// <summary>The atomic commit this flow is dispatching, whose native transaction is open until it commits.</summary>
+    internal static ITransactionCoordinator? AtomicDispatch => Dispatching.Value is { IsCompleted: false } dispatching ? dispatching : null;
+
     public void AfterCommit(Func<CancellationToken, Task> action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -432,49 +437,6 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    public void TrackVectorSave<TEntity, TKey>(
-        TKey id,
-        ReadOnlyMemory<float> embedding,
-        IReadOnlyDictionary<string, object>? metadata,
-        EntityContext.ContextState context)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        ThrowIfCompleted();
-
-        lock (_lock)
-        {
-            var operation = new VectorSaveOperation<TEntity, TKey>(id, embedding, metadata, context);
-            TrackOperation(operation);
-
-            _logger.LogDebug(
-                "Transaction '{TransactionName}' tracked VectorSave<{EntityType}> (id: {EntityId}, dimensions: {Dimensions})",
-                Name,
-                typeof(TEntity).Name,
-                id,
-                embedding.Length);
-        }
-    }
-
-    public void TrackVectorDelete<TEntity, TKey>(TKey id, EntityContext.ContextState context)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull
-    {
-        ThrowIfCompleted();
-
-        lock (_lock)
-        {
-            var operation = new VectorDeleteOperation<TEntity, TKey>(id, context);
-            TrackOperation(operation);
-
-            _logger.LogDebug(
-                "Transaction '{TransactionName}' tracked VectorDelete<{EntityType}> (id: {EntityId})",
-                Name,
-                typeof(TEntity).Name,
-                id);
-        }
-    }
-
     private void TrackOperation(ITrackedOperation operation)
     {
         // An Atomic scope refuses before the operation joins, so nothing it could not commit atomically is ever held.
@@ -770,6 +732,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
 
     private async Task ExecuteOperations(AtomicRoute? scope, CancellationToken ct)
     {
+        // The scope's context is cleared below so an operation does not track itself, and a native transaction is still open around it.
+        if (scope is not null) Dispatching.Value = this;
         var executedAdapters = new List<string>();
         var completedOperations = 0;
 

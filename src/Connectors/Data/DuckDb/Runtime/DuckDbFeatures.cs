@@ -21,7 +21,6 @@ internal static class DuckDbFeatures
         DataCaps.Write.AtomicBatch,
         DataCaps.Write.FastRemove,
         DataCaps.Write.ConditionalReplace,
-        DataCaps.Write.MutationOutcomes,
         DataCaps.Isolation.RowScoped,
         DataCaps.Isolation.ContainerScoped,
         DataCaps.Isolation.DatabaseScoped

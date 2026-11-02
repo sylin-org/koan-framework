@@ -113,6 +113,13 @@ public static class EntityContext
         Current?.TransactionCoordinator;
 
     /// <summary>
+    /// The scope this flow's writes are not yet committed in, which holds them in one native transaction: an open hold, or an atomic commit
+    /// while it dispatches the operations it tracked. For what must not be told of a row until it stands, as a shared cache must not.
+    /// </summary>
+    public static Transactions.ITransactionCoordinator? UncommittedScope =>
+        CurrentTransaction is { IsHeld: true } hold ? hold : Transactions.TransactionCoordinator.AtomicDispatch;
+
+    /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built
     /// <b>inherit-unless-overridden</b>, not wholesale-replaced: each dimension whose argument is left
     /// null adopts the ambient (previous) context's value for that dimension; a non-null argument

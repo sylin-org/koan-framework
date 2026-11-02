@@ -9,6 +9,7 @@ using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Core;
 using Koan.Data.Core.Model;
+using Koan.Data.Core.Transactions;
 using Koan.Tenancy.Tests.Support;
 using Xunit;
 
@@ -69,6 +70,41 @@ public sealed class CacheHoldSpec
 
         (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("held", "the commit retired the cached entry");
         (await ReadOutside(note.Id, partition))!.Title.Should().Be("held");
+    }
+
+    [Fact]
+    public async Task An_atomic_commit_that_fails_leaves_nothing_in_the_cache_and_one_that_lands_retires_what_it_wrote()
+    {
+        await using var runtime = await TenancyRuntimeFixture.CreateAsync(extraSettings: Posture);
+        runtime.ResetEntityCaches();
+        var partition = "p" + Guid.CreateVersion7().ToString("n");
+        using var _ = EntityContext.Partition(partition);
+        var code = "code-" + Guid.CreateVersion7().ToString("n");
+        await new HeldCachedClaim { Code = code, Title = "taken" }.Save();
+        var ghost = new HeldCachedNote { Title = "never landed" };
+
+        var failing = async () =>
+        {
+            using (EntityContext.Transaction("fails", TransactionGuarantee.Atomic))
+            {
+                await ghost.Save();
+                await new HeldCachedClaim { Code = code, Title = "collides" }.Save();
+                await EntityContext.Commit();
+            }
+        };
+        await failing.Should().ThrowAsync<Exception>();
+        (await HeldCachedNote.Get(ghost.Id)).Should().BeNull("a row its commit rolled back was never written, and the cache must not say otherwise");
+
+        var note = await new HeldCachedNote { Title = "committed" }.Save();
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("committed", "this read primes the shared cache");
+        using (EntityContext.Transaction("lands", TransactionGuarantee.Atomic))
+        {
+            note.Title = "landed";
+            await note.Save();
+            await EntityContext.Commit();
+        }
+
+        (await HeldCachedNote.Get(note.Id))!.Title.Should().Be("landed", "the commit retired the cached entry");
     }
 
     [Fact]

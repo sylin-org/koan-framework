@@ -92,17 +92,17 @@ internal sealed class CachedRepository<TEntity, TKey> :
     }
 
     /// <summary>
-    /// A held transaction's rows are visible to its own flow alone and may yet roll back (DATA-0166), so the shared cache
-    /// neither answers for them nor learns of them until the commit: a read inside the hold goes to the store, and a write
-    /// retires its entry once the commit has made it true. Before that, every other flow is right to read the committed
-    /// value the entry holds.
+    /// The rows of a held transaction, or of an atomic commit dispatching its operations, are visible to its own flow alone and may
+    /// yet roll back (DATA-0166), so the shared cache neither answers for them nor learns of them until the commit: a read in
+    /// that scope goes to the store, and a write retires its entry once the commit has made it true. Before that, every other
+    /// flow is right to read the committed value the entry holds.
     /// </summary>
-    private static bool InHold => EntityContext.CurrentTransaction is { IsHeld: true };
+    private static bool Uncommitted => EntityContext.UncommittedScope is not null;
 
     private static bool RetireAfterCommit(Func<CancellationToken, Task> retire)
     {
-        if (EntityContext.CurrentTransaction is not { IsHeld: true } hold) return false;
-        hold.AfterCommit(retire);
+        if (EntityContext.UncommittedScope is not { } scope) return false;
+        scope.AfterCommit(retire);
         return true;
     }
 
@@ -138,7 +138,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
     {
         // The cache decorates outside Data's canonical read fold. A dynamic request predicate therefore has to bypass
         // the global id entry here, before a cache hit can short-circuit the scoped store read.
-        if (_plan.IsReadScopedNow() || InHold)
+        if (_plan.IsReadScopedNow() || Uncommitted)
         {
             return await _inner.Get(id, ct);
         }
@@ -409,7 +409,7 @@ internal sealed class CachedRepository<TEntity, TKey> :
 
         // Never seed a globally keyed cache from a request-scoped write, or from one that is not committed yet. Remove a
         // possible older entry instead.
-        if (_plan.IsReadScopedNow() || InHold)
+        if (_plan.IsReadScopedNow() || Uncommitted)
         {
             if (!IsDefaultKey(entity.Id)) await Remove(entity.Id, ct);
             return;

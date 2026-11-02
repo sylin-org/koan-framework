@@ -903,8 +903,6 @@ from `Koan:Data:Transactions`:
     "Data": {
       "Transactions": {
         "HoldLimit": "00:00:20",
-        "DefaultTimeout": "00:02:00",
-        "LongRunningTransactionWarning": "00:00:30",
         "MaxTrackedOperations": 10000,
         "AutoCommitOnDispose": false
       }

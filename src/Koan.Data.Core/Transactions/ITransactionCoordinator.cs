@@ -55,26 +55,6 @@ public interface ITransactionCoordinator
         where TKey : notnull;
 
     /// <summary>
-    /// Track a vector save operation for deferred execution.
-    /// Orders it with tracked entity operations without claiming atomic consistency.
-    /// </summary>
-    void TrackVectorSave<TEntity, TKey>(
-        TKey id,
-        ReadOnlyMemory<float> embedding,
-        IReadOnlyDictionary<string, object>? metadata,
-        EntityContext.ContextState context)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull;
-
-    /// <summary>
-    /// Track a vector delete operation for deferred execution.
-    /// Orders it with tracked entity operations without claiming atomic consistency.
-    /// </summary>
-    void TrackVectorDelete<TEntity, TKey>(TKey id, EntityContext.ContextState context)
-        where TEntity : class, IEntity<TKey>
-        where TKey : notnull;
-
-    /// <summary>
     /// Execute all tracked operations. When they all target one route whose provider commits atomically, they run
     /// inside one native transaction and a failure leaves nothing durable (<see cref="DataCommitOutcome.NotCommitted"/>),
     /// except a failure of the native commit itself, whose outcome is <see cref="DataCommitOutcome.Unknown"/>.
