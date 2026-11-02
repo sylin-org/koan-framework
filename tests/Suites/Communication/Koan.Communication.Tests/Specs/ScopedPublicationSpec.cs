@@ -99,6 +99,23 @@ public sealed class ScopedPublicationSpec
     }
 
     [Fact]
+    public async Task A_scope_that_has_committed_holds_nothing_back_though_its_block_has_yet_to_close()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var seen = new Seen();
+        await using var host = await CommunicationTestHost.Start(seen, ct);
+        using var hostScope = AppHost.PushScope(host.Services);
+
+        using (EntityContext.Transaction("committed"))
+        {
+            await EntityContext.Commit(ct);
+            var raised = await new ScopedOrder { Name = "after" }.Events.Raise(new Approved("after"), ct);
+            raised.AwaitsCommit.Should().BeFalse();
+            raised.Accepted.Should().Be(1);
+        }
+    }
+
+    [Fact]
     public async Task Outside_a_scope_nothing_waits()
     {
         var ct = TestContext.Current.CancellationToken;

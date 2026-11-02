@@ -32,7 +32,7 @@ internal sealed class TransportCoordinator(
         try
         {
             // A write in a scope has not landed until the scope commits, and a rollback means it never did.
-            if (EntityContext.CurrentTransaction is { } scope)
+            if (EntityContext.CurrentTransaction is { IsCompleted: false } scope)
             {
                 var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
                 scope.AfterCommit(token => Send(CommunicationOperation.Copies<TEntity>(copies), channel, token));

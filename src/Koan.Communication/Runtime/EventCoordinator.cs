@@ -58,7 +58,7 @@ internal sealed class EventCoordinator(
         try
         {
             // What a write in a scope did has not happened until the scope commits, and a rollback means it never did.
-            if (EntityContext.CurrentTransaction is { } scope)
+            if (EntityContext.CurrentTransaction is { IsCompleted: false } scope)
             {
                 var copies = await operation.AwaitCommit(source, ct).ConfigureAwait(false);
                 var copied = hasDetails ? detailsPayload!.FromJson<TEvent>() : null;

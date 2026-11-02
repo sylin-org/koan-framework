@@ -61,6 +61,11 @@ public sealed class AuditChain
     /// <summary>One writer of the chain at a time: the hold it is in, a short hold of its own, or where a route cannot hold, the lock.</summary>
     private async Task<T> InATurn<T>(Func<Task<T>> work, CancellationToken ct)
     {
+        // A scope that has ended holds nothing, though its block has yet to close.
+        if (EntityContext.CurrentTransaction is { IsCompleted: true })
+            using (EntityContext.With(preserveTransaction: false))
+                return await InATurn(work, ct).ConfigureAwait(false);
+
         if (EntityContext.CurrentTransaction is { IsHeld: true }) return await work().ConfigureAwait(false);
         if (EntityContext.CurrentTransaction is null && Data<AuditEvent, string>.Capabilities.Has(DataCaps.Write.HeldTransaction))
         {

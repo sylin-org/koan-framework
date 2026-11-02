@@ -117,7 +117,7 @@ public static class EntityContext
     /// while it dispatches the operations it tracked. For what must not be told of a row until it stands, as a shared cache must not.
     /// </summary>
     public static Transactions.ITransactionCoordinator? UncommittedScope =>
-        CurrentTransaction is { IsHeld: true } hold ? hold : Transactions.TransactionCoordinator.AtomicDispatch;
+        CurrentTransaction is { IsHeld: true, IsCompleted: false } hold ? hold : Transactions.TransactionCoordinator.AtomicDispatch;
 
     /// <summary>
     /// Push a routing context for the lifetime of the returned scope. The new context is built

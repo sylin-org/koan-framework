@@ -134,6 +134,33 @@ public sealed class AuditChainHoldSpec
     }
 
     [Fact]
+    public async Task A_hold_that_has_committed_holds_nothing_back_though_its_block_has_yet_to_close()
+    {
+        var path = Temp("after-commit");
+        try
+        {
+            await using var host = await Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var chain = host.Services.GetRequiredService<AuditChain>();
+
+            using (await EntityContext.Hold("ended", Ct))
+            {
+                await chain.AppendAsync(new AuditEvent { Action = "in.hold", Subject = "s", Target = "T/1" }, ev => ev.Save(Ct), Ct);
+                await EntityContext.Commit(Ct);
+                await chain.AppendAsync(new AuditEvent { Action = "after.commit", Subject = "s", Target = "T/2" }, ev => ev.Save(Ct), Ct);
+            }
+
+            var verified = await chain.VerifyAsync(Ct);
+            verified.Intact.Should().BeTrue(verified.Detail);
+            verified.EventsOrBrokenAt.Should().Be(2);
+        }
+        finally
+        {
+            Remove(path);
+        }
+    }
+
+    [Fact]
     public async Task A_new_host_continues_the_chain_it_finds()
     {
         var path = Temp("restart");
