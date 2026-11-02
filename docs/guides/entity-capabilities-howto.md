@@ -1021,6 +1021,45 @@ later operation and the commit report `NotCommitted`. Await `Hold` in the method
 context does not survive an async method's return. Name another route with `EntityContext.Source` before `Hold`. A route
 that cannot hold a transaction refuses, naming `write.heldTransaction`, rather than quietly deferring.
 
+**Sending a write as a value:**
+
+A command is a hold with a queue in front of it and an answer behind it
+([DATA-0167](../decisions/DATA-0167-an-application-sends-a-write-as-a-value.md)):
+
+```csharp
+public sealed record Reply(string TopicId, string Body) : ICommand<Post>
+{
+    public async Task<Outcome<Post>> Run(CancellationToken ct)
+    {
+        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Absent();
+        var post = await new Post { ParentId = topic.Id, Body = Body }.Save(ct);
+        await new Event { Seq = await Event.Log.Next(ct), PostId = post.Id }.Save(ct);
+        return new Outcome<Post>.Done(post);
+    }
+}
+
+switch (await new Reply(topicId, "hi").Send(ct))
+{
+    case Outcome<Post>.Done { Result: var post }: ...
+    case Outcome<Post>.Failed { Landed: DataCommitOutcome.Unknown }: ...
+}
+```
+
+| Outcome | Means |
+|---|---|
+| `Done(result)` | it committed |
+| `Absent()` | what it acts on is not there, for this sender |
+| `Gated(why)` | this sender may not, or not now |
+| `Invalid(field, reason)` | that field's value cannot be taken |
+| `Conflict(reason)` | it disagrees with what is there |
+| `Failed(landed, cause)` | `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed |
+
+Code below the command that has no `Outcome<T>` to return throws `Refusal.Gated(why)` and its siblings. `Send`'s token bounds the sender: once
+queued, a cancelled wait throws and the command still runs. `TrySend()` never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a
+column carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. `CommandQueue.Committed` tells this process what
+committed, in order. There is one queue, for the default route, and a route with no holds is refused at start. A command does no network, since
+every other writer waits while it runs. Send it outside any transaction scope, and make the tables it writes exist at boot, as for any hold.
+
 **Cross-adapter coordination:**
 
 ```csharp

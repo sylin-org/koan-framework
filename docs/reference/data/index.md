@@ -138,6 +138,13 @@ correction; a route whose DDL policy did not build it refuses the search, naming
 any other writer waits, in another process too, for at most the store's busy timeout. See
 [DATA-0166](../../decisions/DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md).
 
+## Send a write as a value
+
+`await new Reply(...).Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in arrival order on one queue for the default route, and
+answers with an `Outcome<TResult>`: `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, which says what landed. `Sequence.Of<T>(column)`
+numbers a uniquely indexed column with no gap in what commits. See
+[DATA-0167](../../decisions/DATA-0167-an-application-sends-a-write-as-a-value.md).
+
 ## Keep a polymorphic family in one set
 
 Declare one Entity root when several runtime shapes must share one searchable table or collection.

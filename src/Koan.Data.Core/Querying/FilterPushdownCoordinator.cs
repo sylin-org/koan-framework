@@ -62,7 +62,8 @@ public static class FilterPushdownCoordinator
     ///
     /// <para>A caller's own keys are never displaced or reordered — the tiebreaker only settles rows they left
     /// equal, and is skipped when the caller already ordered by the identity, since a key cannot break its own
-    /// ties.</para>
+    /// ties. So is a key a unique index forbids repeating: it has no ties, and a tiebreaker past it keeps the store
+    /// from answering out of that index, so the top row of a numbered column would read every row (DATA-0167).</para>
     ///
     /// <para>Only paginated queries pay for it. An unpaged read has no window to be a window of, so it keeps
     /// whatever order the store finds cheapest.</para>
@@ -71,7 +72,7 @@ public static class FilterPushdownCoordinator
     {
         if (!query.HasPagination) return query;
         if (AggregateMetadata.GetIdSpec(entityType)?.Prop is not { } identity) return query;
-        if (query.Sort.Any(spec => IsIdentity(spec, identity))) return query;
+        if (query.Sort.Any(spec => IsIdentity(spec, identity) || CannotRepeat(spec, entityType))) return query;
         var tiebreak = new SortSpec(
             new MemberPath(entityType, [identity], identity.PropertyType, traversesCollection: false, collectionSegmentIndex: -1),
             Desc: false);
@@ -81,6 +82,11 @@ public static class FilterPushdownCoordinator
     private static bool IsIdentity(SortSpec spec, System.Reflection.PropertyInfo identity) =>
         spec.Path.Members.Count == 1 &&
         string.Equals(spec.Path.Members[0].Name, identity.Name, StringComparison.Ordinal);
+
+    /// <summary>A unique index over this one value, which holds no nulls for a unique index to let repeat.</summary>
+    private static bool CannotRepeat(SortSpec spec, Type entityType) =>
+        spec.Path.Members is [System.Reflection.PropertyInfo { PropertyType: { IsValueType: true } type } member] && Nullable.GetUnderlyingType(type) is null &&
+        IndexMetadata.GetIndexes(entityType).Any(index => index.Unique && index.Properties is [var only] && only.Name == member.Name);
 
     /// <summary>
     /// Finalize an adapter result against the original query and the planned residual: apply the residual

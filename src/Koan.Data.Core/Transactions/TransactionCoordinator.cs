@@ -9,6 +9,7 @@ using Koan.Data.Abstractions;
 using Koan.Data.Abstractions.Capabilities;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Transactions;
+using Koan.Data.Core.Commands;
 using Microsoft.Extensions.Logging;
 using Koan.Data.Core.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,8 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
     private IHeldTransaction? _held;
     private DataRouteHold? _routeHold;
     private Timer? _holdLimit;
+    private readonly Dictionary<Sequence, long> _sequences = new();
+    private readonly SemaphoreSlim _sequenceTurn = new(1, 1);
 
     public string Name { get; }
     public bool IsCompleted => _isCompleted;
@@ -96,16 +99,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             throw new InvalidOperationException(
                 $"{TransactionOptions.SectionPath}:{nameof(TransactionOptions.HoldLimit)} must be positive, or infinite to " +
                 $"remove the bound, and it is {_options.HoldLimit}.");
-        var binding = AdapterResolver
-            .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
-            .Binding ?? throw new NotSupportedException(
-                $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");
-        if (_providers.Find(binding.Plan.Adapter) is not IHeldTransactionProvider provider)
-            throw new NotSupportedException(
-                $"Transaction '{Name}' requires a held transaction, but route '{binding.Plan.Source}' on provider " +
-                $"'{binding.Plan.Adapter}' cannot hold one: the provider does not declare '{DataCaps.Write.HeldTransaction.Id}'. " +
-                "Route the scope to a provider that does (SQLite declares it) with EntityContext.Source or EntityContext.Adapter, " +
-                "or use EntityContext.Transaction, which defers the writes until Commit.");
+        var (binding, provider) = HoldRoute();
         _heldRoute = new HeldRoute(binding.Plan.Adapter, binding.Plan.Source, binding.Plan.ConnectionIdentity);
         _routeHold = _operationHorizon.AdmitHold(binding);
         try
@@ -116,6 +110,43 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         {
             _routeHold.Release();
             throw;
+        }
+    }
+
+    /// <summary>The route the ambient context names and the provider that can hold it, or the refusal, with nothing held.</summary>
+    internal (DataRouteBinding Binding, IHeldTransactionProvider Provider) HoldRoute()
+    {
+        var binding = AdapterResolver
+            .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
+            .Binding ?? throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");
+        if (_providers.Find(binding.Plan.Adapter) is not IHeldTransactionProvider provider)
+            throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but route '{binding.Plan.Source}' on provider " +
+                $"'{binding.Plan.Adapter}' cannot hold one: the provider does not declare '{DataCaps.Write.HeldTransaction.Id}'. " +
+                "Route the scope to a provider that does (SQLite declares it) with EntityContext.Source or EntityContext.Adapter, " +
+                "or use EntityContext.Transaction, which defers the writes until Commit.");
+        return (binding, provider);
+    }
+
+    /// <summary>Whether this hold has admitted a write. <see cref="TrackedOperationCount"/> stays zero in a hold.</summary>
+    internal bool Wrote { get; private set; }
+
+    /// <summary>The last number this hold has taken from each <see cref="Sequence"/>.</summary>
+    internal IReadOnlyDictionary<Sequence, long> Sequences => _sequences;
+
+    /// <summary>The next number of <paramref name="sequence"/> in this hold: its first use reads the store, and the flows of a hold take turns.</summary>
+    internal async Task<long> Take(Sequence sequence, CancellationToken ct)
+    {
+        await _sequenceTurn.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var last = _sequences.TryGetValue(sequence, out var taken) ? taken : await sequence.Highest(ct).ConfigureAwait(false);
+            return _sequences[sequence] = checked(last + 1);
+        }
+        finally
+        {
+            _sequenceTurn.Release();
         }
     }
 
@@ -202,7 +233,10 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         if (binding is not null &&
             string.Equals(binding.Plan.Adapter, held.Adapter, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(binding.Plan.ConnectionIdentity, held.ConnectionIdentity, StringComparison.Ordinal))
+        {
+            Wrote = true;
             return;
+        }
         throw new NotSupportedException(
             $"Transaction '{Name}' holds a native transaction on route '{held.Source}' ({held.Adapter}), and '{operation}' on " +
             $"'{entity}' is routed to '{binding?.Plan.Source ?? "an unbound store"}' ({binding?.Plan.Adapter ?? "unknown"}): one " +

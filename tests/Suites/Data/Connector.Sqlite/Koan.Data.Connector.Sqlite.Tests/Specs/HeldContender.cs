@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Koan.Core;
 using Koan.Data.Abstractions.Annotations;
+using Koan.Data.Core.Commands;
 using Koan.Testing.Integration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -64,6 +65,15 @@ internal static class HeldContender
                         await EntityContext.Commit();
                     }
                 }
+                break;
+            case "command":
+                var commands = int.Parse(argument, System.Globalization.CultureInfo.InvariantCulture);
+                Console.Out.WriteLine(Held);
+                Console.Out.Flush();
+                await Console.In.ReadLineAsync();
+                var answers = await Task.WhenAll(Enumerable.Range(0, commands).Select(ordinal => new NumberASlip("there", ordinal).Send()));
+                foreach (var answer in answers)
+                    if (answer is not Outcome<long>.Done) throw new InvalidOperationException($"A command did not commit: {answer}");
                 break;
         }
         Console.Out.WriteLine(Done);

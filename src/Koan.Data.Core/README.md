@@ -218,6 +218,8 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 - `EntityContext.Hold` holds that native transaction from the start of the scope instead of opening it at commit, on a
   route that declares `write.heldTransaction` (SQLite), and is refused elsewhere (DATA-0166). The body reads its own
   writes, a write acts when it is issued, and other writers wait, in another process too.
+- `command.Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in arrival order on one queue, and answers with an
+  `Outcome<TResult>`; a route with no holds refuses, at start when the application has commands (DATA-0167).
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
 - `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
@@ -298,6 +300,37 @@ unknown commit outcome, and retry/replay dispositions. `EntityContext.Transactio
 TransactionGuarantee.Atomic)` requires the native transaction and refuses, when the operation is
 tracked, anything that cannot join it (DATA-0158). Coordination never claims atomicity across stores,
 and executing a tracked operation suppresses the surrounding transaction to prevent recursive enlistment.
+
+## Send a write as a value
+
+A write that decides from what it reads is a command, and it answers with what happened (DATA-0167):
+
+```csharp
+public sealed record Reply(string TopicId, string Body) : ICommand<Post>
+{
+    public async Task<Outcome<Post>> Run(CancellationToken ct)
+    {
+        if (await Post.Get(TopicId, ct) is not { } topic) return new Outcome<Post>.Absent();
+        if (topic.Locked) return new Outcome<Post>.Gated("locked");
+        var post = await new Post { ParentId = topic.Id, Body = Body }.Save(ct);
+        await new Event { Seq = await Event.Log.Next(ct), PostId = post.Id }.Save(ct);
+        return new Outcome<Post>.Done(post);
+    }
+}
+
+var outcome = await new Reply(topicId, "hi").Send(ct);
+```
+
+- It runs in a hold of its own on the default route, one at a time in arrival order. Only `Done` commits; every other outcome, a
+  `Refusal` thrown from below it and any other throw leave nothing. A role change joins it (SEC-0036).
+- `Outcome<T>` is `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, and `Failed.Landed` says `NotDispatched` (it never ran),
+  `NotCommitted` (nothing landed) or `Unknown` (the native commit itself failed).
+- The token bounds the sender and never the command. Once queued, a cancelled wait throws `OperationCanceledException` and the command
+  still runs. `TrySend()` never waits: null, and the command never runs, when the queue is full or has ended.
+- `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
+  processes too. It reads the top of the column at its first use in a hold, and refuses outside one.
+- `CommandQueue.Committed` announces each commit that wrote, in this process, in commit order, before the sender is answered. A queue that has
+  ended reports unhealthy.
 
 ## Hold a transaction from the start of a scope
 

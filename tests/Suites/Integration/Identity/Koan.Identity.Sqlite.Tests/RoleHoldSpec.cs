@@ -7,6 +7,7 @@ using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Instructions;
 using Koan.Data.Abstractions.Sources;
 using Koan.Data.Core;
+using Koan.Data.Core.Commands;
 using Koan.Data.Core.Model;
 using Koan.Data.Core.Transactions;
 using Koan.Identity.Roles;
@@ -97,6 +98,47 @@ public sealed class RoleHoldSpec
             }
 
             (await roles.Define("role:after", "After")).Position.Should().Be(3, "the next role takes the place the rollback left");
+        }
+        finally { RoleSqliteSpec.Delete(path); }
+    }
+
+    /// <summary>A command's role change and its entity write: one outcome, whichever way the command answers (DATA-0167).</summary>
+    public sealed record GiveRoleAndNote(string Person, string NoteId, Outcome<string> Answer) : ICommand<string>
+    {
+        public async Task<Outcome<string>> Run(CancellationToken ct)
+        {
+            await AppHost.GetRequiredService<RoleCollection>("command").Add("role:commanded", Person, ct: ct);
+            await new HeldRoleNote { Id = NoteId, Text = "says why" }.Save(ct);
+            return Answer;
+        }
+    }
+
+    [Fact]
+    public async Task A_role_change_and_an_entity_write_in_one_command_commit_or_roll_back_together()
+    {
+        var path = Temp("command");
+        try
+        {
+            await using var host = await RoleSqliteSpec.Start(path);
+            using var app = AppHost.PushScope(host.Services);
+            var roles = host.Services.GetRequiredService<RoleCollection>();
+            await roles.Define("role:commanded", "Commanded", ["global:commanded"]);
+            await new HeldRoleNote { Text = "table exists" }.Save();
+            var bag = await roles.Bag("person:refused", true);
+
+            var refused = await new GiveRoleAndNote("person:refused", "refused", new Outcome<string>.Gated("no")).Send();
+
+            refused.Should().BeOfType<Outcome<string>.Gated>();
+            (await roles.Members("role:commanded")).Items.Should().BeEmpty();
+            (await HeldRoleNote.Get("refused")).Should().BeNull();
+            (await roles.Bag("person:refused", true)).Should().BeSameAs(bag, "no compiled bag was touched");
+
+            var given = await new GiveRoleAndNote("person:given", "given", new Outcome<string>.Done("given")).Send();
+
+            given.Should().BeOfType<Outcome<string>.Done>();
+            (await roles.Members("role:commanded")).Items.Select(member => member.PersonId).Should().Equal("person:given");
+            (await HeldRoleNote.Get("given")).Should().NotBeNull();
+            (await roles.Bag("person:given", true)).Contains("global:commanded").Should().BeTrue();
         }
         finally { RoleSqliteSpec.Delete(path); }
     }
