@@ -79,6 +79,10 @@ write JSON-RPC handlers.
 The `EnableLegacySseTransport` option exposes the earlier `GET /mcp/sse` plus `POST /mcp/rpc` shape
 as well; both HTTP shapes share the same dispatcher, session, authorization, and projection core.
 
+## Names
+
+A tool's name is lower-case words joined by underscores, at most 64 characters, whichever door made it: `product_get_by_id`, `koan_code_execute`. Claude's Messages API refuses the dot MCP allows, so a name outside this rule stops the host at start (ARCH-0142).
+
 ## Governance
 
 `AllowMutations = false` removes generated mutation tools, but it is not an authorization system.

@@ -10,7 +10,9 @@ related:
   - DATA-0131
   - DATA-0158
   - DATA-0161
-amended_by: SEC-0036
+amended_by:
+  - SEC-0036
+  - ARCH-0142
 ---
 
 # DATA-0166: A scope can hold a native transaction from its start, on a route that declares it
@@ -20,6 +22,8 @@ amended_by: SEC-0036
 > `AfterCommit` runs outside the scope. The first-use note under Compatibility goes further than it says: a hold that uses a table
 > another flow is provisioning waits for that flow, which is waiting for the hold's store, until the hold's limit. `Koan.Identity`
 > makes its own tables exist at boot for that reason; for any other table first use still belongs at boot.
+
+> **Amended by [ARCH-0142](ARCH-0142-the-realignment-finished.md) (2026-11-02): an entity on a default route that holds has its table at start,** and an atomic commit's writes are uncommitted to a shared cache as a hold's are.
 
 Amends [DATA-0131](DATA-0131-a-transaction-defers-or-refuses-every-write.md) and
 [DATA-0158](DATA-0158-sqlite-posture-and-atomic-commit.md) for a scope that asks. Whoever does not ask keeps both unchanged.

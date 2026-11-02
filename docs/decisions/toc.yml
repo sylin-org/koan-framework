@@ -226,6 +226,8 @@
       href: ARCH-0140-core-hot-paths-take-no-lock-and-start-in-any-order.md
     - name: ARCH-0141 One verb is one route, and a tool call is a request to it
       href: ARCH-0141-one-verb-a-route-that-is-also-a-tool.md
+    - name: ARCH-0142 A table exists before the host says started, a page and an API share one answer, and what a scope wrote is not told until it stands
+      href: ARCH-0142-the-realignment-finished.md
 - name: Core (CORE)
   items:
     - name: CORE-0072 Source-generated registries

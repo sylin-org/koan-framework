@@ -192,8 +192,8 @@ public abstract class McpHarnessFixtureBase : IAsyncLifetime
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
     }
 
-    /// <summary>True when a CallToolResult carries a short circuit in <c>meta.shortCircuit</c>: a Forbid/Challenge denial
-    /// or a refusal status, which SEC-0010 also flags <c>isError</c> with a stable <c>meta.errorCode</c>; null = the
+    /// <summary>True when a CallToolResult carries a short circuit in <c>_meta.shortCircuit</c>: a Forbid/Challenge denial
+    /// or a refusal status, which SEC-0010 also flags <c>isError</c> with a stable <c>_meta.errorCode</c>; null = the
     /// endpoint ran the call.</summary>
     public static bool IsShortCircuited(JToken callResult)
         => callResult["_meta"]?["shortCircuit"] is { Type: not JTokenType.Null and not JTokenType.None };

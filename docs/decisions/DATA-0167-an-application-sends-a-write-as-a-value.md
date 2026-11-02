@@ -10,9 +10,12 @@ related:
   - DATA-0166
   - SEC-0036
   - ARCH-0135
+amended_by: ARCH-0142
 ---
 
 # DATA-0167: An application sends a write as a value, and it runs in a hold of its own, in the sender's flow
+
+> **Amended by [ARCH-0142](ARCH-0142-the-realignment-finished.md) (2026-11-02): an entity on a default route that holds has its table at start,** so the first-use notes under Compatibility apply only to a partition's table and an entity naming its own source.
 
 ## Context
 

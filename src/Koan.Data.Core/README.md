@@ -330,11 +330,11 @@ var outcome = await new Reply(topicId, "hi").Send(ct);
   hold of the store. Only `Done` commits; every other outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it
   (SEC-0036). `Commit` and `Rollback` refuse inside it.
 - `Outcome<T>` is `Done`, `Refused` or `Failed`. A `Reason` declares its kind once, where it is defined: `Reason.Absent`, `Reason.Gated`, `Reason.Conflict`, or a plain
-  string, which is an invalid reason. `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
+  string, which is an invalid reason. A reason compared with a string compares its text, and a null string converts to no reason. `throw new Refusal(reason)` from below a command reaches its sender the same way. `Failed.Landed` says `NotDispatched` (it never ran: the
   sender gave up, the store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit
   itself failed). A command that fails throws; only `Send` says `Failed`.
 - The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. `TrySend()` starts the command beside this flow and
-  never waits: null, and the command never runs, when too many tries are waiting. A command that never returns hangs its own sender, and `HoldLimit` frees the store.
+  never waits: null, and the command never runs, when too many tries are waiting. `CommandExtensions.TriesWaiting` says how many are; at zero, a command sent now runs behind all of them. A command that never returns hangs its own sender, and `HoldLimit` frees the store.
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
   processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
   delete hides rows of.

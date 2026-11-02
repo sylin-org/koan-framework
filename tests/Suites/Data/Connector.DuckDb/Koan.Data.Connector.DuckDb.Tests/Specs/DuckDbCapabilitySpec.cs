@@ -28,6 +28,18 @@ public sealed class DuckDbCapabilitySpec
         options.ExtensionDirectory.Should().Be(".koan/test-extensions");
     }
 
+    [Fact]
+    public async Task It_declares_no_mutation_outcomes_because_it_implements_none()
+    {
+        await using var host = await Boot(Path.Combine(TempDir("outcomes"), "main.duckdb")).StartAsync();
+        var repository = host.Services.GetRequiredService<Koan.Data.Core.IDataService>().GetRepository<OutcomeProbe, string>();
+
+        Koan.Data.Abstractions.Capabilities.DataCaps.Describe(repository, repository.GetType().Name)
+            .Has(Koan.Data.Abstractions.Capabilities.DataCaps.Write.MutationOutcomes).Should().BeFalse();
+    }
+
+    public sealed class OutcomeProbe : Entity<OutcomeProbe>;
+
     private static string TempDir(string label) =>
         Path.Combine(Path.GetTempPath(), $"koan-duckdb-cap-{label}-{Guid.CreateVersion7():n}");
 
