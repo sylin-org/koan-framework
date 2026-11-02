@@ -57,7 +57,6 @@ public sealed class KoanDataCoreModule : KoanModule
         var env = services.GetRequiredService<IHostEnvironment>();
         var logger = services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Axes");
         Axes.DataAxisPreflight.Run(services, env, logger);
-        services.GetService<Commands.CommandQueue>()?.RefuseARouteThatCannotHold();
         return System.Threading.Tasks.Task.CompletedTask;
     }
 

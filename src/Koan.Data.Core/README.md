@@ -218,8 +218,8 @@ the ambient Koan host binding. ASP.NET Core and workers continue to use their na
 - `EntityContext.Hold` holds that native transaction from the start of the scope instead of opening it at commit, on a
   route that declares `write.heldTransaction` (SQLite), and is refused elsewhere (DATA-0166). The body reads its own
   writes, a write acts when it is issued, and other writers wait, in another process too.
-- `command.Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in arrival order on one queue, and answers with an
-  `Outcome<TResult>`; a route with no holds refuses, at start when the application has commands (DATA-0167).
+- `command.Send(ct)` runs an `ICommand<TResult>` in a hold of its own, in this flow, and answers with an `Outcome<TResult>`; a route
+  with no holds refuses it (DATA-0167).
 - Relationship expansion is direct-edge and budgeted. It is not recursive graph traversal, snapshot isolation, or a
   promise that scan-backed providers can execute without an explicit candidate limit.
 - `EntityContext` owns Data routing dimensions only; tenancy, subject, and other semantic axes are contributed and
@@ -321,21 +321,19 @@ public sealed record Reply(string TopicId, string Body) : ICommand<Post>
 var outcome = await new Reply(topicId, "hi").Send(ct);
 ```
 
-- It runs in a hold of its own, in its sender's partition, source and tenant, one at a time in arrival order. Only `Done` commits; every other
-  outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it (SEC-0036). The queue ends the hold, so
-  `Commit` and `Rollback` refuse inside it.
-- `Outcome<T>` is `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, and `Failed.Landed` says `NotDispatched` (it never ran),
-  `NotCommitted` (nothing landed) or `Unknown` (the native commit itself failed, or work following it outlasted the hold's limit). A command that
-  fails throws; only the queue says `Failed`.
-- A command still running at `HoldLimit` is answered `NotCommitted`, and the queue moves on. A send or a try from a command, or from work following its
-  commit, refuses, since it would wait for the queue that is running it.
-- The token bounds the sender and never the command. Once queued, a cancelled wait throws `OperationCanceledException` and the command
-  still runs. `TrySend()` never waits: null, and the command never runs, when the queue is full or has ended.
+- It runs in a hold of its own, in this flow, so in its sender's partition, source and tenant. Commands take turns in arrival order, with every other
+  hold of the store. Only `Done` commits; every other outcome, a `Refusal` thrown from below it and any other throw leave nothing. A role change joins it
+  (SEC-0036). `Commit` and `Rollback` refuse inside it.
+- `Outcome<T>` is `Done`, `Absent`, `Gated`, `Invalid`, `Conflict` or `Failed`, and `Failed.Landed` says `NotDispatched` (it never ran: the sender gave up, the
+  store's busy timeout ran out, the route cannot hold, or a scope is open around the send), `NotCommitted` (nothing landed) or `Unknown` (the native commit itself
+  failed). A command that fails throws; only `Send` says `Failed`.
+- The token ends the wait and the command, and the outcome says what happened. Nothing cuts a commit short. `TrySend()` starts the command beside this flow and
+  never waits: null, and the command never runs, when too many tries are waiting. A command that never returns hangs its own sender, and `HoldLimit` frees the store.
 - `Sequence.Of<Event>(e => e.Seq)` names a column under `[Index(Unique = true)]`, and `Next(ct)` numbers it with no gap in what commits, across
   processes too. It reads the top of the column at its first use in a hold, and refuses outside one, and over an entity a read scope such as soft
   delete hides rows of.
-- `CommandQueue.Committed` announces each commit that wrote, in this process, in commit order, before the sender is answered. A subscriber that
-  throws costs no other, and its own task can send. A queue that has ended reports unhealthy.
+- An `ICommandWatcher` registered in DI is told each commit that wrote, in this process, in commit order, before the sender is answered. One that throws costs no
+  other, and its own task can send.
 
 ## Hold a transaction from the start of a scope
 

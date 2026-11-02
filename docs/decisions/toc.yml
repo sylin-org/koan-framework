@@ -444,7 +444,7 @@
       href: DATA-0165-a-lexical-search-reads-a-word-being-typed-and-takes-a-scope.md
     - name: DATA-0166 A scope can hold a native transaction from its start
       href: DATA-0166-a-scope-can-hold-a-native-transaction-from-its-start.md
-    - name: DATA-0167 An application sends a write as a value, and one queue runs each in a hold of its own
+    - name: DATA-0167 An application sends a write as a value, and it runs in a hold of its own, in the sender's flow
       href: DATA-0167-an-application-sends-a-write-as-a-value.md
 - name: Web (WEB)
   items:

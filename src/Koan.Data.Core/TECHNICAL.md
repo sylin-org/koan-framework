@@ -363,15 +363,12 @@ validation:
   the caller's flow. Work that must follow the data registers with `ITransactionCoordinator.AfterCommit` and runs outside
   the scope, on its route; the Entity cache retires its entries that way and reads past itself inside a hold, so no flow sees
   uncommitted rows through it.
-- `CommandQueue` (DATA-0167) is the one owner of "a write as a value": a hosted service over a bounded channel, whose loop starts with the first send and
-  opens one `EntityContext.Hold` per command, inside the sender's captured `CapturedCarriers` and routing. It keeps nothing of its own about the store.
-  `TransactionCoordinator.Wrote`, set by `AdmitToHold`, is why it needs no tracked operations to know a command wrote; `TransactionCoordinator.Take` tallies
-  a hold's `Sequence` numbers, which roll back with it by being read from the store at first use, through `Data<T,K>.Top`, which takes no tiebreaker so that
-  the store can answer out of the column's unique index. The announcement is one more `AfterCommit`, last, so it inherits commit order from the loop awaiting
-  `Commit`. A static `AsyncLocal` marks the loop's flow, whose sends refuse; subscribers run with flow suppressed, so their tasks are off it.
-  `TransactionCoordinator.EndedByItsOwner` refuses `Commit` and `Rollback` while `Run` runs. The wait for `Run`, on a task of its own, and for the commit's
-  following work, ends at `HoldLimit`. `KoanDataCoreModule.Start` asks `HoldRoute`, the check `BeginHold` makes, with nothing held, only when
-  `[KoanDiscoverable]` `ICommand` has implementers.
+- `Send` (DATA-0167) is one async method around `EntityContext.Hold`, in the sender's flow, with no service behind it: the store's turn is the line, and the hold's own
+  refusals are what a send that cannot run is told. `TransactionCoordinator.Wrote`, set by `AdmitToHold`, is why it needs no tracked operations to know a command wrote;
+  `TransactionCoordinator.Take` tallies a hold's `Sequence` numbers, which roll back with it by being read from the store at first use, through `Data<T,K>.Top`, which takes
+  no tiebreaker so that the store can answer out of the column's unique index. `BeforeItsTurnEnds` runs the `ICommandWatcher` announcement after the native commit and before
+  `EndHold` releases the turn, so that it is in commit order, with flow suppressed so that a task a watcher starts is off the hold. `EndedByItsOwner` refuses `Commit` and
+  `Rollback` while `Run` runs. `TrySend` is `Send` on a task of its own, under a process-wide count.
 - Deferred entity and vector operations restore their captured source, adapter and partition exactly during
   route resolution and execution. A captured default clears the commit caller's corresponding routing axis.
   Executing a tracked operation suppresses the transaction to prevent recursive enlistment.

@@ -1023,7 +1023,7 @@ that cannot hold a transaction refuses, naming `write.heldTransaction`, rather t
 
 **Sending a write as a value:**
 
-A command is a hold with a queue in front of it and an answer behind it
+A command is a hold with an answer behind it, in the sender's own flow
 ([DATA-0167](../decisions/DATA-0167-an-application-sends-a-write-as-a-value.md)):
 
 ```csharp
@@ -1052,15 +1052,16 @@ switch (await new Reply(topicId, "hi").Send(ct))
 | `Gated(why)` | this sender may not, or not now |
 | `Invalid(field, reason)` | that field's value cannot be taken |
 | `Conflict(reason)` | it disagrees with what is there |
-| `Failed` | what only the queue says, with `Landed` and `Cause`. `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed, or work following it outlasted the limit |
+| `Failed` | what only `Send` says, with `Landed` and `Cause`. `NotDispatched`: it never ran. `NotCommitted`: nothing landed. `Unknown`: the native commit itself failed |
 
-Code below the command that has no `Outcome<T>` to return throws `Refusal.Gated(why)` and its siblings. `Send`'s token bounds the sender: once
-queued, a cancelled wait throws and the command still runs. `TrySend()` never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a
-column carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. `CommandQueue.Committed` tells this process what
-committed, in order. A command runs in its sender's partition, source and tenant, on one queue, and a default route with no holds is refused at
-start. A command does no network, since every other writer waits while it runs, and past `HoldLimit` it is answered `NotCommitted` and the queue moves
-on. The queue ends its hold, so `Commit` and `Rollback` refuse inside it. Send it outside any transaction scope and outside any command, and make the
-tables it writes exist at boot, as for any hold. A sequence refuses an entity a read scope such as soft delete hides rows of.
+Code below the command that has no `Outcome<T>` to return throws `Refusal.Gated(why)` and its siblings. `Send`'s token ends the wait and the command, and the outcome
+says which: nothing cuts a commit short. `TrySend()` starts it beside this flow and never waits. A number comes from `Sequence.Of<Event>(e => e.Seq)`, over a column
+carrying `[Index(Unique = true)]`, and has no gap in what commits, across processes too. An `ICommandWatcher` registered in DI is told what committed, in order.
+
+A command runs in its sender's partition, source and tenant, and commands take turns in arrival order, with every other hold of the store. A sender waits at most the busy
+timeout and is then told `NotDispatched`, so raise `Koan:Data:Sqlite:BusyTimeout` if a burst that long is normal. A route with no holds is refused at the send, and so is a
+send inside a transaction scope. A command does no network, since every other writer waits while it runs. `Commit` and `Rollback` refuse inside it. Make the tables it writes
+exist at boot, as for any hold. A sequence refuses an entity a read scope such as soft delete hides rows of.
 
 **Cross-adapter coordination:**
 

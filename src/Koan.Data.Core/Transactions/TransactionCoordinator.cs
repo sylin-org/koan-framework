@@ -99,7 +99,16 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             throw new InvalidOperationException(
                 $"{TransactionOptions.SectionPath}:{nameof(TransactionOptions.HoldLimit)} must be positive, or infinite to " +
                 $"remove the bound, and it is {_options.HoldLimit}.");
-        var (binding, provider) = HoldRoute();
+        var binding = AdapterResolver
+            .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
+            .Binding ?? throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");
+        if (_providers.Find(binding.Plan.Adapter) is not IHeldTransactionProvider provider)
+            throw new NotSupportedException(
+                $"Transaction '{Name}' requires a held transaction, but route '{binding.Plan.Source}' on provider " +
+                $"'{binding.Plan.Adapter}' cannot hold one: the provider does not declare '{DataCaps.Write.HeldTransaction.Id}'. " +
+                "Route the scope to a provider that does (SQLite declares it) with EntityContext.Source or EntityContext.Adapter, " +
+                "or use EntityContext.Transaction, which defers the writes until Commit.");
         _heldRoute = new HeldRoute(binding.Plan.Adapter, binding.Plan.Source, binding.Plan.ConnectionIdentity);
         _routeHold = _operationHorizon.AdmitHold(binding);
         try
@@ -113,30 +122,17 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
         }
     }
 
-    /// <summary>The route the ambient context names and the provider that can hold it, or the refusal, with nothing held.</summary>
-    internal (DataRouteBinding Binding, IHeldTransactionProvider Provider) HoldRoute()
-    {
-        var binding = AdapterResolver
-            .ResolveDecisionForContext(_services, _services.GetRequiredService<DataSourceRegistry>())
-            .Binding ?? throw new NotSupportedException(
-                $"Transaction '{Name}' requires a held transaction, but the ambient route is not bound to a physical store.");
-        if (_providers.Find(binding.Plan.Adapter) is not IHeldTransactionProvider provider)
-            throw new NotSupportedException(
-                $"Transaction '{Name}' requires a held transaction, but route '{binding.Plan.Source}' on provider " +
-                $"'{binding.Plan.Adapter}' cannot hold one: the provider does not declare '{DataCaps.Write.HeldTransaction.Id}'. " +
-                "Route the scope to a provider that does (SQLite declares it) with EntityContext.Source or EntityContext.Adapter, " +
-                "or use EntityContext.Transaction, which defers the writes until Commit.");
-        return (binding, provider);
-    }
-
-    /// <summary>While a command runs, the queue that opened its hold is what ends it.</summary>
+    /// <summary>While a command runs, what sent it is what ends its hold.</summary>
     internal bool EndedByItsOwner { get; set; }
+
+    /// <summary>Runs once the native commit has landed and before the store's turn passes on, so that what it announces is in commit order.</summary>
+    internal Action? BeforeItsTurnEnds { get; set; }
 
     private void RefuseWhileItsOwnerEndsIt()
     {
         if (EndedByItsOwner)
             throw new InvalidOperationException(
-                $"Command '{Name}' does not end its own hold: the queue commits when it returns Done, and rolls back on anything else.");
+                $"Command '{Name}' does not end its own hold: it commits when it returns Done, and rolls back on anything else.");
     }
 
     /// <summary>Whether this hold has admitted a write. <see cref="TrackedOperationCount"/> stays zero in a hold.</summary>
@@ -314,6 +310,7 @@ internal sealed class TransactionCoordinator : ITransactionCoordinator
             }
 
             _isCompleted = true;
+            BeforeItsTurnEnds?.Invoke();
             await EndHold(held).ConfigureAwait(false);
             _logger.LogInformation("Transaction '{TransactionName}' committed its held transaction", Name);
             _activity?.SetStatus(ActivityStatusCode.Ok);

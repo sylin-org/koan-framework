@@ -22,14 +22,14 @@ public abstract record Outcome<TResult>
     /// <summary>It disagrees with what is already there.</summary>
     public sealed record Conflict(string Reason) : Outcome<TResult>;
 
-    /// <summary>It did not complete. Only the queue says so, because a command cannot know: a command that fails throws.</summary>
+    /// <summary>It did not complete. Only <c>Send</c> says so, because a command cannot know: a command that fails throws.</summary>
     public sealed record Failed : Outcome<TResult>
     {
         internal Failed(DataCommitOutcome landed, Exception cause) => (Landed, Cause) = (landed, cause);
 
-        /// <summary><see cref="DataCommitOutcome.NotDispatched"/>: it never ran, because it was stopped in the queue, its sender gave up
-        /// before reaching it, or its hold could not begin. <see cref="DataCommitOutcome.NotCommitted"/>: it ran and nothing landed.
-        /// <see cref="DataCommitOutcome.Unknown"/>: the native commit itself failed.</summary>
+        /// <summary><see cref="DataCommitOutcome.NotDispatched"/>: it never ran, because its hold could not begin: the sender gave up, the wait
+        /// behind other writers ran out, the route cannot hold, or a scope is open around the send. <see cref="DataCommitOutcome.NotCommitted"/>:
+        /// it ran and nothing landed. <see cref="DataCommitOutcome.Unknown"/>: the native commit itself failed.</summary>
         public DataCommitOutcome Landed { get; }
 
         public Exception Cause { get; }

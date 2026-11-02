@@ -2,7 +2,6 @@ using System.Diagnostics;
 using Koan.Core;
 using Koan.Core.BackgroundServices;
 using Koan.Core.Context;
-using Koan.Core.Observability.Health;
 using Koan.Data.Abstractions.Annotations;
 using Koan.Data.Abstractions.Failures;
 using Koan.Data.Abstractions.Instructions;
@@ -86,7 +85,7 @@ public sealed record ReadOwnWrites(string Id) : ICommand<(string? Read, long Cou
     }
 }
 
-/// <summary>Saves a slip, says so, and keeps its turn until the spec lets it go or the queue stops.</summary>
+/// <summary>Saves a slip, says so, and keeps its turn until the spec lets it go or its sender gives up.</summary>
 public sealed class HoldTheTurn(string? id = null) : ICommand<bool>
 {
     public TaskCompletionSource Running { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -113,22 +112,11 @@ public sealed record CommitTheStoreRefuses(string Id) : ICommand<bool>
     }
 }
 
-/// <summary>Sends another command from inside its own turn, which the queue refuses.</summary>
-public sealed record SendFromInside : ICommand<string>
+/// <summary>Sends another command from inside its own turn, and answers with what that send was told.</summary>
+public sealed record SendFromInside : ICommand<Outcome<CommandSlip>>
 {
-    public async Task<Outcome<string>> Run(CancellationToken ct)
-    {
-        var inner = () => new CreateSlip("inner", "inside", 0, "body").Send(ct);
-        try
-        {
-            await inner();
-            return new Outcome<string>.Done("the inner send did not refuse");
-        }
-        catch (InvalidOperationException refused)
-        {
-            return new Outcome<string>.Done(refused.Message);
-        }
-    }
+    public async Task<Outcome<Outcome<CommandSlip>>> Run(CancellationToken ct) =>
+        new Outcome<Outcome<CommandSlip>>.Done(await new CreateSlip("inner", "inside", 0, "body").Send(ct));
 }
 
 /// <summary>Numbers a slip and throws nothing: what two processes run against one file.</summary>
@@ -173,38 +161,24 @@ public sealed record NumberTwoThings(Outcome<(long Number, long Serial)>? Answer
     }
 }
 
-/// <summary>Registers work to follow its commit that awaits another send, which would wait for this queue.</summary>
+/// <summary>Registers work to follow its commit that awaits another send, which runs: the store's turn has passed on by then.</summary>
 public sealed class SendAfterItsCommit(string id) : ICommand<bool>
 {
-    public TaskCompletionSource<Exception> Refused { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource<Outcome<CommandSlip>> Answered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     public async Task<Outcome<bool>> Run(CancellationToken ct)
     {
         await new CommandSlip { Id = id, Sender = "after", Body = "slip", Number = await CommandSlip.Numbers.Next(ct) }.Save(ct);
-        EntityContext.CurrentTransaction!.AfterCommit(async _ =>
-        {
-            try
-            {
-                await new CreateSlip(id + "-next", "after", 0, "body").Send();
-                Refused.SetException(new InvalidOperationException("the send did not refuse"));
-            }
-            catch (InvalidOperationException refused)
-            {
-                Refused.SetResult(refused);
-            }
-        });
+        EntityContext.CurrentTransaction!.AfterCommit(async _ => Answered.SetResult(await new CreateSlip(id + "-next", "after", 0, "body").Send()));
         return new Outcome<bool>.Done(true);
     }
 }
 
-/// <summary>Awaits a try from inside its own turn, which would wait for this queue too.</summary>
-public sealed record AwaitAnotherTry : ICommand<bool>
+/// <summary>Awaits a try from inside its own turn, which inherits this hold, and answers with what the try was told.</summary>
+public sealed record AwaitAnotherTry : ICommand<Outcome<CommandSlip>>
 {
-    public async Task<Outcome<bool>> Run(CancellationToken ct)
-    {
-        await new CreateSlip("inner-try", "inside", 0, "body").TrySend()!;
-        return new Outcome<bool>.Done(true);
-    }
+    public async Task<Outcome<Outcome<CommandSlip>>> Run(CancellationToken ct) =>
+        new Outcome<Outcome<CommandSlip>>.Done(await new CreateSlip("inner-try", "inside", 0, "body").TrySend()!);
 }
 
 /// <summary>Saves, then waits with no token, by await or by blocking its thread, and tries to save again when it is let go.</summary>
@@ -265,6 +239,22 @@ public sealed record WhereAmI(string Id) : ICommand<(string? Partition, string? 
     }
 }
 
+/// <summary>What the specs watch commits through: every commit, as it is announced.</summary>
+public sealed class CommitLog : ICommandWatcher
+{
+    public event Action<Commit>? Committed;
+
+    void ICommandWatcher.Committed(object command, IReadOnlyDictionary<Sequence, long> sequences) => Committed?.Invoke(new Commit(command, sequences));
+}
+
+public sealed record Commit(object Command, IReadOnlyDictionary<Sequence, long> Sequences);
+
+/// <summary>A watcher that always throws.</summary>
+public sealed class ThrowingWatcher : ICommandWatcher
+{
+    void ICommandWatcher.Committed(object command, IReadOnlyDictionary<Sequence, long> sequences) => throw new InvalidOperationException("a watcher that throws");
+}
+
 /// <summary>An ambient axis as a module would carry it.</summary>
 public sealed class CarriedValue : IKoanContextCarrier
 {
@@ -299,11 +289,11 @@ public sealed class SeedAtStartup<TCommand>(Func<Task<Outcome<CommandSlip>>> sen
 }
 
 /// <summary>
-/// DATA-0167: an application sends a write as a value, and one queue runs each in a hold of its own, in arrival order, and
-/// answers with an outcome. The hold is what keeps it correct: reads see the command's own writes, a rollback leaves nothing and
-/// gives back its numbers, and another process's commands take turns with this one's.
+/// DATA-0167: an application sends a write as a value, and each runs in a hold of its own, in its sender's flow, and answers with an
+/// outcome. The hold is what keeps it correct: reads see the command's own writes, a rollback leaves nothing and gives back its
+/// numbers, and every other sender's command takes its turn, in this process and in another.
 /// </summary>
-public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHelper output)
+public sealed class SqliteCommandSpec(SqliteFixture fixture, ITestOutputHelper output)
     : KoanDataSpec<SqliteFixture>(fixture, output)
 {
     private static readonly TimeSpan Bound = TimeSpan.FromSeconds(30);
@@ -338,7 +328,13 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     {
         var host = await KoanIntegrationHost.Configure()
             .WithSettings(settings)
-            .ConfigureServices(services => services.AddKoan())
+            .ConfigureServices(services =>
+            {
+                services.AddKoan();
+                services.AddSingleton<ICommandWatcher, ThrowingWatcher>();
+                services.AddSingleton<CommitLog>();
+                services.AddSingleton<ICommandWatcher>(provider => provider.GetRequiredService<CommitLog>());
+            })
             .StartAsync(Cancellation);
         if (provision)
         {
@@ -350,14 +346,11 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         return host;
     }
 
-    private static CommandQueue Queue(IntegrationHost host) => host.Services.GetRequiredService<CommandQueue>();
+    private static CommitLog Commits(IntegrationHost host) => host.Services.GetRequiredService<CommitLog>();
 
     private static T Done<T>(Outcome<T> outcome) => outcome.Should().BeOfType<Outcome<T>.Done>().Which.Result;
 
-    private static Task<HealthReport> Check(IntegrationHost host) =>
-        host.Services.GetServices<IHealthContributor>().Single(contributor => contributor.Name == nameof(CommandQueue)).Check(Cancellation);
-
-    /// <summary>What a connection outside the queue reads.</summary>
+    /// <summary>What a connection of its own reads.</summary>
     private static async Task<long> CommittedCount(string path, string table)
     {
         await using var connection = new SqliteConnection($"Data Source={path};Pooling=False");
@@ -375,13 +368,13 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         try
         {
             await using var host = await Start(Settings(path));
-            var announced = new List<CommandCommitted>();
-            Queue(host).Committed += announced.Add;
+            var announced = new List<Commit>();
+            Commits(host).Committed += announced.Add;
             const int senders = 4, each = 25;
 
             var outcomes = await Task.WhenAll(Enumerable.Range(0, senders).Select(sender => Task.Run(() =>
             {
-                // Every send is queued before the next, so arrival order is this sender's order.
+                // Every send reaches the store's turn before the next, so arrival order is this sender's order.
                 var sent = Enumerable.Range(0, each).Select(ordinal => new CreateSlip($"s{sender}-{ordinal}", $"s{sender}", ordinal, "body").Send(Cancellation)).ToList();
                 return Task.WhenAll(sent);
             }, Cancellation))).WaitAsync(Bound * 2, Cancellation);
@@ -456,7 +449,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         {
             await using var host = await Start(Settings(path));
             var announced = 0;
-            Queue(host).Committed += _ => announced++;
+            Commits(host).Committed += _ => announced++;
 
             foreach (var answer in new Outcome<string>[]
             {
@@ -496,8 +489,8 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         try
         {
             await using var host = await Start(Settings(path));
-            var announced = new List<CommandCommitted>();
-            Queue(host).Committed += announced.Add;
+            var announced = new List<Commit>();
+            Commits(host).Committed += announced.Add;
 
             var first = Done(await new CreateSlip("same", "s", 0, "one").Send(Cancellation));
             var again = Done(await new CreateSlip("same", "s", 0, "one").Send(Cancellation));
@@ -602,7 +595,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     }
 
     [Fact]
-    public async Task A_full_queue_makes_a_sender_wait_refuses_a_try_and_a_cancelled_wait_for_a_place_never_runs()
+    public async Task Past_the_bound_a_try_is_refused_a_send_waits_for_its_turn_and_a_cancelled_wait_never_runs()
     {
         RequireBackingStore();
         var path = TempDatabase("back-pressure");
@@ -613,97 +606,125 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             var held = holding.Send(Cancellation);
             await holding.Running.Task.WaitAsync(Bound, Cancellation);
 
-            // The queue takes a bounded number, and a try never waits: the first one past the bound answers null.
-            var queued = new List<Task<Outcome<long>>>();
-            while (queued.Count < 5000 && new NumberASlip("queued", queued.Count).TrySend() is { } sent) queued.Add(sent);
-            queued.Should().HaveCountLessThan(5000, "the queue is bounded");
+            // Tries are bounded, and a try never waits: the first one past the bound answers null.
+            var tried = new List<Task<Outcome<long>>>();
+            while (tried.Count < 5000 && new NumberASlip("tried", tried.Count).TrySend() is { } sent) tried.Add(sent);
+            tried.Should().HaveCountLessThan(5000, "tries are bounded");
 
             var waiting = new NumberASlip("waited", 0).Send(Cancellation);
-            (await Task.WhenAny(waiting, Task.Delay(200, Cancellation))).Should().NotBe(waiting, "a sender past the bound waits for a place");
+            (await Task.WhenAny(waiting, Task.Delay(200, Cancellation))).Should().NotBe(waiting, "a send waits for its turn");
 
             using var gaveUp = new CancellationTokenSource();
             var gaveUpSending = new NumberASlip("gave up", 0).Send(gaveUp.Token);
             gaveUp.Cancel();
             var gaveUpFailure = (await gaveUpSending.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<long>.Failed>().Which;
-            gaveUpFailure.Landed.Should().Be(DataCommitOutcome.NotDispatched, "it never reached the queue, so it never runs");
+            gaveUpFailure.Landed.Should().Be(DataCommitOutcome.NotDispatched, "its hold never began, so it never ran");
             gaveUpFailure.Cause.Should().BeAssignableTo<OperationCanceledException>();
 
             holding.Release.SetResult();
             Done(await held.WaitAsync(Bound, Cancellation));
             Done(await waiting.WaitAsync(TimeSpan.FromMinutes(2), Cancellation));
-            await Task.WhenAll(queued).WaitAsync(TimeSpan.FromMinutes(2), Cancellation);
+            await Task.WhenAll(tried).WaitAsync(TimeSpan.FromMinutes(2), Cancellation);
 
             (await CommandSlip.Query(slip => slip.Sender == "gave up", Cancellation)).Should().BeEmpty();
-            (await CommandSlip.Count.Exact(Cancellation)).Should().Be(queued.Count + 1, "the try the full queue refused never ran");
+            (await CommandSlip.Count.Exact(Cancellation)).Should().Be(tried.Count + 1, "the try past the bound never ran");
         }
         finally { Delete(path); }
     }
 
     [Fact]
-    public async Task A_cancelled_sender_is_told_plainly_and_its_command_still_runs()
+    public async Task A_send_behind_a_turn_that_outlasts_the_busy_timeout_is_told_it_never_ran()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("the-bound");
+        try
+        {
+            await using var host = await Start(Settings(path, busyTimeout: TimeSpan.FromSeconds(1)));
+            var holding = new HoldTheTurn();
+            var held = holding.Send(Cancellation);
+            await holding.Running.Task.WaitAsync(Bound, Cancellation);
+
+            var behind = await Task.WhenAll(Enumerable.Range(0, 20).Select(ordinal => new NumberASlip("behind", ordinal).Send(Cancellation))).WaitAsync(Bound, Cancellation);
+
+            behind.Should().AllSatisfy(outcome => outcome.Should().BeOfType<Outcome<long>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotDispatched));
+            holding.Release.SetResult();
+            Done(await held.WaitAsync(Bound, Cancellation));
+            (await CommandSlip.Count.Exact(Cancellation)).Should().Be(0);
+            Done(await new NumberASlip("after", 0).Send(Cancellation)).Should().Be(1);
+        }
+        finally { Delete(path); }
+    }
+
+    /// <summary>Contention in one process: every one of a burst answered, one unbroken sequence, and each announced in commit order.</summary>
+    [Fact]
+    public async Task A_burst_of_concurrent_sends_is_all_answered_with_no_gap_and_announced_in_commit_order()
+    {
+        RequireBackingStore();
+        var path = TempDatabase("burst");
+        try
+        {
+            await using var host = await Start(Settings(path));
+            var announced = new List<long>();
+            Commits(host).Committed += commit => announced.Add(commit.Sequences[CommandSlip.Numbers]);
+            const int burst = 500;
+
+            var clock = Stopwatch.StartNew();
+            var answers = await Task.WhenAll(Enumerable.Range(0, burst).Select(ordinal => Task.Run(() => new NumberASlip("burst", ordinal).Send(Cancellation), Cancellation))).WaitAsync(TimeSpan.FromMinutes(2), Cancellation);
+            Output.WriteLine($"{burst} concurrent sends: {clock.Elapsed.TotalMilliseconds / burst:F2} ms/command");
+
+            answers.Select(Done).Order().Should().Equal(Enumerable.Range(1, burst).Select(number => (long)number));
+            var stored = await CommandSlip.FirstPage(burst + 1, sort => sort.OrderBy(slip => slip.Number), Cancellation);
+            stored.Select(slip => slip.Number).Should().Equal(Enumerable.Range(1, burst).Select(number => (long)number));
+            announced.Should().Equal(Enumerable.Range(1, burst).Select(number => (long)number), "the turn passes on only after the announcement");
+        }
+        finally { Delete(path); }
+    }
+
+    [Fact]
+    public async Task A_sender_cancelled_while_its_command_runs_is_told_nothing_landed_and_gets_its_number_back()
     {
         RequireBackingStore();
         var path = TempDatabase("cancelled");
         try
         {
             await using var host = await Start(Settings(path));
-            var holding = new HoldTheTurn();
-            var held = holding.Send(Cancellation);
-            await holding.Running.Task.WaitAsync(Bound, Cancellation);
-
             using var gaveUp = new CancellationTokenSource();
-            var sent = new CreateSlip("still-runs", "s", 0, "body").Send(gaveUp.Token);
-            gaveUp.Cancel();
-            var wait = async () => await sent;
-            (await wait.Should().ThrowAsync<OperationCanceledException>()).Which.Message.Should().Contain("still runs");
+            var running = new HoldTheTurn("cancelled");
+            var sent = running.Send(gaveUp.Token);
+            await running.Running.Task.WaitAsync(Bound, Cancellation);
 
-            holding.Release.SetResult();
-            Done(await held.WaitAsync(Bound, Cancellation));
-            Done(await new CreateSlip("next", "s", 1, "body").Send(Cancellation)).Number.Should().Be(2, "the abandoned command ran first");
-            (await CommandSlip.Get("still-runs", Cancellation)).Should().NotBeNull();
+            gaveUp.Cancel();
+            var failure = (await sent.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
+
+            failure.Landed.Should().Be(DataCommitOutcome.NotCommitted);
+            failure.Cause.Should().BeAssignableTo<OperationCanceledException>();
+            (await CommandSlip.Get("cancelled", Cancellation)).Should().BeNull();
+            Done(await new CreateSlip("next", "s", 1, "body").Send(Cancellation)).Number.Should().Be(1);
         }
         finally { Delete(path); }
     }
 
     [Fact]
-    public async Task A_stop_ends_the_running_command_answers_what_is_queued_and_a_later_send_is_told_the_same_and_the_queue_reports_it()
+    public async Task A_host_that_ends_rolls_back_the_command_that_is_running()
     {
         RequireBackingStore();
         var path = TempDatabase("stop");
         try
         {
-            await using var host = await Start(Settings(path));
+            var host = await Start(Settings(path));
             using var app = host.Enter();
-            (await Check(host)).State.Should().Be(HealthState.Healthy);
-
             var holding = new HoldTheTurn("in-flight");
             var held = holding.Send(Cancellation);
             await holding.Running.Task.WaitAsync(Bound, Cancellation);
-            var pending = Enumerable.Range(0, 3).Select(ordinal => new CreateSlip($"pending-{ordinal}", "p", ordinal, "body").Send(Cancellation)).ToList();
 
             var clock = Stopwatch.StartNew();
-            await host.StopAsync(Cancellation).WaitAsync(Bound, Cancellation);
-            Output.WriteLine($"stopped in {clock.ElapsedMilliseconds}ms");
+            await host.DisposeAsync().AsTask().WaitAsync(Bound, Cancellation);
+            Output.WriteLine($"ended in {clock.ElapsedMilliseconds}ms");
             clock.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(15));
 
-            var running = (await held.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
-            running.Cause.Should().BeAssignableTo<OperationCanceledException>("the command in flight sees the stop");
-            running.Landed.Should().Be(DataCommitOutcome.NotCommitted);
-            foreach (var sender in pending)
-            {
-                var stopped = (await sender.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<CommandSlip>.Failed>().Which;
-                stopped.Landed.Should().Be(DataCommitOutcome.NotDispatched, "what was queued never ran");
-                stopped.Cause.Message.Should().Contain("stopped before the command ran");
-            }
-
-            var late = await new CreateSlip("late", "p", 9, "body").Send(Cancellation).WaitAsync(Bound, Cancellation);
-            late.Should().BeOfType<Outcome<CommandSlip>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotDispatched);
-            new CreateSlip("late", "p", 9, "body").TrySend().Should().BeNull();
+            holding.Release.SetResult();
+            (await held.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotCommitted);
             (await CommittedCount(path, Slips)).Should().Be(0);
-
-            var report = await Check(host);
-            report.State.Should().Be(HealthState.Unhealthy, "a queue that has ended says so");
-            report.Description.Should().Contain("stopped");
         }
         finally { Delete(path); }
     }
@@ -726,7 +747,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
                 await create.ExecuteNonQueryAsync(Cancellation);
             }
             var announced = 0;
-            Queue(host).Committed += _ => announced++;
+            Commits(host).Committed += _ => announced++;
 
             var failure = (await new CommitTheStoreRefuses("refused").Send(Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
 
@@ -741,7 +762,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     }
 
     [Fact]
-    public async Task A_hold_that_cannot_begin_behind_another_writer_lands_nothing_and_the_queue_goes_on()
+    public async Task A_hold_that_cannot_begin_behind_another_writer_never_ran_and_the_next_send_goes_on()
     {
         RequireBackingStore();
         var path = TempDatabase("busy");
@@ -763,32 +784,27 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             failure.Cause.Should().BeOfType<TransactionException>();
             (await CommandSlip.Get("blocked", Cancellation)).Should().BeNull();
             Done(await new CreateSlip("after", "s", 2, "body").Send(Cancellation)).Number.Should().Be(2);
-            (await Check(host)).State.Should().Be(HealthState.Healthy);
         }
         finally { Delete(path); }
     }
 
     [Fact]
-    public async Task A_subscriber_that_throws_costs_no_other_subscriber_and_a_commit_is_announced_before_its_sender_is_answered()
+    public async Task A_watcher_that_throws_costs_no_other_watcher_and_a_commit_is_announced_before_its_sender_is_answered()
     {
         RequireBackingStore();
-        var path = TempDatabase("subscriber");
+        var path = TempDatabase("watcher");
         try
         {
+            // ThrowingWatcher is registered ahead of the log in every host of this spec.
             await using var host = await Start(Settings(path));
             var holding = new HoldTheTurn();
             var held = holding.Send(Cancellation);
             await holding.Running.Task.WaitAsync(Bound, Cancellation);
             Task? sent = null;
             bool? answeredBeforeTheAnnouncement = null;
-            var reached = 0;
-            var queue = Queue(host);
-            queue.Committed += _ => throw new InvalidOperationException("the first subscriber throws");
-            queue.Committed += commit =>
+            Commits(host).Committed += commit =>
             {
-                if (commit.Command is not CreateSlip) return;
-                reached++;
-                answeredBeforeTheAnnouncement ??= sent!.IsCompleted;
+                if (commit.Command is CreateSlip) answeredBeforeTheAnnouncement ??= sent!.IsCompleted;
             };
             var first = new CreateSlip("first", "s", 0, "body").Send(Cancellation);
             sent = first;
@@ -796,17 +812,15 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             Done(await held.WaitAsync(Bound, Cancellation));
 
             Done(await first.WaitAsync(Bound, Cancellation)).Number.Should().Be(1);
-            answeredBeforeTheAnnouncement.Should().BeFalse();
-            reached.Should().Be(1, "the subscriber after the one that threw was still told");
-            Done(await new CreateSlip("second", "s", 1, "body").Send(Cancellation)).Number.Should().Be(2, "the queue goes on");
+            answeredBeforeTheAnnouncement.Should().BeFalse("the watcher after the one that threw was still told, before the sender");
+            Done(await new CreateSlip("second", "s", 1, "body").Send(Cancellation)).Number.Should().Be(2);
             (await CommittedCount(path, Slips)).Should().Be(2);
-            (await Check(host)).State.Should().Be(HealthState.Healthy);
         }
         finally { Delete(path); }
     }
 
     [Fact]
-    public async Task A_subscribers_own_task_can_send_because_it_is_not_on_the_queue()
+    public async Task A_task_a_watcher_starts_can_send_because_it_does_not_inherit_the_hold()
     {
         RequireBackingStore();
         var path = TempDatabase("hand-off");
@@ -815,7 +829,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             await using var host = await Start(Settings(path));
             var handedOff = new TaskCompletionSource<Outcome<CommandSlip>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var once = 0;
-            Queue(host).Committed += commit =>
+            Commits(host).Committed += commit =>
             {
                 if (Interlocked.Exchange(ref once, 1) == 0)
                     _ = Task.Run(async () => handedOff.SetResult(await new CreateSlip("handed-off", "s", 1, "body").Send()));
@@ -829,7 +843,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     }
 
     [Fact]
-    public async Task What_follows_a_commit_cannot_wait_for_the_queue_and_the_queue_goes_on()
+    public async Task Work_following_a_commit_can_send_and_await_it_since_the_turn_has_passed_on()
     {
         RequireBackingStore();
         var path = TempDatabase("re-entry");
@@ -840,16 +854,16 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
 
             Done(await command.Send(Cancellation).WaitAsync(Bound, Cancellation));
 
-            (await command.Refused.Task.WaitAsync(Bound, Cancellation)).Message.Should().Contain("would wait for the queue");
+            Done(await command.Answered.Task.WaitAsync(Bound, Cancellation)).Number.Should().Be(2);
             (await CommandSlip.Get("after", Cancellation)).Should().NotBeNull();
-            (await CommandSlip.Get("after-next", Cancellation)).Should().BeNull();
-            Done(await new CreateSlip("later", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(2);
+            (await CommandSlip.Get("after-next", Cancellation)).Should().NotBeNull();
+            Done(await new CreateSlip("later", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(3);
         }
         finally { Delete(path); }
     }
 
     [Fact]
-    public async Task Awaiting_a_try_from_inside_a_command_is_refused_and_the_queue_goes_on()
+    public async Task A_try_awaited_from_inside_a_command_is_told_it_never_ran_and_waits_for_nothing()
     {
         RequireBackingStore();
         var path = TempDatabase("re-entry-try");
@@ -857,10 +871,9 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         {
             await using var host = await Start(Settings(path));
 
-            var failure = (await new AwaitAnotherTry().Send(Cancellation).WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
+            var inner = Done(await new AwaitAnotherTry().Send(Cancellation).WaitAsync(Bound, Cancellation));
 
-            failure.Landed.Should().Be(DataCommitOutcome.NotCommitted);
-            failure.Cause.Message.Should().Contain("would wait for the queue");
+            inner.Should().BeOfType<Outcome<CommandSlip>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotDispatched);
             (await CommandSlip.Get("inner-try", Cancellation)).Should().BeNull();
             Done(await new CreateSlip("later", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(1);
         }
@@ -870,7 +883,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task A_command_still_running_at_the_limit_is_answered_nothing_landed_and_the_queue_moves_on(bool blocks)
+    public async Task A_command_that_never_returns_hangs_only_its_own_sender_and_the_limit_frees_the_store(bool blocks)
     {
         RequireBackingStore();
         var path = TempDatabase("limit");
@@ -881,18 +894,16 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             await using var host = await Start(settings);
             var stuck = new IgnoresItsToken("stuck", blocks);
 
-            var sent = stuck.Send(Cancellation);
+            var sent = Task.Run(() => stuck.Send(Cancellation), Cancellation);
             await stuck.Running.Task.WaitAsync(Bound, Cancellation);
-            var failure = (await sent.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
 
-            failure.Landed.Should().Be(DataCommitOutcome.NotCommitted);
-            failure.Cause.Should().BeOfType<TimeoutException>().Which.Message.Should().Contain("Nothing it wrote landed");
-            Done(await new CreateSlip("next", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(1, "the number the stuck command took was given back");
-            (await Check(host)).State.Should().Be(HealthState.Healthy);
+            Done(await new CreateSlip("next", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(1, "the limit ended the hold, and gave back what it took");
+            sent.IsCompleted.Should().BeFalse("it hangs its own sender, and nobody else");
 
-            // Let go long after its hold ended, it finds nothing to write into.
+            // Let go long after its hold ended, it finds nothing to write into, and is told nothing landed.
             stuck.Release.SetResult();
             (await stuck.LateWrite.Task.WaitAsync(Bound, Cancellation)).Should().NotBeNull("an ended hold refuses a late write");
+            (await sent.WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which.Landed.Should().Be(DataCommitOutcome.NotCommitted);
             (await CommandSlip.Get("stuck", Cancellation)).Should().BeNull();
             (await CommandSlip.Get("stuck-late", Cancellation)).Should().BeNull();
         }
@@ -900,21 +911,19 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     }
 
     [Fact]
-    public async Task Work_after_a_commit_that_never_ends_costs_its_own_answer_and_the_queue_moves_on()
+    public async Task Work_after_a_commit_that_never_ends_hangs_only_its_own_sender()
     {
         RequireBackingStore();
         var path = TempDatabase("hang-after");
         try
         {
-            var settings = Settings(path);
-            settings[$"{TransactionOptions.SectionPath}:HoldLimit"] = TimeSpan.FromSeconds(1).ToString();
-            await using var host = await Start(settings);
+            await using var host = await Start(Settings(path));
 
-            var failure = (await new HangAfterItsCommit("hangs").Send(Cancellation).WaitAsync(Bound, Cancellation)).Should().BeOfType<Outcome<bool>.Failed>().Which;
+            var sent = new HangAfterItsCommit("hangs").Send(Cancellation);
 
-            failure.Landed.Should().Be(DataCommitOutcome.Unknown);
-            (await CommandSlip.Get("hangs", Cancellation)).Should().NotBeNull("it had committed, which is why the answer does not say nothing landed");
-            Done(await new CreateSlip("next", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(2);
+            Done(await new CreateSlip("next", "s", 0, "body").Send(Cancellation).WaitAsync(Bound, Cancellation)).Number.Should().Be(2, "the commit stands, and the turn had passed on");
+            sent.IsCompleted.Should().BeFalse();
+            (await CommandSlip.Get("hangs", Cancellation)).Should().NotBeNull();
         }
         finally { Delete(path); }
     }
@@ -1030,8 +1039,8 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
             await new CommandTicket { Id = "first", Serial = 0 }.Save(Cancellation);
             await CommandTicket.Remove("first", Cancellation);
             await new CommandTicket { Serial = 40 }.Save(Cancellation);
-            var announced = new List<CommandCommitted>();
-            Queue(host).Committed += announced.Add;
+            var announced = new List<Commit>();
+            Commits(host).Committed += announced.Add;
 
             Done(await new NumberTwoThings().Send(Cancellation)).Should().Be((1L, 41L));
             (await new NumberTwoThings(new Outcome<(long, long)>.Gated("no")).Send(Cancellation)).Should().BeOfType<Outcome<(long, long)>.Gated>();
@@ -1045,7 +1054,7 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
     }
 
     [Fact]
-    public async Task A_send_from_inside_a_scope_is_refused_rather_than_waiting_for_its_own_turn()
+    public async Task A_send_from_inside_a_scope_is_told_it_never_ran_rather_than_waiting_for_its_own_turn()
     {
         RequireBackingStore();
         var path = TempDatabase("nested");
@@ -1053,16 +1062,23 @@ public sealed class SqliteCommandQueueSpec(SqliteFixture fixture, ITestOutputHel
         {
             await using var host = await Start(Settings(path));
 
-            Done(await new SendFromInside().Send(Cancellation).WaitAsync(Bound, Cancellation)).Should().Contain("would wait for the queue");
+            var inner = Done(await new SendFromInside().Send(Cancellation).WaitAsync(Bound, Cancellation));
+            var fromCommand = inner.Should().BeOfType<Outcome<CommandSlip>.Failed>().Which;
+            fromCommand.Landed.Should().Be(DataCommitOutcome.NotDispatched);
+            fromCommand.Cause.Should().BeOfType<InvalidOperationException>().Which.Message.Should().Contain("nested");
 
             using (await EntityContext.Hold("mine"))
             {
-                var send = () => new CreateSlip("in-hold", "s", 0, "body").Send(Cancellation);
-                (await send.Should().ThrowAsync<InvalidOperationException>()).Which.Message.Should().Contain("'mine'");
+                var fromHold = (await new CreateSlip("in-hold", "s", 0, "body").Send(Cancellation)).Should().BeOfType<Outcome<CommandSlip>.Failed>().Which;
+                fromHold.Landed.Should().Be(DataCommitOutcome.NotDispatched);
+                fromHold.Cause.Message.Should().Contain("'mine'");
             }
 
+            using (EntityContext.Transaction("deferred"))
+                (await new CreateSlip("in-scope", "s", 0, "body").Send(Cancellation)).Should().BeOfType<Outcome<CommandSlip>.Failed>().Which.Cause.Message.Should().Contain("'deferred'");
+
             (await CommandSlip.Get("in-hold", Cancellation)).Should().BeNull();
-            Done(await new CreateSlip("after", "s", 0, "body").Send(Cancellation)).Number.Should().Be(1, "the queue never stopped");
+            Done(await new CreateSlip("after", "s", 0, "body").Send(Cancellation)).Number.Should().Be(1);
         }
         finally { Delete(path); }
     }
