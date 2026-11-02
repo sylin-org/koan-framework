@@ -188,9 +188,9 @@ public sealed class ApplicationBearerSpec(ApplicationBearerFixture host) : IClas
         foreach (var answer in new[] { route, tool })
         {
             var read = JObject.Parse(answer.Text);
-            read["permissions"]?.Value<int?>().Should().Be(permissions, answer.ToString());
-            read["others"]?.Value<int?>().Should().Be(others, answer.ToString());
-            read["plain"]?.Value<int?>().Should().Be(plain, answer.ToString());
+            (read["permissions"]?.Value<int?>()).Should().Be(permissions, answer.ToString());
+            (read["others"]?.Value<int?>()).Should().Be(others, answer.ToString());
+            (read["plain"]?.Value<int?>()).Should().Be(plain, answer.ToString());
         }
     }
 
