@@ -29,6 +29,7 @@ public sealed class WebApplicationSpec
             builder.WebHost.UseTestServer();
             builder.Services.AddScoped<TenantHolder>();
             builder.Services.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, TenantMiddleware>();
+            builder.Services.AddAuthorization(options => options.AddPolicy(Forum.NobodyPasses, policy => policy.RequireAssertion(_ => false)));
             builder.Services.AddKoan();
             await using var app = builder.Build();
             await app.StartAsync(ct);

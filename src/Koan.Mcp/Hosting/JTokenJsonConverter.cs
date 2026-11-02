@@ -41,7 +41,7 @@ internal sealed class JTokenJsonConverter<TToken> : JsonConverter<TToken?>
         if (reader.TokenType == JsonTokenType.Null) return null;
 
         using var document = JsonDocument.ParseValue(ref reader);
-        var token = JToken.Parse(document.RootElement.GetRawText());
+        var token = Koan.Mcp.Execution.McpJson.Parse(document.RootElement.GetRawText());
         if (token is TToken typed) return typed;
 
         throw new JsonException(

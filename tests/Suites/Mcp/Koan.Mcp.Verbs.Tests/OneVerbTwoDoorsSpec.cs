@@ -632,4 +632,85 @@ public sealed class OneVerbTwoDoorsSpec(ForumFixture forum) : IClassFixture<Foru
         Alike(hidden, await forum.Tool("places_census_get", new JObject { ["place"] = "sealed" }, Sam));
         Alike(missing, await forum.Tool("places_census_get", new JObject { ["place"] = "nowhere" }, Sam));
     }
+
+    [Theory]
+    [InlineData("name_get", "name", "..")]
+    [InlineData("name_get", "name", ".")]
+    [InlineData("cat_get", "rest", "a/../../etc/passwd")]
+    [InlineData("cat_get", "rest", "../secret")]
+    public async Task A_dot_segment_never_reaches_an_action_as_http_cannot_deliver_one(string tool, string field, string value)
+    {
+        var answer = await forum.Tool(tool, new JObject { [field] = value }, Sam);
+
+        answer.Status.Should().Be(404, answer.ToString());
+        answer.Kind.Should().Be("absent");
+        (await forum.Route(HttpMethod.Get, "/fidelity/names/%2E%2E", null, Sam)).Status.Should().Be(404);
+    }
+
+    [Fact]
+    public async Task A_catch_all_keeps_its_slashes_and_a_dot_within_a_name_is_a_name()
+    {
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/cat/a/b.txt", null, Sam), await forum.Tool("cat_get", new JObject { ["rest"] = "a/b.txt" }, Sam));
+        Alike(await forum.Route(HttpMethod.Get, "/fidelity/names/..x", null, Sam), await forum.Tool("name_get", new JObject { ["name"] = "..x" }, Sam));
+    }
+
+    [Fact]
+    public async Task An_empty_route_value_is_refused_and_a_call_reaches_the_action_it_named()
+    {
+        var empty = await forum.Tool("item_archive", new JObject { ["id"] = "" }, Sam);
+        empty.Status.Should().Be(400, empty.ToString());
+        empty.Text.Should().StartWith("id:");
+
+        var named = await forum.Tool("item_update", new JObject { ["id"] = "special" }, Sam);
+        named.Status.Should().Be(200, named.ToString());
+        JObject.Parse(named.Text)["ran"]!.Value<string>().Should().Be("update", "the action named, though the bare address is another action's");
+        JObject.Parse((await forum.Route(HttpMethod.Post, "/fidelity/items/special", new JObject(), Sam)).Text)["ran"]!.Value<string>().Should().Be("special");
+
+        var unmatched = await forum.Tool("item_archive", new JObject { ["id"] = "x" }, Sam);
+        JObject.Parse(unmatched.Text)["ran"]!.Value<string>().Should().Be("archive");
+    }
+
+    [Fact]
+    public async Task A_string_that_looks_like_a_date_reaches_the_action_as_sent_and_comes_back_as_it_was_answered()
+    {
+        const string instant = "2026-11-01T10:00:00+02:00";
+        const string utc = "2026-11-01T10:00:00Z";
+
+        Alike(await forum.Route(HttpMethod.Get, $"/fidelity/since?since={utc}&label={utc}", null, Sam),
+            await forum.Tool("since_get", new JObject { ["since"] = utc, ["label"] = utc }, Sam));
+        Alike(await forum.Route(HttpMethod.Get, $"/fidelity/at/{Uri.EscapeDataString(utc)}", null, Sam), await forum.Tool("at_get", new JObject { ["at"] = utc }, Sam));
+
+        var body = await forum.RawBody("echo_post", new JObject { ["body"] = instant }, Sam);
+        body.Should().Contain(instant, "the argument arrived as sent: {0}", body);
+        var call = await forum.Call("echo_post", new JObject { ["body"] = instant }, Sam);
+        call["content"]![0]!["text"]!.Value<string>().Should().Contain(instant);
+
+        var stamp = await forum.RawBody("stamp_get", new JObject(), Sam);
+        var parsed = new Newtonsoft.Json.JsonTextReader(new StringReader(stamp)) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None };
+        var result = JToken.ReadFrom(parsed)["result"]!;
+        JToken.ReadFrom(new Newtonsoft.Json.JsonTextReader(new StringReader(result["content"]![0]!["text"]!.Value<string>()!)) { DateParseHandling = Newtonsoft.Json.DateParseHandling.None })["at"]!.Value<string>().Should().Be(instant);
+        result["structuredContent"]!["at"]!.Value<string>().Should().Be(instant);
+    }
+
+    [Fact]
+    public async Task Only_an_object_is_structured_and_the_text_carries_the_rest()
+    {
+        var list = await forum.Call("list_get", new JObject(), Sam);
+        list["content"]![0]!["text"]!.Value<string>().Should().Be("[1,2,3]");
+        list["structuredContent"].Should().BeNull();
+
+        var person = await forum.Call("whoami_get", new JObject(), Sam);
+        person["structuredContent"]!["id"]!.Value<string>().Should().Be(Sam);
+    }
+
+    [Fact]
+    public async Task A_redirect_says_where_it_went_in_the_text_and_the_structured_answer()
+    {
+        var sent = await forum.Call("places_visits_post", new JObject { ["place"] = "open" }, Mara);
+
+        sent["isError"]?.Value<bool>().Should().NotBe(true);
+        sent["content"]![0]!["text"]!.Value<string>().Should().Contain("/places/open");
+        sent["structuredContent"]!["location"]!.Value<string>().Should().Be("/places/open");
+        sent["structuredContent"]!["status"]!.Value<int>().Should().Be(303);
+    }
 }

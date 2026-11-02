@@ -485,7 +485,7 @@ public sealed class StreamableHttpTransport
         try
         {
             using var reader = new StreamReader(context.Request.Body);
-            using var jsonReader = new JsonTextReader(reader);
+            using var jsonReader = new JsonTextReader(reader) { DateParseHandling = DateParseHandling.None };
             return await JToken.ReadFromAsync(jsonReader, context.RequestAborted);
         }
         catch (JsonReaderException ex)

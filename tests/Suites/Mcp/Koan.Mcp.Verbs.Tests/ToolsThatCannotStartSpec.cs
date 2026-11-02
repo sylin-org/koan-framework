@@ -84,6 +84,27 @@ public sealed class ToolsThatCannotStartSpec
         public IActionResult Read([FromQuery] Nested filter) => Ok();
     }
 
+    public sealed class BySchemedPolicy : ControllerBase
+    {
+        [HttpPost("/by-policy")]
+        [Tool, Authorize(Policy = "schemed")]
+        public IActionResult Write() => Ok();
+    }
+
+    public sealed class ByDefaultPolicy : ControllerBase
+    {
+        [HttpPost("/by-default")]
+        [Tool, Authorize]
+        public IActionResult Write() => Ok();
+    }
+
+    public sealed class AnonymousUnderAScheme : ControllerBase
+    {
+        [HttpPost("/anonymous")]
+        [Tool, AllowAnonymous]
+        public IActionResult Write() => Ok();
+    }
+
     public sealed class Unrouted : ControllerBase
     {
         [Tool]
@@ -99,7 +120,9 @@ public sealed class ToolsThatCannotStartSpec
         }
     }
 
-    private static async Task Start(params Type[] controllers)
+    private static Task Start(params Type[] controllers) => Start(_ => { }, controllers);
+
+    private static async Task Start(Action<IServiceCollection> compose, params Type[] controllers)
     {
         var path = Path.Combine(Path.GetTempPath(), $"koan-verbs-start-{Guid.CreateVersion7():n}.db");
         using var host = Host.CreateDefaultBuilder()
@@ -119,6 +142,7 @@ public sealed class ToolsThatCannotStartSpec
                     services.AddKoan();
                     services.AddKoanWeb();
                     services.AddControllers().ConfigureApplicationPartManager(manager => manager.FeatureProviders.Add(new Only(controllers)));
+                    compose(services);
                 });
                 web.Configure(_ => { });
             })
@@ -154,6 +178,17 @@ public sealed class ToolsThatCannotStartSpec
     {
         var stopped = await Assert.ThrowsAnyAsync<Exception>(() => Start(controller));
         stopped.ToString().Should().Contain(says);
+    }
+
+    [Fact]
+    public async Task A_policy_that_names_a_scheme_stops_the_host_because_a_call_carries_no_credential_for_it()
+    {
+        void Named(IServiceCollection services) => services.AddAuthorization(options => options.AddPolicy("schemed", policy => policy.AddAuthenticationSchemes("Elsewhere").RequireAuthenticatedUser()));
+        void Default(IServiceCollection services) => services.AddAuthorization(options => options.DefaultPolicy = new AuthorizationPolicyBuilder("Elsewhere").RequireAuthenticatedUser().Build());
+
+        (await Assert.ThrowsAsync<InvalidOperationException>(() => Start(Named, typeof(BySchemedPolicy)))).Message.Should().Contain("Elsewhere").And.Contain("[Tool]");
+        (await Assert.ThrowsAsync<InvalidOperationException>(() => Start(Default, typeof(ByDefaultPolicy)))).Message.Should().Contain("Elsewhere");
+        await Start(Default, typeof(AnonymousUnderAScheme));
     }
 
     /// <summary>Not an [McpTool], or nothing in this assembly could boot: discovery stops the host at this.</summary>

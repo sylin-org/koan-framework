@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Routing.Patterns;
 using Newtonsoft.Json.Linq;
@@ -40,7 +41,16 @@ public sealed class McpCustomTool
 }
 
 /// <summary>Where a <c>[Tool]</c> action answers: what a call needs to reach it as a request (ARCH-0141).</summary>
-internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields, string? BodyField);
+internal sealed record RouteTool(ControllerActionDescriptor Action, string HttpMethod, RoutePattern Pattern, IReadOnlySet<string> QueryFields, string? BodyField)
+{
+    /// <summary>The policy ASP.NET's middleware applies to this action; null when it applies none.</summary>
+    public async Task<AuthorizationPolicy?> Policy(IAuthorizationPolicyProvider policies)
+    {
+        if (Action.EndpointMetadata.OfType<IAllowAnonymous>().Any()) return null;
+        return await AuthorizationPolicy.CombineAsync(policies, Action.EndpointMetadata.OfType<IAuthorizeData>().ToArray()).ConfigureAwait(false)
+               ?? await policies.GetFallbackPolicyAsync().ConfigureAwait(false);
+    }
+}
 
 /// <summary>One parameter of a custom tool method and how it is supplied at call time.</summary>
 public sealed class McpCustomToolParameter

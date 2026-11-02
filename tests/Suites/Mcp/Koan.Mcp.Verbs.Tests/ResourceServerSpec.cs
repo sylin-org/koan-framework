@@ -46,6 +46,18 @@ public sealed class ResourceServerSpec(ResourceServerFixture host) : IClassFixtu
     }
 
     [Theory]
+    [InlineData(new string[0], 403)]
+    [InlineData(new[] { "keeper" }, 200)]
+    public async Task A_role_in_a_token_is_a_role_on_either_door(string[] roles, int status)
+    {
+        var route = await host.Route(HttpMethod.Post, "/shelf/own", new JObject(), host.Token(host.BaseUrl, roles));
+        var tool = await host.Tool("shelf_own_post", new JObject(), host.Token($"{host.BaseUrl}/mcp", roles));
+
+        route.Status.Should().Be(status, route.ToString());
+        tool.Status.Should().Be(status, tool.ToString());
+    }
+
+    [Theory]
     [InlineData("/shelf/own", "shelf_own_post", 403)]
     [InlineData("/fidelity/signed-in", "signed_in_post", 200)]
     public async Task ASPNET_answers_an_edges_principal_as_it_answers_a_request(string path, string tool, int status)

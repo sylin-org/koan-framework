@@ -171,7 +171,7 @@ public sealed class HttpSseTransport
         try
         {
             using var reader = new StreamReader(context.Request.Body);
-            using var jsonReader = new JsonTextReader(reader);
+            using var jsonReader = new JsonTextReader(reader) { DateParseHandling = DateParseHandling.None };
             payload = await JToken.ReadFromAsync(jsonReader, context.RequestAborted);
         }
         catch (Exception ex) when (ex is JsonReaderException or IOException)

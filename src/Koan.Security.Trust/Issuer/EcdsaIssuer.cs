@@ -52,6 +52,9 @@ internal sealed class EcdsaIssuer : IIssuer
         ArgumentNullException.ThrowIfNull(claims);
 
         var handler = new JwtSecurityTokenHandler();
+        // The claim types JwtClaimFactory wrote stay as written: the default map would turn ClaimTypes.Role into "role", which the bearer scheme, keeping
+        // what it reads, would never see as a role.
+        handler.OutboundClaimTypeMap.Clear();
         var descriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(JwtClaimFactory.From(claims)),

@@ -51,8 +51,16 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
                 else if (part is RoutePatternParameterPart parameter)
                 {
                     var value = Take(fields, parameter.Name) ?? parameter.Default?.ToString();
-                    if (value is not null) text.Append(parameter.IsCatchAll ? string.Join('/', value.Split('/').Select(Uri.EscapeDataString)) : Uri.EscapeDataString(value));
-                    else if (!parameter.IsOptional) return Failed(tool, StatusCodes.Status400BadRequest, "invalid", $"{parameter.Name}: a value is required.", null);
+                    if (value is null)
+                    {
+                        if (!parameter.IsOptional) return Failed(tool, StatusCodes.Status400BadRequest, "invalid", $"{parameter.Name}: a value is required.", null);
+                        continue;
+                    }
+
+                    // HTTP resolves a dot segment before any route sees it, so no action is ever told one.
+                    string[] pieces = parameter.IsCatchAll ? value.Split('/') : [value];
+                    if (pieces.Any(piece => piece is "." or "..")) return Failed(tool, StatusCodes.Status404NotFound, "absent", Reason.Absent("").Said, null);
+                    text.Append(string.Join('/', pieces.Select(Uri.EscapeDataString)));
                 }
             }
 
@@ -96,6 +104,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
 
         http.Response.Body = answer;
         http.Connection.RemoteIpAddress = outer?.Connection.RemoteIpAddress;
+        http.Features.Set(route);
         if (OriginStamp.TierOf(http.User) is { } tier) http.Features.Set(new OriginFeature(tier));
         // What ASP.NET's policy evaluator goes by, for 403 or 401. The edge's result for a principal it accepted, which the application's default scheme might refuse. WEB-0083: a
         // credential rejected at the edge with nothing to replace it is rejected here too.
@@ -133,7 +142,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
     {
         if (!fields.TryGetValue(name, StringComparison.OrdinalIgnoreCase, out var token)) return null;
         fields.Remove(((JProperty)token.Parent!).Name);
-        return Text(token);
+        return Text(token) is { Length: > 0 } text ? text : null;
     }
 
     private static string? Text(JToken token) => token.Type switch
@@ -155,11 +164,14 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
         }
 
         var meta = new JObject { ["status"] = status };
-        if (http.Response.Headers.Location is { Count: > 0 } location) meta["location"] = location.ToString();
+        var location = http.Response.Headers.Location.ToString();
+        if (location.Length > 0) meta["location"] = location;
+        // An answer with nothing to read says where it went. Only an object is structured: clients' schemas refuse anything else, and the text carries the rest.
+        var empty = string.IsNullOrWhiteSpace(text);
         return new McpRpcHandler.CallToolResult
         {
-            Content = [new McpRpcHandler.McpContent { Type = "text", Text = text }],
-            StructuredContent = json,
+            Content = [new McpRpcHandler.McpContent { Type = "text", Text = !empty ? text : location.Length > 0 ? $"Answered {status}: go on to {location}." : $"Answered {status}." }],
+            StructuredContent = empty && location.Length > 0 ? new JObject { ["status"] = status, ["location"] = location } : json as JObject,
             Meta = meta,
         };
     }
@@ -179,7 +191,7 @@ internal sealed class RouteToolInvoker(RoutePipeline pipeline, IServiceScopeFact
     private static JToken? TryJson(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
-        try { return JToken.Parse(text); }
+        try { return McpJson.Parse(text); }
         catch (JsonException) { return null; }
     }
 

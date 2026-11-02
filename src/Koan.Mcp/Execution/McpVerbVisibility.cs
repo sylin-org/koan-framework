@@ -76,10 +76,8 @@ internal sealed class McpVerbVisibility : IDisposable
     {
         if (_user is null) return true;
         if (!await Allows(tool.Method, tool.GateAction, ct).ConfigureAwait(false)) return false;
-        if (tool.Route is not { Action.EndpointMetadata: var metadata } || metadata.OfType<IAllowAnonymous>().Any()) return true;
-        if (_scope?.ServiceProvider is not { } services || services.GetService<IAuthorizationPolicyProvider>() is not { } policies) return true;
-        var policy = await AuthorizationPolicy.CombineAsync(policies, metadata.OfType<IAuthorizeData>().ToArray()).ConfigureAwait(false)
-                     ?? await policies.GetFallbackPolicyAsync().ConfigureAwait(false);
+        if (tool.Route is null || _scope?.ServiceProvider is not { } services || services.GetService<IAuthorizationPolicyProvider>() is not { } policies) return true;
+        var policy = await tool.Route.Policy(policies).ConfigureAwait(false);
         var knowable = policy?.Requirements.Where(requirement =>
             requirement is DenyAnonymousAuthorizationRequirement or RolesAuthorizationRequirement or ClaimsAuthorizationRequirement or NameAuthorizationRequirement).ToArray();
         return knowable is not { Length: > 0 }

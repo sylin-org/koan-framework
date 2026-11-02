@@ -30,18 +30,21 @@ using Xunit;
 
 namespace Koan.Mcp.Verbs.Tests;
 
-/// <summary>Who a request is: <c>X-Test-User</c> names a person, with <c>;role=x</c> and <c>;flagged=true</c>. None is a visitor.</summary>
+/// <summary>Who a request is: <c>Authorization: Test person;role=x;flagged=true</c>; none is a visitor. The header is the credential, which stops at the MCP edge, so a route
+/// a tool call reaches has only the principal the edge placed on it.</summary>
 internal sealed class TestAuth(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     public const string Name = "Test";
-    public const string Header = "X-Test-User";
+    private const string Prefix = "Test ";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue(Header, out var raw)) return Task.FromResult(AuthenticateResult.NoResult());
+        var raw = Request.Headers.Authorization.ToString();
+        if (!raw.StartsWith(Prefix, StringComparison.Ordinal)) return Task.FromResult(AuthenticateResult.NoResult());
+        raw = raw[Prefix.Length..];
         if (raw == "rejected") return Task.FromResult(AuthenticateResult.Fail("A credential that does not verify."));
-        var parts = raw.ToString().Split(';');
+        var parts = raw.Split(';');
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, parts[0]), new("sub", parts[0]) };
         foreach (var part in parts.Skip(1))
         {
@@ -91,6 +94,8 @@ public class ForumFixture : IAsyncLifetime
     protected virtual bool TestScheme => true;
 
     protected virtual Dictionary<string, string?> Settings() => new();
+
+    protected virtual void Compose(IServiceCollection services) { }
 
     public IServiceProvider Services => _host?.Services ?? throw new InvalidOperationException("Host not started.");
 
@@ -142,7 +147,12 @@ public class ForumFixture : IAsyncLifetime
                     }
 
                     services.TryAddEnumerable(ServiceDescriptor.Scoped<IAuthorizationProvider, CensusRule>());
-                    services.Configure<McpServerOptions>(options => options.Transport.StreamableJsonResponse = true);
+                    services.Configure<McpServerOptions>(options =>
+                    {
+                        options.Transport.StreamableJsonResponse = true;
+                        options.MaxConcurrentSessions = 10000; // each call here opens a session of its own
+                    });
+                    Compose(services);
                 });
                 web.Configure(_ => { });
             })
@@ -180,11 +190,21 @@ public class ForumFixture : IAsyncLifetime
 
     public IDisposable App() => AppHost.PushScope(Services);
 
+    /// <summary>The text of an answer the door's client reads with no parse of its own.</summary>
+    public async Task<string> RawBody(string name, JObject arguments, string? user)
+    {
+        using var client = Client(user);
+        var ct = TestContext.Current.CancellationToken;
+        using var initialize = await client.SendAsync(Envelope("initialize", new JObject { ["protocolVersion"] = "2025-06-18" }, null), ct);
+        var session = initialize.Headers.GetValues("Mcp-Session-Id").Single();
+        using var response = await client.SendAsync(Envelope("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }, session), ct);
+        return await response.Content.ReadAsStringAsync(ct);
+    }
+
     private HttpClient Client(string? user)
     {
         var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { BaseAddress = new Uri(BaseUrl), Timeout = TimeSpan.FromSeconds(60) };
-        if (user?.StartsWith("Bearer ", StringComparison.Ordinal) == true) client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", user);
-        else if (user is not null) client.DefaultRequestHeaders.Add(TestAuth.Header, user);
+        if (user is not null) client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", user.StartsWith("Bearer ", StringComparison.Ordinal) ? user : "Test " + user);
         foreach (var (name, value) in Sent) client.DefaultRequestHeaders.Add(name, value);
         return client;
     }
@@ -225,12 +245,16 @@ public class ForumFixture : IAsyncLifetime
     /// <summary>A real <c>tools/call</c> over Streamable HTTP, in a session of the caller's own.</summary>
     public async Task<Answer> Tool(string name, JObject arguments, string? user)
     {
-        var result = await Rpc("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }, user);
+        var result = await Call(name, arguments, user);
         var text = result["content"]![0]!["text"]!.Value<string>()!;
         var meta = result["meta"] as JObject ?? new JObject();
         return new Answer(meta["status"]?.Value<int>() ?? 0, meta["errorCode"]?.Value<string>(), text, result["isError"]?.Value<bool>() == true, meta["location"]?.Value<string>(),
             result["structuredContent"]?["gate"]?.Value<string>(), result["structuredContent"]?["next"]?.Value<string>());
     }
+
+    /// <summary>The whole result of a real <c>tools/call</c>.</summary>
+    public Task<JToken> Call(string name, JObject arguments, string? user)
+        => Rpc("tools/call", new JObject { ["name"] = name, ["arguments"] = arguments }, user);
 
     /// <summary>A real <c>tools/list</c>.</summary>
     public async Task<JObject[]> Tools(string? user)

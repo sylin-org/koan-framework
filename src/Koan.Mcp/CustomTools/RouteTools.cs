@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using Koan.Mcp.Execution;
 using Koan.Web.Attributes;
 using Koan.Web.Authorization;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ActionConstraints;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -51,9 +50,6 @@ internal static partial class RouteTools
         var name = attribute?.Name ?? Derive(pattern, attribute?.Particle ?? method);
         if (!GoodName().IsMatch(name))
             throw new InvalidOperationException($"The tool name '{name}' of {where} is not lower-case words joined by underscores, at most 64 characters. State one with [Tool(Name = ...)].");
-
-        if (action.EndpointMetadata.OfType<IAuthorizeData>().FirstOrDefault(data => !string.IsNullOrEmpty(data.AuthenticationSchemes)) is { } schemed)
-            throw new InvalidOperationException($"{where} authorizes by the scheme {schemed.AuthenticationSchemes}, whose credential a tool call does not carry. Leave the default scheme to answer it, or move it to a controller without [Tool].");
 
         var (schema, query, bodyField) = Input(action, pattern, method, where);
         var isGet = HttpMethods.IsGet(method) || HttpMethods.IsHead(method);

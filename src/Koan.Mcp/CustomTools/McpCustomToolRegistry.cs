@@ -65,7 +65,7 @@ public sealed class McpCustomToolRegistry
             var index = new Dictionary<string, McpCustomTool>(StringComparer.OrdinalIgnoreCase);
             foreach (var tool in tools)
             {
-                index.TryAdd(tool.Name, tool); // McpToolNameCheck stops the host at start over a duplicate.
+                index.TryAdd(tool.Name, tool); // McpToolStartCheck stops the host at start over a duplicate.
             }
 
             _tools = tools;

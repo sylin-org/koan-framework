@@ -29,6 +29,11 @@ internal static class McpJson
         public override bool CanRead => false;
     }
 
+    /// <summary>JSON as it was sent: a string that looks like a date stays that string (ARCH-0141).</summary>
+    public static JToken Parse(string json) => JsonConvert.DeserializeObject<JToken>(json, AsSent)!;
+
+    private static readonly JsonSerializerSettings AsSent = new() { DateParseHandling = DateParseHandling.None };
+
     public static Task<FieldAccess> Prepare(Type rootType, IServiceProvider services,
         ClaimsPrincipal? principal, CancellationToken ct)
         => FieldAccess.Prepare(rootType, services, principal ?? new ClaimsPrincipal(), ct,

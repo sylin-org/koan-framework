@@ -281,6 +281,38 @@ public sealed class FidelityController : ControllerBase
     [HttpPost("/fidelity/limited"), Tool(Name = "limited_post"), EnableRateLimiting(Forum.OnePermit)]
     public IActionResult Limited() => Ok(new { ran = true });
 
+    [HttpGet("/fidelity/names/{name}"), Tool(Name = "name_get")]
+    public IActionResult Name(string name) => Ok(new { name });
+
+    [HttpGet("/fidelity/cat/{**rest}"), Tool(Name = "cat_get")]
+    public IActionResult Cat(string rest) => Ok(new { rest });
+
+    [HttpPost("/fidelity/items/{id}/archive"), Tool(Name = "item_archive")]
+    public IActionResult Archive(string id) => Ok(new { ran = "archive", id });
+
+    [HttpPost("/fidelity/items/{id}"), Tool(Name = "item_update")]
+    public IActionResult Update(string id) => Ok(new { ran = "update", id });
+
+    [HttpPost("/fidelity/items/special"), Tool(Name = "item_special")]
+    public IActionResult Special() => Ok(new { ran = "special" });
+
+    [HttpGet("/fidelity/since"), Tool(Name = "since_get")]
+    public IActionResult Since([FromQuery] DateTimeOffset? since, [FromQuery] string? label) => Ok(new { since, label });
+
+    [HttpGet("/fidelity/at/{at}"), Tool(Name = "at_get")]
+    public IActionResult At(string at) => Ok(new { at });
+
+    public sealed record Said(string? Body);
+
+    [HttpPost("/fidelity/echo"), Tool(Name = "echo_post")]
+    public IActionResult Echo(Said input) => Ok(new { body = input.Body });
+
+    [HttpGet("/fidelity/stamp"), Tool(Name = "stamp_get")]
+    public IActionResult Stamp() => Ok(new { at = "2026-11-01T10:00:00+02:00" });
+
+    [HttpGet("/fidelity/list"), Tool(Name = "list_get")]
+    public IActionResult List() => Ok(new[] { 1, 2, 3 });
+
     [HttpPost("/fidelity/signed-in"), Tool(Name = "signed_in_post"), Authorize]
     public IActionResult SignedIn() => Ok(new { signedIn = true });
 
