@@ -88,9 +88,9 @@ An application writes nothing for items 1, 5 to 10. A new table costs nothing at
 
 ## Evidence
 
-- `SqliteBootProvisioningSpec` (4): an untouched entity, its FTS5 table and a non-string key exist at start; `schema_version` does not move after start; a file missing a table has it back; `NoDdl` does not stop a boot.
+- `SqliteBootProvisioningSpec` (4) and `SchemaSettledSpec`, a host with authentication and identity referenced: an untouched entity, its FTS5 table and a non-string key exist at start; `schema_version` does not move after start; a file missing a table has it back; `NoDdl` does not stop a boot.
 - **What SQLite does,** measured through Koan's verbs on a new connection each round for five seconds, with DDL on another connection: one `CREATE TABLE` every 30 ms, all 273 rounds of search, rebuild, status, save and query answered. Eight in a burst every 30 ms, 2 to 4 of about 223 failed, a save through its trigger included. A tight loop, most failed, and an ordinary query failed with "database schema has changed". The reproducer's tight loop stands outside what Koan does now.
-- `ReasonSpec` (4), `ProblemNegotiationSpec` (8), `ToolRouteSpec`, `ApplicationMiddlewareSpec` (5: on `WebApplication` and a generic host, a tool call through it, a placed principal surviving, an application's view), `ScopedPublicationSpec` (3), `CacheHoldSpec`'s atomic case, `AuditChainHoldSpec` (4), `AuthEndToEndSpec`'s 403, `ToolNameWireSpec` (4), `ToolsThatCannotStartSpec`'s name cases, `DuckDbCapabilitySpec`'s outcome case.
+- `ReasonSpec` (4), `ProblemNegotiationSpec` (7), `ToolRouteSpec`, `ApplicationMiddlewareSpec` (5: on `WebApplication` and a generic host, a tool call through it, a placed principal surviving, an application's view), `ScopedPublicationSpec` (3), `CacheHoldSpec`'s atomic case, `AuditChainHoldSpec` (4), `AuthEndToEndSpec`'s 403, `ToolNameWireSpec` (4), `ToolsThatCannotStartSpec`'s name cases, `DuckDbCapabilitySpec`'s outcome case.
 - **Measured by removing them,** one at a time: see the package report for each spec shown to fail without its fix.
 
 ## Later
