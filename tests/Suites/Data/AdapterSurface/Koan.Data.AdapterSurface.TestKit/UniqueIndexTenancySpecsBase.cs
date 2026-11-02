@@ -74,6 +74,8 @@ public abstract class UniqueIndexTenancySpecsBase<TFixture> : KoanDataSpec<TFixt
             ConformanceTenancy.Segmented = true;
             var logs = new CapturingLoggerProvider();
             await using var host = await BootAsync(services => services.AddSingleton<ILoggerProvider>(logs));
+            // A store that makes tables at start reports the entity's own table there (ARCH-0142). This is about the partition's.
+            var atStart = logs.Warnings.Count;
             using var _ = Lease(partition);
             using (ConformanceTenancy.Use("acme")) await new ConformanceMember { Email = "a@x.test" }.Save();
 
@@ -81,9 +83,8 @@ public abstract class UniqueIndexTenancySpecsBase<TFixture> : KoanDataSpec<TFixt
             using (ConformanceTenancy.Use("acme")) await AssertConflict(() => new ConformanceMember { Email = "a@x.test" }.Save());
             using (ConformanceTenancy.Use("globex")) await AssertConflict(() => new ConformanceMember { Email = "a@x.test" }.Save());
 
-            // The partition's own table: a store that makes tables at start reports the entity's own table there too (ARCH-0142).
-            var report = logs.Warnings.Should().ContainSingle(entry =>
-                    entry.Message.Contains("global unique index", StringComparison.Ordinal) && entry.Message.Contains(partition, StringComparison.Ordinal))
+            var report = logs.Warnings.Skip(atStart).Should().ContainSingle(entry =>
+                    entry.Message.Contains("global unique index", StringComparison.Ordinal))
                 .Which;
             Output.WriteLine(report.Message);
             report.State.Should().ContainKey("Index");
