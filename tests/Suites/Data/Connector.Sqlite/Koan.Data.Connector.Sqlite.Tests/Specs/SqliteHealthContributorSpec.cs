@@ -142,13 +142,9 @@ public sealed class SqliteHealthContributorSpec
 
                 contributor.IsCritical.Should().BeTrue();
 
-                // A managed database that has not been written to yet is not a fault, and this spec used to say
-                // it was. Readiness gates traffic: if it stays red until something provisions, and nothing
-                // provisions until traffic arrives, the probe can never pass — a fresh host would sit at 503
-                // forever under any orchestrator. What must not change is that observing never provisions,
-                // which the two File.Exists assertions below still hold to.
+                // The default route's tables are made at start (ARCH-0142); health only looks, as the fresh host spec shows.
                 absent.State.Should().Be(HealthState.Healthy);
-                File.Exists(databasePath).Should().BeFalse("health is an observation, not a provisioning path");
+                File.Exists(databasePath).Should().BeTrue("a default route that holds makes its tables at start");
                 File.Exists(fallbackPath).Should().BeFalse(
                     "health must inspect the same configured Default source used by repositories");
 
@@ -232,16 +228,14 @@ public sealed class SqliteHealthContributorSpec
                 .WithSetting("Koan:Environment", "Test")
                 .WithSetting("Koan:Data:Sources:Default:Adapter", "sqlite")
                 .WithSetting("Koan:Data:Sources:Default:ConnectionString", Connection(databasePath))
+                .WithSetting("Koan:Data:Sqlite:DdlPolicy", "NoDdl")
                 .ConfigureServices(services => services.AddKoan())
                 .StartAsync();
             var contributor = SqliteHealth(host.Services);
 
+            // A store where nothing may be made has nothing made at start, so what health does on its own shows here.
             (await contributor.Check()).State.Should().Be(HealthState.Healthy, "an unprovisioned managed store is not a fault");
             Directory.Exists(Path.Combine(root, ".koan")).Should().BeFalse("health is an observation, not a provisioning path");
-
-            await new HealthRecord { Value = "first write" }.Save();
-            (await contributor.Check()).State.Should().Be(HealthState.Healthy);
-            File.Exists(databasePath).Should().BeTrue();
         }
         finally
         {

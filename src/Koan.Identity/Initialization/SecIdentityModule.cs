@@ -9,9 +9,6 @@ using Koan.Core.Hosting.App;
 using Koan.Core.Hosting.Registry;
 using Koan.Core.Modules;
 using Koan.Core.Provenance;
-using Koan.Data.Abstractions;
-using Koan.Data.Abstractions.Capabilities;
-using Koan.Data.Core;
 using Koan.Identity.Infrastructure;
 using Koan.Identity.Erasure;
 using Koan.Identity.Reconciliation;
@@ -93,11 +90,6 @@ public sealed class SecIdentityModule : KoanModule
 
         logger?.LogInformation("Koan.Identity posture resolved: {Posture}.", posture);
 
-        await TableExists<Role>(services, logger, ct).ConfigureAwait(false);
-        await TableExists<RoleMember>(services, logger, ct).ConfigureAwait(false);
-        await TableExists<PermissionOverwrite>(services, logger, ct).ConfigureAwait(false);
-        await TableExists<AuditEvent>(services, logger, ct).ConfigureAwait(false);
-
         if (ShouldSeedDevUsers(KoanEnv.Gate.DevelopmentOnly(env), posture, options.SeedDevUsers))
         {
             var reconciler = services.GetService<IIdentityReconciler>() ?? new IdentityReconciler();
@@ -105,26 +97,6 @@ public sealed class SecIdentityModule : KoanModule
             await SeedDevUsersAsync(reconciler, devUser, ct).ConfigureAwait(false);
             logger?.LogInformation(
                 "Koan.Identity dev-open: seeded dev person '{DevUser}' + alice@example.com + bob@example.com (offline).", devUser);
-        }
-    }
-
-    /// <summary>
-    /// Makes one table a role change writes exist at boot, on a route that offers holds (SEC-0036). Its first use must not
-    /// be inside one: a read on a bag's way to the same table would wait for the hold's store while the hold waited for that
-    /// read's provisioning, until the hold's limit, or would fail on a table the hold has not committed. A store that refuses
-    /// here answers at first use as it would have, so a boot does not depend on it.
-    /// </summary>
-    private static async Task TableExists<TEntity>(IServiceProvider services, ILogger? logger, CancellationToken ct)
-        where TEntity : class, IEntity<string>
-    {
-        try
-        {
-            if (Data<TEntity, string>.Capabilities.Has(DataCaps.Write.HeldTransaction))
-                await services.GetRequiredService<IDataService>().GetRepository<TEntity, string>().EnsureReady(ct).ConfigureAwait(false);
-        }
-        catch (Exception failure) when (failure is not OperationCanceledException)
-        {
-            logger?.LogWarning(failure, "Koan.Identity could not make the {Entity} table exist at start.", typeof(TEntity).Name);
         }
     }
 

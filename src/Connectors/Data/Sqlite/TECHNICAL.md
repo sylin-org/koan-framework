@@ -65,7 +65,7 @@ one goes back to its pool still holding the pragma. A predicate can still read a
 
 ## Schema and policy
 
-Managed sources with `AutoCreate` create the required table on first use. External sources perform validation only
+Managed sources with `AutoCreate` create the required table at start, when they are the default route (ARCH-0142), and otherwise on first use. External sources perform validation only
 and never create, alter, or drop a physical object. `Access: ReadOnly` is enforced by Data before repository
 construction or provider I/O. The two decisions are independent.
 
@@ -148,7 +148,8 @@ ends at commit, at disposal, at `IHeldTransaction.Abort` (the hold's limit), or 
 hold still open so that no write lock outlives the host. Once aborted it stays in the flow's ambient and refuses every
 operation, so a write that raced the abort cannot fall through to a connection of its own. A table first used inside a
 hold is created inside it and forgotten if the hold rolls back; until then another flow can see its readiness and fail on
-the missing table, so first use belongs at boot on a route that holds. `IMutationOutcomeRepository` reads whether the row
+the missing table, which is why every entity on a default route that holds has its table at boot (ARCH-0142), leaving only a partition's table
+and an entity that names its own source to their first use. `IMutationOutcomeRepository` reads whether the row
 exists inside the write's own immediate transaction, or the hold, so the answer cannot be overtaken. A batch, bulk save or bulk delete that joins a
 unit runs in a savepoint of it, so a failure leaves nothing of that operation and the unit goes on. A held commit observes its token only
 until the native commit begins. A named read on a lane keeps its own connection and sees committed state. An in-memory database has no WAL:

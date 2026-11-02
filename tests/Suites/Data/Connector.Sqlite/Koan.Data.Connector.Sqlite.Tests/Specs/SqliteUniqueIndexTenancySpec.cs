@@ -59,7 +59,8 @@ public sealed class SqliteUniqueIndexTenancySpec(SqliteFixture fixture, ITestOut
                     sql = reader.GetString(1);
                 }
                 await using var legacy = connection.CreateCommand();
-                legacy.CommandText = $"""DROP INDEX "{qualified}"; {sql.Replace($"\"{qualified}\"", $"\"{NamedIndex}\"")}""";
+                // The entity's own table, made at start, holds the declared name until this takes it.
+                legacy.CommandText = $"""DROP INDEX IF EXISTS "{NamedIndex}"; DROP INDEX "{qualified}"; {sql.Replace($"\"{qualified}\"", $"\"{NamedIndex}\"")}""";
                 await legacy.ExecuteNonQueryAsync();
             }
 

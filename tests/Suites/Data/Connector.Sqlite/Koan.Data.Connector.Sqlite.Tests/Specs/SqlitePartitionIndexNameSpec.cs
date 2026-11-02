@@ -180,7 +180,8 @@ public sealed class SqlitePartitionIndexNameSpec(SqliteFixture fixture, ITestOut
         {
             await connection.OpenAsync();
             await using var claim = connection.CreateCommand();
-            claim.CommandText = $"""CREATE INDEX "ix_partition_legacy_code" ON "{root}#{Audit}" (json_extract("Json", '$."Code"'))""";
+            // The entity's own table, made at start, holds the name until this takes it.
+            claim.CommandText = $"""DROP INDEX "ix_partition_legacy_code"; CREATE INDEX "ix_partition_legacy_code" ON "{root}#{Audit}" (json_extract("Json", '$."Code"'))""";
             await claim.ExecuteNonQueryAsync();
         }
 

@@ -30,7 +30,7 @@ public sealed class KoanDataCoreModule : KoanModule
         ServiceCollectionExtensions.RegisterKoanDataCoreServices(services);
     }
 
-    public override System.Threading.Tasks.Task Start(IServiceProvider services, System.Threading.CancellationToken ct)
+    public override async System.Threading.Tasks.Task Start(IServiceProvider services, System.Threading.CancellationToken ct)
     {
         // Hydrate durable default-route truth before any hosted workload can resolve an Entity repository. A corrupt,
         // unknown, or drifted route record refuses startup rather than silently returning to the configured default.
@@ -43,7 +43,8 @@ public sealed class KoanDataCoreModule : KoanModule
         var environment = services.GetService<IHostEnvironment>();
         var hasState = routeOptions is not null &&
                        Routing.DefaultDataRouteAuthority.HasDurableState(routeOptions, environment);
-        if (providers is { Candidates.Count: > 0 } || !string.IsNullOrWhiteSpace(configuredDefault) || hasState)
+        var operational = providers is { Candidates.Count: > 0 } || !string.IsNullOrWhiteSpace(configuredDefault) || hasState;
+        if (operational)
         {
             // NK-060: mint every declared source once, from the store its provider resolves, before any route binds it.
             if (providers is not null && sources is not null)
@@ -57,7 +58,11 @@ public sealed class KoanDataCoreModule : KoanModule
         var env = services.GetRequiredService<IHostEnvironment>();
         var logger = services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data.Axes");
         Axes.DataAxisPreflight.Run(services, env, logger);
-        return System.Threading.Tasks.Task.CompletedTask;
+        if (operational)
+        {
+            using var hostScope = Koan.Core.Hosting.App.AppHost.PushScope(services);
+            await TablesAtBoot.Make(services, services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("Koan.Data"), ct).ConfigureAwait(false);
+        }
     }
 
     public override void Report(ProvenanceModuleWriter module, IConfiguration cfg, IHostEnvironment env)

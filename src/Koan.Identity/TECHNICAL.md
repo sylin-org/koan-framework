@@ -19,8 +19,8 @@ In a hold, invalidation and post-events register with `ITransactionCoordinator.A
 post-event reads compiled state that has followed the whole hold, and each post-event alone, so one failing is logged and costs no
 other. They run with a token of their own, outside the hold, once the store is free. `RoleBagCache` compiles past its maps inside a
 hold, so a flow reads its own changes and nothing uncommitted reaches a shared entry. A change that throws part way leaves what it
-wrote in a caller's hold; its own hold rolls back. `SecIdentityModule` makes the role and audit tables exist at boot on such a route,
-because a table first used inside a hold is a wait with no way out.
+wrote in a caller's hold; its own hold rolls back. The role and audit tables exist from boot on such a route, as every entity's do
+(ARCH-0142), because a table first used inside a hold is a wait with no way out.
 
 A role's row id is `Role.KeyFor(key)`, composed from its key; `Role.Key` is the token, and every read and write of a
 role by key goes through the composed id and requires the key read back to match exactly.
