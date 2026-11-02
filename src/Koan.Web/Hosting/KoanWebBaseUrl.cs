@@ -49,7 +49,7 @@ public sealed class KoanWebBaseUrl
     private readonly MagicVerdict _verdict;
     private readonly string? _environment;
     private readonly IApplicationUrlStore? _store;
-    private readonly bool _loopbackHttp;
+    private readonly bool _development;
     private readonly bool _derivesUntilAccepted;
     private readonly IKoanRuntimeFactRecorder? _facts;
     private readonly SemaphoreSlim _accepting = new(1, 1);
@@ -81,7 +81,7 @@ public sealed class KoanWebBaseUrl
         _facts = facts;
         // WEB-0081: an accepted origin is https, or http on a loopback host only where loopback clients exist at all —
         // Development, the one environment the AT Protocol's localhost client profile is allowed in.
-        _loopbackHttp = KoanEnv.Gate.DevelopmentOnly(environment);
+        _development = KoanEnv.Gate.DevelopmentOnly(environment);
         // WEB-0081: the store's DerivesUntilAccepted is the capability's own consent (ARCH-0128). It only matters while
         // nothing is configured or accepted, because Resolve answers either of those before it derives.
         _derivesUntilAccepted = store?.DerivesUntilAccepted == true;
@@ -167,6 +167,17 @@ public sealed class KoanWebBaseUrl
 
         NoticeDerivedOnce();
         return DerivedOrigin(request) + request.PathBase;
+    }
+
+    /// <summary>
+    /// SEC-0037 — the base URL a token's audience is held to or stamped with: <see cref="Current"/>, and in Development, where
+    /// a request is the developer's own, the request's. Null otherwise: a caller who chooses the <c>Host</c> would choose
+    /// which audience passes, so a token cannot be for this application until something has named it.
+    /// </summary>
+    public string? Audience(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return Current ?? (_development ? Resolve(context.Request) : null);
     }
 
     /// <summary>
@@ -402,7 +413,7 @@ public sealed class KoanWebBaseUrl
                           "and the AT Protocol of a client, or http on a loopback host in Development";
                 return false;
             }
-            if (!_loopbackHttp)
+            if (!_development)
             {
                 normalized = null;
                 problem = $"it is http on a loopback host outside Development, in environment '{_environment ?? KoanEnv.EnvironmentName}'; " +

@@ -205,9 +205,11 @@ on its person's id. The answer is `StatusCode`, not `Forbid()`, which forwards t
 
 It is for the application's own resource and lasts `AccessTokenLifetime`. It carries the principal's subject, name, email,
 roles and scopes, with the subject's standing over the name and the roles, and is null for a subject who may not act. It has
-no refresh token: the account proves itself again. Outside Development, with no configured or accepted URL to name the
-application, it refuses rather than take a caller's `Host` for its audience. A door that itself admits a stale bearer carries
-`[ResourceServerExempt]`.
+no refresh token: the account proves itself again. A door that itself admits a stale bearer carries `[ResourceServerExempt]`.
+
+**A token needs a named application.** Outside Development, until `Koan:Web:ApplicationUrl` is set or a URL is accepted, no
+bearer is taken on the pages or at `/mcp`, and `AccessToken.For` refuses: a caller's `Host` never chooses an audience.
+A cookie still signs in.
 
 ## Testing locally before a full client: `/oauth/dev-token`
 

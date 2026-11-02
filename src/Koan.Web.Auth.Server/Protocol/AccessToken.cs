@@ -1,12 +1,10 @@
 using System.Security.Claims;
-using Koan.Core;
 using Koan.Web.Auth.Options;
 using Koan.Web.Auth.Server.Hosting;
 using Koan.Web.Auth.Server.Options;
 using Koan.Web.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace Koan.Web.Auth.Server.Protocol;
@@ -40,12 +38,9 @@ public sealed record AccessToken(string Value, TimeSpan Lifetime)
         if (await OAuthProtocolEndpoints.Standing(services, captured, ct) is not { } identity) return null;
 
         var options = services.GetRequiredService<IOptions<AuthServerOptions>>().Value;
-        var baseUrl = services.GetRequiredService<KoanWebBaseUrl>();
         var resource = services.GetRequiredService<IOptions<AuthOptions>>().Value.ResourceServer.Resource
-            ?? baseUrl.Current
-            ?? (KoanEnv.Gate.DevelopmentOnly(services.GetService<IHostEnvironment>())
-                ? baseUrl.Resolve(context)
-                : throw new InvalidOperationException("A token names the application, and nothing names it yet: set Koan:Web:ApplicationUrl or accept a URL. A caller's Host does not choose an audience outside Development."));
+            ?? services.GetRequiredService<KoanWebBaseUrl>().Audience(context)
+            ?? throw new InvalidOperationException("A token names the application, and nothing names it yet: set Koan:Web:ApplicationUrl or accept a URL. A caller's Host does not choose an audience outside Development.");
         return new AccessToken(OAuthProtocolEndpoints.Mint(services, options, identity, clientId: null, resource), options.AccessTokenLifetime);
     }
 }

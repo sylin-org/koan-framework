@@ -179,7 +179,7 @@ inspection. For a production edge:
 1. serve MCP over HTTPS;
 2. set `Koan:Web:ApplicationUrl` to the application's public URL, or have the application accept it (WEB-0081), so
    the `/mcp` audience, the authorization-server URL and the protected-resource metadata derive from it behind a proxy
-   (WEB-0078); `ResourceUri` remains an
+   (WEB-0078), and until it does, outside Development, the edge takes no token (SEC-0037); `ResourceUri` remains an
    explicit override of the audience alone. A token is accepted when its audience names that resource, with or
    without one trailing slash; one that is expired, foreign or issued for another resource — the application's own
    pages included — answers 401 with `error="invalid_token"` (SEC-0025);

@@ -49,12 +49,13 @@ internal sealed class ResourceServerHandler(
 
     private const string Bearer = "Bearer";
 
-    /// <summary>The resource a token must be issued for: the configured identifier, else the application's base URL.</summary>
-    internal string Resource => auth.Value.ResourceServer.Resource ?? baseUrl.Resolve(Context);
+    /// <summary>The resource a token must be issued for: the configured identifier, else the application's base URL. Null
+    /// when nothing names it yet, and then no token is for it (SEC-0037).</summary>
+    internal string? Resource => auth.Value.ResourceServer.Resource ?? baseUrl.Audience(Context);
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        var result = await KoanBearerResource.Authenticate(Context, Resource).ConfigureAwait(false);
+        var result = await KoanBearerResource.Authenticate(Context, Resource is { } resource ? [resource] : []).ConfigureAwait(false);
         return result.None ? AuthenticateResult.Fail("The Authorization header carries an empty bearer token.") : result;
     }
 

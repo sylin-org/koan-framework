@@ -19,7 +19,8 @@ public sealed class ResourceServerOptions
     /// The resource identifier a token's audience must name, with or without one trailing slash; an absolute URI. Null,
     /// the default, is the application's base URL (<c>Koan:Web:ApplicationUrl</c>, WEB-0078, or the URL the application
     /// accepted, WEB-0081), the resource the embedded
-    /// authorization server's clients name when they act for a person on this application's pages.
+    /// authorization server's clients name when they act for a person on this application's pages. Outside Development,
+    /// until one of those exists, no token is for this application: a request's <c>Host</c> names nothing (SEC-0037).
     /// </summary>
     public string? Resource { get; init; }
 }

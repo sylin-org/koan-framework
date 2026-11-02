@@ -316,15 +316,50 @@ public sealed class UnaddressedEdgeSpec(UnaddressedFixture host) : IClassFixture
         answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
-    public async Task With_nothing_naming_the_application_only_a_token_for_the_edge_is_taken()
+    [Theory]
+    [InlineData("http://sibling.example/mcp", "sibling.example")]
+    [InlineData("{base}/mcp", null)]
+    [InlineData("{base}", null)]
+    public async Task With_nothing_naming_the_application_the_edge_takes_no_token_whatever_the_host(string audience, string? claimed)
     {
-        var edge = await host.Tool("whoami_get", new JObject(), host.Token($"{host.BaseUrl}/mcp"));
         using var client = host.Browser();
-        using var application = await client.SendAsync(ApplicationBearerFixture.Message("initialize", host.Token(host.BaseUrl)), TestContext.Current.CancellationToken);
+        using var request = ApplicationBearerFixture.Message("initialize", host.Token(audience.Replace("{base}", host.BaseUrl)));
+        if (claimed is not null) request.Headers.Host = claimed;
 
-        edge.Failed.Should().BeFalse(edge.ToString());
-        application.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var answer = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        answer.Headers.WwwAuthenticate.ToString().Should().Contain("error=\"invalid_token\"");
+    }
+
+    [Fact]
+    public async Task With_nothing_naming_the_application_no_credential_is_still_the_challenge()
+    {
+        using var client = host.Browser();
+
+        using var answer = await client.SendAsync(ApplicationBearerFixture.Message("initialize"), TestContext.Current.CancellationToken);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        answer.Headers.WwwAuthenticate.ToString().Should().Be($"Bearer resource_metadata=\"{host.Metadata}\"");
+    }
+
+    [Fact]
+    public async Task On_the_pages_a_token_for_the_host_a_request_claims_is_refused_and_a_cookie_still_signs_in()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = host.Browser();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/fidelity/whoami");
+        request.Headers.TryAddWithoutValidation("Authorization", host.Token("http://sibling.example"));
+        request.Headers.Host = "sibling.example";
+
+        using var refused = await client.SendAsync(request, ct);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        refused.Headers.WwwAuthenticate.ToString().Should().Be("Bearer error=\"invalid_token\"");
+
+        (await client.GetAsync("/bearer-spec/signin?subject=bob", ct)).StatusCode.Should().Be(HttpStatusCode.OK);
+        using var page = await client.GetAsync("/fidelity/whoami", ct);
+        JObject.Parse(await page.Content.ReadAsStringAsync(ct))["id"]!.Value<string>().Should().Be("bob");
     }
 }
 
@@ -340,8 +375,36 @@ public sealed class AddressedEdgeSpec(AddressedFixture host) : IClassFixture<Add
         using var named = ApplicationBearerFixture.Message("initialize", host.Token(host.BaseUrl));
         named.Headers.Host = "sibling.example";
 
+        using var spoofedEdge = ApplicationBearerFixture.Message("initialize", host.Token("http://sibling.example/mcp"));
+        spoofedEdge.Headers.Host = "sibling.example";
+        using var namedEdge = ApplicationBearerFixture.Message("initialize", host.Token($"{host.BaseUrl}/mcp"));
+        namedEdge.Headers.Host = "sibling.example";
+
         using var refused = await client.SendAsync(spoofed, TestContext.Current.CancellationToken);
+        using var refusedEdge = await client.SendAsync(spoofedEdge, TestContext.Current.CancellationToken);
         using var accepted = await client.SendAsync(named, TestContext.Current.CancellationToken);
+        using var acceptedEdge = await client.SendAsync(namedEdge, TestContext.Current.CancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        refusedEdge.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        accepted.StatusCode.Should().Be(HttpStatusCode.OK);
+        acceptedEdge.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task On_the_pages_the_configured_url_is_the_application_and_a_claimed_host_is_not()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var client = host.Browser();
+        using var claimed = new HttpRequestMessage(HttpMethod.Get, "/fidelity/whoami");
+        claimed.Headers.TryAddWithoutValidation("Authorization", host.Token("http://sibling.example"));
+        claimed.Headers.Host = "sibling.example";
+        using var named = new HttpRequestMessage(HttpMethod.Get, "/fidelity/whoami");
+        named.Headers.TryAddWithoutValidation("Authorization", host.Token(host.BaseUrl));
+        named.Headers.Host = "sibling.example";
+
+        using var refused = await client.SendAsync(claimed, ct);
+        using var accepted = await client.SendAsync(named, ct);
 
         refused.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         accepted.StatusCode.Should().Be(HttpStatusCode.OK);
