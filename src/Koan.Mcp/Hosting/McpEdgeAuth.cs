@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Koan.Mcp.Options;
 using Koan.Security.Trust.Inbound;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
@@ -22,7 +23,7 @@ internal static class McpEdgeAuth
     /// Authenticate + audience-check this request. Returns <c>true</c> to proceed; on failure it writes the
     /// 401 challenge itself and returns <c>false</c>. A no-op (returns true) when authentication is not required.
     /// </summary>
-    public static async Task<bool> EnsureAuthorized(HttpContext context, string baseRoute, bool requireAuth, string? configuredResource)
+    public static async Task<bool> EnsureAuthorized(HttpContext context, string baseRoute, bool requireAuth, McpServerOptions options)
     {
         if (!requireAuth) return true;
 
@@ -44,8 +45,11 @@ internal static class McpEdgeAuth
         // the RFC 8707 audience must name this resource: an authentic token for another resource (a sibling API, the
         // application's own pages, a service-mesh aud=koan token) is rejected here — the confused-deputy fix. A
         // conformant client re-authorizes with resource=<this> on the challenge. No token at all is a plain challenge.
-        var resource = McpResourceIdentity.Resolve(context, baseRoute, configuredResource);
-        var result = await KoanBearerResource.Authenticate(context, resource);
+        // SEC-0037: an application that says this edge is part of it names one resource more, its own.
+        var resource = McpResourceIdentity.Resolve(context, baseRoute, options.ResourceUri);
+        var result = options.AcceptApplicationBearer
+            ? await KoanBearerResource.Authenticate(context, resource, McpResourceIdentity.Application(context))
+            : await KoanBearerResource.Authenticate(context, resource);
         if (!result.Succeeded || result.Principal?.Identity?.IsAuthenticated != true)
         {
             if (result.None) await WriteChallenge(context, baseRoute, "unauthorized");

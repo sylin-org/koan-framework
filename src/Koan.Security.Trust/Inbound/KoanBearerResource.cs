@@ -20,18 +20,20 @@ public static class KoanBearerResource
     private const string SubjectClaim = "sub";
 
     /// <summary>
-    /// Authenticate this request's bearer for <paramref name="resource"/>. <see cref="AuthenticateResult.NoResult"/> when
-    /// it carries no bearer token; a failure when the token is not authentic, names another audience or names no
-    /// subject; otherwise the bearer's success, its principal carrying <see cref="ClaimTypes.NameIdentifier"/>.
+    /// Authenticate this request's bearer for any of <paramref name="resources"/>, the names one edge answers to.
+    /// <see cref="AuthenticateResult.NoResult"/> when it carries no bearer token; a failure when the token is not authentic,
+    /// names no audience among them or names no subject; otherwise the bearer's success, its principal carrying
+    /// <see cref="ClaimTypes.NameIdentifier"/>.
     /// </summary>
-    public static async Task<AuthenticateResult> Authenticate(HttpContext context, string resource)
+    public static async Task<AuthenticateResult> Authenticate(HttpContext context, params string[] resources)
     {
         ArgumentNullException.ThrowIfNull(context);
-        ArgumentException.ThrowIfNullOrWhiteSpace(resource);
+        ArgumentNullException.ThrowIfNull(resources);
+        if (resources.Length == 0) throw new ArgumentException("Name at least one resource.", nameof(resources));
 
         var result = await context.AuthenticateAsync(KoanBearerDefaults.AuthenticationScheme).ConfigureAwait(false);
         if (!result.Succeeded || result.Principal is not { } principal) return result;
-        if (!Accepts(principal, resource)) return AuthenticateResult.Fail("The token was not issued for this resource.");
+        if (!resources.Any(resource => Accepts(principal, resource))) return AuthenticateResult.Fail("The token was not issued for this resource.");
         if (principal.FindFirst(SubjectClaim)?.Value is not { Length: > 0 } subject)
             return AuthenticateResult.Fail("The token names no subject.");
 

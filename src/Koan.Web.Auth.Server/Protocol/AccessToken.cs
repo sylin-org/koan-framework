@@ -1,0 +1,43 @@
+using System.Security.Claims;
+using Koan.Web.Auth.Options;
+using Koan.Web.Auth.Server.Hosting;
+using Koan.Web.Auth.Server.Options;
+using Koan.Web.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+
+namespace Koan.Web.Auth.Server.Protocol;
+
+/// <summary>
+/// SEC-0037 — a bearer for a person or an agent the application has verified by itself, at a door the authorization
+/// server does not stand behind. It is the token the server's own flows mint, for the application's own resource
+/// (<c>Koan:Web:Auth:ResourceServer:Resource</c>, else the base URL), for <see cref="AuthServerOptions.AccessTokenLifetime"/>.
+/// It has no refresh token and no grant: whoever proved themselves once proves themselves again.
+/// </summary>
+/// <param name="Value">The token, for an <c>Authorization: Bearer</c> header.</param>
+/// <param name="Lifetime">How long it lasts from now, for <c>expires_in</c>.</param>
+public sealed record AccessToken(string Value, TimeSpan Lifetime)
+{
+    /// <summary>
+    /// A token for <paramref name="principal"/>, whom this request has verified: its subject, name, email, roles and scopes,
+    /// with the subject's standing over what it captured, as in every token the server issues. Null when that subject may
+    /// not act now.
+    /// </summary>
+    /// <exception cref="InvalidOperationException"><paramref name="principal"/> names no subject.</exception>
+    public static async Task<AccessToken?> For(HttpContext context, ClaimsPrincipal principal, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(principal);
+        var services = context.RequestServices;
+
+        var claims = SessionPrincipal.ToTrustClaims(principal);
+        var captured = new OAuthProtocolEndpoints.GrantedIdentity(claims.Subject, claims.Name, claims.Email, [.. claims.Roles], [.. claims.Scopes]);
+        if (await OAuthProtocolEndpoints.Standing(services, captured, ct) is not { } identity) return null;
+
+        var options = services.GetRequiredService<IOptions<AuthServerOptions>>().Value;
+        var resource = services.GetRequiredService<IOptions<AuthOptions>>().Value.ResourceServer.Resource
+            ?? services.GetRequiredService<KoanWebBaseUrl>().Resolve(context);
+        return new AccessToken(OAuthProtocolEndpoints.Mint(services, options, identity, clientId: null, resource), options.AccessTokenLifetime);
+    }
+}

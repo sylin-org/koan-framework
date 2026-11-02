@@ -28,6 +28,10 @@ Application code retains the ordinary `AddKoan()` bootstrap. Package reference i
 The controller is deliberately transport-thin. It does not duplicate OAuth mechanics or introduce a second service
 model around the protocol handlers.
 
+`AccessToken.For` is the in-process way to the same token for an account the application verified by itself (SEC-0037):
+the application's own resource, `AccessTokenLifetime`, the subject's standing, no refresh token and no grant. It shares
+`OAuthProtocolEndpoints.Standing` and `Mint` with the flows.
+
 ## Client and artifact model
 
 `OAuthClient`, authorization codes, device codes, consent requests, refresh tokens, signing-key records, and grants

@@ -173,6 +173,35 @@ base URL (or `Koan:Web:Auth:ResourceServer:Resource`), its subject is the person
 token that is not accepted answers 401 with `Bearer error="invalid_token"`. The authorization server's own
 authorize and consent endpoints keep deciding by the person's session alone ([SEC-0026](../decisions/SEC-0026-the-authorization-server-decides-by-the-session.md)). See [SEC-0025](../decisions/SEC-0025-an-application-accepts-its-own-bearer-on-its-pages.md).
 
+## One token for the pages and the tools
+
+A client that reads the pages and calls the tools holds one token when the MCP edge says it is part of the application:
+
+```jsonc
+"Koan": {
+  "Mcp": { "EnableStreamableHttpTransport": true, "AcceptApplicationBearer": true },
+  "Web": { "Auth": { "ResourceServer": { "Enabled": true } } }
+}
+```
+
+A token for the application's resource is then accepted at `/mcp` too. The edge still advertises `{base}/mcp`, so a client
+that knows only the edge authorizes for that and holds a token good there and on no route; a client that wants both doors
+asks for `resource` set to the base URL. A token for the application also reaches tools with no route (`[McpTool]`, an
+entity's tools), as far as its subject may. See [SEC-0037](../decisions/SEC-0037-an-edge-that-is-part-of-the-application.md).
+
+## A token for an account your application verified
+
+At a door where an account proved itself some other way, the application asks for the token the server's flows mint:
+
+```csharp
+var token = await AccessToken.For(HttpContext, principal, ct);
+return token is null ? Forbid() : Ok(new { access_token = token.Value, token_type = "Bearer", expires_in = (int)token.Lifetime.TotalSeconds });
+```
+
+It is for the application's own resource and lasts `AccessTokenLifetime`. It carries the principal's subject, name, email,
+roles and scopes, with the subject's standing over them, and is null for a subject who may not act. It has no refresh token:
+the account proves itself again. A door that itself admits a stale bearer carries `[ResourceServerExempt]`.
+
 ## Testing locally before a full client: `/oauth/dev-token`
 
 In **Development only** (a hard `404` everywhere else), `GET /oauth/dev-token` mints a real ES256 token for the current cookie user, audience-bound to your MCP resource:

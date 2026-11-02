@@ -59,6 +59,32 @@ public sealed class StreamableHttpTransportSpec : IClassFixture<StreamableHttpFi
         result.TryGetProperty("serverInfo", out _).Should().BeTrue();
     }
 
+    /// <summary>The TypeScript SDK asks for a revision past this server's and then says what it was answered on every request.</summary>
+    [Theory]
+    [InlineData("2025-11-25", "2025-06-18")]
+    [InlineData("1999-01-01", "2025-06-18")]
+    [InlineData("2025-03-26", "2025-03-26")]
+    public async Task Initialize_answers_a_version_it_speaks_and_the_next_request_may_say_it(string asked, string answered)
+    {
+        using var client = _fx.NewClient();
+        using var init = PostRequest(Route, Rpc("initialize", id: 1, @params: new
+        {
+            protocolVersion = asked,
+            capabilities = new { },
+            clientInfo = new { name = "negotiation-test", version = "1.0.0" },
+        }));
+        var opened = await client.SendAsync(init, Quick);
+        opened.StatusCode.Should().Be(HttpStatusCode.OK);
+        var sessionId = opened.Headers.GetValues(SessionHeader).Single();
+        using var doc = JsonDocument.Parse(ParseSse(await opened.Content.ReadAsStringAsync(Quick)).Single().Data);
+        doc.RootElement.GetProperty("result").GetProperty("protocolVersion").GetString().Should().Be(answered);
+
+        using var next = PostRequest(Route, Rpc("notifications/initialized"), sessionId, protocolVersion: answered);
+        var answer = await client.SendAsync(next, Quick);
+
+        answer.StatusCode.Should().Be(HttpStatusCode.Accepted);
+    }
+
     [Fact]
     public async Task Tools_list_within_the_session_returns_the_entity_tools()
     {

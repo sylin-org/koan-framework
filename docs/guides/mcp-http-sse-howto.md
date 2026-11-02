@@ -200,8 +200,9 @@ See [OAuth server](oauth-server-howto.md) for token acquisition and
 | `EnableStreamableHttpTransport` | `false` | Host the primary Streamable HTTP edge |
 | `EnableLegacySseTransport` | `false` | Host the earlier `/sse` + `/rpc` two-endpoint edge for clients that use it |
 | `HttpRoute` | `/mcp` | Shared base route for MCP over HTTP |
-| `RequireAuthentication` | environment-derived | Require a remote authenticated principal |
+| `RequireAuthentication` | environment-derived, or true with `AcceptApplicationBearer` | Require a remote authenticated principal |
 | `ResourceUri` | unset | Explicit OAuth resource/audience identifier; unset, it is the base URL (`Koan:Web:ApplicationUrl`, else the accepted URL) + `HttpRoute` |
+| `AcceptApplicationBearer` | `false` | The edge is part of the application: a bearer for the application's own resource is good here too, and authentication is required unless `RequireAuthentication` says otherwise (SEC-0037) |
 | `MaxConcurrentSessions` | `100` | Bound active HTTP sessions |
 | `SessionIdleTimeout` | `30 minutes` | Reclaim idle sessions after this interval |
 | `EnableCors` | `false` | Enable the MCP CORS policy |

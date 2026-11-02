@@ -67,6 +67,14 @@ public sealed class McpModule : KoanModule
                 usedDefault: requireAuth.UsedDefault);
         }
 
+        var acceptApplicationBearer = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.AcceptApplicationBearer), false);
+        module.AddSetting(
+            McpProvenanceItems.AcceptApplicationBearer,
+            FromConfigurationValue(acceptApplicationBearer),
+            acceptApplicationBearer.Value,
+            sourceKey: acceptApplicationBearer.ResolvedKey,
+            usedDefault: acceptApplicationBearer.UsedDefault);
+
         var route = Configuration.ReadWithSource(configuration, ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpRoute), "");
         if (!string.IsNullOrWhiteSpace(route.Value))
         {

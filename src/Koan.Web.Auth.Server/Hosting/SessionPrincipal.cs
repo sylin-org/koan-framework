@@ -18,7 +18,7 @@ internal static class SessionPrincipal
     /// <paramref name="rolesOverride"/> are the dev-token convenience knobs — when supplied they replace the
     /// session's scopes / roles outright (minted as-is, no held-filter — a Development-only testing affordance).
     /// </summary>
-    public static TrustClaims ToTrustClaims(ClaimsPrincipal user, string clientId,
+    public static TrustClaims ToTrustClaims(ClaimsPrincipal user, string? clientId = null,
         IReadOnlyCollection<string>? scopesOverride = null, IReadOnlyCollection<string>? rolesOverride = null)
     {
         var subject = user.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
@@ -41,7 +41,7 @@ internal static class SessionPrincipal
             Email = email,
             Roles = roles,
             Scopes = scopes,
-            Extra = new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
+            Extra = clientId is null ? null : new Dictionary<string, IReadOnlyList<string>> { ["client_id"] = new[] { clientId } },
         };
     }
 }

@@ -65,6 +65,10 @@ public sealed class McpRpcHandler
 
     public const string DefaultProtocolVersion = "2025-06-18";
 
+    /// <summary>The protocol versions this server speaks: the current and the two prior revisions a conformant client may still send.</summary>
+    internal static readonly IReadOnlySet<string> SupportedProtocolVersions =
+        new HashSet<string>(StringComparer.Ordinal) { DefaultProtocolVersion, "2025-03-26", "2024-11-05" };
+
     /// <summary>The provider this handler resolves from; transports open per-listing scopes from it (SEC-0011).</summary>
     internal IServiceProvider Services => _services;
 
@@ -78,7 +82,9 @@ public sealed class McpRpcHandler
 
         return new InitializeResult
         {
-            ProtocolVersion = string.IsNullOrWhiteSpace(parameters?.ProtocolVersion) ? DefaultProtocolVersion : parameters!.ProtocolVersion!,
+            // A version it does not speak is answered with the one it does, as the specification says: the client then
+            // decides. Echoing it would promise a version the transport refuses on the next request.
+            ProtocolVersion = parameters?.ProtocolVersion is { } asked && SupportedProtocolVersions.Contains(asked) ? asked : DefaultProtocolVersion,
             Capabilities = new JObject
             {
                 ["tools"] = new JObject { ["listChanged"] = false },

@@ -85,7 +85,7 @@ internal static class McpEndpointMapping
                 // bearer identity in context.User and enforces aud == this resource.
                 group.AddEndpointFilter(async (efic, next) =>
                 {
-                    if (!await McpEdgeAuth.EnsureAuthorized(efic.HttpContext, baseRoute, requireAuth: true, configuredResource))
+                    if (!await McpEdgeAuth.EnsureAuthorized(efic.HttpContext, baseRoute, requireAuth: true, options))
                         return Results.Empty; // EnsureAuthorized already wrote the 401 + WWW-Authenticate
                     return await next(efic);
                 });

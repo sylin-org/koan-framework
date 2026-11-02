@@ -44,6 +44,13 @@ internal static class McpProvenanceItems
         DefaultValue: BoolString(Defaults.RequireAuthentication),
         DefaultConsumers: TransportConsumers);
 
+    internal static readonly ProvenanceItem AcceptApplicationBearer = new(
+        ConfigurationConstants.FullKey(ConfigurationConstants.Keys.AcceptApplicationBearer),
+        "Accept Application Bearer",
+        "Accepts a bearer issued for the application's own resource at the MCP edge.",
+        DefaultValue: BoolString(Defaults.AcceptApplicationBearer),
+        DefaultConsumers: TransportConsumers);
+
     internal static readonly ProvenanceItem HttpRoute = new(
         ConfigurationConstants.FullKey(ConfigurationConstants.Keys.HttpRoute),
         "HTTP Route",

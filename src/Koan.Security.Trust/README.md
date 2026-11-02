@@ -45,7 +45,7 @@ public sealed class SyncToken(IIssuer issuer)
 ```
 
 Trust validates signature, issuer, algorithm, and lifetime. A resource-specific audience is an authorization decision
-owned by that resource. `KoanBearerResource.Authenticate(context, resource)` makes it: it runs `Koan.bearer`, accepts
+owned by that resource. `KoanBearerResource.Authenticate(context, resources)` makes it: it runs `Koan.bearer`, accepts
 the token only when its audience names the resource (with or without one trailing slash), and gives the principal the
 token's subject as `ClaimTypes.NameIdentifier`. Koan MCP's HTTP edge and Web Auth's resource edge for ordinary
 requests (`Koan:Web:Auth:ResourceServer:Enabled`) both use it (SEC-0025).

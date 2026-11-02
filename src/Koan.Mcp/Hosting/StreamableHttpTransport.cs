@@ -36,11 +36,6 @@ namespace Koan.Mcp.Hosting;
 /// </summary>
 public sealed class StreamableHttpTransport
 {
-    // The protocol versions this edge accepts on the MCP-Protocol-Version header (current + the two prior revisions
-    // a conformant client may still send). An absent header means "assume 2025-03-26" per the spec's back-compat rule.
-    private static readonly IReadOnlySet<string> SupportedProtocolVersions =
-        new HashSet<string>(StringComparer.Ordinal) { "2025-06-18", "2025-03-26", "2024-11-05" };
-
     private const string SessionIdHeader = "Mcp-Session-Id";
     private const string ProtocolVersionHeader = "MCP-Protocol-Version";
     private const string LastEventIdHeader = "Last-Event-ID";
@@ -206,7 +201,7 @@ public sealed class StreamableHttpTransport
             }
             var baseRoute = ResolveBaseRoute(options);
             if (options.RequireAuthentication
-                && !await McpEdgeAuth.EnsureAuthorized(context, baseRoute, requireAuth: true, options.ResourceUri))
+                && !await McpEdgeAuth.EnsureAuthorized(context, baseRoute, requireAuth: true, options))
             {
                 return; // EnsureAuthorized wrote the 401 + WWW-Authenticate
             }
@@ -411,7 +406,7 @@ public sealed class StreamableHttpTransport
         error = string.Empty;
         var header = context.Request.Headers[ProtocolVersionHeader].ToString();
         if (string.IsNullOrEmpty(header)) return true; // absent → assume 2025-03-26 (spec back-compat)
-        if (SupportedProtocolVersions.Contains(header)) return true;
+        if (McpRpcHandler.SupportedProtocolVersions.Contains(header)) return true;
         error = $"Unsupported MCP-Protocol-Version '{header}'.";
         return false;
     }
